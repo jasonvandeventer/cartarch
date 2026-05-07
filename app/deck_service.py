@@ -11,19 +11,81 @@ from app.audit_service import log_transaction
 from app.models import Card, Deck, InventoryRow, StorageLocation
 from app.scryfall import fetch_deck_tokens
 
-_RAMP_LAND_RE = re.compile(r"search your library for .{0,60}land", re.IGNORECASE)
-_DRAW_RE = re.compile(
-    r"\bdraw (?:a|an|x|\d+|two|three|four|five|six|that many) cards?\b", re.IGNORECASE
+# Library search for lands. Anchored to "your library" so opponent-search effects
+# (Demolition Field, Ghost Quarter, Strip Mine giving the opponent a basic) do NOT
+# trigger Ramp. Includes basic-land subtype words so cards like Nature's Lore and
+# Three Visits are detected even when "land" doesn't appear directly.
+_RAMP_LAND_RE = re.compile(
+    r"search your library for .{0,60}\b(?:land|forest|island|plains|mountain|swamp)\b",
+    re.IGNORECASE,
 )
+# Mana acceleration patterns that don't search libraries. Gated to non-land cards at
+# call sites so utility lands ("Add {C}") and basic lands don't get tagged Ramp.
+_RAMP_NON_LAND_RE = re.compile(
+    r"\badds? \{"
+    r"|\badds? (?:one|two|three|four|five|six|seven|eight|x|an additional)\b.{0,40}\bmana\b"
+    r"|\badds? .{0,40}\bmana of any\b"
+    r"|creates? .{0,30}\btreasure tokens?\b"
+    r"|costs? \{\d+\} less to cast"
+    r"|play (?:a |an |\w+ )?additional lands?\b"
+    r"|put (?:a |an? |up to \w+ )?(?:basic )?lands? cards? from your hand onto the battlefield"
+    r"|double the (?:amount of )?mana",
+    re.IGNORECASE,
+)
+_DRAW_RE = re.compile(
+    r"\bdraws? (?:a|an|x|\d+|two|three|four|five|six|seven|that many|an additional)\b.{0,30}\bcards?\b"
+    r"|exile the top (?:\w+ )?cards?.{0,80}(?:may )?(?:cast|play)"
+    r"|each player draws"
+    r"|(?:reveal|look at) the top \w+ cards?.{0,80}put .{0,30}into your hand",
+    re.IGNORECASE,
+)
+# Sentence-level trigger references like Sheoldred's "Whenever a player draws a card,
+# that player loses 2 life." — these aren't draw effects, they punish drawing.
+# Trigger CONDITION mentions drawing (Sheoldred). Restricted to the part of the
+# whenever-clause before the comma so that consequence draws (Mangara, Skullclamp)
+# still register as real draw effects.
+_TRIGGER_DRAW_RE = re.compile(r"whenever [^,.]*\bdraws?\b[^,.]*[,.]", re.IGNORECASE)
+
+
+def matches_draw(oracle: str) -> bool:
+    """True if oracle has a real draw effect (not just a trigger that references drawing)."""
+    if not oracle or not _DRAW_RE.search(oracle):
+        return False
+    if not _TRIGGER_DRAW_RE.search(oracle):
+        return True
+    stripped = _TRIGGER_DRAW_RE.sub("", oracle)
+    return bool(_DRAW_RE.search(stripped))
+
+
 _REMOVAL_RE = re.compile(
-    r"(?:destroy|exile) target (?:\w+ ){0,4}(?:creature|artifact|enchantment|planeswalker|permanent)\b",
+    r"(?:destroy|exile) target (?:\w+ ){0,4}(?:creature|artifact|enchantment|planeswalker|permanent|land|nonbasic land|nonland permanent)\b"
+    r"|counter target (?:spell|activated ability|triggered ability)"
+    r"|return target (?:\w+ ){0,4}(?:creature|permanent|nonland permanent)\b.{0,40}\bto (?:its )?owner'?s? hand"
+    r"|\bdeals? \d+ damage to (?:target|any target)"
+    r"|target (?:creature|permanent) gets -[\dXx]+/-[\dXx]+"
+    r"|target creature fights"
+    r"|target (?:opponent|player) sacrifices a (?:creature|permanent|nonland permanent)",
     re.IGNORECASE,
 )
 _WIPE_RE = re.compile(
-    r"(?:destroy all|exile all (?:creatures?|permanents?)"
-    r"|all creatures? (?:get|have) -\d+/-\d+"
-    r"|each creature (?:gets?|has) -\d+/-\d+"
-    r"|deals \d+ damage to each creature)",
+    r"destroy all (?:creatures?|permanents?|nonland permanents?|attacking creatures?|other creatures?)\b"
+    r"|exile all (?:creatures?|permanents?|nonland permanents?)"
+    r"|return all (?:creatures?|permanents?|nonland permanents?)\b.{0,40}\bto\b"
+    r"|all creatures? (?:get|have|gets?|has) -[\dXx]+/-[\dXx]+"
+    r"|each creature (?:gets?|has) -[\dXx]+/-[\dXx]+"
+    r"|deals \d+ damage to each (?:creature|opponent|player|other creature)"
+    r"|each (?:opponent|player) sacrifices a (?:creature|permanent)"
+    r"|\boverload \{",
+    re.IGNORECASE,
+)
+_PROTECTION_RE = re.compile(
+    r"\b(?:hexproof|indestructible|shroud|protection from)\b.{0,40}\byou control\b"
+    r"|\byou control\b.{0,40}\b(?:hexproof|indestructible|shroud|protection from)\b"
+    r"|\bgains? (?:hexproof|indestructible|shroud|protection from|ward)\b"
+    r"|prevent (?:all|the next \d+|all combat) damage"
+    r"|(?:can'?t|cannot) be (?:countered|the target)"
+    r"|\bwould (?:die|be destroyed|be put into (?:its|their|a) (?:owner'?s? )?graveyard)\b.{0,40}\binstead\b"
+    r"|regenerate target",
     re.IGNORECASE,
 )
 _HEALTH_THRESHOLDS = {"ramp": 10, "draw": 10, "removal": 8, "wipes": 2}
@@ -79,16 +141,16 @@ def suggest_card_roles(card) -> list[str]:
     is_land = "land" in tl
     is_land_tutor = bool(_RAMP_LAND_RE.search(oracle))
     suggestions = []
-    if not is_land and "add {" in oracle:
+    if (not is_land and _RAMP_NON_LAND_RE.search(oracle)) or is_land_tutor:
         suggestions.append("Ramp")
-    elif is_land_tutor:
-        suggestions.append("Ramp")
-    if _DRAW_RE.search(oracle):
+    if matches_draw(oracle):
         suggestions.append("Draw")
     if _REMOVAL_RE.search(oracle):
         suggestions.append("Removal")
     if _WIPE_RE.search(oracle):
         suggestions.append("Wipe")
+    if _PROTECTION_RE.search(oracle):
+        suggestions.append("Protection")
     if "search your library for" in oracle and not is_land_tutor:
         suggestions.append("Tutor")
     return suggestions
@@ -143,7 +205,7 @@ def compute_deck_analytics(rows: list) -> dict:
             non_land_copies += qty
 
             is_ramp = not is_basic and (
-                "add {" in oracle
+                bool(_RAMP_NON_LAND_RE.search(oracle))
                 or bool(_RAMP_LAND_RE.search(oracle))
                 or "Ramp" in get_row_tags(row)
             )
@@ -226,11 +288,13 @@ def compute_consistency(rows: list) -> dict:
             continue
 
         is_land_tutor = bool(oracle and _RAMP_LAND_RE.search(oracle))
-        ramp_oracle = bool(oracle) and ((not is_land and "add {" in oracle) or is_land_tutor)
+        ramp_oracle = bool(oracle) and (
+            (not is_land and bool(_RAMP_NON_LAND_RE.search(oracle))) or is_land_tutor
+        )
         if (ramp_oracle or "Ramp" in tags) and name not in seen_ramp:
             seen_ramp.add(name)
 
-        if ((oracle and _DRAW_RE.search(oracle)) or "Draw" in tags) and name not in seen_draw:
+        if (matches_draw(oracle) or "Draw" in tags) and name not in seen_draw:
             seen_draw.add(name)
 
         tutor_oracle = bool(oracle) and "search your library for" in oracle and not is_land_tutor
@@ -339,12 +403,13 @@ def compute_deck_health(rows: list) -> dict:
             continue
 
         ramp_oracle = bool(oracle) and (
-            (not is_land and "add {" in oracle) or bool(_RAMP_LAND_RE.search(oracle))
+            (not is_land and bool(_RAMP_NON_LAND_RE.search(oracle)))
+            or bool(_RAMP_LAND_RE.search(oracle))
         )
         if ramp_oracle or "Ramp" in tags:
             ramp_cards.append(name)
 
-        if (oracle and _DRAW_RE.search(oracle)) or "Draw" in tags:
+        if matches_draw(oracle) or "Draw" in tags:
             draw_cards.append(name)
 
         if (oracle and _REMOVAL_RE.search(oracle)) or "Removal" in tags:
