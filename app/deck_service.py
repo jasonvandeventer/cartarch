@@ -130,7 +130,11 @@ def compute_deck_analytics(rows: list) -> dict:
             total_cmc += card.cmc * qty
             non_land_copies += qty
 
-            is_ramp = not is_basic and ("add {" in oracle or bool(_RAMP_LAND_RE.search(oracle)))
+            is_ramp = not is_basic and (
+                "add {" in oracle
+                or bool(_RAMP_LAND_RE.search(oracle))
+                or "Ramp" in get_row_tags(row)
+            )
             if is_ramp:
                 curve_ramp[bucket] += qty
             else:
@@ -201,27 +205,29 @@ def compute_consistency(rows: list) -> dict:
         tl = (card.type_line or "").lower()
         is_land = "land" in tl
         is_basic = "basic land" in tl
+        tags = get_row_tags(row)
 
         if not is_land and card.cmc is not None:
             spell_cmcs.extend([card.cmc] * row.quantity)
 
-        if is_basic or not oracle:
+        if is_basic:
             continue
 
-        is_land_tutor = bool(_RAMP_LAND_RE.search(oracle))
-
-        if not is_land and "add {" in oracle and name not in seen_ramp:
-            seen_ramp.add(name)
-        elif is_land_tutor and name not in seen_ramp:
+        is_land_tutor = bool(oracle and _RAMP_LAND_RE.search(oracle))
+        ramp_oracle = bool(oracle) and ((not is_land and "add {" in oracle) or is_land_tutor)
+        if (ramp_oracle or "Ramp" in tags) and name not in seen_ramp:
             seen_ramp.add(name)
 
-        if _DRAW_RE.search(oracle) and name not in seen_draw:
+        if ((oracle and _DRAW_RE.search(oracle)) or "Draw" in tags) and name not in seen_draw:
             seen_draw.add(name)
 
-        if "search your library for" in oracle and not is_land_tutor and name not in seen_tutor:
+        tutor_oracle = bool(oracle) and "search your library for" in oracle and not is_land_tutor
+        if (tutor_oracle or "Tutor" in tags) and name not in seen_tutor:
             seen_tutor.add(name)
 
-        if _REMOVAL_RE.search(oracle) and name not in seen_removal:
+        if (
+            (oracle and _REMOVAL_RE.search(oracle)) or "Removal" in tags
+        ) and name not in seen_removal:
             seen_removal.add(name)
 
     draw_n = len(seen_draw)
@@ -304,6 +310,7 @@ def compute_deck_health(rows: list) -> dict:
         is_land = "land" in type_line
         is_basic = "basic land" in type_line
         qty = row.quantity
+        tags = get_row_tags(row)
 
         if not is_land and card.mana_cost:
             for color in ("W", "U", "B", "R", "G"):
@@ -316,21 +323,22 @@ def compute_deck_health(rows: list) -> dict:
                 if color in card.color_identity:
                     land_sources[color] = land_sources.get(color, 0) + qty
 
-        if is_basic or not oracle:
+        if is_basic:
             continue
 
-        if not is_land and "add {" in oracle:
-            ramp_cards.append(name)
-        elif _RAMP_LAND_RE.search(oracle):
+        ramp_oracle = bool(oracle) and (
+            (not is_land and "add {" in oracle) or bool(_RAMP_LAND_RE.search(oracle))
+        )
+        if ramp_oracle or "Ramp" in tags:
             ramp_cards.append(name)
 
-        if _DRAW_RE.search(oracle):
+        if (oracle and _DRAW_RE.search(oracle)) or "Draw" in tags:
             draw_cards.append(name)
 
-        if _REMOVAL_RE.search(oracle):
+        if (oracle and _REMOVAL_RE.search(oracle)) or "Removal" in tags:
             removal_cards.append(name)
 
-        if _WIPE_RE.search(oracle):
+        if (oracle and _WIPE_RE.search(oracle)) or "Wipe" in tags:
             wipe_cards.append(name)
 
     pip_strain: dict[str, dict] = {}

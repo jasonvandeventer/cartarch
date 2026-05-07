@@ -1918,7 +1918,7 @@ body.game-mode {
 /* Player grid — fixed full viewport, gap acts as divider lines */
 .tracker-grid {
   position: fixed;
-  top: 42px;    /* clear the floating topbar */
+  top: 42px; /* clear the floating topbar */
   bottom: 38px; /* clear the history bar (overridden to 0 for ended games) */
   left: 0;
   right: 0;
