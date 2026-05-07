@@ -20,7 +20,7 @@ Active user onboarding. Self-service registration in place — users sign up ind
 
 ### Drawer sorter
 
-`DRAWER_SORTER_USERNAMES = frozenset({"jason.v", "test"})` in `app/dependencies.py` gates the automatic 6-drawer card sorter (`resort_collection`). Only these users get drawer/slot auto-assignment on import and access to the Drawers page, Audit page, and "Apply Drawer Sorter" button.
+`DRAWER_SORTER_USERNAMES = frozenset({"jason.v", "jason@vanfreckle.com", "test"})` in `app/dependencies.py` gates the automatic 6-drawer card sorter (`resort_collection`). The two `jason.*` entries are transitional during the username→email migration — once prod's jason.v row is renamed to jason@vanfreckle.com the legacy `jason.v` entry can be removed. Only these users get drawer/slot auto-assignment on import and access to the Drawers page, Audit page, and "Apply Drawer Sorter" button.
 
 All other users manage their own StorageLocations and pick placement manually.
 
