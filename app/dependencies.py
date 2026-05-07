@@ -15,7 +15,7 @@ from app.models import User
 
 # Users who get drawer-centric features (auto-sorter, Drawers page, Audit page).
 # Update here to add or remove users — no other changes needed.
-DRAWER_SORTER_USERNAMES: frozenset[str] = frozenset({"jason.v", "jason@vanfreckle.com", "test"})
+DRAWER_SORTER_USERNAMES: frozenset[str] = frozenset({"jason@vanfreckle.com", "test"})
 
 templates = Jinja2Templates(directory="app/templates")
 

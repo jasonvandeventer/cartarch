@@ -686,7 +686,7 @@ def get_inventory_row_stats(
 
     total_value = 0.0
     total_cards = 0
-    unique_cards = 0
+    seen_names: set[str] = set()
     drawer_counts = {str(i): 0 for i in range(1, 7)}
     unassigned_count = 0
 
@@ -695,12 +695,15 @@ def get_inventory_row_stats(
         if price is not None:
             total_value += price * row.quantity
         total_cards += row.quantity
-        unique_cards += 1
+        if row.card and row.card.name:
+            seen_names.add(row.card.name)
 
         if str(row.drawer) in drawer_counts:
             drawer_counts[str(row.drawer)] += row.quantity
         else:
             unassigned_count += row.quantity
+
+    unique_cards = len(seen_names)
 
     return {
         "total_value": total_value,
