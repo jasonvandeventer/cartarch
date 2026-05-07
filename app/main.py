@@ -1876,6 +1876,59 @@ async def decks_pull(
     return RedirectResponse(url=f"/decks/{deck_id}", status_code=303)
 
 
+@app.post("/decks/{deck_id}/retag")
+def decks_retag(
+    deck_id: int,
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+    _: None = CsrfRequired,
+):
+    """Re-evaluate auto-tags for every row in this deck, additively.
+
+    Existing user-set tags are preserved; suggested tags from the current
+    `suggest_card_roles` patterns are unioned in. Never removes a tag.
+    """
+    deck = get_deck(session, deck_id=deck_id, user_id=current_user.id)
+    if not deck:
+        return RedirectResponse(url="/decks", status_code=303)
+
+    commander_rows = (
+        session.query(InventoryRow)
+        .options(joinedload(InventoryRow.card))
+        .filter(
+            InventoryRow.user_id == current_user.id,
+            InventoryRow.storage_location_id == deck.storage_location_id,
+            InventoryRow.role == "commander",
+        )
+        .all()
+    )
+    themes = extract_commander_themes(commander_rows) if commander_rows else None
+
+    rows = (
+        session.query(InventoryRow)
+        .options(joinedload(InventoryRow.card))
+        .filter(
+            InventoryRow.user_id == current_user.id,
+            InventoryRow.storage_location_id == deck.storage_location_id,
+        )
+        .all()
+    )
+
+    changed = False
+    for row in rows:
+        suggested = suggest_card_roles(row.card, themes=themes)
+        existing = get_row_tags(row)
+        merged = sorted(set(suggested) | set(existing))
+        if set(merged) != set(existing):
+            set_row_tags(row, merged)
+            changed = True
+
+    if changed:
+        session.commit()
+
+    return RedirectResponse(url=f"/decks/{deck_id}", status_code=303)
+
+
 @app.post("/decks/return")
 async def decks_return(
     deck_id: int = Form(...),

@@ -17,6 +17,15 @@
                       margin-top: 0.75rem;
                       flex-wrap: wrap">
             <a href="/decks/{{ deck.id }}/export" class="btn-like">Export</a>
+            <form action="/decks/{{ deck.id }}/retag"
+                  method="post"
+                  style="display: inline">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+              <button type="submit"
+                      title="Re-run auto-tag patterns over every row, adding any newly-detected tags. Existing tags are preserved.">
+                Retag
+              </button>
+            </form>
             <form action="/decks/{{ deck.id }}/delete" method="post">
               <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
               <button type="submit"
