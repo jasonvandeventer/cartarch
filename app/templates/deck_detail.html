@@ -27,8 +27,8 @@
           </div>
         </div>
         <div class="hero-stats-inline">
-          <span>{{ (commanders|length) + (items|length) }} entries</span>
-          <span>{{ deck_total_cards }} copies</span>
+          <span>{{ (commanders|length) + (items|length) }} Unique Cards</span>
+          <span>{{ deck_total_cards }} Total Cards</span>
           <span>${{ '%.2f'|format(deck_total_value) }}</span>
           {% if deck_record.total > 0 %}
             <span class="deck-record">{{ deck_record.wins }}W–{{ deck_record.losses }}L</span>
