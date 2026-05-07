@@ -1745,15 +1745,27 @@ def deck_panels_fragment(
 def bulk_move_deck_cards(
     deck_id: int,
     row_ids: list[int] = Form(...),
-    target_location_id: int = Form(...),
+    target_location_id: str = Form(...),
     session: Session = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
     _: None = CsrfRequired,
 ):
+    if target_location_id == "sorter":
+        if current_user.username not in DRAWER_SORTER_USERNAMES:
+            return RedirectResponse(f"/decks/{deck_id}", status_code=303)
+        for row_id in row_ids:
+            return_card_from_deck(session, user_id=current_user.id, deck_row_id=row_id)
+        threading.Thread(target=_bg_resort, args=(current_user.id,), daemon=True).start()
+        return RedirectResponse(f"/decks/{deck_id}", status_code=303)
+
+    try:
+        location_id = int(target_location_id)
+    except ValueError:
+        return RedirectResponse(f"/decks/{deck_id}", status_code=303)
     for row_id in row_ids:
         try:
             move_inventory_row_to_location(
-                session, row_id=row_id, user_id=current_user.id, location_id=target_location_id
+                session, row_id=row_id, user_id=current_user.id, location_id=location_id
             )
         except ValueError:
             pass

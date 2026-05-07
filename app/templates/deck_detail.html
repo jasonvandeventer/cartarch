@@ -367,6 +367,7 @@
             <div class="filter-row">
               <select name="target_location_id" required>
                 <option value="">— Destination —</option>
+                {% if use_drawer_sorter %}<option value="sorter">Return to Sorter</option>{% endif %}
                 {% if bulk_storage %}
                   <optgroup label="Storage Locations">
                     {% for loc in bulk_storage %}<option value="{{ loc.id }}">{{ loc.name }} ({{ loc.type }})</option>{% endfor %}
