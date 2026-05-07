@@ -83,7 +83,10 @@ _WIPE_RE = re.compile(
     r"|each creature (?:gets?|has) -[\dXx]+/-[\dXx]+"
     # Mass damage is wipe-only when the damage hits creatures. Player damage
     # ("deals 1 damage to each opponent") is a per-trigger ping, not a sweeper.
-    r"|deals \d+ damage to each (?:creature|other creature)" r"|\boverload \{",
+    r"|deals \d+ damage to each (?:creature|other creature)" r"|\boverload \{"
+    # "Each player ... sacrifices the rest" — Promise of Loyalty wording: each
+    # player keeps one creature, sacrifices everything else.
+    r"|each player.{0,80}sacrifices? .{0,40}(?:the rest|other (?:creatures?|permanents?)|all but)",
     re.IGNORECASE,
 )
 _PROTECTION_RE = re.compile(
@@ -99,11 +102,12 @@ _PROTECTION_RE = re.compile(
 # Sac outlets (activation cost includes sacrifice — colon-delimited) and graveyard
 # recursion engines. Colon-only avoids matching Bargain-style cast costs ("sacrifice
 # an artifact, enchantment, or token as you cast this spell"). Recursion catches
-# both "return ... from your graveyard to the battlefield" (Reassembling Skeleton)
-# and "put target ... from a graveyard onto the battlefield" (Junji-style).
+# Reassembling Skeleton, Junji-style, and Victimize-style ("creature cards in
+# your graveyard ... return ... to the battlefield") wordings.
 _ENGINE_RE = re.compile(
     r"\bsacrifice (?:a|an|another)\s+(?:[\w'-]+\s+){0,3}(?:creature|permanent|artifact|token|treasure|food|clue|blood)\s*:"
-    r"|(?:return|put) [^.]{0,80}from [^.]{0,30}graveyards?[^.]{0,30}(?:to|onto) the battlefield",
+    r"|(?:return|put) [^.]{0,80}from [^.]{0,30}graveyards?[^.]{0,30}(?:to|onto) the battlefield"
+    r"|(?:creature|permanent) cards? in your graveyard.{0,80}return [^.]{0,80}(?:to|onto) the battlefield",
     re.IGNORECASE,
 )
 # Hard threat indicators only. Power/toughness aren't in the Card model so
@@ -667,7 +671,11 @@ def card_matches_theme(card, themes: dict) -> bool:
     # Mechanic matches
     if "counters" in themes["mechanics"] and "+1/+1 counter" in oracle:
         return True
-    if "tokens" in themes["mechanics"] and "create" in oracle and "token" in oracle:
+    if "tokens" in themes["mechanics"] and (
+        ("create" in oracle and "token" in oracle)
+        or "becomes a token" in oracle
+        or "tokens you control" in oracle
+    ):
         return True
     if "graveyard" in themes["mechanics"] and "graveyard" in oracle:
         return True
