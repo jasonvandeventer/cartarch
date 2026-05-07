@@ -28,7 +28,18 @@ _WIPE_RE = re.compile(
 )
 _HEALTH_THRESHOLDS = {"ramp": 10, "draw": 10, "removal": 8, "wipes": 2}
 
-CARD_ROLE_TAGS = ["Ramp", "Draw", "Removal", "Wipe", "Tutor", "Combo", "Payoff", "Protection"]
+CARD_ROLE_TAGS = [
+    "Ramp",
+    "Draw",
+    "Tutor",
+    "Removal",
+    "Wipe",
+    "Protection",
+    "Engine",
+    "Synergy",
+    "Threat",
+    "Hate",
+]
 
 _TAG_SET = set(CARD_ROLE_TAGS)
 
@@ -37,9 +48,10 @@ def get_row_tags(row) -> list[str]:
     if not row.tags:
         return []
     try:
-        return json.loads(row.tags)
+        raw = json.loads(row.tags)
     except (json.JSONDecodeError, TypeError):
         return []
+    return [t for t in raw if t in _TAG_SET]
 
 
 def set_row_tags(row, tags: list[str]) -> None:
@@ -559,12 +571,15 @@ def compute_deck_synergy(all_rows: list, combos: dict) -> dict | None:
 
         is_direct = (
             name in combo_card_names
-            or "Combo" in tags
-            or "Payoff" in tags
+            or "Synergy" in tags
+            or "Threat" in tags
             or card_matches_theme(card, themes)
         )
         is_supporting = not is_direct and (
-            bool(set(tags) & {"Ramp", "Draw", "Removal", "Wipe", "Tutor", "Protection"})
+            bool(
+                set(tags)
+                & {"Ramp", "Draw", "Removal", "Wipe", "Tutor", "Protection", "Engine", "Hate"}
+            )
             or "Land" in tl
         )
 

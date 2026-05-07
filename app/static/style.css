@@ -1345,14 +1345,20 @@ td {
 .card-tag-tutor {
   background: #6a2db0;
 }
-.card-tag-combo {
-  background: #b04080;
-}
-.card-tag-payoff {
-  background: #c43a2a;
-}
 .card-tag-protection {
   background: #1a7a7a;
+}
+.card-tag-engine {
+  background: #c46a20;
+}
+.card-tag-synergy {
+  background: #b04080;
+}
+.card-tag-threat {
+  background: #c43a2a;
+}
+.card-tag-hate {
+  background: #4a5060;
 }
 .legality-badge {
   display: inline-block;
