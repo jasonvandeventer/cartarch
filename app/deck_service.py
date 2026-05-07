@@ -25,6 +25,10 @@ _RAMP_NON_LAND_RE = re.compile(
     r"\badds? \{"
     r"|\badds? (?:one|two|three|four|five|six|seven|eight|x|an additional)\b.{0,40}\bmana\b"
     r"|\badds? .{0,40}\bmana of any\b"
+    # "Add an amount of {B} equal to..." — Soldevi Adnate, Bubbling Muck. Match
+    # "add" followed by a mana symbol within one sentence. The strip of quoted
+    # token-grant text upstream prevents Sifter-of-Skulls-style false positives.
+    r"|\badds? [^.]{0,60}\{[wubrgcxs\d]\}"
     r"|creates? .{0,30}\btreasure tokens?\b"
     r"|costs? \{\d+\} less to cast"
     r"|play (?:a |an |\w+ )?additional lands?\b"
@@ -64,18 +68,22 @@ _REMOVAL_RE = re.compile(
     r"|\bdeals? \d+ damage to (?:target|any target)"
     r"|target (?:creature|permanent) gets -[\dXx]+/-[\dXx]+"
     r"|target creature fights"
-    r"|target (?:opponent|player) sacrifices a (?:creature|permanent|nonland permanent)",
+    # Edicts (single-target and each-player) are removal, not wipes — one creature
+    # per opponent reads as targeted answer rather than a sweeper.
+    r"|(?:target|each) (?:opponent|player) sacrifices a (?:creature|permanent|nonland permanent)",
     re.IGNORECASE,
 )
 _WIPE_RE = re.compile(
     r"destroy all (?:creatures?|permanents?|nonland permanents?|attacking creatures?|other creatures?)\b"
+    # "Destroy each creature an opponent controls..." — Promise of Loyalty style.
+    r"|destroy each (?:creature|permanent|nonland permanent)"
     r"|exile all (?:creatures?|permanents?|nonland permanents?)"
     r"|return all (?:creatures?|permanents?|nonland permanents?)\b.{0,40}\bto\b"
     r"|all creatures? (?:get|have|gets?|has) -[\dXx]+/-[\dXx]+"
     r"|each creature (?:gets?|has) -[\dXx]+/-[\dXx]+"
-    r"|deals \d+ damage to each (?:creature|opponent|player|other creature)"
-    r"|each (?:opponent|player) sacrifices a (?:creature|permanent)"
-    r"|\boverload \{",
+    # Mass damage is wipe-only when the damage hits creatures. Player damage
+    # ("deals 1 damage to each opponent") is a per-trigger ping, not a sweeper.
+    r"|deals \d+ damage to each (?:creature|other creature)" r"|\boverload \{",
     re.IGNORECASE,
 )
 _PROTECTION_RE = re.compile(
@@ -88,6 +96,53 @@ _PROTECTION_RE = re.compile(
     r"|regenerate target",
     re.IGNORECASE,
 )
+# Sac outlets (activation cost includes sacrifice — colon-delimited) and graveyard
+# recursion engines. Colon-only avoids matching Bargain-style cast costs ("sacrifice
+# an artifact, enchantment, or token as you cast this spell"). Recursion catches
+# both "return ... from your graveyard to the battlefield" (Reassembling Skeleton)
+# and "put target ... from a graveyard onto the battlefield" (Junji-style).
+_ENGINE_RE = re.compile(
+    r"\bsacrifice (?:a|an|another)\s+(?:[\w'-]+\s+){0,3}(?:creature|permanent|artifact|token|treasure|food|clue|blood)\s*:"
+    r"|(?:return|put) [^.]{0,80}from [^.]{0,30}graveyards?[^.]{0,30}(?:to|onto) the battlefield",
+    re.IGNORECASE,
+)
+# Hard threat indicators only. Power/toughness aren't in the Card model so
+# soft "this is a big creature" threats are missed by design — manual tagging.
+# Per-trigger drains ("each opponent loses 1 life") and free-cast tutors
+# ("cast without paying") were dropped — too noisy.
+_THREAT_RE = re.compile(
+    r"\byou win the game\b"
+    r"|(?:target |each |that )?(?:opponents?|players?)\s+loses? the game\b"
+    r"|\binfect\b"
+    r"|\btoxic \d+\b"
+    r"|\bextra (?:combat phase|turn)\b",
+    re.IGNORECASE,
+)
+# Disruption against opponents: graveyard hate, opp-stax, draw hate, stop-effects,
+# enter-tapped slowdowns.
+_HATE_RE = re.compile(
+    r"exile (?:all|any|target|each|that) (?:[\w'-]+\s+){0,2}graveyards?\b"
+    r"|if .{0,80}\bwould\b.{0,40}\bgraveyards?\b.{0,80}\bexile\b.{0,40}\binstead\b"
+    r"|opponents?\s+(?:can'?t|cannot|may not)\s+(?:cast|draw|gain|search|untap|attack)"
+    r"|\bcreatures? (?:and \w+ )?(?:your )?opponents control enter (?:the battlefield )?tapped"
+    r"|\bwhenever an opponent draws? a card"
+    r"|each opponent skips",
+    re.IGNORECASE,
+)
+# Token-granted abilities embedded in oracle text — Sifter of Skulls' "It has
+# 'Sacrifice this creature: Add {C}.'" puts mana production in the TOKEN's text,
+# not the parent. Strip quoted granted abilities before checking ramp.
+_QUOTED_ABILITY_RE = re.compile(r'"[^"]+"')
+
+
+def matches_ramp_non_land(oracle: str) -> bool:
+    """True if oracle has a non-land-tutor ramp pattern, ignoring quoted token abilities."""
+    if not oracle:
+        return False
+    cleaned = _QUOTED_ABILITY_RE.sub("", oracle)
+    return bool(_RAMP_NON_LAND_RE.search(cleaned))
+
+
 _HEALTH_THRESHOLDS = {"ramp": 10, "draw": 10, "removal": 8, "wipes": 2}
 
 CARD_ROLE_TAGS = [
@@ -132,8 +187,12 @@ def get_card_legality(card, format_name: str) -> str | None:
     return data.get(format_name.lower())
 
 
-def suggest_card_roles(card) -> list[str]:
-    """Return auto-detected role tags for a card based on oracle text patterns."""
+def suggest_card_roles(card, themes: dict | None = None) -> list[str]:
+    """Return auto-detected role tags for a card based on oracle text patterns.
+
+    When `themes` is provided (output of extract_commander_themes), Synergy is
+    suggested for cards that match the deck's strategy via card_matches_theme.
+    """
     oracle = (card.oracle_text or "").lower()
     tl = (card.type_line or "").lower()
     if "basic land" in tl or not oracle:
@@ -141,7 +200,7 @@ def suggest_card_roles(card) -> list[str]:
     is_land = "land" in tl
     is_land_tutor = bool(_RAMP_LAND_RE.search(oracle))
     suggestions = []
-    if (not is_land and _RAMP_NON_LAND_RE.search(oracle)) or is_land_tutor:
+    if (not is_land and matches_ramp_non_land(oracle)) or is_land_tutor:
         suggestions.append("Ramp")
     if matches_draw(oracle):
         suggestions.append("Draw")
@@ -151,8 +210,27 @@ def suggest_card_roles(card) -> list[str]:
         suggestions.append("Wipe")
     if _PROTECTION_RE.search(oracle):
         suggestions.append("Protection")
+    if _ENGINE_RE.search(oracle):
+        suggestions.append("Engine")
+    if _THREAT_RE.search(oracle):
+        suggestions.append("Threat")
+    if _HATE_RE.search(oracle):
+        suggestions.append("Hate")
     if "search your library for" in oracle and not is_land_tutor:
         suggestions.append("Tutor")
+    if themes:
+        synergy_match = card_matches_theme(card, themes)
+        if not synergy_match:
+            mechanics = themes.get("mechanics") or set()
+            # In death-trigger decks, sac outlets and graveyard recursion are
+            # synergistic. Gating on Engine ensures we only catch real sac outlets
+            # ("Sacrifice a creature:") and recursion ("from your graveyard to
+            # the battlefield") — not self-sac lands (Myriad Landscape) or
+            # Bargain-cost cards (Beseech the Mirror).
+            if "death_triggers" in mechanics and "Engine" in suggestions:
+                synergy_match = True
+        if synergy_match:
+            suggestions.append("Synergy")
     return suggestions
 
 
@@ -205,7 +283,7 @@ def compute_deck_analytics(rows: list) -> dict:
             non_land_copies += qty
 
             is_ramp = not is_basic and (
-                bool(_RAMP_NON_LAND_RE.search(oracle))
+                matches_ramp_non_land(oracle)
                 or bool(_RAMP_LAND_RE.search(oracle))
                 or "Ramp" in get_row_tags(row)
             )
@@ -289,7 +367,7 @@ def compute_consistency(rows: list) -> dict:
 
         is_land_tutor = bool(oracle and _RAMP_LAND_RE.search(oracle))
         ramp_oracle = bool(oracle) and (
-            (not is_land and bool(_RAMP_NON_LAND_RE.search(oracle))) or is_land_tutor
+            (not is_land and matches_ramp_non_land(oracle)) or is_land_tutor
         )
         if (ramp_oracle or "Ramp" in tags) and name not in seen_ramp:
             seen_ramp.add(name)
@@ -403,8 +481,7 @@ def compute_deck_health(rows: list) -> dict:
             continue
 
         ramp_oracle = bool(oracle) and (
-            (not is_land and bool(_RAMP_NON_LAND_RE.search(oracle)))
-            or bool(_RAMP_LAND_RE.search(oracle))
+            (not is_land and matches_ramp_non_land(oracle)) or bool(_RAMP_LAND_RE.search(oracle))
         )
         if ramp_oracle or "Ramp" in tags:
             ramp_cards.append(name)

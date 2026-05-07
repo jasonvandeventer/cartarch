@@ -41,6 +41,7 @@ from app.deck_service import (
     compute_deck_tokens,
     create_deck,
     delete_deck,
+    extract_commander_themes,
     get_card_legality,
     get_deck,
     get_row_tags,
@@ -1507,6 +1508,19 @@ def deck_detail_page(
     )
 
     if deck:
+        # Commander themes feed Synergy auto-detection per row.
+        _commander_rows = (
+            session.query(InventoryRow)
+            .options(joinedload(InventoryRow.card))
+            .filter(
+                InventoryRow.user_id == current_user.id,
+                InventoryRow.storage_location_id == deck.storage_location_id,
+                InventoryRow.role == "commander",
+            )
+            .all()
+        )
+        _themes = extract_commander_themes(_commander_rows) if _commander_rows else None
+
         # Auto-tag untagged rows from oracle text patterns (non-destructive).
         # Runs before the main query so items see fresh tags on the same request.
         _untagged = (
@@ -1522,7 +1536,7 @@ def deck_detail_page(
         )
         _auto_tagged = False
         for _row in _untagged:
-            _suggested = suggest_card_roles(_row.card)
+            _suggested = suggest_card_roles(_row.card, themes=_themes)
             if _suggested:
                 set_row_tags(_row, _suggested)
                 _auto_tagged = True
@@ -1574,7 +1588,7 @@ def deck_detail_page(
                     "total_value": total_value,
                     "role": row.role,
                     "tags": get_row_tags(row),
-                    "suggested_tags": suggest_card_roles(row.card),
+                    "suggested_tags": suggest_card_roles(row.card, themes=_themes),
                     "legality_status": get_card_legality(row.card, deck.format),
                 }
             )
