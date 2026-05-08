@@ -633,20 +633,143 @@ def _compute_tagging_coverage(
     return round(tagged / len(relevant), 3)
 
 
-def estimate_bracket_v2(session: Session, deck, user_id: int) -> BracketEstimate:
-    """V2 estimator: V1 mechanics + intent + confidence.
+def derive_combo_role(
+    combos: dict | None, tutor_count: int, commander_names: set[str]
+) -> tuple[str, list[Finding]]:
+    """Section 3 Step 4: classify the deck's combo role.
 
-    Takes a full Deck object (not just storage_location_id) so it can read the
-    intent_* survey columns and the deck.id for downstream persistence.
+    Returns (role, findings). Role values:
+      none        — no Spellbook combos in deck
+      incidental  — 1-2 combos, few tutors, no bracket pressure
+      backup      — 1-2 combos, decent tutor support (bracket >= 3)
+      primary     — 3+ combos OR 1 combo with strong tutor support (bracket >= 4)
+      compact     — commander is part of a combo + 4+ tutors (bracket = 5)
+    """
+    if combos is None or not combos.get("included"):
+        return "none", []
+
+    included = combos.get("included", [])
+    combo_count = len(included)
+    findings: list[Finding] = []
+
+    commander_in_combo = any(
+        any(name in commander_names for name in c.get("card_names", [])) for c in included
+    )
+
+    if commander_in_combo and tutor_count >= 4:
+        findings.append(
+            Finding(
+                finding_type="combo_compact_detected",
+                finding_value=str(combo_count),
+                severity="critical",
+                message=(
+                    f"Commander is part of a complete combo with {tutor_count} tutors "
+                    "to assemble. This is a compact combo deck — Bracket 5."
+                ),
+                contributes_to_bracket=5,
+                weight=10.0,
+            )
+        )
+        return "compact", findings
+
+    if combo_count >= 3 or (combo_count >= 1 and tutor_count >= 4):
+        findings.append(
+            Finding(
+                finding_type="combo_primary_detected",
+                finding_value=str(combo_count),
+                severity="critical",
+                message=(
+                    f"{combo_count} complete combo line{'s' if combo_count != 1 else ''} "
+                    f"with {tutor_count} tutors — combo is the primary win condition. Bracket 4+."
+                ),
+                contributes_to_bracket=4,
+                weight=8.0,
+            )
+        )
+        return "primary", findings
+
+    if combo_count >= 1 and tutor_count >= 2:
+        sample_names = [", ".join(c.get("card_names", [])[:3]) for c in included[:2]]
+        findings.append(
+            Finding(
+                finding_type="combo_backup_detected",
+                finding_value=str(combo_count),
+                severity="warning",
+                message=(
+                    f"{combo_count} complete combo line{'s' if combo_count != 1 else ''} "
+                    f"({'; '.join(sample_names)}) with {tutor_count} tutors. "
+                    "Backup combo line — Bracket 3+."
+                ),
+                contributes_to_bracket=3,
+                weight=4.0,
+            )
+        )
+        return "backup", findings
+
+    findings.append(
+        Finding(
+            finding_type="combo_incidental_detected",
+            finding_value=str(combo_count),
+            severity="info",
+            message=(
+                f"{combo_count} complete combo line{'s' if combo_count != 1 else ''} "
+                "but few tutors — combo presence appears incidental, not the plan."
+            ),
+            contributes_to_bracket=None,
+            weight=1.0,
+        )
+    )
+    return "incidental", findings
+
+
+def estimate_bracket_v2(
+    session: Session, deck, user_id: int, combos: dict | None = None
+) -> BracketEstimate:
+    """V2/V3 estimator: V1 mechanics + intent + confidence + (optional) combo role.
+
+    Takes a full Deck object so it can read the intent_* survey columns and
+    the deck.id for downstream persistence. When `combos` is provided (output
+    of compute_deck_combos), V3 combo role is layered on top.
     """
     base = estimate_bracket_v1(session, deck.storage_location_id, user_id)
+    mechanics_bracket = base.mechanics_bracket
+    findings = list(base.findings)
+
+    # V3: combo role analysis
+    if combos is not None:
+        commander_rows = session.execute(
+            text(
+                "SELECT c.name FROM inventory_rows ir JOIN cards c ON ir.card_id = c.id "
+                "WHERE ir.user_id = :uid AND ir.storage_location_id = :loc "
+                "AND ir.role = 'commander'"
+            ),
+            {"uid": user_id, "loc": deck.storage_location_id},
+        ).fetchall()
+        commander_names = {r[0] for r in commander_rows}
+        tutor_rows = session.execute(
+            text(
+                "SELECT COUNT(DISTINCT c.id) FROM inventory_rows ir "
+                "JOIN cards c ON ir.card_id = c.id "
+                "JOIN card_tags ct ON ct.card_id = c.id "
+                "WHERE ir.user_id = :uid AND ir.storage_location_id = :loc "
+                "AND ct.tag IN ('unconditional_tutor', 'restricted_tutor')"
+            ),
+            {"uid": user_id, "loc": deck.storage_location_id},
+        ).first()
+        tutor_count = tutor_rows[0] if tutor_rows else 0
+
+        _role, combo_findings = derive_combo_role(combos, tutor_count, commander_names)
+        findings += combo_findings
+        for cf in combo_findings:
+            if cf.contributes_to_bracket:
+                mechanics_bracket = max(mechanics_bracket, cf.contributes_to_bracket)
 
     intent_bracket = derive_intent_bracket(deck)
     final_bracket, intent_alignment, extra_findings = resolve_mechanics_intent(
-        base.mechanics_bracket, intent_bracket
+        mechanics_bracket, intent_bracket
     )
 
-    findings = list(base.findings) + extra_findings
+    findings += extra_findings
 
     tagging_coverage = _compute_tagging_coverage(session, deck.storage_location_id, user_id)
     # The spec's 85% threshold assumes community-curated tags for every card. Our
@@ -654,13 +777,13 @@ def estimate_bracket_v2(session: Session, deck, user_id: int) -> BracketEstimate
     # legitimately show low coverage. We display the coverage in the UI but don't
     # raise a finding until V3+ adds curated tags.
 
-    # mechanics_clarity for V1 hard-rule logic: every finding currently fires from
-    # an unambiguous rule, so clarity is 1.0. Future ambiguous-rule findings (V3
-    # combo edge cases, soft floors) will drop this.
+    # mechanics_clarity: every V1 hard-rule finding fires from an unambiguous
+    # rule, so clarity is 1.0. Future ambiguous-rule findings will drop this.
     mechanics_clarity = 1.0
+    combo_detection_depth = 1.0 if combos is not None else None
 
     return BracketEstimate(
-        mechanics_bracket=base.mechanics_bracket,
+        mechanics_bracket=mechanics_bracket,
         final_bracket=final_bracket,
         findings=findings,
         rules_version=base.rules_version,
@@ -669,7 +792,7 @@ def estimate_bracket_v2(session: Session, deck, user_id: int) -> BracketEstimate
         confidence_tagging_coverage=tagging_coverage,
         confidence_mechanics_clarity=mechanics_clarity,
         confidence_intent_alignment=intent_alignment,
-        confidence_combo_detection_depth=None,
+        confidence_combo_detection_depth=combo_detection_depth,
     )
 
 

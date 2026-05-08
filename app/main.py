@@ -1640,7 +1640,21 @@ def deck_detail_page(
     if deck and deck.storage_location_id:
         from app.bracket_v2_service import estimate_bracket_v2, persist_estimate
 
-        _est = estimate_bracket_v2(session, deck, current_user.id)
+        # Pull combos from the panels cache if warm. Cold-cache decks fall back to
+        # mechanics+intent-only on first load; the lazy panels endpoint
+        # repopulates the cache + re-runs V3 for next time.
+        _cached_combos: dict | None = None
+        _all_rows = locals().get("all_deck_rows")
+        if _all_rows:
+            try:
+                _ck = _panels_cache_key(_all_rows)
+                _cached = _read_panels_cache(deck.id, _ck)
+                if _cached:
+                    _cached_combos = _cached.get("combos")
+            except Exception:
+                _cached_combos = None
+
+        _est = estimate_bracket_v2(session, deck, current_user.id, combos=_cached_combos)
         try:
             persist_estimate(session, deck.id, _est)
         except Exception as exc:  # noqa: BLE001 — persistence isn't user-facing
@@ -1756,6 +1770,19 @@ def deck_panels_fragment(
         bracket = compute_deck_bracket(all_deck_rows, combos)
         synergy = compute_deck_synergy(all_deck_rows, combos)
         dead_cards = compute_dead_cards(all_deck_rows, synergy)
+
+        # V3: re-run the bracket V2 estimator with combo data and persist the
+        # combo-aware result. The deck-detail bracket panel rendered on initial
+        # page load is mechanics+intent only; this overwrites the persisted
+        # estimate so the next page load shows the V3 result.
+        try:
+            from app.bracket_v2_service import estimate_bracket_v2 as _v2_est
+            from app.bracket_v2_service import persist_estimate as _v2_persist
+
+            _est = _v2_est(session, deck, current_user.id, combos=combos)
+            _v2_persist(session, deck.id, _est)
+        except Exception as exc:  # noqa: BLE001
+            print(f"[bracket_v3] persist failed deck={deck.id}: {exc}", flush=True)
     else:
         dead_cards = None
 
