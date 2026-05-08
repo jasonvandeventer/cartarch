@@ -11,6 +11,7 @@ from scripts.migrate_v3_9_6_legalities import main as migrate_v3_9_6_legalities
 from scripts.migrate_v3_11_3_clear_deck_pending import main as migrate_v3_11_3_clear_deck_pending
 from scripts.migrate_v3_11_display_name import main as migrate_v3_11_display_name
 from scripts.migrate_v3_13_games import main as migrate_v3_13_games
+from scripts.migrate_v3_14_20_scrub_legacy_tags import main as migrate_v3_14_20_scrub_legacy_tags
 from scripts.migrate_v3_14_seat_position import main as migrate_v3_14_seat_position
 
 
@@ -112,6 +113,13 @@ def run():
         _mark_applied("v3_14_seat_position")
     else:
         print("v3.14 seat_position already applied, skipping")
+
+    if not _is_applied("v3_14_20_scrub_legacy_tags"):
+        print("Running v3.14.20 legacy-tag scrub migration...")
+        migrate_v3_14_20_scrub_legacy_tags()
+        _mark_applied("v3_14_20_scrub_legacy_tags")
+    else:
+        print("v3.14.20 scrub_legacy_tags already applied, skipping")
 
     print("Migration runner complete")
 
