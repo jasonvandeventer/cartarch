@@ -308,7 +308,18 @@ def compute_deck_analytics(rows: list) -> dict:
     avg_threat_cmc = round(threat_cmc_total / threat_copies, 1) if threat_copies else 0.0
 
     total_ramp = sum(curve_ramp.values())
-    turns_to_play = max(1, round(avg_threat_cmc) - (1 if total_ramp >= 10 else 0))
+    ramp_acceleration = 1 if total_ramp >= 10 else 0
+    turns_to_play = max(1, round(avg_threat_cmc) - ramp_acceleration)
+
+    # Peak turn = the turn at which the most threats become castable. The CMC bucket
+    # with the largest non-ramp count, ramp-adjusted by 1 if there are 10+ ramp pieces.
+    if threat_copies:
+        peak_cmc = max(range(7), key=lambda k: curve_spells[k])
+        peak_turn = max(1, peak_cmc - ramp_acceleration) if curve_spells[peak_cmc] else None
+        peak_threat_count = curve_spells[peak_cmc] if peak_cmc is not None else 0
+    else:
+        peak_turn = None
+        peak_threat_count = 0
 
     high_cmc_spells = sum(curve_spells[i] for i in range(5, 7))
     dead_hand_pct = round(high_cmc_spells / threat_copies * 100) if threat_copies else 0
@@ -330,6 +341,8 @@ def compute_deck_analytics(rows: list) -> dict:
         "avg_cmc": avg_cmc,
         "avg_threat_cmc": avg_threat_cmc,
         "turns_to_play": turns_to_play,
+        "peak_turn": peak_turn,
+        "peak_threat_count": peak_threat_count,
         "dead_hand_risk": dead_hand_risk,
         "dead_hand_pct": dead_hand_pct,
         "total_ramp": total_ramp,

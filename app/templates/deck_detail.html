@@ -77,6 +77,13 @@
           </div>
           <div class="curve-insights">
             <span class="curve-insight">Threats avg turn <strong>{{ analytics.turns_to_play }}</strong></span>
+            {% if analytics.peak_turn %}
+              <span class="curve-insight"
+                    title="Turn at which the most threats become castable, ramp-adjusted">
+                Peaks at turn <strong>{{ analytics.peak_turn }}</strong>
+                <span class="curve-insight-detail">({{ analytics.peak_threat_count }} threats)</span>
+              </span>
+            {% endif %}
             <span class="curve-insight curve-insight-{{ analytics.dead_hand_risk }}">
               {{ analytics.dead_hand_risk|capitalize }} dead-hand risk
               <span class="curve-insight-detail">({{ analytics.dead_hand_pct }}% CMC≥5)</span>
