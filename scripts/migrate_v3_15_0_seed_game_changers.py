@@ -1,9 +1,10 @@
-"""Seed game_changer_cards with the conservative published Game Changer list
-plus the existing fast_mana / free_interaction frozensets from compute_deck_bracket.
+"""Seed game_changer_cards from Scryfall's `is:gamechanger` query.
 
-Sourced from WotC's Bracket framework reference (April 2025) plus community
-consensus. This is a starting list — admins can add/remove rows in DB without a
-new migration.
+Falls back to a hardcoded conservative list if Scryfall is unreachable during
+the migration (e.g., on offline dev machines or during a Scryfall outage).
+Admins can re-seed by clearing the schema_migrations row for
+v3_15_0_seed_game_changers and restarting; the upsert is non-destructive
+(existing rows are skipped, only new names are added).
 """
 
 from __future__ import annotations
@@ -11,43 +12,23 @@ from __future__ import annotations
 from sqlalchemy import text
 
 from app.db import engine
+from app.scryfall import fetch_game_changer_names
 
 RULES_VERSION = "1.0.0"
-SOURCE = "wotc-2025-04 + community"
 
-# WotC published Game Changer list (subset commonly cited in bracket framework
-# discussion). Conservative — admins can extend in DB.
-GAME_CHANGERS = sorted(
+# Fallback list used only if Scryfall is unreachable.
+_FALLBACK = sorted(
     {
-        # Fast mana
-        "Mana Crypt",
-        "Mana Vault",
-        "Mox Diamond",
-        "Mox Opal",
-        "Chrome Mox",
-        "Jeweled Lotus",
-        "Grim Monolith",
-        "Lotus Petal",
         "Ancient Tomb",
-        # Tutors
+        "Mana Crypt",
+        "Mox Diamond",
         "Demonic Tutor",
         "Vampiric Tutor",
-        "Imperial Seal",
-        "Mystical Tutor",
-        "Worldly Tutor",
-        "Enlightened Tutor",
-        # Free interaction
         "Force of Will",
         "Force of Negation",
-        "Fierce Guardianship",
-        "Mana Drain",
-        "Pact of Negation",
-        "Deflecting Swat",
-        # Generic engines / staples cited as Game Changers
         "Cyclonic Rift",
         "Smothering Tithe",
         "Rhystic Study",
-        "Trouble in Pairs",
         "Dockside Extortionist",
         "Drannith Magistrate",
     }
@@ -55,9 +36,18 @@ GAME_CHANGERS = sorted(
 
 
 def main() -> None:
+    names = fetch_game_changer_names()
+    if names:
+        source = "scryfall is:gamechanger"
+        print(f"Fetched {len(names)} Game Changers from Scryfall")
+    else:
+        names = _FALLBACK
+        source = "fallback (Scryfall unreachable)"
+        print(f"Scryfall unreachable; using {len(names)}-card fallback list")
+
     inserted = 0
     with engine.begin() as conn:
-        for name in GAME_CHANGERS:
+        for name in sorted(set(names)):
             existing = conn.execute(
                 text(
                     "SELECT id FROM game_changer_cards "
@@ -87,12 +77,12 @@ def main() -> None:
                 {
                     "card_id": card_id,
                     "card_name": name,
-                    "source": SOURCE,
+                    "source": source,
                     "rules_version": RULES_VERSION,
                 },
             )
             inserted += 1
-    print(f"Seeded {inserted} Game Changer cards (v{RULES_VERSION})")
+    print(f"Seeded {inserted} new Game Changer rows (v{RULES_VERSION})")
 
 
 if __name__ == "__main__":

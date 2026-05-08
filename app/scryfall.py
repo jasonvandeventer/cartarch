@@ -375,6 +375,27 @@ def fetch_card_traits(scryfall_id: str) -> dict[str, bool] | None:
     }
 
 
+def fetch_game_changer_names() -> list[str]:
+    """Return the current Scryfall `is:gamechanger` card-name list.
+
+    Used to seed/refresh the game_changer_cards table for the bracket
+    estimator. Returns an empty list on network failure so the caller can
+    fall back to a hardcoded seed.
+    """
+    names: list[str] = []
+    url = "https://api.scryfall.com/cards/search?q=is%3Agamechanger&unique=cards"
+    while url:
+        data = _get_json(url)
+        if not data:
+            break
+        for card in data.get("data", []):
+            name = card.get("name")
+            if name:
+                names.append(name)
+        url = data.get("next_page") if data.get("has_more") else None
+    return names
+
+
 def fetch_set_cards(set_code: str) -> list[dict[str, Any]]:
     set_code = (set_code or "").strip().lower()
     if not set_code:
