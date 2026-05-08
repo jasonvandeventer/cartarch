@@ -13,6 +13,10 @@ from scripts.migrate_v3_11_display_name import main as migrate_v3_11_display_nam
 from scripts.migrate_v3_13_games import main as migrate_v3_13_games
 from scripts.migrate_v3_14_20_scrub_legacy_tags import main as migrate_v3_14_20_scrub_legacy_tags
 from scripts.migrate_v3_14_seat_position import main as migrate_v3_14_seat_position
+from scripts.migrate_v3_15_0_bracket_v2_tables import main as migrate_v3_15_0_bracket_v2_tables
+from scripts.migrate_v3_15_0_seed_bracket_rules import main as migrate_v3_15_0_seed_bracket_rules
+from scripts.migrate_v3_15_0_seed_card_tags import main as migrate_v3_15_0_seed_card_tags
+from scripts.migrate_v3_15_0_seed_game_changers import main as migrate_v3_15_0_seed_game_changers
 
 
 def _is_applied(name: str) -> bool:
@@ -120,6 +124,34 @@ def run():
         _mark_applied("v3_14_20_scrub_legacy_tags")
     else:
         print("v3.14.20 scrub_legacy_tags already applied, skipping")
+
+    if not _is_applied("v3_15_0_bracket_v2_tables"):
+        print("Running v3.15.0 Bracket V2 schema migration...")
+        migrate_v3_15_0_bracket_v2_tables()
+        _mark_applied("v3_15_0_bracket_v2_tables")
+    else:
+        print("v3.15.0 bracket_v2_tables already applied, skipping")
+
+    if not _is_applied("v3_15_0_seed_bracket_rules"):
+        print("Running v3.15.0 bracket rules seed...")
+        migrate_v3_15_0_seed_bracket_rules()
+        _mark_applied("v3_15_0_seed_bracket_rules")
+    else:
+        print("v3.15.0 seed_bracket_rules already applied, skipping")
+
+    if not _is_applied("v3_15_0_seed_game_changers"):
+        print("Running v3.15.0 Game Changer seed...")
+        migrate_v3_15_0_seed_game_changers()
+        _mark_applied("v3_15_0_seed_game_changers")
+    else:
+        print("v3.15.0 seed_game_changers already applied, skipping")
+
+    if not _is_applied("v3_15_0_seed_card_tags"):
+        print("Running v3.15.0 card-tag auto-seed...")
+        migrate_v3_15_0_seed_card_tags()
+        _mark_applied("v3_15_0_seed_card_tags")
+    else:
+        print("v3.15.0 seed_card_tags already applied, skipping")
 
     print("Migration runner complete")
 

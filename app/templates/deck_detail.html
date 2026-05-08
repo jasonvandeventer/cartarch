@@ -51,6 +51,43 @@
       <h2 class="panel-title">Deck not found</h2>
     {% endif %}
   </section>
+  {% if bracket_v2 %}
+    <section class="panel bracket-v2-panel">
+      <h3 class="panel-title">
+        Bracket Estimate <span class="muted small-text">(v2 preview)</span>
+      </h3>
+      <div class="bracket-v2-row">
+        <div class="bracket-v2-badge bracket-{{ bracket_v2.bracket }}">{{ bracket_v2.bracket }}</div>
+        <div class="bracket-v2-meta">
+          <div class="bracket-v2-mech">
+            Mechanical signal: <strong>{{ bracket_v2.mechanics_bracket }}</strong>
+          </div>
+          <div class="muted small-text">Rules v{{ bracket_v2.rules_version }}</div>
+        </div>
+      </div>
+      <details class="bracket-v2-findings-details">
+        <summary>
+          Why this bracket ({{ bracket_v2.findings|length }} signal{{ "" if bracket_v2.findings|length == 1 else "s" }})
+        </summary>
+        <ul class="bracket-v2-findings">
+          {% for f in bracket_v2.findings %}
+            <li class="bracket-v2-finding bracket-v2-{{ f.severity }}">
+              <span class="bracket-v2-sev-icon">
+                {% if f.severity == 'critical' %}
+                  ⛔
+                {% elif f.severity == 'warning' %}
+                  ⚠️
+                {% else %}
+                  ℹ️
+                {% endif %}
+              </span>
+              {{ f.message }}
+            </li>
+          {% endfor %}
+        </ul>
+      </details>
+    </section>
+  {% endif %}
   {% if analytics %}
     <section class="panel analytics-panel">
       <div class="analytics-grid {% if not analytics.pips %}no-pips{% endif %}">

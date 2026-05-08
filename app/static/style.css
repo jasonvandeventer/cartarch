@@ -2709,3 +2709,73 @@ body.game-mode {
   font-weight: 700;
   color: var(--accent);
 }
+
+/* Bracket Estimator V2 panel */
+.bracket-v2-panel {
+  margin-top: 1rem;
+}
+.bracket-v2-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin: 0.5rem 0 0.75rem;
+}
+.bracket-v2-badge {
+  width: 64px;
+  height: 64px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2.4rem;
+  font-weight: 800;
+  color: #0d0f0f;
+  flex-shrink: 0;
+}
+.bracket-v2-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+.bracket-v2-mech {
+  font-size: 0.95rem;
+}
+.bracket-v2-findings-details summary {
+  cursor: pointer;
+  font-size: 0.85rem;
+  color: #94a3b8;
+  list-style: none;
+  padding: 0.25rem 0;
+}
+.bracket-v2-findings-details summary::-webkit-details-marker {
+  display: none;
+}
+.bracket-v2-findings {
+  list-style: none;
+  padding: 0.4rem 0 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+.bracket-v2-finding {
+  font-size: 0.875rem;
+  padding: 0.4rem 0.6rem;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.04);
+  border-left: 3px solid #4a5568;
+}
+.bracket-v2-finding.bracket-v2-info {
+  border-left-color: #4a90e2;
+}
+.bracket-v2-finding.bracket-v2-warning {
+  border-left-color: #c46a20;
+  background: rgba(196, 106, 32, 0.08);
+}
+.bracket-v2-finding.bracket-v2-critical {
+  border-left-color: #c43a2a;
+  background: rgba(196, 58, 42, 0.1);
+}
+.bracket-v2-sev-icon {
+  margin-right: 0.4rem;
+}

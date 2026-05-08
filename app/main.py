@@ -1636,6 +1636,30 @@ def deck_detail_page(
             health = compute_deck_health(all_deck_rows)
             consistency = compute_consistency(all_deck_rows)
 
+    bracket_v2 = None
+    if deck and deck.storage_location_id:
+        from app.bracket_v2_service import estimate_bracket_v1, persist_estimate
+
+        _est = estimate_bracket_v1(session, deck.storage_location_id, current_user.id)
+        try:
+            persist_estimate(session, deck.id, _est)
+        except Exception as exc:  # noqa: BLE001 — persistence isn't user-facing
+            print(f"[bracket_v2] persist failed deck={deck.id}: {exc}", flush=True)
+        bracket_v2 = {
+            "bracket": _est.final_bracket,
+            "mechanics_bracket": _est.mechanics_bracket,
+            "rules_version": _est.rules_version,
+            "findings": [
+                {
+                    "type": f.finding_type,
+                    "severity": f.severity,
+                    "message": f.message,
+                    "value": f.finding_value,
+                }
+                for f in _est.findings
+            ],
+        }
+
     # Apply health filter before splitting into commanders/deck_cards
     if health and health_filter in _VALID_HEALTH_FILTERS:
         _health_names = set(health[health_filter]["cards"])
@@ -1662,6 +1686,7 @@ def deck_detail_page(
             "items": deck_cards if deck else [],
             "deck_total_value": deck_total_value if deck else 0.0,
             "deck_total_cards": total_cards if deck else 0,
+            "bracket_v2": bracket_v2,
             "search": search,
             "sort": sort,
             "direction": direction,
