@@ -633,6 +633,87 @@ def _compute_tagging_coverage(
     return round(tagged / len(relevant), 3)
 
 
+# ---------------------------------------------------------------------------
+# Soft power score (Section 3 Step 3) — informational, never bracket-pushing
+# ---------------------------------------------------------------------------
+
+
+def compute_soft_score(
+    session: Session,
+    deck_storage_location_id: int,
+    user_id: int,
+    combo_role: str,
+    pip_strain: dict | None = None,
+) -> int:
+    """Aggregate 0-100 power score per Section 3 Step 3.
+
+    Does NOT influence the bracket — strictly informational. Lets users see
+    why a deck plays harder than its mechanical bracket suggests.
+    """
+    sig = _gather_deck_signals(session, deck_storage_location_id, user_id)
+
+    fast_mana_n = sig["tag_counts"].get("fast_mana", 0)
+    free_int_n = sig["tag_counts"].get("free_interaction", 0)
+    uncond_tutor_n = sig["tag_counts"].get("unconditional_tutor", 0)
+    restr_tutor_n = sig["tag_counts"].get("restricted_tutor", 0)
+    stax_n = sig["tag_counts"].get("stax", 0)
+
+    # Spec weights — see Section 3 Step 3
+    score = 0
+    score += min(20, fast_mana_n * 5)
+    score += min(20, uncond_tutor_n * 5 + restr_tutor_n * 2)
+    score += min(15, free_int_n * 5)
+    score += min(5, stax_n * 2)
+
+    combo_points = {
+        "none": 0,
+        "incidental": 3,
+        "backup": 8,
+        "primary": 12,
+        "compact": 15,
+    }
+    score += combo_points.get(combo_role, 0)
+
+    # Card-draw efficiency: count InventoryRow.tags including "Draw" or "Engine"
+    draw_engine_count = (
+        session.execute(
+            text(
+                """
+            SELECT COUNT(*) FROM inventory_rows
+            WHERE user_id = :uid AND storage_location_id = :loc
+              AND tags IS NOT NULL AND (tags LIKE '%Draw%' OR tags LIKE '%Engine%')
+            """
+            ),
+            {"uid": user_id, "loc": deck_storage_location_id},
+        ).scalar()
+        or 0
+    )
+    score += min(15, draw_engine_count)
+
+    # Mana base quality — fraction of non-basic lands as a proxy. 0-10.
+    land_rows = session.execute(
+        text(
+            """
+            SELECT c.type_line FROM inventory_rows ir
+            JOIN cards c ON ir.card_id = c.id
+            WHERE ir.user_id = :uid AND ir.storage_location_id = :loc
+              AND c.type_line LIKE '%Land%'
+            """
+        ),
+        {"uid": user_id, "loc": deck_storage_location_id},
+    ).fetchall()
+    if land_rows:
+        non_basic = sum(1 for r in land_rows if "basic land" not in (r[0] or "").lower())
+        score += round((non_basic / len(land_rows)) * 10)
+
+    # Pip strain penalty — strained colors drag the score
+    if pip_strain:
+        strained = sum(1 for v in pip_strain.values() if v.get("strained"))
+        score -= min(5, strained * 2)
+
+    return max(0, min(100, score))
+
+
 def derive_combo_role(
     combos: dict | None, tutor_count: int, commander_names: set[str]
 ) -> tuple[str, list[Finding]]:
@@ -734,6 +815,7 @@ def estimate_bracket_v2(
     base = estimate_bracket_v1(session, deck.storage_location_id, user_id)
     mechanics_bracket = base.mechanics_bracket
     findings = list(base.findings)
+    combo_role = "none"
 
     # V3: combo role analysis
     if combos is not None:
@@ -758,7 +840,7 @@ def estimate_bracket_v2(
         ).first()
         tutor_count = tutor_rows[0] if tutor_rows else 0
 
-        _role, combo_findings = derive_combo_role(combos, tutor_count, commander_names)
+        combo_role, combo_findings = derive_combo_role(combos, tutor_count, commander_names)
         findings += combo_findings
         for cf in combo_findings:
             if cf.contributes_to_bracket:
@@ -782,12 +864,35 @@ def estimate_bracket_v2(
     mechanics_clarity = 1.0
     combo_detection_depth = 1.0 if combos is not None else None
 
+    # Soft power score — Section 3 Step 3. Informational, never bracket-pushing.
+    # Pip strain is pulled from compute_deck_health; lazy import to avoid cycles.
+    try:
+        from sqlalchemy.orm import joinedload
+
+        from app.deck_service import compute_deck_health
+        from app.models import InventoryRow
+
+        _rows = (
+            session.query(InventoryRow)
+            .options(joinedload(InventoryRow.card))
+            .filter(
+                InventoryRow.user_id == user_id,
+                InventoryRow.storage_location_id == deck.storage_location_id,
+            )
+            .all()
+        )
+        _health = compute_deck_health(_rows) if _rows else None
+        pip_strain = _health.get("pip_strain") if _health else None
+    except Exception:
+        pip_strain = None
+    score = compute_soft_score(session, deck.storage_location_id, user_id, combo_role, pip_strain)
+
     return BracketEstimate(
         mechanics_bracket=mechanics_bracket,
         final_bracket=final_bracket,
         findings=findings,
         rules_version=base.rules_version,
-        score=base.score,
+        score=score,
         intent_bracket=intent_bracket,
         confidence_tagging_coverage=tagging_coverage,
         confidence_mechanics_clarity=mechanics_clarity,

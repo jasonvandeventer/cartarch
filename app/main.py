@@ -1664,6 +1664,7 @@ def deck_detail_page(
             "mechanics_bracket": _est.mechanics_bracket,
             "intent_bracket": _est.intent_bracket,
             "rules_version": _est.rules_version,
+            "score": _est.score,
             "confidence": {
                 "tagging_coverage": _est.confidence_tagging_coverage,
                 "mechanics_clarity": _est.confidence_mechanics_clarity,

@@ -61,6 +61,12 @@
         <div class="bracket-v2-meta">
           <div class="bracket-v2-mech">
             Mechanical signal: <strong>{{ bracket_v2.mechanics_bracket }}</strong>
+            {% if bracket_v2.score is not none %}
+              <span class="bracket-v2-score"
+                    title="Soft power score (0-100). Informational only — does not change the bracket.">
+                · Power score <strong>{{ bracket_v2.score }}</strong>/100
+              </span>
+            {% endif %}
           </div>
           {% if bracket_v2.intent_bracket %}
             <div class="bracket-v2-intent">
