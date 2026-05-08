@@ -83,8 +83,9 @@
         <div class="bracket-v2-confidence">
           {% if bracket_v2.confidence.tagging_coverage is not none %}
             {% set pct = (bracket_v2.confidence.tagging_coverage * 100)|round|int %}
-            <div class="bracket-v2-conf-row">
-              <span class="bracket-v2-conf-label">Tagging coverage</span>
+            <div class="bracket-v2-conf-row"
+                 title="% of non-basic cards that fire a bracket-relevant signal (fast mana, tutors, free interaction, mass land denial, extra turns, stax). Casual decks are expectedly low; cEDH-tier decks high.">
+              <span class="bracket-v2-conf-label">Signal density</span>
               <div class="bracket-v2-conf-bar-wrap">
                 <div class="bracket-v2-conf-bar" style="width: {{ pct }}%"></div>
               </div>
