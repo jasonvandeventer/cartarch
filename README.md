@@ -2,7 +2,7 @@
 
 Self-hosted web application for managing a physical Magic: The Gathering collection.
 
-**Current version: v3.14.20** · [Platform repo](https://github.com/jasonvandeventer/mana-archive-platform)
+**Current version: v3.15.0** · [Platform repo](https://github.com/jasonvandeventer/mana-archive-platform)
 
 ---
 
@@ -31,7 +31,7 @@ Self-hosted web application for managing a physical Magic: The Gathering collect
 - **Token panel**: auto-discovers tokens produceable by the deck via Scryfall `all_parts`; click a token image to view its detail page
 - **Synergy classification**: cards split into Direct / Supporting / Unrelated based on commander themes (death triggers, tokens, sacrifice, +1/+1 counters, tribal subtypes)
 - **Win condition detection**: live integration with CommanderSpellbook to surface combos present in the deck
-- **Bracket estimator**: floor-based 1–5 bracket using fast mana, free interaction, combos, tutors, mass land denial, and extra turns
+- **Bracket Estimator V2** (v3.15.0+): multi-stage pipeline producing a 1-5 bracket with explainable findings. Mechanics floor (Game Changer count via Scryfall `is:gamechanger`, mass land denial, extra-turn chains) + 5-question intent survey + combo role classification (none/incidental/backup/primary/compact via Commander Spellbook). Mechanics-vs-intent mismatch warnings; multi-dimensional confidence (tagging coverage, mechanics clarity, intent alignment, combo detection depth)
 - **Role tag system** with 10 tags (Ramp, Draw, Tutor, Removal, Wipe, Protection, Engine, Synergy, Threat, Hate); auto-detected from oracle text and commander themes; **Retag** button re-runs detection over already-tagged rows additively
 - Click any health metric count to filter the deck grid to just those cards
 
