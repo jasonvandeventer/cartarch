@@ -55,3 +55,34 @@ def change_password(
         session.commit()
 
     return RedirectResponse(url="/account?success=password_changed", status_code=303)
+
+
+@router.post("/update-profile")
+def update_profile(
+    request: Request,
+    email: str = Form(...),
+    display_name: str = Form(""),
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+    _: None = CsrfRequired,
+):
+    email = email.strip()
+    display_name = display_name.strip() or None
+
+    if "@" not in email or "." not in email.split("@", 1)[1]:
+        return RedirectResponse(url="/account?error=bad_email", status_code=303)
+
+    if email != current_user.username:
+        existing = (
+            session.query(User).filter(User.username == email, User.id != current_user.id).first()
+        )
+        if existing:
+            return RedirectResponse(url="/account?error=email_taken", status_code=303)
+
+    user = session.query(User).filter(User.id == current_user.id).first()
+    if user:
+        user.username = email
+        user.display_name = display_name
+        session.commit()
+
+    return RedirectResponse(url="/account?success=profile_updated", status_code=303)

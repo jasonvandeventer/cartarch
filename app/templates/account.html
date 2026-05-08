@@ -3,7 +3,8 @@
   <section class="panel page-hero">
     <div>
       <div class="eyebrow">Account</div>
-      <h2 class="panel-title">{{ current_user.username }}</h2>
+      <h2 class="panel-title">{{ current_user.display_name or current_user.username }}</h2>
+      {% if current_user.display_name %}<p class="muted">{{ current_user.username }}</p>{% endif %}
       <p class="muted">
         Member since {{ current_user.created_at.strftime("%B %d, %Y") if current_user.created_at else 'unknown' }}
         {% if current_user.is_admin %}&nbsp;·&nbsp; <span style="color: #7fb0ff; font-weight: 600;">Admin</span>{% endif %}
@@ -19,6 +20,10 @@
           New password must be at least 8 characters.
         {% elif error == 'passwords_dont_match' %}
           New passwords do not match.
+        {% elif error == 'bad_email' %}
+          Please enter a valid email address.
+        {% elif error == 'email_taken' %}
+          That email is already in use by another account.
         {% else %}
           An error occurred. Please try again.
         {% endif %}
@@ -30,12 +35,37 @@
       <p style="margin: 0; font-weight: 600;">
         {% if success == 'password_changed' %}
           Password updated successfully.
+        {% elif success == 'profile_updated' %}
+          Profile updated successfully.
         {% else %}
           Done.
         {% endif %}
       </p>
     </section>
   {% endif %}
+  <section class="panel">
+    <h3 class="panel-title">Profile</h3>
+    <form action="/account/update-profile"
+          method="post"
+          class="stack-form"
+          style="max-width: 360px;
+                 margin-top: 0.75rem">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <label>Email</label>
+      <input type="email"
+             name="email"
+             required
+             value="{{ current_user.username }}"
+             autocomplete="email">
+      <label>Display name</label>
+      <input type="text"
+             name="display_name"
+             maxlength="64"
+             value="{{ current_user.display_name or '' }}"
+             placeholder="Shown in nav, decks, games">
+      <button type="submit">Update Profile</button>
+    </form>
+  </section>
   <section class="panel">
     <h3 class="panel-title">Change Password</h3>
     <form action="/account/change-password"
