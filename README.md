@@ -2,7 +2,7 @@
 
 Self-hosted web application for managing a physical Magic: The Gathering collection.
 
-**Current version: v3.14.11** · [Platform repo](https://github.com/jasonvandeventer/mana-archive-platform)
+**Current version: v3.14.20** · [Platform repo](https://github.com/jasonvandeventer/mana-archive-platform)
 
 ---
 
@@ -26,9 +26,13 @@ Self-hosted web application for managing a physical Magic: The Gathering collect
 - Create and manage Commander (or any format) decks; edit name, format, and notes inline
 - Mark commanders; commander cards appear in a dedicated panel above the deck grid
 - Full Scryfall-style search within a deck
-- **Analytics panel**: mana curve, card type breakdown, color pip counts, avg CMC
+- **Analytics panel**: mana curve, card type breakdown, color pip counts, avg CMC, "deck peaks at turn X" insight
 - **Health panel**: ramp/draw/removal/board-wipe density vs recommended thresholds; pip strain analysis (colored pip demand vs land color sources)
 - **Token panel**: auto-discovers tokens produceable by the deck via Scryfall `all_parts`; click a token image to view its detail page
+- **Synergy classification**: cards split into Direct / Supporting / Unrelated based on commander themes (death triggers, tokens, sacrifice, +1/+1 counters, tribal subtypes)
+- **Win condition detection**: live integration with CommanderSpellbook to surface combos present in the deck
+- **Bracket estimator**: floor-based 1–5 bracket using fast mana, free interaction, combos, tutors, mass land denial, and extra turns
+- **Role tag system** with 10 tags (Ramp, Draw, Tutor, Removal, Wipe, Protection, Engine, Synergy, Threat, Hate); auto-detected from oracle text and commander themes; **Retag** button re-runs detection over already-tagged rows additively
 - Click any health metric count to filter the deck grid to just those cards
 
 ### Organization
@@ -36,7 +40,7 @@ Self-hosted web application for managing a physical Magic: The Gathering collect
 - Drawer/slot system for physical organization (gated per-user)
 - Custom storage locations: create, edit (name/type/parent/sort order), and delete
 - Move cards between locations from the location detail page or deck detail page
-- **Bulk move**: select multiple cards from a location or deck and move them in one action; destination picker includes both storage locations and other decks
+- **Bulk move**: select multiple cards from a location or deck and move them in one action; destination picker includes both storage locations and other decks; drawer-sorter users get a "Return to Sorter" option that bulk-returns rows to pending and triggers auto-placement
 - Return cards from decks to pending/collection
 - **CSV export**: download your full collection or any individual location as a CSV (Name, Set, Collector Number, Finish, Quantity, Location)
 
@@ -49,6 +53,7 @@ Self-hosted web application for managing a physical Magic: The Gathering collect
 ### Multi-user
 
 - **Self-service registration** — users sign up with email + display name; no admin involvement required
+- **Update Profile form** at `/account` lets any user change their email and display name without admin DB access
 - Admin panel: create/delete users, toggle admin/active, reset passwords
 - Display names shown throughout the UI; email used as login identifier
 - Per-user data isolation; drawer sorter is opt-in per username
