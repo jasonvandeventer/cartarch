@@ -1638,9 +1638,9 @@ def deck_detail_page(
 
     bracket_v2 = None
     if deck and deck.storage_location_id:
-        from app.bracket_v2_service import estimate_bracket_v1, persist_estimate
+        from app.bracket_v2_service import estimate_bracket_v2, persist_estimate
 
-        _est = estimate_bracket_v1(session, deck.storage_location_id, current_user.id)
+        _est = estimate_bracket_v2(session, deck, current_user.id)
         try:
             persist_estimate(session, deck.id, _est)
         except Exception as exc:  # noqa: BLE001 — persistence isn't user-facing
@@ -1648,7 +1648,14 @@ def deck_detail_page(
         bracket_v2 = {
             "bracket": _est.final_bracket,
             "mechanics_bracket": _est.mechanics_bracket,
+            "intent_bracket": _est.intent_bracket,
             "rules_version": _est.rules_version,
+            "confidence": {
+                "tagging_coverage": _est.confidence_tagging_coverage,
+                "mechanics_clarity": _est.confidence_mechanics_clarity,
+                "intent_alignment": _est.confidence_intent_alignment,
+                "combo_detection_depth": _est.confidence_combo_detection_depth,
+            },
             "findings": [
                 {
                     "type": f.finding_type,
@@ -1898,6 +1905,31 @@ async def decks_pull(
         quantity=quantity,
     )
 
+    return RedirectResponse(url=f"/decks/{deck_id}", status_code=303)
+
+
+@app.post("/decks/{deck_id}/intent")
+def decks_intent(
+    deck_id: int,
+    intent_pod: str = Form(""),
+    intent_speed: str = Form(""),
+    intent_combo: str = Form(""),
+    intent_winning: str = Form(""),
+    intent_played: str = Form(""),
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+    _: None = CsrfRequired,
+):
+    """Persist the bracket intent survey answers for a deck. Empty -> NULL."""
+    deck = get_deck(session, deck_id=deck_id, user_id=current_user.id)
+    if not deck:
+        return RedirectResponse(url="/decks", status_code=303)
+    deck.intent_pod = intent_pod.strip() or None
+    deck.intent_speed = intent_speed.strip() or None
+    deck.intent_combo = intent_combo.strip() or None
+    deck.intent_winning = intent_winning.strip() or None
+    deck.intent_played = intent_played.strip() or None
+    session.commit()
     return RedirectResponse(url=f"/decks/{deck_id}", status_code=303)
 
 

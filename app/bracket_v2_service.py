@@ -216,6 +216,11 @@ class BracketEstimate:
     findings: list[Finding] = field(default_factory=list)
     rules_version: str = RULES_VERSION
     score: float | None = None
+    intent_bracket: int | None = None
+    confidence_tagging_coverage: float | None = None
+    confidence_mechanics_clarity: float | None = None
+    confidence_intent_alignment: float | None = None
+    confidence_combo_detection_depth: float | None = None
 
 
 def _load_rules(session: Session) -> dict[int, dict]:
@@ -480,6 +485,194 @@ def estimate_bracket_v1(
     )
 
 
+# ---------------------------------------------------------------------------
+# V2: intent survey + multi-dimensional confidence
+# ---------------------------------------------------------------------------
+
+# Per Section 3 Step 5. Each intent answer maps to a bracket-like integer 1-5;
+# the deck's intent_bracket = round(mean of non-null answers), with overrides.
+_INTENT_POD_BRACKET = {
+    "precon": 1,
+    "casual": 2,
+    "upgraded": 3,
+    "optimized": 4,
+    "cedh": 5,
+}
+_INTENT_SPEED_BRACKET = {"journey": 2, "eventually": 3, "quickly": 4}
+_INTENT_COMBO_BRACKET = {"no": 2, "backup": 3, "plan": 4}
+_INTENT_WINNING_BRACKET = {"wild": 2, "balanced": 3, "consistent": 4}
+_INTENT_PLAYED_BRACKET = {"fine": 2, "mixed": 3, "groaned": 4}
+
+
+def derive_intent_bracket(deck) -> int | None:
+    """Translate the 5 intent answers on a Deck into a single bracket 1-5.
+
+    Returns None if every intent_* field is null (user skipped survey).
+    Hard overrides:
+      - intent_pod = 'cedh'        -> 5
+      - intent_played = 'groaned'  -> max(result, 4)
+    """
+    answers = []
+    pod = deck.intent_pod
+    if pod and pod in _INTENT_POD_BRACKET:
+        if pod == "cedh":
+            return 5
+        answers.append(_INTENT_POD_BRACKET[pod])
+    if deck.intent_speed in _INTENT_SPEED_BRACKET:
+        answers.append(_INTENT_SPEED_BRACKET[deck.intent_speed])
+    if deck.intent_combo in _INTENT_COMBO_BRACKET:
+        answers.append(_INTENT_COMBO_BRACKET[deck.intent_combo])
+    if deck.intent_winning in _INTENT_WINNING_BRACKET:
+        answers.append(_INTENT_WINNING_BRACKET[deck.intent_winning])
+    if deck.intent_played in _INTENT_PLAYED_BRACKET:
+        answers.append(_INTENT_PLAYED_BRACKET[deck.intent_played])
+
+    if not answers:
+        return None
+
+    avg = sum(answers) / len(answers)
+    bracket = max(1, min(5, round(avg)))
+    if deck.intent_played == "groaned":
+        bracket = max(bracket, 4)
+    return bracket
+
+
+def resolve_mechanics_intent(
+    mechanics_bracket: int, intent_bracket: int | None
+) -> tuple[int, float | None, list[Finding]]:
+    """Section 3 Step 6: pick final_bracket and produce alignment confidence.
+
+    Returns (final_bracket, intent_alignment, extra_findings).
+    """
+    if intent_bracket is None:
+        return mechanics_bracket, None, []
+
+    diff = mechanics_bracket - intent_bracket
+    if diff == 0:
+        return mechanics_bracket, 1.0, []
+    if abs(diff) == 1:
+        return (
+            mechanics_bracket,
+            0.7,
+            [
+                Finding(
+                    finding_type="intent_off_by_one",
+                    finding_value=f"mech={mechanics_bracket}/intent={intent_bracket}",
+                    severity="info",
+                    message=(
+                        f"Intent says Bracket {intent_bracket}; mechanics show "
+                        f"Bracket {mechanics_bracket}. Close — pod expectations should match."
+                    ),
+                    contributes_to_bracket=None,
+                    weight=1.0,
+                )
+            ],
+        )
+    if diff >= 2:
+        return (
+            mechanics_bracket,
+            0.3,
+            [
+                Finding(
+                    finding_type="pod_mismatch_warning",
+                    finding_value=f"mech={mechanics_bracket}/intent={intent_bracket}",
+                    severity="critical",
+                    message=(
+                        f"This deck plays as Bracket {mechanics_bracket} mechanically but "
+                        f"you've indicated Bracket {intent_bracket} intent. The deck may feel "
+                        f"oppressive in the intended pod."
+                    ),
+                    contributes_to_bracket=mechanics_bracket,
+                    weight=5.0,
+                )
+            ],
+        )
+    return (
+        intent_bracket,
+        0.3,
+        [
+            Finding(
+                finding_type="intent_above_mechanics",
+                finding_value=f"mech={mechanics_bracket}/intent={intent_bracket}",
+                severity="info",
+                message=(
+                    f"You play this as Bracket {intent_bracket} though the cards only "
+                    f"signal Bracket {mechanics_bracket}. That's fine — pod expectations "
+                    f"matter."
+                ),
+                contributes_to_bracket=intent_bracket,
+                weight=1.0,
+            )
+        ],
+    )
+
+
+def _compute_tagging_coverage(
+    session: Session, deck_storage_location_id: int, user_id: int
+) -> float:
+    """% of non-basic deck cards that have at least one confident card_tags row."""
+    rows = session.execute(
+        text(
+            """
+            SELECT c.id, c.type_line, EXISTS(
+                SELECT 1 FROM card_tags ct
+                WHERE ct.card_id = c.id AND ct.confidence IN ('certain', 'high', 'medium')
+            ) AS tagged
+            FROM inventory_rows ir
+            JOIN cards c ON ir.card_id = c.id
+            WHERE ir.user_id = :uid AND ir.storage_location_id = :loc
+            """
+        ),
+        {"uid": user_id, "loc": deck_storage_location_id},
+    ).fetchall()
+
+    relevant = [r for r in rows if "basic land" not in (r[1] or "").lower()]
+    if not relevant:
+        return 1.0
+    tagged = sum(1 for r in relevant if r[2])
+    return round(tagged / len(relevant), 3)
+
+
+def estimate_bracket_v2(session: Session, deck, user_id: int) -> BracketEstimate:
+    """V2 estimator: V1 mechanics + intent + confidence.
+
+    Takes a full Deck object (not just storage_location_id) so it can read the
+    intent_* survey columns and the deck.id for downstream persistence.
+    """
+    base = estimate_bracket_v1(session, deck.storage_location_id, user_id)
+
+    intent_bracket = derive_intent_bracket(deck)
+    final_bracket, intent_alignment, extra_findings = resolve_mechanics_intent(
+        base.mechanics_bracket, intent_bracket
+    )
+
+    findings = list(base.findings) + extra_findings
+
+    tagging_coverage = _compute_tagging_coverage(session, deck.storage_location_id, user_id)
+    # The spec's 85% threshold assumes community-curated tags for every card. Our
+    # V2 auto-tagger only fires on bracket-relevant cards, so casual decks
+    # legitimately show low coverage. We display the coverage in the UI but don't
+    # raise a finding until V3+ adds curated tags.
+
+    # mechanics_clarity for V1 hard-rule logic: every finding currently fires from
+    # an unambiguous rule, so clarity is 1.0. Future ambiguous-rule findings (V3
+    # combo edge cases, soft floors) will drop this.
+    mechanics_clarity = 1.0
+
+    return BracketEstimate(
+        mechanics_bracket=base.mechanics_bracket,
+        final_bracket=final_bracket,
+        findings=findings,
+        rules_version=base.rules_version,
+        score=base.score,
+        intent_bracket=intent_bracket,
+        confidence_tagging_coverage=tagging_coverage,
+        confidence_mechanics_clarity=mechanics_clarity,
+        confidence_intent_alignment=intent_alignment,
+        confidence_combo_detection_depth=None,
+    )
+
+
 def persist_estimate(session: Session, deck_id: int, estimate: BracketEstimate) -> int:
     """Replace any existing estimate for this deck and write the findings."""
     session.execute(
@@ -497,10 +690,13 @@ def persist_estimate(session: Session, deck_id: int, estimate: BracketEstimate) 
         text(
             """
             INSERT INTO deck_bracket_estimates (
-                deck_id, estimated_bracket, mechanics_bracket, final_bracket,
-                score, rules_version
+                deck_id, estimated_bracket, mechanics_bracket, intent_bracket,
+                final_bracket, score, rules_version,
+                confidence_tagging_coverage, confidence_mechanics_clarity,
+                confidence_intent_alignment, confidence_combo_detection_depth
             ) VALUES (
-                :d, :bracket, :mech, :final, :score, :v
+                :d, :bracket, :mech, :intent, :final, :score, :v,
+                :ctc, :cmc, :cia, :ccd
             )
             """
         ),
@@ -508,9 +704,14 @@ def persist_estimate(session: Session, deck_id: int, estimate: BracketEstimate) 
             "d": deck_id,
             "bracket": estimate.final_bracket,
             "mech": estimate.mechanics_bracket,
+            "intent": estimate.intent_bracket,
             "final": estimate.final_bracket,
             "score": estimate.score,
             "v": estimate.rules_version,
+            "ctc": estimate.confidence_tagging_coverage,
+            "cmc": estimate.confidence_mechanics_clarity,
+            "cia": estimate.confidence_intent_alignment,
+            "ccd": estimate.confidence_combo_detection_depth,
         },
     )
     estimate_id = result.lastrowid

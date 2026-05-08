@@ -2779,3 +2779,88 @@ body.game-mode {
 .bracket-v2-sev-icon {
   margin-right: 0.4rem;
 }
+
+/* Bracket V2 panel — intent + confidence + survey */
+.bracket-v2-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 1rem;
+}
+.bracket-v2-intent {
+  font-size: 0.95rem;
+}
+.bracket-v2-aligned {
+  color: #4ade80;
+  margin-left: 0.5rem;
+  font-size: 0.85rem;
+}
+.bracket-v2-confidence {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 220px;
+}
+.bracket-v2-conf-row {
+  display: grid;
+  grid-template-columns: 110px 1fr 36px;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.78rem;
+}
+.bracket-v2-conf-label {
+  color: #94a3b8;
+}
+.bracket-v2-conf-bar-wrap {
+  height: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.bracket-v2-conf-bar {
+  height: 100%;
+  background: #4a90e2;
+}
+.bracket-v2-conf-val {
+  text-align: right;
+  color: #94a3b8;
+}
+.bracket-v2-intent-survey summary {
+  cursor: pointer;
+  font-size: 0.85rem;
+  color: #4a90e2;
+  padding: 0.25rem 0;
+  list-style: none;
+}
+.bracket-v2-intent-survey summary::-webkit-details-marker {
+  display: none;
+}
+.bracket-v2-intent-form {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.6rem;
+  margin-top: 0.5rem;
+}
+.bracket-v2-intent-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-size: 0.85rem;
+  color: #94a3b8;
+}
+.bracket-v2-intent-form button {
+  grid-column: 1 / -1;
+  justify-self: start;
+  margin-top: 0.4rem;
+}
+@media (max-width: 720px) {
+  .bracket-v2-row {
+    grid-template-columns: auto 1fr;
+  }
+  .bracket-v2-confidence {
+    grid-column: 1 / -1;
+  }
+  .bracket-v2-intent-form {
+    grid-template-columns: 1fr;
+  }
+}

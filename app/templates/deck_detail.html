@@ -62,7 +62,49 @@
           <div class="bracket-v2-mech">
             Mechanical signal: <strong>{{ bracket_v2.mechanics_bracket }}</strong>
           </div>
+          {% if bracket_v2.intent_bracket %}
+            <div class="bracket-v2-intent">
+              Your intent: <strong>{{ bracket_v2.intent_bracket }}</strong>
+              {% if bracket_v2.intent_bracket == bracket_v2.mechanics_bracket %}
+                <span class="bracket-v2-aligned">✓ Aligned</span>
+              {% endif %}
+            </div>
+          {% else %}
+            <div class="muted small-text">Intent survey not answered</div>
+          {% endif %}
           <div class="muted small-text">Rules v{{ bracket_v2.rules_version }}</div>
+        </div>
+        <div class="bracket-v2-confidence">
+          {% if bracket_v2.confidence.tagging_coverage is not none %}
+            {% set pct = (bracket_v2.confidence.tagging_coverage * 100)|round|int %}
+            <div class="bracket-v2-conf-row">
+              <span class="bracket-v2-conf-label">Tagging coverage</span>
+              <div class="bracket-v2-conf-bar-wrap">
+                <div class="bracket-v2-conf-bar" style="width: {{ pct }}%"></div>
+              </div>
+              <span class="bracket-v2-conf-val">{{ pct }}%</span>
+            </div>
+          {% endif %}
+          {% if bracket_v2.confidence.mechanics_clarity is not none %}
+            {% set pct = (bracket_v2.confidence.mechanics_clarity * 100)|round|int %}
+            <div class="bracket-v2-conf-row">
+              <span class="bracket-v2-conf-label">Mechanics clarity</span>
+              <div class="bracket-v2-conf-bar-wrap">
+                <div class="bracket-v2-conf-bar" style="width: {{ pct }}%"></div>
+              </div>
+              <span class="bracket-v2-conf-val">{{ pct }}%</span>
+            </div>
+          {% endif %}
+          {% if bracket_v2.confidence.intent_alignment is not none %}
+            {% set pct = (bracket_v2.confidence.intent_alignment * 100)|round|int %}
+            <div class="bracket-v2-conf-row">
+              <span class="bracket-v2-conf-label">Intent alignment</span>
+              <div class="bracket-v2-conf-bar-wrap">
+                <div class="bracket-v2-conf-bar" style="width: {{ pct }}%"></div>
+              </div>
+              <span class="bracket-v2-conf-val">{{ pct }}%</span>
+            </div>
+          {% endif %}
         </div>
       </div>
       <details class="bracket-v2-findings-details">
@@ -85,6 +127,67 @@
             </li>
           {% endfor %}
         </ul>
+      </details>
+      <details class="bracket-v2-intent-survey">
+        <summary>
+          {% if bracket_v2.intent_bracket %}
+            Update
+          {% else %}
+            Answer
+          {% endif %}
+          pod intent survey
+        </summary>
+        <form action="/decks/{{ deck.id }}/intent"
+              method="post"
+              class="bracket-v2-intent-form">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <label>
+            What pod is this deck for?
+            <select name="intent_pod">
+              <option value="">— pick —</option>
+              {% for v, lbl in [("precon","Precon"),("casual","Casual"),("upgraded","Upgraded"),("optimized","Optimized"),("cedh","cEDH"),("none","No preference")] %}
+                <option value="{{ v }}" {% if deck.intent_pod == v %}selected{% endif %}>{{ lbl }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <label>
+            Are you trying to win quickly?
+            <select name="intent_speed">
+              <option value="">— pick —</option>
+              {% for v, lbl in [("quickly","Yes — turn 5-7"),("eventually","Eventually — turn 8-10"),("journey","The journey is the point")] %}
+                <option value="{{ v }}" {% if deck.intent_speed == v %}selected{% endif %}>{{ lbl }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <label>
+            Does the deck intentionally assemble combos?
+            <select name="intent_combo">
+              <option value="">— pick —</option>
+              {% for v, lbl in [("plan","Yes — combo is the plan"),("backup","Yes — backup line"),("no","No — just good cards")] %}
+                <option value="{{ v }}" {% if deck.intent_combo == v %}selected{% endif %}>{{ lbl }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <label>
+            How do you feel about losing?
+            <select name="intent_winning">
+              <option value="">— pick —</option>
+              {% for v, lbl in [("consistent","Want to win consistently"),("balanced","Winning's nice, game matters more"),("wild","Wild game over winning")] %}
+                <option value="{{ v }}" {% if deck.intent_winning == v %}selected{% endif %}>{{ lbl }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <label>
+            Has this deck been at the table before?
+            <select name="intent_played">
+              <option value="">— pick —</option>
+              {% for v, lbl in [("untested","Haven't played it"),("fine","People seemed fine"),("mixed","Mixed reactions"),("groaned","People groaned")] %}
+                <option value="{{ v }}" {% if deck.intent_played == v %}selected{% endif %}>{{ lbl }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <button type="submit">Save Intent</button>
+        </form>
       </details>
     </section>
   {% endif %}

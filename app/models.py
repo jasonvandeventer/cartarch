@@ -120,6 +120,11 @@ class Deck(Base):
     name: Mapped[str] = mapped_column(String(255), index=True)
     format: Mapped[str | None] = mapped_column(String(64), nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    intent_pod: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    intent_speed: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    intent_combo: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    intent_winning: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    intent_played: Mapped[str | None] = mapped_column(String(16), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     storage_location: Mapped[StorageLocation | None] = relationship()
