@@ -2,7 +2,7 @@
 
 Self-hosted web application for managing a physical Magic: The Gathering collection.
 
-**Current version: v3.15.0** · [Platform repo](https://github.com/jasonvandeventer/mana-archive-platform)
+**Current version: v3.16.0** · [Platform repo](https://github.com/jasonvandeventer/mana-archive-platform)
 
 ---
 
@@ -70,9 +70,18 @@ Self-hosted web application for managing a physical Magic: The Gathering collect
 - State persisted to `localStorage` — survives page refresh mid-game
 - End Game records placements, final life totals, and turn count; W/L record shown on each deck's detail page
 
+### Tokens
+
+- **Lightweight token catalog** at `/tokens` — track physical tokens you own (Pest x12, Treasure x30, etc.) separate from card inventory
+- **Scryfall integration** on the new-token form: live name autocomplete, "Look up exact (set + collector)" button (auto-tries the `t`-prefix for token sets — `BIG #0006` resolves to the Golem in `tbig`), and "Search by name" picker that returns multiple matches as a visual image grid for disambiguation
+- **Storage location reuse** — tokens go in any StorageLocation but are excluded from drawer-sorter automation
+- **Double-sided token support** — real DFC tokens (Goblin // Treasure) auto-detected via Scryfall's `card_faces`; user can also flag manually
+- **Deck Tokens-Needed** table on each deck detail page: declare what the deck needs (Pest x10, Food x8) and see Owned / Missing status pulled from your token inventory
+
 ### Sets
 
-- Browse cards by set; token tracking toggle per set
+- Browse cards by set; token panel renders by default and includes substitute cards (`s{set_code}` like SZNR) appended after regular tokens
+- Owned/Missing badges on every token tile sourced from your token inventory by `(set_code, collector_number)` match
 
 ---
 
