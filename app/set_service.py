@@ -3,7 +3,32 @@ from __future__ import annotations
 from sqlalchemy.orm import Session
 
 from app.inventory_service import get_owned_cards_by_set, list_owned_sets
+from app.models import TokenInventory
 from app.scryfall import fetch_set_cards
+
+
+def _get_owned_token_map(session: Session, set_code: str, user_id: int) -> dict[str, int]:
+    """Map collector_number -> total owned quantity for tokens in a set.
+
+    Sources from the token_inventory table (NOT inventory_rows). Set codes
+    are matched case-insensitively. Multiple inventory rows for the same
+    printing get summed.
+    """
+    rows = (
+        session.query(TokenInventory.collector_number, TokenInventory.quantity)
+        .filter(
+            TokenInventory.user_id == user_id,
+            TokenInventory.set_code.ilike(set_code),
+        )
+        .all()
+    )
+    out: dict[str, int] = {}
+    for cn, qty in rows:
+        if not cn:
+            continue
+        key = cn.lstrip("0") or "0"
+        out[key] = out.get(key, 0) + int(qty or 0)
+    return out
 
 
 def get_set_completion(
@@ -49,11 +74,12 @@ def get_set_completion(
 
     token_data = None
     if include_tokens:
-        token_set_code = "t" + set_code
+        token_set_code = "t" + set_code if not set_code.startswith("t") else set_code
         token_cards = fetch_set_cards(token_set_code)
-        token_owned_map = get_owned_cards_by_set(session, set_code=token_set_code, user_id=user_id)
+        token_owned_map = _get_owned_token_map(session, token_set_code, user_id)
         for token in token_cards:
-            token["quantity_owned"] = token_owned_map.get(token["collector_number"], 0)
+            cn_key = (token["collector_number"] or "").lstrip("0") or "0"
+            token["quantity_owned"] = token_owned_map.get(cn_key, 0)
         if token_cards:
             token_data = {
                 "set_code": token_set_code,

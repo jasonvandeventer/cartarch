@@ -2888,3 +2888,59 @@ body.game-mode {
 .filter-checkbox input {
   margin: 0;
 }
+
+/* Token search picker on /tokens/new */
+.token-search-results {
+  margin-top: 0.5rem;
+}
+.token-search-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 0.5rem;
+}
+.token-search-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  padding: 0.4rem;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  cursor: pointer;
+  text-align: left;
+  color: inherit;
+  font: inherit;
+}
+.token-search-card:hover {
+  background: rgba(74, 144, 226, 0.15);
+  border-color: #4a90e2;
+}
+.token-search-card img {
+  width: 100%;
+  border-radius: 4px;
+  display: block;
+}
+.token-search-noimg {
+  aspect-ratio: 0.72;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #94a3b8;
+  font-size: 0.75rem;
+}
+.token-search-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+/* Token completion tiles on set detail */
+.card-tile.token-tile-owned {
+  border-left: 3px solid #4ade80;
+}
+.card-tile.token-tile-missing {
+  border-left: 3px solid #f59e0b;
+  opacity: 0.78;
+}

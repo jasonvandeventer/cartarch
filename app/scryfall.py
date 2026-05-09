@@ -480,6 +480,26 @@ def fetch_token_by_set_number(set_code: str, collector_number: str) -> dict[str,
     return None
 
 
+def search_tokens_by_name(name: str, limit: int = 12) -> list[dict[str, Any]]:
+    """Return up to `limit` matching tokens with form-ready fields each.
+
+    For disambiguating tokens with the same name across multiple sets — e.g.,
+    'Treasure' has dozens of printings; 'Goblin' has many. The picker UI
+    consumes this so the user can choose the right printing.
+    """
+    n = (name or "").strip()
+    if len(n) < 2:
+        return []
+    url = (
+        "https://api.scryfall.com/cards/search"
+        f"?q=is%3Atoken+name%3A{requests.utils.quote(n)}"
+        "&unique=prints&order=released&dir=desc"
+    )
+    data = _get_json(url)
+    cards = data.get("data", []) if data else []
+    return [_format_token_response(c) for c in cards[:limit]]
+
+
 def fetch_token_by_name(name: str) -> dict[str, Any] | None:
     """Look up a single token by name and return form-ready fields.
 

@@ -118,10 +118,10 @@ from app.scryfall import (
     bulk_refresh_prices,
     fetch_card_by_scryfall_id,
     fetch_card_by_set_and_number,
-    fetch_token_by_name,
     fetch_token_by_set_number,
     refresh_card_from_scryfall,
     search_cards_by_name,
+    search_tokens_by_name,
 )
 from app.set_service import get_set_completion
 from app.token_service import (
@@ -2384,20 +2384,33 @@ def tokens_api_lookup(
     collector: str = "",
     current_user: User = Depends(get_current_user),
 ):
-    """Single-token lookup for auto-fill on the new-token form.
-
-    Prefers set + collector number when both are provided (most precise
-    path; auto-tries the `t`-prefixed token set if the bare set code
-    doesn't return a token). Falls back to fuzzy name search.
-    """
-    if set.strip() and collector.strip():
-        data = fetch_token_by_set_number(set, collector)
-        if data:
-            return JSONResponse(data)
-    data = fetch_token_by_name(name)
+    """Precise single-token lookup for auto-fill. Requires set + collector
+    number; the t-prefix is auto-tried if the bare set code isn't a token
+    set. Returns 400 if set + collector are missing — the picker endpoint
+    is the right path for ambiguous name-only lookups."""
+    if not (set.strip() and collector.strip()):
+        return JSONResponse(
+            {"error": "set_and_collector_required"},
+            status_code=400,
+        )
+    data = fetch_token_by_set_number(set, collector)
     if not data:
         return JSONResponse({"error": "not_found"}, status_code=404)
     return JSONResponse(data)
+
+
+@app.get("/tokens/api/search")
+def tokens_api_search(
+    name: str = "",
+    current_user: User = Depends(get_current_user),
+):
+    """Multi-result search for the picker UI on the new-token form.
+
+    Returns up to ~12 matching tokens with images so the user can
+    disambiguate visually (e.g., picking the right Treasure printing
+    when several share the name)."""
+    results = search_tokens_by_name(name, limit=12)
+    return JSONResponse({"results": results})
 
 
 @app.post("/decks/{deck_id}/tokens/{req_id}/delete")

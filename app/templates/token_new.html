@@ -14,7 +14,7 @@
           style="max-width: 520px">
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
       <label>
-        Name <span class="muted small-text">(required — type 2+ chars to autocomplete from Scryfall)</span>
+        Name <span class="muted small-text">(required — type 2+ chars for autocomplete)</span>
       </label>
       <input type="text"
              id="token-name-input"
@@ -24,15 +24,20 @@
              list="token-name-suggestions"
              autocomplete="off">
       <datalist id="token-name-suggestions"></datalist>
-      <button type="button"
-              id="token-lookup-btn"
-              class="btn-like btn-like-muted"
-              style="margin-top:-0.25rem;
-                     align-self:start">Look up on Scryfall</button>
+      <p class="muted small-text" style="margin: 0">
+        Best precision: also fill <strong>Set code</strong> + <strong>Collector number</strong> below
+        and click <em>Look up exact</em>. Without a set, the lookup will show all matching prints so
+        you can pick the right one.
+      </p>
+      <div style="display:flex;gap:0.5rem;flex-wrap:wrap">
+        <button type="button" id="token-lookup-exact-btn" class="btn-like">Look up exact (set + collector)</button>
+        <button type="button" id="token-search-btn" class="btn-like btn-like-muted">Search by name</button>
+      </div>
       <p id="token-lookup-status"
          class="muted small-text"
          style="margin:0;
                 min-height:1em"></p>
+      <div id="token-search-results" class="token-search-results"></div>
       <label>Quantity</label>
       <input type="number" name="quantity" value="1" min="0">
       <label>
@@ -98,12 +103,35 @@
 (() => {
   const nameInput = document.getElementById('token-name-input');
   const datalist = document.getElementById('token-name-suggestions');
-  const lookupBtn = document.getElementById('token-lookup-btn');
+  const lookupExactBtn = document.getElementById('token-lookup-exact-btn');
+  const searchBtn = document.getElementById('token-search-btn');
   const statusEl = document.getElementById('token-lookup-status');
+  const resultsEl = document.getElementById('token-search-results');
   if (!nameInput) return;
 
   let acTimer = null;
   let lastQuery = '';
+
+  function applyTokenData(data) {
+    const set = (id, value) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      if (el.type === 'checkbox') el.checked = !!value;
+      else if (value !== null && value !== undefined) el.value = value;
+    };
+    nameInput.value = data.name || nameInput.value;
+    set('token-field-subtype', data.subtype);
+    set('token-field-image_url', data.image_url);
+    set('token-field-set_code', data.set_code);
+    set('token-field-collector_number', data.collector_number);
+    set('token-field-scryfall_id', data.scryfall_id);
+    set('token-field-is_double_sided', data.is_double_sided);
+    set('token-field-back_name', data.back_name);
+    set('token-field-back_image_url', data.back_image_url);
+    resultsEl.innerHTML = '';
+    statusEl.textContent = 'Filled from Scryfall · ' + (data.set_code || '?').toUpperCase() +
+      ' #' + (data.collector_number || '?');
+  }
 
   // Live autocomplete: debounce, fetch, populate datalist.
   nameInput.addEventListener('input', () => {
@@ -121,64 +149,79 @@
     }, 200);
   });
 
-  // Auto-fill: clicking the button (or selecting from datalist) populates the form.
-  // Set + collector takes precedence over name when both are filled.
-  async function fillFromScryfall() {
-    const name = nameInput.value.trim();
+  // Precise lookup: requires set + collector
+  lookupExactBtn.addEventListener('click', async () => {
     const setCode = (document.getElementById('token-field-set_code').value || '').trim();
     const collector = (document.getElementById('token-field-collector_number').value || '').trim();
-    if (!name && !(setCode && collector)) {
-      statusEl.textContent = 'Enter a token name OR set + collector number.';
+    if (!setCode || !collector) {
+      statusEl.textContent = 'Enter both Set code and Collector number for an exact lookup.';
       return;
     }
-    statusEl.textContent = 'Looking up on Scryfall…';
-    const params = new URLSearchParams();
-    if (name) params.set('name', name);
-    if (setCode && collector) {
-      params.set('set', setCode);
-      params.set('collector', collector);
-    }
+    statusEl.textContent = 'Looking up exact match…';
+    const params = new URLSearchParams({ set: setCode, collector: collector });
+    if (nameInput.value.trim()) params.set('name', nameInput.value.trim());
     try {
       const res = await fetch('/tokens/api/lookup?' + params.toString());
       if (res.status === 404) {
-        statusEl.textContent = 'No token matched on Scryfall — fill manually.';
+        statusEl.textContent = 'No token at ' + setCode.toUpperCase() + ' #' + collector + '.';
         return;
       }
       if (!res.ok) {
         statusEl.textContent = 'Lookup failed (' + res.status + ').';
         return;
       }
-      const data = await res.json();
-      const set = (id, value) => {
-        const el = document.getElementById(id);
-        if (el && value !== null && value !== undefined && value !== '') {
-          if (el.type === 'checkbox') el.checked = !!value;
-          else el.value = value;
-        }
-      };
-      nameInput.value = data.name || nameInput.value;
-      set('token-field-subtype', data.subtype);
-      set('token-field-image_url', data.image_url);
-      set('token-field-set_code', data.set_code);
-      set('token-field-collector_number', data.collector_number);
-      set('token-field-scryfall_id', data.scryfall_id);
-      set('token-field-is_double_sided', data.is_double_sided);
-      set('token-field-back_name', data.back_name);
-      set('token-field-back_image_url', data.back_image_url);
-      statusEl.textContent = 'Filled from Scryfall · ' + (data.set_code || '?').toUpperCase() +
-        ' #' + (data.collector_number || '?');
+      applyTokenData(await res.json());
     } catch (e) {
       statusEl.textContent = 'Lookup error: ' + e.message;
     }
+  });
+
+  // Name search: returns multiple matches; user picks one.
+  function renderResults(items) {
+    if (!items.length) {
+      resultsEl.innerHTML = '<p class="muted small-text">No tokens matched on Scryfall.</p>';
+      return;
+    }
+    resultsEl.innerHTML = '<p class="muted small-text" style="margin:0 0 0.5rem 0">' +
+      items.length + ' match' + (items.length === 1 ? '' : 'es') +
+      ' — click one to fill the form:</p>' +
+      '<div class="token-search-grid">' + items.map((t, i) => `
+        <button type="button" class="token-search-card" data-idx="${i}">
+          ${t.image_url ? `<img src="${t.image_url}" alt="${t.name}">` : '<div class="token-search-noimg">no image</div>'}
+          <div class="token-search-meta">
+            <strong>${t.name}</strong>
+            <span class="muted small-text">${(t.set_code || '?').toUpperCase()} #${t.collector_number || '?'}</span>
+            ${t.is_double_sided ? `<span class="finish-badge">↻ ${t.back_name || ''}</span>` : ''}
+          </div>
+        </button>
+      `).join('') + '</div>';
+    resultsEl.querySelectorAll('.token-search-card').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const idx = parseInt(btn.dataset.idx, 10);
+        applyTokenData(items[idx]);
+      });
+    });
   }
 
-  lookupBtn.addEventListener('click', fillFromScryfall);
-
-  // Picking a datalist option fires a change event — auto-fill on that too.
-  nameInput.addEventListener('change', () => {
-    // Only auto-fill if the entered name exactly matches a suggestion option.
-    const opts = Array.from(datalist.options).map(o => o.value);
-    if (opts.includes(nameInput.value)) fillFromScryfall();
+  searchBtn.addEventListener('click', async () => {
+    const name = nameInput.value.trim();
+    if (name.length < 2) {
+      statusEl.textContent = 'Type at least 2 characters of the token name.';
+      return;
+    }
+    statusEl.textContent = 'Searching Scryfall…';
+    try {
+      const res = await fetch('/tokens/api/search?name=' + encodeURIComponent(name));
+      if (!res.ok) {
+        statusEl.textContent = 'Search failed (' + res.status + ').';
+        return;
+      }
+      const data = await res.json();
+      statusEl.textContent = '';
+      renderResults(data.results || []);
+    } catch (e) {
+      statusEl.textContent = 'Search error: ' + e.message;
+    }
   });
 })();
   </script>

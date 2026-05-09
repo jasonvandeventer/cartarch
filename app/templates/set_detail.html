@@ -50,19 +50,23 @@
     {% if data.token_data %}
       <section class="panel" style="margin-top: 1rem;">
         <h3 class="panel-title">Tokens · {{ data.token_data.owned }} / {{ data.token_data.total }} owned</h3>
-        <p class="muted small-text">Tokens have no USD market price. Track ownership only.</p>
+        <p class="muted small-text">
+          Token ownership is sourced from your <a href="/tokens">Token Inventory</a> (set code + collector number match).
+          {% set pct = ((data.token_data.owned / data.token_data.total) * 100)|round|int if data.token_data.total else 0 %}
+          <strong>{{ pct }}%</strong> complete.
+        </p>
       </section>
       <div class="card-grid">
         {% for token in data.token_data.cards %}
-          <div class="card-tile">
+          <div class="card-tile {% if token.quantity_owned %}token-tile-owned{% else %}token-tile-missing{% endif %}">
             {% if token.image_url %}<img src="{{ token.image_url }}">{% endif %}
             <div class="card-name">{{ token.name }}</div>
             <div class="card-meta">
               #{{ token.collector_number }}
               {% if token.quantity_owned and token.quantity_owned > 0 %}
-                · Owned: {{ token.quantity_owned }}
+                · <span class="token-status-ok">Owned · {{ token.quantity_owned }}</span>
               {% else %}
-                · Missing
+                · <span class="token-status-missing">Missing</span>
               {% endif %}
             </div>
           </div>
