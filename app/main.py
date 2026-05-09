@@ -21,7 +21,13 @@ from datetime import datetime, timedelta
 from urllib.parse import urlparse
 
 from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
-from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse, Response
+from fastapi.responses import (
+    HTMLResponse,
+    JSONResponse,
+    PlainTextResponse,
+    RedirectResponse,
+    Response,
+)
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session, joinedload
 from starlette.middleware.sessions import SessionMiddleware
@@ -108,9 +114,11 @@ from app.presentation_service import build_pending_view_model
 from app.pricing import effective_price
 from app.routes import account, admin, auth
 from app.scryfall import (
+    autocomplete_token_names,
     bulk_refresh_prices,
     fetch_card_by_scryfall_id,
     fetch_card_by_set_and_number,
+    fetch_token_by_name,
     refresh_card_from_scryfall,
     search_cards_by_name,
 )
@@ -2354,6 +2362,31 @@ def decks_token_requirement_add(
     except ValueError:
         pass
     return RedirectResponse(url=f"/decks/{deck_id}", status_code=303)
+
+
+@app.get("/tokens/api/autocomplete")
+def tokens_api_autocomplete(
+    q: str = "",
+    current_user: User = Depends(get_current_user),
+):
+    """Live autocomplete for the new-token form. Calls Scryfall search with
+    `is:token` so non-token cards don't pollute results."""
+    if len(q.strip()) < 2:
+        return JSONResponse([])
+    return JSONResponse(autocomplete_token_names(q, limit=10))
+
+
+@app.get("/tokens/api/lookup")
+def tokens_api_lookup(
+    name: str = "",
+    current_user: User = Depends(get_current_user),
+):
+    """Single-token lookup for auto-fill on the new-token form. Returns a
+    dict with form-ready fields, or a 404 if Scryfall has nothing."""
+    data = fetch_token_by_name(name)
+    if not data:
+        return JSONResponse({"error": "not_found"}, status_code=404)
+    return JSONResponse(data)
 
 
 @app.post("/decks/{deck_id}/tokens/{req_id}/delete")

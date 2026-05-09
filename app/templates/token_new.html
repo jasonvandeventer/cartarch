@@ -14,15 +14,32 @@
           style="max-width: 520px">
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
       <label>
-        Name <span class="muted small-text">(required — Pest, Treasure, Spirit, etc.)</span>
+        Name <span class="muted small-text">(required — type 2+ chars to autocomplete from Scryfall)</span>
       </label>
-      <input type="text" name="name" required placeholder="e.g. Treasure">
+      <input type="text"
+             id="token-name-input"
+             name="name"
+             required
+             placeholder="e.g. Treasure"
+             list="token-name-suggestions"
+             autocomplete="off">
+      <datalist id="token-name-suggestions"></datalist>
+      <button type="button"
+              id="token-lookup-btn"
+              class="btn-like btn-like-muted"
+              style="margin-top:-0.25rem;
+                     align-self:start">Look up on Scryfall</button>
+      <p id="token-lookup-status"
+         class="muted small-text"
+         style="margin:0;
+                min-height:1em"></p>
       <label>Quantity</label>
       <input type="number" name="quantity" value="1" min="0">
       <label>
         Subtype <span class="muted small-text">(for grouping)</span>
       </label>
       <input type="text"
+             id="token-field-subtype"
              name="subtype"
              placeholder="e.g. Insect, Zombie, Treasure">
       <label>Storage location</label>
@@ -33,29 +50,38 @@
       <label>
         Image URL <span class="muted small-text">(optional)</span>
       </label>
-      <input type="url" name="image_url" placeholder="https://...">
+      <input type="url"
+             id="token-field-image_url"
+             name="image_url"
+             placeholder="https://...">
       <label class="filter-checkbox">
-        <input type="checkbox" name="is_double_sided" value="1">
+        <input type="checkbox"
+               id="token-field-is_double_sided"
+               name="is_double_sided"
+               value="1">
         Double-sided
       </label>
       <label>
         Back-face name <span class="muted small-text">(if double-sided)</span>
       </label>
-      <input type="text" name="back_name" placeholder="e.g. Zombie">
+      <input type="text"
+             id="token-field-back_name"
+             name="back_name"
+             placeholder="e.g. Zombie">
       <label>Back-face image URL</label>
-      <input type="url" name="back_image_url">
+      <input type="url" id="token-field-back_image_url" name="back_image_url">
       <label>
         Set code <span class="muted small-text">(optional)</span>
       </label>
-      <input type="text" name="set_code">
+      <input type="text" id="token-field-set_code" name="set_code">
       <label>
         Collector number <span class="muted small-text">(optional)</span>
       </label>
-      <input type="text" name="collector_number">
+      <input type="text" id="token-field-collector_number" name="collector_number">
       <label>
         Scryfall ID <span class="muted small-text">(optional)</span>
       </label>
-      <input type="text" name="scryfall_id">
+      <input type="text" id="token-field-scryfall_id" name="scryfall_id">
       <label>Notes</label>
       <textarea name="notes"
                 rows="3"
@@ -66,4 +92,85 @@
       </div>
     </form>
   </section>
+{% endblock %}
+{% block extra_scripts %}
+  <script>
+(() => {
+  const nameInput = document.getElementById('token-name-input');
+  const datalist = document.getElementById('token-name-suggestions');
+  const lookupBtn = document.getElementById('token-lookup-btn');
+  const statusEl = document.getElementById('token-lookup-status');
+  if (!nameInput) return;
+
+  let acTimer = null;
+  let lastQuery = '';
+
+  // Live autocomplete: debounce, fetch, populate datalist.
+  nameInput.addEventListener('input', () => {
+    const q = nameInput.value.trim();
+    if (q.length < 2 || q === lastQuery) return;
+    lastQuery = q;
+    clearTimeout(acTimer);
+    acTimer = setTimeout(async () => {
+      try {
+        const res = await fetch('/tokens/api/autocomplete?q=' + encodeURIComponent(q));
+        if (!res.ok) return;
+        const names = await res.json();
+        datalist.innerHTML = names.map(n => `<option value="${n.replace(/"/g, '&quot;')}">`).join('');
+      } catch (_) {}
+    }, 200);
+  });
+
+  // Auto-fill: clicking the button (or selecting from datalist) populates the form.
+  async function fillFromScryfall() {
+    const name = nameInput.value.trim();
+    if (!name) {
+      statusEl.textContent = 'Enter a token name first.';
+      return;
+    }
+    statusEl.textContent = 'Looking up on Scryfall…';
+    try {
+      const res = await fetch('/tokens/api/lookup?name=' + encodeURIComponent(name));
+      if (res.status === 404) {
+        statusEl.textContent = 'No token matched on Scryfall — fill manually.';
+        return;
+      }
+      if (!res.ok) {
+        statusEl.textContent = 'Lookup failed (' + res.status + ').';
+        return;
+      }
+      const data = await res.json();
+      const set = (id, value) => {
+        const el = document.getElementById(id);
+        if (el && value !== null && value !== undefined && value !== '') {
+          if (el.type === 'checkbox') el.checked = !!value;
+          else el.value = value;
+        }
+      };
+      nameInput.value = data.name || nameInput.value;
+      set('token-field-subtype', data.subtype);
+      set('token-field-image_url', data.image_url);
+      set('token-field-set_code', data.set_code);
+      set('token-field-collector_number', data.collector_number);
+      set('token-field-scryfall_id', data.scryfall_id);
+      set('token-field-is_double_sided', data.is_double_sided);
+      set('token-field-back_name', data.back_name);
+      set('token-field-back_image_url', data.back_image_url);
+      statusEl.textContent = 'Filled from Scryfall · ' + (data.set_code || '?').toUpperCase() +
+        ' #' + (data.collector_number || '?');
+    } catch (e) {
+      statusEl.textContent = 'Lookup error: ' + e.message;
+    }
+  }
+
+  lookupBtn.addEventListener('click', fillFromScryfall);
+
+  // Picking a datalist option fires a change event — auto-fill on that too.
+  nameInput.addEventListener('change', () => {
+    // Only auto-fill if the entered name exactly matches a suggestion option.
+    const opts = Array.from(datalist.options).map(o => o.value);
+    if (opts.includes(nameInput.value)) fillFromScryfall();
+  });
+})();
+  </script>
 {% endblock %}

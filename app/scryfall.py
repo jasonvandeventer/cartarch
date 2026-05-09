@@ -375,6 +375,106 @@ def fetch_card_traits(scryfall_id: str) -> dict[str, bool] | None:
     }
 
 
+def autocomplete_token_names(query: str, limit: int = 10) -> list[str]:
+    """Return token name suggestions matching the user's typed prefix.
+
+    Uses the search API (not the autocomplete catalog) because catalog has no
+    token-only filter — `is:token` ensures we don't mix in real cards. Names
+    are deduplicated since Scryfall returns one row per printing.
+    """
+    q = (query or "").strip()
+    if len(q) < 2:
+        return []
+    url = (
+        "https://api.scryfall.com/cards/search"
+        f"?q=is%3Atoken+name%3A{requests.utils.quote(q)}&unique=cards"
+    )
+    data = _get_json(url)
+    if not data:
+        return []
+    seen: list[str] = []
+    seen_set: set[str] = set()
+    for card in data.get("data", []):
+        name = card.get("name")
+        if name and name not in seen_set:
+            seen_set.add(name)
+            seen.append(name)
+            if len(seen) >= limit:
+                break
+    return seen
+
+
+def fetch_token_by_name(name: str) -> dict[str, Any] | None:
+    """Look up a single token by name and return form-ready fields.
+
+    Returns a dict with keys: name, type_line, subtype, set_code,
+    collector_number, scryfall_id, image_url, is_double_sided, back_name,
+    back_image_url. Returns None if no token matches.
+    """
+    n = (name or "").strip()
+    if not n:
+        return None
+    url = (
+        "https://api.scryfall.com/cards/search"
+        f'?q=is%3Atoken+!"{requests.utils.quote(n)}"&unique=cards&order=released&dir=desc'
+    )
+    data = _get_json(url)
+    cards = data.get("data", []) if data else []
+    if not cards:
+        url = (
+            "https://api.scryfall.com/cards/search"
+            f"?q=is%3Atoken+name%3A{requests.utils.quote(n)}&unique=cards&order=released&dir=desc"
+        )
+        data = _get_json(url)
+        cards = data.get("data", []) if data else []
+    if not cards:
+        return None
+    card = cards[0]
+    type_line = card.get("type_line") or ""
+    subtype: str | None = None
+    if "—" in type_line:
+        subtype = type_line.split("—", 1)[1].strip().split(" ")[0] or None
+
+    faces = card.get("card_faces") or []
+    is_dfc = len(faces) == 2
+    if is_dfc:
+        front, back = faces[0], faces[1]
+        image_url = (front.get("image_uris") or {}).get("normal") or (
+            front.get("image_uris") or {}
+        ).get("large")
+        back_image_url = (back.get("image_uris") or {}).get("normal") or (
+            back.get("image_uris") or {}
+        ).get("large")
+        return {
+            "name": front.get("name") or card.get("name"),
+            "type_line": front.get("type_line") or type_line,
+            "subtype": subtype,
+            "set_code": card.get("set"),
+            "collector_number": card.get("collector_number"),
+            "scryfall_id": card.get("id"),
+            "image_url": image_url,
+            "is_double_sided": True,
+            "back_name": back.get("name"),
+            "back_image_url": back_image_url,
+        }
+
+    image_url = (card.get("image_uris") or {}).get("normal") or (card.get("image_uris") or {}).get(
+        "large"
+    )
+    return {
+        "name": card.get("name"),
+        "type_line": type_line,
+        "subtype": subtype,
+        "set_code": card.get("set"),
+        "collector_number": card.get("collector_number"),
+        "scryfall_id": card.get("id"),
+        "image_url": image_url,
+        "is_double_sided": False,
+        "back_name": None,
+        "back_image_url": None,
+    }
+
+
 def fetch_game_changer_names() -> list[str]:
     """Return the current Scryfall `is:gamechanger` card-name list.
 
