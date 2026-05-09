@@ -440,23 +440,22 @@ def _format_token_response(card: dict[str, Any]) -> dict[str, Any]:
     image_url = (card.get("image_uris") or {}).get("normal") or (card.get("image_uris") or {}).get(
         "large"
     )
-    # Substitute-card sets (SZNR Zendikar Rising, plus SLD/SHM substitute prints)
-    # are physically double-sided cards used in lieu of DFCs in play. Scryfall
-    # stores them as layout=normal with no card_faces, so they look single-sided
-    # to the API. Detect by set_name / name patterns and flag the box; the user
-    # can fill back_name/back_image_url manually if they care.
-    set_name = (card.get("set_name") or "").lower()
-    name = card.get("name") or ""
-    is_substitute_card = "substitute card" in set_name or name.lower().startswith("double-faced")
+    # Substitute-card sets (SZNR etc.) have "Double-Faced" in the name because
+    # they SUBSTITUTE for a DFC during play — but they themselves are
+    # single-sided with a standard MTG back, so they can run in clear sleeves
+    # without leaking what's substituted. Scryfall correctly stores them as
+    # layout=normal with no card_faces; is_double_sided stays False. Real
+    # double-faced tokens (Goblin // Treasure) are caught by the is_dfc branch
+    # above via card_faces.
     return {
-        "name": name,
+        "name": card.get("name"),
         "type_line": type_line,
         "subtype": subtype,
         "set_code": card.get("set"),
         "collector_number": card.get("collector_number"),
         "scryfall_id": card.get("id"),
         "image_url": image_url,
-        "is_double_sided": is_substitute_card,
+        "is_double_sided": False,
         "back_name": None,
         "back_image_url": None,
     }
