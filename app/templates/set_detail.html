@@ -16,13 +16,14 @@
                 flex-wrap: wrap;
                 align-items: center;
                 justify-content: space-between">
+      {% set tok_param = '&show_tokens=true' if data.show_tokens else '&show_tokens=false' %}
       <div class="filter-tabs" style="margin: 0;">
-        <a href="/sets/{{ data.set_code }}?view=all{% if data.show_tokens %}&show_tokens=true{% endif %}">All</a>
-        <a href="/sets/{{ data.set_code }}?view=owned{% if data.show_tokens %}&show_tokens=true{% endif %}">Owned</a>
-        <a href="/sets/{{ data.set_code }}?view=missing{% if data.show_tokens %}&show_tokens=true{% endif %}">Missing</a>
+        <a href="/sets/{{ data.set_code }}?view=all{{ tok_param }}">All</a>
+        <a href="/sets/{{ data.set_code }}?view=owned{{ tok_param }}">Owned</a>
+        <a href="/sets/{{ data.set_code }}?view=missing{{ tok_param }}">Missing</a>
       </div>
       {% if data.show_tokens %}
-        <a href="/sets/{{ data.set_code }}?view={{ data.view }}"
+        <a href="/sets/{{ data.set_code }}?view={{ data.view }}&show_tokens=false"
            class="muted small-text">Hide Tokens</a>
       {% else %}
         <a href="/sets/{{ data.set_code }}?view={{ data.view }}&show_tokens=true"
@@ -54,13 +55,23 @@
           Token ownership is sourced from your <a href="/tokens">Token Inventory</a> (set code + collector number match).
           {% set pct = ((data.token_data.owned / data.token_data.total) * 100)|round|int if data.token_data.total else 0 %}
           <strong>{{ pct }}%</strong> complete.
+          {% if data.token_data.substitute_count %}
+            Includes {{ data.token_data.substitute_count }} substitute card{{ '' if data.token_data.substitute_count == 1 else 's' }}
+            from <code>{{ data.token_data.substitute_set_code }}</code> at the end of the list — these are single-sided placeholders
+            for double-faced cards (standard MTG back; safe to play in clear sleeves).
+          {% endif %}
         </p>
       </section>
       <div class="card-grid">
         {% for token in data.token_data.cards %}
           <div class="card-tile {% if token.quantity_owned %}token-tile-owned{% else %}token-tile-missing{% endif %}">
             {% if token.image_url %}<img src="{{ token.image_url }}">{% endif %}
-            <div class="card-name">{{ token.name }}</div>
+            <div class="card-name">
+              {{ token.name }}
+              {% if token.is_substitute %}
+                <span class="finish-badge" title="Substitute card — placeholder for a DFC">Substitute</span>
+              {% endif %}
+            </div>
             <div class="card-meta">
               #{{ token.collector_number }}
               {% if token.quantity_owned and token.quantity_owned > 0 %}

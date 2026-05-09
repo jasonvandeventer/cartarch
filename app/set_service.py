@@ -74,18 +74,39 @@ def get_set_completion(
 
     token_data = None
     if include_tokens:
-        token_set_code = "t" + set_code if not set_code.startswith("t") else set_code
-        token_cards = fetch_set_cards(token_set_code)
+        is_already_token_set = set_code.startswith("t")
+        token_set_code = "t" + set_code if not is_already_token_set else set_code
+        token_cards = list(fetch_set_cards(token_set_code))
         token_owned_map = _get_owned_token_map(session, token_set_code, user_id)
         for token in token_cards:
             cn_key = (token["collector_number"] or "").lstrip("0") or "0"
             token["quantity_owned"] = token_owned_map.get(cn_key, 0)
-        if token_cards:
+            token["is_substitute"] = False
+
+        # Append substitute cards (s{code}) at the end of the token list. Not
+        # every set has substitutes; fetch_set_cards returns [] for unknown
+        # sets so this is safe even when the substitute set doesn't exist.
+        substitute_set_code = "s" + set_code if not is_already_token_set else None
+        substitute_cards: list = []
+        if substitute_set_code:
+            substitute_cards = list(fetch_set_cards(substitute_set_code))
+            if substitute_cards:
+                sub_owned_map = _get_owned_token_map(session, substitute_set_code, user_id)
+                for sub in substitute_cards:
+                    cn_key = (sub["collector_number"] or "").lstrip("0") or "0"
+                    sub["quantity_owned"] = sub_owned_map.get(cn_key, 0)
+                    sub["is_substitute"] = True
+
+        all_cards = token_cards + substitute_cards
+        if all_cards:
             token_data = {
                 "set_code": token_set_code,
-                "cards": token_cards,
-                "owned": sum(1 for t in token_cards if t["quantity_owned"] > 0),
-                "total": len(token_cards),
+                "substitute_set_code": substitute_set_code if substitute_cards else None,
+                "cards": all_cards,
+                "owned": sum(1 for t in all_cards if t["quantity_owned"] > 0),
+                "total": len(all_cards),
+                "token_count": len(token_cards),
+                "substitute_count": len(substitute_cards),
             }
 
     return {

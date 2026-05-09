@@ -2507,7 +2507,7 @@ def set_detail_page(
     request: Request,
     set_code: str,
     view: str = "all",
-    show_tokens: bool = False,
+    show_tokens: bool = True,
     session: Session = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
 ):
