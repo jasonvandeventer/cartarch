@@ -20,6 +20,7 @@ from scripts.migrate_v3_15_0_seed_game_changers import main as migrate_v3_15_0_s
 from scripts.migrate_v3_15_1_bracket_v2_intent_confidence import (
     main as migrate_v3_15_1_intent_confidence,
 )
+from scripts.migrate_v3_16_0_token_inventory import main as migrate_v3_16_0_token_inventory
 
 
 def _is_applied(name: str) -> bool:
@@ -162,6 +163,13 @@ def run():
         _mark_applied("v3_15_1_bracket_v2_intent_confidence")
     else:
         print("v3.15.1 intent_confidence already applied, skipping")
+
+    if not _is_applied("v3_16_0_token_inventory"):
+        print("Running v3.16.0 token inventory schema...")
+        migrate_v3_16_0_token_inventory()
+        _mark_applied("v3_16_0_token_inventory")
+    else:
+        print("v3.16.0 token_inventory already applied, skipping")
 
     print("Migration runner complete")
 

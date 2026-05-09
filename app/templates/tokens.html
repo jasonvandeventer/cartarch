@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+{% block content %}
+  <section class="panel hero-panel compact-hero">
+    <div class="hero-row">
+      <div>
+        <div class="panel-topline">Tokens</div>
+        <h2 class="panel-title">Token Inventory</h2>
+        <p class="muted">Lightweight tracking for the physical tokens you actually use at the table.</p>
+      </div>
+      <div class="hero-stats-inline">
+        <span>{{ tokens|length }} entries</span>
+        <span>{{ total_count }} total tokens</span>
+        <a href="/tokens/new" class="btn-like">+ New Token</a>
+      </div>
+    </div>
+  </section>
+  <section class="panel controls-panel">
+    <form method="get" action="/tokens" class="filter-row">
+      <input type="text"
+             name="name"
+             value="{{ name }}"
+             placeholder="Name (e.g. Treasure)">
+      <input type="text"
+             name="subtype"
+             value="{{ subtype }}"
+             placeholder="Subtype"
+             list="subtype-list">
+      <datalist id="subtype-list">
+        {% for st in subtypes %}<option value="{{ st }}">{% endfor %}
+        </datalist>
+        <select name="location">
+          <option value="">— Any location —</option>
+          {% for loc in locations %}
+            <option value="{{ loc.id }}"
+                    {% if location == loc.id|string %}selected{% endif %}>{{ loc.name }}</option>
+          {% endfor %}
+        </select>
+        <label class="filter-checkbox">
+          <input type="checkbox"
+                 name="double_sided"
+                 value="1"
+                 {% if double_sided == '1' %}checked{% endif %}>
+          Double-sided only
+        </label>
+        <button type="submit">Filter</button>
+        <a href="/tokens" class="btn-like btn-like-muted">Reset</a>
+      </form>
+    </section>
+    {% if tokens %}
+      <section class="panel">
+        <table>
+          <thead>
+            <tr>
+              <th>Token</th>
+              <th>Subtype</th>
+              <th>Qty</th>
+              <th>Location</th>
+              <th>Notes</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for t in tokens %}
+              <tr>
+                <td>
+                  <strong>{{ t.name }}</strong>
+                  {% if t.is_double_sided %}
+                    <span class="finish-badge" title="Double-sided">↻ {{ t.back_name or 'flip' }}</span>
+                  {% endif %}
+                  {% if t.image_url %}
+                    <details class="inline-details" style="display:inline">
+                      <summary class="btn-like btn-like-muted">image</summary>
+                      <div class="edit-popout">
+                        <img src="{{ t.image_url }}"
+                             alt="{{ t.name }}"
+                             style="max-width:200px;
+                                    border-radius:6px">
+                      </div>
+                    </details>
+                  {% endif %}
+                </td>
+                <td>{{ t.subtype or '—' }}</td>
+                <td>
+                  <strong>{{ t.quantity }}</strong>
+                </td>
+                <td>{{ t.storage_location.name if t.storage_location else '—' }}</td>
+                <td class="muted small-text">{{ t.notes or '' }}</td>
+                <td>
+                  <details class="inline-details">
+                    <summary class="btn-like btn-like-muted">Edit</summary>
+                    <div class="edit-popout">
+                      <form action="/tokens/{{ t.id }}/edit" method="post" class="stack-form">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                        <label>Name</label>
+                        <input type="text" name="name" value="{{ t.name }}" required>
+                        <label>Subtype</label>
+                        <input type="text" name="subtype" value="{{ t.subtype or '' }}">
+                        <label>Quantity</label>
+                        <input type="number" name="quantity" value="{{ t.quantity }}" min="0">
+                        <label>Storage location</label>
+                        <select name="storage_location_id">
+                          <option value="">— None —</option>
+                          {% for loc in locations %}
+                            <option value="{{ loc.id }}"
+                                    {% if t.storage_location_id == loc.id %}selected{% endif %}>{{ loc.name }}</option>
+                          {% endfor %}
+                        </select>
+                        <label>Image URL</label>
+                        <input type="url" name="image_url" value="{{ t.image_url or '' }}">
+                        <label class="filter-checkbox">
+                          <input type="checkbox"
+                                 name="is_double_sided"
+                                 value="1"
+                                 {% if t.is_double_sided %}checked{% endif %}>
+                          Double-sided
+                        </label>
+                        <label>Back-face name</label>
+                        <input type="text" name="back_name" value="{{ t.back_name or '' }}">
+                        <label>Back-face image URL</label>
+                        <input type="url" name="back_image_url" value="{{ t.back_image_url or '' }}">
+                        <label>Notes</label>
+                        <textarea name="notes" rows="2">{{ t.notes or '' }}</textarea>
+                        <button type="submit">Save</button>
+                      </form>
+                      <form action="/tokens/{{ t.id }}/delete"
+                            method="post"
+                            style="margin-top:0.5rem">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                        <button type="submit"
+                                class="btn-danger-small"
+                                onclick="return confirm('Delete this token entry?')">Delete</button>
+                      </form>
+                    </div>
+                  </details>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </section>
+    {% else %}
+      <section class="panel">
+        <p class="muted">
+          No tokens yet. <a href="/tokens/new">Add your first token</a> — Pest x12, Treasure x30, whatever you actually have on hand.
+        </p>
+      </section>
+    {% endif %}
+  {% endblock %}

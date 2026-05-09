@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block content %}
+  <section class="panel hero-panel compact-hero">
+    <div>
+      <div class="panel-topline">Tokens</div>
+      <h2 class="panel-title">New Token</h2>
+      <p class="muted">Just the name and a quantity gets you started. Everything else is optional.</p>
+    </div>
+  </section>
+  <section class="panel">
+    <form action="/tokens/create"
+          method="post"
+          class="stack-form"
+          style="max-width: 520px">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <label>
+        Name <span class="muted small-text">(required — Pest, Treasure, Spirit, etc.)</span>
+      </label>
+      <input type="text" name="name" required placeholder="e.g. Treasure">
+      <label>Quantity</label>
+      <input type="number" name="quantity" value="1" min="0">
+      <label>
+        Subtype <span class="muted small-text">(for grouping)</span>
+      </label>
+      <input type="text"
+             name="subtype"
+             placeholder="e.g. Insect, Zombie, Treasure">
+      <label>Storage location</label>
+      <select name="storage_location_id">
+        <option value="">— None —</option>
+        {% for loc in locations %}<option value="{{ loc.id }}">{{ loc.name }}</option>{% endfor %}
+      </select>
+      <label>
+        Image URL <span class="muted small-text">(optional)</span>
+      </label>
+      <input type="url" name="image_url" placeholder="https://...">
+      <label class="filter-checkbox">
+        <input type="checkbox" name="is_double_sided" value="1">
+        Double-sided
+      </label>
+      <label>
+        Back-face name <span class="muted small-text">(if double-sided)</span>
+      </label>
+      <input type="text" name="back_name" placeholder="e.g. Zombie">
+      <label>Back-face image URL</label>
+      <input type="url" name="back_image_url">
+      <label>
+        Set code <span class="muted small-text">(optional)</span>
+      </label>
+      <input type="text" name="set_code">
+      <label>
+        Collector number <span class="muted small-text">(optional)</span>
+      </label>
+      <input type="text" name="collector_number">
+      <label>
+        Scryfall ID <span class="muted small-text">(optional)</span>
+      </label>
+      <input type="text" name="scryfall_id">
+      <label>Notes</label>
+      <textarea name="notes"
+                rows="3"
+                placeholder="Where you got it, who borrowed it, etc."></textarea>
+      <div style="display:flex;gap:0.5rem;margin-top:0.5rem">
+        <button type="submit">Add Token</button>
+        <a href="/tokens" class="btn-like btn-like-muted">Cancel</a>
+      </div>
+    </form>
+  </section>
+{% endblock %}

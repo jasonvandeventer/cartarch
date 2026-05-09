@@ -202,3 +202,57 @@ class GameSeat(Base):
 
     game: Mapped[Game] = relationship(back_populates="seats")
     deck: Mapped[Deck | None] = relationship()
+
+
+class TokenInventory(Base):
+    """Per-user physical token holdings (Pest x12, Treasure x30, etc.).
+
+    Separate from InventoryRow so resort_collection / drawer-sorter logic
+    doesn't try to organize tokens.
+    """
+
+    __tablename__ = "token_inventory"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    name: Mapped[str] = mapped_column(String(255), index=True)
+    type_line: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    subtype: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    quantity: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    set_code: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    collector_number: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    scryfall_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    image_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    is_double_sided: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    back_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    back_image_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    storage_location_id: Mapped[int | None] = mapped_column(
+        ForeignKey("storage_locations.id"), nullable=True, index=True
+    )
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    storage_location: Mapped[StorageLocation | None] = relationship()
+
+
+class DeckTokenRequirement(Base):
+    """A deck's declared need for a token type (Pest x10, Food x8, etc.).
+
+    May reference an exact TokenInventory row via token_inventory_id, or be
+    a loose name-only requirement when the user doesn't yet own the token.
+    """
+
+    __tablename__ = "deck_token_requirements"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    deck_id: Mapped[int] = mapped_column(ForeignKey("decks.id"), nullable=False, index=True)
+    token_inventory_id: Mapped[int | None] = mapped_column(
+        ForeignKey("token_inventory.id"), nullable=True
+    )
+    token_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    quantity_needed: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    token_inventory: Mapped[TokenInventory | None] = relationship()

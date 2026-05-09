@@ -2864,3 +2864,27 @@ body.game-mode {
     grid-template-columns: 1fr;
   }
 }
+
+/* Token cataloging */
+.token-needs-panel table {
+  margin-top: 0.4rem;
+}
+.token-status-ok {
+  color: #4ade80;
+  font-weight: 600;
+}
+.token-status-missing {
+  color: #f59e0b;
+  font-weight: 600;
+}
+.filter-checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+  color: #94a3b8;
+  user-select: none;
+}
+.filter-checkbox input {
+  margin: 0;
+}

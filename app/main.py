@@ -115,6 +115,17 @@ from app.scryfall import (
     search_cards_by_name,
 )
 from app.set_service import get_set_completion
+from app.token_service import (
+    add_deck_token_requirement,
+    create_token,
+    deck_token_status,
+    delete_deck_token_requirement,
+    delete_token,
+    list_token_subtypes,
+    list_tokens,
+    total_token_count,
+    update_token,
+)
 from scripts.run_migrations import run as run_migrations
 
 app = FastAPI(title="Mana Archive")
@@ -1709,6 +1720,10 @@ def deck_detail_page(
             "deck_total_value": deck_total_value if deck else 0.0,
             "deck_total_cards": total_cards if deck else 0,
             "bracket_v2": bracket_v2,
+            "token_requirements": (
+                deck_token_status(session, deck.id, current_user.id) if deck else []
+            ),
+            "token_inventory_options": (list_tokens(session, current_user.id) if deck else []),
             "search": search,
             "sort": sort,
             "direction": direction,
@@ -2155,6 +2170,210 @@ def card_detail_page(
     )
 
 
+@app.get("/tokens")
+def tokens_page(
+    request: Request,
+    name: str = "",
+    subtype: str = "",
+    location: str = "",
+    double_sided: str = "",
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+):
+    """User's token-inventory page. Filter by name/subtype/location/double-sided."""
+    storage_id: int | None = None
+    if location.strip():
+        try:
+            storage_id = int(location)
+        except ValueError:
+            storage_id = None
+    tokens = list_tokens(
+        session,
+        user_id=current_user.id,
+        name_filter=name,
+        subtype_filter=subtype,
+        storage_location_id=storage_id,
+        double_sided_only=(double_sided == "1"),
+    )
+    return render(
+        request,
+        "tokens.html",
+        {
+            "title": "Tokens",
+            "tokens": tokens,
+            "name": name,
+            "subtype": subtype,
+            "location": location,
+            "double_sided": double_sided,
+            "subtypes": list_token_subtypes(session, current_user.id),
+            "locations": list_locations(session, current_user.id),
+            "total_count": total_token_count(session, current_user.id),
+            "current_user": current_user,
+        },
+    )
+
+
+@app.get("/tokens/new")
+def tokens_new_page(
+    request: Request,
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+):
+    return render(
+        request,
+        "token_new.html",
+        {
+            "title": "New Token",
+            "locations": list_locations(session, current_user.id),
+            "current_user": current_user,
+        },
+    )
+
+
+@app.post("/tokens/create")
+def tokens_create(
+    name: str = Form(...),
+    quantity: int = Form(1),
+    subtype: str = Form(""),
+    type_line: str = Form(""),
+    storage_location_id: str = Form(""),
+    image_url: str = Form(""),
+    is_double_sided: str = Form(""),
+    back_name: str = Form(""),
+    back_image_url: str = Form(""),
+    set_code: str = Form(""),
+    collector_number: str = Form(""),
+    scryfall_id: str = Form(""),
+    notes: str = Form(""),
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+    _: None = CsrfRequired,
+):
+    try:
+        storage_id = int(storage_location_id) if storage_location_id else None
+    except ValueError:
+        storage_id = None
+    try:
+        create_token(
+            session,
+            user_id=current_user.id,
+            name=name,
+            quantity=quantity,
+            subtype=subtype,
+            type_line=type_line,
+            storage_location_id=storage_id,
+            image_url=image_url,
+            is_double_sided=(is_double_sided == "1"),
+            back_name=back_name,
+            back_image_url=back_image_url,
+            set_code=set_code,
+            collector_number=collector_number,
+            scryfall_id=scryfall_id,
+            notes=notes,
+        )
+    except ValueError:
+        return RedirectResponse(url="/tokens/new", status_code=303)
+    return RedirectResponse(url="/tokens", status_code=303)
+
+
+@app.post("/tokens/{token_id}/edit")
+def tokens_edit(
+    token_id: int,
+    name: str = Form(...),
+    quantity: int = Form(1),
+    subtype: str = Form(""),
+    storage_location_id: str = Form(""),
+    image_url: str = Form(""),
+    is_double_sided: str = Form(""),
+    back_name: str = Form(""),
+    back_image_url: str = Form(""),
+    notes: str = Form(""),
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+    _: None = CsrfRequired,
+):
+    try:
+        storage_id = int(storage_location_id) if storage_location_id else None
+    except ValueError:
+        storage_id = None
+    update_token(
+        session,
+        token_id=token_id,
+        user_id=current_user.id,
+        name=name,
+        quantity=max(0, quantity),
+        subtype=subtype,
+        storage_location_id=storage_id,
+        image_url=image_url,
+        is_double_sided=(is_double_sided == "1"),
+        back_name=back_name,
+        back_image_url=back_image_url,
+        notes=notes,
+    )
+    return RedirectResponse(url="/tokens", status_code=303)
+
+
+@app.post("/tokens/{token_id}/delete")
+def tokens_delete(
+    token_id: int,
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+    _: None = CsrfRequired,
+):
+    delete_token(session, token_id, current_user.id)
+    return RedirectResponse(url="/tokens", status_code=303)
+
+
+@app.post("/decks/{deck_id}/tokens/add")
+def decks_token_requirement_add(
+    deck_id: int,
+    token_name: str = Form(...),
+    quantity_needed: int = Form(1),
+    token_inventory_id: str = Form(""),
+    notes: str = Form(""),
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+    _: None = CsrfRequired,
+):
+    deck = get_deck(session, deck_id=deck_id, user_id=current_user.id)
+    if not deck:
+        return RedirectResponse(url="/decks", status_code=303)
+    try:
+        link_id = int(token_inventory_id) if token_inventory_id else None
+    except ValueError:
+        link_id = None
+    try:
+        add_deck_token_requirement(
+            session,
+            deck_id=deck.id,
+            token_name=token_name,
+            quantity_needed=max(1, quantity_needed),
+            token_inventory_id=link_id,
+            notes=notes,
+        )
+    except ValueError:
+        pass
+    return RedirectResponse(url=f"/decks/{deck_id}", status_code=303)
+
+
+@app.post("/decks/{deck_id}/tokens/{req_id}/delete")
+def decks_token_requirement_delete(
+    deck_id: int,
+    req_id: int,
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+    _: None = CsrfRequired,
+):
+    deck = get_deck(session, deck_id=deck_id, user_id=current_user.id)
+    if not deck:
+        return RedirectResponse(url="/decks", status_code=303)
+    delete_deck_token_requirement(session, req_id, deck.id)
+    return RedirectResponse(url=f"/decks/{deck_id}", status_code=303)
+
+
+# NOTE: /tokens/{scryfall_id} below MUST stay after the /tokens routes above —
+# FastAPI matches in registration order; otherwise "new"/etc would be treated
+# as scryfall ids.
 @app.get("/tokens/{scryfall_id}")
 def token_detail_page(
     request: Request,

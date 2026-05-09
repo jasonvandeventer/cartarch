@@ -487,98 +487,189 @@
         </a>
       </form>
     </section>
-    {% set bulk_storage = locations | selectattr("type", "ne", "root") | rejectattr("type", "equalto", "deck") | list %}
-    {% set bulk_decks = locations | selectattr("type", "equalto", "deck") | rejectattr("id", "equalto", deck.storage_location_id) | list %}
-    {% if items and (bulk_storage or bulk_decks) %}
-      <section class="panel">
-        <details>
-          <summary style="cursor: pointer;
-                          user-select: none;
-                          font-weight: 600;
-                          list-style: none;
-                          padding: 0.2rem 0">▸ Bulk Move</summary>
-          <form action="/decks/{{ deck.id }}/bulk-move"
-                method="post"
-                style="margin-top: 0.75rem">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-            <div style="display: flex;
-                        flex-direction: column;
-                        gap: 0.3rem;
-                        margin-bottom: 0.75rem;
-                        max-height: 260px;
-                        overflow-y: auto">
-              <label style="font-size: 0.8rem; color: #94a3b8; cursor: pointer;">
-                <input type="checkbox"
-                       onclick="document.querySelectorAll('.deck-bulk-cb').forEach(cb => cb.checked = this.checked)">
-                Select all
-              </label>
-              {% for item in items %}
-                <label style="display: flex;
-                              align-items: center;
-                              gap: 0.4rem;
-                              font-size: 0.875rem;
-                              cursor: pointer">
-                  <input type="checkbox"
-                         name="row_ids"
-                         value="{{ item.id }}"
-                         class="deck-bulk-cb">
-                  {{ item.card.name }}
-                  {% if item.finish != 'normal' %}<span class="finish-badge">{{ item.finish }}</span>{% endif %}
-                </label>
+    {% if deck %}
+      <section class="panel token-needs-panel">
+        <h3 class="panel-title">Tokens Needed</h3>
+        {% if token_requirements %}
+          <table>
+            <thead>
+              <tr>
+                <th>Token</th>
+                <th>Needed</th>
+                <th>Owned</th>
+                <th>Location</th>
+                <th>Status</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for r in token_requirements %}
+                <tr>
+                  <td>
+                    <strong>{{ r.token_name }}</strong>
+                    {% if r.notes %}
+                      <br>
+                      <span class="muted small-text">{{ r.notes }}</span>
+                    {% endif %}
+                  </td>
+                  <td>{{ r.quantity_needed }}</td>
+                  <td>{{ r.owned }}</td>
+                  <td>{{ r.location or '—' }}</td>
+                  <td>
+                    {% if r.deficit == 0 %}
+                      <span class="token-status-ok">OK</span>
+                    {% else %}
+                      <span class="token-status-missing">Missing {{ r.deficit }}</span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    <form action="/decks/{{ deck.id }}/tokens/{{ r.id }}/delete"
+                          method="post"
+                          style="display:inline">
+                      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                      <button type="submit"
+                              class="btn-danger-small"
+                              onclick="return confirm('Remove this token requirement?')">×</button>
+                    </form>
+                  </td>
+                </tr>
               {% endfor %}
-            </div>
-            <div class="filter-row">
-              <select name="target_location_id" required>
-                <option value="">— Destination —</option>
-                {% if use_drawer_sorter %}<option value="sorter">Return to Sorter</option>{% endif %}
-                {% if bulk_storage %}
-                  <optgroup label="Storage Locations">
-                    {% for loc in bulk_storage %}<option value="{{ loc.id }}">{{ loc.name }} ({{ loc.type }})</option>{% endfor %}
-                  </optgroup>
-                {% endif %}
-                {% if bulk_decks %}
-                  <optgroup label="Decks">
-                    {% for loc in bulk_decks %}<option value="{{ loc.id }}">{{ loc.name }}</option>{% endfor %}
-                  </optgroup>
-                {% endif %}
+            </tbody>
+          </table>
+        {% else %}
+          <p class="muted small-text">
+            No token requirements declared. Add one below if this deck creates tokens you want to track.
+          </p>
+        {% endif %}
+        <details style="margin-top: 0.5rem">
+          <summary class="btn-like btn-like-muted" style="display:inline-block">+ Add token requirement</summary>
+          <form action="/decks/{{ deck.id }}/tokens/add"
+                method="post"
+                class="filter-row"
+                style="margin-top:0.5rem">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <input type="text"
+                   name="token_name"
+                   placeholder="Token name (e.g. Pest)"
+                   required
+                   list="token-name-options">
+            <datalist id="token-name-options">
+              {% for t in token_inventory_options %}<option value="{{ t.name }}">{% endfor %}
+              </datalist>
+              <input type="number"
+                     name="quantity_needed"
+                     min="1"
+                     value="1"
+                     style="width:5rem"
+                     placeholder="Qty">
+              <select name="token_inventory_id">
+                <option value="">— Loose match —</option>
+                {% for t in token_inventory_options %}
+                  <option value="{{ t.id }}">
+                    {{ t.name }}
+                    {% if t.subtype %}({{ t.subtype }}){% endif %}
+                    · qty {{ t.quantity }}
+                  </option>
+                {% endfor %}
               </select>
-              <button type="submit">Move Selected</button>
-            </div>
-          </form>
-        </details>
-      </section>
-    {% endif %}
-    {% if items %}
-      <section class="card-grid-section">
-        <div class="inventory-grid">
-          {% for item in items %}
-            {{ inventory_card(item, csrf_token,
-                        show_deck_actions=true,
-                        deck=deck,
-                        use_drawer_sorter=use_drawer_sorter,
-                        locations=locations) }}
-          {% endfor %}
-        </div>
-      </section>
-    {% else %}
-      {% if not commanders %}
-        <section class="panel">
-          <p>No cards in this deck yet.</p>
-          <p class="muted small-text">Use Search Collection above to find owned cards and add them to this deck.</p>
-          <a href="/collection">
-            <button type="button">Go to Collection</button>
-          </a>
+              <input type="text" name="notes" placeholder="Notes (optional)">
+              <button type="submit">Add</button>
+            </form>
+          </details>
         </section>
       {% endif %}
+      {% set bulk_storage = locations | selectattr("type", "ne", "root") | rejectattr("type", "equalto", "deck") | list %}
+      {% set bulk_decks = locations | selectattr("type", "equalto", "deck") | rejectattr("id", "equalto", deck.storage_location_id) | list %}
+      {% if items and (bulk_storage or bulk_decks) %}
+        <section class="panel">
+          <details>
+            <summary style="cursor: pointer;
+                            user-select: none;
+                            font-weight: 600;
+                            list-style: none;
+                            padding: 0.2rem 0">▸ Bulk Move</summary>
+            <form action="/decks/{{ deck.id }}/bulk-move"
+                  method="post"
+                  style="margin-top: 0.75rem">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+              <div style="display: flex;
+                          flex-direction: column;
+                          gap: 0.3rem;
+                          margin-bottom: 0.75rem;
+                          max-height: 260px;
+                          overflow-y: auto">
+                <label style="font-size: 0.8rem; color: #94a3b8; cursor: pointer;">
+                  <input type="checkbox"
+                         onclick="document.querySelectorAll('.deck-bulk-cb').forEach(cb => cb.checked = this.checked)">
+                  Select all
+                </label>
+                {% for item in items %}
+                  <label style="display: flex;
+                                align-items: center;
+                                gap: 0.4rem;
+                                font-size: 0.875rem;
+                                cursor: pointer">
+                    <input type="checkbox"
+                           name="row_ids"
+                           value="{{ item.id }}"
+                           class="deck-bulk-cb">
+                    {{ item.card.name }}
+                    {% if item.finish != 'normal' %}<span class="finish-badge">{{ item.finish }}</span>{% endif %}
+                  </label>
+                {% endfor %}
+              </div>
+              <div class="filter-row">
+                <select name="target_location_id" required>
+                  <option value="">— Destination —</option>
+                  {% if use_drawer_sorter %}<option value="sorter">Return to Sorter</option>{% endif %}
+                  {% if bulk_storage %}
+                    <optgroup label="Storage Locations">
+                      {% for loc in bulk_storage %}<option value="{{ loc.id }}">{{ loc.name }} ({{ loc.type }})</option>{% endfor %}
+                    </optgroup>
+                  {% endif %}
+                  {% if bulk_decks %}
+                    <optgroup label="Decks">
+                      {% for loc in bulk_decks %}<option value="{{ loc.id }}">{{ loc.name }}</option>{% endfor %}
+                    </optgroup>
+                  {% endif %}
+                </select>
+                <button type="submit">Move Selected</button>
+              </div>
+            </form>
+          </details>
+        </section>
+      {% endif %}
+      {% if items %}
+        <section class="card-grid-section">
+          <div class="inventory-grid">
+            {% for item in items %}
+              {{ inventory_card(item, csrf_token,
+                            show_deck_actions=true,
+                            deck=deck,
+                            use_drawer_sorter=use_drawer_sorter,
+                            locations=locations) }}
+            {% endfor %}
+          </div>
+        </section>
+      {% else %}
+        {% if not commanders %}
+          <section class="panel">
+            <p>No cards in this deck yet.</p>
+            <p class="muted small-text">Use Search Collection above to find owned cards and add them to this deck.</p>
+            <a href="/collection">
+              <button type="button">Go to Collection</button>
+            </a>
+          </section>
+        {% endif %}
+      {% endif %}
+      <div id="deck-lazy-panels" class="lazy-loading-panels">
+        <div class="lazy-loading">Loading panels…</div>
+      </div>
     {% endif %}
-    <div id="deck-lazy-panels" class="lazy-loading-panels">
-      <div class="lazy-loading">Loading panels…</div>
-    </div>
-  {% endif %}
-{% endblock %}
-{% block extra_scripts %}
-  {% if deck %}
-    <script>
+  {% endblock %}
+  {% block extra_scripts %}
+    {% if deck %}
+      <script>
       (function () {
         fetch('/decks/{{ deck.id }}/panels')
           .then(function (r) { return r.text(); })
@@ -600,6 +691,6 @@
             if (p) { p.innerHTML = ''; }
           });
       })();
-    </script>
-  {% endif %}
-{% endblock %}
+      </script>
+    {% endif %}
+  {% endblock %}
