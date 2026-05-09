@@ -404,32 +404,11 @@ def autocomplete_token_names(query: str, limit: int = 10) -> list[str]:
     return seen
 
 
-def fetch_token_by_name(name: str) -> dict[str, Any] | None:
-    """Look up a single token by name and return form-ready fields.
-
-    Returns a dict with keys: name, type_line, subtype, set_code,
-    collector_number, scryfall_id, image_url, is_double_sided, back_name,
-    back_image_url. Returns None if no token matches.
+def _format_token_response(card: dict[str, Any]) -> dict[str, Any]:
+    """Convert a Scryfall card payload into the form-ready dict the
+    /tokens/api/lookup endpoint returns. Handles double-faced tokens via
+    card_faces and derives subtype from the type_line.
     """
-    n = (name or "").strip()
-    if not n:
-        return None
-    url = (
-        "https://api.scryfall.com/cards/search"
-        f'?q=is%3Atoken+!"{requests.utils.quote(n)}"&unique=cards&order=released&dir=desc'
-    )
-    data = _get_json(url)
-    cards = data.get("data", []) if data else []
-    if not cards:
-        url = (
-            "https://api.scryfall.com/cards/search"
-            f"?q=is%3Atoken+name%3A{requests.utils.quote(n)}&unique=cards&order=released&dir=desc"
-        )
-        data = _get_json(url)
-        cards = data.get("data", []) if data else []
-    if not cards:
-        return None
-    card = cards[0]
     type_line = card.get("type_line") or ""
     subtype: str | None = None
     if "—" in type_line:
@@ -473,6 +452,59 @@ def fetch_token_by_name(name: str) -> dict[str, Any] | None:
         "back_name": None,
         "back_image_url": None,
     }
+
+
+def fetch_token_by_set_number(set_code: str, collector_number: str) -> dict[str, Any] | None:
+    """Look up a single token by set + collector number (most precise path).
+
+    Token sets on Scryfall are typically prefixed with `t` (e.g. tbig for the
+    BIG token set). If the user enters "big" and the regular set's collector
+    number doesn't return a token, this falls back to "tbig". Leading zeros
+    on the collector number are stripped — Scryfall uses "6" not "0006".
+    """
+    code = (set_code or "").strip().lower()
+    cn_raw = (collector_number or "").strip()
+    if not code or not cn_raw:
+        return None
+    cn = cn_raw.lstrip("0") or "0"
+
+    candidates = [code]
+    if not code.startswith("t"):
+        candidates.append("t" + code)
+
+    for c in candidates:
+        url = f"https://api.scryfall.com/cards/{c}/{requests.utils.quote(cn)}"
+        data = _get_json(url)
+        if data and data.get("set_type") == "token":
+            return _format_token_response(data)
+    return None
+
+
+def fetch_token_by_name(name: str) -> dict[str, Any] | None:
+    """Look up a single token by name and return form-ready fields.
+
+    Tries an exact `!"name"` match first, falls back to fuzzy `name:` search.
+    Returns None if no token matches.
+    """
+    n = (name or "").strip()
+    if not n:
+        return None
+    url = (
+        "https://api.scryfall.com/cards/search"
+        f'?q=is%3Atoken+!"{requests.utils.quote(n)}"&unique=cards&order=released&dir=desc'
+    )
+    data = _get_json(url)
+    cards = data.get("data", []) if data else []
+    if not cards:
+        url = (
+            "https://api.scryfall.com/cards/search"
+            f"?q=is%3Atoken+name%3A{requests.utils.quote(n)}&unique=cards&order=released&dir=desc"
+        )
+        data = _get_json(url)
+        cards = data.get("data", []) if data else []
+    if not cards:
+        return None
+    return _format_token_response(cards[0])
 
 
 def fetch_game_changer_names() -> list[str]:

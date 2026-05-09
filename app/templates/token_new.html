@@ -122,15 +122,24 @@
   });
 
   // Auto-fill: clicking the button (or selecting from datalist) populates the form.
+  // Set + collector takes precedence over name when both are filled.
   async function fillFromScryfall() {
     const name = nameInput.value.trim();
-    if (!name) {
-      statusEl.textContent = 'Enter a token name first.';
+    const setCode = (document.getElementById('token-field-set_code').value || '').trim();
+    const collector = (document.getElementById('token-field-collector_number').value || '').trim();
+    if (!name && !(setCode && collector)) {
+      statusEl.textContent = 'Enter a token name OR set + collector number.';
       return;
     }
     statusEl.textContent = 'Looking up on Scryfall…';
+    const params = new URLSearchParams();
+    if (name) params.set('name', name);
+    if (setCode && collector) {
+      params.set('set', setCode);
+      params.set('collector', collector);
+    }
     try {
-      const res = await fetch('/tokens/api/lookup?name=' + encodeURIComponent(name));
+      const res = await fetch('/tokens/api/lookup?' + params.toString());
       if (res.status === 404) {
         statusEl.textContent = 'No token matched on Scryfall — fill manually.';
         return;

@@ -119,6 +119,7 @@ from app.scryfall import (
     fetch_card_by_scryfall_id,
     fetch_card_by_set_and_number,
     fetch_token_by_name,
+    fetch_token_by_set_number,
     refresh_card_from_scryfall,
     search_cards_by_name,
 )
@@ -2379,10 +2380,20 @@ def tokens_api_autocomplete(
 @app.get("/tokens/api/lookup")
 def tokens_api_lookup(
     name: str = "",
+    set: str = "",
+    collector: str = "",
     current_user: User = Depends(get_current_user),
 ):
-    """Single-token lookup for auto-fill on the new-token form. Returns a
-    dict with form-ready fields, or a 404 if Scryfall has nothing."""
+    """Single-token lookup for auto-fill on the new-token form.
+
+    Prefers set + collector number when both are provided (most precise
+    path; auto-tries the `t`-prefixed token set if the bare set code
+    doesn't return a token). Falls back to fuzzy name search.
+    """
+    if set.strip() and collector.strip():
+        data = fetch_token_by_set_number(set, collector)
+        if data:
+            return JSONResponse(data)
     data = fetch_token_by_name(name)
     if not data:
         return JSONResponse({"error": "not_found"}, status_code=404)
