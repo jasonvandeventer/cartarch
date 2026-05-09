@@ -440,15 +440,23 @@ def _format_token_response(card: dict[str, Any]) -> dict[str, Any]:
     image_url = (card.get("image_uris") or {}).get("normal") or (card.get("image_uris") or {}).get(
         "large"
     )
+    # Substitute-card sets (SZNR Zendikar Rising, plus SLD/SHM substitute prints)
+    # are physically double-sided cards used in lieu of DFCs in play. Scryfall
+    # stores them as layout=normal with no card_faces, so they look single-sided
+    # to the API. Detect by set_name / name patterns and flag the box; the user
+    # can fill back_name/back_image_url manually if they care.
+    set_name = (card.get("set_name") or "").lower()
+    name = card.get("name") or ""
+    is_substitute_card = "substitute card" in set_name or name.lower().startswith("double-faced")
     return {
-        "name": card.get("name"),
+        "name": name,
         "type_line": type_line,
         "subtype": subtype,
         "set_code": card.get("set"),
         "collector_number": card.get("collector_number"),
         "scryfall_id": card.get("id"),
         "image_url": image_url,
-        "is_double_sided": False,
+        "is_double_sided": is_substitute_card,
         "back_name": None,
         "back_image_url": None,
     }
