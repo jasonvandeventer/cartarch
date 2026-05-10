@@ -184,17 +184,29 @@
     }
     resultsEl.innerHTML = '<p class="muted small-text" style="margin:0 0 0.5rem 0">' +
       items.length + ' match' + (items.length === 1 ? '' : 'es') +
-      ' — click one to fill the form:</p>' +
-      '<div class="token-search-grid">' + items.map((t, i) => `
-        <button type="button" class="token-search-card" data-idx="${i}">
-          ${t.image_url ? `<img src="${t.image_url}" alt="${t.name}">` : '<div class="token-search-noimg">no image</div>'}
-          <div class="token-search-meta">
-            <strong>${t.name}</strong>
-            <span class="muted small-text">${(t.set_code || '?').toUpperCase()} #${t.collector_number || '?'}</span>
-            ${t.is_double_sided ? `<span class="finish-badge">↻ ${t.back_name || ''}</span>` : ''}
-          </div>
-        </button>
-      `).join('') + '</div>';
+      ' — click one to fill the form. Double-faced tokens show both sides:</p>' +
+      '<div class="token-search-grid">' + items.map((t, i) => {
+        const front = t.image_url ? `<img src="${t.image_url}" alt="${t.name}">` : '<div class="token-search-noimg">no image</div>';
+        const back = t.is_double_sided && t.back_image_url
+          ? `<img src="${t.back_image_url}" alt="${t.back_name || 'back'}">`
+          : '';
+        const imgs = t.is_double_sided && t.back_image_url
+          ? `<div class="token-search-faces">${front}${back}</div>`
+          : front;
+        const dfcLabel = t.is_double_sided
+          ? `<span class="finish-badge" title="Double-faced token">↻ ${t.name} / ${t.back_name || ''}</span>`
+          : '';
+        return `
+          <button type="button" class="token-search-card" data-idx="${i}">
+            ${imgs}
+            <div class="token-search-meta">
+              <strong>${t.name}${t.is_double_sided && t.back_name ? ' // ' + t.back_name : ''}</strong>
+              <span class="muted small-text">${(t.set_code || '?').toUpperCase()} #${t.collector_number || '?'}</span>
+              ${dfcLabel}
+            </div>
+          </button>
+        `;
+      }).join('') + '</div>';
     resultsEl.querySelectorAll('.token-search-card').forEach(btn => {
       btn.addEventListener('click', () => {
         const idx = parseInt(btn.dataset.idx, 10);

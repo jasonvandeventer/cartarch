@@ -493,10 +493,16 @@ def search_tokens_by_name(name: str, limit: int = 12) -> list[dict[str, Any]]:
     For disambiguating tokens with the same name across multiple sets — e.g.,
     'Treasure' has dozens of printings; 'Goblin' has many. The picker UI
     consumes this so the user can choose the right printing.
+
+    DFC tokens are surfaced first within the limit because most users aren't
+    looking up "yet another Goblin token" — if they want a double-faced
+    Goblin/Blood, they want to see it ranked highly.
     """
     n = (name or "").strip()
     if len(n) < 2:
         return []
+    # Pull a larger window so DFCs (often older printings buried under recent
+    # singles in release order) survive the trim to `limit`.
     url = (
         "https://api.scryfall.com/cards/search"
         f"?q=is%3Atoken+name%3A{requests.utils.quote(n)}"
@@ -504,7 +510,9 @@ def search_tokens_by_name(name: str, limit: int = 12) -> list[dict[str, Any]]:
     )
     data = _get_json(url)
     cards = data.get("data", []) if data else []
-    return [_format_token_response(c) for c in cards[:limit]]
+    formatted = [_format_token_response(c) for c in cards]
+    formatted.sort(key=lambda t: (0 if t["is_double_sided"] else 1))
+    return formatted[:limit]
 
 
 def fetch_token_by_name(name: str) -> dict[str, Any] | None:
