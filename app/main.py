@@ -132,7 +132,7 @@ from app.token_service import (
     delete_token,
     list_token_subtypes,
     list_tokens,
-    parse_bulk_dfc_lines,
+    parse_bulk_token_lines,
     total_token_count,
     update_token,
 )
@@ -2409,7 +2409,7 @@ def tokens_bulk_add_submit(
     except ValueError:
         storage_id = None
 
-    parsed = parse_bulk_dfc_lines(pairs)
+    parsed = parse_bulk_token_lines(pairs)
     rows_created: list[dict] = []
     errors: list[dict] = []
 
@@ -2417,6 +2417,7 @@ def tokens_bulk_add_submit(
         if not entry["ok"]:
             errors.append({"raw": entry["raw"], "error": entry["error"]})
             continue
+
         front = fetch_token_by_set_number(entry["front_set"], entry["front_collector"])
         if not front:
             errors.append(
@@ -2426,46 +2427,82 @@ def tokens_bulk_add_submit(
                 }
             )
             continue
-        back = fetch_token_by_set_number(entry["back_set"], entry["back_collector"])
-        if not back:
-            errors.append(
-                {
-                    "raw": entry["raw"],
-                    "error": f"back not found: {entry['back_set']} #{entry['back_collector']}",
-                }
-            )
-            continue
-        try:
-            token = create_token(
-                session,
-                user_id=current_user.id,
-                name=front["name"] or "",
-                quantity=max(1, entry["quantity"] if entry["quantity"] else default_qty),
-                subtype=front.get("subtype"),
-                type_line=front.get("type_line"),
-                storage_location_id=storage_id,
-                image_url=front.get("image_url"),
-                is_double_sided=True,
-                back_name=back.get("name"),
-                back_image_url=back.get("image_url"),
-                back_set_code=back.get("set_code"),
-                back_collector_number=back.get("collector_number"),
-                set_code=front.get("set_code"),
-                collector_number=front.get("collector_number"),
-                scryfall_id=front.get("scryfall_id"),
-            )
-            rows_created.append(
-                {
-                    "id": token.id,
-                    "front_name": front["name"],
-                    "front_id": f"{front['set_code'].upper()}#{front['collector_number']}",
-                    "back_name": back["name"],
-                    "back_id": f"{back['set_code'].upper()}#{back['collector_number']}",
-                    "quantity": token.quantity,
-                }
-            )
-        except ValueError as exc:
-            errors.append({"raw": entry["raw"], "error": str(exc)})
+
+        qty = max(1, entry["quantity"] if entry["quantity"] else default_qty)
+
+        # DFC path — also fetch the back face
+        if entry["is_dfc"]:
+            back = fetch_token_by_set_number(entry["back_set"], entry["back_collector"])
+            if not back:
+                errors.append(
+                    {
+                        "raw": entry["raw"],
+                        "error": f"back not found: {entry['back_set']} #{entry['back_collector']}",
+                    }
+                )
+                continue
+            try:
+                token = create_token(
+                    session,
+                    user_id=current_user.id,
+                    name=front["name"] or "",
+                    quantity=qty,
+                    subtype=front.get("subtype"),
+                    type_line=front.get("type_line"),
+                    storage_location_id=storage_id,
+                    image_url=front.get("image_url"),
+                    is_double_sided=True,
+                    back_name=back.get("name"),
+                    back_image_url=back.get("image_url"),
+                    back_set_code=back.get("set_code"),
+                    back_collector_number=back.get("collector_number"),
+                    set_code=front.get("set_code"),
+                    collector_number=front.get("collector_number"),
+                    scryfall_id=front.get("scryfall_id"),
+                )
+                rows_created.append(
+                    {
+                        "id": token.id,
+                        "front_name": front["name"],
+                        "front_id": f"{(front.get('set_code') or '').upper()}#{front.get('collector_number')}",
+                        "back_name": back["name"],
+                        "back_id": f"{(back.get('set_code') or '').upper()}#{back.get('collector_number')}",
+                        "quantity": token.quantity,
+                        "is_dfc": True,
+                    }
+                )
+            except ValueError as exc:
+                errors.append({"raw": entry["raw"], "error": str(exc)})
+        else:
+            # Single-sided path
+            try:
+                token = create_token(
+                    session,
+                    user_id=current_user.id,
+                    name=front["name"] or "",
+                    quantity=qty,
+                    subtype=front.get("subtype"),
+                    type_line=front.get("type_line"),
+                    storage_location_id=storage_id,
+                    image_url=front.get("image_url"),
+                    is_double_sided=False,
+                    set_code=front.get("set_code"),
+                    collector_number=front.get("collector_number"),
+                    scryfall_id=front.get("scryfall_id"),
+                )
+                rows_created.append(
+                    {
+                        "id": token.id,
+                        "front_name": front["name"],
+                        "front_id": f"{(front.get('set_code') or '').upper()}#{front.get('collector_number')}",
+                        "back_name": None,
+                        "back_id": None,
+                        "quantity": token.quantity,
+                        "is_dfc": False,
+                    }
+                )
+            except ValueError as exc:
+                errors.append({"raw": entry["raw"], "error": str(exc)})
 
     return render(
         request,

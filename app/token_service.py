@@ -256,15 +256,20 @@ def list_token_subtypes(session: Session, user_id: int) -> list[str]:
     return [r[0] for r in rows]
 
 
-def parse_bulk_dfc_lines(raw: str) -> list[dict]:
-    """Parse a paste-list of DFC tokens. Returns list of dicts with parse status.
+def parse_bulk_token_lines(raw: str) -> list[dict]:
+    """Parse a paste-list of tokens (single-sided OR DFC).
 
-    Format per line:  front_set front_collector back_set back_collector [quantity]
-    Whitespace-separated. Blank lines and lines starting with `#` are ignored.
+    Per line, whitespace-separated:
+      2 fields:  set collector                                   (single, qty=default)
+      3 fields:  set collector quantity                          (single)
+      4 fields:  front_set front_# back_set back_#               (DFC, qty=default)
+      5 fields:  front_set front_# back_set back_# quantity      (DFC)
+
+    Blank lines and lines starting with `#` are ignored.
 
     Each result dict has either:
-      - 'ok': True with parsed fields
-      - 'ok': False with 'error' message (line still surfaced for user feedback)
+      - 'ok': True with parsed fields including 'is_dfc' bool
+      - 'ok': False with 'error' message (raw line preserved for user feedback)
     """
     out: list[dict] = []
     for raw_line in raw.splitlines():
@@ -272,48 +277,102 @@ def parse_bulk_dfc_lines(raw: str) -> list[dict]:
         if not line or line.startswith("#"):
             continue
         parts = line.split()
-        if len(parts) < 4:
+        n = len(parts)
+
+        if n == 2:
             out.append(
                 {
-                    "ok": False,
+                    "ok": True,
                     "raw": raw_line,
-                    "error": "expected at least 4 tokens (front_set front_# back_set back_#)",
+                    "is_dfc": False,
+                    "front_set": parts[0],
+                    "front_collector": parts[1],
+                    "quantity": None,
                 }
             )
             continue
-        if len(parts) > 5:
+        if n == 3:
+            try:
+                qty = int(parts[2])
+                if qty < 1:
+                    raise ValueError
+            except ValueError:
+                out.append(
+                    {
+                        "ok": False,
+                        "raw": raw_line,
+                        "error": (
+                            f"invalid quantity {parts[2]!r} (single-sided line is "
+                            "set collector [qty])"
+                        ),
+                    }
+                )
+                continue
             out.append(
                 {
-                    "ok": False,
+                    "ok": True,
                     "raw": raw_line,
-                    "error": "too many fields (max 5: 4 ids + optional qty)",
+                    "is_dfc": False,
+                    "front_set": parts[0],
+                    "front_collector": parts[1],
+                    "quantity": qty,
                 }
             )
             continue
-        front_set, front_cn, back_set, back_cn = parts[:4]
-        qty = 1
-        if len(parts) == 5:
+        if n == 4:
+            out.append(
+                {
+                    "ok": True,
+                    "raw": raw_line,
+                    "is_dfc": True,
+                    "front_set": parts[0],
+                    "front_collector": parts[1],
+                    "back_set": parts[2],
+                    "back_collector": parts[3],
+                    "quantity": None,
+                }
+            )
+            continue
+        if n == 5:
             try:
                 qty = int(parts[4])
                 if qty < 1:
                     raise ValueError
             except ValueError:
                 out.append(
-                    {"ok": False, "raw": raw_line, "error": f"invalid quantity {parts[4]!r}"}
+                    {
+                        "ok": False,
+                        "raw": raw_line,
+                        "error": f"invalid quantity {parts[4]!r}",
+                    }
                 )
                 continue
+            out.append(
+                {
+                    "ok": True,
+                    "raw": raw_line,
+                    "is_dfc": True,
+                    "front_set": parts[0],
+                    "front_collector": parts[1],
+                    "back_set": parts[2],
+                    "back_collector": parts[3],
+                    "quantity": qty,
+                }
+            )
+            continue
+
         out.append(
             {
-                "ok": True,
+                "ok": False,
                 "raw": raw_line,
-                "front_set": front_set,
-                "front_collector": front_cn,
-                "back_set": back_set,
-                "back_collector": back_cn,
-                "quantity": qty,
+                "error": f"expected 2/3/4/5 fields per line, got {n}",
             }
         )
     return out
+
+
+# Back-compat alias — old name used while the parser was DFC-only.
+parse_bulk_dfc_lines = parse_bulk_token_lines
 
 
 def total_token_count(session: Session, user_id: int) -> int:

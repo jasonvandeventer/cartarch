@@ -3,32 +3,51 @@
   <section class="panel hero-panel compact-hero">
     <div>
       <div class="panel-topline">Tokens</div>
-      <h2 class="panel-title">Bulk Add DFC Tokens</h2>
+      <h2 class="panel-title">Bulk Add Tokens</h2>
       <p class="muted">
-        Paste a list of double-faced token pairs. Each line is the front and back, looked up from Scryfall.
+        Paste a list of tokens. Each line can be single-sided or double-faced; the parser
+        decides by how many fields you supply.
       </p>
     </div>
   </section>
   <section class="panel">
     <h3 class="panel-title">Format</h3>
-    <p class="muted small-text">
-      One line per physical token. Whitespace-separated:
-      <code>front_set front_collector back_set back_collector [quantity]</code>.
-      Quantity defaults to the value below if omitted. Blank lines and
-      lines starting with <code>#</code> are ignored.
+    <p class="muted small-text">One line per physical token. Whitespace-separated. Field count picks the line type:</p>
+    <ul class="muted small-text"
+        style="margin: 0 0 0.5rem 0;
+               padding-left: 1.2rem">
+      <li>
+        <code>set collector</code> — single-sided (uses default qty)
+      </li>
+      <li>
+        <code>set collector qty</code> — single-sided with explicit qty
+      </li>
+      <li>
+        <code>front_set front_# back_set back_#</code> — DFC (uses default qty)
+      </li>
+      <li>
+        <code>front_set front_# back_set back_# qty</code> — DFC with explicit qty
+      </li>
+    </ul>
+    <p class="muted small-text" style="margin: 0">
+      Blank lines and lines starting with <code>#</code> are ignored.
     </p>
-    <pre style="background: rgba(255,255,255,0.04); padding: 0.75rem; border-radius: 6px; font-size: 0.85rem; margin: 0">
-# Front and back from different sets
+    <pre style="background: rgba(255,255,255,0.04); padding: 0.75rem; border-radius: 6px; font-size: 0.85rem; margin: 0.5rem 0 0 0">
+# Single-sided
+tsoc 27
+# Single-sided with quantity
+thob 12 6
+# DFC, front + back from different sets
 tblb 3 tblc 14
-# Same front paired with a different back
+# DFC, both sides same set
 tblb 3 tblb 7
-# With explicit quantity
+# DFC with explicit quantity
 tblb 1 tblc 8 2</pre>
   </section>
   <section class="panel">
     <form action="/tokens/bulk-add" method="post" class="stack-form">
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-      <label>Paste your DFC pairs</label>
+      <label>Paste your tokens</label>
       <textarea name="pairs"
                 rows="12"
                 placeholder="tblb 3 tblc 14&#10;tblb 3 tblb 7&#10;..."
@@ -86,7 +105,11 @@ tblb 1 tblc 8 2</pre>
                   <strong>{{ r.front_name }}</strong> <span class="muted small-text">{{ r.front_id }}</span>
                 </td>
                 <td>
-                  <strong>{{ r.back_name }}</strong> <span class="muted small-text">{{ r.back_id }}</span>
+                  {% if r.is_dfc %}
+                    <strong>{{ r.back_name }}</strong> <span class="muted small-text">{{ r.back_id }}</span>
+                  {% else %}
+                    <span class="muted small-text">— (single-sided)</span>
+                  {% endif %}
                 </td>
                 <td>{{ r.quantity }}</td>
               </tr>
