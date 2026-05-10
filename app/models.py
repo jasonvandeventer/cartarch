@@ -226,6 +226,8 @@ class TokenInventory(Base):
     is_double_sided: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     back_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     back_image_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    back_set_code: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    back_collector_number: Mapped[str | None] = mapped_column(String(32), nullable=True)
     storage_location_id: Mapped[int | None] = mapped_column(
         ForeignKey("storage_locations.id"), nullable=True, index=True
     )

@@ -62,6 +62,8 @@ def create_token(
     is_double_sided: bool = False,
     back_name: str | None = None,
     back_image_url: str | None = None,
+    back_set_code: str | None = None,
+    back_collector_number: str | None = None,
     set_code: str | None = None,
     collector_number: str | None = None,
     scryfall_id: str | None = None,
@@ -85,6 +87,8 @@ def create_token(
         is_double_sided=bool(is_double_sided),
         back_name=back_name.strip() if back_name else None,
         back_image_url=back_image_url.strip() if back_image_url else None,
+        back_set_code=back_set_code.strip() if back_set_code else None,
+        back_collector_number=back_collector_number.strip() if back_collector_number else None,
         storage_location_id=storage_location_id,
         notes=notes.strip() if notes else None,
     )

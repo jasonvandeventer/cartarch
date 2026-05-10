@@ -66,15 +66,52 @@
                value="1">
         Double-sided
       </label>
-      <label>
-        Back-face name <span class="muted small-text">(if double-sided)</span>
-      </label>
-      <input type="text"
-             id="token-field-back_name"
-             name="back_name"
-             placeholder="e.g. Zombie">
-      <label>Back-face image URL</label>
-      <input type="url" id="token-field-back_image_url" name="back_image_url">
+      <fieldset id="token-back-section"
+                style="border:1px solid rgba(255,255,255,0.08);
+                       border-radius:6px;
+                       padding:0.6rem;
+                       display:none">
+        <legend class="muted small-text">Back face</legend>
+        <p class="muted small-text" style="margin: 0 0 0.5rem">
+          Some sets (TMH3 etc.) have physically double-faced tokens that Scryfall stores as
+          separate single-sided records. Enter the back face's set + collector and click
+          <em>Look up back</em>; the back name and image will fill from Scryfall.
+        </p>
+        <div style="display:grid;
+                    grid-template-columns:1fr 1fr;
+                    gap:0.4rem;
+                    margin-bottom:0.4rem">
+          <label style="margin:0">
+            Back set code
+            <input type="text"
+                   id="token-field-back_set_code"
+                   name="back_set_code"
+                   placeholder="e.g. tmh3">
+          </label>
+          <label style="margin:0">
+            Back collector #
+            <input type="text"
+                   id="token-field-back_collector_number"
+                   name="back_collector_number"
+                   placeholder="e.g. 1">
+          </label>
+        </div>
+        <button type="button"
+                id="token-back-lookup-btn"
+                class="btn-like btn-like-muted"
+                style="margin-bottom:0.4rem">Look up back</button>
+        <p id="token-back-status"
+           class="muted small-text"
+           style="margin:0;
+                  min-height:1em"></p>
+        <label>Back-face name</label>
+        <input type="text"
+               id="token-field-back_name"
+               name="back_name"
+               placeholder="(auto-filled from Look up back, or type manually)">
+        <label>Back-face image URL</label>
+        <input type="url" id="token-field-back_image_url" name="back_image_url">
+      </fieldset>
       <label>
         Set code <span class="muted small-text">(optional)</span>
       </label>
@@ -214,6 +251,54 @@
       });
     });
   }
+
+  // --- Double-sided back-face handling ----------------------------------
+  const dfcCheckbox = document.getElementById('token-field-is_double_sided');
+  const backSection = document.getElementById('token-back-section');
+  const backStatusEl = document.getElementById('token-back-status');
+  const backLookupBtn = document.getElementById('token-back-lookup-btn');
+
+  function syncBackVisibility() {
+    backSection.style.display = dfcCheckbox.checked ? '' : 'none';
+  }
+  dfcCheckbox.addEventListener('change', syncBackVisibility);
+  syncBackVisibility();
+
+  backLookupBtn.addEventListener('click', async () => {
+    const setCode = (document.getElementById('token-field-back_set_code').value || '').trim();
+    const collector = (document.getElementById('token-field-back_collector_number').value || '').trim();
+    if (!setCode || !collector) {
+      backStatusEl.textContent = 'Enter back set code and collector number first.';
+      return;
+    }
+    backStatusEl.textContent = 'Looking up back face…';
+    const params = new URLSearchParams({ set: setCode, collector: collector });
+    try {
+      const res = await fetch('/tokens/api/lookup?' + params.toString());
+      if (res.status === 404) {
+        backStatusEl.textContent = 'No token at ' + setCode.toUpperCase() + ' #' + collector + '.';
+        return;
+      }
+      if (!res.ok) {
+        backStatusEl.textContent = 'Lookup failed (' + res.status + ').';
+        return;
+      }
+      const data = await res.json();
+      const setEl = (id, value) => {
+        const el = document.getElementById(id);
+        if (el && value) el.value = value;
+      };
+      setEl('token-field-back_name', data.name);
+      setEl('token-field-back_image_url', data.image_url);
+      // Normalize the typed set code to whatever Scryfall returned (e.g. 'big' -> 'tmh3')
+      setEl('token-field-back_set_code', data.set_code);
+      setEl('token-field-back_collector_number', data.collector_number);
+      backStatusEl.textContent = 'Back filled · ' + (data.set_code || '?').toUpperCase() +
+        ' #' + (data.collector_number || '?');
+    } catch (e) {
+      backStatusEl.textContent = 'Lookup error: ' + e.message;
+    }
+  });
 
   searchBtn.addEventListener('click', async () => {
     const name = nameInput.value.trim();

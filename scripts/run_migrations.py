@@ -21,6 +21,9 @@ from scripts.migrate_v3_15_1_bracket_v2_intent_confidence import (
     main as migrate_v3_15_1_intent_confidence,
 )
 from scripts.migrate_v3_16_0_token_inventory import main as migrate_v3_16_0_token_inventory
+from scripts.migrate_v3_16_1_token_back_set_collector import (
+    main as migrate_v3_16_1_token_back_set_collector,
+)
 
 
 def _is_applied(name: str) -> bool:
@@ -170,6 +173,13 @@ def run():
         _mark_applied("v3_16_0_token_inventory")
     else:
         print("v3.16.0 token_inventory already applied, skipping")
+
+    if not _is_applied("v3_16_1_token_back_set_collector"):
+        print("Running v3.16.1 token back set/collector columns...")
+        migrate_v3_16_1_token_back_set_collector()
+        _mark_applied("v3_16_1_token_back_set_collector")
+    else:
+        print("v3.16.1 token_back_set_collector already applied, skipping")
 
     print("Migration runner complete")
 
