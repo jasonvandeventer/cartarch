@@ -132,6 +132,7 @@ from app.token_service import (
     delete_token,
     list_token_subtypes,
     list_tokens,
+    parse_bulk_dfc_lines,
     total_token_count,
     update_token,
 )
@@ -2371,6 +2372,118 @@ def decks_token_requirement_add(
     except ValueError:
         pass
     return RedirectResponse(url=f"/decks/{deck_id}", status_code=303)
+
+
+@app.get("/tokens/bulk-add")
+def tokens_bulk_add_page(
+    request: Request,
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+):
+    """Render the bulk-DFC paste-list page (no result yet)."""
+    return render(
+        request,
+        "token_bulk_add.html",
+        {
+            "title": "Bulk Add DFC Tokens",
+            "locations": list_locations(session, current_user.id),
+            "current_user": current_user,
+            "result": None,
+        },
+    )
+
+
+@app.post("/tokens/bulk-add")
+def tokens_bulk_add_submit(
+    request: Request,
+    pairs: str = Form(""),
+    storage_location_id: str = Form(""),
+    default_qty: int = Form(1),
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+    _: None = CsrfRequired,
+):
+    """Parse the paste-list, fetch each face from Scryfall, create rows."""
+    try:
+        storage_id = int(storage_location_id) if storage_location_id else None
+    except ValueError:
+        storage_id = None
+
+    parsed = parse_bulk_dfc_lines(pairs)
+    rows_created: list[dict] = []
+    errors: list[dict] = []
+
+    for entry in parsed:
+        if not entry["ok"]:
+            errors.append({"raw": entry["raw"], "error": entry["error"]})
+            continue
+        front = fetch_token_by_set_number(entry["front_set"], entry["front_collector"])
+        if not front:
+            errors.append(
+                {
+                    "raw": entry["raw"],
+                    "error": f"front not found: {entry['front_set']} #{entry['front_collector']}",
+                }
+            )
+            continue
+        back = fetch_token_by_set_number(entry["back_set"], entry["back_collector"])
+        if not back:
+            errors.append(
+                {
+                    "raw": entry["raw"],
+                    "error": f"back not found: {entry['back_set']} #{entry['back_collector']}",
+                }
+            )
+            continue
+        try:
+            token = create_token(
+                session,
+                user_id=current_user.id,
+                name=front["name"] or "",
+                quantity=max(1, entry["quantity"] if entry["quantity"] else default_qty),
+                subtype=front.get("subtype"),
+                type_line=front.get("type_line"),
+                storage_location_id=storage_id,
+                image_url=front.get("image_url"),
+                is_double_sided=True,
+                back_name=back.get("name"),
+                back_image_url=back.get("image_url"),
+                back_set_code=back.get("set_code"),
+                back_collector_number=back.get("collector_number"),
+                set_code=front.get("set_code"),
+                collector_number=front.get("collector_number"),
+                scryfall_id=front.get("scryfall_id"),
+            )
+            rows_created.append(
+                {
+                    "id": token.id,
+                    "front_name": front["name"],
+                    "front_id": f"{front['set_code'].upper()}#{front['collector_number']}",
+                    "back_name": back["name"],
+                    "back_id": f"{back['set_code'].upper()}#{back['collector_number']}",
+                    "quantity": token.quantity,
+                }
+            )
+        except ValueError as exc:
+            errors.append({"raw": entry["raw"], "error": str(exc)})
+
+    return render(
+        request,
+        "token_bulk_add.html",
+        {
+            "title": "Bulk Add DFC Tokens",
+            "locations": list_locations(session, current_user.id),
+            "current_user": current_user,
+            "result": {
+                "created": rows_created,
+                "errors": errors,
+                "total_lines": len(parsed),
+            },
+            "previous_pairs": pairs,
+            "previous_default_qty": default_qty,
+            "previous_storage_id": storage_id,
+        },
+    )
 
 
 @app.get("/tokens/api/autocomplete")

@@ -256,6 +256,66 @@ def list_token_subtypes(session: Session, user_id: int) -> list[str]:
     return [r[0] for r in rows]
 
 
+def parse_bulk_dfc_lines(raw: str) -> list[dict]:
+    """Parse a paste-list of DFC tokens. Returns list of dicts with parse status.
+
+    Format per line:  front_set front_collector back_set back_collector [quantity]
+    Whitespace-separated. Blank lines and lines starting with `#` are ignored.
+
+    Each result dict has either:
+      - 'ok': True with parsed fields
+      - 'ok': False with 'error' message (line still surfaced for user feedback)
+    """
+    out: list[dict] = []
+    for raw_line in raw.splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+        parts = line.split()
+        if len(parts) < 4:
+            out.append(
+                {
+                    "ok": False,
+                    "raw": raw_line,
+                    "error": "expected at least 4 tokens (front_set front_# back_set back_#)",
+                }
+            )
+            continue
+        if len(parts) > 5:
+            out.append(
+                {
+                    "ok": False,
+                    "raw": raw_line,
+                    "error": "too many fields (max 5: 4 ids + optional qty)",
+                }
+            )
+            continue
+        front_set, front_cn, back_set, back_cn = parts[:4]
+        qty = 1
+        if len(parts) == 5:
+            try:
+                qty = int(parts[4])
+                if qty < 1:
+                    raise ValueError
+            except ValueError:
+                out.append(
+                    {"ok": False, "raw": raw_line, "error": f"invalid quantity {parts[4]!r}"}
+                )
+                continue
+        out.append(
+            {
+                "ok": True,
+                "raw": raw_line,
+                "front_set": front_set,
+                "front_collector": front_cn,
+                "back_set": back_set,
+                "back_collector": back_cn,
+                "quantity": qty,
+            }
+        )
+    return out
+
+
 def total_token_count(session: Session, user_id: int) -> int:
     return (
         session.query(func.coalesce(func.sum(TokenInventory.quantity), 0))

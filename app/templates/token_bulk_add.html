@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+{% block content %}
+  <section class="panel hero-panel compact-hero">
+    <div>
+      <div class="panel-topline">Tokens</div>
+      <h2 class="panel-title">Bulk Add DFC Tokens</h2>
+      <p class="muted">
+        Paste a list of double-faced token pairs. Each line is the front and back, looked up from Scryfall.
+      </p>
+    </div>
+  </section>
+  <section class="panel">
+    <h3 class="panel-title">Format</h3>
+    <p class="muted small-text">
+      One line per physical token. Whitespace-separated:
+      <code>front_set front_collector back_set back_collector [quantity]</code>.
+      Quantity defaults to the value below if omitted. Blank lines and
+      lines starting with <code>#</code> are ignored.
+    </p>
+    <pre style="background: rgba(255,255,255,0.04); padding: 0.75rem; border-radius: 6px; font-size: 0.85rem; margin: 0">
+# Front and back from different sets
+tblb 3 tblc 14
+# Same front paired with a different back
+tblb 3 tblb 7
+# With explicit quantity
+tblb 1 tblc 8 2</pre>
+  </section>
+  <section class="panel">
+    <form action="/tokens/bulk-add" method="post" class="stack-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <label>Paste your DFC pairs</label>
+      <textarea name="pairs"
+                rows="12"
+                placeholder="tblb 3 tblc 14&#10;tblb 3 tblb 7&#10;..."
+                style="font-family: monospace;
+                       font-size: 0.9rem">{{ previous_pairs or '' }}</textarea>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.5rem">
+        <label>
+          Default quantity per row
+          <input type="number"
+                 name="default_qty"
+                 min="1"
+                 value="{{ previous_default_qty or 1 }}">
+        </label>
+        <label>
+          Storage location for all
+          <select name="storage_location_id">
+            <option value="">— None —</option>
+            {% for loc in locations %}
+              <option value="{{ loc.id }}"
+                      {% if previous_storage_id == loc.id %}selected{% endif %}>{{ loc.name }}</option>
+            {% endfor %}
+          </select>
+        </label>
+      </div>
+      <div style="display:flex; gap:0.5rem; margin-top:0.5rem">
+        <button type="submit">Look Up &amp; Add All</button>
+        <a href="/tokens" class="btn-like btn-like-muted">Cancel</a>
+      </div>
+      <p class="muted small-text" style="margin: 0">
+        Each pair triggers two Scryfall lookups; ~80ms throttled. Expect roughly
+        ~0.2 seconds per token. A 100-row paste takes ~20 seconds.
+      </p>
+    </form>
+  </section>
+  {% if result %}
+    <section class="panel">
+      <h3 class="panel-title">
+        Result · {{ result.created|length }} created
+        {% if result.errors|length %}· <span class="token-status-missing">{{ result.errors|length }} errors</span>{% endif %}
+      </h3>
+      {% if result.created %}
+        <h4 class="muted small-text" style="margin-top:0.5rem">Created</h4>
+        <table>
+          <thead>
+            <tr>
+              <th>Front</th>
+              <th>Back</th>
+              <th>Qty</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in result.created %}
+              <tr>
+                <td>
+                  <strong>{{ r.front_name }}</strong> <span class="muted small-text">{{ r.front_id }}</span>
+                </td>
+                <td>
+                  <strong>{{ r.back_name }}</strong> <span class="muted small-text">{{ r.back_id }}</span>
+                </td>
+                <td>{{ r.quantity }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      {% endif %}
+      {% if result.errors %}
+        <h4 class="muted small-text" style="margin-top:0.75rem">Errors</h4>
+        <table>
+          <thead>
+            <tr>
+              <th>Line</th>
+              <th>Error</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for e in result.errors %}
+              <tr>
+                <td>
+                  <code>{{ e.raw }}</code>
+                </td>
+                <td class="token-status-missing">{{ e.error }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        <p class="muted small-text" style="margin-top:0.5rem">
+          Errored lines are unchanged in the textarea above so you can fix and resubmit.
+        </p>
+      {% endif %}
+    </section>
+  {% endif %}
+{% endblock %}
