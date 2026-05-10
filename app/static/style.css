@@ -2955,3 +2955,12 @@ body.game-mode {
   width: 100%;
   border-radius: 4px;
 }
+
+/* Side popouts (image previews on /tokens) — open to the right of the trigger
+   instead of below. Avoids pushing rows when the image is taller than the row. */
+.inline-details.inline-details-side .edit-popout {
+  left: calc(100% + 4px);
+  right: auto;
+  top: 0;
+  max-width: 240px;
+}
