@@ -63,9 +63,18 @@
             {% for t in tokens %}
               <tr>
                 <td>
-                  <strong>{{ t.name }}</strong>
-                  {% if t.is_double_sided %}
-                    <span class="finish-badge" title="Double-sided">↻ {{ t.back_name or 'flip' }}</span>
+                  <strong>
+                    {{ t.name }}
+                    {% if t.is_double_sided and t.back_name %}<span class="muted">/</span> {{ t.back_name }}{% endif %}
+                  </strong>
+                  {% if t.is_double_sided %}<span class="finish-badge" title="Double-sided">↻</span>{% endif %}
+                  {% set front_id = (t.set_code|upper if t.set_code else '') ~ ('#' ~ t.collector_number if t.collector_number else '') %}
+                  {% set back_id = (t.back_set_code|upper if t.back_set_code else '') ~ ('#' ~ t.back_collector_number if t.back_collector_number else '') %}
+                  {% if front_id or (t.is_double_sided and back_id) %}
+                    <div class="muted small-text">
+                      {{ front_id }}
+                      {% if t.is_double_sided and back_id %}/ {{ back_id }}{% endif %}
+                    </div>
                   {% endif %}
                   {% if t.image_url %}
                     <details class="inline-details" style="display:inline">
@@ -75,6 +84,13 @@
                              alt="{{ t.name }}"
                              style="max-width:200px;
                                     border-radius:6px">
+                        {% if t.is_double_sided and t.back_image_url %}
+                          <img src="{{ t.back_image_url }}"
+                               alt="{{ t.back_name or 'back' }}"
+                               style="max-width:200px;
+                                      border-radius:6px;
+                                      margin-top:0.4rem">
+                        {% endif %}
                       </div>
                     </details>
                   {% endif %}
@@ -114,10 +130,47 @@
                                  {% if t.is_double_sided %}checked{% endif %}>
                           Double-sided
                         </label>
-                        <label>Back-face name</label>
-                        <input type="text" name="back_name" value="{{ t.back_name or '' }}">
-                        <label>Back-face image URL</label>
-                        <input type="url" name="back_image_url" value="{{ t.back_image_url or '' }}">
+                        <fieldset class="token-edit-back"
+                                  style="border:1px solid rgba(255,255,255,0.08);
+                                         border-radius:6px;
+                                         padding:0.5rem">
+                          <legend class="muted small-text">Back face</legend>
+                          <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.4rem">
+                            <label style="margin:0">
+                              Back set
+                              <input type="text"
+                                     name="back_set_code"
+                                     value="{{ t.back_set_code or '' }}"
+                                     class="token-back-set"
+                                     placeholder="e.g. tblc">
+                            </label>
+                            <label style="margin:0">
+                              Back #
+                              <input type="text"
+                                     name="back_collector_number"
+                                     value="{{ t.back_collector_number or '' }}"
+                                     class="token-back-collector"
+                                     placeholder="e.g. 14">
+                            </label>
+                          </div>
+                          <button type="button"
+                                  class="btn-like btn-like-muted token-edit-back-lookup"
+                                  data-token-id="{{ t.id }}"
+                                  style="margin-top:0.4rem">Look up back</button>
+                          <p class="muted small-text token-edit-back-status"
+                             style="margin:0;
+                                    min-height:1em"></p>
+                          <label>Back-face name</label>
+                          <input type="text"
+                                 name="back_name"
+                                 value="{{ t.back_name or '' }}"
+                                 class="token-back-name">
+                          <label>Back-face image URL</label>
+                          <input type="url"
+                                 name="back_image_url"
+                                 value="{{ t.back_image_url or '' }}"
+                                 class="token-back-image">
+                        </fieldset>
                         <label>Notes</label>
                         <textarea name="notes" rows="2">{{ t.notes or '' }}</textarea>
                         <button type="submit">Save</button>
@@ -145,4 +198,51 @@
         </p>
       </section>
     {% endif %}
+  {% endblock %}
+  {% block extra_scripts %}
+    <script>
+(() => {
+  // Wire the per-row 'Look up back' button in the edit popout.
+  document.querySelectorAll('.token-edit-back-lookup').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const fieldset = btn.closest('.token-edit-back');
+      if (!fieldset) return;
+      const setEl = fieldset.querySelector('.token-back-set');
+      const cnEl = fieldset.querySelector('.token-back-collector');
+      const nameEl = fieldset.querySelector('.token-back-name');
+      const imgEl = fieldset.querySelector('.token-back-image');
+      const statusEl = fieldset.querySelector('.token-edit-back-status');
+
+      const setCode = (setEl.value || '').trim();
+      const collector = (cnEl.value || '').trim();
+      if (!setCode || !collector) {
+        statusEl.textContent = 'Enter back set + collector first.';
+        return;
+      }
+      statusEl.textContent = 'Looking up back…';
+      try {
+        const params = new URLSearchParams({ set: setCode, collector: collector });
+        const res = await fetch('/tokens/api/lookup?' + params.toString());
+        if (res.status === 404) {
+          statusEl.textContent = 'No token at ' + setCode.toUpperCase() + ' #' + collector + '.';
+          return;
+        }
+        if (!res.ok) {
+          statusEl.textContent = 'Lookup failed (' + res.status + ').';
+          return;
+        }
+        const data = await res.json();
+        if (data.name) nameEl.value = data.name;
+        if (data.image_url) imgEl.value = data.image_url;
+        if (data.set_code) setEl.value = data.set_code;
+        if (data.collector_number) cnEl.value = data.collector_number;
+        statusEl.textContent = 'Back filled · ' + (data.set_code || '?').toUpperCase() +
+          ' #' + (data.collector_number || '?');
+      } catch (e) {
+        statusEl.textContent = 'Lookup error: ' + e.message;
+      }
+    });
+  });
+})();
+    </script>
   {% endblock %}

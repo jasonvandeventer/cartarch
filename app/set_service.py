@@ -11,10 +11,16 @@ def _get_owned_token_map(session: Session, set_code: str, user_id: int) -> dict[
     """Map collector_number -> total owned quantity for tokens in a set.
 
     Sources from the token_inventory table (NOT inventory_rows). Set codes
-    are matched case-insensitively. Multiple inventory rows for the same
-    printing get summed.
+    are matched case-insensitively. Counts BOTH front (set_code +
+    collector_number) AND back (back_set_code + back_collector_number) so
+    physical DFC tokens like TBLB#3 // TBLC#14 contribute to ownership of
+    both sets even though only one face is the "front" in our schema.
+    Multiple inventory rows for the same printing sum.
     """
-    rows = (
+    out: dict[str, int] = {}
+
+    # Fronts
+    front_rows = (
         session.query(TokenInventory.collector_number, TokenInventory.quantity)
         .filter(
             TokenInventory.user_id == user_id,
@@ -22,12 +28,28 @@ def _get_owned_token_map(session: Session, set_code: str, user_id: int) -> dict[
         )
         .all()
     )
-    out: dict[str, int] = {}
-    for cn, qty in rows:
+    for cn, qty in front_rows:
         if not cn:
             continue
         key = cn.lstrip("0") or "0"
         out[key] = out.get(key, 0) + int(qty or 0)
+
+    # Backs
+    back_rows = (
+        session.query(TokenInventory.back_collector_number, TokenInventory.quantity)
+        .filter(
+            TokenInventory.user_id == user_id,
+            TokenInventory.is_double_sided.is_(True),
+            TokenInventory.back_set_code.ilike(set_code),
+        )
+        .all()
+    )
+    for cn, qty in back_rows:
+        if not cn:
+            continue
+        key = cn.lstrip("0") or "0"
+        out[key] = out.get(key, 0) + int(qty or 0)
+
     return out
 
 
