@@ -13,15 +13,15 @@
       </div>
     </div>
   </section>
-  <section class="detail-layout">
-    <div class="detail-image-panel">
+  <section>
+    <div>
       {% if token.image_url %}
         <img src="{{ token.image_url }}"
              alt="{{ token.name }}"
-             class="detail-image">
+             loading="lazy">
       {% endif %}
     </div>
-    <div class="detail-meta-panel">
+    <div>
       {% if token.type_line %}
         <section class="panel">
           <h3 class="panel-title">Type</h3>

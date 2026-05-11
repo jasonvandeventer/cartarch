@@ -54,7 +54,7 @@
   {% if bracket_v2 %}
     <section class="panel bracket-v2-panel">
       <h3 class="panel-title">
-        Bracket Estimate <span class="muted small-text">(v2 preview)</span>
+        Bracket Estimate <span class="muted">(v2 preview)</span>
       </h3>
       <div class="bracket-v2-row">
         <div class="bracket-v2-badge bracket-{{ bracket_v2.bracket }}">{{ bracket_v2.bracket }}</div>
@@ -76,9 +76,9 @@
               {% endif %}
             </div>
           {% else %}
-            <div class="muted small-text">Intent survey not answered</div>
+            <div class="muted">Intent survey not answered</div>
           {% endif %}
-          <div class="muted small-text">Rules v{{ bracket_v2.rules_version }}</div>
+          <div class="muted">Rules v{{ bracket_v2.rules_version }}</div>
         </div>
         <div class="bracket-v2-confidence">
           {% if bracket_v2.confidence.tagging_coverage is not none %}
@@ -331,7 +331,7 @@
         {% if health.pip_strain %}
           <div class="health-pips">
             <div class="health-section-label">Pip Strain</div>
-            <div class="health-pip-note muted small-text">Colored pip demand vs land sources. Ratio &gt;2.5 may be strained.</div>
+            <div class="health-pip-note muted">Colored pip demand vs land sources. Ratio &gt;2.5 may be strained.</div>
             {% for color in ["W","U","B","R","G"] %}
               {% if color in health.pip_strain %}
                 {% set ps = health.pip_strain[color] %}
@@ -365,7 +365,7 @@
   {% if deck %}
     <section class="panel controls-panel">
       <h3>Search Collection</h3>
-      <p class="muted small-text">
+      <p class="muted">
         Search your owned cards: name, <code>t:type</code>, <code>c:WU</code>, <code>cmc:&gt;3</code>, <code>o:oracle</code>, <code>finish:foil</code>.
       </p>
       <form method="get" action="/decks/{{ deck.id }}" class="filter-row">
@@ -470,6 +470,7 @@
         <input type="text"
                name="search"
                placeholder="t:creature OR t:artifact · id:gb · -t:land · cmc:&gt;=3 · is:commander"
+               data-mobile-placeholder="Search…"
                value="{{ search }}">
         <select name="sort">
           <option value="name" {% if sort == 'name' %}selected{% endif %}>Name</option>
@@ -491,7 +492,8 @@
       <section class="panel token-needs-panel">
         <h3 class="panel-title">Tokens Needed</h3>
         {% if token_requirements %}
-          <table>
+          <div class="table-wrap">
+            <table>
             <thead>
               <tr>
                 <th>Token</th>
@@ -509,7 +511,7 @@
                     <strong>{{ r.token_name }}</strong>
                     {% if r.notes %}
                       <br>
-                      <span class="muted small-text">{{ r.notes }}</span>
+                      <span class="muted">{{ r.notes }}</span>
                     {% endif %}
                   </td>
                   <td>{{ r.quantity_needed }}</td>
@@ -535,9 +537,10 @@
                 </tr>
               {% endfor %}
             </tbody>
-          </table>
+            </table>
+          </div>
         {% else %}
-          <p class="muted small-text">
+          <p class="muted">
             No token requirements declared. Add one below if this deck creates tokens you want to track.
           </p>
         {% endif %}
@@ -655,7 +658,7 @@
         {% if not commanders %}
           <section class="panel">
             <p>No cards in this deck yet.</p>
-            <p class="muted small-text">Use Search Collection above to find owned cards and add them to this deck.</p>
+            <p class="muted">Use Search Collection above to find owned cards and add them to this deck.</p>
             <a href="/collection">
               <button type="button">Go to Collection</button>
             </a>

@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.db import SessionLocal
 from app.deck_service import CARD_ROLE_TAGS
-from app.models import User
+from app.models import InventoryRow, User
 
 # Users who get drawer-centric features (auto-sorter, Drawers page, Audit page).
 # Update here to add or remove users — no other changes needed.
@@ -66,8 +66,32 @@ def require_csrf_token(
 CsrfRequired = Depends(require_csrf_token)
 
 
+def _pending_count_for(user_id: int | None) -> int:
+    """Count this user's pending-placement rows. Used by the mobile nav badge.
+
+    Runs once per render; cheap count(*) on a per-user filter.
+    """
+    if not user_id:
+        return 0
+    session = SessionLocal()
+    try:
+        return (
+            session.query(InventoryRow)
+            .filter(
+                InventoryRow.user_id == user_id,
+                InventoryRow.is_pending.is_(True),
+            )
+            .count()
+        )
+    finally:
+        session.close()
+
+
 def render(request: Request, template: str, ctx: dict | None = None):
-    context = {"csrf_token": get_csrf_token(request)}
+    context = {
+        "csrf_token": get_csrf_token(request),
+        "pending_count": _pending_count_for(request.session.get("user_id")),
+    }
     if ctx:
         context.update(ctx)
     return templates.TemplateResponse(request=request, name=template, context=context)

@@ -25,7 +25,8 @@
   </section>
   <section class="panel">
     {% if drawer_summaries %}
-      <table>
+      <div class="table-wrap">
+        <table>
         <thead>
           <tr>
             <th>Drawer</th>
@@ -48,7 +49,8 @@
             </tr>
           {% endfor %}
         </tbody>
-      </table>
+        </table>
+      </div>
     {% else %}
       <p class="muted">No drawers with assigned inventory yet.</p>
     {% endif %}

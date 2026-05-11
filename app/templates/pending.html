@@ -70,12 +70,13 @@
                   {% if item.card.image_url %}
                     <img class="pending-thumb"
                          src="{{ item.card.image_url }}"
-                         alt="{{ item.card.name }}">
+                         alt="{{ item.card.name }}"
+                         loading="lazy">
                   {% else %}
                     <div class="pending-thumb placeholder"></div>
                   {% endif %}
                 </div>
-                <div class="pending-copy">
+                <div>
                   <div class="pending-name">{{ item.card.name }}</div>
                   <div class="pending-meta">
                     {{ item.card.set_name }} ({{ item.card.set_code|upper }}) · {{ item.finish|capitalize }} · Qty: {{ item.quantity }} · ${{ '%.2f'|format(item.price) }}

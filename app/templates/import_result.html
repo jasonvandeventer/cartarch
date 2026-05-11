@@ -43,22 +43,24 @@
   {% if failed_rows %}
     <section class="panel">
       <h3>Failed Rows</h3>
-      <table>
-        <thead>
-          <tr>
-            <th>Line</th>
-            <th>Reason</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for row in failed_rows %}
+      <div class="table-wrap">
+        <table>
+          <thead>
             <tr>
-              <td>{{ row.line_number }}</td>
-              <td>{{ row.reason }}</td>
+              <th>Line</th>
+              <th>Reason</th>
             </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {% for row in failed_rows %}
+              <tr>
+                <td>{{ row.line_number }}</td>
+                <td>{{ row.reason }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
     </section>
   {% endif %}
 {% endblock %}

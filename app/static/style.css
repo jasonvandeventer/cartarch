@@ -1,3 +1,31 @@
+/* ============================================================================
+   Responsive breakpoints
+   ----------------------------------------------------------------------------
+   Two semantic mobile breakpoints. Custom-property names are documentation
+   only — CSS doesn't allow custom properties inside @media conditions, so
+   the literal pixel values appear in every @media rule below.
+
+   --bp-tablet: 768px   "tablet portrait and below" — phone + tablet portrait.
+                        Card grids collapse to single column, filter rows
+                        stack, popouts cap at 90vw, tap targets enforced 44px.
+                        Used in @media (max-width: 768px) blocks — currently
+                        five (header/inventory, analytics, consistency, health,
+                        bracket-v2) plus the 44px tap-target rule at EOF.
+
+   --bp-phone:  480px   Reserved for true-phone overrides (tighter spacing,
+                        smaller heroes, bottom-sheet-style modal hooks).
+                        Not yet wired up — Stage 4+ work.
+
+   Desktop tier kept as-is:
+   --bp-desktop-narrow: 980px   First-pass shrink (laptop → tablet). Used
+                                only at line 504 for inventory-card grid.
+
+   Game tracker portrait: @media (orientation: portrait) at line ~1944.
+                          Tablet-landscape-first by explicit design; the
+                          44px tap-target enforcement does NOT apply to
+                          tracker buttons (see exception list in the rule).
+   ============================================================================ */
+
 :root {
   --bg: #07111f;
   --panel: #12243f;
@@ -9,6 +37,9 @@
   --accent: #2f6df6;
   --accent-2: #ffd57a;
   --danger: #ff5d57;
+  --bp-tablet: 768px;
+  --bp-phone: 480px;
+  --bp-desktop-narrow: 980px;
 }
 
 * {
@@ -83,6 +114,15 @@ body {
   padding-bottom: 2rem;
   display: grid;
   gap: 1rem;
+}
+/* Grid items default to min-width: auto which sizes to their min-content. A
+   wide child (e.g. `.table-wrap table { min-width: 900px }`) would propagate
+   up through the grid item and blow the section past the viewport on mobile,
+   making .table-wrap's overflow-x: auto useless because the clipping ancestor
+   is already wider than the screen. Forcing min-width: 0 here lets sections
+   shrink to viewport width and lets .table-wrap actually scroll internally. */
+.page-shell > * {
+  min-width: 0;
 }
 
 .brand-logo-link {
@@ -519,7 +559,7 @@ td {
   }
 }
 
-@media (max-width: 720px) {
+@media (max-width: 768px) {
   .header-shell,
   .page-shell {
     padding-left: 1rem;
@@ -1020,7 +1060,7 @@ td {
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
-@media (max-width: 760px) {
+@media (max-width: 768px) {
   .analytics-grid,
   .analytics-grid.no-pips {
     grid-template-columns: 1fr;
@@ -1035,6 +1075,17 @@ td {
   .analytics-section:last-child {
     border-bottom: none;
     padding-bottom: 0;
+  }
+  /* Mana-curve bar labels are functional data, not decoration. Bump them
+     from ~11px to ~13.6px on mobile so the 0-6+ axis and per-bar counts
+     are legible at arm's length. */
+  .curve-label,
+  .curve-count {
+    font-size: 0.85rem;
+  }
+  .curve-count {
+    height: auto;
+    line-height: 1.2;
   }
 }
 .token-image-grid {
@@ -1155,7 +1206,7 @@ td {
   border-top: 1px solid rgba(86, 113, 160, 0.2);
   margin: 0.85rem 0;
 }
-@media (max-width: 760px) {
+@media (max-width: 768px) {
   .consistency-row {
     flex-wrap: wrap;
   }
@@ -1301,7 +1352,7 @@ td {
 .pip-sym-g {
   background: #238a46;
 }
-@media (max-width: 760px) {
+@media (max-width: 768px) {
   .health-grid {
     grid-template-columns: 1fr;
     gap: 1.25rem 0;
@@ -2714,12 +2765,7 @@ body.game-mode {
 .bracket-v2-panel {
   margin-top: 1rem;
 }
-.bracket-v2-row {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  margin: 0.5rem 0 0.75rem;
-}
+/* (.bracket-v2-row defined below as a grid — earlier flex declaration removed) */
 .bracket-v2-badge {
   width: 64px;
   height: 64px;
@@ -2853,7 +2899,7 @@ body.game-mode {
   justify-self: start;
   margin-top: 0.4rem;
 }
-@media (max-width: 720px) {
+@media (max-width: 768px) {
   .bracket-v2-row {
     grid-template-columns: auto 1fr;
   }
@@ -2963,4 +3009,428 @@ body.game-mode {
   right: auto;
   top: 0;
   max-width: 240px;
+}
+
+/* ============================================================================
+   Mobile bottom-tab navigation
+   ----------------------------------------------------------------------------
+   Above 768px: bottom nav and More overlay are hidden; existing top-bar
+   nav inside .site-header is used.
+   At or below 768px: top-bar nav is hidden; bottom-nav (Home, Collection,
+   Decks, Games, More) is fixed to the viewport bottom; "More" opens a
+   full-screen overlay containing Import, Pending, Locations, Tokens, Sets,
+   Drawers/Audit (conditional), Admin (conditional), Account, Logout.
+   ============================================================================ */
+.bottom-nav,
+.more-menu {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .site-header nav {
+    display: none;
+  }
+  .site-header .header-right {
+    display: none;
+  }
+  .site-header .brand-wordmark {
+    height: 40px;
+  }
+  body {
+    padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px));
+  }
+  body.game-mode {
+    padding-bottom: 0;
+  }
+  body.more-menu-open {
+    overflow: hidden;
+  }
+  .bottom-nav {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 800;
+    background: linear-gradient(180deg, #06142a 0%, #050f22 100%);
+    border-top: 1px solid rgba(86, 115, 168, 0.45);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    box-shadow: 0 -6px 16px rgba(0, 0, 0, 0.4);
+  }
+  body.game-mode .bottom-nav {
+    display: none;
+  }
+  .bottom-nav-tab {
+    background: transparent;
+    border: none;
+    color: var(--muted);
+    text-decoration: none;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    padding: 0.45rem 0.25rem 0.55rem;
+    min-height: 60px;
+    font: inherit;
+    cursor: pointer;
+    position: relative;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .bottom-nav-tab.active {
+    color: var(--text);
+  }
+  .bottom-nav-tab.active::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 18%;
+    right: 18%;
+    height: 3px;
+    background: var(--accent);
+    border-radius: 0 0 3px 3px;
+  }
+  .bottom-nav-tab:active {
+    background: rgba(255, 255, 255, 0.04);
+  }
+  .bottom-nav-icon {
+    font-size: 1.35rem;
+    line-height: 1;
+  }
+  .bottom-nav-label {
+    font-size: 0.72rem;
+    letter-spacing: 0.02em;
+  }
+  .bottom-nav-badge {
+    position: absolute;
+    top: 0.3rem;
+    right: 28%;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    border-radius: 9px;
+    background: var(--danger);
+    color: #fff;
+    font-size: 0.68rem;
+    font-weight: 800;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+  }
+  .bottom-nav-badge[hidden] {
+    display: none;
+  }
+  .more-menu {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 900;
+    background: rgba(4, 11, 22, 0.97);
+    overflow-y: auto;
+    padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px));
+  }
+  .more-menu[hidden] {
+    display: none;
+  }
+  .more-menu-inner {
+    padding: 1.25rem 1.25rem 0;
+    max-width: 480px;
+    margin: 0 auto;
+  }
+  .more-menu-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1rem;
+  }
+  .more-menu-title {
+    margin: 0;
+    font-size: 1.35rem;
+  }
+  .more-menu-close {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 999px;
+    width: 44px;
+    height: 44px;
+    font-size: 1.4rem;
+    line-height: 1;
+    cursor: pointer;
+  }
+  .more-menu-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  .more-menu-list a {
+    display: block;
+    padding: 0.95rem 1rem;
+    background: rgba(20, 39, 68, 0.55);
+    border: 1px solid rgba(88, 114, 163, 0.32);
+    border-radius: 12px;
+    color: var(--text);
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 1rem;
+    min-height: 44px;
+  }
+  .more-menu-list a:active {
+    background: rgba(20, 39, 68, 0.8);
+  }
+  .more-menu-logout {
+    margin-top: 1.5rem;
+  }
+  .more-menu-logout button {
+    width: 100%;
+    padding: 0.85rem 1rem;
+    min-height: 48px;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    color: var(--text);
+    font-weight: 600;
+    cursor: pointer;
+  }
+}
+
+/* ============================================================================
+   Stage 4 — mobile form/grid collapses + popout escape from table-wrap.
+   ----------------------------------------------------------------------------
+   At ≤ 768px:
+   - .filter-row controls go full-width and stack one per row (kills the
+     desktop min-width: 140px that produced 5-stack chaos on phones).
+   - Long search placeholders are shortened via [data-mobile-placeholder]
+     swap in base.html script.
+   - Popouts (.edit-popout, .bracket-popout, .layout-picker-popover) cap
+     at 90vw and overflow-auto. When inside a .table-wrap (overflow:auto
+     scroll container that would clip them), they switch to position:fixed
+     centered on the viewport.
+   - Wide desktop grids (.health-row, .deck-create-form,
+     .bracket-v2-conf-row, .deck-item-actions) collapse to single column.
+   ============================================================================ */
+@media (max-width: 768px) {
+  /* Filter-row controls full-width on phones */
+  .filter-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .filter-row > * {
+    width: 100%;
+  }
+  .filter-row input,
+  .filter-row select,
+  .filter-row textarea,
+  .filter-row button {
+    min-width: 0;
+    width: 100%;
+  }
+  .filter-row a {
+    width: 100%;
+  }
+  .filter-row a button {
+    width: 100%;
+  }
+
+  /* Popouts: cap at 90vw + scroll inside if tall */
+  .edit-popout,
+  .bracket-popout,
+  .layout-picker-popover {
+    max-width: 90vw;
+    max-height: 70vh;
+    overflow: auto;
+  }
+  /* Popouts inside a horizontally-scrolling table-wrap would be clipped.
+     Switch them to viewport-fixed so they escape the scroll container. */
+  .table-wrap .edit-popout,
+  .table-wrap .bracket-popout {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    right: auto;
+    transform: translate(-50%, -50%);
+    max-width: 90vw;
+    width: 320px;
+    z-index: 950;
+  }
+
+  /* Logout-button label: hide the trailing "(Display Name)" on phones */
+  .logout-display-name {
+    display: none;
+  }
+
+  /* Health row: bar wraps to its own row below label/count/link */
+  .health-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.4rem 0.6rem;
+  }
+  .health-row .health-bar-wrap {
+    flex: 1 1 100%;
+    order: 99;
+  }
+  .health-row .health-label {
+    flex: 0 1 auto;
+  }
+  .health-row .health-count {
+    margin-left: auto;
+  }
+  .health-pip-row .pip-sym {
+    flex: 0 0 24px;
+  }
+
+  /* bracket-v2 confidence rows: label wraps if needed */
+  .bracket-v2-conf-row {
+    grid-template-columns: 1fr 36px;
+    row-gap: 0.2rem;
+  }
+  .bracket-v2-conf-row .bracket-v2-conf-label {
+    grid-column: 1 / -1;
+    font-size: 0.78rem;
+  }
+  .bracket-v2-conf-row .bracket-v2-conf-bar-wrap {
+    grid-column: 1;
+  }
+  .bracket-v2-conf-row .bracket-v2-conf-val {
+    grid-column: 2;
+  }
+
+  /* Deck create form: stack each control to its own row */
+  .deck-create-form {
+    grid-template-columns: 1fr;
+  }
+  .deck-create-form input,
+  .deck-create-form select,
+  .deck-create-form button,
+  .deck-create-form textarea {
+    width: 100%;
+  }
+
+  /* Deck-item action row inside card body: stack qty inputs above buttons */
+  .deck-item-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .deck-item-actions input,
+  .deck-item-actions button {
+    width: 100%;
+  }
+}
+
+/* ============================================================================
+   Stage 6 — remaining page-level mobile fixes (post-audit sweep).
+   ----------------------------------------------------------------------------
+   - Inventory-card grid shrinks 320 → 260px so tablet portrait shows two cards
+     per row. Single-column rule for cards <768px stays in place.
+   - .pending-action: form + select fill the row on mobile so the location
+     picker isn't squeezed under the 72px thumb.
+   - .card-actions-body inline-forms: select/qty inputs use min-width:0 + flex
+     so the "Add to Deck" / "Move" dropdowns don't blow past 100% width.
+   - .hero-row + .hero-stats-inline: stack vertically below 480px so the
+     bracket badge and stats don't crowd the deck title on small phones.
+   - Inline button-rows (deck hero, location hero, card_detail Actions) wrap
+     and get a slight gap bump on mobile.
+   ============================================================================ */
+@media (max-width: 768px) {
+  .inventory-grid {
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  }
+  .pending-action,
+  .pending-action form,
+  .pending-action select,
+  .pending-action button {
+    width: 100%;
+  }
+  .pending-action form {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .card-actions-body .inline-form {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+  .card-actions-body .inline-form select,
+  .card-actions-body .inline-form input[type="text"] {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  .card-actions-body .inline-form button {
+    flex: 0 0 auto;
+  }
+}
+
+@media (max-width: 480px) {
+  .hero-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .hero-stats-inline {
+    gap: 0.6rem 1rem;
+  }
+  .panel-title {
+    font-size: 1.45rem;
+  }
+}
+
+/* ============================================================================
+   Stage 5 — form layouts: game_new seat rows + import panels.
+   ----------------------------------------------------------------------------
+   game_new.html: .seat-row-fields stack vertically; selects + inputs fill
+   row width. Player-count buttons + seat-pos-pill picked up by the global
+   44px tap-target rule.
+
+   import.html: .filter-row controls already stack via the Stage 4 block;
+   no extra rules required.
+   ============================================================================ */
+@media (max-width: 768px) {
+  .seat-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .seat-row-label {
+    width: auto;
+  }
+  .seat-row-fields {
+    flex-direction: column;
+    align-items: stretch;
+    width: 100%;
+  }
+  .seat-row-fields input,
+  .seat-row-fields select,
+  .seat-row-fields button {
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+}
+
+/* ============================================================================
+   Tap-target enforcement — 44px minimum at tablet-portrait and below.
+   ----------------------------------------------------------------------------
+   Excludes the live game tracker (`body.game-mode` set by game_detail.html JS).
+   Explicit :not() list covers the small tracker buttons even before JS sets
+   .game-mode (avoids a brief layout distortion on slow first paint).
+
+   In-scope: every <button> outside the tracker, plus .btn-like / .return-summary
+   / .bracket-badge / .health-cards-link (these are <summary> or <a> elements
+   styled as buttons).
+
+   Out-of-scope by design: .tc-cpill-btn, .tc-ctr-btn, .tc-elim-btn, .tc-life-btn,
+   .fs-btn (per audit Issue 7.7 — tracker is tablet-landscape-first).
+   ============================================================================ */
+@media (max-width: 768px) {
+  body:not(.game-mode)
+    button:not(.tc-cpill-btn):not(.tc-ctr-btn):not(.tc-elim-btn):not(.tc-life-btn):not(.fs-btn) {
+    min-height: 44px;
+  }
+  body:not(.game-mode) .btn-like,
+  body:not(.game-mode) .return-summary,
+  body:not(.game-mode) .bracket-badge,
+  body:not(.game-mode) .health-cards-link {
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+  }
 }

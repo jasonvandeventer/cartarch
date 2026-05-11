@@ -40,6 +40,7 @@
       <input type="text"
              name="search"
              placeholder="t:rat -t:pirate · t:creature OR t:artifact · id:gb · cmc:&gt;=3 · is:foil"
+             data-mobile-placeholder="Search…"
              value="{{ search }}">
       <select name="sort">
         <option value="slot" {% if sort == 'slot' %}selected{% endif %}>Slot</option>
@@ -117,7 +118,7 @@
                     show_collection_actions=true,
                     locations=locations,
                     decks=decks) }}
-          {% if item.is_pending %}<div class="muted small-text" style="text-align:center;">Pending placement</div>{% endif %}
+          {% if item.is_pending %}<div class="muted" style="text-align:center;">Pending placement</div>{% endif %}
         {% endfor %}
       </div>
     </section>

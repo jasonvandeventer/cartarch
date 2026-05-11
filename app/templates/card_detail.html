@@ -25,11 +25,13 @@
       </div>
     </div>
   </section>
-  <section class="detail-layout">
-    <div class="detail-image-panel">
-      {% if card.image_url %}<img src="{{ card.image_url }}" alt="{{ card.name }}" class="detail-image">{% endif %}
+  <section>
+    <div>
+      {% if card.image_url %}
+        <img src="{{ card.image_url }}" alt="{{ card.name }}" loading="lazy">
+      {% endif %}
     </div>
-    <div class="detail-meta-panel">
+    <div>
       {% if card.oracle_text %}
         <section class="panel">
           <h3 class="panel-title">Oracle Text</h3>
@@ -64,7 +66,7 @@
                     <td>${{ "%.2f"|format(row.effective_price) }}</td>
                     <td>${{ "%.2f"|format(row.total_value) }}</td>
                     <td>
-                      <div class="inventory-actions">
+                      <div>
                         <form action="/inventory/rows/{{ row.id }}/remove"
                               method="post"
                               class="inline-form">

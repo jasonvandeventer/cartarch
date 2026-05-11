@@ -14,7 +14,7 @@
           style="max-width: 520px">
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
       <label>
-        Name <span class="muted small-text">(required — type 2+ chars for autocomplete)</span>
+        Name <span class="muted">(required — type 2+ chars for autocomplete)</span>
       </label>
       <input type="text"
              id="token-name-input"
@@ -24,7 +24,7 @@
              list="token-name-suggestions"
              autocomplete="off">
       <datalist id="token-name-suggestions"></datalist>
-      <p class="muted small-text" style="margin: 0">
+      <p class="muted" style="margin: 0">
         Best precision: also fill <strong>Set code</strong> + <strong>Collector number</strong> below
         and click <em>Look up exact</em>. Without a set, the lookup will show all matching prints so
         you can pick the right one.
@@ -34,14 +34,14 @@
         <button type="button" id="token-search-btn" class="btn-like btn-like-muted">Search by name</button>
       </div>
       <p id="token-lookup-status"
-         class="muted small-text"
+         class="muted"
          style="margin:0;
                 min-height:1em"></p>
       <div id="token-search-results" class="token-search-results"></div>
       <label>Quantity</label>
       <input type="number" name="quantity" value="1" min="0">
       <label>
-        Subtype <span class="muted small-text">(for grouping)</span>
+        Subtype <span class="muted">(for grouping)</span>
       </label>
       <input type="text"
              id="token-field-subtype"
@@ -53,7 +53,7 @@
         {% for loc in locations %}<option value="{{ loc.id }}">{{ loc.name }}</option>{% endfor %}
       </select>
       <label>
-        Image URL <span class="muted small-text">(optional)</span>
+        Image URL <span class="muted">(optional)</span>
       </label>
       <input type="url"
              id="token-field-image_url"
@@ -71,8 +71,8 @@
                        border-radius:6px;
                        padding:0.6rem;
                        display:none">
-        <legend class="muted small-text">Back face</legend>
-        <p class="muted small-text" style="margin: 0 0 0.5rem">
+        <legend class="muted">Back face</legend>
+        <p class="muted" style="margin: 0 0 0.5rem">
           Some sets (TMH3 etc.) have physically double-faced tokens that Scryfall stores as
           separate single-sided records. Enter the back face's set + collector and click
           <em>Look up back</em>; the back name and image will fill from Scryfall.
@@ -101,7 +101,7 @@
                 class="btn-like btn-like-muted"
                 style="margin-bottom:0.4rem">Look up back</button>
         <p id="token-back-status"
-           class="muted small-text"
+           class="muted"
            style="margin:0;
                   min-height:1em"></p>
         <label>Back-face name</label>
@@ -113,15 +113,15 @@
         <input type="url" id="token-field-back_image_url" name="back_image_url">
       </fieldset>
       <label>
-        Set code <span class="muted small-text">(optional)</span>
+        Set code <span class="muted">(optional)</span>
       </label>
       <input type="text" id="token-field-set_code" name="set_code">
       <label>
-        Collector number <span class="muted small-text">(optional)</span>
+        Collector number <span class="muted">(optional)</span>
       </label>
       <input type="text" id="token-field-collector_number" name="collector_number">
       <label>
-        Scryfall ID <span class="muted small-text">(optional)</span>
+        Scryfall ID <span class="muted">(optional)</span>
       </label>
       <input type="text" id="token-field-scryfall_id" name="scryfall_id">
       <label>Notes</label>
@@ -216,16 +216,16 @@
   // Name search: returns multiple matches; user picks one.
   function renderResults(items) {
     if (!items.length) {
-      resultsEl.innerHTML = '<p class="muted small-text">No tokens matched on Scryfall.</p>';
+      resultsEl.innerHTML = '<p class="muted">No tokens matched on Scryfall.</p>';
       return;
     }
-    resultsEl.innerHTML = '<p class="muted small-text" style="margin:0 0 0.5rem 0">' +
+    resultsEl.innerHTML = '<p class="muted" style="margin:0 0 0.5rem 0">' +
       items.length + ' match' + (items.length === 1 ? '' : 'es') +
       ' — click one to fill the form. Double-faced tokens show both sides:</p>' +
       '<div class="token-search-grid">' + items.map((t, i) => {
-        const front = t.image_url ? `<img src="${t.image_url}" alt="${t.name}">` : '<div class="token-search-noimg">no image</div>';
+        const front = t.image_url ? `<img src="${t.image_url}" alt="${t.name}" loading="lazy">` : '<div class="token-search-noimg">no image</div>';
         const back = t.is_double_sided && t.back_image_url
-          ? `<img src="${t.back_image_url}" alt="${t.back_name || 'back'}">`
+          ? `<img src="${t.back_image_url}" alt="${t.back_name || 'back'}" loading="lazy">`
           : '';
         const imgs = t.is_double_sided && t.back_image_url
           ? `<div class="token-search-faces">${front}${back}</div>`
@@ -238,7 +238,7 @@
             ${imgs}
             <div class="token-search-meta">
               <strong>${t.name}${t.is_double_sided && t.back_name ? ' // ' + t.back_name : ''}</strong>
-              <span class="muted small-text">${(t.set_code || '?').toUpperCase()} #${t.collector_number || '?'}</span>
+              <span class="muted">${(t.set_code || '?').toUpperCase()} #${t.collector_number || '?'}</span>
               ${dfcLabel}
             </div>
           </button>

@@ -24,17 +24,17 @@
       </div>
       {% if data.show_tokens %}
         <a href="/sets/{{ data.set_code }}?view={{ data.view }}&show_tokens=false"
-           class="muted small-text">Hide Tokens</a>
+           class="muted">Hide Tokens</a>
       {% else %}
         <a href="/sets/{{ data.set_code }}?view={{ data.view }}&show_tokens=true"
-           class="muted small-text">Show Tokens</a>
+           class="muted">Show Tokens</a>
       {% endif %}
     </div>
   </section>
   <div class="card-grid">
     {% for card in data.visible_cards %}
       <div class="card-tile">
-        {% if card.image_url %}<img src="{{ card.image_url }}">{% endif %}
+        {% if card.image_url %}<img src="{{ card.image_url }}" alt="{{ card.name }}" loading="lazy">{% endif %}
         <div class="card-name">{{ card.name }}</div>
         <div class="card-meta">
           #{{ card.collector_number }}
@@ -51,7 +51,7 @@
     {% if data.token_data %}
       <section class="panel" style="margin-top: 1rem;">
         <h3 class="panel-title">Tokens · {{ data.token_data.owned }} / {{ data.token_data.total }} owned</h3>
-        <p class="muted small-text">
+        <p class="muted">
           Token ownership is sourced from your <a href="/tokens">Token Inventory</a> (set code + collector number match).
           {% set pct = ((data.token_data.owned / data.token_data.total) * 100)|round|int if data.token_data.total else 0 %}
           <strong>{{ pct }}%</strong> complete.
@@ -65,7 +65,7 @@
       <div class="card-grid">
         {% for token in data.token_data.cards %}
           <div class="card-tile {% if token.quantity_owned %}token-tile-owned{% else %}token-tile-missing{% endif %}">
-            {% if token.image_url %}<img src="{{ token.image_url }}">{% endif %}
+            {% if token.image_url %}<img src="{{ token.image_url }}" alt="{{ token.name }}" loading="lazy">{% endif %}
             <div class="card-name">
               {{ token.name }}
               {% if token.is_substitute %}

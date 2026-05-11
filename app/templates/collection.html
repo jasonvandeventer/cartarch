@@ -5,7 +5,7 @@
     <section class="panel">
       <h3>Welcome to Mana Archive</h3>
       {% if not use_drawer_sorter and not locations %}
-        <p class="muted small-text">
+        <p class="muted">
           Start by creating a storage location (binder, box, drawer, etc.), then import your cards into it.
         </p>
         <div style="display:flex; gap:1rem; flex-wrap:wrap;">
@@ -17,7 +17,7 @@
           </a>
         </div>
       {% else %}
-        <p class="muted small-text">Start by importing your collection, then build decks.</p>
+        <p class="muted">Start by importing your collection, then build decks.</p>
         <div style="display:flex; gap:1rem; flex-wrap:wrap;">
           <a href="/import">
             <button type="button">Import Collection</button>
@@ -82,6 +82,7 @@
       <input type="text"
              name="search"
              placeholder="t:rat -t:pirate · t:creature OR t:artifact · (t:instant OR t:sorcery) · id:gb · is:foil · qty:&gt;1 · price:&gt;=5"
+             data-mobile-placeholder="Search…"
              value="{{ search }}">
       <select name="finish">
         <option value="">All finishes</option>

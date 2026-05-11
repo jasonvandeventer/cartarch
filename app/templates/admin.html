@@ -92,7 +92,8 @@
   </section>
   <section class="panel">
     <h3 class="panel-title">Users</h3>
-    <table>
+    <div class="table-wrap">
+      <table>
       <thead>
         <tr>
           <th>Name / Email</th>
@@ -110,7 +111,7 @@
           <tr>
             <td>
               <strong>{{ row.user.display_name or row.user.username }}</strong>
-              {% if row.user.display_name %}<div class="muted small-text">{{ row.user.username }}</div>{% endif %}
+              {% if row.user.display_name %}<div class="muted">{{ row.user.username }}</div>{% endif %}
             </td>
             <td>
               {% if row.user.is_active %}
@@ -181,6 +182,7 @@
           {% endif %}
         {% endfor %}
       </tbody>
-    </table>
+      </table>
+    </div>
   </section>
 {% endblock %}

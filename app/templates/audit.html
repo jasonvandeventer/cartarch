@@ -16,7 +16,8 @@
   <section class="panel">
     <h3 class="panel-title">Import Batches</h3>
     {% if batches %}
-      <table>
+      <div class="table-wrap">
+        <table>
         <thead>
           <tr>
             <th>Batch ID</th>
@@ -43,7 +44,8 @@
             </tr>
           {% endfor %}
         </tbody>
-      </table>
+        </table>
+      </div>
     {% else %}
       <p class="muted">No import batches yet.</p>
     {% endif %}
@@ -51,7 +53,8 @@
   <section class="panel">
     <h3 class="panel-title">Transaction Log</h3>
     {% if logs %}
-      <table>
+      <div class="table-wrap">
+        <table>
         <thead>
           <tr>
             <th>ID</th>
@@ -82,7 +85,8 @@
             </tr>
           {% endfor %}
         </tbody>
-      </table>
+        </table>
+      </div>
     {% else %}
       <p class="muted">No transaction logs yet.</p>
     {% endif %}

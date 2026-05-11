@@ -24,7 +24,8 @@
                 <a href="/cards/{{ item.card.id }}">
                   <img class="inventory-thumb"
                        src="{{ item.card.image_url }}"
-                       alt="{{ item.card.name }}">
+                       alt="{{ item.card.name }}"
+                       loading="lazy">
                 </a>
               {% else %}
                 <a href="/cards/{{ item.card.id }}" class="inventory-thumb placeholder"></a>

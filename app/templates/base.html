@@ -55,6 +55,132 @@
     <main class="page-shell">
       {% block content %}{% endblock %}
     </main>
+    {% set path = request.url.path if request else '/' %}
+    {% if current_user %}
+      <nav class="bottom-nav" aria-label="Primary mobile navigation">
+        <a href="/"
+           class="bottom-nav-tab{% if path == '/' %} active{% endif %}">
+          <span class="bottom-nav-icon" aria-hidden="true">⌂</span>
+          <span class="bottom-nav-label">Home</span>
+        </a>
+        <a href="/collection"
+           class="bottom-nav-tab{% if path.startswith('/collection') %} active{% endif %}">
+          <span class="bottom-nav-icon" aria-hidden="true">▦</span>
+          <span class="bottom-nav-label">Collection</span>
+        </a>
+        <a href="/decks"
+           class="bottom-nav-tab{% if path.startswith('/decks') %} active{% endif %}">
+          <span class="bottom-nav-icon" aria-hidden="true">▤</span>
+          <span class="bottom-nav-label">Decks</span>
+        </a>
+        <a href="/games"
+           class="bottom-nav-tab{% if path.startswith('/games') %} active{% endif %}">
+          <span class="bottom-nav-icon" aria-hidden="true">◉</span>
+          <span class="bottom-nav-label">Games</span>
+        </a>
+        {% set on_more = path.startswith('/import') or path.startswith('/pending') or path.startswith('/locations') or path.startswith('/tokens') or path.startswith('/sets') or path.startswith('/drawers') or path.startswith('/audit') or path.startswith('/admin') or path.startswith('/account') %}
+        <button type="button"
+                class="bottom-nav-tab{% if on_more %} active{% endif %}"
+                onclick="toggleMoreMenu()"
+                aria-haspopup="dialog"
+                aria-expanded="false"
+                aria-controls="more-menu"
+                id="more-tab-btn">
+          <span class="bottom-nav-icon" aria-hidden="true">≡</span>
+          <span class="bottom-nav-label">More</span>
+          {% set badge_count = pending_count or 0 %}
+          <span class="bottom-nav-badge"
+                id="more-badge"
+                {% if not badge_count %}hidden{% endif %}
+                aria-label="{{ badge_count }} pending items">
+            {%- if badge_count >= 100 -%}
+              99+
+            {%- else -%}
+              {{ badge_count }}
+            {%- endif -%}
+          </span>
+        </button>
+      </nav>
+      <div class="more-menu"
+           id="more-menu"
+           role="dialog"
+           aria-modal="true"
+           aria-label="More navigation"
+           hidden>
+        <div class="more-menu-inner">
+          <div class="more-menu-header">
+            <h2 class="more-menu-title">More</h2>
+            <button type="button"
+                    class="more-menu-close"
+                    onclick="toggleMoreMenu()"
+                    aria-label="Close menu">×</button>
+          </div>
+          <nav class="more-menu-list" aria-label="Secondary navigation">
+            <a href="/import">Import</a>
+            <a href="/pending">Pending</a>
+            <a href="/locations">Locations</a>
+            <a href="/tokens">Tokens</a>
+            <a href="/sets">Sets</a>
+            {% if current_user.username in drawer_sorter_usernames %}
+              <a href="/drawers">Drawers</a>
+              <a href="/audit">Audit</a>
+            {% endif %}
+            {% if current_user.is_admin %}<a href="/admin">Admin</a>{% endif %}
+            <a href="/account">Account</a>
+          </nav>
+          <form method="post" action="/logout" class="more-menu-logout">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <button type="submit">
+              Logout
+              <span class="logout-display-name">({{ current_user.display_name or current_user.username }})</span>
+            </button>
+          </form>
+        </div>
+      </div>
+      <script>
+        (function () {
+          /* Swap any [data-mobile-placeholder] input's placeholder to its
+             mobile-short text below 768px, restore desktop text above. */
+          var mq = window.matchMedia('(max-width: 768px)');
+          function applyMobilePlaceholders() {
+            document.querySelectorAll('[data-mobile-placeholder]').forEach(function (el) {
+              if (!el.hasAttribute('data-desktop-placeholder')) {
+                el.setAttribute('data-desktop-placeholder', el.getAttribute('placeholder') || '');
+              }
+              el.setAttribute(
+                'placeholder',
+                mq.matches
+                  ? el.getAttribute('data-mobile-placeholder')
+                  : el.getAttribute('data-desktop-placeholder')
+              );
+            });
+          }
+          applyMobilePlaceholders();
+          mq.addEventListener('change', applyMobilePlaceholders);
+
+          window.toggleMoreMenu = function () {
+            var menu = document.getElementById('more-menu');
+            var btn = document.getElementById('more-tab-btn');
+            if (!menu || !btn) return;
+            var willOpen = menu.hasAttribute('hidden');
+            if (willOpen) {
+              menu.removeAttribute('hidden');
+              btn.setAttribute('aria-expanded', 'true');
+              document.body.classList.add('more-menu-open');
+            } else {
+              menu.setAttribute('hidden', '');
+              btn.setAttribute('aria-expanded', 'false');
+              document.body.classList.remove('more-menu-open');
+            }
+          };
+          document.addEventListener('keydown', function (e) {
+            if (e.key !== 'Escape') return;
+            var menu = document.getElementById('more-menu');
+            if (menu && !menu.hasAttribute('hidden')) window.toggleMoreMenu();
+          });
+        })();
+      </script>
+    {% endif %}
     {% block extra_scripts %}{% endblock %}
   </body>
 </html>

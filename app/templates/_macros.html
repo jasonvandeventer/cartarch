@@ -62,7 +62,7 @@
         {% endif %}
       </div>
       {% if item.card.type_line %}
-        <div class="muted small-text" style="margin-top: 0.15rem;">{{ item.card.type_line }}</div>
+        <div class="muted" style="margin-top: 0.15rem;">{{ item.card.type_line }}</div>
       {% endif %}
       {% if show_location_label %}
         <div class="inventory-location">
@@ -70,7 +70,7 @@
           {% if item.slot %}· Slot {{ item.slot }}{% endif %}
         </div>
       {% elif item.slot %}
-        <div class="muted small-text">Slot {{ item.slot }}</div>
+        <div class="muted">Slot {{ item.slot }}</div>
       {% endif %}
       <div class="inventory-total">
         Total:
@@ -249,7 +249,7 @@
                     <input type="text" name="slot" placeholder="Slot override">
                     <button type="submit">Confirm Remove</button>
                   </div>
-                  <p class="muted small-text" style="margin: 0.2rem 0 0">Leave blank to send to Pending.</p>
+                  <p class="muted" style="margin: 0.2rem 0 0">Leave blank to send to Pending.</p>
                 </details>
               {% else %}
                 <button type="submit">Remove from Deck</button>

@@ -66,7 +66,8 @@
   <section class="panel">
     <h3 class="panel-title">Valid Rows</h3>
     {% if valid_rows %}
-      <table>
+      <div class="table-wrap">
+        <table>
         <thead>
           <tr>
             <th>Line</th>
@@ -99,7 +100,8 @@
             </tr>
           {% endfor %}
         </tbody>
-      </table>
+        </table>
+      </div>
     {% else %}
       <p class="muted">No valid rows found.</p>
     {% endif %}
@@ -107,7 +109,8 @@
   {% if invalid_rows %}
     <section class="panel">
       <h3 class="panel-title">Invalid Rows</h3>
-      <table>
+      <div class="table-wrap">
+        <table>
         <thead>
           <tr>
             <th>Line</th>
@@ -132,7 +135,8 @@
             </tr>
           {% endfor %}
         </tbody>
-      </table>
+        </table>
+      </div>
     </section>
   {% endif %}
 {% endblock %}

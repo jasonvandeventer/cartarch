@@ -2,7 +2,7 @@
 
 Self-hosted web application for managing a physical Magic: The Gathering collection.
 
-**Current version: v3.16.2** · [Platform repo](https://github.com/jasonvandeventer/mana-archive-platform)
+**Current version: v3.16.3** · [Platform repo](https://github.com/jasonvandeventer/mana-archive-platform)
 
 ---
 
@@ -83,6 +83,14 @@ Self-hosted web application for managing a physical Magic: The Gathering collect
 
 - Browse cards by set; token panel renders by default and includes substitute cards (`s{set_code}` like SZNR) appended after regular tokens
 - Owned/Missing badges on every token tile sourced from your token inventory by `(set_code, collector_number)` match
+
+### Mobile
+
+- Full mobile responsiveness across every page except the live game tracker (which is intentionally tablet-landscape-first)
+- Below 768px the top-bar nav collapses to a 5-tab bottom bar (Home / Collection / Decks / Games / More) with a "More" overlay containing Import, Pending, Locations, Tokens, Sets, Drawers/Audit/Admin (gated), Account, Logout
+- "More" tab shows a red badge with the user's pending-placement count (capped at `99+`)
+- 44px tap-target floor enforced on phone/tablet-portrait; tracker buttons exempt by design
+- Tables scroll horizontally inside their panels; popouts (Edit, Bracket) become viewport-centered on phones
 
 ---
 

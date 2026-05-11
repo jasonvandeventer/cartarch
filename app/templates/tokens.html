@@ -49,7 +49,8 @@
     </section>
     {% if tokens %}
       <section class="panel">
-        <table>
+        <div class="table-wrap">
+          <table>
           <thead>
             <tr>
               <th>Token</th>
@@ -72,7 +73,7 @@
                   {% set front_id = (t.set_code|upper if t.set_code else '') ~ ('#' ~ t.collector_number if t.collector_number else '') %}
                   {% set back_id = (t.back_set_code|upper if t.back_set_code else '') ~ ('#' ~ t.back_collector_number if t.back_collector_number else '') %}
                   {% if front_id or (t.is_double_sided and back_id) %}
-                    <div class="muted small-text">
+                    <div class="muted">
                       {{ front_id }}
                       {% if t.is_double_sided and back_id %}/ {{ back_id }}{% endif %}
                     </div>
@@ -83,11 +84,13 @@
                       <div class="edit-popout">
                         <img src="{{ t.image_url }}"
                              alt="{{ t.name }}"
+                             loading="lazy"
                              style="max-width:200px;
                                     border-radius:6px">
                         {% if t.is_double_sided and t.back_image_url %}
                           <img src="{{ t.back_image_url }}"
                                alt="{{ t.back_name or 'back' }}"
+                               loading="lazy"
                                style="max-width:200px;
                                       border-radius:6px;
                                       margin-top:0.4rem">
@@ -101,7 +104,7 @@
                   <strong>{{ t.quantity }}</strong>
                 </td>
                 <td>{{ t.storage_location.name if t.storage_location else '—' }}</td>
-                <td class="muted small-text">{{ t.notes or '' }}</td>
+                <td class="muted">{{ t.notes or '' }}</td>
                 <td>
                   <details class="inline-details">
                     <summary class="btn-like btn-like-muted">Edit</summary>
@@ -135,7 +138,7 @@
                                   style="border:1px solid rgba(255,255,255,0.08);
                                          border-radius:6px;
                                          padding:0.5rem">
-                          <legend class="muted small-text">Back face</legend>
+                          <legend class="muted">Back face</legend>
                           <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.4rem">
                             <label style="margin:0">
                               Back set
@@ -158,7 +161,7 @@
                                   class="btn-like btn-like-muted token-edit-back-lookup"
                                   data-token-id="{{ t.id }}"
                                   style="margin-top:0.4rem">Look up back</button>
-                          <p class="muted small-text token-edit-back-status"
+                          <p class="muted token-edit-back-status"
                              style="margin:0;
                                     min-height:1em"></p>
                           <label>Back-face name</label>
@@ -190,7 +193,8 @@
               </tr>
             {% endfor %}
           </tbody>
-        </table>
+          </table>
+        </div>
       </section>
     {% else %}
       <section class="panel">

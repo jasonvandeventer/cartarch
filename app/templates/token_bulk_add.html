@@ -12,8 +12,8 @@
   </section>
   <section class="panel">
     <h3 class="panel-title">Format</h3>
-    <p class="muted small-text">One line per physical token. Whitespace-separated. Field count picks the line type:</p>
-    <ul class="muted small-text"
+    <p class="muted">One line per physical token. Whitespace-separated. Field count picks the line type:</p>
+    <ul class="muted"
         style="margin: 0 0 0.5rem 0;
                padding-left: 1.2rem">
       <li>
@@ -29,7 +29,7 @@
         <code>front_set front_# back_set back_# qty</code> — DFC with explicit qty
       </li>
     </ul>
-    <p class="muted small-text" style="margin: 0">
+    <p class="muted" style="margin: 0">
       Blank lines and lines starting with <code>#</code> are ignored.
     </p>
     <pre style="background: rgba(255,255,255,0.04); padding: 0.75rem; border-radius: 6px; font-size: 0.85rem; margin: 0.5rem 0 0 0">
@@ -76,7 +76,7 @@ tblb 1 tblc 8 2</pre>
         <button type="submit">Look Up &amp; Add All</button>
         <a href="/tokens" class="btn-like btn-like-muted">Cancel</a>
       </div>
-      <p class="muted small-text" style="margin: 0">
+      <p class="muted" style="margin: 0">
         Each pair triggers two Scryfall lookups; ~80ms throttled. Expect roughly
         ~0.2 seconds per token. A 100-row paste takes ~20 seconds.
       </p>
@@ -89,8 +89,9 @@ tblb 1 tblc 8 2</pre>
         {% if result.errors|length %}· <span class="token-status-missing">{{ result.errors|length }} errors</span>{% endif %}
       </h3>
       {% if result.created %}
-        <h4 class="muted small-text" style="margin-top:0.5rem">Created</h4>
-        <table>
+        <h4 class="muted" style="margin-top:0.5rem">Created</h4>
+        <div class="table-wrap">
+          <table>
           <thead>
             <tr>
               <th>Front</th>
@@ -102,24 +103,26 @@ tblb 1 tblc 8 2</pre>
             {% for r in result.created %}
               <tr>
                 <td>
-                  <strong>{{ r.front_name }}</strong> <span class="muted small-text">{{ r.front_id }}</span>
+                  <strong>{{ r.front_name }}</strong> <span class="muted">{{ r.front_id }}</span>
                 </td>
                 <td>
                   {% if r.is_dfc %}
-                    <strong>{{ r.back_name }}</strong> <span class="muted small-text">{{ r.back_id }}</span>
+                    <strong>{{ r.back_name }}</strong> <span class="muted">{{ r.back_id }}</span>
                   {% else %}
-                    <span class="muted small-text">— (single-sided)</span>
+                    <span class="muted">— (single-sided)</span>
                   {% endif %}
                 </td>
                 <td>{{ r.quantity }}</td>
               </tr>
             {% endfor %}
           </tbody>
-        </table>
+          </table>
+        </div>
       {% endif %}
       {% if result.errors %}
-        <h4 class="muted small-text" style="margin-top:0.75rem">Errors</h4>
-        <table>
+        <h4 class="muted" style="margin-top:0.75rem">Errors</h4>
+        <div class="table-wrap">
+          <table>
           <thead>
             <tr>
               <th>Line</th>
@@ -136,8 +139,9 @@ tblb 1 tblc 8 2</pre>
               </tr>
             {% endfor %}
           </tbody>
-        </table>
-        <p class="muted small-text" style="margin-top:0.5rem">
+          </table>
+        </div>
+        <p class="muted" style="margin-top:0.5rem">
           Errored lines are unchanged in the textarea above so you can fix and resubmit.
         </p>
       {% endif %}

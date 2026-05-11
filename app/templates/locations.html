@@ -48,7 +48,8 @@
   <section class="panel">
     <h3 class="panel-title">Your Locations</h3>
     {% if locations %}
-      <table>
+      <div class="table-wrap">
+        <table>
         <thead>
           <tr>
             <th>Name</th>
@@ -128,7 +129,8 @@
             </tr>
           {% endfor %}
         </tbody>
-      </table>
+        </table>
+      </div>
     {% else %}
       <p class="muted">No locations yet. Use the form above to create your first one.</p>
     {% endif %}
