@@ -484,11 +484,85 @@ _SECTION_HEADERS = frozenset(
     {"deck", "sideboard", "commander", "companion", "maybeboard", "considering", "tokens"}
 )
 
+# Short-form: bare set + collector with optional qty / foil marker.
+# SET = 2-6 chars starting with a letter; COLLECTOR = digits with optional letter suffix
+# (e.g. "145", "23a"); QTY = 1-3 digits.
+_SHORT_SET_RE = re.compile(r"^[A-Za-z][A-Za-z0-9]{1,5}$")
+_SHORT_COLL_RE = re.compile(r"^[0-9]+[A-Za-z]?$")
+_SHORT_QTY_RE = re.compile(r"^[0-9]{1,3}$")
+
+
+def _parse_short_list_line(line: str) -> dict[str, Any] | None:
+    """Parse a bare 'SET COLLECTOR [qty]' or 'qty SET COLLECTOR' line.
+
+    Returns None if the line doesn't fit the short form so the caller can fall
+    through to the standard Moxfield-style parser.
+    """
+    rest = line.strip()
+    if not rest:
+        return None
+
+    # Detect *F* foil marker anywhere on the line and strip it.
+    finish = "normal"
+    if re.search(r"(?i)\*F\*", rest):
+        finish = "foil"
+        rest = re.sub(r"(?i)\s*\*F\*\s*", " ", rest).strip()
+
+    parts = rest.split()
+    if len(parts) not in (2, 3):
+        return None
+
+    set_code = ""
+    collector_number = ""
+    quantity = 1
+
+    if len(parts) == 2:
+        a, b = parts
+        if _SHORT_SET_RE.match(a) and _SHORT_COLL_RE.match(b):
+            set_code, collector_number = a.lower(), b
+        else:
+            return None
+    else:
+        if (
+            _SHORT_QTY_RE.match(parts[0])
+            and _SHORT_SET_RE.match(parts[1])
+            and _SHORT_COLL_RE.match(parts[2])
+        ):
+            quantity = int(parts[0])
+            set_code, collector_number = parts[1].lower(), parts[2]
+        elif (
+            _SHORT_SET_RE.match(parts[0])
+            and _SHORT_COLL_RE.match(parts[1])
+            and _SHORT_QTY_RE.match(parts[2])
+        ):
+            set_code, collector_number = parts[0].lower(), parts[1]
+            quantity = int(parts[2])
+        else:
+            return None
+
+    if quantity < 1:
+        return None
+
+    return {
+        "name": "",
+        "set_code": set_code,
+        "collector_number": collector_number,
+        "quantity": quantity,
+        "finish": finish,
+    }
+
 
 def _parse_list_line(line: str) -> dict[str, Any] | None:
     """Parse one line of a pasted card list. Returns None for non-card lines."""
     line = line.strip()
-    if not line or not line[0].isdigit():
+    if not line:
+        return None
+
+    short = _parse_short_list_line(line)
+    if short is not None:
+        return short
+
+    if not line[0].isdigit():
         return None
 
     # Extract leading quantity (supports "4 " and "4x ")
@@ -569,7 +643,7 @@ def parse_text_list(text: str) -> dict[str, Any]:
                     card_data = fetch_card_by_set_and_number(
                         parsed["set_code"], parsed["collector_number"]
                     )
-            if not card_data:
+            if not card_data and parsed["name"]:
                 card_data = fetch_card_by_name(parsed["name"], set_code=parsed["set_code"])
         except Exception:
             card_data = None
@@ -589,9 +663,14 @@ def parse_text_list(text: str) -> dict[str, Any]:
                 }
             )
         else:
-            label = parsed["name"]
-            if parsed["set_code"]:
-                label += f" ({parsed['set_code'].upper()})"
+            if parsed["name"]:
+                label = parsed["name"]
+                if parsed["set_code"]:
+                    label += f" ({parsed['set_code'].upper()})"
+            elif parsed["set_code"]:
+                label = f"({parsed['set_code'].upper()}) {parsed['collector_number']}".strip()
+            else:
+                label = "(unknown)"
             invalid_rows.append(
                 {
                     "line_number": line_number,
