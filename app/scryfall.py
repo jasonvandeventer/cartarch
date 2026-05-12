@@ -588,21 +588,35 @@ def fetch_set_cards(set_code: str) -> list[dict[str, Any]]:
     return results
 
 
-def search_cards_by_name(name: str, limit: int = 20) -> list[dict[str, Any]]:
+def search_cards_by_name(name: str, limit: int = 500) -> list[dict[str, Any]]:
+    """Full printing list for a card-name search on the manual-import picker.
+
+    Follows Scryfall's ``next_page`` pagination so popular reprints (Sol
+    Ring ~80, basic lands ~hundreds) show every printing the user could
+    pick. Each page is 175 cards; the helper iterates until ``has_more``
+    is false or ``limit`` is hit. ``_throttle`` runs per page request so
+    Scryfall's rate-limit is respected.
+
+    ``limit`` defaults to 500 — high enough that even basic lands return
+    every printing in practice, low enough that a degenerate one-letter
+    query won't pull thousands of pages.
+    """
     query = name.strip()
     if not query:
         return []
 
-    url = (
+    url: str | None = (
         "https://api.scryfall.com/cards/search"
         f'?q=!"{query}" or {query}&unique=prints&order=released&dir=desc'
     )
-
-    data = _get_json(url)
-    if not data:
-        return []
-
-    cards = data.get("data", [])
+    cards: list[dict[str, Any]] = []
+    while url and len(cards) < limit:
+        data = _get_json(url)
+        if not data:
+            break
+        cards.extend(data.get("data", []))
+        url = data.get("next_page") if data.get("has_more") else None
+    cards = cards[:limit]
 
     return [
         {
@@ -616,7 +630,7 @@ def search_cards_by_name(name: str, limit: int = 20) -> list[dict[str, Any]]:
             "card_faces": card.get("card_faces"),
             "prices": card.get("prices"),
         }
-        for card in cards[:limit]
+        for card in cards
     ]
 
 
