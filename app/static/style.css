@@ -930,6 +930,15 @@ td {
   min-width: 260px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
 }
+/* Inline-create row (import preview "+ Create new deck/location"):
+   the trigger buttons sit on the LEFT of their container, so the default
+   `right: 0` anchor would push the 260px popout off-screen to the left at
+   non-fullscreen browser widths above the mobile-popover breakpoint (768px).
+   Anchor left so the popout extends rightward into available space. */
+.inline-create-row .edit-popout {
+  right: auto;
+  left: 0;
+}
 
 .card-actions-drawer {
   margin-top: 0.6rem;
