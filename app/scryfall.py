@@ -620,7 +620,7 @@ def search_cards_by_name(name: str, limit: int = 20) -> list[dict[str, Any]]:
     ]
 
 
-def autocomplete_cards_for_add(query: str, limit: int = 8) -> list[dict[str, Any]]:
+def autocomplete_cards_for_add(query: str, limit: int = 50) -> list[dict[str, Any]]:
     """Slim card-autocomplete payload for the deck "Add card" UI.
 
     Used by ``/decks/api/card-autocomplete``: top printings matching the
@@ -630,6 +630,12 @@ def autocomplete_cards_for_add(query: str, limit: int = 8) -> list[dict[str, Any
     via ``unique=prints``; for a deck-builder use case the user usually
     wants the most recent reprint they can buy. Single-faced cards use
     ``image_uris.small``; DFCs fall back to ``card_faces[0].image_uris.small``.
+
+    ``limit`` defaults to 50 — high enough to cover even popular reprints
+    (Sol Ring has ~80 printings, but recent ones bubble to the top and 50
+    is a reasonable scroll length). Short-tail cards return only their
+    actual prints. Scryfall's API page is capped at 175 so we never need
+    pagination at this limit.
 
     No DB writes. Pure Scryfall passthrough.
     """

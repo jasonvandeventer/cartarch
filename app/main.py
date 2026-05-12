@@ -2902,12 +2902,14 @@ def decks_card_autocomplete(
 ):
     """Lightweight JSON autocomplete for the deck-detail "Add card" panel.
 
-    Returns up to 8 Scryfall printings matching ``q`` (min 2 chars). The
+    Returns up to 50 Scryfall printings matching ``q`` (min 2 chars). The
     payload is intentionally slim — just enough for the dropdown to render
     a thumbnail + name + set/collector line and submit the selected
     printing back via the hidden ``scryfall_id`` field on the Add form.
+    50 is high enough that popular reprints (Sol Ring, basic lands) cover
+    their meaningful printings; the dropdown is scrollable in the panel CSS.
     """
-    return JSONResponse(autocomplete_cards_for_add(q, limit=8))
+    return JSONResponse(autocomplete_cards_for_add(q, limit=50))
 
 
 @app.post("/decks/{deck_id}/add-card")
