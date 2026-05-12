@@ -463,7 +463,26 @@
     class="health-filter-clear">× clear</a>
         {% endif %}
       </h3>
-      <form method="get" action="/decks/{{ deck.id }}" class="filter-row">
+      {# HTMX: hx-get hits a partial endpoint that returns just the filtered
+         card grid; hx-target swaps it in place so scroll position and other
+         panels stay intact. hx-push-url updates the address bar so the user
+         can bookmark/share the search. The form retains method="get" and
+         action="/decks/{id}" as a no-JS fallback — without HTMX it submits
+         normally and the full deck-detail route serves the same result.
+
+         hx-trigger is left to its form default (`submit`) so clicking Apply
+         OR pressing Enter inside the search input both fire the HTMX
+         request. Auto-firing on sort/direction `change` was tried but the
+         CSS attribute-selector trigger spec was a parse-quirk magnet across
+         browsers — keeping the submit-only path is the conservative call.
+         See docs/mobile_patterns.md for the HTMX pattern reference. #}
+      <form method="get"
+            action="/decks/{{ deck.id }}"
+            class="filter-row"
+            hx-get="/decks/{{ deck.id }}/cards-partial"
+            hx-target="#deck-card-list"
+            hx-swap="innerHTML"
+            hx-push-url="true">
         <input type="hidden"
                name="collection_search"
                value="{{ collection_search }}">
@@ -642,20 +661,16 @@
           </details>
         </section>
       {% endif %}
-      {% if items %}
-        <section class="card-grid-section">
-          <div class="inventory-grid">
-            {% for item in items %}
-              {{ inventory_card(item, csrf_token,
-                            show_deck_actions=true,
-                            deck=deck,
-                            use_drawer_sorter=use_drawer_sorter,
-                            locations=locations) }}
-            {% endfor %}
-          </div>
-        </section>
-      {% else %}
-        {% if not commanders %}
+      {# #deck-card-list is the hx-target for the search form above.
+         Initial render uses the same _deck_card_list.html partial that
+         the /decks/{id}/cards-partial endpoint returns, so the markup
+         is identical and HTMX innerHTML swaps produce no visual diff.
+         When `items` is empty AND no `search` is active, we fall through
+         to the empty-deck prompt (preserved from the original template). #}
+      <div id="deck-card-list">
+        {% if items or search %}
+          {% include "_deck_card_list.html" %}
+        {% elif not commanders %}
           <section class="panel">
             <p>No cards in this deck yet.</p>
             <p class="muted">Use Search Collection above to find owned cards and add them to this deck.</p>
@@ -664,7 +679,7 @@
             </a>
           </section>
         {% endif %}
-      {% endif %}
+      </div>
       <div id="deck-lazy-panels" class="lazy-loading-panels">
         <div class="lazy-loading">Loading panels…</div>
       </div>

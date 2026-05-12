@@ -18,7 +18,7 @@ import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta
-from urllib.parse import urlparse
+from urllib.parse import urlencode, urlparse
 
 from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import (
@@ -1575,6 +1575,94 @@ def _write_panels_cache(deck_id: int, cache_key: str, payload: dict) -> None:
         print(f"[panels] disk write failed deck={deck_id}: {e}", flush=True)
 
 
+def _build_deck_card_items(
+    session: Session,
+    deck: Deck,
+    user_id: int,
+    search: str,
+    sort: str,
+    direction: str,
+) -> tuple[list[dict], float, int]:
+    """Filter + sort + materialize the deck-card item list.
+
+    Shared by `deck_detail_page` (full page render) and `deck_cards_partial`
+    (the HTMX-driven search swap on /decks/{id}). Returns (items list, total
+    value, total card count). Theme extraction + suggested_tags + tag/legality
+    decoration is included so the partial render produces identical card UI
+    to the full-page render.
+
+    Does NOT auto-tag untagged rows — that side effect stays in
+    `deck_detail_page` so search keystrokes don't write to the DB.
+    """
+    items: list[dict] = []
+    total_value = 0.0
+    total_cards = 0
+
+    if not deck or not deck.storage_location_id:
+        return items, total_value, total_cards
+
+    commander_rows = (
+        session.query(InventoryRow)
+        .options(joinedload(InventoryRow.card))
+        .filter(
+            InventoryRow.user_id == user_id,
+            InventoryRow.storage_location_id == deck.storage_location_id,
+            InventoryRow.role == "commander",
+        )
+        .all()
+    )
+    themes = extract_commander_themes(commander_rows) if commander_rows else None
+
+    deck_query = (
+        session.query(InventoryRow)
+        .options(joinedload(InventoryRow.card))
+        .join(Card)
+        .filter(
+            InventoryRow.user_id == user_id,
+            InventoryRow.storage_location_id == deck.storage_location_id,
+        )
+    )
+    if search.strip():
+        deck_query = apply_collection_search_filters(deck_query, search)
+
+    reverse = direction == "desc"
+    if sort == "type":
+        deck_query = deck_query.order_by(Card.type_line.desc() if reverse else Card.type_line.asc())
+    elif sort == "cmc":
+        deck_query = deck_query.order_by(Card.cmc.desc() if reverse else Card.cmc.asc())
+    elif sort == "value":
+        # Computed in Python after fetch (price is a per-finish attribute)
+        deck_rows = deck_query.all()
+        deck_rows.sort(key=lambda r: effective_price(r.card, r.finish) or 0.0, reverse=reverse)
+    else:
+        deck_query = deck_query.order_by(Card.name.desc() if reverse else Card.name.asc())
+
+    if sort != "value":
+        deck_rows = deck_query.all()
+
+    for row in deck_rows:
+        price = effective_price(row.card, row.finish) or 0.0
+        row_total = price * row.quantity
+        total_value += row_total
+        total_cards += row.quantity
+        items.append(
+            {
+                "id": row.id,
+                "card": row.card,
+                "finish": row.finish,
+                "quantity": row.quantity,
+                "effective_price": price,
+                "total_value": row_total,
+                "role": row.role,
+                "tags": get_row_tags(row),
+                "suggested_tags": suggest_card_roles(row.card, themes=themes),
+                "legality_status": get_card_legality(row.card, deck.format),
+            }
+        )
+
+    return items, total_value, total_cards
+
+
 @app.get("/decks/{deck_id}")
 def deck_detail_page(
     request: Request,
@@ -1632,55 +1720,9 @@ def deck_detail_page(
         if _auto_tagged:
             session.commit()
 
-        deck_query = (
-            session.query(InventoryRow)
-            .options(joinedload(InventoryRow.card))
-            .join(Card)
-            .filter(
-                InventoryRow.user_id == current_user.id,
-                InventoryRow.storage_location_id == deck.storage_location_id,
-            )
+        items, deck_total_value, total_cards = _build_deck_card_items(
+            session, deck, current_user.id, search, sort, direction
         )
-        if search.strip():
-            deck_query = apply_collection_search_filters(deck_query, search)
-
-        reverse = direction == "desc"
-        if sort == "type":
-            deck_query = deck_query.order_by(
-                Card.type_line.desc() if reverse else Card.type_line.asc()
-            )
-        elif sort == "cmc":
-            deck_query = deck_query.order_by(Card.cmc.desc() if reverse else Card.cmc.asc())
-        elif sort == "value":
-            deck_rows = deck_query.all()
-        else:
-            deck_query = deck_query.order_by(Card.name.desc() if reverse else Card.name.asc())
-
-        if sort != "value":
-            deck_rows = deck_query.all()
-
-        if sort == "value":
-            deck_rows.sort(key=lambda r: effective_price(r.card, r.finish) or 0.0, reverse=reverse)
-
-        for row in deck_rows:
-            price = effective_price(row.card, row.finish) or 0.0
-            total_value = price * row.quantity
-            deck_total_value += total_value
-            total_cards += row.quantity
-            items.append(
-                {
-                    "id": row.id,
-                    "card": row.card,
-                    "finish": row.finish,
-                    "quantity": row.quantity,
-                    "effective_price": price,
-                    "total_value": total_value,
-                    "role": row.role,
-                    "tags": get_row_tags(row),
-                    "suggested_tags": suggest_card_roles(row.card, themes=_themes),
-                    "legality_status": get_card_legality(row.card, deck.format),
-                }
-            )
 
     if collection_search.strip():
         rows, _ = list_inventory_rows(
@@ -1817,6 +1859,50 @@ def deck_detail_page(
             "locations": list_locations(session, user_id=current_user.id),
         },
     )
+
+
+@app.get("/decks/{deck_id}/cards-partial")
+def deck_cards_partial(
+    deck_id: int,
+    request: Request,
+    search: str = "",
+    sort: str = "name",
+    direction: str = "asc",
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+):
+    """HTMX-driven partial: re-renders ONLY the filtered deck-card grid.
+
+    Triggered by the search form on /decks/{id} via `hx-get` so the user gets
+    in-place filter results without losing scroll position or collapsing
+    expanded panels. The full deck-detail route remains the no-JS fallback —
+    the form keeps `method="get" action="/decks/{id}"` so users without
+    HTMX get the original full-page reload behavior.
+    """
+    deck = get_deck(session, deck_id=deck_id, user_id=current_user.id)
+    if not deck:
+        raise HTTPException(status_code=404, detail="Deck not found")
+
+    items, _, _ = _build_deck_card_items(session, deck, current_user.id, search, sort, direction)
+    use_drawer_sorter = current_user.username in DRAWER_SORTER_USERNAMES
+    response = render(
+        request,
+        "_deck_card_list.html",
+        {
+            "deck": deck,
+            "items": items,
+            "commanders": [],  # the partial only re-renders deck cards, not commanders
+            "use_drawer_sorter": use_drawer_sorter,
+            "locations": list_locations(session, user_id=current_user.id),
+        },
+    )
+    # Tell HTMX to push the full-page URL to the address bar (not the partial
+    # endpoint URL) so bookmarks / shares hit the real page on a cold visit.
+    # `hx-push-url="true"` on the form would otherwise push /cards-partial?...
+    # which only serves a fragment.
+    qs = urlencode({"search": search, "sort": sort, "direction": direction})
+    response.headers["HX-Push-Url"] = f"/decks/{deck_id}?{qs}"
+    return response
 
 
 @app.get("/decks/{deck_id}/panels")

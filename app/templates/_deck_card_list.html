@@ -1,0 +1,29 @@
+{# Partial: the filtered deck-card grid.
+   Rendered both as part of /decks/{id} (full page) AND as the HTMX response
+   from /decks/{id}/cards-partial. Keep the markup inside the wrapper div
+   identical in both contexts so HTMX `innerHTML` swap produces no visual
+   diff vs the full-page render.
+
+   The wrapper #deck-card-list is the hx-target on the search form.
+#}
+{% from "_macros.html" import inventory_card %}
+{% if items %}
+  <section class="card-grid-section">
+    <div class="inventory-grid">
+      {% for item in items %}
+        {{ inventory_card(item, csrf_token,
+                      show_deck_actions=true,
+                      deck=deck,
+                      use_drawer_sorter=use_drawer_sorter,
+                      locations=locations) }}
+      {% endfor %}
+    </div>
+  </section>
+{% else %}
+  {% if not commanders %}
+    <section class="panel">
+      <p>No cards match.</p>
+      <p class="muted">Try clearing the search or adding cards via Search Collection above.</p>
+    </section>
+  {% endif %}
+{% endif %}

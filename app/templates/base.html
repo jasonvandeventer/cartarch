@@ -11,6 +11,17 @@
           sizes="32x32">
     <link rel="apple-touch-icon" href="/static/icons/icon-180x180.png">
     <link rel="stylesheet" href="/static/style.css?v={{ static_v('style.css') }}">
+    {# HTMX: small (~14kb) library for server-driven partial page updates via
+       HTML attributes. Pinned to 1.9.12 (current 1.x stable) with SRI hash —
+       2.x is a separate major with API changes; do not auto-upgrade.
+
+       In use on: /decks/{id} search form (swaps the card grid via hx-get
+       to /decks/{id}/cards-partial). Pattern available for other partial
+       updates: tag a form/button with hx-get|hx-post + hx-target + hx-swap.
+       Docs: https://htmx.org/docs/ #}
+    <script src="https://unpkg.com/htmx.org@1.9.12/dist/htmx.min.js"
+            integrity="sha384-ujb1lZYygJmzgSwoxRggbCHcjc0rB2XoQrxeTUQyRjrOnlCoYta87iKBWq3EsdM2"
+            crossorigin="anonymous"></script>
   </head>
   <body>
     <header class="site-header">
