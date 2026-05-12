@@ -1487,9 +1487,17 @@ def pull_card_to_deck(
     )
 
     if existing_deck_row:
+        # Existing deck row keeps its own tags — that's the established
+        # per-deck role context. Source tags (if any) reflect a different
+        # location's context and shouldn't pollute it.
         existing_deck_row.quantity += quantity
         existing_deck_row.updated_at = datetime.utcnow()
     else:
+        # No deck row yet — inherit the source row's tags so role context
+        # carries into the deck (closes the v3.16.13/14-era tag-loss bug
+        # documented in `pull_card_to_deck` source: both pull-then-delete
+        # and pull-with-remainder dropped tags before this fix). User can
+        # edit on the new deck row if the role differs in this deck.
         existing_deck_row = InventoryRow(
             user_id=user_id,
             card_id=row.card_id,
@@ -1499,6 +1507,7 @@ def pull_card_to_deck(
             drawer=None,
             slot=None,
             is_pending=False,
+            tags=row.tags,
             created_at=datetime.utcnow(),
             updated_at=datetime.utcnow(),
         )

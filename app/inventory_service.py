@@ -814,6 +814,27 @@ def move_inventory_row_to_location(
 def place_imported_rows(
     session: Session, row_ids: list[int], user_id: int, location_id: int
 ) -> int:
+    """Place freshly-imported rows at ``location_id``, auto-merging with
+    any existing non-pending row at the destination matching
+    ``(user_id, card_id, finish)``.
+
+    Auto-merge closes the dup-row gap described in
+    ``docs/collection_import_sync.md`` §8.1: previously a binder/box user
+    who imported a card they already had at the destination ended up with
+    two rows for the same printing+finish until manual consolidation.
+    Drawer-sorter users got auto-consolidation via ``resort_collection``;
+    everyone else now gets it here.
+
+    Merge semantics: for each placed row, if an existing destination row
+    matches ``(user_id, card_id, finish, storage_location_id, is_pending=False)``,
+    increment its ``quantity`` by the placed row's quantity and ``session.delete``
+    the placed row. The existing row's ``tags`` are preserved — the placed
+    row carries no user-assigned tags at this point (imports don't auto-tag),
+    so there's nothing to merge.
+
+    Returns the count of input ``row_ids`` processed (every input row is
+    handled, whether by merge or by direct placement).
+    """
     location = (
         session.query(StorageLocation)
         .filter(StorageLocation.id == location_id, StorageLocation.user_id == user_id)
@@ -829,9 +850,26 @@ def place_imported_rows(
     )
     now = datetime.now(UTC)
     for row in rows:
-        row.storage_location_id = location.id
-        row.is_pending = False
-        row.updated_at = now
+        existing = (
+            session.query(InventoryRow)
+            .filter(
+                InventoryRow.user_id == user_id,
+                InventoryRow.card_id == row.card_id,
+                InventoryRow.finish == row.finish,
+                InventoryRow.storage_location_id == location.id,
+                InventoryRow.is_pending.is_(False),
+                InventoryRow.id != row.id,
+            )
+            .first()
+        )
+        if existing is not None:
+            existing.quantity += row.quantity
+            existing.updated_at = now
+            session.delete(row)
+        else:
+            row.storage_location_id = location.id
+            row.is_pending = False
+            row.updated_at = now
 
     session.commit()
     return len(rows)

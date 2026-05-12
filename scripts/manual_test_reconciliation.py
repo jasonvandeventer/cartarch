@@ -47,6 +47,17 @@ Scenarios L-P (collection-mode sync — Session A):
     P. user owns 2 pending rows of cards[14], imports 4
        → "import_delta", new_qty=2, owned_breakdown has 1 pending entry
 
+Scenarios U-V (post-Session-B polish — v3.16.17):
+
+    U. place_imported_rows auto-merge: user owns 2 of cards[19] in Binder A.
+       persist_import_rows produces a pending row of cards[19] qty=2;
+       place_imported_rows targets Binder A → existing binder row's qty
+       becomes 4, pending row is deleted (NOT 2 separate binder rows).
+    V. pull_card_to_deck preserves source tags: user owns 1 of cards[20]
+       in drawer with tags=["Ramp"]. pull_card_to_deck(1) → source row
+       deleted (qty 0), new deck row exists with qty=1 AND tags=["Ramp"]
+       carried forward.
+
 Scenarios Q-T (collection-mode commit handler — Session B):
 
     Q. owns 4 of cards[15] in drawer, action=skip_already_owned, qty=4
@@ -77,8 +88,17 @@ import sys
 import time
 
 from app.db import SessionLocal
-from app.deck_service import find_inventory_matches_for_deck_import
-from app.inventory_service import find_inventory_matches_for_collection_import
+from app.deck_service import (
+    find_inventory_matches_for_deck_import,
+    get_row_tags,
+    pull_card_to_deck,
+    set_row_tags,
+)
+from app.import_service import persist_import_rows
+from app.inventory_service import (
+    find_inventory_matches_for_collection_import,
+    place_imported_rows,
+)
 from app.main import (
     _commit_collection_import_with_reconciliation,
     _commit_deck_import_with_reconciliation,
@@ -108,11 +128,13 @@ def setup(session):
     # N uses card 13 (target deck only — deck rows count toward owned).
     # P uses card 14 (pending row only — pending counts toward owned).
     # Q-T use cards 15-18 (collection-mode commit handler dispatch tests).
+    # U-V use cards 19-20 (post-Session-B polish: place_imported_rows
+    # auto-merge and pull_card_to_deck tag preservation).
     # Distinct cards per scenario keep them independent.
-    cards = session.query(Card).limit(19).all()
-    if len(cards) < 19:
+    cards = session.query(Card).limit(21).all()
+    if len(cards) < 21:
         raise RuntimeError(
-            f"dev DB has only {len(cards)} Card rows; need at least 19 for the smoke test"
+            f"dev DB has only {len(cards)} Card rows; need at least 21 for the smoke test"
         )
 
     stamp = int(time.time())
@@ -359,8 +381,36 @@ def setup(session):
             storage_location_id=drawer_loc.id,
             is_pending=False,
         ),
+        # U: user1 owns 2 of cards[19] in Binder A. Scenario imports 2 more
+        # to Binder A via persist+place; auto-merge should fold them in.
+        InventoryRow(
+            user_id=user1.id,
+            card_id=cards[19].id,
+            finish="normal",
+            quantity=2,
+            storage_location_id=binder_loc.id,
+            is_pending=False,
+        ),
+        # V: user1 owns 1 of cards[20] in drawer with tags=["Ramp"].
+        # Scenario calls pull_card_to_deck and verifies the deck row
+        # carries the tag.
     ]
     session.add_all(inv_rows)
+    session.flush()
+
+    # V: user1 owns 1 of cards[20] in drawer with tags=["Ramp"]. Create
+    # separately so we can call set_row_tags() to write the JSON payload.
+    drawer_row_v = InventoryRow(
+        user_id=user1.id,
+        card_id=cards[20].id,
+        finish="normal",
+        quantity=1,
+        storage_location_id=drawer_loc.id,
+        is_pending=False,
+    )
+    session.add(drawer_row_v)
+    session.flush()
+    set_row_tags(drawer_row_v, ["Ramp"])
     session.commit()
 
     return {
@@ -373,6 +423,7 @@ def setup(session):
         "binder_loc_id": binder_loc.id,
         "other_deck_loc_id": other_deck_loc.id,
         "binder_loc_2_id": binder_loc_2.id,
+        "drawer_row_v_id": drawer_row_v.id,
     }
 
 
@@ -1376,6 +1427,126 @@ def run_scenarios(session, env):
             len(pending_rows_t) == 1 and pending_rows_t[0].quantity == 2,
             f"pending rows: count={len(pending_rows_t)} "
             f"qty={pending_rows_t[0].quantity if pending_rows_t else None}",
+        )
+    )
+
+    # ---- Scenario U: place_imported_rows auto-merge ----
+    # User owns 2 of cards[19] in Binder A. persist_import_rows creates a
+    # pending row of cards[19] qty=2; place_imported_rows targets Binder A.
+    # Expected: existing binder row qty becomes 4, pending row deleted —
+    # one row total at the destination for (cards[19], normal).
+    parsed_u = [
+        {
+            "line_number": 1,
+            "name": "",
+            "scryfall_id": env["cards"][19].scryfall_id,
+            "set_code": "",
+            "collector_number": "",
+            "finish": "normal",
+            "quantity": 2,
+            "location": "",
+        }
+    ]
+    persist_result_u = persist_import_rows(
+        session, parsed_u, filename="smoke U", user_id=env["user1"].id
+    )
+    placed_u = place_imported_rows(
+        session,
+        persist_result_u["imported_row_ids"],
+        user_id=env["user1"].id,
+        location_id=env["binder_loc_id"],
+    )
+    binder_rows_u = (
+        session.query(InventoryRow)
+        .filter(
+            InventoryRow.user_id == env["user1"].id,
+            InventoryRow.card_id == env["cards"][19].id,
+            InventoryRow.storage_location_id == env["binder_loc_id"],
+        )
+        .all()
+    )
+    pending_rows_u = (
+        session.query(InventoryRow)
+        .filter(
+            InventoryRow.user_id == env["user1"].id,
+            InventoryRow.card_id == env["cards"][19].id,
+            InventoryRow.is_pending.is_(True),
+        )
+        .all()
+    )
+    results.append(
+        _check(
+            "U.placed_count",
+            placed_u == 1,
+            f"got placed_count={placed_u}",
+        )
+    )
+    results.append(
+        _check(
+            "U.single_binder_row",
+            len(binder_rows_u) == 1 and binder_rows_u[0].quantity == 4,
+            f"binder rows: count={len(binder_rows_u)} "
+            f"qty={binder_rows_u[0].quantity if binder_rows_u else None}",
+        )
+    )
+    results.append(
+        _check(
+            "U.no_orphan_pending",
+            pending_rows_u == [],
+            f"unexpected pending rows: {pending_rows_u!r}",
+        )
+    )
+
+    # ---- Scenario V: pull_card_to_deck preserves source tags ----
+    # User owns 1 of cards[20] in drawer with tags=["Ramp"]. Pulling 1 to
+    # deck1 should: source row deleted (qty 0), new deck row exists with
+    # qty=1 AND tags=["Ramp"] carried over.
+    ok_v = pull_card_to_deck(
+        session,
+        user_id=env["user1"].id,
+        deck_id=env["deck1"].id,
+        inventory_row_id=env["drawer_row_v_id"],
+        quantity=1,
+    )
+    drawer_row_v_after = (
+        session.query(InventoryRow).filter(InventoryRow.id == env["drawer_row_v_id"]).first()
+    )
+    deck_row_v = (
+        session.query(InventoryRow)
+        .filter(
+            InventoryRow.user_id == env["user1"].id,
+            InventoryRow.card_id == env["cards"][20].id,
+            InventoryRow.storage_location_id == env["deck1"].storage_location_id,
+        )
+        .first()
+    )
+    deck_tags_v = get_row_tags(deck_row_v) if deck_row_v else []
+    results.append(
+        _check(
+            "V.pull_returned_true",
+            ok_v is True,
+            f"got ok={ok_v}",
+        )
+    )
+    results.append(
+        _check(
+            "V.source_deleted",
+            drawer_row_v_after is None,
+            f"source still present: {drawer_row_v_after!r}",
+        )
+    )
+    results.append(
+        _check(
+            "V.deck_row_present",
+            deck_row_v is not None and deck_row_v.quantity == 1,
+            f"deck row: {deck_row_v!r} qty={deck_row_v.quantity if deck_row_v else None}",
+        )
+    )
+    results.append(
+        _check(
+            "V.tags_preserved",
+            deck_tags_v == ["Ramp"],
+            f"got tags={deck_tags_v!r} (expected ['Ramp'])",
         )
     )
 
