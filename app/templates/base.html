@@ -10,7 +10,7 @@
           type="image/png"
           sizes="32x32">
     <link rel="apple-touch-icon" href="/static/icons/icon-180x180.png">
-    <link rel="stylesheet" href="/static/style.css?v={{ app_version }}">
+    <link rel="stylesheet" href="/static/style.css?v={{ static_v('style.css') }}">
   </head>
   <body>
     <header class="site-header">
@@ -55,6 +55,126 @@
     <main class="page-shell">
       {% block content %}{% endblock %}
     </main>
+    <script>
+      /* Mobile popover behavior. Applied to elements tagged .mobile-popover
+         when viewport ≤ 768px:
+         - Renders a backdrop and locks body scroll while open
+         - Dismissable by backdrop tap, Escape key, or .mobile-popover-close
+         Above 768px the class is inert and elements keep their desktop layout.
+         For <details>-based popovers we toggle the parent <details>'s `open`
+         attribute; for free-floating popovers (.layout-picker-popover) the
+         element exposes openMobilePopover/closeMobilePopover. */
+      (function () {
+        var mq = window.matchMedia('(max-width: 768px)');
+        var openSet = new Set(); // currently-open mobile-popover elements
+        var backdrop = null;
+
+        function ensureBackdrop() {
+          if (backdrop) return backdrop;
+          backdrop = document.createElement('div');
+          backdrop.className = 'mobile-popover-backdrop';
+          backdrop.setAttribute('aria-hidden', 'true');
+          backdrop.addEventListener('click', closeAll);
+          return backdrop;
+        }
+
+        function ensureCloseBtn(popover) {
+          if (popover.querySelector(':scope > .mobile-popover-close')) return;
+          var btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'mobile-popover-close';
+          btn.setAttribute('aria-label', 'Close');
+          btn.textContent = '×';
+          btn.addEventListener('click', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            closePopover(popover);
+          });
+          popover.appendChild(btn);
+        }
+
+        function attachPopover(popover) {
+          ensureCloseBtn(popover);
+          openSet.add(popover);
+          if (openSet.size === 1) {
+            document.body.classList.add('mobile-popover-open');
+            document.body.appendChild(ensureBackdrop());
+          }
+        }
+
+        function detachPopover(popover) {
+          openSet.delete(popover);
+          if (openSet.size === 0) {
+            document.body.classList.remove('mobile-popover-open');
+            if (backdrop && backdrop.parentNode) backdrop.parentNode.removeChild(backdrop);
+          }
+        }
+
+        function closePopover(popover) {
+          // <details>-based popover: closing the popover collapses the parent details
+          var details = popover.closest('details');
+          if (details && details.open) {
+            details.open = false; // triggers our toggle listener which detaches
+            return;
+          }
+          // free-floating popover: caller wires close via custom event
+          popover.dispatchEvent(new CustomEvent('mobilepopover:close', { bubbles: true }));
+          detachPopover(popover);
+        }
+
+        function closeAll() {
+          // Iterate snapshot since closePopover mutates the set
+          Array.from(openSet).forEach(closePopover);
+        }
+
+        // Bind a toggle listener directly to each <details> that wraps a
+        // .mobile-popover. iOS Safari has historically been inconsistent
+        // about capture-phase delegation of non-bubbling events, so direct
+        // binding is the safe path. Re-run on DOMContentLoaded plus when
+        // dynamically-injected content fires `mobilepopover:scan`.
+        function wireDetails() {
+          var popovers = document.querySelectorAll('.mobile-popover');
+          popovers.forEach(function (popover) {
+            var details = popover.closest('details');
+            if (!details || details.dataset.mobilePopoverWired === '1') return;
+            details.dataset.mobilePopoverWired = '1';
+            details.addEventListener('toggle', function () {
+              if (details.open && mq.matches) attachPopover(popover);
+              else detachPopover(popover);
+            });
+          });
+        }
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', wireDetails);
+        } else {
+          wireDetails();
+        }
+        document.addEventListener('mobilepopover:scan', wireDetails);
+
+        // Escape closes everything open
+        document.addEventListener('keydown', function (e) {
+          if (e.key === 'Escape' && openSet.size > 0) closeAll();
+        });
+
+        // Breakpoint change: if we cross from mobile to desktop while a
+        // popover is open, drop the backdrop + body lock but leave the
+        // <details> open (desktop layout is fine).
+        mq.addEventListener('change', function () {
+          if (!mq.matches && openSet.size > 0) {
+            openSet.clear();
+            document.body.classList.remove('mobile-popover-open');
+            if (backdrop && backdrop.parentNode) backdrop.parentNode.removeChild(backdrop);
+          }
+        });
+
+        // Expose for non-<details> popovers (e.g., layout-picker)
+        window.MobilePopover = {
+          open: function (el) { if (mq.matches) attachPopover(el); },
+          close: function (el) { detachPopover(el); },
+          isMobile: function () { return mq.matches; },
+        };
+      })();
+    </script>
     {% set path = request.url.path if request else '/' %}
     {% if current_user %}
       <nav class="bottom-nav" aria-label="Primary mobile navigation">

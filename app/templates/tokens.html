@@ -81,7 +81,7 @@
                   {% if t.image_url %}
                     <details class="inline-details inline-details-side" style="display:inline">
                       <summary class="btn-like btn-like-muted">image</summary>
-                      <div class="edit-popout">
+                      <div class="edit-popout mobile-popover">
                         <img src="{{ t.image_url }}"
                              alt="{{ t.name }}"
                              loading="lazy"
@@ -108,7 +108,7 @@
                 <td>
                   <details class="inline-details">
                     <summary class="btn-like btn-like-muted">Edit</summary>
-                    <div class="edit-popout">
+                    <div class="edit-popout mobile-popover">
                       <form action="/tokens/{{ t.id }}/edit" method="post" class="stack-form">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                         <label>Name</label>

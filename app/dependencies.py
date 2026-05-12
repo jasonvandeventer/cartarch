@@ -47,6 +47,20 @@ templates.env.globals["drawer_sorter_usernames"] = DRAWER_SORTER_USERNAMES
 templates.env.globals["card_role_tags"] = CARD_ROLE_TAGS
 
 
+def static_v(path: str) -> str:
+    """Cache-buster keyed on the static file's mtime so working-tree edits
+    invalidate browser caches without needing a git commit. Falls back to
+    app_version if the file is missing."""
+    full = os.path.join("app", "static", path.lstrip("/"))
+    try:
+        return str(int(os.path.getmtime(full)))
+    except OSError:
+        return os.getenv("APP_VERSION") or _dev_version()
+
+
+templates.env.globals["static_v"] = static_v
+
+
 def get_csrf_token(request: Request) -> str:
     if "csrf_token" not in request.session:
         request.session["csrf_token"] = secrets.token_hex(32)

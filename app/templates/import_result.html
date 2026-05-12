@@ -6,7 +6,10 @@
     <div class="stat-grid" style="margin-top: 1rem;">
       <div class="stat-card compact">
         <div class="stat-label">Cards imported</div>
-        <div class="stat-number">{{ imported_count }}</div>
+        <div class="stat-number">{{ total_quantity if total_quantity is defined else imported_count }}</div>
+        {% if total_quantity is defined and total_quantity != imported_count %}
+          <div class="muted small-text">{{ imported_count }} unique</div>
+        {% endif %}
       </div>
       <div class="stat-card compact">
         <div class="stat-label">Failed rows</div>
@@ -26,15 +29,10 @@
                 gap: 0.75rem;
                 flex-wrap: wrap;
                 margin-top: 1rem">
-      {% if placed_in %}
-        <a href="/collection">
-          <button type="button">Go to Collection</button>
-        </a>
-      {% else %}
-        <a href="/pending">
-          <button type="button">Go to Pending</button>
-        </a>
-      {% endif %}
+      {% set destination_url = placed_in_url if placed_in_url is defined else ('/pending' if not placed_in else '/collection') %}
+      <a href="{{ destination_url }}">
+        <button type="button">Go to {{ placed_in if placed_in else 'Pending' }}</button>
+      </a>
       <a href="/import">
         <button type="button">Import Another</button>
       </a>

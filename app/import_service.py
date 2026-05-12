@@ -232,6 +232,7 @@ def persist_import_rows(
         raise ValueError("user_id must be a positive integer when importing rows")
 
     imported_count = 0
+    total_quantity = 0
     failed_rows: list[dict[str, Any]] = []
     imported_row_ids: list[int] = []
     batch = create_import_batch(
@@ -289,6 +290,7 @@ def persist_import_rows(
         session.commit()
         return {
             "imported_count": 0,
+            "total_quantity": 0,
             "failed_rows": failed_rows,
             "batch_id": batch.id,
             "imported_row_ids": [],
@@ -436,6 +438,7 @@ def persist_import_rows(
             inventory_map[key] = target_row
 
         imported_count += 1
+        total_quantity += qty
         audit_payloads.append(
             {
                 "card_id": card.id,
@@ -470,6 +473,7 @@ def persist_import_rows(
     session.commit()
     return {
         "imported_count": imported_count,
+        "total_quantity": total_quantity,
         "failed_rows": failed_rows,
         "batch_id": batch.id,
         "imported_row_ids": imported_row_ids,

@@ -3434,3 +3434,69 @@ body.game-mode {
     align-items: center;
   }
 }
+
+/* ============================================================================
+   Mobile popover pattern (≤ 768px)
+   ----------------------------------------------------------------------------
+   Apply .mobile-popover to any popout element to opt it into a centered,
+   viewport-constrained, backdrop-dismissable presentation on phones. The
+   element retains its existing desktop layout above 768px.
+
+   The backdrop element + body scroll lock + dismiss wiring are handled by
+   the IIFE in base.html — CSS here just defines the visual presentation.
+
+   Usage: see docs/mobile_patterns.md.
+   ============================================================================ */
+.mobile-popover-backdrop {
+  display: none;
+}
+.mobile-popover-close {
+  display: none;
+}
+@media (max-width: 768px) {
+  .mobile-popover {
+    position: fixed !important;
+    top: 50% !important;
+    left: 50% !important;
+    right: auto !important;
+    bottom: auto !important;
+    transform: translate(-50%, -50%) !important;
+    width: min(90vw, 400px) !important;
+    max-width: min(90vw, 400px) !important;
+    max-height: 80vh !important;
+    overflow: auto !important;
+    z-index: 1100 !important;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6) !important;
+  }
+  .mobile-popover-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.4);
+    z-index: 1090;
+  }
+  body.mobile-popover-open {
+    overflow: hidden;
+  }
+  .mobile-popover-close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    position: absolute;
+    top: 0.25rem;
+    right: 0.25rem;
+    width: 44px;
+    height: 44px;
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    font-size: 1.6rem;
+    line-height: 1;
+    padding: 0;
+    cursor: pointer;
+  }
+  .mobile-popover-close:hover,
+  .mobile-popover-close:focus {
+    color: var(--text);
+  }
+}

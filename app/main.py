@@ -29,6 +29,7 @@ from fastapi.responses import (
     Response,
 )
 from fastapi.staticfiles import StaticFiles
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
 from starlette.middleware.sessions import SessionMiddleware
 
@@ -430,6 +431,7 @@ async def import_commit(
     result = persist_import_rows(session, rows, filename=filename, user_id=current_user.id)
     row_ids = result.get("imported_row_ids", [])
     placed_in = None
+    placed_in_url = "/pending"
 
     if row_ids and target_location_id:
         place_imported_rows(
@@ -437,6 +439,7 @@ async def import_commit(
         )
         loc = get_location(session, location_id=target_location_id, user_id=current_user.id)
         placed_in = loc.name if loc else None
+        placed_in_url = f"/locations/{target_location_id}" if loc else "/pending"
         if loc and loc.type != "deck" and current_user.username in DRAWER_SORTER_USERNAMES:
             resort_collection(session, user_id=current_user.id)
 
@@ -450,9 +453,11 @@ async def import_commit(
         {
             "title": "Import Results",
             "imported_count": result["imported_count"],
+            "total_quantity": result.get("total_quantity", result["imported_count"]),
             "failed_rows": result["failed_rows"],
             "batch_id": result["batch_id"],
             "placed_in": placed_in,
+            "placed_in_url": placed_in_url,
             "current_user": current_user,
         },
     )
@@ -554,6 +559,7 @@ async def manual_import_commit(
 
     row_ids = result.get("imported_row_ids", [])
     placed_in = None
+    placed_in_url = "/pending"
 
     if row_ids and target_location_id:
         place_imported_rows(
@@ -561,6 +567,7 @@ async def manual_import_commit(
         )
         loc = get_location(session, location_id=target_location_id, user_id=current_user.id)
         placed_in = loc.name if loc else None
+        placed_in_url = f"/locations/{target_location_id}" if loc else "/pending"
         if loc and loc.type != "deck" and current_user.username in DRAWER_SORTER_USERNAMES:
             resort_collection(session, user_id=current_user.id)
     elif row_ids and current_user.username in DRAWER_SORTER_USERNAMES:
@@ -572,9 +579,11 @@ async def manual_import_commit(
         {
             "title": "Import Results",
             "imported_count": result["imported_count"],
+            "total_quantity": result.get("total_quantity", result["imported_count"]),
             "failed_rows": result["failed_rows"],
             "batch_id": result["batch_id"],
             "placed_in": placed_in,
+            "placed_in_url": placed_in_url,
             "current_user": current_user,
         },
     )
@@ -1060,6 +1069,59 @@ def create_deck_from_locations(
 ):
     create_deck(session, user_id=current_user.id, name=name, format_name=format_name)
     return RedirectResponse("/locations", status_code=303)
+
+
+@app.post("/decks/create-inline")
+def decks_create_inline(
+    name: str = Form(...),
+    format_name: str = Form(""),
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+    _: None = CsrfRequired,
+):
+    """JSON variant of /decks/create for inline use in the import wizard."""
+    try:
+        deck = create_deck(session, user_id=current_user.id, name=name, format_name=format_name)
+    except (ValueError, IntegrityError) as exc:
+        session.rollback()
+        return JSONResponse({"error": str(exc) or "could_not_create"}, status_code=400)
+    return JSONResponse(
+        {
+            "id": deck.id,
+            "storage_location_id": deck.storage_location_id,
+            "name": deck.name,
+            "format": deck.format or "",
+        }
+    )
+
+
+@app.post("/locations/create-inline")
+def locations_create_inline(
+    name: str = Form(...),
+    type: str = Form("other"),
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+    _: None = CsrfRequired,
+):
+    """JSON variant of POST /locations for inline use in the import wizard.
+
+    Deck-type locations are blocked here — callers should hit
+    /decks/create-inline instead so a proper Deck record is created.
+    """
+    if type.strip().lower() == "deck":
+        return JSONResponse({"error": "use /decks/create-inline for decks"}, status_code=400)
+    try:
+        location = create_location(session, user_id=current_user.id, name=name, type=type)
+    except (ValueError, IntegrityError) as exc:
+        session.rollback()
+        return JSONResponse({"error": str(exc) or "could_not_create"}, status_code=400)
+    return JSONResponse(
+        {
+            "id": location.id,
+            "name": location.name,
+            "type": location.type,
+        }
+    )
 
 
 @app.post("/locations/{location_id}/delete")

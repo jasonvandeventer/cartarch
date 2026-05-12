@@ -4,7 +4,7 @@
     <details class="bracket-details">
       <summary class="bracket-badge bracket-{{ bracket.bracket }}">Bracket {{ bracket.bracket }}</summary>
       {% if bracket.reasons %}
-        <div class="bracket-popout">
+        <div class="bracket-popout mobile-popover">
           <div class="bracket-popout-title">Why Bracket {{ bracket.bracket }}</div>
           <ul class="bracket-reasons">
             {% for r in bracket.reasons %}<li>{{ r }}</li>{% endfor %}

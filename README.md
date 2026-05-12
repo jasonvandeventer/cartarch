@@ -2,7 +2,7 @@
 
 Self-hosted web application for managing a physical Magic: The Gathering collection.
 
-**Current version: v3.16.3** · [Platform repo](https://github.com/jasonvandeventer/mana-archive-platform)
+**Current version: v3.16.4** · [Platform repo](https://github.com/jasonvandeventer/mana-archive-platform)
 
 ---
 
@@ -20,6 +20,8 @@ Self-hosted web application for managing a physical Magic: The Gathering collect
 - **CSV upload** — auto-detects Scanner App, Helvault (free/pro), and Moxfield collection CSV formats
 - **Paste list** — parses Moxfield deck exports, MTGA, MTGO, and standard `N CardName (SET) #` format; also accepts bare `SET COLLECTOR` lines (`MH3 145`, `MH3 145 2`, `2 MH3 145`, `*F*` for foil) so you can add cards by set + collector number alone
 - Import directly to a deck or storage location at commit time
+- **Inline create** — "+ Create new deck" / "+ Create new location" popouts on the import preview screen create the destination via JSON endpoints and pre-select it in the dropdown without leaving the wizard
+- Import complete screen shows total cards imported + unique-row count, and a "Go to [destination]" button that links straight to the deck or location
 
 ### Decks
 
@@ -90,7 +92,7 @@ Self-hosted web application for managing a physical Magic: The Gathering collect
 - Below 768px the top-bar nav collapses to a 5-tab bottom bar (Home / Collection / Decks / Games / More) with a "More" overlay containing Import, Pending, Locations, Tokens, Sets, Drawers/Audit/Admin (gated), Account, Logout
 - "More" tab shows a red badge with the user's pending-placement count (capped at `99+`)
 - 44px tap-target floor enforced on phone/tablet-portrait; tracker buttons exempt by design
-- Tables scroll horizontally inside their panels; popouts (Edit, Bracket) become viewport-centered on phones
+- Tables scroll horizontally inside their panels; popouts (Edit, Bracket, inline-create) become viewport-centered modals on phones with semi-transparent backdrop, body scroll lock, auto-injected × close button, and dismiss on backdrop tap / Escape / × — see [docs/mobile_patterns.md](docs/mobile_patterns.md)
 
 ---
 

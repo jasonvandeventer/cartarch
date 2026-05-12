@@ -1,5 +1,10 @@
 # Mana Archive — Mobile Responsiveness Audit
 
+> **Note:** this is the original audit document (pre-v3.16.3). For the
+> living reference covering current mobile UI primitives — popover pattern,
+> tap targets, bottom-nav rules, cache-busting — see
+> [mobile_patterns.md](mobile_patterns.md).
+
 **Audit scope:** read-only review of `app/templates/*.html` (10 priority templates) and `app/static/style.css` (2966 lines). Target viewports: 375px (iPhone SE / mini), 390px (typical phone), 768px (tablet portrait). Tap-target target: 44×44 px (Apple HIG) / 48×48 (Android M3).
 
 **TL;DR:** the desktop UI works, but the app is materially desktop-first. The two biggest pain points are (1) the global nav — 9–12 unwrapped text links that wrap to 3+ rows on a phone — and (2) `inventory-card` and `pending-item`, which only collapse to single-column at 720px and don't reduce thumb size below ~170px, eating most of the viewport on a 375px screen. There are also six unwrapped `<table>` elements with no `.table-wrap` that will horizontal-scroll the entire page (instead of just the table) on a phone. Existing media queries are inconsistent (980 / 760 / 720) and only cover ~15% of components.

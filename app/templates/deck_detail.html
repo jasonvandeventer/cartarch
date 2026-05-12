@@ -688,6 +688,7 @@
             if (panelsContent && panelsPlaceholder) {
               panelsPlaceholder.replaceWith(panelsContent);
             }
+            document.dispatchEvent(new Event('mobilepopover:scan'));
           })
           .catch(function () {
             var p = document.getElementById('deck-lazy-panels');

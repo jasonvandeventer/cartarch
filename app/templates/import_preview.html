@@ -35,32 +35,26 @@
           <input type="hidden" name="location" value="{{ row.location }}">
         {% endfor %}
         <label style="font-weight: 600;">Destination</label>
-        <select name="target_location_id">
+        <select name="target_location_id" id="import-destination-select">
           {% if use_drawer_sorter %}<option value="0">Auto-sort to drawers</option>{% endif %}
-          {% if placeable %}
-            <optgroup label="Storage Locations">
-              {% for loc in placeable %}<option value="{{ loc.id }}">{{ loc.name }} ({{ loc.type }})</option>{% endfor %}
-            </optgroup>
-          {% endif %}
-          {% if decks %}
-            <optgroup label="Decks">
-              {% for deck in decks %}
-                <option value="{{ deck.storage_location_id }}">
-                  {{ deck.name }}
-                  {% if deck.format %}({{ deck.format }}){% endif %}
-                </option>
-              {% endfor %}
-            </optgroup>
-          {% endif %}
-          {% if not use_drawer_sorter and not placeable and not decks %}
-            <option value="" disabled>No locations — create one first</option>
-          {% endif %}
+          <optgroup label="Storage Locations" id="opt-locations">
+            {% for loc in placeable %}<option value="{{ loc.id }}">{{ loc.name }} ({{ loc.type }})</option>{% endfor %}
+          </optgroup>
+          <optgroup label="Decks" id="opt-decks">
+            {% for deck in decks %}
+              <option value="{{ deck.storage_location_id }}">
+                {{ deck.name }}
+                {% if deck.format %}({{ deck.format }}){% endif %}
+              </option>
+            {% endfor %}
+          </optgroup>
         </select>
-        <button type="submit"
+        <button type="submit" id="import-submit-btn"
                 {% if not use_drawer_sorter and not placeable and not decks %}disabled{% endif %}>
           Import Valid Rows
         </button>
       </form>
+      {% include "_inline_create_destination.html" %}
     {% endif %}
   </section>
   <section class="panel">

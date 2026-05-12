@@ -1,0 +1,132 @@
+<div class="inline-create-row" style="display: flex; gap: 0.75rem; flex-wrap: wrap; margin-top: 0.75rem;">
+  <details class="inline-details">
+    <summary class="btn-like">+ Create new deck</summary>
+    <div class="edit-popout mobile-popover" style="min-width: 260px;">
+      <div class="stack-form">
+        <label>Deck name</label>
+        <input type="text" id="inline-deck-name" placeholder="Deck name">
+        <label>Format</label>
+        <select id="inline-deck-format">
+          <option value="Commander" selected>Commander</option>
+          <option value="Standard">Standard</option>
+          <option value="Pioneer">Pioneer</option>
+          <option value="Modern">Modern</option>
+          <option value="Legacy">Legacy</option>
+          <option value="Vintage">Vintage</option>
+          <option value="Cube">Cube</option>
+          <option value="">(none)</option>
+        </select>
+        <button type="button" id="inline-deck-submit">Create &amp; select</button>
+        <div class="muted small-text" id="inline-deck-status"></div>
+      </div>
+    </div>
+  </details>
+  <details class="inline-details">
+    <summary class="btn-like">+ Create new location</summary>
+    <div class="edit-popout mobile-popover" style="min-width: 260px;">
+      <div class="stack-form">
+        <label>Location name</label>
+        <input type="text" id="inline-loc-name" placeholder="Location name">
+        <label>Type</label>
+        <select id="inline-loc-type">
+          <option value="binder">Binder</option>
+          <option value="box">Box</option>
+          <option value="drawer">Drawer</option>
+          <option value="other" selected>Other</option>
+        </select>
+        <button type="button" id="inline-loc-submit">Create &amp; select</button>
+        <div class="muted small-text" id="inline-loc-status"></div>
+      </div>
+    </div>
+  </details>
+</div>
+<script>
+(function () {
+  const csrf = "{{ csrf_token }}";
+  const selectEl = document.getElementById('import-destination-select');
+  const submitBtn = document.getElementById('import-submit-btn');
+  if (!selectEl) return;
+
+  function ensureOptgroup(id, label) {
+    let og = document.getElementById(id);
+    if (!og) {
+      og = document.createElement('optgroup');
+      og.id = id;
+      og.label = label;
+      selectEl.appendChild(og);
+    }
+    return og;
+  }
+
+  async function postForm(url, data) {
+    const body = new FormData();
+    body.append('csrf_token', csrf);
+    for (const [k, v] of Object.entries(data)) body.append(k, v);
+    const res = await fetch(url, { method: 'POST', body, credentials: 'same-origin' });
+    const payload = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const msg = payload && payload.error ? payload.error : ('HTTP ' + res.status);
+      throw new Error(msg);
+    }
+    return payload;
+  }
+
+  const deckBtn = document.getElementById('inline-deck-submit');
+  if (deckBtn) {
+    deckBtn.addEventListener('click', async () => {
+      const nameEl = document.getElementById('inline-deck-name');
+      const fmtEl = document.getElementById('inline-deck-format');
+      const statusEl = document.getElementById('inline-deck-status');
+      const name = (nameEl.value || '').trim();
+      if (!name) { statusEl.textContent = 'Name required.'; return; }
+      statusEl.textContent = 'Creating…';
+      try {
+        const deck = await postForm('/decks/create-inline', {
+          name: name,
+          format_name: fmtEl.value,
+        });
+        const og = ensureOptgroup('opt-decks', 'Decks');
+        const opt = document.createElement('option');
+        opt.value = deck.storage_location_id;
+        opt.textContent = deck.name + (deck.format ? ' (' + deck.format + ')' : '');
+        og.appendChild(opt);
+        selectEl.value = String(deck.storage_location_id);
+        if (submitBtn) submitBtn.disabled = false;
+        statusEl.textContent = 'Created and selected.';
+        nameEl.value = '';
+      } catch (err) {
+        statusEl.textContent = 'Failed: ' + err.message;
+      }
+    });
+  }
+
+  const locBtn = document.getElementById('inline-loc-submit');
+  if (locBtn) {
+    locBtn.addEventListener('click', async () => {
+      const nameEl = document.getElementById('inline-loc-name');
+      const typeEl = document.getElementById('inline-loc-type');
+      const statusEl = document.getElementById('inline-loc-status');
+      const name = (nameEl.value || '').trim();
+      if (!name) { statusEl.textContent = 'Name required.'; return; }
+      statusEl.textContent = 'Creating…';
+      try {
+        const loc = await postForm('/locations/create-inline', {
+          name: name,
+          type: typeEl.value,
+        });
+        const og = ensureOptgroup('opt-locations', 'Storage Locations');
+        const opt = document.createElement('option');
+        opt.value = loc.id;
+        opt.textContent = loc.name + ' (' + loc.type + ')';
+        og.appendChild(opt);
+        selectEl.value = String(loc.id);
+        if (submitBtn) submitBtn.disabled = false;
+        statusEl.textContent = 'Created and selected.';
+        nameEl.value = '';
+      } catch (err) {
+        statusEl.textContent = 'Failed: ' + err.message;
+      }
+    });
+  }
+})();
+</script>

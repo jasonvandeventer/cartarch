@@ -65,7 +65,7 @@
                   <details class="bracket-details">
                     <summary class="bracket-badge bracket-{{ deck.bracket.bracket }}">Bracket {{ deck.bracket.bracket }}</summary>
                     {% if deck.bracket.reasons %}
-                      <div class="bracket-popout">
+                      <div class="bracket-popout mobile-popover">
                         <div class="bracket-popout-title">Why Bracket {{ deck.bracket.bracket }}</div>
                         <ul class="bracket-reasons">
                           {% for r in deck.bracket.reasons %}<li>{{ r }}</li>{% endfor %}
@@ -90,7 +90,7 @@
                          style="display: inline-block;
                                 margin-right: 0.4rem">
                   <summary class="btn-like">Edit</summary>
-                  <div class="edit-popout">
+                  <div class="edit-popout mobile-popover">
                     <form action="/decks/{{ deck.id }}/edit" method="post" class="stack-form">
                       <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                       <label>Name</label>
