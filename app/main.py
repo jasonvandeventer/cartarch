@@ -2148,6 +2148,48 @@ async def toggle_commander(
     if row:
         row.role = None if row.role == "commander" else "commander"
         session.commit()
+
+        # Changing a row's role invalidates the panels disk cache (the cache
+        # key includes role), but the V2 bracket panel rendered server-side
+        # on the next page load reads combos from that same cache. A cold
+        # miss means estimate_bracket_v2 runs without combo data, so the
+        # panel shows a mechanics+intent-only bracket until the next refresh
+        # (when the cache is warm from the lazy panels endpoint).
+        #
+        # Warm the cache here synchronously so the redirect lands on a
+        # deck-detail page that finds combos in the cache. Spellbook +
+        # Scryfall calls have in-memory caches, so this is cheap on
+        # warm-server / repeat-deck paths. Failures are swallowed; the
+        # lazy panels endpoint will repopulate the cache on the next page
+        # load if this warm-up fails.
+        try:
+            deck = get_deck(session, deck_id=deck_id, user_id=current_user.id)
+            if deck and deck.storage_location_id:
+                all_rows = (
+                    session.query(InventoryRow)
+                    .options(joinedload(InventoryRow.card))
+                    .join(Card)
+                    .filter(
+                        InventoryRow.user_id == current_user.id,
+                        InventoryRow.storage_location_id == deck.storage_location_id,
+                    )
+                    .all()
+                )
+                if all_rows:
+                    ck = _panels_cache_key(all_rows)
+                    if not _read_panels_cache(deck_id, ck):
+                        with ThreadPoolExecutor(max_workers=2) as pool:
+                            tokens_future = pool.submit(compute_deck_tokens, all_rows)
+                            combos_future = pool.submit(compute_deck_combos, all_rows)
+                            tokens = tokens_future.result()
+                            combos = combos_future.result()
+                        _write_panels_cache(deck_id, ck, {"tokens": tokens, "combos": combos})
+        except Exception as exc:  # noqa: BLE001 — non-critical warm-up
+            print(
+                f"[toggle_commander] panels cache warm-up failed deck={deck_id}: {exc}",
+                flush=True,
+            )
+
     return RedirectResponse(url=f"/decks/{deck_id}", status_code=303)
 
 
