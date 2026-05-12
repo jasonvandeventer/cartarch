@@ -47,6 +47,22 @@ Scenarios L-P (collection-mode sync — Session A):
     P. user owns 2 pending rows of cards[14], imports 4
        → "import_delta", new_qty=2, owned_breakdown has 1 pending entry
 
+Scenarios Q-T (collection-mode commit handler — Session B):
+
+    Q. owns 4 of cards[15] in drawer, action=skip_already_owned, qty=4
+       → no new InventoryRow created, skipped_count=4, drawer untouched,
+         one import_skipped TransactionLog entry
+    R. owns 2 of cards[16] in drawer, target=binder, action=import_delta,
+       new_qty=2, qty=4 → 1 new row qty=2 placed in binder, drawer
+       untouched, skipped_count=2 (delta portion)
+    S. owns 4 of cards[17] in drawer, action=import_new (override),
+       new_qty=4 → 1 new pending row qty=4, drawer untouched,
+       skipped_count=0
+    T. owns 4 of cards[18] in drawer initially, but qty is decremented to 2
+       before commit. Action=skip_already_owned with qty=4 → stale-match
+       fallback to import_delta, new row qty=2 created, skipped_count=2,
+       stale_match_rows has 1 entry with reason="inventory_decreased"
+
 Run from project root:
     DATA_DIR=$(pwd)/dev-data SESSION_SECRET_KEY=test \\
       python -m scripts.manual_test_reconciliation
@@ -63,7 +79,10 @@ import time
 from app.db import SessionLocal
 from app.deck_service import find_inventory_matches_for_deck_import
 from app.inventory_service import find_inventory_matches_for_collection_import
-from app.main import _commit_deck_import_with_reconciliation
+from app.main import (
+    _commit_collection_import_with_reconciliation,
+    _commit_deck_import_with_reconciliation,
+)
 from app.models import (
     Card,
     Deck,
@@ -88,11 +107,12 @@ def setup(session):
     # (drawer, full coverage). M uses card 12 (drawer, partial coverage).
     # N uses card 13 (target deck only — deck rows count toward owned).
     # P uses card 14 (pending row only — pending counts toward owned).
+    # Q-T use cards 15-18 (collection-mode commit handler dispatch tests).
     # Distinct cards per scenario keep them independent.
-    cards = session.query(Card).limit(15).all()
-    if len(cards) < 15:
+    cards = session.query(Card).limit(19).all()
+    if len(cards) < 19:
         raise RuntimeError(
-            f"dev DB has only {len(cards)} Card rows; need at least 15 for the smoke test"
+            f"dev DB has only {len(cards)} Card rows; need at least 19 for the smoke test"
         )
 
     stamp = int(time.time())
@@ -298,6 +318,46 @@ def setup(session):
             quantity=2,
             storage_location_id=None,
             is_pending=True,
+        ),
+        # Q: user1 owns 4 of cards[15] in drawer. Skip action will record a
+        # TransactionLog entry without mutating inventory.
+        InventoryRow(
+            user_id=user1.id,
+            card_id=cards[15].id,
+            finish="normal",
+            quantity=4,
+            storage_location_id=drawer_loc.id,
+            is_pending=False,
+        ),
+        # R: user1 owns 2 of cards[16] in drawer; importing 4 with delta
+        # places 2 new copies in binder.
+        InventoryRow(
+            user_id=user1.id,
+            card_id=cards[16].id,
+            finish="normal",
+            quantity=2,
+            storage_location_id=drawer_loc.id,
+            is_pending=False,
+        ),
+        # S: user1 owns 4 of cards[17] in drawer; import_new override
+        # creates a new pending row qty=4 without touching drawer.
+        InventoryRow(
+            user_id=user1.id,
+            card_id=cards[17].id,
+            finish="normal",
+            quantity=4,
+            storage_location_id=drawer_loc.id,
+            is_pending=False,
+        ),
+        # T: user1 owns 4 of cards[18] in drawer; test mutates this to 2
+        # before commit to trigger stale-match fallback (skip → delta).
+        InventoryRow(
+            user_id=user1.id,
+            card_id=cards[18].id,
+            finish="normal",
+            quantity=4,
+            storage_location_id=drawer_loc.id,
+            is_pending=False,
         ),
     ]
     session.add_all(inv_rows)
@@ -1014,6 +1074,308 @@ def run_scenarios(session, env):
             and row_p["owned_breakdown"][0]["location_type"] == "pending"
             and row_p["owned_breakdown"][0]["location_name"] == "Pending",
             f"got breakdown={row_p['owned_breakdown']!r}",
+        )
+    )
+
+    # ---- Scenario Q: collection-mode commit skip_already_owned ----
+    # User owns 4 of cards[15] in drawer. Action=skip_already_owned with
+    # qty=4 → no new InventoryRow, skipped_count=4, drawer untouched, an
+    # import_skipped TransactionLog entry exists.
+    parsed_q = [
+        {
+            "line_number": 1,
+            "name": "",
+            "scryfall_id": env["cards"][15].scryfall_id,
+            "set_code": "",
+            "collector_number": "",
+            "finish": "normal",
+            "quantity": 4,
+            "location": "",
+        }
+    ]
+    result_q = _commit_collection_import_with_reconciliation(
+        session=session,
+        user_id=env["user1"].id,
+        target_location_id=0,
+        parsed_rows=parsed_q,
+        actions=["skip_already_owned"],
+        new_qtys=[0],
+        filename="smoke Q",
+    )
+    drawer_row_q = (
+        session.query(InventoryRow)
+        .filter(
+            InventoryRow.user_id == env["user1"].id,
+            InventoryRow.card_id == env["cards"][15].id,
+            InventoryRow.storage_location_id == env["drawer_loc_id"],
+        )
+        .first()
+    )
+    skip_log_q = (
+        session.query(TransactionLog)
+        .filter(
+            TransactionLog.user_id == env["user1"].id,
+            TransactionLog.card_id == env["cards"][15].id,
+            TransactionLog.event_type == "import_skipped",
+        )
+        .first()
+    )
+    results.append(
+        _check(
+            "Q.skipped_count",
+            result_q["skipped_count"] == 4
+            and result_q["imported_count"] == 0
+            and result_q["total_quantity"] == 0,
+            f"got skipped={result_q['skipped_count']} "
+            f"imported={result_q['imported_count']} "
+            f"total_q={result_q['total_quantity']}",
+        )
+    )
+    results.append(
+        _check(
+            "Q.drawer_untouched",
+            drawer_row_q is not None and drawer_row_q.quantity == 4,
+            f"drawer row: qty={drawer_row_q.quantity if drawer_row_q else None}",
+        )
+    )
+    results.append(
+        _check(
+            "Q.skip_log",
+            skip_log_q is not None,
+            f"skip log: {skip_log_q!r}",
+        )
+    )
+
+    # ---- Scenario R: collection-mode commit import_delta ----
+    # User owns 2 of cards[16] in drawer. Action=import_delta, new_qty=2,
+    # qty=4, target=binder → 1 new row qty=2 placed in binder, drawer
+    # untouched, skipped_count=2 (the 2 already owned).
+    parsed_r = [
+        {
+            "line_number": 1,
+            "name": "",
+            "scryfall_id": env["cards"][16].scryfall_id,
+            "set_code": "",
+            "collector_number": "",
+            "finish": "normal",
+            "quantity": 4,
+            "location": "",
+        }
+    ]
+    result_r = _commit_collection_import_with_reconciliation(
+        session=session,
+        user_id=env["user1"].id,
+        target_location_id=env["binder_loc_id"],
+        parsed_rows=parsed_r,
+        actions=["import_delta"],
+        new_qtys=[2],
+        filename="smoke R",
+    )
+    drawer_row_r = (
+        session.query(InventoryRow)
+        .filter(
+            InventoryRow.user_id == env["user1"].id,
+            InventoryRow.card_id == env["cards"][16].id,
+            InventoryRow.storage_location_id == env["drawer_loc_id"],
+        )
+        .first()
+    )
+    binder_rows_r = (
+        session.query(InventoryRow)
+        .filter(
+            InventoryRow.user_id == env["user1"].id,
+            InventoryRow.card_id == env["cards"][16].id,
+            InventoryRow.storage_location_id == env["binder_loc_id"],
+        )
+        .all()
+    )
+    results.append(
+        _check(
+            "R.counts",
+            result_r["imported_count"] == 1
+            and result_r["total_quantity"] == 2
+            and result_r["skipped_count"] == 2,
+            f"got imported={result_r['imported_count']} "
+            f"total_q={result_r['total_quantity']} "
+            f"skipped={result_r['skipped_count']}",
+        )
+    )
+    results.append(
+        _check(
+            "R.drawer_untouched",
+            drawer_row_r is not None and drawer_row_r.quantity == 2,
+            f"drawer row: qty={drawer_row_r.quantity if drawer_row_r else None}",
+        )
+    )
+    results.append(
+        _check(
+            "R.binder_placed",
+            len(binder_rows_r) == 1 and binder_rows_r[0].quantity == 2,
+            f"binder rows: count={len(binder_rows_r)} "
+            f"qty={binder_rows_r[0].quantity if binder_rows_r else None}",
+        )
+    )
+
+    # ---- Scenario S: collection-mode commit import_new override ----
+    # User owns 4 of cards[17] in drawer. Action=import_new override with
+    # new_qty=4, no target → 1 new pending row qty=4, drawer untouched,
+    # skipped_count=0.
+    parsed_s = [
+        {
+            "line_number": 1,
+            "name": "",
+            "scryfall_id": env["cards"][17].scryfall_id,
+            "set_code": "",
+            "collector_number": "",
+            "finish": "normal",
+            "quantity": 4,
+            "location": "",
+        }
+    ]
+    result_s = _commit_collection_import_with_reconciliation(
+        session=session,
+        user_id=env["user1"].id,
+        target_location_id=0,
+        parsed_rows=parsed_s,
+        actions=["import_new"],
+        new_qtys=[4],
+        filename="smoke S",
+    )
+    drawer_row_s = (
+        session.query(InventoryRow)
+        .filter(
+            InventoryRow.user_id == env["user1"].id,
+            InventoryRow.card_id == env["cards"][17].id,
+            InventoryRow.storage_location_id == env["drawer_loc_id"],
+        )
+        .first()
+    )
+    pending_rows_s = (
+        session.query(InventoryRow)
+        .filter(
+            InventoryRow.user_id == env["user1"].id,
+            InventoryRow.card_id == env["cards"][17].id,
+            InventoryRow.is_pending.is_(True),
+        )
+        .all()
+    )
+    results.append(
+        _check(
+            "S.counts",
+            result_s["imported_count"] == 1
+            and result_s["total_quantity"] == 4
+            and result_s["skipped_count"] == 0,
+            f"got imported={result_s['imported_count']} "
+            f"total_q={result_s['total_quantity']} "
+            f"skipped={result_s['skipped_count']}",
+        )
+    )
+    results.append(
+        _check(
+            "S.drawer_untouched",
+            drawer_row_s is not None and drawer_row_s.quantity == 4,
+            f"drawer row: qty={drawer_row_s.quantity if drawer_row_s else None}",
+        )
+    )
+    results.append(
+        _check(
+            "S.pending_created",
+            len(pending_rows_s) == 1 and pending_rows_s[0].quantity == 4,
+            f"pending rows: count={len(pending_rows_s)} "
+            f"qty={pending_rows_s[0].quantity if pending_rows_s else None}",
+        )
+    )
+
+    # ---- Scenario T: stale-match fallback (inventory decreased) ----
+    # User owned 4 of cards[18] when preview rendered, but qty drops to 2
+    # before commit (simulates concurrent sell). Action=skip_already_owned
+    # with qty=4 → fallback to import_delta with new_qty=2. Drawer is left
+    # at 2, a new pending row qty=2 is created, stale_match_rows reports
+    # the adjustment.
+    drawer_row_t = (
+        session.query(InventoryRow)
+        .filter(
+            InventoryRow.user_id == env["user1"].id,
+            InventoryRow.card_id == env["cards"][18].id,
+            InventoryRow.storage_location_id == env["drawer_loc_id"],
+        )
+        .one()
+    )
+    drawer_row_t.quantity = 2
+    session.commit()
+    parsed_t = [
+        {
+            "line_number": 1,
+            "name": "",
+            "scryfall_id": env["cards"][18].scryfall_id,
+            "set_code": "",
+            "collector_number": "",
+            "finish": "normal",
+            "quantity": 4,
+            "location": "",
+        }
+    ]
+    result_t = _commit_collection_import_with_reconciliation(
+        session=session,
+        user_id=env["user1"].id,
+        target_location_id=0,
+        parsed_rows=parsed_t,
+        actions=["skip_already_owned"],
+        new_qtys=[0],
+        filename="smoke T",
+    )
+    drawer_row_t_after = (
+        session.query(InventoryRow)
+        .filter(
+            InventoryRow.user_id == env["user1"].id,
+            InventoryRow.card_id == env["cards"][18].id,
+            InventoryRow.storage_location_id == env["drawer_loc_id"],
+        )
+        .first()
+    )
+    pending_rows_t = (
+        session.query(InventoryRow)
+        .filter(
+            InventoryRow.user_id == env["user1"].id,
+            InventoryRow.card_id == env["cards"][18].id,
+            InventoryRow.is_pending.is_(True),
+        )
+        .all()
+    )
+    results.append(
+        _check(
+            "T.counts",
+            result_t["imported_count"] == 1
+            and result_t["total_quantity"] == 2
+            and result_t["skipped_count"] == 2,
+            f"got imported={result_t['imported_count']} "
+            f"total_q={result_t['total_quantity']} "
+            f"skipped={result_t['skipped_count']}",
+        )
+    )
+    results.append(
+        _check(
+            "T.stale_match_rows",
+            len(result_t["stale_match_rows"]) == 1
+            and result_t["stale_match_rows"][0]["reason"] == "inventory_decreased"
+            and result_t["stale_match_rows"][0]["expected_skip"] == 4
+            and result_t["stale_match_rows"][0]["actual_new_qty"] == 2,
+            f"got stale_match_rows={result_t['stale_match_rows']!r}",
+        )
+    )
+    results.append(
+        _check(
+            "T.drawer_untouched",
+            drawer_row_t_after is not None and drawer_row_t_after.quantity == 2,
+            f"drawer row qty={drawer_row_t_after.quantity if drawer_row_t_after else None}",
+        )
+    )
+    results.append(
+        _check(
+            "T.pending_created",
+            len(pending_rows_t) == 1 and pending_rows_t[0].quantity == 2,
+            f"pending rows: count={len(pending_rows_t)} "
+            f"qty={pending_rows_t[0].quantity if pending_rows_t else None}",
         )
     )
 

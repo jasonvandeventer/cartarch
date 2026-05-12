@@ -167,14 +167,6 @@
      because querySelectorAll re-binds. #}
   <script>
     (function () {
-      // Re-enable the Import button if a previous collection-mode swap
-      // had disabled it. Deck mode is always commit-safe (Session 2/2.5
-      // shipped the dispatch).
-      var importBtn = document.getElementById('import-submit-btn');
-      if (importBtn && importBtn.dataset.disabledByCollectionMode) {
-        importBtn.disabled = false;
-        delete importBtn.dataset.disabledByCollectionMode;
-      }
       document.querySelectorAll('.reconcile-action-select').forEach(function (sel) {
         // Stash the row's needed/available on the select element so we can
         // recompute move/new on change. Walk to the <tr> and read the cells.
@@ -208,24 +200,7 @@
      skip_already_owned / import_delta / import_new. Default is
      `recommended_action` unless manual_mode is True, in which case the
      default flips to import_new (acquisition semantics for single-card
-     manual entry, per design doc §5.5).
-
-     IMPORT BUTTON IS DISABLED IN COLLECTION MODE FOR SESSION A.
-     The reconciliation function + UI ship in v3.16.15 (Session A), but
-     the commit handler still runs the OLD duplicating path for non-deck
-     destinations. Disabling the button until Session B ships prevents
-     users from creating duplicates while the new behavior is being
-     finalized. Deck imports stay enabled. #}
-  <div class="warning-text"
-       style="margin-top: 0.75rem;
-              padding: 0.6rem 0.9rem;
-              border-radius: 8px;
-              background: rgba(244, 158, 76, 0.12);
-              border: 1px solid rgba(244, 158, 76, 0.35)">
-    <strong>Collection import is being upgraded</strong> to recognize cards
-    you already own. This is temporarily disabled while the new behavior
-    is finalized. Deck imports work as normal.
-  </div>
+     manual entry, per design doc §5.5). #}
   <section class="panel"
            style="margin-top: 0.75rem;"
            id="reconciliation-content">
@@ -321,21 +296,6 @@
   </section>
   <script>
     (function () {
-      // Disable the Import button while Session B (commit-handler dispatch
-      // for non-deck destinations) is still pending. Without that wiring,
-      // clicking Import would run the OLD persist_import_rows path and
-      // create duplicates — exactly what the reconciliation panel is
-      // designed to prevent. The button gets re-enabled on the next swap
-      // back to deck mode (see deck-mode script). The data-* flag lets us
-      // distinguish "we disabled this" from a pre-existing disabled state
-      // (e.g., no destinations available — set server-side in the parent
-      // template).
-      var importBtn = document.getElementById('import-submit-btn');
-      if (importBtn && !importBtn.disabled) {
-        importBtn.disabled = true;
-        importBtn.dataset.disabledByCollectionMode = "1";
-      }
-
       // Collection-mode action-select sync. Mirrors the deck-mode block but
       // reads total_user_owned from cell 3 and writes new_qty only
       // (move_qty stays 0 in collection mode).

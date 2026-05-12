@@ -5,8 +5,10 @@
     <h2 class="panel-title">Import Complete</h2>
     {% set _moved = moved_count if moved_count is defined else 0 %}
     {% set _merged = merged_count if merged_count is defined else 0 %}
+    {% set _skipped = skipped_count if skipped_count is defined else 0 %}
     {% set _new = total_quantity if total_quantity is defined else imported_count %}
     {% set _total_added = _new + _moved + _merged %}
+    {% set _nothing_new = _new == 0 and _moved == 0 and _merged == 0 and _skipped > 0 %}
     <div class="stat-grid" style="margin-top: 1rem;">
       <div class="stat-card compact">
         <div class="stat-label">Cards imported</div>
@@ -29,18 +31,29 @@
           <div class="muted small-text">into existing deck rows</div>
         </div>
       {% endif %}
+      {% if _skipped > 0 %}
+        <div class="stat-card compact">
+          <div class="stat-label">Cards skipped</div>
+          <div class="stat-number">{{ _skipped }}</div>
+          <div class="muted small-text">already in your collection</div>
+        </div>
+      {% endif %}
       <div class="stat-card compact">
         <div class="stat-label">Failed rows</div>
         <div class="stat-number">{{ failed_rows|length }}</div>
       </div>
     </div>
-    {% if placed_in %}
+    {% if _nothing_new %}
       <p class="muted" style="margin-top: 0.75rem;">
-        {% if _moved > 0 or _merged > 0 %}
+        Nothing new to import — every card was already in your collection.
+      </p>
+    {% elif placed_in %}
+      <p class="muted" style="margin-top: 0.75rem;">
+        {% if _moved > 0 or _merged > 0 or _skipped > 0 %}
           Added <strong>{{ _total_added }}</strong>
           {{ "card" if _total_added == 1 else "cards" }} to
           <strong>{{ placed_in }}</strong>
-          ({{ _new }} imported new{% if _moved > 0 %}, {{ _moved }} moved from collection{% endif %}{% if _merged > 0 %}, {{ _merged }} merged into existing rows{% endif %}).
+          ({{ _new }} imported new{% if _moved > 0 %}, {{ _moved }} moved from collection{% endif %}{% if _merged > 0 %}, {{ _merged }} merged into existing rows{% endif %}{% if _skipped > 0 %}, {{ _skipped }} skipped — already owned{% endif %}).
         {% else %}
           All cards placed directly into <strong>{{ placed_in }}</strong>.
         {% endif %}
@@ -54,12 +67,15 @@
       <p class="warning-text" style="margin-top: 0.75rem">
         <strong>{{ stale_match_rows|length }}</strong>
         {{ "card" if stale_match_rows|length == 1 else "cards" }}
-        were re-imported instead of moved because inventory changed
-        between preview and commit. Details:
+        were adjusted because your inventory changed between preview and commit. Details:
       </p>
       <ul class="muted small-text">
         {% for row in stale_match_rows %}
-          <li>{{ row.name }}: expected {{ row.expected_move }} from inventory, found {{ row.actual_move }}</li>
+          {% if row.expected_skip is defined %}
+            <li>{{ row.name }}: expected to skip {{ row.expected_skip }} (already owned), but found fewer in inventory — imported {{ row.actual_new_qty }} new instead.</li>
+          {% else %}
+            <li>{{ row.name }}: expected {{ row.expected_move }} from inventory, found {{ row.actual_move }}</li>
+          {% endif %}
         {% endfor %}
       </ul>
     {% endif %}

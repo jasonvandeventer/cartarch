@@ -780,6 +780,185 @@ def _commit_deck_import_with_reconciliation(
     }
 
 
+def _commit_collection_import_with_reconciliation(
+    session: Session,
+    user_id: int,
+    target_location_id: int,
+    parsed_rows: list[dict],
+    actions: list[str],
+    new_qtys: list[int],
+    filename: str,
+) -> dict:
+    """Per-row dispatch for non-deck imports under the sync model
+    (Refined Model A, design doc collection_import_sync.md §4).
+
+    Sibling of ``_commit_deck_import_with_reconciliation`` for non-deck
+    destinations. The user's choices map to three actions:
+
+    - ``skip_already_owned``  → no ``InventoryRow`` created. Increment
+                                ``skipped_count`` and emit an
+                                ``import_skipped`` ``TransactionLog`` event
+                                for audit.
+    - ``import_delta``        → create + place ``new_qty`` copies (the user
+                                owns some but fewer than they're importing).
+    - ``import_new``          → create + place full ``quantity_needed`` copies
+                                (override: the user explicitly wants new
+                                copies even though they may already own
+                                some).
+
+    Re-resolves matches at commit time via
+    ``find_inventory_matches_for_collection_import``. If a row's recommended
+    action was ``skip_already_owned`` at preview but ``total_user_owned``
+    has decreased below ``quantity_needed`` by commit (a concurrent change
+    — user sold a card between preview and commit), fall back to
+    ``import_delta`` with ``new_qty = quantity_needed - actual_owned`` and
+    record the adjustment in ``stale_match_rows``. Stale-match fallback
+    only triggers in the dangerous direction (less owned than expected);
+    if the user gained inventory between preview and commit, their
+    explicit ``import_delta`` / ``import_new`` choice is honored as-is.
+
+    Args:
+        session, user_id:       per-user-scoped session
+        target_location_id:     0 = auto-sort (no ``place_imported_rows``
+                                call; caller handles drawer-sorter resort);
+                                >0 = specific non-deck location to place new
+                                rows into. Per design doc §8.1, new rows are
+                                placed alongside any existing rows for the
+                                same (card, finish) at the destination —
+                                merge-into-existing is a v3.16.X polish
+                                target.
+        parsed_rows:            same shape as
+                                ``persist_import_rows`` input
+        actions, new_qtys:      parallel arrays from the reconciliation
+                                form; ``actions[i]`` is the user's choice
+                                for ``parsed_rows[i]``, ``new_qtys[i]`` is
+                                the qty to import as new (0 for skip).
+        filename:               passed through to ``persist_import_rows``.
+
+    Returns:
+        Dict shaped for ``import_result.html``::
+
+            {
+                "imported_count":     int,  # unique new InventoryRows created
+                "total_quantity":     int,  # total copies imported as new
+                "skipped_count":      int,  # total copies skipped (skip + delta-portion)
+                "failed_rows":        list[dict],
+                "stale_match_rows":   list[dict],
+                "batch_id":           int | None,
+                "imported_row_ids":   list[int],
+            }
+    """
+    skipped_count = 0
+    stale_match_rows: list[dict] = []
+    new_import_rows: list[dict] = []
+
+    # Re-resolve at commit time so we can detect inventory drift since
+    # preview. Single batched query — same shape as the read function.
+    recheck = find_inventory_matches_for_collection_import(session, user_id, parsed_rows)
+    recheck_by_line = {r["line_number"]: r for r in recheck}
+
+    for idx, row in enumerate(parsed_rows):
+        action = actions[idx] if idx < len(actions) else "import_new"
+        form_new_qty = int(new_qtys[idx]) if idx < len(new_qtys) else int(row.get("quantity") or 1)
+        quantity_needed = max(1, int(row.get("quantity") or 1))
+        line_number = row.get("line_number")
+        rc = recheck_by_line.get(line_number, {})
+        actual_owned = rc.get("total_user_owned", 0)
+        rc_card_id = rc.get("card_id")
+
+        if action == "skip_already_owned":
+            # Stale-match check: did the user's actual ownership drop below
+            # the expected count between preview and commit?
+            if actual_owned < quantity_needed:
+                fallback_new_qty = quantity_needed - actual_owned
+                stale_match_rows.append(
+                    {
+                        "line_number": line_number,
+                        "name": row.get("name") or row.get("scryfall_id"),
+                        "expected_skip": quantity_needed,
+                        "actual_new_qty": fallback_new_qty,
+                        "reason": "inventory_decreased",
+                    }
+                )
+                row_for_new = dict(row)
+                row_for_new["quantity"] = fallback_new_qty
+                new_import_rows.append(row_for_new)
+                skipped_count += actual_owned  # the rest is now imported
+            else:
+                # Still safe to skip.
+                skipped_count += quantity_needed
+                if rc_card_id is not None:
+                    log_transaction(
+                        session=session,
+                        user_id=user_id,
+                        event_type="import_skipped",
+                        card_id=rc_card_id,
+                        finish=(row.get("finish") or "normal").strip().lower(),
+                        quantity_delta=0,
+                        source_location="import",
+                        destination_location="(skipped — already owned)",
+                        batch_id=None,
+                        inventory_row_id=None,
+                        note=f"Skipped {quantity_needed} — already own {actual_owned}",
+                        flush=False,
+                    )
+            continue
+
+        # import_delta or import_new — trust the form's new_qty.
+        if form_new_qty <= 0:
+            # User overrode action to non-skip but set qty to 0. Treat as skip.
+            skipped_count += quantity_needed
+            continue
+
+        row_for_new = dict(row)
+        row_for_new["quantity"] = form_new_qty
+        new_import_rows.append(row_for_new)
+        # Any remaining quantity beyond new_qty is implicitly skipped (the
+        # user owns enough already — for import_delta only; import_new with
+        # the full qty contributes 0 to skipped_count).
+        skipped_count += max(0, quantity_needed - form_new_qty)
+
+    # Run the existing import path for everything that didn't get skipped.
+    imported_count = 0
+    total_quantity = 0
+    failed_rows: list[dict] = []
+    batch_id = None
+    imported_row_ids: list[int] = []
+
+    if new_import_rows:
+        result = persist_import_rows(session, new_import_rows, filename=filename, user_id=user_id)
+        imported_count = result["imported_count"]
+        total_quantity = result.get("total_quantity", imported_count)
+        failed_rows = result["failed_rows"]
+        batch_id = result["batch_id"]
+        imported_row_ids = result.get("imported_row_ids", [])
+
+        # Place at destination if one was selected. target_location_id == 0
+        # (auto-sort) skips placement — the route's drawer-sorter logic
+        # handles those rows via resort_collection on the parent flow.
+        if imported_row_ids and target_location_id > 0:
+            place_imported_rows(
+                session,
+                imported_row_ids,
+                user_id=user_id,
+                location_id=target_location_id,
+            )
+
+    # Always commit so the import_skipped TransactionLog entries land even
+    # when there are no new imports (pure-skip case).
+    session.commit()
+
+    return {
+        "imported_count": imported_count,
+        "total_quantity": total_quantity,
+        "skipped_count": skipped_count,
+        "failed_rows": failed_rows,
+        "stale_match_rows": stale_match_rows,
+        "batch_id": batch_id,
+        "imported_row_ids": imported_row_ids,
+    }
+
+
 @app.post("/import/commit")
 async def import_commit(
     request: Request,
@@ -810,13 +989,15 @@ async def import_commit(
     moved_count = 0
     stale_match_rows: list[dict] = []
 
-    # Branch: deck destination with reconciliation choices → per-row dispatch.
-    # Non-deck destination (or no reconciliation fields) → existing path
-    # exactly as before, byte-identical behavior.
+    # 3-branch dispatch:
+    #  (a) deck destination + reconciliation → deck per-row helper
+    #  (b) non-deck destination + reconciliation → collection per-row helper
+    #  (c) no reconciliation fields → existing path, byte-identical
     deck = _deck_for_storage_location(session, current_user.id, target_location_id)
-    using_reconciliation = deck is not None and any(reconcile_action)
+    has_reconciliation = any(reconcile_action)
+    skipped_count = 0
 
-    if using_reconciliation:
+    if deck is not None and has_reconciliation:
         result = _commit_deck_import_with_reconciliation(
             session=session,
             user_id=current_user.id,
@@ -833,6 +1014,31 @@ async def import_commit(
         placed_in = deck.name
         placed_in_url = f"/locations/{target_location_id}"
         placed_in_kind = "deck"
+    elif deck is None and has_reconciliation:
+        result = _commit_collection_import_with_reconciliation(
+            session=session,
+            user_id=current_user.id,
+            target_location_id=target_location_id,
+            parsed_rows=rows,
+            actions=reconcile_action,
+            new_qtys=[int(q or 0) for q in reconcile_new_qty],
+            filename=filename,
+        )
+        merged_count = 0
+        skipped_count = result.get("skipped_count", 0)
+        stale_match_rows = result["stale_match_rows"]
+        row_ids = result.get("imported_row_ids", [])
+
+        if target_location_id:
+            loc = get_location(session, location_id=target_location_id, user_id=current_user.id)
+            placed_in = loc.name if loc else None
+            placed_in_url = f"/locations/{target_location_id}" if loc else "/pending"
+            placed_in_kind = ("deck" if loc.type == "deck" else "location") if loc else None
+            if loc and loc.type != "deck" and current_user.username in DRAWER_SORTER_USERNAMES:
+                resort_collection(session, user_id=current_user.id)
+        elif row_ids and current_user.username in DRAWER_SORTER_USERNAMES:
+            resort_collection(session, user_id=current_user.id)
+            return RedirectResponse(url="/pending", status_code=303)
     else:
         result = persist_import_rows(session, rows, filename=filename, user_id=current_user.id)
         merged_count = 0
@@ -862,6 +1068,7 @@ async def import_commit(
             "total_quantity": result.get("total_quantity", result["imported_count"]),
             "moved_count": moved_count,
             "merged_count": merged_count,
+            "skipped_count": skipped_count,
             "stale_match_rows": stale_match_rows,
             "failed_rows": result["failed_rows"],
             "batch_id": result["batch_id"],
@@ -1084,9 +1291,10 @@ async def manual_import_commit(
     stale_match_rows: list[dict] = []
 
     deck = _deck_for_storage_location(session, current_user.id, target_location_id)
-    using_reconciliation = deck is not None and any(reconcile_action)
+    has_reconciliation = any(reconcile_action)
+    skipped_count = 0
 
-    if using_reconciliation:
+    if deck is not None and has_reconciliation:
         result = _commit_deck_import_with_reconciliation(
             session=session,
             user_id=current_user.id,
@@ -1103,6 +1311,29 @@ async def manual_import_commit(
         placed_in = deck.name
         placed_in_url = f"/locations/{target_location_id}"
         placed_in_kind = "deck"
+    elif deck is None and has_reconciliation:
+        result = _commit_collection_import_with_reconciliation(
+            session=session,
+            user_id=current_user.id,
+            target_location_id=target_location_id,
+            parsed_rows=parsed_rows,
+            actions=reconcile_action,
+            new_qtys=[int(q or 0) for q in reconcile_new_qty],
+            filename="manual import",
+        )
+        merged_count = 0
+        skipped_count = result.get("skipped_count", 0)
+        stale_match_rows = result["stale_match_rows"]
+        row_ids = result.get("imported_row_ids", [])
+        if target_location_id:
+            loc = get_location(session, location_id=target_location_id, user_id=current_user.id)
+            placed_in = loc.name if loc else None
+            placed_in_url = f"/locations/{target_location_id}" if loc else "/pending"
+            placed_in_kind = ("deck" if loc.type == "deck" else "location") if loc else None
+            if loc and loc.type != "deck" and current_user.username in DRAWER_SORTER_USERNAMES:
+                resort_collection(session, user_id=current_user.id)
+        elif row_ids and current_user.username in DRAWER_SORTER_USERNAMES:
+            resort_collection(session, user_id=current_user.id)
     else:
         result = persist_import_rows(
             session, parsed_rows, filename="manual import", user_id=current_user.id
@@ -1131,6 +1362,7 @@ async def manual_import_commit(
             "total_quantity": result.get("total_quantity", result["imported_count"]),
             "moved_count": moved_count,
             "merged_count": merged_count,
+            "skipped_count": skipped_count,
             "stale_match_rows": stale_match_rows,
             "failed_rows": result["failed_rows"],
             "batch_id": result["batch_id"],
