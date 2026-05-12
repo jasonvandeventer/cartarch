@@ -40,7 +40,7 @@
   {% if decks %}
     <section class="panel">
       <div class="table-wrap">
-        <table>
+        <table class="stacking-table">
         <thead>
           <tr>
             <th>Name</th>
@@ -58,9 +58,9 @@
                 <a href="/decks/{{ deck.id }}">{{ deck.name }}</a>
                 <span class="mana-pip-row">{{ mana_pips(deck.color_identity) }}</span>
               </td>
-              <td>{{ deck.format or '—' }}</td>
-              <td>{{ deck.card_count or 0 }}</td>
-              <td>
+              <td data-label="Format">{{ deck.format or '—' }}</td>
+              <td data-label="Total Cards">{{ deck.card_count or 0 }}</td>
+              <td data-label="Bracket">
                 {% if deck.bracket %}
                   <details class="bracket-details">
                     <summary class="bracket-badge bracket-{{ deck.bracket.bracket }}">Bracket {{ deck.bracket.bracket }}</summary>
@@ -77,7 +77,7 @@
                   —
                 {% endif %}
               </td>
-              <td>
+              <td data-label="Health">
                 {% if deck.consistency %}
                   <span class="consistency-badge cs-{{ deck.consistency.tier }}"
                         title="{{ deck.consistency.label }}">{{ deck.consistency.score }}</span>

@@ -49,7 +49,7 @@
     <h3 class="panel-title">Your Locations</h3>
     {% if locations %}
       <div class="table-wrap">
-        <table>
+        <table class="stacking-table">
         <thead>
           <tr>
             <th>Name</th>
@@ -68,11 +68,11 @@
               <td>
                 <a href="/locations/{{ loc.id }}">{{ loc.name }}</a>
               </td>
-              <td>{{ loc.type }}</td>
-              <td>{{ loc.parent.name if loc.parent else '—' }}</td>
-              <td>{{ summary.row_count }}</td>
-              <td>{{ summary.quantity }}</td>
-              <td>${{ '%.2f'|format(summary.total_value) }}</td>
+              <td data-label="Type">{{ loc.type }}</td>
+              <td data-label="Parent">{{ loc.parent.name if loc.parent else '—' }}</td>
+              <td data-label="Rows">{{ summary.row_count }}</td>
+              <td data-label="Qty">{{ summary.quantity }}</td>
+              <td data-label="Value">${{ '%.2f'|format(summary.total_value) }}</td>
               <td style="text-align: right; white-space: nowrap;">
                 <a href="/locations/{{ loc.id }}">
                   <button type="button">Open</button>

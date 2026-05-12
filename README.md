@@ -2,7 +2,7 @@
 
 Self-hosted web application for managing a physical Magic: The Gathering collection.
 
-**Current version: v3.16.7** · [Platform repo](https://github.com/jasonvandeventer/mana-archive-platform)
+**Current version: v3.16.8** · [Platform repo](https://github.com/jasonvandeventer/mana-archive-platform)
 
 ---
 
@@ -93,6 +93,8 @@ Self-hosted web application for managing a physical Magic: The Gathering collect
 - "More" tab shows a red badge with the user's pending-placement count (capped at `99+`)
 - 44px tap-target floor enforced on phone/tablet-portrait; tracker buttons exempt by design
 - Tables scroll horizontally inside their panels; popouts (Edit, Bracket, inline-create) become viewport-centered modals on phones with semi-transparent backdrop, body scroll lock, auto-injected × close button, and dismiss on backdrop tap / Escape / × — see [docs/mobile_patterns.md](docs/mobile_patterns.md)
+- Below 480px, six-column tables (decks, locations, games, card-detail inventory) flip to a stacked-card layout via opt-in `class="stacking-table"` + `data-label` attributes — each row renders as a self-contained card with label/value pairs and action buttons grouped at the bottom, no horizontal scroll required
+- Inventory card thumbnails compact further on true phones (130px below 480px, 170px at 480-768, 138px on desktop); drawer pills enforce a 44px tap-target floor
 - Mobile fundamentals applied globally: 16px input font-size (prevents iOS auto-zoom on focus), `overflow-x: hidden` below 768px (page never horizontal-scrolls; tables still scroll internally), `box-sizing: border-box` on every element including pseudo-elements, `viewport-fit=cover` + `env(safe-area-inset-bottom)` for notched devices, `overflow-wrap: anywhere` on text containers, and a `min-height: 44px` floor on link-styled tap targets in nav, filter, hero, and pagination surfaces
 
 ---

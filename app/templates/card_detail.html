@@ -42,7 +42,7 @@
         <h3 class="panel-title">Inventory</h3>
         {% if rows %}
           <div class="table-wrap">
-            <table>
+            <table class="stacking-table">
               <thead>
                 <tr>
                   <th>Finish</th>
@@ -60,11 +60,11 @@
                     <td>
                       <span class="finish-badge">{{ row.finish|capitalize }}</span>
                     </td>
-                    <td>{{ row.quantity }}</td>
-                    <td>{{ row.drawer_label }}</td>
-                    <td>{{ "Yes" if row.is_pending else "No" }}</td>
-                    <td>${{ "%.2f"|format(row.effective_price) }}</td>
-                    <td>${{ "%.2f"|format(row.total_value) }}</td>
+                    <td data-label="Qty">{{ row.quantity }}</td>
+                    <td data-label="Location">{{ row.drawer_label }}</td>
+                    <td data-label="Pending">{{ "Yes" if row.is_pending else "No" }}</td>
+                    <td data-label="Price">${{ "%.2f"|format(row.effective_price) }}</td>
+                    <td data-label="Total">${{ "%.2f"|format(row.total_value) }}</td>
                     <td>
                       <div>
                         <form action="/inventory/rows/{{ row.id }}/remove"

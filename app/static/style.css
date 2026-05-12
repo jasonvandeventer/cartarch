@@ -375,6 +375,22 @@ textarea {
   gap: 0.85rem;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
 }
+
+/* Tighter variant used on /pending where the 3 stat cards (Pending Cards,
+   Drawers Affected, Total Copies) hold short integer values. Default
+   .stat-grid drops to 1 column too eagerly at the 480-768 tier because
+   180px doesn't fit twice; compact variant keeps a 3-column layout down
+   to 480px so the action buttons stay closer to the fold on phones. */
+.stat-grid-compact {
+  display: grid;
+  gap: 0.85rem;
+  grid-template-columns: repeat(3, 1fr);
+}
+@media (max-width: 480px) {
+  .stat-grid-compact {
+    grid-template-columns: 1fr;
+  }
+}
 .stat-card {
   background: rgba(8, 19, 35, 0.35);
   border: 1px solid rgba(86, 113, 160, 0.25);
@@ -413,6 +429,7 @@ textarea {
   border: 1px solid rgba(86, 113, 160, 0.32);
   background: rgba(10, 20, 36, 0.38);
   color: #dbe6ff;
+  min-height: 44px;
 }
 
 .card-grid-section {
@@ -3455,6 +3472,28 @@ body.game-mode {
   .panel-title {
     font-size: 1.45rem;
   }
+
+  /* Inventory grid + thumb compaction for true phones.
+     - Grid minmax(220px) lets wider phones (~480px landscape) fit 2 cards
+       per row instead of always 1.
+     - Thumb width 130px (was 170px at the 768 tier) trims a chunky vertical
+       block on iPhone-SE-width portraits without making the art unreadable
+       — a 130×182 (aspect 0.716) crop is still the readable Scryfall crop.
+       Action drawer below stays full-width via existing card-body rules. */
+  .inventory-grid {
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  }
+  .inventory-thumb {
+    width: 130px;
+  }
+
+  /* Drawer-pill density: tighten horizontal padding so more pills fit per
+     row on /collection at iPhone-SE-width. The 44px min-height set on the
+     base .drawer-pill rule preserves the tap target — vertical padding
+     stays comfortable via inline-flex align-items: center. */
+  .drawer-pill {
+    padding: 0.4rem 0.7rem;
+  }
 }
 
 /* ============================================================================
@@ -3580,5 +3619,100 @@ body.game-mode {
   .mobile-popover-close:hover,
   .mobile-popover-close:focus {
     color: var(--text);
+  }
+}
+
+/* ============================================================================
+   Stacking tables (≤ 480px)
+   ----------------------------------------------------------------------------
+   Opt-in: tag a <table> with class="stacking-table" and add data-label
+   attributes to the <td> cells that should render with a label prefix on
+   phones. Cells without data-label render as-is (typical pattern: first
+   cell is a heading, last cell is action buttons).
+
+   Above 480px: the table renders normally (inside .table-wrap, which
+   handles horizontal scroll if it overflows).
+   At or below 480px: each <tr> becomes a self-contained card, each <td>
+   becomes a row inside the card with "Label: value" pairs, action cells
+   sit at the bottom of the card with a top divider.
+
+   Used by: decks.html, locations.html, games.html.
+   ============================================================================ */
+@media (max-width: 480px) {
+  /* Reset the desktop `.table-wrap table { min-width: 900px }` so the
+     stacking table can shrink to viewport width without triggering
+     horizontal scroll on the .table-wrap. */
+  .table-wrap .stacking-table {
+    min-width: 0;
+  }
+  .stacking-table,
+  .stacking-table thead,
+  .stacking-table tbody,
+  .stacking-table tr,
+  .stacking-table th,
+  .stacking-table td {
+    display: block;
+  }
+  .stacking-table thead {
+    /* Visually hidden but available to screen readers when navigated as a table.
+       Browsers strip semantics when display: block is applied anyway, so the
+       practical effect is "hidden". */
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+  .stacking-table tr {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--panel-2);
+    padding: 0.8rem 1rem;
+    margin-bottom: 0.75rem;
+  }
+  .stacking-table td {
+    padding: 0.35rem 0;
+    border: none;
+    width: auto;
+    overflow-wrap: anywhere;
+  }
+  /* Cells with data-label render as label+value pairs */
+  .stacking-table td[data-label]::before {
+    content: attr(data-label);
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--muted);
+    font-weight: 600;
+    display: block;
+    margin-bottom: 0.1rem;
+  }
+  /* First cell (heading: name + link, no data-label) — larger font, no top padding */
+  .stacking-table td:first-child {
+    font-size: 1.05rem;
+    font-weight: 600;
+    padding-top: 0;
+    padding-bottom: 0.5rem;
+  }
+  /* Last cell (action buttons, no data-label) — divider on top, full-width buttons stack */
+  .stacking-table td:last-child {
+    margin-top: 0.5rem;
+    padding-top: 0.6rem;
+    border-top: 1px solid var(--border);
+    text-align: left !important;
+    white-space: normal !important;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+  .stacking-table td:last-child a,
+  .stacking-table td:last-child form,
+  .stacking-table td:last-child details {
+    margin: 0 !important;
+  }
+  /* The .inline-details popout summary is the Edit button — give it room */
+  .stacking-table td:last-child .inline-details {
+    display: inline-block;
   }
 }
