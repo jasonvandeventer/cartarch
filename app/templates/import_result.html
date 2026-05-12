@@ -4,10 +4,13 @@
     <div class="panel-topline">Import</div>
     <h2 class="panel-title">Import Complete</h2>
     {% set _moved = moved_count if moved_count is defined else 0 %}
+    {% set _merged = merged_count if merged_count is defined else 0 %}
+    {% set _new = total_quantity if total_quantity is defined else imported_count %}
+    {% set _total_added = _new + _moved + _merged %}
     <div class="stat-grid" style="margin-top: 1rem;">
       <div class="stat-card compact">
         <div class="stat-label">Cards imported</div>
-        <div class="stat-number">{{ total_quantity if total_quantity is defined else imported_count }}</div>
+        <div class="stat-number">{{ _new }}</div>
         {% if total_quantity is defined and total_quantity != imported_count %}
           <div class="muted small-text">{{ imported_count }} unique</div>
         {% endif %}
@@ -19,6 +22,13 @@
           <div class="muted small-text">from your collection</div>
         </div>
       {% endif %}
+      {% if _merged > 0 %}
+        <div class="stat-card compact">
+          <div class="stat-label">Cards merged</div>
+          <div class="stat-number">{{ _merged }}</div>
+          <div class="muted small-text">into existing deck rows</div>
+        </div>
+      {% endif %}
       <div class="stat-card compact">
         <div class="stat-label">Failed rows</div>
         <div class="stat-number">{{ failed_rows|length }}</div>
@@ -26,8 +36,11 @@
     </div>
     {% if placed_in %}
       <p class="muted" style="margin-top: 0.75rem;">
-        {% if _moved > 0 %}
-          {{ total_quantity if total_quantity is defined else imported_count }} new cards imported, {{ _moved }} moved from your collection into <strong>{{ placed_in }}</strong>.
+        {% if _moved > 0 or _merged > 0 %}
+          Added <strong>{{ _total_added }}</strong>
+          {{ "card" if _total_added == 1 else "cards" }} to
+          <strong>{{ placed_in }}</strong>
+          ({{ _new }} imported new{% if _moved > 0 %}, {{ _moved }} moved from collection{% endif %}{% if _merged > 0 %}, {{ _merged }} merged into existing rows{% endif %}).
         {% else %}
           All cards placed directly into <strong>{{ placed_in }}</strong>.
         {% endif %}

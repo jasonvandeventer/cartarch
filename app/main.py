@@ -33,7 +33,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
 from starlette.middleware.sessions import SessionMiddleware
 
-from app.audit_service import list_transaction_logs
+from app.audit_service import list_transaction_logs, log_transaction
 from app.auth import hash_password
 from app.db import DATA_DIR, SessionLocal, init_db
 from app.deck_service import (
@@ -497,7 +497,14 @@ async def import_reconcile_preview(
         )
 
     total_to_move = sum(r["recommended_move_qty"] for r in matches_rows)
-    total_to_import_new = sum(r["recommended_new_qty"] for r in matches_rows)
+    # Anticipated auto-merge: when target deck already has a row for this
+    # (card, finish), the import_new path will fold ALL of recommended_new_qty
+    # into that existing row instead of creating a duplicate. Otherwise the
+    # new copies are placed fresh.
+    total_to_merge = sum(
+        r["recommended_new_qty"] for r in matches_rows if r["total_in_target_deck"] > 0
+    )
+    total_to_import_new = sum(r["recommended_new_qty"] for r in matches_rows) - total_to_merge
 
     return render(
         request,
@@ -507,6 +514,7 @@ async def import_reconcile_preview(
             "deck_name": deck.name,
             "total_to_move": total_to_move,
             "total_to_import_new": total_to_import_new,
+            "total_to_merge": total_to_merge,
         },
     )
 
@@ -529,14 +537,27 @@ def _commit_deck_import_with_reconciliation(
     - move_existing:        all copies come from existing inventory
                             (pull_card_to_deck loop, multi-source in order)
     - move_existing_plus_new: some copies move, some are imported new
-    - import_new:           current behavior (persist_import_rows path)
+    - import_new:           the existing persist_import_rows path
 
-    Returns a dict mirroring persist_import_rows' shape plus three extra
-    counts used by import_result.html:
+    After persist_import_rows creates new pending rows for the import_new
+    portion, this handler does an auto-merge pass: for each new row whose
+    (card_id, finish) already has a placed row in the target deck, the
+    new row's quantity is added to the existing deck row and the new row
+    is deleted (rather than placed alongside as a duplicate). The merged
+    count is tracked separately from imported_count and reported back to
+    the result page. Singleton-format decks (Commander etc.) never end
+    up with two rows for the same printing as a result.
 
-      imported_count       — unique (card, finish) rows touched as new
-      total_quantity       — total copies of new imports
-      moved_count          — total copies moved from existing inventory
+    Returns a dict mirroring persist_import_rows' shape plus extra counts
+    used by import_result.html:
+
+      imported_count       — unique (card, finish) rows that ended up as
+                             NEW deck rows (after the auto-merge pass)
+      total_quantity       — total copies of those new deck rows
+      moved_count          — total copies moved from non-deck inventory
+                             via pull_card_to_deck
+      merged_count         — total copies merged into existing deck rows
+                             instead of creating duplicates
       failed_rows          — list of rows that couldn't be resolved
       stale_match_rows     — rows where the preview said "move N" but
                              inventory had less than N at commit time;
@@ -544,7 +565,8 @@ def _commit_deck_import_with_reconciliation(
       batch_id             — most recent ImportBatch created for the new
                              import portion (None if no new copies were
                              imported)
-      imported_row_ids     — same as persist_import_rows
+      imported_row_ids     — IDs of rows that actually became new deck
+                             rows (merged-then-deleted rows are excluded)
     """
     moved_count = 0
     stale_match_rows: list[dict] = []
@@ -610,6 +632,7 @@ def _commit_deck_import_with_reconciliation(
     # Run the existing import path for everything that didn't get moved.
     new_imported_count = 0
     new_total_quantity = 0
+    merged_count = 0
     failed_rows: list[dict] = []
     batch_id = None
     imported_row_ids: list[int] = []
@@ -621,19 +644,85 @@ def _commit_deck_import_with_reconciliation(
         batch_id = result["batch_id"]
         imported_row_ids = result.get("imported_row_ids", [])
 
-        # Place the new copies into the deck location.
+        # Auto-merge pass: for each new pending row whose (card_id, finish)
+        # already has a placed row in the target deck, increment the
+        # existing row's quantity and delete the new one. Otherwise queue
+        # it for normal placement. Singleton-correct behavior — never two
+        # rows for the same printing in the same deck.
         if imported_row_ids and deck.storage_location_id:
-            place_imported_rows(
-                session,
-                imported_row_ids,
-                user_id=user_id,
-                location_id=deck.storage_location_id,
+            new_pending_rows = (
+                session.query(InventoryRow).filter(InventoryRow.id.in_(imported_row_ids)).all()
             )
+            existing_deck_rows = (
+                session.query(InventoryRow)
+                .filter(
+                    InventoryRow.user_id == user_id,
+                    InventoryRow.storage_location_id == deck.storage_location_id,
+                    InventoryRow.is_pending.is_(False),
+                )
+                .all()
+            )
+            existing_by_key: dict[tuple[int, str], InventoryRow] = {
+                (r.card_id, r.finish): r for r in existing_deck_rows
+            }
+            rows_to_place: list[int] = []
+            merged_row_ids: set[int] = set()
+            now_ts = datetime.utcnow()
+            for new_row in new_pending_rows:
+                key = (new_row.card_id, new_row.finish)
+                existing = existing_by_key.get(key)
+                if existing is None:
+                    rows_to_place.append(new_row.id)
+                    continue
+                existing.quantity += new_row.quantity
+                existing.updated_at = now_ts
+                merged_count += new_row.quantity
+                merged_row_ids.add(new_row.id)
+                log_transaction(
+                    session=session,
+                    user_id=user_id,
+                    event_type="import_merge",
+                    card_id=new_row.card_id,
+                    finish=new_row.finish,
+                    quantity_delta=new_row.quantity,
+                    source_location="import",
+                    destination_location=f"deck:{deck.name}",
+                    batch_id=batch_id,
+                    inventory_row_id=existing.id,
+                    note=(
+                        f"Merged {new_row.quantity} new copies into existing "
+                        f"deck row in {deck.name}"
+                    ),
+                    flush=False,
+                )
+                session.delete(new_row)
+
+            if rows_to_place:
+                place_imported_rows(
+                    session,
+                    rows_to_place,
+                    user_id=user_id,
+                    location_id=deck.storage_location_id,
+                )
+
+            # Update reported counts: imported_count/total_quantity reflect
+            # rows that ended up as NEW deck rows. Rows that merged into an
+            # existing deck row instead are tracked in merged_count.
+            if merged_row_ids:
+                merged_rows_total_qty = sum(
+                    r.quantity for r in new_pending_rows if r.id in merged_row_ids
+                )
+                new_imported_count = max(0, new_imported_count - len(merged_row_ids))
+                new_total_quantity = max(0, new_total_quantity - merged_rows_total_qty)
+                imported_row_ids = [rid for rid in imported_row_ids if rid not in merged_row_ids]
+
+            session.commit()
 
     return {
         "imported_count": new_imported_count,
         "total_quantity": new_total_quantity,
         "moved_count": moved_count,
+        "merged_count": merged_count,
         "failed_rows": failed_rows,
         "stale_match_rows": stale_match_rows,
         "batch_id": batch_id,
@@ -689,12 +778,14 @@ async def import_commit(
             filename=filename,
         )
         moved_count = result["moved_count"]
+        merged_count = result.get("merged_count", 0)
         stale_match_rows = result["stale_match_rows"]
         placed_in = deck.name
         placed_in_url = f"/locations/{target_location_id}"
         placed_in_kind = "deck"
     else:
         result = persist_import_rows(session, rows, filename=filename, user_id=current_user.id)
+        merged_count = 0
         row_ids = result.get("imported_row_ids", [])
 
         if row_ids and target_location_id:
@@ -720,6 +811,7 @@ async def import_commit(
             "imported_count": result["imported_count"],
             "total_quantity": result.get("total_quantity", result["imported_count"]),
             "moved_count": moved_count,
+            "merged_count": merged_count,
             "stale_match_rows": stale_match_rows,
             "failed_rows": result["failed_rows"],
             "batch_id": result["batch_id"],
@@ -842,7 +934,10 @@ async def manual_import_reconcile_preview(
         matches_rows[0]["display_name"] = scryfall_id
 
     total_to_move = sum(r["recommended_move_qty"] for r in matches_rows)
-    total_to_import_new = sum(r["recommended_new_qty"] for r in matches_rows)
+    total_to_merge = sum(
+        r["recommended_new_qty"] for r in matches_rows if r["total_in_target_deck"] > 0
+    )
+    total_to_import_new = sum(r["recommended_new_qty"] for r in matches_rows) - total_to_merge
 
     return render(
         request,
@@ -852,6 +947,7 @@ async def manual_import_reconcile_preview(
             "deck_name": deck.name,
             "total_to_move": total_to_move,
             "total_to_import_new": total_to_import_new,
+            "total_to_merge": total_to_merge,
         },
     )
 
@@ -906,6 +1002,7 @@ async def manual_import_commit(
             filename="manual import",
         )
         moved_count = result["moved_count"]
+        merged_count = result.get("merged_count", 0)
         stale_match_rows = result["stale_match_rows"]
         placed_in = deck.name
         placed_in_url = f"/locations/{target_location_id}"
@@ -914,6 +1011,7 @@ async def manual_import_commit(
         result = persist_import_rows(
             session, parsed_rows, filename="manual import", user_id=current_user.id
         )
+        merged_count = 0
         row_ids = result.get("imported_row_ids", [])
         if row_ids and target_location_id:
             place_imported_rows(
@@ -936,6 +1034,7 @@ async def manual_import_commit(
             "imported_count": result["imported_count"],
             "total_quantity": result.get("total_quantity", result["imported_count"]),
             "moved_count": moved_count,
+            "merged_count": merged_count,
             "stale_match_rows": stale_match_rows,
             "failed_rows": result["failed_rows"],
             "batch_id": result["batch_id"],

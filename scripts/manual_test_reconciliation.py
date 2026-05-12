@@ -24,6 +24,17 @@ Scenarios G-H (end-to-end commit handler — Session 2):
        drawer row UNTOUCHED, deck row created with qty=4, one unique new
        import row created
 
+Scenarios I-K (target_deck / other_deck handling — Session 2.5):
+
+    I. commit auto-merges into existing target-deck row: target deck has
+       1 of cards[8], import 2 more → existing deck row's qty goes to 3
+       (NOT a separate row with qty=2)
+    J. function returns target_deck_matches when target deck has the
+       card; matches list stays empty; recommended_action=import_new
+    K. function returns other_deck_matches when card is in a different
+       deck; both lists are surfaced separately; matches list stays
+       empty; recommended_action=import_new
+
 Run from project root:
     DATA_DIR=$(pwd)/dev-data SESSION_SECRET_KEY=test \\
       python -m scripts.manual_test_reconciliation
@@ -57,12 +68,15 @@ def setup(session):
     Returns a SimpleNamespace-like object with handles to created entities.
     """
     # Re-use real Card records from the catalog. Scenarios A-F use cards
-    # 0-5 (read-only). Scenarios G-H use cards 6-7 (mutating — drain drawer
-    # rows on commit). Distinct cards per scenario keep them independent.
-    cards = session.query(Card).limit(8).all()
-    if len(cards) < 8:
+    # 0-5 (read-only). G-H use cards 6-7 (commit mutates drawer rows).
+    # I uses card 8 (target deck already has it, commit auto-merges). J
+    # uses card 9 (target deck has it, function output check). K uses
+    # card 10 (in other deck, function output check). Distinct cards per
+    # scenario keep them independent.
+    cards = session.query(Card).limit(11).all()
+    if len(cards) < 11:
         raise RuntimeError(
-            f"dev DB has only {len(cards)} Card rows; need at least 8 for the smoke test"
+            f"dev DB has only {len(cards)} Card rows; need at least 11 for the smoke test"
         )
 
     stamp = int(time.time())
@@ -194,6 +208,37 @@ def setup(session):
             finish="normal",
             quantity=4,
             storage_location_id=drawer_loc.id,
+            is_pending=False,
+        ),
+        # I: user1 owns 1 of cards[8] in the TARGET deck (deck1). Importing
+        # 2 more should merge into this existing row (qty 1 -> 3).
+        InventoryRow(
+            user_id=user1.id,
+            card_id=cards[8].id,
+            finish="normal",
+            quantity=1,
+            storage_location_id=target_deck_loc.id,
+            is_pending=False,
+        ),
+        # J: user1 owns 1 of cards[9] in the TARGET deck. Used for function
+        # output verification — target_deck_matches should report it.
+        InventoryRow(
+            user_id=user1.id,
+            card_id=cards[9].id,
+            finish="normal",
+            quantity=1,
+            storage_location_id=target_deck_loc.id,
+            is_pending=False,
+        ),
+        # K: user1 owns 1 of cards[10] in the OTHER deck (other_deck_loc).
+        # Used for function output verification — other_deck_matches should
+        # report it; matches list stays empty (not movable by default).
+        InventoryRow(
+            user_id=user1.id,
+            card_id=cards[10].id,
+            finish="normal",
+            quantity=1,
+            storage_location_id=other_deck_loc.id,
             is_pending=False,
         ),
     ]
@@ -623,6 +668,162 @@ def run_scenarios(session, env):
             "H.deck_row_qty",
             deck_row_h is not None and deck_row_h.quantity == 4,
             f"deck row: {deck_row_h!r} qty={deck_row_h.quantity if deck_row_h else None}",
+        )
+    )
+
+    # ---- Scenario I: commit auto-merges into existing target-deck row ----
+    # Target deck has 1 of cards[8]. Importing 2 more should NOT create a
+    # second deck row — instead the existing row's qty becomes 3.
+    parsed_i = [
+        {
+            "line_number": 1,
+            "name": "",
+            "scryfall_id": env["cards"][8].scryfall_id,
+            "set_code": "",
+            "collector_number": "",
+            "finish": "normal",
+            "quantity": 2,
+            "location": "",
+        }
+    ]
+    result_i = _commit_deck_import_with_reconciliation(
+        session=session,
+        user_id=env["user1"].id,
+        deck=env["deck1"],
+        parsed_rows=parsed_i,
+        actions=["import_new"],
+        move_qtys=[0],
+        new_qtys=[2],
+        filename="smoke I",
+    )
+    # Look for ALL deck1 rows for cards[8]. Should be exactly one with qty=3.
+    deck_rows_i = (
+        session.query(InventoryRow)
+        .filter(
+            InventoryRow.user_id == env["user1"].id,
+            InventoryRow.card_id == env["cards"][8].id,
+            InventoryRow.storage_location_id == env["deck1"].storage_location_id,
+        )
+        .all()
+    )
+    results.append(
+        _check(
+            "I.merged_count",
+            result_i["merged_count"] == 2,
+            f"got merged_count={result_i['merged_count']}",
+        )
+    )
+    results.append(
+        _check(
+            "I.imported_count",
+            result_i["imported_count"] == 0,
+            f"got imported_count={result_i['imported_count']}",
+        )
+    )
+    results.append(
+        _check(
+            "I.single_deck_row",
+            len(deck_rows_i) == 1,
+            f"got {len(deck_rows_i)} deck rows for cards[8] (expected 1)",
+        )
+    )
+    results.append(
+        _check(
+            "I.merged_qty",
+            len(deck_rows_i) == 1 and deck_rows_i[0].quantity == 3,
+            f"got qty={deck_rows_i[0].quantity if deck_rows_i else None} (expected 3)",
+        )
+    )
+
+    # ---- Scenario J: function returns target_deck_matches ----
+    out_j = find_inventory_matches_for_deck_import(
+        session,
+        env["user1"].id,
+        env["deck1"].id,
+        [
+            {
+                "line_number": 1,
+                "scryfall_id": env["cards"][9].scryfall_id,
+                "finish": "normal",
+                "quantity": 1,
+            }
+        ],
+    )
+    row_j = out_j[0]
+    results.append(
+        _check(
+            "J.matches_empty",
+            row_j["matches"] == [] and row_j["total_available"] == 0,
+            f"matches={row_j['matches']!r} total={row_j['total_available']}",
+        )
+    )
+    results.append(
+        _check(
+            "J.target_deck_match_present",
+            len(row_j["target_deck_matches"]) == 1
+            and row_j["target_deck_matches"][0]["quantity_available"] == 1
+            and row_j["target_deck_matches"][0]["location_type"] == "deck"
+            and row_j["total_in_target_deck"] == 1,
+            f"target_deck_matches={row_j['target_deck_matches']!r} "
+            f"total_in_target={row_j['total_in_target_deck']}",
+        )
+    )
+    results.append(
+        _check(
+            "J.recommends_import_new",
+            row_j["recommended_action"] == "import_new"
+            and row_j["recommended_new_qty"] == 1
+            and row_j["recommended_move_qty"] == 0,
+            f"got action={row_j['recommended_action']} "
+            f"move={row_j['recommended_move_qty']} new={row_j['recommended_new_qty']}",
+        )
+    )
+
+    # ---- Scenario K: function returns other_deck_matches ----
+    out_k = find_inventory_matches_for_deck_import(
+        session,
+        env["user1"].id,
+        env["deck1"].id,
+        [
+            {
+                "line_number": 1,
+                "scryfall_id": env["cards"][10].scryfall_id,
+                "finish": "normal",
+                "quantity": 1,
+            }
+        ],
+    )
+    row_k = out_k[0]
+    results.append(
+        _check(
+            "K.matches_empty",
+            row_k["matches"] == [] and row_k["total_available"] == 0,
+            f"matches={row_k['matches']!r}",
+        )
+    )
+    results.append(
+        _check(
+            "K.target_deck_empty",
+            row_k["target_deck_matches"] == [] and row_k["total_in_target_deck"] == 0,
+            f"target_deck_matches={row_k['target_deck_matches']!r}",
+        )
+    )
+    results.append(
+        _check(
+            "K.other_deck_match_present",
+            len(row_k["other_deck_matches"]) == 1
+            and row_k["other_deck_matches"][0]["quantity_available"] == 1
+            and row_k["other_deck_matches"][0]["location_name"] == "Other Deck"
+            and row_k["total_in_other_decks"] == 1,
+            f"other_deck_matches={row_k['other_deck_matches']!r} "
+            f"total_in_other={row_k['total_in_other_decks']}",
+        )
+    )
+    results.append(
+        _check(
+            "K.recommends_import_new",
+            row_k["recommended_action"] == "import_new",
+            f"got action={row_k['recommended_action']}",
         )
     )
 

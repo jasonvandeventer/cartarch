@@ -1155,7 +1155,7 @@ def find_inventory_matches_for_deck_import(
                 "scryfall_id": str,
                 "finish": str,
                 "quantity_needed": int,
-                "matches": [
+                "matches": [                  # non-deck rows, eligible to MOVE
                     {
                         "inventory_row_id": int,
                         "location_name": str,
@@ -1165,21 +1165,36 @@ def find_inventory_matches_for_deck_import(
                     },
                     ...
                 ],
-                "total_available": int,
+                "target_deck_matches": [...],  # rows in the destination deck
+                "other_deck_matches":  [...],  # rows in any OTHER deck
+                "total_available":       int,  # sum of `matches`
+                "total_in_target_deck":  int,  # sum of `target_deck_matches`
+                "total_in_other_decks":  int,  # sum of `other_deck_matches`
                 "recommended_action": str,
                     # "move_existing" | "move_existing_plus_new" | "import_new"
                 "recommended_move_qty": int,
                 "recommended_new_qty": int,
             }
 
-    Match selection rules:
+    Match selection / bucketing rules:
       - Match same ``(user_id, card_id, finish)``.
-      - Exclude rows in any deck-type ``StorageLocation`` (don't cannibalize
-        other decks by default — design doc §3.3 rationale). This also
-        covers the target deck's own rows as a subset.
+      - **Non-deck rows** (drawer/binder/box/other/pending) go into
+        ``matches`` — these are the movable inventory for the move
+        recommendation.
+      - **Target-deck rows** (``storage_location_id == deck.storage_location_id``)
+        go into ``target_deck_matches``. They're informational for the UI
+        ("Already in this deck: N") and used by the commit handler to merge
+        new imports into the existing deck row rather than duplicate it.
+      - **Other-deck rows** (``type == "deck"`` but a different deck) go
+        into ``other_deck_matches``. Informational only — surfaced to the
+        user but not auto-moved (design doc §3.3 — don't silently
+        cannibalize another deck).
       - Pending rows (``is_pending=True``, no ``storage_location_id``) are
-        included as last-resort matches with synthetic
-        ``location_name="Pending"`` and ``location_type="pending"``.
+        included in ``matches`` with synthetic ``location_name="Pending"``
+        and ``location_type="pending"``.
+
+      The ``recommended_action`` is driven by ``total_available`` (non-deck
+      rows) only — deck-located rows never auto-shift the recommendation.
 
     Match ordering (callers consume in order until ``move_qty`` is hit):
       1. ``type=="drawer"`` — drawer-sorter slots; loosest inventory.
@@ -1250,6 +1265,7 @@ def find_inventory_matches_for_deck_import(
     deck = session.query(Deck).filter(Deck.id == deck_id, Deck.user_id == user_id).first()
     if deck is None:
         raise ValueError("deck not found")
+    target_storage_location_id = deck.storage_location_id
 
     if not parsed_rows:
         return []
@@ -1282,7 +1298,22 @@ def find_inventory_matches_for_deck_import(
     # One tuple-IN query for all matching inventory rows + their storage
     # locations. Outerjoin so pending rows (storage_location_id IS NULL)
     # come through with loc=None.
+    #
+    # Rows are bucketed into three lists per (card_id, finish):
+    #   matches             — non-deck rows. Eligible to MOVE into the target
+    #                         deck (this is the existing "movable inventory"
+    #                         list that drives recommended_action).
+    #   target_deck_matches — rows in the destination deck itself. Used by
+    #                         the commit handler to auto-merge import_new
+    #                         copies into the existing deck row instead of
+    #                         creating a duplicate.
+    #   other_deck_matches  — rows in any OTHER deck-type location. Surfaced
+    #                         in the UI as informational ("In another deck"),
+    #                         not auto-moved by default (per §3.3 — don't
+    #                         silently cannibalize a different deck).
     matches_by_key: dict[tuple[int, str], list[dict]] = {key: [] for key in lookup_keys}
+    target_deck_by_key: dict[tuple[int, str], list[dict]] = {key: [] for key in lookup_keys}
+    other_deck_by_key: dict[tuple[int, str], list[dict]] = {key: [] for key in lookup_keys}
     if lookup_keys:
         rows = (
             session.query(InventoryRow, StorageLocation)
@@ -1297,27 +1328,27 @@ def find_inventory_matches_for_deck_import(
             .all()
         )
         for row, loc in rows:
-            # Exclude any deck-type location (including the target deck's
-            # own rows — that's a subset). Per design doc §3.3, decks
-            # default to "import new" rather than cannibalize the source
-            # deck silently.
-            if loc is not None and loc.type == "deck":
-                continue
             if loc is None:
                 location_name = "Pending"
                 location_type = "pending"
             else:
                 location_name = loc.name
                 location_type = loc.type
-            matches_by_key[(row.card_id, row.finish)].append(
-                {
-                    "inventory_row_id": row.id,
-                    "location_name": location_name,
-                    "location_type": location_type,
-                    "quantity_available": row.quantity,
-                    "tags": get_row_tags(row),
-                }
-            )
+            entry = {
+                "inventory_row_id": row.id,
+                "location_name": location_name,
+                "location_type": location_type,
+                "quantity_available": row.quantity,
+                "tags": get_row_tags(row),
+            }
+            key = (row.card_id, row.finish)
+            if loc is not None and loc.type == "deck":
+                if row.storage_location_id == target_storage_location_id:
+                    target_deck_by_key[key].append(entry)
+                else:
+                    other_deck_by_key[key].append(entry)
+            else:
+                matches_by_key[key].append(entry)
 
     # Sort each per-key match list by tier then row id.
     for match_list in matches_by_key.values():
@@ -1327,6 +1358,12 @@ def find_inventory_matches_for_deck_import(
                 m["inventory_row_id"],
             )
         )
+    # Deck-located match lists need only stable-by-id ordering (tier is always
+    # "deck", so the tier comparison is a no-op).
+    for match_list in target_deck_by_key.values():
+        match_list.sort(key=lambda m: m["inventory_row_id"])
+    for match_list in other_deck_by_key.values():
+        match_list.sort(key=lambda m: m["inventory_row_id"])
 
     # Build per-parsed-row output in input order.
     output: list[dict] = []
@@ -1346,7 +1383,11 @@ def find_inventory_matches_for_deck_import(
                     "finish": finish,
                     "quantity_needed": quantity_needed,
                     "matches": [],
+                    "target_deck_matches": [],
+                    "other_deck_matches": [],
                     "total_available": 0,
+                    "total_in_target_deck": 0,
+                    "total_in_other_decks": 0,
                     "recommended_action": "import_new",
                     "recommended_move_qty": 0,
                     "recommended_new_qty": quantity_needed,
@@ -1354,9 +1395,19 @@ def find_inventory_matches_for_deck_import(
             )
             continue
 
-        matches = matches_by_key.get((card_id, finish), [])
+        key = (card_id, finish)
+        matches = matches_by_key.get(key, [])
+        target_deck_matches = target_deck_by_key.get(key, [])
+        other_deck_matches = other_deck_by_key.get(key, [])
         total_available = sum(m["quantity_available"] for m in matches)
+        total_in_target_deck = sum(m["quantity_available"] for m in target_deck_matches)
+        total_in_other_decks = sum(m["quantity_available"] for m in other_deck_matches)
 
+        # recommended_action / move_qty / new_qty are driven by `matches`
+        # (non-deck rows) ONLY. Deck-located rows never auto-move by
+        # default — they're informational. The commit handler uses
+        # target_deck_matches separately to merge new imports into an
+        # existing deck row rather than create a duplicate.
         if total_available >= quantity_needed:
             action = "move_existing"
             move_qty = quantity_needed
@@ -1378,7 +1429,11 @@ def find_inventory_matches_for_deck_import(
                 "finish": finish,
                 "quantity_needed": quantity_needed,
                 "matches": matches,
+                "target_deck_matches": target_deck_matches,
+                "other_deck_matches": other_deck_matches,
                 "total_available": total_available,
+                "total_in_target_deck": total_in_target_deck,
+                "total_in_other_decks": total_in_other_decks,
                 "recommended_action": action,
                 "recommended_move_qty": move_qty,
                 "recommended_new_qty": new_qty,

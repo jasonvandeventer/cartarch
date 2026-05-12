@@ -10,10 +10,15 @@
     Inputs (set by /import/reconcile-preview or the initial import_preview
     render):
       - rows: list of dicts from find_inventory_matches_for_deck_import,
-              or empty list for the empty state
+              or empty list for the empty state. Each row also carries
+              target_deck_matches and other_deck_matches lists (deck-located
+              copies the user already owns — surfaced as informational
+              notices, not auto-moved).
       - deck_name: str | None  (display in the summary header)
       - total_to_move: int     (aggregate move qty across all rows)
       - total_to_import_new: int (aggregate new qty across all rows)
+      - total_to_merge: int    (aggregate qty that will merge into existing
+                                deck rows instead of creating duplicates)
 
     Per-row hidden form fields use parallel-array naming matching the
     existing import form's pattern:
@@ -42,8 +47,16 @@
         — no new copies will be imported.
       {% elif total_to_import_new > 0 %}
         None of the <strong>{{ total_to_import_new }}</strong>
-        {{ "card" if total_to_import_new == 1 else "cards" }} match existing inventory
-        — all will be imported new.
+        {{ "card" if total_to_import_new == 1 else "cards" }} are in your free
+        collection (drawers/binders/boxes) — all will be imported new.
+      {% endif %}
+      {% if total_to_merge and total_to_merge > 0 %}
+        <br>
+        <strong>{{ total_to_merge }}</strong>
+        {{ "copy" if total_to_merge == 1 else "copies" }} will merge into
+        {% if deck_name %}<strong>{{ deck_name }}</strong>{% else %}this deck{% endif %}'s
+        existing row{{ "" if total_to_merge == 1 else "s" }} rather than
+        creating a duplicate.
       {% endif %}
     </p>
     <details style="margin-top: 0.5rem">
@@ -65,7 +78,7 @@
               <tr>
                 <td>
                   {{ row.display_name or row.scryfall_id }}
-                  {% if row.matches and row.matches[0].location_type != "deck" %}
+                  {% if row.matches %}
                     <div class="muted small-text">
                       {% for m in row.matches %}
                         {{ m.quantity_available }}× in {{ m.location_name }}{% if not loop.last %},{% endif %}
@@ -76,9 +89,26 @@
                 <td>{{ row.quantity_needed }}×</td>
                 <td>
                   {% if row.total_available > 0 %}
-                    {{ row.total_available }}×
+                    {{ row.total_available }}× in collection
+                  {% elif row.total_in_target_deck or row.total_in_other_decks %}
+                    <span class="muted">0 movable</span>
                   {% else %}
                     <span class="muted">none</span>
+                  {% endif %}
+                  {% if row.total_in_target_deck and row.total_in_target_deck > 0 %}
+                    <div class="muted small-text">
+                      Already in this deck: <strong>{{ row.total_in_target_deck }}×</strong>
+                      <br>(import will merge into the existing row)
+                    </div>
+                  {% endif %}
+                  {% if row.other_deck_matches %}
+                    <div class="muted small-text">
+                      In another deck:
+                      {% for m in row.other_deck_matches %}
+                        <strong>{{ m.quantity_available }}×</strong> in
+                        <em>{{ m.location_name }}</em>{% if not loop.last %},{% endif %}
+                      {% endfor %}
+                    </div>
                   {% endif %}
                 </td>
                 <td>
