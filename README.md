@@ -2,7 +2,7 @@
 
 Self-hosted web application for managing a physical Magic: The Gathering collection.
 
-**Current version: v3.16.12** · [Platform repo](https://github.com/jasonvandeventer/mana-archive-platform)
+**Current version: v3.16.13** · [Platform repo](https://github.com/jasonvandeventer/mana-archive-platform)
 
 ---
 
@@ -22,6 +22,7 @@ Self-hosted web application for managing a physical Magic: The Gathering collect
 - Import directly to a deck or storage location at commit time
 - **Inline create** — "+ Create new deck" / "+ Create new location" popouts on the import preview screen create the destination via JSON endpoints and pre-select it in the dropdown without leaving the wizard
 - Import complete screen shows total cards imported + unique-row count, and a "Go to [destination]" button that links straight to the deck or location
+- **Import-to-deck reconciliation** — when the destination is a deck, the preview page shows a reconciliation panel: cards already in your collection (drawer, binder, box, pending) are *moved* into the deck instead of duplicated; new copies are imported only for cards you don't already own. Per-row override available behind a "Review individually" expand. Stale-match fallback: if inventory changes between preview and commit, the affected quantity is re-imported and surfaced as a warning on the import-result screen
 
 ### Decks
 

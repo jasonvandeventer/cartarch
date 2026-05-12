@@ -19,7 +19,8 @@
       <form action="/import/commit"
             method="post"
             class="filter-row"
-            style="margin-top: 1rem">
+            style="margin-top: 1rem;
+                   display: block">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
         <input type="hidden" name="filename" value="{{ filename }}">
         {% for row in valid_rows %}
@@ -34,25 +35,39 @@
           <input type="hidden" name="quantity" value="{{ row.quantity }}">
           <input type="hidden" name="location" value="{{ row.location }}">
         {% endfor %}
-        <label style="font-weight: 600;">Destination</label>
-        <select name="target_location_id" id="import-destination-select">
-          {% if use_drawer_sorter %}<option value="0">Auto-sort to drawers</option>{% endif %}
-          <optgroup label="Storage Locations" id="opt-locations">
-            {% for loc in placeable %}<option value="{{ loc.id }}">{{ loc.name }} ({{ loc.type }})</option>{% endfor %}
-          </optgroup>
-          <optgroup label="Decks" id="opt-decks">
-            {% for deck in decks %}
-              <option value="{{ deck.storage_location_id }}">
-                {{ deck.name }}
-                {% if deck.format %}({{ deck.format }}){% endif %}
-              </option>
-            {% endfor %}
-          </optgroup>
-        </select>
-        <button type="submit" id="import-submit-btn"
-                {% if not use_drawer_sorter and not placeable and not decks %}disabled{% endif %}>
-          Import Valid Rows
-        </button>
+        <div class="filter-row" style="margin: 0">
+          <label style="font-weight: 600;">Destination</label>
+          <select name="target_location_id"
+                  id="import-destination-select"
+                  hx-post="/import/reconcile-preview"
+                  hx-include="closest form"
+                  hx-target="#reconciliation-panel"
+                  hx-swap="innerHTML"
+                  hx-trigger="change">
+            {% if use_drawer_sorter %}<option value="0">Auto-sort to drawers</option>{% endif %}
+            <optgroup label="Storage Locations" id="opt-locations">
+              {% for loc in placeable %}<option value="{{ loc.id }}">{{ loc.name }} ({{ loc.type }})</option>{% endfor %}
+            </optgroup>
+            <optgroup label="Decks" id="opt-decks">
+              {% for deck in decks %}
+                <option value="{{ deck.storage_location_id }}">
+                  {{ deck.name }}
+                  {% if deck.format %}({{ deck.format }}){% endif %}
+                </option>
+              {% endfor %}
+            </optgroup>
+          </select>
+          <button type="submit" id="import-submit-btn"
+                  {% if not use_drawer_sorter and not placeable and not decks %}disabled{% endif %}>
+            Import Valid Rows
+          </button>
+        </div>
+        {# HTMX target: when destination changes, /import/reconcile-preview swaps
+           the inner content of this wrapper. The wrapper lives INSIDE the form
+           so the reconcile_action / reconcile_move_qty / reconcile_new_qty
+           hidden fields submit along with the existing parsed-row fields when
+           the user clicks Import. #}
+        <div id="reconciliation-panel"></div>
       </form>
       {% include "_inline_create_destination.html" %}
     {% endif %}

@@ -49,6 +49,7 @@ from app.deck_service import (
     create_deck,
     delete_deck,
     extract_commander_themes,
+    find_inventory_matches_for_deck_import,
     get_card_legality,
     get_deck,
     get_row_tags,
@@ -396,23 +397,21 @@ async def import_list_preview(
     )
 
 
-@app.post("/import/commit")
-async def import_commit(
-    request: Request,
-    filename: str = Form("uploaded.csv"),
-    line_number: list[str] = Form([]),
-    name: list[str] = Form([]),
-    scryfall_id: list[str] = Form([]),
-    set_code: list[str] = Form([]),
-    collector_number: list[str] = Form([]),
-    finish: list[str] = Form([]),
-    quantity: list[str] = Form([]),
-    location: list[str] = Form([]),
-    target_location_id: int = Form(0),
-    session: Session = Depends(get_db_session),
-    current_user: User = Depends(get_current_user),
-    _: None = CsrfRequired,
-):
+def _parsed_rows_from_form(
+    line_number: list[str],
+    name: list[str],
+    scryfall_id: list[str],
+    set_code: list[str],
+    collector_number: list[str],
+    finish: list[str],
+    quantity: list[str],
+    location: list[str],
+) -> list[dict]:
+    """Rebuild the parsed-row dicts from the parallel-array form fields.
+
+    Shared by /import/commit, /import/reconcile-preview, and any future
+    handler that receives the same field shape from import_preview.html.
+    """
     rows = []
     for i in range(len(line_number)):
         rows.append(
@@ -427,27 +426,291 @@ async def import_commit(
                 "location": location[i],
             }
         )
+    return rows
 
-    result = persist_import_rows(session, rows, filename=filename, user_id=current_user.id)
-    row_ids = result.get("imported_row_ids", [])
+
+def _deck_for_storage_location(
+    session: Session, user_id: int, storage_location_id: int
+) -> Deck | None:
+    """If the given storage_location is a deck-type location owned by the user,
+    return the Deck record that owns it. Otherwise None.
+    """
+    if storage_location_id <= 0:
+        return None
+    loc = get_location(session, location_id=storage_location_id, user_id=user_id)
+    if loc is None or loc.type != "deck":
+        return None
+    return session.query(Deck).filter(Deck.storage_location_id == loc.id).first()
+
+
+@app.post("/import/reconcile-preview")
+async def import_reconcile_preview(
+    request: Request,
+    target_location_id: int = Form(0),
+    line_number: list[str] = Form([]),
+    name: list[str] = Form([]),
+    scryfall_id: list[str] = Form([]),
+    set_code: list[str] = Form([]),
+    collector_number: list[str] = Form([]),
+    finish: list[str] = Form([]),
+    quantity: list[str] = Form([]),
+    location: list[str] = Form([]),
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+    _: None = CsrfRequired,
+):
+    """HTMX endpoint: fires when the destination dropdown changes on the
+    import preview. Returns the inner HTML of #reconciliation-panel —
+    populated reconciliation table when the destination is a deck, empty
+    otherwise. The wrapper div lives in import_preview.html and is
+    untouched by hx-swap=innerHTML.
+    """
+    deck = _deck_for_storage_location(session, current_user.id, target_location_id)
+    if deck is None:
+        # Non-deck destination (auto-sort, binder, box, etc.) — no
+        # reconciliation. Returning empty content clears the panel.
+        return render(
+            request,
+            "_import_reconciliation.html",
+            {"rows": [], "deck_name": None, "total_to_move": 0, "total_to_import_new": 0},
+        )
+
+    parsed_rows = _parsed_rows_from_form(
+        line_number, name, scryfall_id, set_code, collector_number, finish, quantity, location
+    )
+    matches_rows = find_inventory_matches_for_deck_import(
+        session, current_user.id, deck.id, parsed_rows
+    )
+
+    # Decorate each result with a display_name (prefer the user-typed name
+    # from the import row; fall back to the Card.name from the catalog).
+    name_by_index = {r.get("line_number"): r.get("name") for r in parsed_rows}
+    card_ids = [r["card_id"] for r in matches_rows if r.get("card_id")]
+    card_name_by_id: dict[int, str] = {}
+    if card_ids:
+        for c in session.query(Card.id, Card.name).filter(Card.id.in_(card_ids)).all():
+            card_name_by_id[c.id] = c.name
+    for row in matches_rows:
+        from_form = name_by_index.get(row.get("line_number")) or ""
+        row["display_name"] = (
+            from_form or card_name_by_id.get(row.get("card_id")) or row.get("scryfall_id", "")
+        )
+
+    total_to_move = sum(r["recommended_move_qty"] for r in matches_rows)
+    total_to_import_new = sum(r["recommended_new_qty"] for r in matches_rows)
+
+    return render(
+        request,
+        "_import_reconciliation.html",
+        {
+            "rows": matches_rows,
+            "deck_name": deck.name,
+            "total_to_move": total_to_move,
+            "total_to_import_new": total_to_import_new,
+        },
+    )
+
+
+def _commit_deck_import_with_reconciliation(
+    session: Session,
+    user_id: int,
+    deck: Deck,
+    parsed_rows: list[dict],
+    actions: list[str],
+    move_qtys: list[int],
+    new_qtys: list[int],
+    filename: str,
+) -> dict:
+    """Per-row dispatch for deck imports under Refined Model A.
+
+    For each parsed row, the user's reconciliation choice (or its default)
+    selects one of three paths:
+
+    - move_existing:        all copies come from existing inventory
+                            (pull_card_to_deck loop, multi-source in order)
+    - move_existing_plus_new: some copies move, some are imported new
+    - import_new:           current behavior (persist_import_rows path)
+
+    Returns a dict mirroring persist_import_rows' shape plus three extra
+    counts used by import_result.html:
+
+      imported_count       — unique (card, finish) rows touched as new
+      total_quantity       — total copies of new imports
+      moved_count          — total copies moved from existing inventory
+      failed_rows          — list of rows that couldn't be resolved
+      stale_match_rows     — rows where the preview said "move N" but
+                             inventory had less than N at commit time;
+                             the shortfall fell back to import_new
+      batch_id             — most recent ImportBatch created for the new
+                             import portion (None if no new copies were
+                             imported)
+      imported_row_ids     — same as persist_import_rows
+    """
+    moved_count = 0
+    stale_match_rows: list[dict] = []
+    new_import_rows: list[dict] = []
+    new_import_indices: list[int] = []  # position in parsed_rows for the new portion
+
+    for idx, row in enumerate(parsed_rows):
+        action = actions[idx] if idx < len(actions) else "import_new"
+        move_qty = int(move_qtys[idx]) if idx < len(move_qtys) else 0
+        new_qty = int(new_qtys[idx]) if idx < len(new_qtys) else int(row["quantity"])
+
+        if action == "import_new":
+            new_import_rows.append(row)
+            new_import_indices.append(idx)
+            continue
+
+        # Re-resolve matches at commit time (preview state may be stale).
+        recheck = find_inventory_matches_for_deck_import(session, user_id, deck.id, [row])[0]
+        available = recheck["total_available"]
+
+        # How many can we actually move now, capped by the user's
+        # requested move_qty AND the current inventory.
+        actual_move_qty = min(move_qty, available)
+        shortfall = move_qty - actual_move_qty
+
+        # Walk matches in order, draining each until actual_move_qty is hit.
+        remaining_to_move = actual_move_qty
+        for match in recheck["matches"]:
+            if remaining_to_move <= 0:
+                break
+            pull_qty = min(remaining_to_move, match["quantity_available"])
+            pulled_ok = pull_card_to_deck(
+                session=session,
+                user_id=user_id,
+                deck_id=deck.id,
+                inventory_row_id=match["inventory_row_id"],
+                quantity=pull_qty,
+            )
+            if pulled_ok:
+                moved_count += pull_qty
+                remaining_to_move -= pull_qty
+
+        # If the move shortfall was non-zero, we promised the user N moves
+        # but only delivered some. Cover the rest as new imports and flag
+        # this row in the result so import_result.html can warn.
+        compensating_new = shortfall + new_qty
+        if shortfall > 0:
+            stale_match_rows.append(
+                {
+                    "line_number": row.get("line_number"),
+                    "name": row.get("name") or row.get("scryfall_id"),
+                    "expected_move": move_qty,
+                    "actual_move": actual_move_qty,
+                }
+            )
+        if compensating_new > 0:
+            # Schedule a new import for the remaining quantity.
+            row_for_new = dict(row)
+            row_for_new["quantity"] = compensating_new
+            new_import_rows.append(row_for_new)
+            new_import_indices.append(idx)
+
+    # Run the existing import path for everything that didn't get moved.
+    new_imported_count = 0
+    new_total_quantity = 0
+    failed_rows: list[dict] = []
+    batch_id = None
+    imported_row_ids: list[int] = []
+    if new_import_rows:
+        result = persist_import_rows(session, new_import_rows, filename=filename, user_id=user_id)
+        new_imported_count = result["imported_count"]
+        new_total_quantity = result.get("total_quantity", new_imported_count)
+        failed_rows = result["failed_rows"]
+        batch_id = result["batch_id"]
+        imported_row_ids = result.get("imported_row_ids", [])
+
+        # Place the new copies into the deck location.
+        if imported_row_ids and deck.storage_location_id:
+            place_imported_rows(
+                session,
+                imported_row_ids,
+                user_id=user_id,
+                location_id=deck.storage_location_id,
+            )
+
+    return {
+        "imported_count": new_imported_count,
+        "total_quantity": new_total_quantity,
+        "moved_count": moved_count,
+        "failed_rows": failed_rows,
+        "stale_match_rows": stale_match_rows,
+        "batch_id": batch_id,
+        "imported_row_ids": imported_row_ids,
+    }
+
+
+@app.post("/import/commit")
+async def import_commit(
+    request: Request,
+    filename: str = Form("uploaded.csv"),
+    line_number: list[str] = Form([]),
+    name: list[str] = Form([]),
+    scryfall_id: list[str] = Form([]),
+    set_code: list[str] = Form([]),
+    collector_number: list[str] = Form([]),
+    finish: list[str] = Form([]),
+    quantity: list[str] = Form([]),
+    location: list[str] = Form([]),
+    target_location_id: int = Form(0),
+    reconcile_action: list[str] = Form([]),
+    reconcile_move_qty: list[str] = Form([]),
+    reconcile_new_qty: list[str] = Form([]),
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+    _: None = CsrfRequired,
+):
+    rows = _parsed_rows_from_form(
+        line_number, name, scryfall_id, set_code, collector_number, finish, quantity, location
+    )
+
     placed_in = None
     placed_in_url = "/pending"
     placed_in_kind = None
+    moved_count = 0
+    stale_match_rows: list[dict] = []
 
-    if row_ids and target_location_id:
-        place_imported_rows(
-            session, row_ids, user_id=current_user.id, location_id=target_location_id
+    # Branch: deck destination with reconciliation choices → per-row dispatch.
+    # Non-deck destination (or no reconciliation fields) → existing path
+    # exactly as before, byte-identical behavior.
+    deck = _deck_for_storage_location(session, current_user.id, target_location_id)
+    using_reconciliation = deck is not None and any(reconcile_action)
+
+    if using_reconciliation:
+        result = _commit_deck_import_with_reconciliation(
+            session=session,
+            user_id=current_user.id,
+            deck=deck,
+            parsed_rows=rows,
+            actions=reconcile_action,
+            move_qtys=[int(q or 0) for q in reconcile_move_qty],
+            new_qtys=[int(q or 0) for q in reconcile_new_qty],
+            filename=filename,
         )
-        loc = get_location(session, location_id=target_location_id, user_id=current_user.id)
-        placed_in = loc.name if loc else None
-        placed_in_url = f"/locations/{target_location_id}" if loc else "/pending"
-        placed_in_kind = ("deck" if loc.type == "deck" else "location") if loc else None
-        if loc and loc.type != "deck" and current_user.username in DRAWER_SORTER_USERNAMES:
-            resort_collection(session, user_id=current_user.id)
+        moved_count = result["moved_count"]
+        stale_match_rows = result["stale_match_rows"]
+        placed_in = deck.name
+        placed_in_url = f"/locations/{target_location_id}"
+        placed_in_kind = "deck"
+    else:
+        result = persist_import_rows(session, rows, filename=filename, user_id=current_user.id)
+        row_ids = result.get("imported_row_ids", [])
 
-    elif row_ids and current_user.username in DRAWER_SORTER_USERNAMES:
-        resort_collection(session, user_id=current_user.id)
-        return RedirectResponse(url="/pending", status_code=303)
+        if row_ids and target_location_id:
+            place_imported_rows(
+                session, row_ids, user_id=current_user.id, location_id=target_location_id
+            )
+            loc = get_location(session, location_id=target_location_id, user_id=current_user.id)
+            placed_in = loc.name if loc else None
+            placed_in_url = f"/locations/{target_location_id}" if loc else "/pending"
+            placed_in_kind = ("deck" if loc.type == "deck" else "location") if loc else None
+            if loc and loc.type != "deck" and current_user.username in DRAWER_SORTER_USERNAMES:
+                resort_collection(session, user_id=current_user.id)
+
+        elif row_ids and current_user.username in DRAWER_SORTER_USERNAMES:
+            resort_collection(session, user_id=current_user.id)
+            return RedirectResponse(url="/pending", status_code=303)
 
     return render(
         request,
@@ -456,6 +719,8 @@ async def import_commit(
             "title": "Import Results",
             "imported_count": result["imported_count"],
             "total_quantity": result.get("total_quantity", result["imported_count"]),
+            "moved_count": moved_count,
+            "stale_match_rows": stale_match_rows,
             "failed_rows": result["failed_rows"],
             "batch_id": result["batch_id"],
             "placed_in": placed_in,
@@ -529,6 +794,68 @@ async def manual_import_search(
     )
 
 
+@app.post("/import/manual/reconcile-preview")
+async def manual_import_reconcile_preview(
+    request: Request,
+    target_location_id: int = Form(0),
+    scryfall_id: str = Form(""),
+    set_code: str = Form(""),
+    collector_number: str = Form(""),
+    finish: str = Form("normal"),
+    quantity: int = Form(1),
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+    _: None = CsrfRequired,
+):
+    """HTMX endpoint for the single-card (manual) import preview. Same
+    contract as /import/reconcile-preview but takes scalar fields
+    instead of the parallel arrays.
+    """
+    deck = _deck_for_storage_location(session, current_user.id, target_location_id)
+    if deck is None:
+        return render(
+            request,
+            "_import_reconciliation.html",
+            {"rows": [], "deck_name": None, "total_to_move": 0, "total_to_import_new": 0},
+        )
+
+    parsed_rows = [
+        {
+            "line_number": 1,
+            "scryfall_id": scryfall_id,
+            "set_code": set_code,
+            "collector_number": collector_number,
+            "finish": normalize_finish(finish),
+            "quantity": max(1, quantity),
+            "location": "",
+            "name": "",
+        }
+    ]
+    matches_rows = find_inventory_matches_for_deck_import(
+        session, current_user.id, deck.id, parsed_rows
+    )
+
+    if matches_rows and matches_rows[0].get("card_id"):
+        card = session.query(Card.name).filter(Card.id == matches_rows[0]["card_id"]).first()
+        matches_rows[0]["display_name"] = card.name if card else scryfall_id
+    elif matches_rows:
+        matches_rows[0]["display_name"] = scryfall_id
+
+    total_to_move = sum(r["recommended_move_qty"] for r in matches_rows)
+    total_to_import_new = sum(r["recommended_new_qty"] for r in matches_rows)
+
+    return render(
+        request,
+        "_import_reconciliation.html",
+        {
+            "rows": matches_rows,
+            "deck_name": deck.name,
+            "total_to_move": total_to_move,
+            "total_to_import_new": total_to_import_new,
+        },
+    )
+
+
 @app.post("/import/manual/commit")
 async def manual_import_commit(
     request: Request,
@@ -538,45 +865,68 @@ async def manual_import_commit(
     finish: str = Form("normal"),
     quantity: int = Form(1),
     target_location_id: int = Form(0),
+    reconcile_action: list[str] = Form([]),
+    reconcile_move_qty: list[str] = Form([]),
+    reconcile_new_qty: list[str] = Form([]),
     session: Session = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
     _: None = CsrfRequired,
 ):
-    result = persist_import_rows(
-        session,
-        [
-            {
-                "line_number": 1,
-                "scryfall_id": scryfall_id,
-                "set_code": set_code,
-                "collector_number": collector_number,
-                "finish": normalize_finish(finish),
-                "quantity": max(1, quantity),
-                "location": "",
-                "name": "",
-            }
-        ],
-        filename="manual import",
-        user_id=current_user.id,
-    )
+    parsed_rows = [
+        {
+            "line_number": 1,
+            "scryfall_id": scryfall_id,
+            "set_code": set_code,
+            "collector_number": collector_number,
+            "finish": normalize_finish(finish),
+            "quantity": max(1, quantity),
+            "location": "",
+            "name": "",
+        }
+    ]
 
-    row_ids = result.get("imported_row_ids", [])
     placed_in = None
     placed_in_url = "/pending"
     placed_in_kind = None
+    moved_count = 0
+    stale_match_rows: list[dict] = []
 
-    if row_ids and target_location_id:
-        place_imported_rows(
-            session, row_ids, user_id=current_user.id, location_id=target_location_id
+    deck = _deck_for_storage_location(session, current_user.id, target_location_id)
+    using_reconciliation = deck is not None and any(reconcile_action)
+
+    if using_reconciliation:
+        result = _commit_deck_import_with_reconciliation(
+            session=session,
+            user_id=current_user.id,
+            deck=deck,
+            parsed_rows=parsed_rows,
+            actions=reconcile_action,
+            move_qtys=[int(q or 0) for q in reconcile_move_qty],
+            new_qtys=[int(q or 0) for q in reconcile_new_qty],
+            filename="manual import",
         )
-        loc = get_location(session, location_id=target_location_id, user_id=current_user.id)
-        placed_in = loc.name if loc else None
-        placed_in_url = f"/locations/{target_location_id}" if loc else "/pending"
-        placed_in_kind = ("deck" if loc.type == "deck" else "location") if loc else None
-        if loc and loc.type != "deck" and current_user.username in DRAWER_SORTER_USERNAMES:
+        moved_count = result["moved_count"]
+        stale_match_rows = result["stale_match_rows"]
+        placed_in = deck.name
+        placed_in_url = f"/locations/{target_location_id}"
+        placed_in_kind = "deck"
+    else:
+        result = persist_import_rows(
+            session, parsed_rows, filename="manual import", user_id=current_user.id
+        )
+        row_ids = result.get("imported_row_ids", [])
+        if row_ids and target_location_id:
+            place_imported_rows(
+                session, row_ids, user_id=current_user.id, location_id=target_location_id
+            )
+            loc = get_location(session, location_id=target_location_id, user_id=current_user.id)
+            placed_in = loc.name if loc else None
+            placed_in_url = f"/locations/{target_location_id}" if loc else "/pending"
+            placed_in_kind = ("deck" if loc.type == "deck" else "location") if loc else None
+            if loc and loc.type != "deck" and current_user.username in DRAWER_SORTER_USERNAMES:
+                resort_collection(session, user_id=current_user.id)
+        elif row_ids and current_user.username in DRAWER_SORTER_USERNAMES:
             resort_collection(session, user_id=current_user.id)
-    elif row_ids and current_user.username in DRAWER_SORTER_USERNAMES:
-        resort_collection(session, user_id=current_user.id)
 
     return render(
         request,
@@ -585,6 +935,8 @@ async def manual_import_commit(
             "title": "Import Results",
             "imported_count": result["imported_count"],
             "total_quantity": result.get("total_quantity", result["imported_count"]),
+            "moved_count": moved_count,
+            "stale_match_rows": stale_match_rows,
             "failed_rows": result["failed_rows"],
             "batch_id": result["batch_id"],
             "placed_in": placed_in,

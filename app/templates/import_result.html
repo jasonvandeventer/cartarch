@@ -3,6 +3,7 @@
   <section class="panel hero-panel compact-hero">
     <div class="panel-topline">Import</div>
     <h2 class="panel-title">Import Complete</h2>
+    {% set _moved = moved_count if moved_count is defined else 0 %}
     <div class="stat-grid" style="margin-top: 1rem;">
       <div class="stat-card compact">
         <div class="stat-label">Cards imported</div>
@@ -11,6 +12,13 @@
           <div class="muted small-text">{{ imported_count }} unique</div>
         {% endif %}
       </div>
+      {% if _moved > 0 %}
+        <div class="stat-card compact">
+          <div class="stat-label">Cards moved</div>
+          <div class="stat-number">{{ _moved }}</div>
+          <div class="muted small-text">from your collection</div>
+        </div>
+      {% endif %}
       <div class="stat-card compact">
         <div class="stat-label">Failed rows</div>
         <div class="stat-number">{{ failed_rows|length }}</div>
@@ -18,12 +26,29 @@
     </div>
     {% if placed_in %}
       <p class="muted" style="margin-top: 0.75rem;">
-        All cards placed directly into <strong>{{ placed_in }}</strong>.
+        {% if _moved > 0 %}
+          {{ total_quantity if total_quantity is defined else imported_count }} new cards imported, {{ _moved }} moved from your collection into <strong>{{ placed_in }}</strong>.
+        {% else %}
+          All cards placed directly into <strong>{{ placed_in }}</strong>.
+        {% endif %}
       </p>
     {% else %}
       <p class="muted" style="margin-top: 0.75rem;">
         Cards are queued in <a href="/pending">Pending Placement</a> for confirmation.
       </p>
+    {% endif %}
+    {% if stale_match_rows is defined and stale_match_rows %}
+      <p class="warning-text" style="margin-top: 0.75rem">
+        <strong>{{ stale_match_rows|length }}</strong>
+        {{ "card" if stale_match_rows|length == 1 else "cards" }}
+        were re-imported instead of moved because inventory changed
+        between preview and commit. Details:
+      </p>
+      <ul class="muted small-text">
+        {% for row in stale_match_rows %}
+          <li>{{ row.name }}: expected {{ row.expected_move }} from inventory, found {{ row.actual_move }}</li>
+        {% endfor %}
+      </ul>
     {% endif %}
     <div style="display: flex;
                 gap: 0.75rem;

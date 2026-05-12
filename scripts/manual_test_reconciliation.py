@@ -4,7 +4,7 @@ Creates and tears down its own test data — two throwaway users, fresh
 locations, decks, and inventory rows — so the script is idempotent and
 doesn't pollute the dev DB or depend on existing collection state.
 
-Six scenarios, matching the Session 1 implementation plan:
+Scenarios A-F (read-only — Session 1):
 
     A. owns 4 in drawer, needs 4   -> move_existing
     B. owns 2 in drawer, needs 4   -> move_existing_plus_new
@@ -15,6 +15,14 @@ Six scenarios, matching the Session 1 implementation plan:
                                    -> move_existing (drawer first, then binder)
     F. user with NO drawers, owns 2 in binder, needs 4
                                    -> move_existing_plus_new (binder source)
+
+Scenarios G-H (end-to-end commit handler — Session 2):
+
+    G. commit with move_existing for all rows: drawer row drained to 0
+       (deleted), deck row created with qty=4, no new imports
+    H. commit with import_new override (user owns 4 but chose to buy new):
+       drawer row UNTOUCHED, deck row created with qty=4, one unique new
+       import row created
 
 Run from project root:
     DATA_DIR=$(pwd)/dev-data SESSION_SECRET_KEY=test \\
@@ -31,7 +39,16 @@ import time
 
 from app.db import SessionLocal
 from app.deck_service import find_inventory_matches_for_deck_import
-from app.models import Card, Deck, InventoryRow, StorageLocation, User
+from app.main import _commit_deck_import_with_reconciliation
+from app.models import (
+    Card,
+    Deck,
+    ImportBatch,
+    InventoryRow,
+    StorageLocation,
+    TransactionLog,
+    User,
+)
 
 
 def setup(session):
@@ -39,13 +56,13 @@ def setup(session):
 
     Returns a SimpleNamespace-like object with handles to created entities.
     """
-    # Re-use real Card records from the catalog so we don't have to fabricate
-    # Scryfall metadata. We need 6 distinct cards for the 6 scenarios so the
-    # tuple-IN lookup picks each row independently.
-    cards = session.query(Card).limit(6).all()
-    if len(cards) < 6:
+    # Re-use real Card records from the catalog. Scenarios A-F use cards
+    # 0-5 (read-only). Scenarios G-H use cards 6-7 (mutating — drain drawer
+    # rows on commit). Distinct cards per scenario keep them independent.
+    cards = session.query(Card).limit(8).all()
+    if len(cards) < 8:
         raise RuntimeError(
-            f"dev DB has only {len(cards)} Card rows; need at least 6 for the smoke test"
+            f"dev DB has only {len(cards)} Card rows; need at least 8 for the smoke test"
         )
 
     stamp = int(time.time())
@@ -160,6 +177,25 @@ def setup(session):
             storage_location_id=binder_loc_2.id,
             is_pending=False,
         ),
+        # G: user1 owns 4 of cards[6] in drawer (will be drained by commit)
+        InventoryRow(
+            user_id=user1.id,
+            card_id=cards[6].id,
+            finish="normal",
+            quantity=4,
+            storage_location_id=drawer_loc.id,
+            is_pending=False,
+        ),
+        # H: user1 owns 4 of cards[7] in drawer (untouched by commit — user
+        # overrides default to import_new)
+        InventoryRow(
+            user_id=user1.id,
+            card_id=cards[7].id,
+            finish="normal",
+            quantity=4,
+            storage_location_id=drawer_loc.id,
+            is_pending=False,
+        ),
     ]
     session.add_all(inv_rows)
     session.commit()
@@ -178,10 +214,21 @@ def setup(session):
 
 
 def teardown(session, env):
-    """Delete everything we created. Order respects FKs."""
+    """Delete everything we created. Order respects FKs.
+
+    Scenarios G + H create ImportBatch + TransactionLog rows via the
+    commit handler's persist_import_rows path; clean those too so the
+    script is fully idempotent.
+    """
     if env is None:
         return
     user_ids = [env["user1"].id, env["user2"].id]
+    session.query(TransactionLog).filter(TransactionLog.user_id.in_(user_ids)).delete(
+        synchronize_session=False
+    )
+    session.query(ImportBatch).filter(ImportBatch.user_id.in_(user_ids)).delete(
+        synchronize_session=False
+    )
     session.query(InventoryRow).filter(InventoryRow.user_id.in_(user_ids)).delete(
         synchronize_session=False
     )
@@ -427,6 +474,155 @@ def run_scenarios(session, env):
             "F.no_drawer_user",
             binder_first,
             f"got matches={matches!r}",
+        )
+    )
+
+    # ---- Scenario G: commit with move_existing — drawer drained, deck filled ----
+    # User1 owns 4 of cards[6] in drawer. Importing 4 of cards[6] into deck1
+    # with action=move_existing should: pull 4 from drawer (row deleted because
+    # quantity hits 0), create deck row with qty=4, persist NO new imports.
+    parsed_g = [
+        {
+            "line_number": 1,
+            "name": "",
+            "scryfall_id": env["cards"][6].scryfall_id,
+            "set_code": "",
+            "collector_number": "",
+            "finish": "normal",
+            "quantity": 4,
+            "location": "",
+        }
+    ]
+    result_g = _commit_deck_import_with_reconciliation(
+        session=session,
+        user_id=env["user1"].id,
+        deck=env["deck1"],
+        parsed_rows=parsed_g,
+        actions=["move_existing"],
+        move_qtys=[4],
+        new_qtys=[0],
+        filename="smoke G",
+    )
+    # Drawer row for cards[6] should be gone (qty reached 0 -> deleted).
+    drawer_row_remaining = (
+        session.query(InventoryRow)
+        .filter(
+            InventoryRow.user_id == env["user1"].id,
+            InventoryRow.card_id == env["cards"][6].id,
+            InventoryRow.storage_location_id == env["drawer_loc_id"],
+        )
+        .first()
+    )
+    # Deck row should exist with qty 4.
+    deck_row_g = (
+        session.query(InventoryRow)
+        .filter(
+            InventoryRow.user_id == env["user1"].id,
+            InventoryRow.card_id == env["cards"][6].id,
+            InventoryRow.storage_location_id == env["deck1"].storage_location_id,
+        )
+        .first()
+    )
+    results.append(
+        _check(
+            "G.moved_count",
+            result_g["moved_count"] == 4,
+            f"got moved_count={result_g['moved_count']}",
+        )
+    )
+    results.append(
+        _check(
+            "G.imported_count",
+            result_g["imported_count"] == 0,
+            f"got imported_count={result_g['imported_count']}",
+        )
+    )
+    results.append(
+        _check(
+            "G.drawer_drained",
+            drawer_row_remaining is None,
+            f"drawer row still exists: id={drawer_row_remaining.id if drawer_row_remaining else None} "
+            f"qty={drawer_row_remaining.quantity if drawer_row_remaining else None}",
+        )
+    )
+    results.append(
+        _check(
+            "G.deck_row_qty",
+            deck_row_g is not None and deck_row_g.quantity == 4,
+            f"deck row: {deck_row_g!r} qty={deck_row_g.quantity if deck_row_g else None}",
+        )
+    )
+
+    # ---- Scenario H: commit with import_new override — drawer untouched ----
+    # User1 owns 4 of cards[7] in drawer. Importing 4 of cards[7] into deck1
+    # with action=import_new should: leave drawer row alone (qty still 4),
+    # create a NEW deck row with qty=4.
+    parsed_h = [
+        {
+            "line_number": 1,
+            "name": "",
+            "scryfall_id": env["cards"][7].scryfall_id,
+            "set_code": "",
+            "collector_number": "",
+            "finish": "normal",
+            "quantity": 4,
+            "location": "",
+        }
+    ]
+    result_h = _commit_deck_import_with_reconciliation(
+        session=session,
+        user_id=env["user1"].id,
+        deck=env["deck1"],
+        parsed_rows=parsed_h,
+        actions=["import_new"],
+        move_qtys=[0],
+        new_qtys=[4],
+        filename="smoke H",
+    )
+    drawer_row_h = (
+        session.query(InventoryRow)
+        .filter(
+            InventoryRow.user_id == env["user1"].id,
+            InventoryRow.card_id == env["cards"][7].id,
+            InventoryRow.storage_location_id == env["drawer_loc_id"],
+        )
+        .first()
+    )
+    deck_row_h = (
+        session.query(InventoryRow)
+        .filter(
+            InventoryRow.user_id == env["user1"].id,
+            InventoryRow.card_id == env["cards"][7].id,
+            InventoryRow.storage_location_id == env["deck1"].storage_location_id,
+        )
+        .first()
+    )
+    results.append(
+        _check(
+            "H.moved_count",
+            result_h["moved_count"] == 0,
+            f"got moved_count={result_h['moved_count']}",
+        )
+    )
+    results.append(
+        _check(
+            "H.imported_count",
+            result_h["imported_count"] == 1,
+            f"got imported_count={result_h['imported_count']}",
+        )
+    )
+    results.append(
+        _check(
+            "H.drawer_untouched",
+            drawer_row_h is not None and drawer_row_h.quantity == 4,
+            f"drawer row: {drawer_row_h!r} qty={drawer_row_h.quantity if drawer_row_h else None}",
+        )
+    )
+    results.append(
+        _check(
+            "H.deck_row_qty",
+            deck_row_h is not None and deck_row_h.quantity == 4,
+            f"deck row: {deck_row_h!r} qty={deck_row_h.quantity if deck_row_h else None}",
         )
     )
 
