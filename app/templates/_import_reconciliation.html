@@ -2,34 +2,52 @@
     (the wrapper div lives in the parent template, e.g. import_preview.html).
     HTMX swaps via innerHTML, so this template only emits the INNER content.
 
-    Two states:
-      - rows is empty / no deck destination → emit nothing (empty inner HTML;
-        the wrapper div stays in place but renders no children).
-      - rows present → emit the summary + expandable per-row table.
+    The partial branches on `reconcile_mode`:
+      "deck"       — deck-target import (Session 2 / v3.16.13-14). Per-row
+                     output has matches / target_deck_matches /
+                     other_deck_matches; action select offers
+                     move_existing / move_existing_plus_new / import_new.
+      "collection" — non-deck-target import (Session A / v3.16.15+). Per-row
+                     output has owned_breakdown / total_user_owned; action
+                     select offers skip_already_owned / import_delta /
+                     import_new.
+      (unset)      — defaults to "deck" for backward compatibility with
+                     callers that haven't been updated to set the mode.
 
-    Inputs (set by /import/reconcile-preview or the initial import_preview
-    render):
-      - rows: list of dicts from find_inventory_matches_for_deck_import,
-              or empty list for the empty state. Each row also carries
-              target_deck_matches and other_deck_matches lists (deck-located
-              copies the user already owns — surfaced as informational
-              notices, not auto-moved).
-      - deck_name: str | None  (display in the summary header)
-      - total_to_move: int     (aggregate move qty across all rows)
-      - total_to_import_new: int (aggregate new qty across all rows)
-      - total_to_merge: int    (aggregate qty that will merge into existing
-                                deck rows instead of creating duplicates)
+    Empty state (rows == []): emit nothing in either mode. The wrapper
+    div stays in place but renders no children.
 
-    Per-row hidden form fields use parallel-array naming matching the
-    existing import form's pattern:
-      reconcile_action[]   — "move_existing" | "move_existing_plus_new" | "import_new"
-      reconcile_move_qty[] — integer
-      reconcile_new_qty[]  — integer
+    Common inputs (both modes):
+      rows:         list of dicts from the per-mode reconciliation function
+      deck_name:    str | None (deck mode: name of target deck; collection
+                                mode: name of target storage location)
+      manual_mode:  bool (collection mode only — flips the action-select
+                          default to import_new for the single-card manual
+                          flow per design doc §5.5)
 
-    These submit alongside the parent form's existing parsed-row hidden
-    fields when the user clicks Import.
+    Deck-mode-only inputs:
+      total_to_move:        aggregate move qty across rows
+      total_to_import_new:  aggregate new qty
+      total_to_merge:       aggregate qty that will merge into existing
+                            deck rows
+
+    Collection-mode-only inputs:
+      total_to_skip:    aggregate skip qty (cards user already owns enough of)
+      total_to_delta:   aggregate qty for import_delta rows
+      total_to_new:     aggregate qty for import_new rows
+
+    Per-row hidden form fields use parallel-array naming for both modes:
+      reconcile_action[]   — mode-specific action string
+      reconcile_move_qty[] — deck mode only (always 0 in collection mode)
+      reconcile_new_qty[]  — qty to import as new InventoryRows
+
+    Session B will read these to dispatch the commit. Session A leaves the
+    existing commit handlers untouched — clicking Import on a collection-mode
+    panel still produces the OLD duplicating behavior on non-deck destinations
+    until Session B ships.
 #}
-{% if rows %}
+{% set mode = reconcile_mode | default("deck") %}
+{% if rows and mode == "deck" %}
   <section class="panel"
            style="margin-top: 0.75rem;"
            id="reconciliation-content">
@@ -149,6 +167,14 @@
      because querySelectorAll re-binds. #}
   <script>
     (function () {
+      // Re-enable the Import button if a previous collection-mode swap
+      // had disabled it. Deck mode is always commit-safe (Session 2/2.5
+      // shipped the dispatch).
+      var importBtn = document.getElementById('import-submit-btn');
+      if (importBtn && importBtn.dataset.disabledByCollectionMode) {
+        importBtn.disabled = false;
+        delete importBtn.dataset.disabledByCollectionMode;
+      }
       document.querySelectorAll('.reconcile-action-select').forEach(function (sel) {
         // Stash the row's needed/available on the select element so we can
         // recompute move/new on change. Walk to the <tr> and read the cells.
@@ -170,6 +196,163 @@
             hiddenNew.value = Math.max(0, needed - available);
           } else {
             hiddenMove.value = 0;
+            hiddenNew.value = needed;
+          }
+        });
+      });
+    })();
+  </script>
+{% elif rows and mode == "collection" %}
+  {# Collection-mode branch: sync semantics. Per-row output has
+     owned_breakdown / total_user_owned; action select offers
+     skip_already_owned / import_delta / import_new. Default is
+     `recommended_action` unless manual_mode is True, in which case the
+     default flips to import_new (acquisition semantics for single-card
+     manual entry, per design doc §5.5).
+
+     IMPORT BUTTON IS DISABLED IN COLLECTION MODE FOR SESSION A.
+     The reconciliation function + UI ship in v3.16.15 (Session A), but
+     the commit handler still runs the OLD duplicating path for non-deck
+     destinations. Disabling the button until Session B ships prevents
+     users from creating duplicates while the new behavior is being
+     finalized. Deck imports stay enabled. #}
+  <div class="warning-text"
+       style="margin-top: 0.75rem;
+              padding: 0.6rem 0.9rem;
+              border-radius: 8px;
+              background: rgba(244, 158, 76, 0.12);
+              border: 1px solid rgba(244, 158, 76, 0.35)">
+    <strong>Collection import is being upgraded</strong> to recognize cards
+    you already own. This is temporarily disabled while the new behavior
+    is finalized. Deck imports work as normal.
+  </div>
+  <section class="panel"
+           style="margin-top: 0.75rem;"
+           id="reconciliation-content">
+    <h3 class="panel-title" style="margin-bottom: 0.4rem">Reconciliation</h3>
+    <p class="muted" style="margin-top: 0">
+      {% set _to_skip = total_to_skip | default(0) %}
+      {% set _to_delta = total_to_delta | default(0) %}
+      {% set _to_new = total_to_new | default(0) %}
+      {% set _row_count = rows | length %}
+      Importing
+      <strong>{{ _row_count }}</strong>
+      {{ "card" if _row_count == 1 else "cards" }}{% if deck_name %} into <strong>{{ deck_name }}</strong>{% endif %}:
+      {% if _to_new > 0 %}
+        <strong>{{ _to_new }}</strong> new,
+      {% endif %}
+      {% if _to_delta > 0 %}
+        <strong>{{ _to_delta }}</strong> partial (your collection is short),
+      {% endif %}
+      {% if _to_skip > 0 %}
+        <strong>{{ _to_skip }}</strong> already owned (will skip).
+      {% endif %}
+    </p>
+    <details style="margin-top: 0.5rem">
+      <summary class="btn-like" style="cursor: pointer; display: inline-block">
+        Review individually (override per card)
+      </summary>
+      <div class="table-wrap" style="margin-top: 0.6rem">
+        <table>
+          <thead>
+            <tr>
+              <th>Card</th>
+              <th>Need</th>
+              <th>You own</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in rows %}
+              <tr>
+                <td>
+                  {{ row.display_name or row.scryfall_id }}
+                  {% if row.owned_breakdown %}
+                    <div class="muted small-text">
+                      {% for entry in row.owned_breakdown %}
+                        {{ entry.quantity }}× in {{ entry.location_name }}{% if not loop.last %},{% endif %}
+                      {% endfor %}
+                    </div>
+                  {% endif %}
+                </td>
+                <td>{{ row.quantity_needed }}×</td>
+                <td>
+                  {% if row.total_user_owned > 0 %}
+                    {{ row.total_user_owned }}×
+                  {% else %}
+                    <span class="muted">none</span>
+                  {% endif %}
+                </td>
+                <td>
+                  {# Default action selection logic:
+                     - manual_mode flips to import_new (acquisition default
+                       for single-card manual entry)
+                     - otherwise, use the function's recommended_action #}
+                  {% set rec = row.recommended_action %}
+                  {% set default_action = "import_new" if manual_mode else rec %}
+                  <select name="reconcile_action" class="reconcile-action-select">
+                    {% if row.total_user_owned >= row.quantity_needed %}
+                      <option value="skip_already_owned" {% if default_action == "skip_already_owned" %}selected{% endif %}>
+                        Skip — already owned{% if default_action == "skip_already_owned" %} (default){% endif %}
+                      </option>
+                    {% elif row.total_user_owned > 0 %}
+                      <option value="import_delta" {% if default_action == "import_delta" %}selected{% endif %}>
+                        Import {{ row.quantity_needed - row.total_user_owned }} more{% if default_action == "import_delta" %} (default){% endif %}
+                      </option>
+                    {% endif %}
+                    <option value="import_new" {% if default_action == "import_new" %}selected{% endif %}>
+                      Import {{ row.quantity_needed }} new{% if default_action == "import_new" %} (default){% endif %}
+                    </option>
+                  </select>
+                  {# Hidden fields encode the new_qty for the commit handler.
+                     move_qty stays 0 in collection mode (no moves between
+                     non-deck locations are auto-proposed). #}
+                  <input type="hidden" name="reconcile_move_qty" value="0">
+                  <input type="hidden"
+                         name="reconcile_new_qty"
+                         value="{% if default_action == 'skip_already_owned' %}0{% elif default_action == 'import_delta' %}{{ row.quantity_needed - row.total_user_owned }}{% else %}{{ row.quantity_needed }}{% endif %}">
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </details>
+  </section>
+  <script>
+    (function () {
+      // Disable the Import button while Session B (commit-handler dispatch
+      // for non-deck destinations) is still pending. Without that wiring,
+      // clicking Import would run the OLD persist_import_rows path and
+      // create duplicates — exactly what the reconciliation panel is
+      // designed to prevent. The button gets re-enabled on the next swap
+      // back to deck mode (see deck-mode script). The data-* flag lets us
+      // distinguish "we disabled this" from a pre-existing disabled state
+      // (e.g., no destinations available — set server-side in the parent
+      // template).
+      var importBtn = document.getElementById('import-submit-btn');
+      if (importBtn && !importBtn.disabled) {
+        importBtn.disabled = true;
+        importBtn.dataset.disabledByCollectionMode = "1";
+      }
+
+      // Collection-mode action-select sync. Mirrors the deck-mode block but
+      // reads total_user_owned from cell 3 and writes new_qty only
+      // (move_qty stays 0 in collection mode).
+      document.querySelectorAll('.reconcile-action-select').forEach(function (sel) {
+        var row = sel.closest('tr');
+        if (!row) return;
+        var hiddenNew = row.querySelector('input[name="reconcile_new_qty"]');
+        var cells = row.querySelectorAll('td');
+        var needed = parseInt((cells[1].textContent || '').replace(/\D/g, ''), 10) || 0;
+        var owned = parseInt((cells[2].textContent || '').replace(/\D/g, ''), 10) || 0;
+        sel.addEventListener('change', function () {
+          var v = sel.value;
+          if (v === 'skip_already_owned') {
+            hiddenNew.value = 0;
+          } else if (v === 'import_delta') {
+            hiddenNew.value = Math.max(0, needed - owned);
+          } else {
             hiddenNew.value = needed;
           }
         });

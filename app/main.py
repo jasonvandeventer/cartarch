@@ -89,6 +89,7 @@ from app.inventory_service import (
     confirm_all_pending,
     confirm_pending_row,
     delete_inventory_row,
+    find_inventory_matches_for_collection_import,
     get_drawer_label,
     get_inventory_row_stats,
     get_location_label,
@@ -460,61 +461,110 @@ async def import_reconcile_preview(
     _: None = CsrfRequired,
 ):
     """HTMX endpoint: fires when the destination dropdown changes on the
-    import preview. Returns the inner HTML of #reconciliation-panel —
-    populated reconciliation table when the destination is a deck, empty
-    otherwise. The wrapper div lives in import_preview.html and is
-    untouched by hx-swap=innerHTML.
-    """
-    deck = _deck_for_storage_location(session, current_user.id, target_location_id)
-    if deck is None:
-        # Non-deck destination (auto-sort, binder, box, etc.) — no
-        # reconciliation. Returning empty content clears the panel.
-        return render(
-            request,
-            "_import_reconciliation.html",
-            {"rows": [], "deck_name": None, "total_to_move": 0, "total_to_import_new": 0},
-        )
+    import preview. Returns the inner HTML of #reconciliation-panel.
 
+    Dispatches on destination type:
+      - Deck destination → deck-reconciliation path (Session 2 / v3.16.13-14).
+        Renders the partial in `reconcile_mode="deck"` with movable matches,
+        target-deck and other-deck breakdowns, and move/move-plus-new/import
+        action options.
+      - Non-deck destination (drawer/binder/box/other) OR auto-sort
+        (target_location_id == 0) → collection-reconciliation path
+        (Session A / v3.16.15+). Renders the partial in
+        `reconcile_mode="collection"` with skip/delta/new actions based on
+        total cross-location ownership.
+
+    The wrapper div #reconciliation-panel lives in import_preview.html and
+    is untouched by hx-swap=innerHTML — only its inner content changes.
+    """
     parsed_rows = _parsed_rows_from_form(
         line_number, name, scryfall_id, set_code, collector_number, finish, quantity, location
     )
-    matches_rows = find_inventory_matches_for_deck_import(
-        session, current_user.id, deck.id, parsed_rows
-    )
 
-    # Decorate each result with a display_name (prefer the user-typed name
-    # from the import row; fall back to the Card.name from the catalog).
-    name_by_index = {r.get("line_number"): r.get("name") for r in parsed_rows}
-    card_ids = [r["card_id"] for r in matches_rows if r.get("card_id")]
-    card_name_by_id: dict[int, str] = {}
-    if card_ids:
-        for c in session.query(Card.id, Card.name).filter(Card.id.in_(card_ids)).all():
-            card_name_by_id[c.id] = c.name
-    for row in matches_rows:
-        from_form = name_by_index.get(row.get("line_number")) or ""
-        row["display_name"] = (
-            from_form or card_name_by_id.get(row.get("card_id")) or row.get("scryfall_id", "")
+    # Decorate each parsed row's resolved card with a display_name for
+    # the partial template. Same logic used by both reconciliation paths.
+    def _decorate_display_names(rows: list[dict]) -> None:
+        name_by_index = {r.get("line_number"): r.get("name") for r in parsed_rows}
+        card_ids = [r["card_id"] for r in rows if r.get("card_id")]
+        card_name_by_id: dict[int, str] = {}
+        if card_ids:
+            for c in session.query(Card.id, Card.name).filter(Card.id.in_(card_ids)).all():
+                card_name_by_id[c.id] = c.name
+        for row in rows:
+            from_form = name_by_index.get(row.get("line_number")) or ""
+            row["display_name"] = (
+                from_form or card_name_by_id.get(row.get("card_id")) or row.get("scryfall_id", "")
+            )
+
+    deck = _deck_for_storage_location(session, current_user.id, target_location_id)
+
+    if deck is not None:
+        # Deck destination — existing path.
+        matches_rows = find_inventory_matches_for_deck_import(
+            session, current_user.id, deck.id, parsed_rows
+        )
+        _decorate_display_names(matches_rows)
+
+        total_to_move = sum(r["recommended_move_qty"] for r in matches_rows)
+        # Anticipated auto-merge: when target deck already has a row for
+        # this (card, finish), the import_new path folds ALL of
+        # recommended_new_qty into that existing row instead of creating
+        # a duplicate.
+        total_to_merge = sum(
+            r["recommended_new_qty"] for r in matches_rows if r["total_in_target_deck"] > 0
+        )
+        total_to_import_new = sum(r["recommended_new_qty"] for r in matches_rows) - total_to_merge
+
+        return render(
+            request,
+            "_import_reconciliation.html",
+            {
+                "reconcile_mode": "deck",
+                "rows": matches_rows,
+                "deck_name": deck.name,
+                "total_to_move": total_to_move,
+                "total_to_import_new": total_to_import_new,
+                "total_to_merge": total_to_merge,
+            },
         )
 
-    total_to_move = sum(r["recommended_move_qty"] for r in matches_rows)
-    # Anticipated auto-merge: when target deck already has a row for this
-    # (card, finish), the import_new path will fold ALL of recommended_new_qty
-    # into that existing row instead of creating a duplicate. Otherwise the
-    # new copies are placed fresh.
-    total_to_merge = sum(
-        r["recommended_new_qty"] for r in matches_rows if r["total_in_target_deck"] > 0
+    # Non-deck destination (auto-sort or any non-deck location).
+    matches_rows = find_inventory_matches_for_collection_import(
+        session, current_user.id, parsed_rows
     )
-    total_to_import_new = sum(r["recommended_new_qty"] for r in matches_rows) - total_to_merge
+    _decorate_display_names(matches_rows)
+
+    total_to_skip = 0
+    total_to_delta = 0
+    total_to_new = 0
+    for r in matches_rows:
+        action = r["recommended_action"]
+        if action == "skip_already_owned":
+            total_to_skip += r["quantity_needed"]
+        elif action == "import_delta":
+            total_to_delta += r["recommended_new_qty"]
+            total_to_skip += r["quantity_needed"] - r["recommended_new_qty"]
+        else:  # import_new
+            total_to_new += r["recommended_new_qty"]
+
+    # Destination name for the summary (when not auto-sort).
+    destination_name: str | None = None
+    if target_location_id > 0:
+        loc = get_location(session, location_id=target_location_id, user_id=current_user.id)
+        if loc is not None:
+            destination_name = loc.name
 
     return render(
         request,
         "_import_reconciliation.html",
         {
+            "reconcile_mode": "collection",
             "rows": matches_rows,
-            "deck_name": deck.name,
-            "total_to_move": total_to_move,
-            "total_to_import_new": total_to_import_new,
-            "total_to_merge": total_to_merge,
+            "deck_name": destination_name,  # template treats this as a generic destination label
+            "total_to_skip": total_to_skip,
+            "total_to_delta": total_to_delta,
+            "total_to_new": total_to_new,
+            "manual_mode": False,
         },
     )
 
@@ -899,18 +949,18 @@ async def manual_import_reconcile_preview(
     current_user: User = Depends(get_current_user),
     _: None = CsrfRequired,
 ):
-    """HTMX endpoint for the single-card (manual) import preview. Same
-    contract as /import/reconcile-preview but takes scalar fields
-    instead of the parallel arrays.
-    """
-    deck = _deck_for_storage_location(session, current_user.id, target_location_id)
-    if deck is None:
-        return render(
-            request,
-            "_import_reconciliation.html",
-            {"rows": [], "deck_name": None, "total_to_move": 0, "total_to_import_new": 0},
-        )
+    """HTMX endpoint for the single-card (manual) import preview.
 
+    Dispatch shape mirrors /import/reconcile-preview (deck vs non-deck),
+    but for the manual flow we always set `manual_mode=True` in the
+    collection-mode render context. That flips the action-select default
+    to `import_new` (acquisition semantics) instead of `skip_already_owned`,
+    per design doc §5.5: manual single-card entries are usually
+    acquisitions, not sync operations.
+
+    For deck destinations the manual flow uses the same defaults as the
+    CSV flow — manual_mode is collection-mode-only.
+    """
     parsed_rows = [
         {
             "line_number": 1,
@@ -923,31 +973,77 @@ async def manual_import_reconcile_preview(
             "name": "",
         }
     ]
-    matches_rows = find_inventory_matches_for_deck_import(
-        session, current_user.id, deck.id, parsed_rows
-    )
 
-    if matches_rows and matches_rows[0].get("card_id"):
-        card = session.query(Card.name).filter(Card.id == matches_rows[0]["card_id"]).first()
-        matches_rows[0]["display_name"] = card.name if card else scryfall_id
-    elif matches_rows:
-        matches_rows[0]["display_name"] = scryfall_id
+    def _decorate_single(rows: list[dict]) -> None:
+        if rows and rows[0].get("card_id"):
+            c = session.query(Card.name).filter(Card.id == rows[0]["card_id"]).first()
+            rows[0]["display_name"] = c.name if c else scryfall_id
+        elif rows:
+            rows[0]["display_name"] = scryfall_id
 
-    total_to_move = sum(r["recommended_move_qty"] for r in matches_rows)
-    total_to_merge = sum(
-        r["recommended_new_qty"] for r in matches_rows if r["total_in_target_deck"] > 0
+    deck = _deck_for_storage_location(session, current_user.id, target_location_id)
+
+    if deck is not None:
+        matches_rows = find_inventory_matches_for_deck_import(
+            session, current_user.id, deck.id, parsed_rows
+        )
+        _decorate_single(matches_rows)
+
+        total_to_move = sum(r["recommended_move_qty"] for r in matches_rows)
+        total_to_merge = sum(
+            r["recommended_new_qty"] for r in matches_rows if r["total_in_target_deck"] > 0
+        )
+        total_to_import_new = sum(r["recommended_new_qty"] for r in matches_rows) - total_to_merge
+
+        return render(
+            request,
+            "_import_reconciliation.html",
+            {
+                "reconcile_mode": "deck",
+                "rows": matches_rows,
+                "deck_name": deck.name,
+                "total_to_move": total_to_move,
+                "total_to_import_new": total_to_import_new,
+                "total_to_merge": total_to_merge,
+            },
+        )
+
+    # Non-deck destination — collection mode with manual_mode=True.
+    matches_rows = find_inventory_matches_for_collection_import(
+        session, current_user.id, parsed_rows
     )
-    total_to_import_new = sum(r["recommended_new_qty"] for r in matches_rows) - total_to_merge
+    _decorate_single(matches_rows)
+
+    total_to_skip = 0
+    total_to_delta = 0
+    total_to_new = 0
+    for r in matches_rows:
+        action = r["recommended_action"]
+        if action == "skip_already_owned":
+            total_to_skip += r["quantity_needed"]
+        elif action == "import_delta":
+            total_to_delta += r["recommended_new_qty"]
+            total_to_skip += r["quantity_needed"] - r["recommended_new_qty"]
+        else:
+            total_to_new += r["recommended_new_qty"]
+
+    destination_name: str | None = None
+    if target_location_id > 0:
+        loc = get_location(session, location_id=target_location_id, user_id=current_user.id)
+        if loc is not None:
+            destination_name = loc.name
 
     return render(
         request,
         "_import_reconciliation.html",
         {
+            "reconcile_mode": "collection",
             "rows": matches_rows,
-            "deck_name": deck.name,
-            "total_to_move": total_to_move,
-            "total_to_import_new": total_to_import_new,
-            "total_to_merge": total_to_merge,
+            "deck_name": destination_name,
+            "total_to_skip": total_to_skip,
+            "total_to_delta": total_to_delta,
+            "total_to_new": total_to_new,
+            "manual_mode": True,  # default flips to import_new
         },
     )
 

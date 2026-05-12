@@ -35,6 +35,18 @@ Scenarios I-K (target_deck / other_deck handling — Session 2.5):
        deck; both lists are surfaced separately; matches list stays
        empty; recommended_action=import_new
 
+Scenarios L-P (collection-mode sync — Session A):
+
+    L. user owns 4 of cards[11] in a drawer, imports 4 to auto-sort
+       → "skip_already_owned", new_qty=0, owned_breakdown has 1 entry
+    M. user owns 2 of cards[12] in a drawer, imports 4
+       → "import_delta", new_qty=2, total_user_owned=2
+    N. user owns 1 of cards[13] in the target deck (NO non-deck copies),
+       imports 1 → "skip_already_owned" (deck rows count!), new_qty=0,
+       owned_breakdown has 1 deck-type entry
+    P. user owns 2 pending rows of cards[14], imports 4
+       → "import_delta", new_qty=2, owned_breakdown has 1 pending entry
+
 Run from project root:
     DATA_DIR=$(pwd)/dev-data SESSION_SECRET_KEY=test \\
       python -m scripts.manual_test_reconciliation
@@ -50,6 +62,7 @@ import time
 
 from app.db import SessionLocal
 from app.deck_service import find_inventory_matches_for_deck_import
+from app.inventory_service import find_inventory_matches_for_collection_import
 from app.main import _commit_deck_import_with_reconciliation
 from app.models import (
     Card,
@@ -71,12 +84,15 @@ def setup(session):
     # 0-5 (read-only). G-H use cards 6-7 (commit mutates drawer rows).
     # I uses card 8 (target deck already has it, commit auto-merges). J
     # uses card 9 (target deck has it, function output check). K uses
-    # card 10 (in other deck, function output check). Distinct cards per
-    # scenario keep them independent.
-    cards = session.query(Card).limit(11).all()
-    if len(cards) < 11:
+    # card 10 (in other deck, function output check). L uses card 11
+    # (drawer, full coverage). M uses card 12 (drawer, partial coverage).
+    # N uses card 13 (target deck only — deck rows count toward owned).
+    # P uses card 14 (pending row only — pending counts toward owned).
+    # Distinct cards per scenario keep them independent.
+    cards = session.query(Card).limit(15).all()
+    if len(cards) < 15:
         raise RuntimeError(
-            f"dev DB has only {len(cards)} Card rows; need at least 11 for the smoke test"
+            f"dev DB has only {len(cards)} Card rows; need at least 15 for the smoke test"
         )
 
     stamp = int(time.time())
@@ -240,6 +256,48 @@ def setup(session):
             quantity=1,
             storage_location_id=other_deck_loc.id,
             is_pending=False,
+        ),
+        # L: user1 owns 4 of cards[11] in drawer. Importing 4 should
+        # skip_already_owned in collection mode.
+        InventoryRow(
+            user_id=user1.id,
+            card_id=cards[11].id,
+            finish="normal",
+            quantity=4,
+            storage_location_id=drawer_loc.id,
+            is_pending=False,
+        ),
+        # M: user1 owns 2 of cards[12] in drawer. Importing 4 should
+        # import_delta with new_qty=2.
+        InventoryRow(
+            user_id=user1.id,
+            card_id=cards[12].id,
+            finish="normal",
+            quantity=2,
+            storage_location_id=drawer_loc.id,
+            is_pending=False,
+        ),
+        # N: user1 owns 1 of cards[13] ONLY in the target deck — no
+        # non-deck copies. Importing 1 should still skip (deck rows
+        # count toward total_user_owned in collection mode).
+        InventoryRow(
+            user_id=user1.id,
+            card_id=cards[13].id,
+            finish="normal",
+            quantity=1,
+            storage_location_id=target_deck_loc.id,
+            is_pending=False,
+        ),
+        # P: user1 owns 2 of cards[14] as a PENDING row (no
+        # storage_location_id, is_pending=True). Importing 4 should
+        # import_delta with new_qty=2 because pending counts toward owned.
+        InventoryRow(
+            user_id=user1.id,
+            card_id=cards[14].id,
+            finish="normal",
+            quantity=2,
+            storage_location_id=None,
+            is_pending=True,
         ),
     ]
     session.add_all(inv_rows)
@@ -824,6 +882,138 @@ def run_scenarios(session, env):
             "K.recommends_import_new",
             row_k["recommended_action"] == "import_new",
             f"got action={row_k['recommended_action']}",
+        )
+    )
+
+    # ---- Scenario L: collection-mode skip_already_owned ----
+    # User owns 4 of cards[11] in a drawer. Importing 4 → skip.
+    out_l = find_inventory_matches_for_collection_import(
+        session,
+        env["user1"].id,
+        [
+            {
+                "line_number": 1,
+                "scryfall_id": env["cards"][11].scryfall_id,
+                "finish": "normal",
+                "quantity": 4,
+            }
+        ],
+    )
+    row_l = out_l[0]
+    results.append(
+        _check(
+            "L.action",
+            row_l["recommended_action"] == "skip_already_owned"
+            and row_l["recommended_new_qty"] == 0
+            and row_l["total_user_owned"] == 4,
+            f"got action={row_l['recommended_action']} new={row_l['recommended_new_qty']} "
+            f"owned={row_l['total_user_owned']}",
+        )
+    )
+    results.append(
+        _check(
+            "L.breakdown",
+            len(row_l["owned_breakdown"]) == 1
+            and row_l["owned_breakdown"][0]["location_type"] == "drawer"
+            and row_l["owned_breakdown"][0]["quantity"] == 4,
+            f"got breakdown={row_l['owned_breakdown']!r}",
+        )
+    )
+
+    # ---- Scenario M: collection-mode import_delta ----
+    # User owns 2 of cards[12] in a drawer. Importing 4 → import_delta, new_qty=2.
+    out_m = find_inventory_matches_for_collection_import(
+        session,
+        env["user1"].id,
+        [
+            {
+                "line_number": 1,
+                "scryfall_id": env["cards"][12].scryfall_id,
+                "finish": "normal",
+                "quantity": 4,
+            }
+        ],
+    )
+    row_m = out_m[0]
+    results.append(
+        _check(
+            "M.action",
+            row_m["recommended_action"] == "import_delta"
+            and row_m["recommended_new_qty"] == 2
+            and row_m["total_user_owned"] == 2,
+            f"got action={row_m['recommended_action']} new={row_m['recommended_new_qty']} "
+            f"owned={row_m['total_user_owned']}",
+        )
+    )
+
+    # ---- Scenario N: deck rows count toward owned in collection mode ----
+    # User owns 1 of cards[13] ONLY in target deck. No non-deck copies.
+    # Importing 1 → still skip (because deck rows count).
+    out_n = find_inventory_matches_for_collection_import(
+        session,
+        env["user1"].id,
+        [
+            {
+                "line_number": 1,
+                "scryfall_id": env["cards"][13].scryfall_id,
+                "finish": "normal",
+                "quantity": 1,
+            }
+        ],
+    )
+    row_n = out_n[0]
+    results.append(
+        _check(
+            "N.action",
+            row_n["recommended_action"] == "skip_already_owned"
+            and row_n["recommended_new_qty"] == 0
+            and row_n["total_user_owned"] == 1,
+            f"got action={row_n['recommended_action']} new={row_n['recommended_new_qty']} "
+            f"owned={row_n['total_user_owned']}",
+        )
+    )
+    results.append(
+        _check(
+            "N.deck_breakdown",
+            len(row_n["owned_breakdown"]) == 1
+            and row_n["owned_breakdown"][0]["location_type"] == "deck",
+            f"got breakdown={row_n['owned_breakdown']!r}",
+        )
+    )
+
+    # ---- Scenario P: pending rows count toward owned ----
+    # User has 2 of cards[14] in pending (is_pending=True, no storage_location).
+    # Importing 4 → import_delta, new_qty=2.
+    out_p = find_inventory_matches_for_collection_import(
+        session,
+        env["user1"].id,
+        [
+            {
+                "line_number": 1,
+                "scryfall_id": env["cards"][14].scryfall_id,
+                "finish": "normal",
+                "quantity": 4,
+            }
+        ],
+    )
+    row_p = out_p[0]
+    results.append(
+        _check(
+            "P.action",
+            row_p["recommended_action"] == "import_delta"
+            and row_p["recommended_new_qty"] == 2
+            and row_p["total_user_owned"] == 2,
+            f"got action={row_p['recommended_action']} new={row_p['recommended_new_qty']} "
+            f"owned={row_p['total_user_owned']}",
+        )
+    )
+    results.append(
+        _check(
+            "P.pending_breakdown",
+            len(row_p["owned_breakdown"]) == 1
+            and row_p["owned_breakdown"][0]["location_type"] == "pending"
+            and row_p["owned_breakdown"][0]["location_name"] == "Pending",
+            f"got breakdown={row_p['owned_breakdown']!r}",
         )
     )
 

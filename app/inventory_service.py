@@ -5,7 +5,7 @@ from collections.abc import Iterable
 from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import Float as SAFloat
-from sqlalchemy import and_, cast, func, not_, or_, text
+from sqlalchemy import and_, cast, func, not_, or_, text, tuple_
 from sqlalchemy.orm import Session, joinedload
 
 from app.audit_service import log_transaction
@@ -835,6 +835,268 @@ def place_imported_rows(
 
     session.commit()
     return len(rows)
+
+
+# Tier priority for ordering owned-breakdown entries. Mirrors the deck
+# reconciliation function's tier order but with "deck" inserted before
+# "pending" since deck-located copies still count toward "owned" for sync
+# purposes (design doc collection_import_sync.md §4.4).
+_COLLECTION_TIER_PRIORITY: dict[str, int] = {
+    "drawer": 0,
+    "binder": 1,
+    "box": 2,
+    "other": 3,
+    "deck": 4,
+    "pending": 5,
+}
+
+
+def find_inventory_matches_for_collection_import(
+    session: Session,
+    user_id: int,
+    parsed_rows: list[dict],
+) -> list[dict]:
+    """Read-only sync-mode reconciliation lookup for non-deck imports.
+
+    Sibling function to ``find_inventory_matches_for_deck_import`` in
+    ``app/deck_service.py``. Where the deck function asks "what could I
+    MOVE into this deck?", this function asks "how much do I already
+    OWN of each card across all locations?" — the answer drives the
+    skip / partial-import / new-import recommendation for full-collection
+    re-imports (Helvault/Moxfield collection exports, etc.) per
+    ``docs/collection_import_sync.md``.
+
+    Pure read function — no DB writes. Callers (the eventual Session B
+    commit handler) consume the recommendation by:
+      - skipping rows where ``recommended_action == "skip_already_owned"``
+      - importing ``recommended_new_qty`` copies for the remaining rows
+        via the existing ``persist_import_rows`` + ``place_imported_rows``
+        path
+
+    Args:
+        session:      SQLAlchemy session.
+        user_id:      Owner of the inventory being reconciled. Per-user
+                      scoped — never returns inventory from other users.
+        parsed_rows:  List of dicts matching the shape produced by
+                      ``parse_scanner_csv`` / ``parse_text_list`` in
+                      ``app/import_service.py``. Each must have at least
+                      ``line_number``, ``scryfall_id``, ``finish``,
+                      ``quantity``.
+
+    Returns:
+        One dict per parsed row, preserving input order. Each output
+        dict::
+
+            {
+                "line_number": int,
+                "card_id": int | None,        # None if scryfall_id not in catalog
+                "scryfall_id": str,
+                "finish": str,
+                "quantity_needed": int,
+                "total_user_owned": int,      # sum across all locations + pending
+                "owned_breakdown": [
+                    {
+                        "location_name": str,   # "Drawer 2" | "Binder A" | deck name | "Pending"
+                        "location_type": str,   # drawer|binder|box|other|deck|pending
+                        "quantity": int,
+                    },
+                    ...
+                ],
+                "recommended_action": str,
+                    # "skip_already_owned" | "import_delta" | "import_new"
+                "recommended_new_qty": int,
+            }
+
+        The "skip qty" is implicit: ``quantity_needed - recommended_new_qty``.
+
+    Recommended action — pure function of ``total_user_owned`` vs
+    ``quantity_needed``::
+
+        total_user_owned >= quantity_needed
+            -> "skip_already_owned", new_qty=0
+        0 < total_user_owned < quantity_needed
+            -> "import_delta", new_qty=quantity_needed - total_user_owned
+        total_user_owned == 0
+            -> "import_new", new_qty=quantity_needed
+
+    Match selection rules:
+      - Same ``(user_id, card_id, finish)``.
+      - **Includes ALL locations** — decks, non-deck (drawer/binder/box/
+        other), and pending rows. The whole point of the sync flow is
+        "do I already own this card anywhere?" so deck-located copies
+        and unplaced pending rows both contribute to the count. This is
+        the key difference from the deck-reconciliation function, which
+        excludes deck rows from its movable-matches list.
+      - Pending rows (``is_pending=True``, no ``storage_location_id``)
+        synthesize ``location_name="Pending"`` and ``location_type="pending"``
+        for the breakdown.
+
+    Owned-breakdown ordering (callers may iterate in tier order):
+      1. ``drawer``
+      2. ``binder``
+      3. ``box``
+      4. ``other``
+      5. ``deck``
+      6. ``pending``
+      Within tier: ordered by ``inventory_row_id`` ASC for determinism.
+
+    Performance: one query for Card-id resolution + one tuple-IN query
+    for inventory matches (joined to StorageLocation via outerjoin so
+    pending rows come through with loc=None). No N+1.
+
+    Session A precursor notes (captured during implementation for future
+    readers):
+
+    Pending rows count as "owned."
+        ``app/import_service.py::persist_import_rows`` (lines 379-394)
+        merges new imports with existing PENDING rows from the same
+        user. The merge query strictly filters
+        ``drawer IS NULL AND slot IS NULL AND is_pending IS TRUE``.
+        Pending rows are real ``InventoryRow`` records — quantity the
+        user owns but hasn't filed yet. Including them here matches the
+        sync semantics (the user does own these cards). If a later
+        ``import_delta`` for the same row routes the delta through
+        ``persist_import_rows`` again, the existing pending-merge logic
+        will fold the delta qty into the same pending row rather than
+        create a duplicate pending row — also correct, since pending
+        rows merge by ``(card_id, finish)``.
+
+    ``place_imported_rows`` doesn't auto-merge.
+        ``app/inventory_service.py::place_imported_rows`` (lines
+        814-837) sets ``storage_location_id`` + ``is_pending=False`` on
+        the given row IDs without checking for existing matching rows
+        at the destination. So ``recommended_new_qty`` translates to
+        "new rows PLACED ALONGSIDE existing rows at the destination,"
+        not "merged into existing rows." The drawer-sorter
+        (``resort_collection``) consolidates these for drawer-sorter
+        users on the next pass; binder/box destinations will see
+        permanent scattered duplicates until a future v3.16.X polish
+        ports the v3.16.14 deck-merge pattern to non-deck destinations
+        (design doc §8.1, flagged as a polish target rather than
+        deferred-indefinitely future work).
+    """
+    if not parsed_rows:
+        return []
+
+    # Resolve scryfall_ids → card_ids in one query.
+    scryfall_ids = sorted({r.get("scryfall_id") for r in parsed_rows if r.get("scryfall_id")})
+    card_by_sid: dict[str, int] = {}
+    if scryfall_ids:
+        for card_row in (
+            session.query(Card.id, Card.scryfall_id)
+            .filter(Card.scryfall_id.in_(scryfall_ids))
+            .all()
+        ):
+            card_by_sid[card_row.scryfall_id] = card_row.id
+
+    # Build the set of (card_id, finish) tuples to look up.
+    lookup_keys: set[tuple[int, str]] = set()
+    for r in parsed_rows:
+        sid = r.get("scryfall_id")
+        if not sid:
+            continue
+        card_id = card_by_sid.get(sid)
+        if card_id is None:
+            continue
+        finish = (r.get("finish") or "normal").strip().lower()
+        lookup_keys.add((card_id, finish))
+
+    # One tuple-IN query for all matching inventory rows. Outerjoin so
+    # pending rows (storage_location_id IS NULL) come through with loc=None.
+    breakdown_by_key: dict[tuple[int, str], list[dict]] = {key: [] for key in lookup_keys}
+    if lookup_keys:
+        rows = (
+            session.query(InventoryRow, StorageLocation)
+            .outerjoin(
+                StorageLocation,
+                InventoryRow.storage_location_id == StorageLocation.id,
+            )
+            .filter(
+                InventoryRow.user_id == user_id,
+                tuple_(InventoryRow.card_id, InventoryRow.finish).in_(list(lookup_keys)),
+            )
+            .all()
+        )
+        for row, loc in rows:
+            if loc is None:
+                location_name = "Pending"
+                location_type = "pending"
+            else:
+                location_name = loc.name
+                location_type = loc.type
+            breakdown_by_key[(row.card_id, row.finish)].append(
+                {
+                    "location_name": location_name,
+                    "location_type": location_type,
+                    "quantity": row.quantity,
+                    "_inventory_row_id": row.id,  # for sort, stripped before return
+                }
+            )
+
+    # Sort each per-key breakdown by tier then row id, then drop the sort key.
+    for entries in breakdown_by_key.values():
+        entries.sort(
+            key=lambda e: (
+                _COLLECTION_TIER_PRIORITY.get(e["location_type"], 99),
+                e["_inventory_row_id"],
+            )
+        )
+        for e in entries:
+            e.pop("_inventory_row_id", None)
+
+    # Build per-parsed-row output in input order.
+    output: list[dict] = []
+    for r in parsed_rows:
+        sid = r.get("scryfall_id") or ""
+        card_id = card_by_sid.get(sid) if sid else None
+        finish = (r.get("finish") or "normal").strip().lower()
+        quantity_needed = max(1, int(r.get("quantity") or 1))
+        line_number = r.get("line_number")
+
+        if card_id is None:
+            output.append(
+                {
+                    "line_number": line_number,
+                    "card_id": None,
+                    "scryfall_id": sid,
+                    "finish": finish,
+                    "quantity_needed": quantity_needed,
+                    "total_user_owned": 0,
+                    "owned_breakdown": [],
+                    "recommended_action": "import_new",
+                    "recommended_new_qty": quantity_needed,
+                }
+            )
+            continue
+
+        breakdown = breakdown_by_key.get((card_id, finish), [])
+        total_user_owned = sum(e["quantity"] for e in breakdown)
+
+        if total_user_owned >= quantity_needed:
+            action = "skip_already_owned"
+            new_qty = 0
+        elif total_user_owned > 0:
+            action = "import_delta"
+            new_qty = quantity_needed - total_user_owned
+        else:
+            action = "import_new"
+            new_qty = quantity_needed
+
+        output.append(
+            {
+                "line_number": line_number,
+                "card_id": card_id,
+                "scryfall_id": sid,
+                "finish": finish,
+                "quantity_needed": quantity_needed,
+                "total_user_owned": total_user_owned,
+                "owned_breakdown": breakdown,
+                "recommended_action": action,
+                "recommended_new_qty": new_qty,
+            }
+        )
+
+    return output
 
 
 def list_pending_rows(session: Session, user_id: int) -> list[InventoryRow]:
