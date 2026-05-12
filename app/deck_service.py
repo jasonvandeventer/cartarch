@@ -4,7 +4,7 @@ import json
 import re
 from datetime import datetime
 
-from sqlalchemy import func
+from sqlalchemy import func, tuple_
 from sqlalchemy.orm import Session, joinedload
 
 from app.audit_service import log_transaction
@@ -1098,6 +1098,294 @@ def get_deck(session: Session, deck_id: int, user_id: int) -> Deck | None:
         )
         .first()
     )
+
+
+# Tier priority for ordering reconciliation matches. Lower number = preferred
+# source for the recommended move. "drawer" is most "loose" / fungible
+# inventory; "pending" is last-resort since those rows haven't been physically
+# placed yet. Empty tiers are skipped naturally — most users have no drawer
+# locations, so binder becomes the effective first tier for them.
+_RECONCILE_TIER_PRIORITY: dict[str, int] = {
+    "drawer": 0,
+    "binder": 1,
+    "box": 2,
+    "other": 3,
+    "pending": 4,
+}
+
+
+def find_inventory_matches_for_deck_import(
+    session: Session,
+    user_id: int,
+    deck_id: int,
+    parsed_rows: list[dict],
+) -> list[dict]:
+    """Read-only reconciliation lookup for the deck-import flow.
+
+    For each parsed import row, find existing inventory the user owns that
+    could be moved to the destination deck instead of importing new copies.
+    This is the data layer behind the upcoming import-preview reconciliation
+    UI (design doc: docs/deck_collection_model.md §3.3).
+
+    Pure read function — does not mutate state. Callers (the eventual
+    Session 3 commit handler) consume the recommendation by either:
+      - calling ``pull_card_to_deck`` for each match in order until
+        ``recommended_move_qty`` is reached, OR
+      - falling through to ``persist_import_rows`` + ``place_imported_rows``
+        for ``recommended_new_qty`` copies.
+
+    Args:
+        session:       SQLAlchemy session.
+        user_id:       Owner of the deck and inventory. Per-user scoped;
+                       this function never returns matches from other users.
+        deck_id:       Target deck. Raises ``ValueError("deck not found")``
+                       if the deck doesn't exist or belongs to another user.
+        parsed_rows:   List of dicts matching the shape produced by
+                       ``parse_scanner_csv`` / ``parse_text_list`` in
+                       ``app/import_service.py``. Each must have at least
+                       ``line_number``, ``scryfall_id``, ``finish``,
+                       ``quantity``.
+
+    Returns:
+        One dict per parsed row, preserving input order. Each output dict::
+
+            {
+                "line_number": int,
+                "card_id": int | None,        # None if scryfall_id not in catalog
+                "scryfall_id": str,
+                "finish": str,
+                "quantity_needed": int,
+                "matches": [
+                    {
+                        "inventory_row_id": int,
+                        "location_name": str,
+                        "location_type": str,  # drawer|binder|box|other|pending
+                        "quantity_available": int,
+                        "tags": list[str],     # source-row role tags (informational)
+                    },
+                    ...
+                ],
+                "total_available": int,
+                "recommended_action": str,
+                    # "move_existing" | "move_existing_plus_new" | "import_new"
+                "recommended_move_qty": int,
+                "recommended_new_qty": int,
+            }
+
+    Match selection rules:
+      - Match same ``(user_id, card_id, finish)``.
+      - Exclude rows in any deck-type ``StorageLocation`` (don't cannibalize
+        other decks by default — design doc §3.3 rationale). This also
+        covers the target deck's own rows as a subset.
+      - Pending rows (``is_pending=True``, no ``storage_location_id``) are
+        included as last-resort matches with synthetic
+        ``location_name="Pending"`` and ``location_type="pending"``.
+
+    Match ordering (callers consume in order until ``move_qty`` is hit):
+      1. ``type=="drawer"`` — drawer-sorter slots; loosest inventory.
+         Only one user account in this app has drawers configured.
+      2. ``type=="binder"``
+      3. ``type=="box"``
+      4. ``type=="other"``
+      5. ``type=="pending"``
+      Within tier: ordered by ``inventory_row_id`` ASC (oldest first) for
+      stable, deterministic output.
+
+    Recommended action — pure function of ``total_available`` vs
+    ``quantity_needed``::
+
+        total_available >= quantity_needed
+            -> "move_existing", move=needed, new=0
+        0 < total_available < quantity_needed
+            -> "move_existing_plus_new",
+               move=total_available, new=needed - total_available
+        total_available == 0
+            -> "import_new", move=0, new=needed
+
+    For cards whose ``scryfall_id`` isn't yet in the local ``Card`` catalog,
+    the output row has ``card_id=None``, empty ``matches``, and
+    ``recommended_action="import_new"``. The existing import flow will
+    resolve+create the ``Card`` during commit.
+
+    Performance: one query for Card-id resolution + one tuple-IN query for
+    inventory matches + one StorageLocation outerjoin in the same query.
+    No N+1 — ~100 parsed rows touch the DB twice total.
+
+    Precursor verification notes (captured during Session 1 for future
+    readers):
+
+    Drawer-sorter excludes deck rows.
+        ``app/inventory_service.py::resort_collection`` (line 1164-1168)
+        applies an outerjoin + ``or_(is None, type != 'deck')`` filter that
+        keeps deck-located rows out of the auto-sort. The same exclusion is
+        mirrored in ``list_pending_rows`` (line 840-853). Reconciliation
+        moves into a deck are therefore safe — the next auto-sort run will
+        not pull them back. Both rules date to v3.11.3 along with a
+        migration that scrubbed any rows previously stuck in the wrong
+        state.
+
+    Source-row tags are dropped by ``pull_card_to_deck`` today (two flavors,
+    tracked separately):
+        1. Pull-then-delete (``app/deck_service.py`` line 1168-1169): when
+           the source ``InventoryRow.quantity`` reaches zero, the row is
+           ``session.delete``'d. Its ``tags`` JSON goes with it. Total
+           data loss for the moved copies.
+        2. Pull-with-remainder (``app/deck_service.py`` line 1150-1163):
+           when a new deck-side row is created, ``InventoryRow(...)``
+           assigns ``user_id``, ``card_id``, ``storage_location_id``,
+           ``finish``, ``quantity``, ``drawer``, ``slot``, ``is_pending``,
+           and timestamps — but never ``tags``. The destination row starts
+           with ``tags=NULL`` even if the source row had a meaningful tag
+           set. Tag discontinuity between source and destination.
+
+        This function reports the source row's ``tags`` in each match's
+        payload so the eventual fix (separate ticket) has all the data it
+        needs at the moment of the move. The reconciliation function itself
+        performs no moves — those go through ``pull_card_to_deck`` (or its
+        successor) in Session 3.
+    """
+    # Validate the deck exists and belongs to this user. Match the style of
+    # other deck_service functions that raise ValueError for ownership /
+    # not-found conditions.
+    deck = session.query(Deck).filter(Deck.id == deck_id, Deck.user_id == user_id).first()
+    if deck is None:
+        raise ValueError("deck not found")
+
+    if not parsed_rows:
+        return []
+
+    # Resolve scryfall_ids → card_ids in one query. Skip rows with no
+    # scryfall_id (the import preview shouldn't pass these through but the
+    # function is defensive).
+    scryfall_ids = sorted({r.get("scryfall_id") for r in parsed_rows if r.get("scryfall_id")})
+    card_by_sid: dict[str, int] = {}
+    if scryfall_ids:
+        for card_row in (
+            session.query(Card.id, Card.scryfall_id)
+            .filter(Card.scryfall_id.in_(scryfall_ids))
+            .all()
+        ):
+            card_by_sid[card_row.scryfall_id] = card_row.id
+
+    # Build the set of (card_id, finish) tuples we need to look up.
+    lookup_keys: set[tuple[int, str]] = set()
+    for r in parsed_rows:
+        sid = r.get("scryfall_id")
+        if not sid:
+            continue
+        card_id = card_by_sid.get(sid)
+        if card_id is None:
+            continue
+        finish = (r.get("finish") or "normal").strip().lower()
+        lookup_keys.add((card_id, finish))
+
+    # One tuple-IN query for all matching inventory rows + their storage
+    # locations. Outerjoin so pending rows (storage_location_id IS NULL)
+    # come through with loc=None.
+    matches_by_key: dict[tuple[int, str], list[dict]] = {key: [] for key in lookup_keys}
+    if lookup_keys:
+        rows = (
+            session.query(InventoryRow, StorageLocation)
+            .outerjoin(
+                StorageLocation,
+                InventoryRow.storage_location_id == StorageLocation.id,
+            )
+            .filter(
+                InventoryRow.user_id == user_id,
+                tuple_(InventoryRow.card_id, InventoryRow.finish).in_(list(lookup_keys)),
+            )
+            .all()
+        )
+        for row, loc in rows:
+            # Exclude any deck-type location (including the target deck's
+            # own rows — that's a subset). Per design doc §3.3, decks
+            # default to "import new" rather than cannibalize the source
+            # deck silently.
+            if loc is not None and loc.type == "deck":
+                continue
+            if loc is None:
+                location_name = "Pending"
+                location_type = "pending"
+            else:
+                location_name = loc.name
+                location_type = loc.type
+            matches_by_key[(row.card_id, row.finish)].append(
+                {
+                    "inventory_row_id": row.id,
+                    "location_name": location_name,
+                    "location_type": location_type,
+                    "quantity_available": row.quantity,
+                    "tags": get_row_tags(row),
+                }
+            )
+
+    # Sort each per-key match list by tier then row id.
+    for match_list in matches_by_key.values():
+        match_list.sort(
+            key=lambda m: (
+                _RECONCILE_TIER_PRIORITY.get(m["location_type"], 99),
+                m["inventory_row_id"],
+            )
+        )
+
+    # Build per-parsed-row output in input order.
+    output: list[dict] = []
+    for r in parsed_rows:
+        sid = r.get("scryfall_id") or ""
+        card_id = card_by_sid.get(sid) if sid else None
+        finish = (r.get("finish") or "normal").strip().lower()
+        quantity_needed = max(1, int(r.get("quantity") or 1))
+        line_number = r.get("line_number")
+
+        if card_id is None:
+            output.append(
+                {
+                    "line_number": line_number,
+                    "card_id": None,
+                    "scryfall_id": sid,
+                    "finish": finish,
+                    "quantity_needed": quantity_needed,
+                    "matches": [],
+                    "total_available": 0,
+                    "recommended_action": "import_new",
+                    "recommended_move_qty": 0,
+                    "recommended_new_qty": quantity_needed,
+                }
+            )
+            continue
+
+        matches = matches_by_key.get((card_id, finish), [])
+        total_available = sum(m["quantity_available"] for m in matches)
+
+        if total_available >= quantity_needed:
+            action = "move_existing"
+            move_qty = quantity_needed
+            new_qty = 0
+        elif total_available > 0:
+            action = "move_existing_plus_new"
+            move_qty = total_available
+            new_qty = quantity_needed - total_available
+        else:
+            action = "import_new"
+            move_qty = 0
+            new_qty = quantity_needed
+
+        output.append(
+            {
+                "line_number": line_number,
+                "card_id": card_id,
+                "scryfall_id": sid,
+                "finish": finish,
+                "quantity_needed": quantity_needed,
+                "matches": matches,
+                "total_available": total_available,
+                "recommended_action": action,
+                "recommended_move_qty": move_qty,
+                "recommended_new_qty": new_qty,
+            }
+        )
+
+    return output
 
 
 def pull_card_to_deck(
