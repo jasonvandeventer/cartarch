@@ -51,6 +51,62 @@
       <h2 class="panel-title">Deck not found</h2>
     {% endif %}
   </section>
+  {% if deck %}
+    <section class="panel add-card-panel">
+      <h3 class="panel-title" style="margin-bottom: 0.4rem">Add card to this deck</h3>
+      <p class="muted" style="margin-top: 0; margin-bottom: 0.6rem">
+        Type a card name, pick a printing, and click Add. If you already
+        own the card, it'll be moved from your collection.
+        <a href="/import">Import a list</a> for bulk add.
+      </p>
+      <form id="deck-add-card-form"
+            method="post"
+            action="/decks/{{ deck.id }}/add-card"
+            class="add-card-form"
+            hx-post="/decks/{{ deck.id }}/add-card"
+            hx-target="#deck-card-list"
+            hx-swap="innerHTML">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <input type="hidden" id="deck-add-scryfall-id" name="scryfall_id" value="">
+        <label for="deck-add-name-input" class="add-card-label">Card name</label>
+        <div class="add-card-input-row">
+          <input type="text"
+                 id="deck-add-name-input"
+                 placeholder="e.g. Sol Ring"
+                 autocomplete="off"
+                 data-mobile-placeholder="Card name…">
+          <input type="number"
+                 id="deck-add-qty"
+                 name="quantity"
+                 value="1"
+                 min="1"
+                 max="99"
+                 inputmode="numeric"
+                 aria-label="Quantity"
+                 title="Quantity">
+        </div>
+        <div class="add-card-finish-row">
+          <label class="add-card-finish-label">
+            <input type="radio" name="finish" value="normal" checked> Nonfoil
+          </label>
+          <label class="add-card-finish-label">
+            <input type="radio" name="finish" value="foil"> Foil
+          </label>
+          <label class="add-card-finish-label">
+            <input type="radio" name="finish" value="etched"> Etched
+          </label>
+        </div>
+        <div id="deck-add-results"
+             class="add-card-results"
+             role="listbox"
+             aria-live="polite"></div>
+        <div class="add-card-actions">
+          <button type="submit" id="deck-add-submit" class="add-card-submit" disabled>Add</button>
+          <span id="deck-add-status" class="muted small-text" aria-live="polite"></span>
+        </div>
+      </form>
+    </section>
+  {% endif %}
   {% if bracket_v2 %}
     <section class="panel bracket-v2-panel">
       <h3 class="panel-title">
@@ -709,6 +765,125 @@
             var p = document.getElementById('deck-lazy-panels');
             if (p) { p.innerHTML = ''; }
           });
+      })();
+      </script>
+      <script>
+      // Deck "Add card" autocomplete + submit gate.
+      // - Debounced fetch against /decks/api/card-autocomplete (200ms).
+      // - Results render as clickable rows with thumbnail + name + set/collector.
+      // - Picking a result populates the hidden scryfall_id field, locks in
+      //   the visible name, and enables the Add button. Editing the name
+      //   after a pick clears the selection (re-enters search mode).
+      // - Enter never submits — only the button can submit, and only when
+      //   a printing has been selected (data-selected-printing flag).
+      // - After HTMX returns the swapped card list, the form resets so the
+      //   user can add another card without a page reload.
+      (function () {
+        var form = document.getElementById('deck-add-card-form');
+        if (!form) return;
+        var nameInput = document.getElementById('deck-add-name-input');
+        var hiddenId = document.getElementById('deck-add-scryfall-id');
+        var qtyInput = document.getElementById('deck-add-qty');
+        var resultsEl = document.getElementById('deck-add-results');
+        var submitBtn = document.getElementById('deck-add-submit');
+        var statusEl = document.getElementById('deck-add-status');
+        var acTimer = null;
+        var lastQuery = '';
+
+        function resetSelection() {
+          hiddenId.value = '';
+          submitBtn.disabled = true;
+          form.dataset.selectedPrinting = '';
+        }
+
+        function selectPrinting(card) {
+          hiddenId.value = card.scryfall_id || '';
+          nameInput.value =
+            card.name +
+            ' (' + (card.set_code || '').toUpperCase() +
+            ' #' + (card.collector_number || '') + ')';
+          submitBtn.disabled = !hiddenId.value;
+          form.dataset.selectedPrinting = '1';
+          resultsEl.innerHTML = '';
+          statusEl.textContent = '';
+        }
+
+        function renderResults(items) {
+          if (!items || !items.length) {
+            resultsEl.innerHTML = '<p class="muted small-text" style="margin: 0.4rem 0 0">No cards matched on Scryfall.</p>';
+            return;
+          }
+          resultsEl.innerHTML = items.map(function (c, i) {
+            var img = c.image_uri_small
+              ? '<img src="' + c.image_uri_small + '" alt="" loading="lazy">'
+              : '<div class="add-card-result-noimg"></div>';
+            var setCode = (c.set_code || '?').toUpperCase();
+            return (
+              '<button type="button" class="add-card-result" data-idx="' + i + '" role="option">' +
+              img +
+              '<div class="add-card-result-meta">' +
+                '<strong>' + (c.name || '') + '</strong>' +
+                '<span class="muted">' + setCode + ' #' + (c.collector_number || '?') +
+                  ' · ' + (c.set_name || '') + '</span>' +
+              '</div>' +
+              '</button>'
+            );
+          }).join('');
+          resultsEl.querySelectorAll('.add-card-result').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+              var idx = parseInt(btn.dataset.idx, 10);
+              selectPrinting(items[idx]);
+            });
+          });
+        }
+
+        nameInput.addEventListener('input', function () {
+          // Editing after a pick → re-enter search mode.
+          if (form.dataset.selectedPrinting) {
+            resetSelection();
+          }
+          var q = nameInput.value.trim();
+          if (q.length < 2) {
+            resultsEl.innerHTML = '';
+            lastQuery = '';
+            return;
+          }
+          if (q === lastQuery) return;
+          lastQuery = q;
+          clearTimeout(acTimer);
+          acTimer = setTimeout(function () {
+            statusEl.textContent = 'Searching…';
+            fetch('/decks/api/card-autocomplete?q=' + encodeURIComponent(q))
+              .then(function (r) { return r.ok ? r.json() : []; })
+              .then(function (data) {
+                statusEl.textContent = '';
+                renderResults(data);
+              })
+              .catch(function () { statusEl.textContent = ''; });
+          }, 200);
+        });
+
+        // Block Enter from submitting unless a printing is selected.
+        nameInput.addEventListener('keydown', function (e) {
+          if (e.key === 'Enter' && !form.dataset.selectedPrinting) {
+            e.preventDefault();
+          }
+        });
+
+        // Reset on successful HTMX swap so the user can add another card.
+        form.addEventListener('htmx:afterRequest', function (evt) {
+          if (evt.detail && evt.detail.successful) {
+            nameInput.value = '';
+            qtyInput.value = '1';
+            resultsEl.innerHTML = '';
+            lastQuery = '';
+            resetSelection();
+            statusEl.textContent = 'Added.';
+            setTimeout(function () { statusEl.textContent = ''; }, 1500);
+          }
+        });
+
+        resetSelection();
       })();
       </script>
     {% endif %}

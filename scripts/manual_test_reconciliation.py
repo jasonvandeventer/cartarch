@@ -58,6 +58,18 @@ Scenarios U-V (post-Session-B polish — v3.16.17):
        deleted (qty 0), new deck row exists with qty=1 AND tags=["Ramp"]
        carried forward.
 
+Scenarios W-X (deck "Add card" endpoint dispatch — v3.16.18):
+
+    W. User owns 2 of cards[21] in drawer; add 1 to deck.
+       find_inventory_matches_for_deck_import → action=move_existing;
+       _commit_deck_import_with_reconciliation moves 1 from drawer to deck
+       (drawer qty 2 → 1, new deck row qty=1, no new InventoryRows).
+       Mirrors the single-card add path /decks/{id}/add-card uses.
+    X. User owns 0 of cards[22]; add 1 to deck.
+       find_inventory_matches_for_deck_import → action=import_new;
+       _commit_deck_import_with_reconciliation imports 1 new row to the
+       deck location (no source mutation, 1 new InventoryRow at deck loc).
+
 Scenarios Q-T (collection-mode commit handler — Session B):
 
     Q. owns 4 of cards[15] in drawer, action=skip_already_owned, qty=4
@@ -130,11 +142,13 @@ def setup(session):
     # Q-T use cards 15-18 (collection-mode commit handler dispatch tests).
     # U-V use cards 19-20 (post-Session-B polish: place_imported_rows
     # auto-merge and pull_card_to_deck tag preservation).
+    # W uses card 21 (add-card: user owns → move). X uses card 22 (add-card:
+    # user doesn't own → import new).
     # Distinct cards per scenario keep them independent.
-    cards = session.query(Card).limit(21).all()
-    if len(cards) < 21:
+    cards = session.query(Card).limit(23).all()
+    if len(cards) < 23:
         raise RuntimeError(
-            f"dev DB has only {len(cards)} Card rows; need at least 21 for the smoke test"
+            f"dev DB has only {len(cards)} Card rows; need at least 23 for the smoke test"
         )
 
     stamp = int(time.time())
@@ -394,6 +408,18 @@ def setup(session):
         # V: user1 owns 1 of cards[20] in drawer with tags=["Ramp"].
         # Scenario calls pull_card_to_deck and verifies the deck row
         # carries the tag.
+        # W: user1 owns 2 of cards[21] in drawer; add-card dispatch should
+        # move 1 to deck (action=move_existing, recommended).
+        InventoryRow(
+            user_id=user1.id,
+            card_id=cards[21].id,
+            finish="normal",
+            quantity=2,
+            storage_location_id=drawer_loc.id,
+            is_pending=False,
+        ),
+        # X: cards[22] — intentionally no row (user owns 0). add-card
+        # dispatch should import a fresh row (action=import_new).
     ]
     session.add_all(inv_rows)
     session.flush()
@@ -1547,6 +1573,148 @@ def run_scenarios(session, env):
             "V.tags_preserved",
             deck_tags_v == ["Ramp"],
             f"got tags={deck_tags_v!r} (expected ['Ramp'])",
+        )
+    )
+
+    # ---- Scenario W: add-card dispatch — user owns → move_existing ----
+    # User owns 2 of cards[21] in drawer; add 1 to deck1. The endpoint
+    # routes parsed_rows through find_inventory_matches_for_deck_import,
+    # picks recommended_action=move_existing, then commits via
+    # _commit_deck_import_with_reconciliation. After: drawer qty 2→1,
+    # one deck row qty=1, no new InventoryRows imported.
+    parsed_w = [
+        {
+            "line_number": 1,
+            "name": "",
+            "scryfall_id": env["cards"][21].scryfall_id,
+            "set_code": "",
+            "collector_number": "",
+            "finish": "normal",
+            "quantity": 1,
+            "location": "",
+        }
+    ]
+    matches_w = find_inventory_matches_for_deck_import(
+        session, env["user1"].id, env["deck1"].id, parsed_w
+    )
+    rc_w = matches_w[0]
+    result_w = _commit_deck_import_with_reconciliation(
+        session=session,
+        user_id=env["user1"].id,
+        deck=env["deck1"],
+        parsed_rows=parsed_w,
+        actions=[rc_w["recommended_action"]],
+        move_qtys=[rc_w["recommended_move_qty"]],
+        new_qtys=[rc_w["recommended_new_qty"]],
+        filename="add-card",
+    )
+    drawer_row_w = (
+        session.query(InventoryRow)
+        .filter(
+            InventoryRow.user_id == env["user1"].id,
+            InventoryRow.card_id == env["cards"][21].id,
+            InventoryRow.storage_location_id == env["drawer_loc_id"],
+        )
+        .first()
+    )
+    deck_rows_w = (
+        session.query(InventoryRow)
+        .filter(
+            InventoryRow.user_id == env["user1"].id,
+            InventoryRow.card_id == env["cards"][21].id,
+            InventoryRow.storage_location_id == env["deck1"].storage_location_id,
+        )
+        .all()
+    )
+    results.append(
+        _check(
+            "W.recommends_move",
+            rc_w["recommended_action"] == "move_existing" and rc_w["recommended_move_qty"] == 1,
+            f"got action={rc_w['recommended_action']} move={rc_w['recommended_move_qty']}",
+        )
+    )
+    results.append(
+        _check(
+            "W.moved_count",
+            result_w["moved_count"] == 1 and result_w["imported_count"] == 0,
+            f"got moved={result_w['moved_count']} imported={result_w['imported_count']}",
+        )
+    )
+    results.append(
+        _check(
+            "W.drawer_decremented",
+            drawer_row_w is not None and drawer_row_w.quantity == 1,
+            f"drawer qty={drawer_row_w.quantity if drawer_row_w else None}",
+        )
+    )
+    results.append(
+        _check(
+            "W.deck_row_qty",
+            len(deck_rows_w) == 1 and deck_rows_w[0].quantity == 1,
+            f"deck rows: count={len(deck_rows_w)} "
+            f"qty={deck_rows_w[0].quantity if deck_rows_w else None}",
+        )
+    )
+
+    # ---- Scenario X: add-card dispatch — user doesn't own → import_new ----
+    # User owns 0 of cards[22]; add 1 to deck1. find_matches returns
+    # action=import_new; commit creates 1 new InventoryRow at the deck
+    # location, no source mutations (there's no source).
+    parsed_x = [
+        {
+            "line_number": 1,
+            "name": "",
+            "scryfall_id": env["cards"][22].scryfall_id,
+            "set_code": "",
+            "collector_number": "",
+            "finish": "normal",
+            "quantity": 1,
+            "location": "",
+        }
+    ]
+    matches_x = find_inventory_matches_for_deck_import(
+        session, env["user1"].id, env["deck1"].id, parsed_x
+    )
+    rc_x = matches_x[0]
+    result_x = _commit_deck_import_with_reconciliation(
+        session=session,
+        user_id=env["user1"].id,
+        deck=env["deck1"],
+        parsed_rows=parsed_x,
+        actions=[rc_x["recommended_action"]],
+        move_qtys=[rc_x["recommended_move_qty"]],
+        new_qtys=[rc_x["recommended_new_qty"]],
+        filename="add-card",
+    )
+    deck_rows_x = (
+        session.query(InventoryRow)
+        .filter(
+            InventoryRow.user_id == env["user1"].id,
+            InventoryRow.card_id == env["cards"][22].id,
+            InventoryRow.storage_location_id == env["deck1"].storage_location_id,
+        )
+        .all()
+    )
+    results.append(
+        _check(
+            "X.recommends_import_new",
+            rc_x["recommended_action"] == "import_new" and rc_x["recommended_new_qty"] == 1,
+            f"got action={rc_x['recommended_action']} new={rc_x['recommended_new_qty']}",
+        )
+    )
+    results.append(
+        _check(
+            "X.imported_count",
+            result_x["imported_count"] == 1 and result_x["moved_count"] == 0,
+            f"got imported={result_x['imported_count']} moved={result_x['moved_count']}",
+        )
+    )
+    results.append(
+        _check(
+            "X.deck_row_present",
+            len(deck_rows_x) == 1 and deck_rows_x[0].quantity == 1,
+            f"deck rows: count={len(deck_rows_x)} "
+            f"qty={deck_rows_x[0].quantity if deck_rows_x else None}",
         )
     )
 

@@ -117,6 +117,7 @@ from app.presentation_service import build_pending_view_model
 from app.pricing import effective_price
 from app.routes import account, admin, auth
 from app.scryfall import (
+    autocomplete_cards_for_add,
     autocomplete_token_names,
     bulk_refresh_prices,
     fetch_card_by_scryfall_id,
@@ -2890,6 +2891,108 @@ async def decks_pull(
         inventory_row_id=inventory_row_id,
         quantity=quantity,
     )
+
+    return RedirectResponse(url=f"/decks/{deck_id}", status_code=303)
+
+
+@app.get("/decks/api/card-autocomplete")
+def decks_card_autocomplete(
+    q: str = "",
+    current_user: User = Depends(get_current_user),
+):
+    """Lightweight JSON autocomplete for the deck-detail "Add card" panel.
+
+    Returns up to 8 Scryfall printings matching ``q`` (min 2 chars). The
+    payload is intentionally slim — just enough for the dropdown to render
+    a thumbnail + name + set/collector line and submit the selected
+    printing back via the hidden ``scryfall_id`` field on the Add form.
+    """
+    return JSONResponse(autocomplete_cards_for_add(q, limit=8))
+
+
+@app.post("/decks/{deck_id}/add-card")
+async def decks_add_card(
+    request: Request,
+    deck_id: int,
+    scryfall_id: str = Form(...),
+    finish: str = Form("normal"),
+    quantity: int = Form(1),
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+    _: None = CsrfRequired,
+):
+    """Single-card add to a deck, mirroring the import-flow reconciliation.
+
+    Reuses the same reconciliation pipeline the import flow does — calls
+    ``find_inventory_matches_for_deck_import`` to figure out whether the
+    user owns the card in non-deck inventory (then prefer moving over
+    duplicating) or not (then import a fresh row). The function-provided
+    ``recommended_action`` / ``recommended_move_qty`` / ``recommended_new_qty``
+    drive ``_commit_deck_import_with_reconciliation`` directly — no UI
+    reconciliation panel is shown for a single-card add because the action
+    is implicit (move when possible, otherwise import).
+
+    Responds with the HTMX partial when ``HX-Request`` is set so the deck
+    card grid updates in place; otherwise 303-redirects to the deck page
+    (no-JS / non-HTMX fallback).
+    """
+    deck = get_deck(session, deck_id=deck_id, user_id=current_user.id)
+    if not deck or not deck.storage_location_id:
+        raise HTTPException(status_code=404, detail="Deck not found")
+
+    scryfall_id = scryfall_id.strip()
+    if not scryfall_id:
+        raise HTTPException(status_code=400, detail="scryfall_id is required")
+
+    quantity = max(1, min(int(quantity), 99))
+    finish_normalized = normalize_finish(finish)
+
+    parsed_rows = [
+        {
+            "line_number": 1,
+            "name": "",
+            "scryfall_id": scryfall_id,
+            "set_code": "",
+            "collector_number": "",
+            "finish": finish_normalized,
+            "quantity": quantity,
+            "location": "",
+        }
+    ]
+
+    matches = find_inventory_matches_for_deck_import(session, current_user.id, deck.id, parsed_rows)
+    rc = matches[0]
+    action = rc["recommended_action"]
+
+    _commit_deck_import_with_reconciliation(
+        session=session,
+        user_id=current_user.id,
+        deck=deck,
+        parsed_rows=parsed_rows,
+        actions=[action],
+        move_qtys=[rc["recommended_move_qty"]],
+        new_qtys=[rc["recommended_new_qty"]],
+        filename="add-card",
+    )
+
+    if request.headers.get("HX-Request"):
+        items, _value, _count = _build_deck_card_items(
+            session, deck, current_user.id, search="", sort="name", direction="asc"
+        )
+        use_drawer_sorter = current_user.username in DRAWER_SORTER_USERNAMES
+        response = render(
+            request,
+            "_deck_card_list.html",
+            {
+                "deck": deck,
+                "items": items,
+                "commanders": [],
+                "use_drawer_sorter": use_drawer_sorter,
+                "locations": list_locations(session, user_id=current_user.id),
+            },
+        )
+        response.headers["HX-Push-Url"] = f"/decks/{deck_id}"
+        return response
 
     return RedirectResponse(url=f"/decks/{deck_id}", status_code=303)
 

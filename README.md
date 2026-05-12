@@ -2,7 +2,7 @@
 
 Self-hosted web application for managing a physical Magic: The Gathering collection.
 
-**Current version: v3.16.17** · [Platform repo](https://github.com/jasonvandeventer/mana-archive-platform)
+**Current version: v3.16.18** · [Platform repo](https://github.com/jasonvandeventer/mana-archive-platform)
 
 ---
 
@@ -28,6 +28,7 @@ Self-hosted web application for managing a physical Magic: The Gathering collect
 ### Decks
 
 - Create and manage Commander (or any format) decks; edit name, format, and notes inline
+- **Add card panel** on deck detail — type a card name, pick a printing from the Scryfall autocomplete, click Add. If you already own the card it's moved from your collection automatically; otherwise a new copy is imported. Mobile-first single-column layout
 - Mark commanders; commander cards appear in a dedicated panel above the deck grid
 - Full Scryfall-style search within a deck (HTMX-powered partial update: clicking Apply / pressing Enter swaps just the card grid in place, scroll position preserved, address bar updates for shareable URLs; no-JS fallback to the full-page GET form is preserved)
 - **Analytics panel**: mana curve, card type breakdown, color pip counts, avg CMC, "deck peaks at turn X" insight

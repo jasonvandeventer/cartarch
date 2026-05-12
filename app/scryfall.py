@@ -618,3 +618,53 @@ def search_cards_by_name(name: str, limit: int = 20) -> list[dict[str, Any]]:
         }
         for card in cards[:limit]
     ]
+
+
+def autocomplete_cards_for_add(query: str, limit: int = 8) -> list[dict[str, Any]]:
+    """Slim card-autocomplete payload for the deck "Add card" UI.
+
+    Used by ``/decks/api/card-autocomplete``: top printings matching the
+    typed name, returned with just enough info to render a dropdown row
+    (name + set/collector + thumbnail) and resolve the user's pick to a
+    Scryfall ID. Ordered by release date desc (newest printing first)
+    via ``unique=prints``; for a deck-builder use case the user usually
+    wants the most recent reprint they can buy. Single-faced cards use
+    ``image_uris.small``; DFCs fall back to ``card_faces[0].image_uris.small``.
+
+    No DB writes. Pure Scryfall passthrough.
+    """
+    q = query.strip()
+    if len(q) < 2:
+        return []
+
+    url = (
+        "https://api.scryfall.com/cards/search"
+        f"?q={requests.utils.quote(q)}&unique=prints&order=released&dir=desc"
+    )
+    data = _get_json(url)
+    if not data:
+        return []
+
+    cards = data.get("data", [])
+    out: list[dict[str, Any]] = []
+    for card in cards[:limit]:
+        image_small = None
+        image_uris = card.get("image_uris") or {}
+        if image_uris:
+            image_small = image_uris.get("small")
+        else:
+            faces = card.get("card_faces") or []
+            if faces and isinstance(faces[0], dict):
+                front_uris = faces[0].get("image_uris") or {}
+                image_small = front_uris.get("small")
+        out.append(
+            {
+                "scryfall_id": card.get("id"),
+                "name": card.get("name"),
+                "set_code": card.get("set"),
+                "set_name": card.get("set_name"),
+                "collector_number": card.get("collector_number"),
+                "image_uri_small": image_small,
+            }
+        )
+    return out
