@@ -170,7 +170,7 @@
             Does the deck intentionally assemble combos?
             <select name="intent_combo">
               <option value="">— pick —</option>
-              {% for v, lbl in [("plan","Yes — combo is the plan"),("backup","Yes — backup line"),("no","No — just good cards")] %}
+              {% for v, lbl in [("plan","Yes — combo is the plan"),("backup","Yes — backup plan"),("no","No — just good cards")] %}
                 <option value="{{ v }}" {% if deck.intent_combo == v %}selected{% endif %}>{{ lbl }}</option>
               {% endfor %}
             </select>

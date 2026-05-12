@@ -30,11 +30,19 @@
                 flex-wrap: wrap;
                 margin-top: 1rem">
       {% set destination_url = placed_in_url if placed_in_url is defined else ('/pending' if not placed_in else '/collection') %}
+      {% set kind = placed_in_kind if placed_in_kind is defined else none %}
+      {% if kind == 'deck' %}
+        {% set primary_label = 'View deck' %}
+      {% elif kind == 'location' %}
+        {% set primary_label = 'View location' %}
+      {% else %}
+        {% set primary_label = 'View pending' %}
+      {% endif %}
       <a href="{{ destination_url }}">
-        <button type="button">Go to {{ placed_in if placed_in else 'Pending' }}</button>
+        <button type="button">{{ primary_label }}</button>
       </a>
       <a href="/import">
-        <button type="button">Import Another</button>
+        <button type="button" class="ghost-button">Import more cards</button>
       </a>
     </div>
   </section>
