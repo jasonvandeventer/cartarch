@@ -52,12 +52,83 @@ HEADER_ALIASES = {
     "location": "location",
     "name": "name",
     "type": "type",
+    "language": "language",
+    "lang": "language",
     # Helvault: finish is in a column called "extras"
     "extras": "finish",
     # Moxfield: set code is in "Edition", foil status is in "Foil"
     "edition": "set_code",
     "foil": "finish",
 }
+
+
+# Scryfall canonical 2-3 char language codes. Anything outside this set is
+# coerced to "en" rather than persisted as garbage. Helvault/Moxfield exports
+# may write "ja" or "Japanese" — `normalize_language` handles both.
+_SUPPORTED_LANGUAGES: frozenset[str] = frozenset(
+    {
+        "en",
+        "es",
+        "fr",
+        "de",
+        "it",
+        "pt",
+        "ja",
+        "ko",
+        "ru",
+        "zhs",
+        "zht",
+        "he",
+        "la",
+        "grc",
+        "ar",
+        "ph",
+        "sa",
+        "px",
+        "qya",
+    }
+)
+
+_LANGUAGE_NAME_TO_CODE: dict[str, str] = {
+    "english": "en",
+    "spanish": "es",
+    "french": "fr",
+    "german": "de",
+    "italian": "it",
+    "portuguese": "pt",
+    "japanese": "ja",
+    "korean": "ko",
+    "russian": "ru",
+    "chinese": "zhs",
+    "simplified chinese": "zhs",
+    "traditional chinese": "zht",
+    "chinese (simplified)": "zhs",
+    "chinese (traditional)": "zht",
+    "hebrew": "he",
+    "latin": "la",
+    "ancient greek": "grc",
+    "arabic": "ar",
+    "phyrexian": "ph",
+    "sanskrit": "sa",
+}
+
+
+def normalize_language(value: str | None) -> str:
+    """Coerce a language string to a Scryfall code.
+
+    Accepts the code form ("ja"), the long name ("Japanese", case-insensitive),
+    or empty/unknown → "en". Anything outside the recognized set falls back
+    to "en" so import never persists garbage values.
+    """
+    cleaned = (value or "").strip().lower()
+    if not cleaned:
+        return "en"
+    if cleaned in _SUPPORTED_LANGUAGES:
+        return cleaned
+    mapped = _LANGUAGE_NAME_TO_CODE.get(cleaned)
+    if mapped:
+        return mapped
+    return "en"
 
 
 def detect_csv_format(headers: list[str]) -> str:
@@ -136,6 +207,7 @@ def parse_scanner_csv(file_bytes: bytes) -> dict[str, Any]:
         quantity_raw = row.get("quantity", "1")
         name = row.get("name", "")
         card_type = row.get("type", "")
+        language = normalize_language(row.get("language", ""))
         try:
             quantity = max(1, int(quantity_raw or "1"))
         except ValueError:
@@ -151,6 +223,7 @@ def parse_scanner_csv(file_bytes: bytes) -> dict[str, Any]:
                 "location": location,
                 "name": name,
                 "type": card_type,
+                "language": language,
             }
         )
 
@@ -185,6 +258,7 @@ def parse_scanner_csv(file_bytes: bytes) -> dict[str, Any]:
             "location": r["location"],
             "name": r["name"],
             "type": r["type"],
+            "language": r["language"],
             "warnings": [],
         }
 
@@ -388,8 +462,16 @@ def persist_import_rows(
             .all()
         )
 
-    inventory_map: dict[tuple[int, int, str, str | None, str | None, bool], InventoryRow] = {
-        (row.user_id, row.card_id, row.finish, row.drawer, row.slot, row.is_pending): row
+    inventory_map: dict[tuple[int, int, str, str, str | None, str | None, bool], InventoryRow] = {
+        (
+            row.user_id,
+            row.card_id,
+            row.finish,
+            row.language or "en",
+            row.drawer,
+            row.slot,
+            row.is_pending,
+        ): row
         for row in existing_pending_rows
     }
 
@@ -410,9 +492,10 @@ def persist_import_rows(
 
         qty = max(1, int(row.get("quantity") or 1))
         finish = (row.get("finish") or "normal").strip().lower()
+        language = normalize_language(row.get("language"))
         location_note = (row.get("location") or "").strip() or None
 
-        key = (user_id, card.id, finish, None, None, True)
+        key = (user_id, card.id, finish, language, None, None, True)
         target_row = inventory_map.get(key)
 
         if target_row:
@@ -429,6 +512,7 @@ def persist_import_rows(
                 drawer=None,
                 slot=None,
                 is_pending=True,
+                language=language,
                 notes=location_note,
                 created_at=now,
                 updated_at=now,
@@ -663,6 +747,7 @@ def parse_text_list(text: str) -> dict[str, Any]:
                     "finish": parsed["finish"],
                     "quantity": parsed["quantity"],
                     "location": "",
+                    "language": "en",
                     "warnings": build_finish_warnings(card_data, parsed["finish"]),
                 }
             )

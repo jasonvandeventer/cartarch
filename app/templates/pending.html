@@ -90,7 +90,7 @@
                 <div>
                   <div class="pending-name">{{ item.card.name }}</div>
                   <div class="pending-meta">
-                    {{ item.card.set_name }} ({{ item.card.set_code|upper }}) · {{ item.finish|capitalize }} · Qty: {{ item.quantity }} · ${{ '%.2f'|format(item.price) }}
+                    {{ item.card.set_name }} ({{ item.card.set_code|upper }}) · {{ item.finish|capitalize }}{% if item.language and item.language != 'en' %} · <span class="language-badge">{{ item.language|upper }}</span>{% endif %} · Qty: {{ item.quantity }} · ${{ '%.2f'|format(item.price) }}
                   </div>
                   {% if use_drawer_sorter %}
                     <div class="pending-location">

@@ -9,6 +9,7 @@
       </p>
       <p class="muted">
         Finish: {{ finish|capitalize }} &nbsp;·&nbsp; Quantity: {{ quantity }}
+        {% if language and language != 'en' %}&nbsp;·&nbsp; Language: <span class="language-badge">{{ language|upper }}</span>{% endif %}
         &nbsp;·&nbsp; Normal: ${{ card.price_usd or "0.00" }}
         &nbsp;·&nbsp; Foil: ${{ card.price_usd_foil or "0.00" }}
         &nbsp;·&nbsp; Etched: ${{ card.price_usd_etched or "0.00" }}
@@ -25,6 +26,7 @@
         <input type="hidden" name="collector_number" value="{{ collector_number }}">
         <input type="hidden" name="finish" value="{{ finish }}">
         <input type="hidden" name="quantity" value="{{ quantity }}">
+        <input type="hidden" name="language" value="{{ language or 'en' }}">
         <div class="filter-row" style="margin: 0">
           <label style="font-weight: 600;">Destination</label>
           <select name="target_location_id"

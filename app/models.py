@@ -99,6 +99,7 @@ class InventoryRow(Base):
     is_pending: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
     role: Mapped[str | None] = mapped_column(String(32), nullable=True)
     tags: Mapped[str | None] = mapped_column(Text, nullable=True)
+    language: Mapped[str | None] = mapped_column(String(8), nullable=True, default="en", index=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

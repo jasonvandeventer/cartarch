@@ -78,6 +78,7 @@ from app.game_service import (
 )
 from app.import_service import (
     normalize_finish,
+    normalize_language,
     parse_scanner_csv,
     parse_text_list,
     persist_import_rows,
@@ -408,6 +409,7 @@ def _parsed_rows_from_form(
     finish: list[str],
     quantity: list[str],
     location: list[str],
+    language: list[str] | None = None,
 ) -> list[dict]:
     """Rebuild the parsed-row dicts from the parallel-array form fields.
 
@@ -415,6 +417,7 @@ def _parsed_rows_from_form(
     handler that receives the same field shape from import_preview.html.
     """
     rows = []
+    languages = language or []
     for i in range(len(line_number)):
         rows.append(
             {
@@ -426,6 +429,7 @@ def _parsed_rows_from_form(
                 "finish": normalize_finish(finish[i]),
                 "quantity": int(quantity[i]),
                 "location": location[i],
+                "language": normalize_language(languages[i]) if i < len(languages) else "en",
             }
         )
     return rows
@@ -483,6 +487,7 @@ async def import_reconcile_preview(
     finish: list[str] = Form([]),
     quantity: list[str] = Form([]),
     location: list[str] = Form([]),
+    language: list[str] = Form([]),
     session: Session = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
     _: None = CsrfRequired,
@@ -505,7 +510,15 @@ async def import_reconcile_preview(
     is untouched by hx-swap=innerHTML — only its inner content changes.
     """
     parsed_rows = _parsed_rows_from_form(
-        line_number, name, scryfall_id, set_code, collector_number, finish, quantity, location
+        line_number,
+        name,
+        scryfall_id,
+        set_code,
+        collector_number,
+        finish,
+        quantity,
+        location,
+        language,
     )
 
     # Decorate each parsed row's resolved card with a display_name for
@@ -1002,6 +1015,7 @@ async def import_commit(
     finish: list[str] = Form([]),
     quantity: list[str] = Form([]),
     location: list[str] = Form([]),
+    language: list[str] = Form([]),
     target_location_id: int = Form(0),
     reconcile_action: list[str] = Form([]),
     reconcile_move_qty: list[str] = Form([]),
@@ -1011,7 +1025,15 @@ async def import_commit(
     _: None = CsrfRequired,
 ):
     rows = _parsed_rows_from_form(
-        line_number, name, scryfall_id, set_code, collector_number, finish, quantity, location
+        line_number,
+        name,
+        scryfall_id,
+        set_code,
+        collector_number,
+        finish,
+        quantity,
+        location,
+        language,
     )
 
     placed_in = None
@@ -1119,6 +1141,7 @@ async def manual_import_preview(
     collector_number: str = Form(""),
     finish: str = Form("normal"),
     quantity: int = Form(1),
+    language: str = Form("en"),
     session: Session = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
     _: None = CsrfRequired,
@@ -1143,6 +1166,7 @@ async def manual_import_preview(
             "resolved_scryfall_id": resolved_id,
             "finish": normalize_finish(finish),
             "quantity": max(1, quantity),
+            "language": normalize_language(language),
             "set_code": set_code,
             "collector_number": collector_number,
             "current_user": current_user,
@@ -1183,6 +1207,7 @@ async def manual_import_reconcile_preview(
     collector_number: str = Form(""),
     finish: str = Form("normal"),
     quantity: int = Form(1),
+    language: str = Form("en"),
     session: Session = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
     _: None = CsrfRequired,
@@ -1209,6 +1234,7 @@ async def manual_import_reconcile_preview(
             "quantity": max(1, quantity),
             "location": "",
             "name": "",
+            "language": normalize_language(language),
         }
     ]
 
@@ -1298,6 +1324,7 @@ async def manual_import_commit(
     collector_number: str = Form(""),
     finish: str = Form("normal"),
     quantity: int = Form(1),
+    language: str = Form("en"),
     target_location_id: int = Form(0),
     reconcile_action: list[str] = Form([]),
     reconcile_move_qty: list[str] = Form([]),
@@ -1316,6 +1343,7 @@ async def manual_import_commit(
             "quantity": max(1, quantity),
             "location": "",
             "name": "",
+            "language": normalize_language(language),
         }
     ]
 
@@ -1585,6 +1613,7 @@ def collection_page(
                 "id": row.id,
                 "card": row.card,
                 "finish": row.finish,
+                "language": row.language or "en",
                 "quantity": row.quantity,
                 "drawer": row.drawer,
                 "slot": row.slot,
@@ -2095,6 +2124,7 @@ def location_detail_page(
                 "id": row.id,
                 "card": row.card,
                 "finish": row.finish,
+                "language": row.language or "en",
                 "quantity": row.quantity,
                 "slot": row.slot,
                 "effective_price": price,
@@ -2233,6 +2263,7 @@ def drawer_detail_page(
                 "id": row.id,
                 "card": row.card,
                 "finish": row.finish,
+                "language": row.language or "en",
                 "quantity": row.quantity,
                 "slot": row.slot,
                 "is_pending": row.is_pending,
@@ -2495,6 +2526,7 @@ def _build_deck_card_items(
                 "id": row.id,
                 "card": row.card,
                 "finish": row.finish,
+                "language": row.language or "en",
                 "quantity": row.quantity,
                 "effective_price": price,
                 "total_value": row_total,
@@ -2585,6 +2617,7 @@ def deck_detail_page(
                     "id": row.id,
                     "card": row.card,
                     "finish": row.finish,
+                    "language": row.language or "en",
                     "quantity": row.quantity,
                     "location_label": get_location_label(row),
                     "effective_price": price,
@@ -3299,6 +3332,7 @@ def card_detail_page(
             {
                 "id": row.id,
                 "finish": row.finish,
+                "language": row.language or "en",
                 "quantity": row.quantity,
                 "drawer": row.drawer,
                 "slot": row.slot,

@@ -34,6 +34,7 @@
           <input type="hidden" name="finish" value="{{ row.finish }}">
           <input type="hidden" name="quantity" value="{{ row.quantity }}">
           <input type="hidden" name="location" value="{{ row.location }}">
+          <input type="hidden" name="language" value="{{ row.language or 'en' }}">
         {% endfor %}
         <div class="filter-row" style="margin: 0">
           <label style="font-weight: 600;">Destination</label>
@@ -84,6 +85,7 @@
             <th>Set</th>
             <th>Collector #</th>
             <th>Finish</th>
+            <th>Lang</th>
             <th>Qty</th>
             <th>Warnings</th>
           </tr>
@@ -97,6 +99,13 @@
               <td>{{ row.collector_number or '-' }}</td>
               <td>
                 <span class="finish-badge">{{ row.finish|capitalize }}</span>
+              </td>
+              <td>
+                {% if row.language and row.language != 'en' %}
+                  <span class="language-badge">{{ row.language|upper }}</span>
+                {% else %}
+                  <span class="muted">EN</span>
+                {% endif %}
               </td>
               <td>{{ row.quantity }}</td>
               <td>

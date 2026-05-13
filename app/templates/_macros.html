@@ -47,6 +47,9 @@
       </div>
       <div class="inventory-meta">
         <span class="finish-badge">{{ item.finish|capitalize }}</span>
+        {% if item.language and item.language != 'en' %}
+          <span class="language-badge" title="Physical language">{{ item.language|upper }}</span>
+        {% endif %}
         {% if item.card.mana_cost %}· {{ item.card.mana_cost }}{% endif %}
         · Qty {{ item.quantity }} ·
         {% if item.price_status is defined and item.price_status %}

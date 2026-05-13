@@ -24,6 +24,7 @@ from scripts.migrate_v3_16_0_token_inventory import main as migrate_v3_16_0_toke
 from scripts.migrate_v3_16_1_token_back_set_collector import (
     main as migrate_v3_16_1_token_back_set_collector,
 )
+from scripts.migrate_v3_18_0_inventory_language import main as migrate_v3_18_0_inventory_language
 
 
 def _is_applied(name: str) -> bool:
@@ -180,6 +181,13 @@ def run():
         _mark_applied("v3_16_1_token_back_set_collector")
     else:
         print("v3.16.1 token_back_set_collector already applied, skipping")
+
+    if not _is_applied("v3_18_0_inventory_language"):
+        print("Running v3.18.0 inventory language column migration...")
+        migrate_v3_18_0_inventory_language()
+        _mark_applied("v3_18_0_inventory_language")
+    else:
+        print("v3.18.0 inventory_language already applied, skipping")
 
     print("Migration runner complete")
 

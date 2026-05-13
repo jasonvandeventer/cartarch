@@ -372,6 +372,15 @@ def _term_to_clause(key: str | None, value: str):
         return InventoryRow.finish == value
     if key == "drawer":
         return InventoryRow.drawer == value
+    if key in ("lang", "language"):
+        code = (value or "").strip().lower()
+        if not code:
+            return None
+        # Treat NULL as "en" so historic rows imported before the language
+        # column existed answer `lang:en` correctly.
+        if code == "en":
+            return or_(InventoryRow.language == "en", InventoryRow.language.is_(None))
+        return InventoryRow.language == code
     if key in ("c", "color", "colors"):
         color_clauses = []
         for letter in value.upper():
@@ -814,6 +823,7 @@ def move_inventory_row_to_location(
             InventoryRow.user_id == user_id,
             InventoryRow.card_id == row.card_id,
             InventoryRow.finish == row.finish,
+            func.coalesce(InventoryRow.language, "en") == (row.language or "en"),
             InventoryRow.storage_location_id == new_location.id,
             InventoryRow.is_pending.is_(False),
             InventoryRow.id != row.id,
@@ -929,6 +939,7 @@ def place_imported_rows(
                 InventoryRow.user_id == user_id,
                 InventoryRow.card_id == row.card_id,
                 InventoryRow.finish == row.finish,
+                func.coalesce(InventoryRow.language, "en") == (row.language or "en"),
                 InventoryRow.storage_location_id == location.id,
                 InventoryRow.is_pending.is_(False),
                 InventoryRow.id != row.id,

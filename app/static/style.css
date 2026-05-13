@@ -1773,6 +1773,22 @@ td {
   border: 1px solid rgba(86, 113, 160, 0.5);
 }
 
+/* Physical-language badge (v3.18.0). Shown next to the finish badge in
+   the inventory_card macro when item.language is set and is not "en".
+   Amber tint to distinguish from finish at a glance. */
+.language-badge {
+  display: inline-block;
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  background: rgba(245, 158, 11, 0.18);
+  border: 1px solid rgba(245, 158, 11, 0.55);
+  color: #f59e0b;
+  letter-spacing: 0.04em;
+  margin-left: 0.2rem;
+}
+
 .warning-text {
   color: #b45309;
   font-size: 0.9rem;
