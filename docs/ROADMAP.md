@@ -58,13 +58,44 @@ Items that are documented and scoped but not urgent.
 
 ## Tier 4: Future / Someday
 
-Items that are interesting but speculative or low-impact.
+Items here are speculative and may never be implemented. Capturing them keeps the architecture from accidentally foreclosing the option, but none of these are commitments.
 
 - **"What changed since I last looked" per-deck view.** Surface price drift, legality flips, new combos detected by Spellbook since the user's last visit. Would lean on the existing TransactionLog.
 
 - **Set completion progress across the catalog.** A cross-set dashboard ("you're 73% on MH3, 41% on LCI") rather than only the per-set page.
 
 - **Mobile deck-editing additional polish.** The CubeCobra-style panel works; if users surface specific gaps (e.g., a "Remove/Replace" section), follow up.
+
+### AI-backed recommendation engine
+
+A multi-phase feature spanning deck building, collection analysis, and playgroup meta. Currently aspirational; not queued for implementation. Three motivations:
+
+1. **Personal utility.** Deck-building creativity support — suggest cards from the user's collection that fit a deck's themes, propose new deck ideas from owned cards, budget-constrained upgrade paths per deck.
+2. **Learning project.** Productionizing LLM-powered features is a career-relevant skill (provider abstraction, cost management, caching, observability, error handling, RAG patterns). This feature is an opportunity to build that skill against a real personal use case.
+3. **Possible commercialization path.** If Mana Archive ever moves toward public use, AI-powered features are the kind of differentiator that justifies a paid tier. Not a commitment to that path; just an option the architecture should not foreclose.
+
+**Scope (phased):**
+
+- *Phase 1:* Deck upgrade suggestions. Given a deck and the user's collection, suggest cards from the collection that fit the deck's themes. Simple LLM API call with a thoughtful prompt; ships in 1-2 weekends.
+- *Phase 2:* Architectural foundation. Provider abstraction (so the app can swap between Claude, OpenAI, local models), caching by deck-contents hash, request/response logging, cost tracking. Doesn't change user-visible behavior; builds the foundation for everything that follows.
+- *Phase 3:* Embedding-based card similarity. Compute and cache embeddings for cards. Use vector similarity for candidate selection, then LLM for ranking and explanation (retrieval-augmented generation pattern).
+- *Phase 4:* Combo and synergy discovery beyond what CommanderSpellbook surfaces. Use the LLM to identify unexpected interactions among cards in the user's collection.
+- *Phase 5:* Playgroup meta analysis. Given the play record data from the analytics overhaul, suggest deck adjustments based on what's winning or losing in the playgroup over time.
+- *Phase 6:* New deck ideas from collection. "Here are five Commander decks you could build with what you own." More speculative; deepest creative use of the LLM.
+
+**Dependencies:**
+
+- Analytics overhaul must ship first (Phase 5 requires the play-record data the overhaul produces; phases 1-4 don't strictly require it but benefit from the cleaner deck-data surface the overhaul provides).
+- A design doc is required before Phase 1 implementation, covering: provider choice and abstraction approach, prompt design, cost modeling, caching strategy, observability, hallucination handling (LLMs sometimes suggest cards that don't exist), and the success metric for v1.
+
+**Architectural notes:**
+
+- LLM API costs scale per-use, unlike feature engineering costs. At playgroup scale (~10 users, ~10 recommendations/week each), costs are negligible — probably under $5/month. At public scale this would need a cost-control strategy (per-user quotas, free tier limits, paid tier features).
+- Cache by deck-contents hash; same deck shouldn't generate the same recommendation request twice within a TTL window.
+- Log every recommendation request and response for quality analysis and future fine-tuning data. Treat this as observability from day one, not as something added later.
+- Provider abstraction lives behind a single interface so swapping Claude → OpenAI → local model is a configuration change, not a refactor.
+
+**Status:** Aspirational. No timeline. Likely begins with the design doc only — write the doc to discover whether this is actually a feature worth building or just a feature worth thinking about.
 
 ---
 
