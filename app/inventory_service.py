@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import re
 from collections.abc import Iterable
 from datetime import UTC, datetime, timedelta
@@ -773,6 +774,21 @@ def update_inventory_location(
 def move_inventory_row_to_location(
     session: Session, row_id: int, user_id: int, location_id: int
 ) -> InventoryRow:
+    """Move ``row_id`` to ``location_id``, auto-merging with any existing
+    non-pending row at the destination matching ``(user_id, card_id, finish)``.
+
+    Mirrors the v3.16.17 fix in ``place_imported_rows``: previously the
+    manual card-move flow could create a second row when the destination
+    already held the same ``(card, finish)``. Now it consolidates.
+
+    Tag handling: when merging, the moved row's tags are unioned into the
+    existing destination row's tags (de-duplicated, order preserved) before
+    the moved row is deleted, so user-applied role tags are never silently
+    lost.
+
+    Returns the surviving row — the merged-into existing row when a merge
+    happened, otherwise the moved row.
+    """
     row = (
         session.query(InventoryRow)
         .filter(InventoryRow.id == row_id, InventoryRow.user_id == user_id)
@@ -790,10 +806,53 @@ def move_inventory_row_to_location(
         raise ValueError("Storage location not found.")
 
     old_location = row.storage_location.name if row.storage_location else "unassigned"
+    now = datetime.now(UTC)
+
+    existing = (
+        session.query(InventoryRow)
+        .filter(
+            InventoryRow.user_id == user_id,
+            InventoryRow.card_id == row.card_id,
+            InventoryRow.finish == row.finish,
+            InventoryRow.storage_location_id == new_location.id,
+            InventoryRow.is_pending.is_(False),
+            InventoryRow.id != row.id,
+        )
+        .first()
+    )
+
+    if existing is not None:
+        merged_quantity = row.quantity
+        existing.quantity += merged_quantity
+        existing.updated_at = now
+
+        moved_tags = _safe_load_tags(row.tags)
+        if moved_tags:
+            existing_tags = _safe_load_tags(existing.tags)
+            for tag in moved_tags:
+                if tag not in existing_tags:
+                    existing_tags.append(tag)
+            existing.tags = json.dumps(existing_tags) if existing_tags else None
+
+        log_transaction(
+            session=session,
+            user_id=user_id,
+            event_type="location_merge",
+            card_id=row.card_id,
+            finish=row.finish,
+            quantity_delta=merged_quantity,
+            source_location=old_location,
+            destination_location=new_location.name,
+            inventory_row_id=existing.id,
+            note=f"Merged {merged_quantity} into existing row on move",
+        )
+        session.delete(row)
+        session.commit()
+        return existing
 
     row.storage_location_id = new_location.id
     row.is_pending = False
-    row.updated_at = datetime.now(UTC)
+    row.updated_at = now
 
     log_transaction(
         session=session,
@@ -809,6 +868,20 @@ def move_inventory_row_to_location(
     )
     session.commit()
     return row
+
+
+def _safe_load_tags(raw: str | None) -> list[str]:
+    """Parse the ``InventoryRow.tags`` JSON text without raising. Returns
+    [] for null/blank/malformed values."""
+    if not raw:
+        return []
+    try:
+        data = json.loads(raw)
+    except (json.JSONDecodeError, TypeError):
+        return []
+    if not isinstance(data, list):
+        return []
+    return [t for t in data if isinstance(t, str)]
 
 
 def place_imported_rows(

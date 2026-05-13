@@ -772,6 +772,58 @@ td {
   background: #2f9e44;
 }
 
+.rarity-breakdown {
+  margin-top: 0.9rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.rarity-row {
+  display: grid;
+  grid-template-columns: 90px 1fr 90px;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.85rem;
+}
+.rarity-label {
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+.rarity-label-common { color: #a0a3a7; }
+.rarity-label-uncommon { color: #c0c4c8; }
+.rarity-label-rare { color: #d4af37; }
+.rarity-label-mythic { color: #f08020; }
+.rarity-label-special { color: #b070d0; }
+.rarity-label-bonus { color: #e070b0; }
+.rarity-bar {
+  width: 100%;
+  height: 8px;
+  background: #1a1c1f;
+  border-radius: 4px;
+  overflow: hidden;
+}
+.rarity-bar-fill {
+  height: 100%;
+}
+.rarity-bar-common { background: #8e9296; }
+.rarity-bar-uncommon { background: #c0c4c8; }
+.rarity-bar-rare { background: #d4af37; }
+.rarity-bar-mythic { background: #f08020; }
+.rarity-bar-special { background: #b070d0; }
+.rarity-bar-bonus { background: #e070b0; }
+.rarity-count {
+  text-align: right;
+  color: #aab;
+  font-variant-numeric: tabular-nums;
+}
+@media (max-width: 480px) {
+  .rarity-row {
+    grid-template-columns: 70px 1fr 70px;
+    gap: 0.4rem;
+    font-size: 0.78rem;
+  }
+}
+
 .filter-tabs {
   display: flex;
   gap: 10px;

@@ -88,6 +88,8 @@ def get_set_completion(
     owned_cards = len(owned_cards_list)
     completion_pct = round((owned_cards / total_cards) * 100, 2) if total_cards else 0
 
+    rarity_breakdown = _compute_rarity_breakdown(set_cards)
+
     visible_cards = set_cards
     if view == "owned":
         visible_cards = owned_cards_list
@@ -137,6 +139,7 @@ def get_set_completion(
         "total_cards": total_cards,
         "owned_cards": owned_cards,
         "completion_pct": completion_pct,
+        "rarity_breakdown": rarity_breakdown,
         "owned_cards_list": owned_cards_list,
         "missing_cards": missing_cards,
         "visible_cards": visible_cards,
@@ -144,6 +147,47 @@ def get_set_completion(
         "token_data": token_data,
         "show_tokens": include_tokens,
     }
+
+
+# Display order for per-rarity rows. Mythic + rare first because that's the
+# meaningful signal for Commander collectors (the overall completion %
+# obscures the gap between "I have most commons" and "I'm missing 3 mythics").
+_RARITY_ORDER = ["mythic", "rare", "uncommon", "common", "special", "bonus"]
+
+
+def _compute_rarity_breakdown(set_cards: list[dict]) -> list[dict]:
+    """Return per-rarity owned/total counts for the set, ordered for display.
+
+    Each entry: {rarity, label, owned, total, completion_pct}. Rarities with
+    zero cards in the set are omitted. Unknown rarity strings are skipped
+    rather than bucketed; Scryfall rarities are stable.
+    """
+    counts: dict[str, dict[str, int]] = {}
+    for card in set_cards:
+        rarity = (card.get("rarity") or "").lower()
+        if rarity not in _RARITY_ORDER:
+            continue
+        bucket = counts.setdefault(rarity, {"owned": 0, "total": 0})
+        bucket["total"] += 1
+        if card.get("quantity_owned", 0) > 0:
+            bucket["owned"] += 1
+
+    breakdown: list[dict] = []
+    for rarity in _RARITY_ORDER:
+        bucket = counts.get(rarity)
+        if not bucket or bucket["total"] == 0:
+            continue
+        completion_pct = round((bucket["owned"] / bucket["total"]) * 100, 2)
+        breakdown.append(
+            {
+                "rarity": rarity,
+                "label": rarity.capitalize(),
+                "owned": bucket["owned"],
+                "total": bucket["total"],
+                "completion_pct": completion_pct,
+            }
+        )
+    return breakdown
 
 
 def list_set_completion_summaries(session: Session, user_id: int) -> list[dict]:

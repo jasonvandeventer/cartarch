@@ -51,9 +51,11 @@
       {% endif %}
     </div>
   </section>
-  {% if grouped_drawers %}
-    {% for group in grouped_drawers %}
-      <section class="panel pending-group">
+  <div id="pending-groups-wrap">
+  {% for group in grouped_drawers %}
+      <section class="panel pending-group"
+               id="pending-group-{{ group.drawer|replace('-', 'none') }}"
+               data-pending-group="{{ group.drawer }}">
         <details open>
           <summary>
             {% if use_drawer_sorter %}
@@ -68,10 +70,13 @@
               {# HTMX: Confirm + Remove POST to the existing endpoints with hx-swap="delete"
                  so the row disappears in place without a full page reload (scroll position
                  preserved). The endpoints emit small OOB-swap fragments updating the
-                 stat counters. No-JS fallback: standard form submit → 303 redirect →
-                 full page reload (the current address bar is /pending so it still works). #}
+                 stat counters. Inline JS at the bottom of this template removes the
+                 surrounding group section when its last row is deleted, and flips the
+                 empty-state panel visible when the last group is gone. No-JS fallback:
+                 standard form submit → 303 redirect → full page reload. #}
               <article class="pending-item unified-card-row cross-drawer"
-                       id="pending-row-{{ item.id }}">
+                       id="pending-row-{{ item.id }}"
+                       data-pending-group="{{ group.drawer }}">
                 <div class="pending-thumb-wrap">
                   {% if item.card.image_url %}
                     <img class="pending-thumb"
@@ -139,10 +144,34 @@
           </div>
         </details>
       </section>
-    {% endfor %}
-  {% else %}
-    <section class="panel">
-      <p class="muted">No cards pending placement.</p>
-    </section>
-  {% endif %}
+  {% endfor %}
+  </div>
+  <section class="panel pending-empty" id="pending-empty-state" {% if grouped_drawers %}hidden{% endif %}>
+    <p class="muted">Nothing to place right now — your pending queue is clear.</p>
+    <p class="muted" style="margin-top: 0.5rem;">
+      <a href="/import">Import more cards</a> when you're ready to add to your collection.
+    </p>
+  </section>
+  <script>
+    (function () {
+      // Remove an empty <section class="pending-group"> after the last row
+      // inside it is deleted by hx-swap="delete". Show the empty-state panel
+      // once every group is gone. Listener fires for any successful HTMX
+      // swap on this page; cheap to scope by always re-reading the wrapper.
+      document.body.addEventListener('htmx:afterSwap', function () {
+        var wrap = document.getElementById('pending-groups-wrap');
+        if (!wrap) return;
+        wrap.querySelectorAll('section.pending-group').forEach(function (section) {
+          if (section.querySelectorAll('article.pending-item').length === 0) {
+            section.remove();
+          }
+        });
+        var empty = document.getElementById('pending-empty-state');
+        if (empty) {
+          var hasGroups = wrap.querySelector('section.pending-group') !== null;
+          empty.hidden = hasGroups;
+        }
+      });
+    })();
+  </script>
 {% endblock %}

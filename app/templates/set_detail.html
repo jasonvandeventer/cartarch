@@ -9,6 +9,20 @@
     <div class="progress-bar" style="margin-top: 0.75rem;">
       <div class="progress-fill" style="width: {{ data.completion_pct }}%;"></div>
     </div>
+    {% if data.rarity_breakdown %}
+      <div class="rarity-breakdown">
+        {% for entry in data.rarity_breakdown %}
+          <div class="rarity-row">
+            <span class="rarity-label rarity-label-{{ entry.rarity }}">{{ entry.label }}</span>
+            <div class="rarity-bar">
+              <div class="rarity-bar-fill rarity-bar-{{ entry.rarity }}"
+                   style="width: {{ entry.completion_pct }}%;"></div>
+            </div>
+            <span class="rarity-count">{{ entry.owned }} / {{ entry.total }}</span>
+          </div>
+        {% endfor %}
+      </div>
+    {% endif %}
   </section>
   <section class="panel controls-panel">
     <div style="display: flex;
