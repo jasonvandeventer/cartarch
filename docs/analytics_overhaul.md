@@ -28,6 +28,15 @@ not a vibe. The user — not the system — synthesizes them.
 This doc covers what comes out, what goes in, and how to land the change
 without breaking the live system.
 
+Source-of-truth framing: Mana Archive's analytics are anchored in the user's
+own data and the playgroup's actual game history. They do not compare a deck
+to community averages, aggregate inclusion rates, or other users' decks
+outside the playgroup. External services (EDHREC, Commander Spellbook) are
+integrated as inline enrichment where they add value (per-card inclusion
+percentages, combo detection), but never as the primary signal. This
+positioning is intentional and described in the North Star section of the
+roadmap.
+
 ---
 
 ## 1. Inventory — what's being deleted
@@ -93,13 +102,26 @@ These look bracket-adjacent but are independent and **do not change**:
 - `app/spellbook.py` and `compute_deck_combos` — still drives the Win
   Conditions panel and feeds Layer 1's combo signal.
 - `InventoryRow.tags` JSON + `app/deck_service.py::suggest_card_roles` /
-  `get_row_tags` — drives Synergy and Health panels.
+  `get_row_tags` — drives Synergy and Health panels. A separate work stream
+  (the "Tag system accuracy overhaul" in Tier 2 of the roadmap) is sequenced
+  ahead of this overhaul and is expected to improve the precision of the
+  auto-tagger that populates `InventoryRow.tags`. The composition signals in
+  Layer 1 (see section 2) consume both oracle-text-derived signals (computed
+  on the fly) and user-confirmed tags from `InventoryRow.tags`; the latter
+  become more reliable as the tag work lands.
 - `compute_deck_health`, `compute_consistency`, `compute_deck_analytics`,
-  `compute_deck_synergy`, `compute_dead_cards`, `extract_commander_themes` —
-  none of these depend on Bracket V2.
+  `compute_deck_synergy`, `extract_commander_themes` — none of these depend
+  on Bracket V2.
 - `Game` / `GameSeat` tables and `app/game_service.py` — already produce per-deck
   W-L records; Layer 2 extends what gets read out, but the schema is sufficient
   as-is.
+- `compute_dead_cards` in `app/deck_service.py` — currently produces the
+  Upgrade Targets list shown on the deck detail page. Stays for now, but is
+  slated to be replaced by the AI Phase 1 recommendation engine (Tier 3 of
+  the roadmap). Users have reported that the current implementation's
+  accuracy is limited, which the AI replacement is designed to address. No
+  changes to `compute_dead_cards` are required as part of this analytics
+  overhaul; the eventual replacement is tracked separately.
 
 ---
 
@@ -365,6 +387,32 @@ Cache the active-cohort signal payload in the existing panels-cache layer with
 a 1-hour TTL keyed on `user_id` + active deck set hash. Invalidate when any
 deck is edited or a new game is recorded.
 
+## 5.4 What this overhaul enables downstream
+
+The three-layer composition + play record + playgroup context output is
+designed to be consumable by downstream features, not just rendered on the
+deck detail page. The two specific downstream consumers in the near-term
+roadmap are:
+
+- The **AI-powered upgrade suggestions** feature (Tier 3 of the roadmap). The
+  AI prompt will receive the same composition signal payload that the UI
+  renders, plus the user's collection inventory, plus an optional free-text
+  "deck intent" string from the user. The AI's recommendations are then
+  grounded in the deck's actual composition rather than in generic
+  deck-building heuristics.
+
+- The **playgroup-relative comparison** itself (Layer 3 here). A user with
+  multiple active decks gets a per-signal comparison without ever leaving
+  the app. This is what distinguishes Mana Archive's analytics from a
+  Moxfield-or-Archidekt analytics page: the comparison cohort is the user's
+  own decks and the playgroup's decks, not the anonymous community.
+
+Both downstream consumers benefit from the same payload structure, so
+`compute_composition_signals` (section 2.2) should be designed with reuse in
+mind. Returning a flat dict of `{signal_name: {count, cards,
+percentile_label}}` is sufficient and avoids over-engineering the return
+type.
+
 ---
 
 ## 6. Migration plan
@@ -487,9 +535,24 @@ adding `power_label` later is one tiny ALTER TABLE, not a structural change.
    typically end turn N" line in §5.1 is misleading. Audit the existing data
    before relying on this stat; if coverage is poor, drop the line from the
    initial panel and add it back once future games are filling the field.
+   The playgroup has not yet logged any games as of this writing, so
+   historical coverage is zero. Layer 2 stats will populate over time as
+   games are recorded. The "wins typically end turn N" line in section 5.1
+   should be hidden until at least 5 games with non-null turn_count exist
+   for the deck in question.
 
 4. **The "no games" deck experience.** A deck with 0 games shows Layer 1
    signals fine, gets a "No games recorded yet" Layer 2 panel, and is
    excluded from Layer 3 cohort. That's the design. Worth a one-time prompt
    in the UI: "Track your next game to unlock comparison context"? Maybe.
    Defer until v3.17.1.
+
+5. **Should the analytics overhaul ship before, after, or alongside the tag
+   system accuracy overhaul?** The roadmap sequences tags first, but a
+   strict "tags first, then analytics" interpretation could delay the
+   analytics overhaul by weeks. An alternative is to ship the analytics
+   overhaul with the current tag system as-is (Layer 1 will be less reliable
+   for cards with weakly-tagged roles), then backfill accuracy as the tag
+   work lands. Recommend: ship the analytics overhaul with the existing tag
+   system and improve the inputs over time. The overhaul's value is in the
+   three-layer structure, not the absolute accuracy of any single signal.

@@ -24,6 +24,19 @@ Stack: FastAPI + Jinja2 + SQLite via SQLAlchemy + HTMX (self-hosted). Deployed v
 
 ---
 
+## North Star
+
+Mana Archive is the source of truth for the playgroup. Authoritative data about who owns what, what's in which deck, and how decks have performed in our games lives here. External services (Scryfall, Spellbook, EDHREC) are integrated as enrichment for that data, not as replacements.
+
+Practical implications for feature decisions:
+
+- Recommendation features ground their suggestions in the user's collection first, the playgroup's data second, and external aggregators last.
+- Analytics compare a deck against the user's other decks and the playgroup's game history, not against community averages.
+- External service data appears as inline enrichment (per-card hover, combo detection results, EDHREC inclusion percentages) rather than as primary navigation surfaces.
+- Features that would route users away from Mana Archive's data toward an aggregator's data are scrutinized closely. Enrichment is welcome; replacement is not.
+
+---
+
 ## Tier 1: Near-term (this week to next)
 
 Items with concrete demand or that close known gaps. Each is contained scope.
@@ -38,17 +51,38 @@ Items with concrete demand or that close known gaps. Each is contained scope.
 
 - **Drawer-sorter placement for tokens, foreign-language cards, and premium basics.** Personal workflow customization for the drawer-sorter user. Updates the Drawer 6 layout to top-to-bottom: numeric sets, foreign-language cards, premium basics (full-art / foil / alt-art / snow), plain basics, tokens, proxies. Premium basics support the "play with the nice ones first" workflow. Depends on the foreign-language support feature shipping first.
 
+- **Deck view list mode with grouping.** Add a list/grid toggle to the deck detail page card display. List mode renders cards as text rows grouped by a user-selectable axis (type, mana value, role tag, color, subtype). Card image shown on hover (desktop) or tap (mobile). Sub-group counts surfaced inline ("Creatures (35) · Humans (6)"). The existing image grid stays available as the alternate view. User preference persisted per-user (not per-deck). Addresses a direct request from the playgroup: Moxfield-style scanning is the use case being filled.
+
 ## Tier 2: Significant features (next 1-2 months)
 
 Larger arcs that need design conversations before implementation. Both have design docs in place; both are sequential rather than parallel.
 
+- **Tag system accuracy overhaul.** The auto-tagger (`suggest_card_roles` in `deck_service.py`) and the user-applied row tag system (`InventoryRow.tags`) are the foundation for Synergy, Health, the existing Upgrade Targets feature, and the future AI recommendation engine. Users have surfaced concerns that these are not reliable in practice.
+
+  Scope:
+
+  - Audit the existing auto-tagger rules against a sample of 100 real-world cards. Document false positives and false negatives.
+  - Define a more precise tag taxonomy. The current 10-tag system stays, but with clearer rules for ambiguous cases: hybrid mana costs, cards with multiple modes, cards whose role depends on commander.
+  - Add a tag confidence indicator (high / medium / low) so downstream consumers (Synergy, Health, Upgrade Targets, AI engine) can choose to use only high-confidence tags.
+  - Add a per-deck "review tags" workflow that surfaces low-confidence auto-tags for the user to confirm, edit, or dismiss.
+
+  Design doc: [tag_system_overhaul.md](tag_system_overhaul.md). Sequencing: tag work ships first, analytics overhaul ships against the cleaner tag base, AI recommendations ship after both.
+
 - **Analytics overhaul.** Replace Bracket V2's single power score with a three-layer data-first display: objective composition signals (tutors, fast mana, board wipes, combos, game changers), empirical play record (win rate, average finishing position, games played), and comparative context within the playgroup (percentile within active decks). Design doc at [analytics_overhaul.md](analytics_overhaul.md). Multi-session refactor that deletes `bracket_v2_service.py`, the intent survey, and related CSS. Addresses a known structural issue with the current scoring (commander identity not weighted, scoring feels arbitrary).
+
+  Source-of-truth framing: the three-layer display (composition signals, play record, playgroup-relative context) is anchored in the user's own data and the playgroup's actual game history, not aggregate community data. External services (EDHREC inclusion percentages, Spellbook combos) are integrated as enrichment for the user's data, not as replacements. This is consistent with the source-of-truth positioning Mana Archive holds for the playgroup.
 
 - **Deck playtester.** Single-player playtest mode integrated with the existing game tracker. Virtual hand / library / battlefield / graveyard / exile zones; draw, tap, shuffle, mulligan; optional persistence and replay. The "single-player game tracker plus card zone management" framing keeps scope tractable, but this is still 6-8 sessions across a few weeks. Addresses the only Moxfield-retention driver named by users.
 
 ## Tier 3: Real but lower-priority
 
 Items that are documented and scoped but not urgent.
+
+- **AI-powered deck upgrade suggestions (Phase 1 of AI engine).** Replaces the current Upgrade Targets feature, which users have flagged as inaccurate. Takes the deck's commander, strategy as expressed through tags and themes, and the user's collection as input. Returns a ranked list of suggested additions and cuts, with each suggestion grounded in cards the user already owns (loose in storage, or in other decks that could be cannibalized) before suggesting cards to acquire. Optionally takes a free-text "deck intent" string from the user ("big stompy land creatures, multiple combats") as additional context for the LLM prompt.
+
+  Depends on: analytics overhaul (Tier 2) for reliable composition signals; tag system accuracy overhaul (Tier 2) for trustworthy tags. Both must ship first.
+
+  Scope: ships in 1-2 weekends after dependencies are satisfied. Single LLM API call with a thoughtful prompt. Provider abstraction (Phase 2 of the AI engine) can wait. This Tier 3 placement is a promotion of the existing Phase 1 in the Tier 4 AI engine arc.
 
 - **Deck Reconciliation Session 3.** Edge cases in the deck reconciliation flow: multi-source moves, concurrent edits between preview and commit, brand-new decks with no existing rows. Documented in [deck_collection_model.md](deck_collection_model.md) as deferred. Unlikely to bite normal usage; address when a specific case surfaces.
 
@@ -68,7 +102,7 @@ Items here are speculative and may never be implemented. Capturing them keeps th
 
 ### AI-backed recommendation engine
 
-A multi-phase feature spanning deck building, collection analysis, and playgroup meta. Currently aspirational; not queued for implementation. Three motivations:
+A multi-phase feature spanning deck building, collection analysis, and playgroup meta. Phases 2-6 are aspirational. Phase 1 has been promoted to Tier 3 based on user demand and its dependency chain (analytics overhaul + tag system overhaul). Three motivations:
 
 1. **Personal utility.** Deck-building creativity support — suggest cards from the user's collection that fit a deck's themes, propose new deck ideas from owned cards, budget-constrained upgrade paths per deck.
 2. **Learning project.** Productionizing LLM-powered features is a career-relevant skill (provider abstraction, cost management, caching, observability, error handling, RAG patterns). This feature is an opportunity to build that skill against a real personal use case.
@@ -76,7 +110,7 @@ A multi-phase feature spanning deck building, collection analysis, and playgroup
 
 **Scope (phased):**
 
-- *Phase 1:* Deck upgrade suggestions. Given a deck and the user's collection, suggest cards from the collection that fit the deck's themes. Simple LLM API call with a thoughtful prompt; ships in 1-2 weekends.
+- *Phase 1:* Deck upgrade suggestions. Given a deck and the user's collection, suggest cards from the collection that fit the deck's themes. Simple LLM API call with a thoughtful prompt; ships in 1-2 weekends. (promoted to Tier 3 — see Tier 3 entry above).
 - *Phase 2:* Architectural foundation. Provider abstraction (so the app can swap between Claude, OpenAI, local models), caching by deck-contents hash, request/response logging, cost tracking. Doesn't change user-visible behavior; builds the foundation for everything that follows.
 - *Phase 3:* Embedding-based card similarity. Compute and cache embeddings for cards. Use vector similarity for candidate selection, then LLM for ranking and explanation (retrieval-augmented generation pattern).
 - *Phase 4:* Combo and synergy discovery beyond what CommanderSpellbook surfaces. Use the LLM to identify unexpected interactions among cards in the user's collection.
@@ -95,7 +129,7 @@ A multi-phase feature spanning deck building, collection analysis, and playgroup
 - Log every recommendation request and response for quality analysis and future fine-tuning data. Treat this as observability from day one, not as something added later.
 - Provider abstraction lives behind a single interface so swapping Claude → OpenAI → local model is a configuration change, not a refactor.
 
-**Status:** Aspirational. No timeline. Likely begins with the design doc only — write the doc to discover whether this is actually a feature worth building or just a feature worth thinking about.
+**Status:** Phase 1 promoted to Tier 3. Phases 2-6 remain aspirational with no timeline; revisit after Phase 1 ships and behaviour in production is observed.
 
 ---
 
@@ -129,6 +163,7 @@ When in doubt, ship for the current user base rather than for hypothetical futur
 
 Implementation references kept alongside this roadmap:
 
+- [tag_system_overhaul.md](tag_system_overhaul.md) — Tier 2 tag system accuracy overhaul.
 - [analytics_overhaul.md](analytics_overhaul.md) — Tier 2 analytics redesign.
 - [deck_collection_model.md](deck_collection_model.md) — Refined Model A for deck/collection reconciliation; documents the deferred Session 3 work.
 - [collection_import_sync.md](collection_import_sync.md) — Sync-semantics model for full-collection re-imports.
