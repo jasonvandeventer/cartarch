@@ -38,7 +38,10 @@
       that exports in <code>N Card Name (SET) Collector#</code> format.
       You can also paste bare <code>SET Collector#</code> lines (with optional quantity) to
       add cards by set + collector number alone &mdash; e.g. <code>MH3 145</code>, <code>MH3 145 2</code>, or <code>2 MH3 145</code>.
-      Append <code>*F*</code> for foil.
+      Append <code>*F*</code> for foil, or a 2&ndash;3 letter language code like
+      <code>*JP*</code> / <code>*DE*</code> / <code>*FR*</code> / <code>*IT*</code> / <code>*ES*</code> / <code>*PT*</code> /
+      <code>*RU*</code> / <code>*KO*</code> / <code>*ZHS*</code> / <code>*ZHT*</code> for non-English printings.
+      You can combine markers, e.g. <code>WAR 171 *JP*</code> or <code>1 Sol Ring (LTC) 284 *F* *DE*</code>.
     </p>
     <form action="/import/list/preview"
           method="post"
@@ -47,7 +50,7 @@
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
       <textarea name="card_list"
                 rows="10"
-                placeholder="4 Lightning Bolt (M10) 146&#10;2 Force of Will&#10;MH3 145&#10;2 LTR 246 *F*"></textarea>
+                placeholder="4 Lightning Bolt (M10) 146&#10;2 Force of Will&#10;MH3 145&#10;2 LTR 246 *F*&#10;WAR 171 *JP*"></textarea>
       <button type="submit">Preview Import</button>
     </form>
   </section>

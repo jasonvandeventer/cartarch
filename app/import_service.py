@@ -90,6 +90,7 @@ _SUPPORTED_LANGUAGES: frozenset[str] = frozenset(
 )
 
 _LANGUAGE_NAME_TO_CODE: dict[str, str] = {
+    # Long-name forms (Helvault / Moxfield CSVs occasionally use these)
     "english": "en",
     "spanish": "es",
     "french": "fr",
@@ -110,6 +111,14 @@ _LANGUAGE_NAME_TO_CODE: dict[str, str] = {
     "arabic": "ar",
     "phyrexian": "ph",
     "sanskrit": "sa",
+    # Country-code aliases — users typing the paste-list `*XX*` marker often
+    # reach for the country code rather than the Scryfall language code,
+    # so jp/cn/tw/kr need to map to ja/zhs/zht/ko respectively.
+    "jp": "ja",
+    "cn": "zhs",
+    "zh": "zhs",
+    "tw": "zht",
+    "kr": "ko",
 }
 
 
@@ -596,6 +605,15 @@ def _parse_short_list_line(line: str) -> dict[str, Any] | None:
         finish = "foil"
         rest = re.sub(r"(?i)\s*\*F\*\s*", " ", rest).strip()
 
+    # Detect *XX* / *XXX* language marker (e.g. *JP* → ja, *DE* → de).
+    # 2-3 letter codes so it can't collide with the 1-letter *F* foil marker.
+    language = "en"
+    lang_match = re.search(r"\*([A-Za-z]{2,3})\*", rest)
+    if lang_match:
+        language = normalize_language(lang_match.group(1))
+        rest = (rest[: lang_match.start()] + rest[lang_match.end() :]).strip()
+        rest = re.sub(r"\s+", " ", rest)
+
     parts = rest.split()
     if len(parts) not in (2, 3):
         return None
@@ -637,6 +655,7 @@ def _parse_short_list_line(line: str) -> dict[str, Any] | None:
         "collector_number": collector_number,
         "quantity": quantity,
         "finish": finish,
+        "language": language,
     }
 
 
@@ -661,11 +680,25 @@ def _parse_list_line(line: str) -> dict[str, Any] | None:
     quantity = int(m.group(1))
     rest = line[m.end() :]
 
-    # Detect MTGA foil marker (*F*)
+    # Detect *XX* / *XXX* language marker first. 2-3 letter codes so it
+    # can't collide with the 1-letter *F* foil marker. Strip from `rest`
+    # before the (SET) extraction so the trailing-suffix regex sees a
+    # clean tail.
+    language = "en"
+    lang_match = re.search(r"\*([A-Za-z]{2,3})\*", rest)
+    if lang_match:
+        language = normalize_language(lang_match.group(1))
+        rest = (rest[: lang_match.start()] + rest[lang_match.end() :]).strip()
+        rest = re.sub(r"\s+", " ", rest)
+
+    # Detect MTGA foil marker (*F*) anywhere on the line and strip it.
+    # Search-anywhere (not just endswith) so it works when combined with
+    # a language marker like `*F* *DE*` in any order.
     finish = "normal"
-    if rest.upper().endswith("*F*"):
+    if re.search(r"(?i)\*F\*", rest):
         finish = "foil"
-        rest = rest[:-3].strip()
+        rest = re.sub(r"(?i)\s*\*F\*\s*", " ", rest).strip()
+        rest = re.sub(r"\s+", " ", rest)
 
     # Extract trailing (SET) and optional collector number
     set_code = ""
@@ -686,6 +719,7 @@ def _parse_list_line(line: str) -> dict[str, Any] | None:
         "collector_number": collector_number,
         "quantity": quantity,
         "finish": finish,
+        "language": language,
     }
 
 
@@ -747,7 +781,7 @@ def parse_text_list(text: str) -> dict[str, Any]:
                     "finish": parsed["finish"],
                     "quantity": parsed["quantity"],
                     "location": "",
-                    "language": "en",
+                    "language": parsed.get("language", "en"),
                     "warnings": build_finish_warnings(card_data, parsed["finish"]),
                 }
             )
