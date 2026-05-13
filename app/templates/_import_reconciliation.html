@@ -200,7 +200,17 @@
      skip_already_owned / import_delta / import_new. Default is
      `recommended_action` unless manual_mode is True, in which case the
      default flips to import_new (acquisition semantics for single-card
-     manual entry, per design doc §5.5). #}
+     manual entry, per design doc §5.5).
+
+     When `has_deck_only_dupes` is True (any row's only matches are in
+     decks rather than free-collection locations), the <details> panel
+     auto-opens and the per-row table renders ONLY rows the user needs
+     to make a decision on (any row with prior ownership). Non-duplicate
+     fresh imports are still in the DOM as hidden rows so their hidden
+     reconcile_action / reconcile_new_qty fields submit in order — the
+     commit handler indexes by parsed_rows position, so dropping rows
+     from the form would shift the actions onto the wrong cards. #}
+  {% set _show_dupes_only = has_deck_only_dupes | default(false) %}
   <section class="panel"
            style="margin-top: 0.75rem;"
            id="reconciliation-content">
@@ -223,11 +233,28 @@
         <strong>{{ _to_skip }}</strong> already owned (will skip).
       {% endif %}
     </p>
-    <details style="margin-top: 0.5rem">
+    {% if _show_dupes_only %}
+      <p class="warning-text"
+         style="margin-top: 0.5rem;
+                padding: 0.55rem 0.85rem;
+                border-radius: 8px;
+                background: rgba(244, 158, 76, 0.12);
+                border: 1px solid rgba(244, 158, 76, 0.35);">
+        <strong>Some of these are already in a deck.</strong>
+        Deck copies are allocated, so an auto-skip might not be what you want.
+        Review the per-card list below and confirm what to do with each.
+      </p>
+    {% endif %}
+    <details style="margin-top: 0.5rem" {% if _show_dupes_only %}open{% endif %}>
       <summary class="btn-like" style="cursor: pointer; display: inline-block">
-        Review individually (override per card)
+        {% if _show_dupes_only %}
+          Showing duplicates only — pick an action per card
+        {% else %}
+          Review individually (override per card)
+        {% endif %}
       </summary>
-      <div class="table-wrap" style="margin-top: 0.6rem">
+      <div class="table-wrap{% if _show_dupes_only %} reconcile-dupes-only{% endif %}"
+           style="margin-top: 0.6rem">
         <table>
           <thead>
             <tr>
@@ -239,7 +266,17 @@
           </thead>
           <tbody>
             {% for row in rows %}
-              <tr>
+              {# Row classes:
+                  - reconcile-row-dupe  : has prior ownership somewhere
+                  - reconcile-row-fresh : nothing owned, will import new
+                  - reconcile-row-deck-only : only matches are in decks
+                 CSS .reconcile-dupes-only .reconcile-row-fresh { display:none }
+                 hides fresh rows when the panel auto-expanded. Hidden fields
+                 still submit since the row is in the DOM (display:none retains
+                 submission). #}
+              {% set _row_class = "reconcile-row-dupe" if row.has_owned_match else "reconcile-row-fresh" %}
+              {% set _row_class = _row_class ~ (" reconcile-row-deck-only" if row.is_deck_only_dupe else "") %}
+              <tr class="{{ _row_class }}">
                 <td>
                   {{ row.display_name or row.scryfall_id }}
                   {% if row.owned_breakdown %}

@@ -1728,6 +1728,22 @@ td {
   margin-bottom: 0.2rem;
 }
 
+/* Reconciliation table — duplicates-only view (v3.16.22).
+   When `has_deck_only_dupes` is set, the table-wrap gets
+   .reconcile-dupes-only and fresh (no-match) rows are display:none'd.
+   They stay in the DOM so their hidden reconcile_action / new_qty
+   fields submit at the right array indices — the commit handler walks
+   parsed_rows by position. */
+.reconcile-dupes-only .reconcile-row-fresh {
+  display: none;
+}
+.reconcile-row-deck-only {
+  background: rgba(244, 158, 76, 0.08);
+}
+.reconcile-row-deck-only td:first-child {
+  border-left: 3px solid rgba(244, 158, 76, 0.6);
+}
+
 /* Win Conditions / Combo panel */
 .combo-section-label {
   font-size: 0.78rem;

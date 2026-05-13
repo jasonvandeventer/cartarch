@@ -445,6 +445,32 @@ def _deck_for_storage_location(
     return session.query(Deck).filter(Deck.storage_location_id == loc.id).first()
 
 
+def _annotate_collection_dupes(rows: list[dict]) -> None:
+    """Tag each collection-mode reconciliation row with display flags so the
+    partial can render a focused "show only duplicates" view.
+
+    Adds two booleans per row (mutating in place):
+
+      - ``has_owned_match``  — total_user_owned > 0; the row is a duplicate
+                               of something the user already owns somewhere.
+      - ``is_deck_only_dupe`` — owned_breakdown has entries and ALL of them
+                                are deck-type. This is the case where the
+                                user's "duplicate" is allocated to a deck
+                                rather than a free-collection location, and
+                                a re-import shouldn't silently skip — the
+                                deck copy is in use, the user probably wants
+                                a new copy. The collection-mode template
+                                auto-expands the per-row review when any
+                                row has this flag set.
+    """
+    for r in rows:
+        breakdown = r.get("owned_breakdown") or []
+        r["has_owned_match"] = bool(breakdown) and (r.get("total_user_owned", 0) > 0)
+        r["is_deck_only_dupe"] = r["has_owned_match"] and all(
+            (b.get("location_type") == "deck") for b in breakdown
+        )
+
+
 @app.post("/import/reconcile-preview")
 async def import_reconcile_preview(
     request: Request,
@@ -534,6 +560,7 @@ async def import_reconcile_preview(
         session, current_user.id, parsed_rows
     )
     _decorate_display_names(matches_rows)
+    _annotate_collection_dupes(matches_rows)
 
     total_to_skip = 0
     total_to_delta = 0
@@ -547,6 +574,8 @@ async def import_reconcile_preview(
             total_to_skip += r["quantity_needed"] - r["recommended_new_qty"]
         else:  # import_new
             total_to_new += r["recommended_new_qty"]
+
+    has_deck_only_dupes = any(r.get("is_deck_only_dupe") for r in matches_rows)
 
     # Destination name for the summary (when not auto-sort).
     destination_name: str | None = None
@@ -566,6 +595,7 @@ async def import_reconcile_preview(
             "total_to_delta": total_to_delta,
             "total_to_new": total_to_new,
             "manual_mode": False,
+            "has_deck_only_dupes": has_deck_only_dupes,
         },
     )
 
@@ -1221,6 +1251,7 @@ async def manual_import_reconcile_preview(
         session, current_user.id, parsed_rows
     )
     _decorate_single(matches_rows)
+    _annotate_collection_dupes(matches_rows)
 
     total_to_skip = 0
     total_to_delta = 0
@@ -1234,6 +1265,8 @@ async def manual_import_reconcile_preview(
             total_to_skip += r["quantity_needed"] - r["recommended_new_qty"]
         else:
             total_to_new += r["recommended_new_qty"]
+
+    has_deck_only_dupes = any(r.get("is_deck_only_dupe") for r in matches_rows)
 
     destination_name: str | None = None
     if target_location_id > 0:
@@ -1252,6 +1285,7 @@ async def manual_import_reconcile_preview(
             "total_to_delta": total_to_delta,
             "total_to_new": total_to_new,
             "manual_mode": True,  # default flips to import_new
+            "has_deck_only_dupes": has_deck_only_dupes,
         },
     )
 
