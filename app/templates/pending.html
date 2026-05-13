@@ -20,17 +20,17 @@
     <div class="stat-grid stat-grid-compact" style="margin-top: 1rem;">
       <div class="stat-card">
         <div class="stat-label">Pending Cards</div>
-        <div class="stat-value">{{ pending_count }}</div>
+        <div class="stat-value" id="pending-stat-count">{{ pending_count }}</div>
       </div>
       {% if use_drawer_sorter %}
         <div class="stat-card">
           <div class="stat-label">Drawers Affected</div>
-          <div class="stat-value">{{ drawer_count }}</div>
+          <div class="stat-value" id="pending-stat-drawers">{{ drawer_count }}</div>
         </div>
       {% endif %}
       <div class="stat-card">
         <div class="stat-label">Total Copies</div>
-        <div class="stat-value">{{ total_copies }}</div>
+        <div class="stat-value" id="pending-stat-copies">{{ total_copies }}</div>
       </div>
     </div>
   </section>
@@ -65,7 +65,13 @@
           </summary>
           <div class="pending-list">
             {% for item in group.entries %}
-              <article class="pending-item unified-card-row cross-drawer">
+              {# HTMX: Confirm + Remove POST to the existing endpoints with hx-swap="delete"
+                 so the row disappears in place without a full page reload (scroll position
+                 preserved). The endpoints emit small OOB-swap fragments updating the
+                 stat counters. No-JS fallback: standard form submit → 303 redirect →
+                 full page reload (the current address bar is /pending so it still works). #}
+              <article class="pending-item unified-card-row cross-drawer"
+                       id="pending-row-{{ item.id }}">
                 <div class="pending-thumb-wrap">
                   {% if item.card.image_url %}
                     <img class="pending-thumb"
@@ -93,7 +99,10 @@
                         method="post"
                         class="inline-form"
                         style="flex-wrap: wrap;
-                               gap: 0.4rem">
+                               gap: 0.4rem"
+                        hx-post="/pending/confirm"
+                        hx-target="#pending-row-{{ item.id }}"
+                        hx-swap="delete">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                     <input type="hidden" name="row_id" value="{{ item.id }}">
                     {% if not use_drawer_sorter %}
@@ -112,8 +121,14 @@
                   </form>
                   <form action="/pending/{{ item.id }}/remove"
                         method="post"
-                        class="inline-form">
+                        class="inline-form"
+                        hx-post="/pending/{{ item.id }}/remove"
+                        hx-target="#pending-row-{{ item.id }}"
+                        hx-swap="delete">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                    {# onclick fires before HTMX intercepts submit; cancel here
+                       blocks the request entirely. Using onclick rather than
+                       hx-confirm avoids a double-prompt in HTMX mode. #}
                     <button type="submit"
                             class="ghost-button"
                             onclick="return confirm('Remove this pending card from your collection?');">Remove</button>

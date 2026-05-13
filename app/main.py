@@ -1770,8 +1770,34 @@ def pending_page(
     )
 
 
+def _pending_stat_oob_response(session: Session, user_id: int) -> HTMLResponse:
+    """Build the HTMX response for pending row mutations.
+
+    Body contains only out-of-band swap fragments that update the
+    Pending-page stat counters (pending count, drawer count, total
+    copies). The row itself is deleted client-side by ``hx-swap="delete"``
+    on the originating form, so there's no main content in the response.
+
+    Keeps the user's scroll position intact when confirming or removing
+    one row at a time — the v3.16.23 fix for the "Confirm scrolls me back
+    to the top" complaint.
+    """
+    rows = list_pending_rows(session, user_id=user_id)
+    view_model = build_pending_view_model(rows)
+    pending_count = view_model.get("pending_count", 0)
+    drawer_count = view_model.get("drawer_count", 0)
+    total_copies = view_model.get("total_copies", 0)
+    body = (
+        f'<div id="pending-stat-count" hx-swap-oob="true">{pending_count}</div>'
+        f'<div id="pending-stat-drawers" hx-swap-oob="true">{drawer_count}</div>'
+        f'<div id="pending-stat-copies" hx-swap-oob="true">{total_copies}</div>'
+    )
+    return HTMLResponse(body)
+
+
 @app.post("/pending/confirm")
 async def pending_confirm(
+    request: Request,
     row_id: int = Form(...),
     location_id: int = Form(0),
     session: Session = Depends(get_db_session),
@@ -1784,6 +1810,8 @@ async def pending_confirm(
         user_id=current_user.id,
         location_id=location_id or None,
     )
+    if request.headers.get("HX-Request"):
+        return _pending_stat_oob_response(session, current_user.id)
     return RedirectResponse(url="/pending", status_code=303)
 
 
@@ -1800,6 +1828,7 @@ async def pending_confirm_all(
 
 @app.post("/pending/{row_id}/remove")
 def remove_pending_row(
+    request: Request,
     row_id: int,
     session: Session = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
@@ -1821,6 +1850,8 @@ def remove_pending_row(
     session.delete(row)
     session.commit()
 
+    if request.headers.get("HX-Request"):
+        return _pending_stat_oob_response(session, current_user.id)
     return RedirectResponse(url="/pending", status_code=303)
 
 
