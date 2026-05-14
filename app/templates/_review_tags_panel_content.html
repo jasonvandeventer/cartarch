@@ -8,52 +8,48 @@
         <div class="review-tags-row-card">
           <a href="/cards/{{ item.card_id }}" class="review-tags-row-name">{{ item.card_name }}</a>
           {% if item.confirmed_tags %}
-            <span class="review-tags-row-confirmed muted">
-              · already confirmed: {{ item.confirmed_tags | join(", ") }}
-            </span>
+            <span class="review-tags-row-confirmed muted">· already confirmed: {{ item.confirmed_tags | join(", ") }}</span>
           {% endif %}
         </div>
         <div class="review-tags-chip-row">
           {% for tag in item.review_tags %}
             <span class="review-tags-chip">
               <span class="review-tags-chip-label">{{ tag }}</span>
-              <form
-                method="post"
-                action="/decks/{{ deck.id }}/rows/{{ item.row_id }}/review-tag"
-                hx-post="/decks/{{ deck.id }}/rows/{{ item.row_id }}/review-tag"
-                hx-target="#review-tags-panel-content"
-                hx-swap="innerHTML"
-                class="review-tags-chip-form"
-              >
+              <form method="post"
+                    action="/decks/{{ deck.id }}/rows/{{ item.row_id }}/review-tag"
+                    hx-post="/decks/{{ deck.id }}/rows/{{ item.row_id }}/review-tag"
+                    hx-target="#review-tags-panel-content"
+                    hx-swap="innerHTML"
+                    class="review-tags-chip-form">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                 <input type="hidden" name="action" value="confirm">
                 <input type="hidden" name="tag" value="{{ tag }}">
-                <button type="submit" class="review-tags-chip-btn review-tags-chip-confirm" title="Confirm — promote to user/high">&#x2714;</button>
+                <button type="submit"
+                        class="review-tags-chip-btn review-tags-chip-confirm"
+                        title="Confirm — promote to user/high">&#x2714;</button>
               </form>
-              <form
-                method="post"
-                action="/decks/{{ deck.id }}/rows/{{ item.row_id }}/review-tag"
-                hx-post="/decks/{{ deck.id }}/rows/{{ item.row_id }}/review-tag"
-                hx-target="#review-tags-panel-content"
-                hx-swap="innerHTML"
-                class="review-tags-chip-form"
-              >
+              <form method="post"
+                    action="/decks/{{ deck.id }}/rows/{{ item.row_id }}/review-tag"
+                    hx-post="/decks/{{ deck.id }}/rows/{{ item.row_id }}/review-tag"
+                    hx-target="#review-tags-panel-content"
+                    hx-swap="innerHTML"
+                    class="review-tags-chip-form">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                 <input type="hidden" name="action" value="remove">
                 <input type="hidden" name="tag" value="{{ tag }}">
-                <button type="submit" class="review-tags-chip-btn review-tags-chip-remove" title="Remove — delete this tag from the row">&#x2715;</button>
+                <button type="submit"
+                        class="review-tags-chip-btn review-tags-chip-remove"
+                        title="Remove — delete this tag from the row">&#x2715;</button>
               </form>
             </span>
           {% endfor %}
           {% if item.review_tags | length > 1 %}
-            <form
-              method="post"
-              action="/decks/{{ deck.id }}/rows/{{ item.row_id }}/review-tag"
-              hx-post="/decks/{{ deck.id }}/rows/{{ item.row_id }}/review-tag"
-              hx-target="#review-tags-panel-content"
-              hx-swap="innerHTML"
-              class="review-tags-row-confirm-all-form"
-            >
+            <form method="post"
+                  action="/decks/{{ deck.id }}/rows/{{ item.row_id }}/review-tag"
+                  hx-post="/decks/{{ deck.id }}/rows/{{ item.row_id }}/review-tag"
+                  hx-target="#review-tags-panel-content"
+                  hx-swap="innerHTML"
+                  class="review-tags-row-confirm-all-form">
               <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
               <input type="hidden" name="action" value="confirm_row">
               <button type="submit" class="review-tags-row-confirm-all-btn">Confirm row</button>

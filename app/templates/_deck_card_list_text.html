@@ -25,7 +25,8 @@
         {% if group.subgroups %}
           <div class="deck-list-subgroups">
             {% for sub in group.subgroups %}
-              <span class="deck-list-subgroup">{{ sub.label }} ({{ sub.count }})</span>{% if not loop.last %} · {% endif %}
+              <span class="deck-list-subgroup">{{ sub.label }} ({{ sub.count }})</span>
+              {% if not loop.last %}·{% endif %}
             {% endfor %}
           </div>
         {% endif %}
@@ -34,30 +35,24 @@
         {% for item in group.rows %}
           {% set tl = (item.card.type_line or '')|lower %}
           {% set is_basic = 'basic' in tl and (
-              'plains' in tl or 'island' in tl or 'swamp' in tl
-              or 'mountain' in tl or 'forest' in tl or 'wastes' in tl) %}
+                      'plains' in tl or 'island' in tl or 'swamp' in tl
+                    or 'mountain' in tl or 'forest' in tl or 'wastes' in tl) %}
           <li class="deck-list-row"
               data-card-image="{{ item.card.image_url or '' }}"
               data-card-name="{{ item.card.name }}">
             <span class="dlr-qty">{{ item.quantity }}</span>
             <a class="dlr-name" href="/cards/{{ item.card.id }}">{{ item.card.name }}</a>
-            {% if item.card.mana_cost %}
-              <span class="dlr-mana">{{ item.card.mana_cost }}</span>
-            {% endif %}
+            {% if item.card.mana_cost %}<span class="dlr-mana">{{ item.card.mana_cost }}</span>{% endif %}
             {% if (item.finish and item.finish != 'normal')
-                  or (item.language and item.language != 'en')
-                  or item.is_proxy
-                  or item.get('legality_status') in ('banned', 'restricted', 'not_legal') %}
+              or (item.language and item.language != 'en')
+              or item.is_proxy
+              or item.get('legality_status') in ('banned', 'restricted', 'not_legal') %}
               <span class="dlr-meta">
                 {% if item.finish and item.finish != 'normal' %}
                   <span class="dlr-tag finish">{{ item.finish[:1]|upper }}</span>
                 {% endif %}
-                {% if item.language and item.language != 'en' %}
-                  <span class="dlr-tag lang">{{ item.language|upper }}</span>
-                {% endif %}
-                {% if item.is_proxy %}
-                  <span class="dlr-tag proxy">P</span>
-                {% endif %}
+                {% if item.language and item.language != 'en' %}<span class="dlr-tag lang">{{ item.language|upper }}</span>{% endif %}
+                {% if item.is_proxy %}<span class="dlr-tag proxy">P</span>{% endif %}
                 {% set leg = item.get('legality_status') %}
                 {% if leg == 'banned' %}
                   <span class="dlr-tag bad">!</span>
@@ -80,8 +75,7 @@
                       hx-swap="innerHTML">
                   <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                   <input type="hidden" name="delta" value="-1">
-                  <button type="submit" class="dlr-qty-btn"
-                          aria-label="Decrement quantity">−</button>
+                  <button type="submit" class="dlr-qty-btn" aria-label="Decrement quantity">−</button>
                 </form>
                 <form method="post"
                       class="dlr-qty-form"
@@ -91,8 +85,7 @@
                       hx-swap="innerHTML">
                   <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                   <input type="hidden" name="delta" value="1">
-                  <button type="submit" class="dlr-qty-btn"
-                          aria-label="Increment quantity">+</button>
+                  <button type="submit" class="dlr-qty-btn" aria-label="Increment quantity">+</button>
                 </form>
               {% endif %}
               {# Switch-printing trigger. Loads the modal contents into the

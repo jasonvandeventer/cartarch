@@ -105,7 +105,7 @@ _ENGINE_RE = re.compile(
 )
 ```
 
-**Caveat:** Pattern expansion increases false-positive risk. The non-graveyard recursion pattern in particular needs testing — it could match cards that do *one-shot* death returns (like a Reanimate effect) which aren't engines. Recommend a unit test sweep before deploying.
+**Caveat:** Pattern expansion increases false-positive risk. The non-graveyard recursion pattern in particular needs testing — it could match cards that do _one-shot_ death returns (like a Reanimate effect) which aren't engines. Recommend a unit test sweep before deploying.
 
 ### Pattern D: Threat pattern misses scaling damage finishers
 
@@ -119,7 +119,7 @@ Current `_THREAT_RE` catches "you win the game", "opponent loses the game", infe
 
 **Decision required:** Are damage doublers and scaling-damage cards Threats?
 
-Arguments for: They're commonly the *finisher* in any deck that runs them. In Bello specifically, Unnatural Growth + animated big enchantment = lethal.
+Arguments for: They're commonly the _finisher_ in any deck that runs them. In Bello specifically, Unnatural Growth + animated big enchantment = lethal.
 
 Arguments against: They don't win on their own. They're enablers. Tagging them Threat may inflate "threat density" metrics in Health calculations.
 
@@ -170,6 +170,7 @@ _DRAW_RE = re.compile(
 **Confirmed by:** 4 of 14 cards in known-mistagged + commander-ambiguous samples had user-applied tags that were factually wrong.
 
 The most common errors:
+
 - "Wipe" applied to per-trigger drains (Serrated Scorpion, Syr Konrad)
 - "Wipe" applied to single/mass edicts (Demon's Disciple, Plaguecrafter)
 - User-defined "Ramp" applied to Sifter of Skulls (defensible — practical Ramp via token sac — but not intrinsic)
@@ -185,6 +186,7 @@ The most common errors:
 **Confirmed by:** 9 of 14 cards (64%) were correct because architecture works.
 
 **Cases where it succeeds:**
+
 - Commander explicitly mentions a theme word ("dying", "enchantments", "tokens")
 - Candidate card oracle has the same theme word in a positive context
 - `extract_commander_themes` correctly identifies the mechanic
@@ -206,14 +208,14 @@ But the user reasonably tagged Sifter as Ramp because the deck uses Sifter's tok
 
 ## Summary of code changes recommended
 
-| # | Change | File | Risk | Impact |
-|---|---|---|---|---|
-| 1 | Add `_DEATH_TRIGGER_DRAIN_RE` | deck_service.py | Low | Catches Syr Konrad class — ~5-15% of aristocrats decks gain a correct Threat tag |
-| 2 | Extend `card_matches_theme` for death_triggers + mass-edict | deck_service.py | Low | Catches Demon's Disciple class — Synergy correctly added to mass-edict creatures in death-triggers decks |
-| 3 | Expand `_ENGINE_RE` with 5 new patterns | deck_service.py | Medium | Catches many engine cards currently missed. Requires unit tests before deploy. |
-| 4 | Add damage-doubler patterns to `_THREAT_RE` | deck_service.py | Medium | Catches damage-doubling enchantments. Changes Health metric for decks running these. |
-| 5 | Add "draw cards equal to" to `_DRAW_RE` | deck_service.py | Low | Catches Greater Good and similar cards. |
-| 6 | Expand `extract_commander_themes` mechanics | deck_service.py | Medium | Add at least: lifegain, Food, Treasure, Clue, Ring, +1/+1 counters (separately from generic counters), spells_cast, attack, landfall. Per the tag overhaul doc §2.4. |
+| #   | Change                                                      | File            | Risk   | Impact                                                                                                                                                               |
+| --- | ----------------------------------------------------------- | --------------- | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Add `_DEATH_TRIGGER_DRAIN_RE`                               | deck_service.py | Low    | Catches Syr Konrad class — ~5-15% of aristocrats decks gain a correct Threat tag                                                                                     |
+| 2   | Extend `card_matches_theme` for death_triggers + mass-edict | deck_service.py | Low    | Catches Demon's Disciple class — Synergy correctly added to mass-edict creatures in death-triggers decks                                                             |
+| 3   | Expand `_ENGINE_RE` with 5 new patterns                     | deck_service.py | Medium | Catches many engine cards currently missed. Requires unit tests before deploy.                                                                                       |
+| 4   | Add damage-doubler patterns to `_THREAT_RE`                 | deck_service.py | Medium | Catches damage-doubling enchantments. Changes Health metric for decks running these.                                                                                 |
+| 5   | Add "draw cards equal to" to `_DRAW_RE`                     | deck_service.py | Low    | Catches Greater Good and similar cards.                                                                                                                              |
+| 6   | Expand `extract_commander_themes` mechanics                 | deck_service.py | Medium | Add at least: lifegain, Food, Treasure, Clue, Ring, +1/+1 counters (separately from generic counters), spells_cast, attack, landfall. Per the tag overhaul doc §2.4. |
 
 **Sequencing:** Implement #1, #2, #5 first (low risk, localized). Then #6 (mechanics expansion is the big lever for Synergy accuracy). Then #3 and #4 with unit tests.
 
@@ -224,27 +226,27 @@ But the user reasonably tagged Sifter as Ramp because the deck uses Sifter's tok
 ## Recommended Claude Code prompt
 
 ```
-The tag system overhaul has audit findings ready at 
-docs/tag_audit_findings.md. Implement the code changes recommended 
+The tag system overhaul has audit findings ready at
+docs/tag_audit_findings.md. Implement the code changes recommended
 in §"Summary of code changes recommended", in the sequence specified.
 
 For each change:
 
 1. Modify the relevant function or regex in app/deck_service.py
-2. Add unit tests covering the audit fixtures cited in the findings 
-   doc (Syr Konrad, Demon's Disciple, Plaguecrafter, Greater Good, 
-   Idol of Oblivion, Luminous Broodmoth, Sunbird's Invocation, 
+2. Add unit tests covering the audit fixtures cited in the findings
+   doc (Syr Konrad, Demon's Disciple, Plaguecrafter, Greater Good,
+   Idol of Oblivion, Luminous Broodmoth, Sunbird's Invocation,
    Rolling Hamsphere, Warstorm Surge, Unnatural Growth)
 3. Run the existing test suite to verify no regressions
-4. Re-tag the user's decks and present the diff of tag changes for 
+4. Re-tag the user's decks and present the diff of tag changes for
    review before committing
 
-Do NOT make changes #3, #4, or #6 in the same commit as #1, #2, #5. 
-The first three changes are surgical; the latter three change tag 
-distributions across many cards and need to ship separately for clean 
+Do NOT make changes #3, #4, or #6 in the same commit as #1, #2, #5.
+The first three changes are surgical; the latter three change tag
+distributions across many cards and need to ship separately for clean
 review.
 
-When ready, ping the user for approval of each batch before moving 
+When ready, ping the user for approval of each batch before moving
 to the next.
 ```
 

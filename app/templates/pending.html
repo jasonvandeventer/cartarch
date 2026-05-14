@@ -52,7 +52,7 @@
     </div>
   </section>
   <div id="pending-groups-wrap">
-  {% for group in grouped_drawers %}
+    {% for group in grouped_drawers %}
       <section class="panel pending-group"
                id="pending-group-{{ group.drawer|replace('-', 'none') }}"
                data-pending-group="{{ group.drawer }}">
@@ -90,11 +90,18 @@
                 <div>
                   <div class="pending-name">{{ item.card.name }}</div>
                   <div class="pending-meta">
-                    {{ item.card.set_name }} ({{ item.card.set_code|upper }}) · {{ item.finish|capitalize }}{% if item.language and item.language != 'en' %} · <span class="language-badge">{{ item.language|upper }}</span>{% endif %} · Qty: {{ item.quantity }} · ${{ '%.2f'|format(item.price) }}
+                    {{ item.card.set_name }} ({{ item.card.set_code|upper }}) · {{ item.finish|capitalize }}
+                    {% if item.language and item.language != 'en' %}
+                      · <span class="language-badge">{{ item.language|upper }}</span>
+                    {% endif %}
+                    · Qty: {{ item.quantity }} · ${{ '%.2f'|format(item.price) }}
                   </div>
                   {% if use_drawer_sorter %}
                     <div class="pending-location">
-                      <div class="pending-location-from">FROM: {{ item.current_location_label }}{% if item.from_slot %} · Slot {{ item.from_slot }}{% endif %}</div>
+                      <div class="pending-location-from">
+                        FROM: {{ item.current_location_label }}
+                        {% if item.from_slot %}· Slot {{ item.from_slot }}{% endif %}
+                      </div>
                       <div class="pending-location-to">TO: {{ item.target_location_label }} · Slot {{ item.slot or '?' }}</div>
                     </div>
                   {% endif %}
@@ -144,9 +151,11 @@
           </div>
         </details>
       </section>
-  {% endfor %}
+    {% endfor %}
   </div>
-  <section class="panel pending-empty" id="pending-empty-state" {% if grouped_drawers %}hidden{% endif %}>
+  <section class="panel pending-empty"
+           id="pending-empty-state"
+           {% if grouped_drawers %}hidden{% endif %}>
     <p class="muted">Nothing to place right now — your pending queue is clear.</p>
     <p class="muted" style="margin-top: 0.5rem;">
       <a href="/import">Import more cards</a> when you're ready to add to your collection.

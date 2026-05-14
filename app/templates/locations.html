@@ -50,85 +50,85 @@
     {% if locations %}
       <div class="table-wrap">
         <table class="stacking-table">
-        <thead>
-          <tr>
-            <th>Name</th>
-            <th>Type</th>
-            <th>Parent</th>
-            <th>Rows</th>
-            <th>Qty</th>
-            <th>Value</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for summary in location_summaries %}
-            {% set loc = summary.location %}
+          <thead>
             <tr>
-              <td>
-                <a href="/locations/{{ loc.id }}">{{ loc.name }}</a>
-              </td>
-              <td data-label="Type">{{ loc.type }}</td>
-              <td data-label="Parent">{{ loc.parent.name if loc.parent else '—' }}</td>
-              <td data-label="Rows">{{ summary.row_count }}</td>
-              <td data-label="Qty">{{ summary.quantity }}</td>
-              <td data-label="Value">${{ '%.2f'|format(summary.total_value) }}</td>
-              <td style="text-align: right; white-space: nowrap;">
-                <a href="/locations/{{ loc.id }}">
-                  <button type="button">Open</button>
-                </a>
-                {% if loc.type not in ('root', 'deck') %}
-                  <details class="inline-details"
-                           style="display: inline-block;
-                                  margin-left: 0.4rem">
-                    <summary class="btn-like">Edit</summary>
-                    <div class="edit-popout mobile-popover">
-                      <form action="/locations/{{ loc.id }}/edit"
-                            method="post"
-                            class="stack-form">
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                        <label>Name</label>
-                        <input type="text" name="name" value="{{ loc.name }}" required>
-                        <label>Type</label>
-                        <select name="type">
-                          {% for t in location_types %}
-                            <option value="{{ t }}" {% if t == loc.type %}selected{% endif %}>{{ t.capitalize() }}</option>
-                          {% endfor %}
-                        </select>
-                        <label>Parent</label>
-                        <select name="parent_id">
-                          <option value="0" {% if not loc.parent_id %}selected{% endif %}>No parent</option>
-                          {% for p in parent_locations %}
-                            {% if p.id != loc.id %}
-                              <option value="{{ p.id }}" {% if p.id == loc.parent_id %}selected{% endif %}>{{ p.name }} ({{ p.type }})</option>
-                            {% endif %}
-                          {% endfor %}
-                        </select>
-                        <label>Sort order</label>
-                        <input type="number"
-                               name="sort_order"
-                               value="{{ loc.sort_order }}"
-                               style="width: 80px">
-                        <button type="submit" style="margin-top: 0.25rem">Save</button>
-                      </form>
-                    </div>
-                  </details>
-                {% endif %}
-                {% if summary.is_deletable %}
-                  <form action="/locations/{{ loc.id }}/delete"
-                        method="post"
-                        style="display: inline-block;
-                               margin-left: 0.4rem">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                    <button type="submit"
-                            class="btn-danger-small"
-                            onclick="return confirm('Delete location \'{{ loc.name }}\'?');">Delete</button>
-                  </form>
-                {% endif %}
-              </td>
+              <th>Name</th>
+              <th>Type</th>
+              <th>Parent</th>
+              <th>Rows</th>
+              <th>Qty</th>
+              <th>Value</th>
+              <th></th>
             </tr>
-          {% endfor %}
-        </tbody>
+          </thead>
+          <tbody>
+            {% for summary in location_summaries %}
+              {% set loc = summary.location %}
+              <tr>
+                <td>
+                  <a href="/locations/{{ loc.id }}">{{ loc.name }}</a>
+                </td>
+                <td data-label="Type">{{ loc.type }}</td>
+                <td data-label="Parent">{{ loc.parent.name if loc.parent else '—' }}</td>
+                <td data-label="Rows">{{ summary.row_count }}</td>
+                <td data-label="Qty">{{ summary.quantity }}</td>
+                <td data-label="Value">${{ '%.2f'|format(summary.total_value) }}</td>
+                <td style="text-align: right; white-space: nowrap;">
+                  <a href="/locations/{{ loc.id }}">
+                    <button type="button">Open</button>
+                  </a>
+                  {% if loc.type not in ('root', 'deck') %}
+                    <details class="inline-details"
+                             style="display: inline-block;
+                                    margin-left: 0.4rem">
+                      <summary class="btn-like">Edit</summary>
+                      <div class="edit-popout mobile-popover">
+                        <form action="/locations/{{ loc.id }}/edit"
+                              method="post"
+                              class="stack-form">
+                          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                          <label>Name</label>
+                          <input type="text" name="name" value="{{ loc.name }}" required>
+                          <label>Type</label>
+                          <select name="type">
+                            {% for t in location_types %}
+                              <option value="{{ t }}" {% if t == loc.type %}selected{% endif %}>{{ t.capitalize() }}</option>
+                            {% endfor %}
+                          </select>
+                          <label>Parent</label>
+                          <select name="parent_id">
+                            <option value="0" {% if not loc.parent_id %}selected{% endif %}>No parent</option>
+                            {% for p in parent_locations %}
+                              {% if p.id != loc.id %}
+                                <option value="{{ p.id }}" {% if p.id == loc.parent_id %}selected{% endif %}>{{ p.name }} ({{ p.type }})</option>
+                              {% endif %}
+                            {% endfor %}
+                          </select>
+                          <label>Sort order</label>
+                          <input type="number"
+                                 name="sort_order"
+                                 value="{{ loc.sort_order }}"
+                                 style="width: 80px">
+                          <button type="submit" style="margin-top: 0.25rem">Save</button>
+                        </form>
+                      </div>
+                    </details>
+                  {% endif %}
+                  {% if summary.is_deletable %}
+                    <form action="/locations/{{ loc.id }}/delete"
+                          method="post"
+                          style="display: inline-block;
+                                 margin-left: 0.4rem">
+                      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                      <button type="submit"
+                              class="btn-danger-small"
+                              onclick="return confirm('Delete location \'{{ loc.name }}\'?');">Delete</button>
+                    </form>
+                  {% endif %}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
         </table>
       </div>
     {% else %}

@@ -14,6 +14,7 @@
 ## 1. base.html — header, nav, overall shell
 
 ### Layout
+
 - `.header-shell` and `.page-shell` use `width: min(96vw, 1800px)` with `padding-left/right: 1rem` — content area sizing is fine on mobile.
 - `.header-shell` is `display: flex; justify-content: space-between` between `.header-left` (wordmark + nav) and `.header-right` (version pill + logout button). At `max-width: 720px` it flex-wraps and `.header-right` becomes full-width row-aligned (style.css:532–540). OK in principle, but everything else inside the header is uncontrolled.
 
@@ -45,6 +46,7 @@ Nav links have no aria-current and no `.active` class. On mobile this matters mo
 ## 2. home.html
 
 ### Layout
+
 - `.feature-grid` uses `grid-template-columns: repeat(auto-fit, minmax(220px, 1fr))` (style.css:571-575) — collapses naturally to a single column at <440px viewport. Good.
 - Each `.feature-card` is `display: block` with comfortable padding. Tap target is the whole card, which is large.
 
@@ -62,6 +64,7 @@ The hover effect doesn't fire on touch but isn't harmful. Note that the cards ha
 ## 3. collection.html
 
 ### Layout
+
 - Hero stat row uses `.stat-grid` with `repeat(auto-fit, minmax(180px, 1fr))` (style.css:251-255) — fine.
 - Filter bar (`.filter-row`, style.css:240-249): `min-width: 140px` on every input/select. 6 controls (search, finish, location, sort, direction, Apply, Clear, Export) × 140px = 840px laid out. Wraps onto multiple rows on mobile.
 - Card grid: `.inventory-grid { grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)) }` (style.css:321-325) — single column at <340px viewport. The `.inventory-card` template is `grid-template-columns: 150px 1fr` (thumb + body, style.css:336-340), which at 720px reduces thumb to 110px (style.css:508-513), and at 720px collapses to single-column-stacked (thumb above body, style.css:546-554) with the thumb growing to 170px wide.
@@ -81,7 +84,7 @@ On a 343px content area, that's at most 2 controls per row with the search input
 **Severity: high (tap targets).**
 
 **Issue 3.4 — Inventory-card per-card action drawer is wide.**
-The `.card-actions-drawer` (style.css:795-824) contains 3+ inline-forms (Remove, Add to Deck, Move) plus a row of 4 buttons (Sell, Trade, Delete, Refresh). The quantity input has `style="width: 64px"` (inline, _macros.html:102) — fine — but the Add-to-Deck and Move dropdowns have no width control. On a 320px-wide column they collide with the buttons. The Delete Row button uses `confirm()` which works on mobile but the button label is verbose.
+The `.card-actions-drawer` (style.css:795-824) contains 3+ inline-forms (Remove, Add to Deck, Move) plus a row of 4 buttons (Sell, Trade, Delete, Refresh). The quantity input has `style="width: 64px"` (inline, \_macros.html:102) — fine — but the Add-to-Deck and Move dropdowns have no width control. On a 320px-wide column they collide with the buttons. The Delete Row button uses `confirm()` which works on mobile but the button label is verbose.
 **Severity: medium.**
 
 **Issue 3.5 — Inline `style="width: 80px"` on page-jump input is OK but adjacent number-input + button is a 2-control row on its own.**
@@ -99,6 +102,7 @@ The `.card-actions-drawer` (style.css:795-824) contains 3+ inline-forms (Remove,
 This is the most complex page in the app. It has the deck hero, bracket-v2 panel, analytics panel, health panel, search-collection panel, commanders grid, deck-cards filter+grid, tokens-needed table, bulk-move panel, and lazy-loaded combos/synergy/upgrade panels.
 
 ### Layout
+
 - Hero uses `.hero-row` (flex with `space-between` + wrap) and `.hero-stats-inline` (flex with wrap, style.css:179-192).
 - `analytics-grid`, `health-grid`, and `bracket-v2-row` all have explicit mobile overrides:
   - `.analytics-grid` collapses to 1 column at 760px (style.css:1023-1038).
@@ -154,6 +158,7 @@ Inside the deck-card actions drawer, the select has no `style="width: …"` so i
 ## 5. decks.html
 
 ### Layout
+
 - "New Deck" filter-row with name input + format select + Create button — 3 controls, fine.
 - Decks table with 6 columns: Name, Format, Total Cards, Bracket, Health, (actions). The actions cell has `text-align: right; white-space: nowrap` (decks.html:87) — an inline-popout Edit `<details>` + Delete form.
 
@@ -176,6 +181,7 @@ The popout sits at `top: calc(100% + 6px); left: 0` (style.css:1601-1613). Insid
 ## 6. card_detail.html
 
 ### Layout
+
 - Uses **classes that don't exist in style.css**: `.detail-layout`, `.detail-image-panel`, `.detail-meta-panel`, `.detail-image`, `.inventory-actions` (grep against style.css confirms no matches). The page falls back to default block layout — image and meta panels stack vertically, which on mobile is actually OK. On desktop this is presumably "broken" too but the user didn't flag it, so it's working by accident.
 - Inventory table is wrapped in `.table-wrap` (card_detail.html:42). Good.
 
@@ -199,6 +205,7 @@ Reflows to 1 column. Fine.
 ### game_new.html
 
 #### Layout
+
 - Player-count picker is 7 buttons (2-8) in a `.player-count-row` with `flex-wrap: wrap`. Buttons have `padding: 0.3rem 0.8rem` → ~30px tall, **below 44px target**.
 - Seat diagram is a 3×3 grid with explicit widths: `.sd-mid-row { grid-template-columns: 80px 1fr 80px }` (style.css:2638-2643). At 343px content width this leaves only 183px for the center "Screen" placeholder and the diagram itself is constrained by `max-width: 420px` (style.css:2625-2631). Should work.
 - Each `.seat-row` (style.css:2564-2592) has `gap: 0.6rem; flex-wrap: wrap` with 5 child fields including a hidden input and a seat-pos-pill button. `.seat-row-fields` flex-children include `input { width: 140px }` and `select { flex: 1; min-width: 160px }` — on a 343px content area, 140 + 16 + 160 = 316px is the first row, the deck select (`min-width: 180px`) wraps below. Total seat-row height is ~3-4 rows of controls per player × 4+ players = a long form on mobile.
@@ -223,6 +230,7 @@ Style.css:2595-2613. **Below 44px tap target.**
 ### game_detail.html (live tracker)
 
 #### Layout
+
 This page is the only one with deliberate fullscreen + tablet-first design. It has its own coordinate system (`.tracker-grid`, fixed inset, dynamic JS layout) and a portrait-mode media query (style.css:1944-1950) that triggers a 2-column auto-flow layout via JS.
 
 - Tap targets are intentionally sized: `.tc-life-btn { min-height: 52px; min-width: 58px }`, `.tc-elim-btn { min-width: 36px; min-height: 36px }`, `.turn-next-btn { min-height: 44px }`, `.fs-btn` is small but corner-tucked.
@@ -253,6 +261,7 @@ The portrait-mode `@media (orientation: portrait)` block only enables the portra
 ### locations.html
 
 #### Layout
+
 - Two stacked `filter-row` forms (Add Location, Add Deck) — 3-4 controls each.
 - One 7-column table: Name, Type, Parent, Rows, Qty, Value, Actions.
 - Actions cell has `text-align: right; white-space: nowrap` with an Open link + Edit `<details>` popout + Delete form.
@@ -270,6 +279,7 @@ When the row is near the right edge of a scrolled-narrow table, the popout sits 
 ### location_detail.html
 
 #### Layout
+
 - Stat-grid + filter-row + Bulk Move `<details>` + inventory-grid.
 - The Bulk Move pattern duplicates deck_detail.html's pattern, with the same `max-height: 260px` scroll container.
 
@@ -291,6 +301,7 @@ See 4.5, 4.8.
 ## 9. pending.html
 
 ### Layout
+
 - `.pending-item` is a CSS grid: `grid-template-columns: 96px 1fr auto` (style.css:422-431). At 720px collapses to `72px 1fr` with action moving to `grid-column: 2` (style.css:555-564).
 - `.pending-actions` is a flex row with `space-between` and wrap. Inline-forms inside `.pending-action` have `flex-wrap: wrap` (pending.html:91-94).
 
@@ -317,6 +328,7 @@ Pending.html:78. Falls through to inherited block layout. Works, but indicates o
 ## 10. import.html
 
 ### Layout
+
 - 4 panels: Upload CSV, Paste Card List, Search by Name, Manual Entry.
 - Upload CSV and Search panels use `.filter-row` (inline-flex with wrap). Paste-list and Manual use `.stack-form` (column flex).
 
@@ -344,15 +356,15 @@ Pending.html:78. Falls through to inherited block layout. Works, but indicates o
 
 ### Media-query inventory
 
-| # | Line | Breakpoint | Targets | Notes |
-|---|------|-----------|---------|-------|
-| 1 | 504  | `max-width: 980px` | `.inventory-grid`, `.inventory-card`, `.inventory-thumb`, `.compact-form-grid` | First-pass shrink (laptop → tablet). Not a mobile breakpoint. |
-| 2 | 522  | `max-width: 720px` | `.header-shell`, `.site-title`, `.header-right`, `.header-tagline`, `.inventory-card`, `.pending-item`, `.pending-thumb`, `.pending-action` | Main "mobile" pass. Hides `.header-tagline`. Collapses inventory card to single column. |
-| 3 | 1023 | `max-width: 760px` | `.analytics-grid`, `.analytics-section` | Deck analytics 1-col collapse. |
-| 4 | 1158 | `max-width: 760px` | `.consistency-row`, `.consistency-breakdown` | Consistency badge wrap. |
-| 5 | 1304 | `max-width: 760px` | `.health-grid`, `.health-pips` | Deck health 1-col collapse. |
-| 6 | 1944 | `orientation: portrait` | `.portrait-turn-row` | Game tracker portrait-only nav row. |
-| 7 | 2856 | `max-width: 720px` | `.bracket-v2-row`, `.bracket-v2-confidence`, `.bracket-v2-intent-form` | Bracket V2 panel 1-col collapse. |
+| #   | Line | Breakpoint              | Targets                                                                                                                                     | Notes                                                                                   |
+| --- | ---- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| 1   | 504  | `max-width: 980px`      | `.inventory-grid`, `.inventory-card`, `.inventory-thumb`, `.compact-form-grid`                                                              | First-pass shrink (laptop → tablet). Not a mobile breakpoint.                           |
+| 2   | 522  | `max-width: 720px`      | `.header-shell`, `.site-title`, `.header-right`, `.header-tagline`, `.inventory-card`, `.pending-item`, `.pending-thumb`, `.pending-action` | Main "mobile" pass. Hides `.header-tagline`. Collapses inventory card to single column. |
+| 3   | 1023 | `max-width: 760px`      | `.analytics-grid`, `.analytics-section`                                                                                                     | Deck analytics 1-col collapse.                                                          |
+| 4   | 1158 | `max-width: 760px`      | `.consistency-row`, `.consistency-breakdown`                                                                                                | Consistency badge wrap.                                                                 |
+| 5   | 1304 | `max-width: 760px`      | `.health-grid`, `.health-pips`                                                                                                              | Deck health 1-col collapse.                                                             |
+| 6   | 1944 | `orientation: portrait` | `.portrait-turn-row`                                                                                                                        | Game tracker portrait-only nav row.                                                     |
+| 7   | 2856 | `max-width: 720px`      | `.bracket-v2-row`, `.bracket-v2-confidence`, `.bracket-v2-intent-form`                                                                      | Bracket V2 panel 1-col collapse.                                                        |
 
 ### Inconsistencies
 
@@ -417,22 +429,25 @@ Pending.html:78. Falls through to inherited block layout. Works, but indicates o
 
 **Proposal: collapse the three existing breakpoints (720 / 760 / 980) to two semantic ones — 768 and 480 — with a third orientation query reserved for the game tracker.**
 
-| Breakpoint | Name | Purpose |
-|------------|------|---------|
-| `(max-width: 768px)` | `--bp-tablet` | Phone + tablet portrait. Single column for analytics/health/inventory cards. Filter rows stack. Tables wrap. Header nav collapses to a hamburger or scrolling-pill row. |
-| `(max-width: 480px)` | `--bp-phone` | True phone. Extra-aggressive: smaller hero, taller tap targets (44px floor enforced), bulk-move scroll containers expand to full height, popouts become bottom-sheet modals instead of absolute. |
-| `(orientation: portrait) and (max-width: 768px)` | game-tracker | Already used. Keep. |
+| Breakpoint                                       | Name          | Purpose                                                                                                                                                                                          |
+| ------------------------------------------------ | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `(max-width: 768px)`                             | `--bp-tablet` | Phone + tablet portrait. Single column for analytics/health/inventory cards. Filter rows stack. Tables wrap. Header nav collapses to a hamburger or scrolling-pill row.                          |
+| `(max-width: 480px)`                             | `--bp-phone`  | True phone. Extra-aggressive: smaller hero, taller tap targets (44px floor enforced), bulk-move scroll containers expand to full height, popouts become bottom-sheet modals instead of absolute. |
+| `(orientation: portrait) and (max-width: 768px)` | game-tracker  | Already used. Keep.                                                                                                                                                                              |
 
 **Why 768 and not 720/760?**
+
 - 768 is the iPad Mini portrait width and a near-universal "tablet portrait" threshold in popular frameworks (Bootstrap, Tailwind). Matching it avoids surprises.
 - The current 720 / 760 split provides zero functional difference at the 720-760 viewport range — they fire 40px apart for no reason. Picking 768 captures both intents.
 - A single primary breakpoint is easier to reason about and audit.
 
 **Why also 480?**
+
 - Several patterns that work at 480-768 (e.g. side-by-side stat cards, 2-column tag editor) break at <400 (iPhone SE width is 375). Having an explicit second tier prevents the "works on most phones, breaks on small ones" failure mode.
 - Phone-specific overrides like converting popouts to bottom sheets, enforcing 44px tap targets globally, and stacking the header nav apply at this tier.
 
 **Why not mobile-first (min-width)?**
+
 - The codebase is already 2966 lines of desktop-first CSS. Migrating to mobile-first is a larger refactor than the audit recommends. Two consistent max-width breakpoints achieve 90% of the benefit with 10% of the churn.
 
 **Single-breakpoint variant:**

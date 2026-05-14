@@ -10,14 +10,14 @@ Current version: **v3.16.23**.
 
 ## Stack
 
-| Layer         | Technology                                          |
-| ------------- | --------------------------------------------------- |
-| Web framework | FastAPI + Jinja2 templates                          |
-| Database      | SQLite via SQLAlchemy (per-user data isolation)     |
+| Layer         | Technology                                                  |
+| ------------- | ----------------------------------------------------------- |
+| Web framework | FastAPI + Jinja2 templates                                  |
+| Database      | SQLite via SQLAlchemy (per-user data isolation)             |
 | Front-end     | Server-rendered HTML, HTMX 1.9.12 (self-hosted), vanilla JS |
-| Styling       | Hand-written CSS, no framework                      |
-| Card data     | Scryfall API (cached locally; bulk-fetched in batches) |
-| Combo data    | Commander Spellbook API (cached in-memory per deck) |
+| Styling       | Hand-written CSS, no framework                              |
+| Card data     | Scryfall API (cached locally; bulk-fetched in batches)      |
+| Combo data    | Commander Spellbook API (cached in-memory per deck)         |
 
 InventoryRow is the single source of truth for owned cards. StorageLocation is the canonical location model — decks are themselves `type="deck"` storage locations referenced by a Deck record. SQLite is the permanent choice (see ROADMAP "Explicitly NOT Planned").
 

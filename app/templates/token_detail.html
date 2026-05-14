@@ -15,11 +15,7 @@
   </section>
   <section>
     <div>
-      {% if token.image_url %}
-        <img src="{{ token.image_url }}"
-             alt="{{ token.name }}"
-             loading="lazy">
-      {% endif %}
+      {% if token.image_url %}<img src="{{ token.image_url }}" alt="{{ token.name }}" loading="lazy">{% endif %}
     </div>
     <div>
       {% if token.type_line %}

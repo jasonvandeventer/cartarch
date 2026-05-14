@@ -11,7 +11,10 @@
    the roadmap entry calls out. Full printings list follows, with the
    current row's set highlighted.
 #}
-<article class="switch-printing-modal modal-open" role="dialog" aria-modal="true" aria-label="Switch printing">
+<article class="switch-printing-modal modal-open"
+         role="dialog"
+         aria-modal="true"
+         aria-label="Switch printing">
   <div class="switch-printing-modal-card">
     <header class="switch-printing-modal-header">
       <div>
@@ -27,13 +30,10 @@
               data-modal-close
               aria-label="Close">×</button>
     </header>
-
     {% if owned_printings %}
       <section class="switch-printing-section switch-printing-section-owned">
         <h4 class="switch-printing-section-title">In your collection</h4>
-        <p class="muted switch-printing-section-blurb">
-          Pick a printing you already own.
-        </p>
+        <p class="muted switch-printing-section-blurb">Pick a printing you already own.</p>
         <ul class="switch-printing-list">
           {% for entry in owned_printings %}
             <li class="switch-printing-row owned"
@@ -44,8 +44,11 @@
                 <span class="muted">({{ entry.set_code|upper }} #{{ entry.collector_number }})</span>
               </span>
               <span class="switch-printing-row-locations muted">
-                {% for loc in entry.locations[:3] %}{{ loc }}{% if not loop.last %} · {% endif %}{% endfor %}
-                {% if entry.locations|length > 3 %} · +{{ entry.locations|length - 3 }} more{% endif %}
+                {% for loc in entry.locations[:3] %}
+                  {{ loc }}
+                  {% if not loop.last %}·{% endif %}
+                {% endfor %}
+                {% if entry.locations|length > 3 %}· +{{ entry.locations|length - 3 }} more{% endif %}
               </span>
               <form action="/decks/{{ deck.id }}/rows/{{ row.id }}/switch-printing"
                     method="post"
@@ -58,77 +61,76 @@
                 <input type="hidden" name="scryfall_id" value="{{ entry.scryfall_id }}">
                 <input type="hidden" name="finish" value="{{ entry.finish }}">
                 <button type="submit" class="switch-printing-pick"
-                        {% if entry.set_code == current_set_code
-                              and entry.collector_number == current_collector_number
-                              and entry.finish == current_finish %}disabled{% endif %}>
-                  {{ entry.finish|capitalize }} · Qty {{ entry.quantity }}
-                </button>
-              </form>
-            </li>
-          {% endfor %}
-        </ul>
-      </section>
-    {% endif %}
-
-    <section class="switch-printing-section">
-      <h4 class="switch-printing-section-title">All printings</h4>
-      {% if not printings %}
-        <p class="muted">No printings returned from Scryfall.</p>
-      {% else %}
-        <p class="muted switch-printing-section-blurb">
-          Newest reprint first. Finish buttons show only the finishes that
-          actually exist for that printing.
-        </p>
-        <ul class="switch-printing-list">
-          {% for p in printings %}
-            <li class="switch-printing-row
-                       {% if p.set_code == current_set_code and p.collector_number == current_collector_number %}current{% endif %}"
-                data-card-image="{{ p.image_uri_normal or p.image_uri_small or '' }}"
-                data-card-name="{{ card_name }}">
-              <span class="switch-printing-row-set">
-                {{ p.set_name }}
-                <span class="muted">({{ p.set_code|upper }} #{{ p.collector_number }})</span>
-                {% if p.set_code == current_set_code and p.collector_number == current_collector_number %}
-                  <span class="switch-printing-row-current-badge">current</span>
-                {% endif %}
-              </span>
-              <span class="switch-printing-row-meta muted">
-                {% if p.released_at %}{{ p.released_at }}{% endif %}
-                {% if p.frame_effects %}
-                  {% for eff in p.frame_effects %}
-                    <span class="switch-printing-frame-effect">{{ eff }}</span>
-                  {% endfor %}
-                {% endif %}
-              </span>
-              <span class="switch-printing-row-finishes">
-                {% for finish in p.finishes %}
-                  <form action="/decks/{{ deck.id }}/rows/{{ row.id }}/switch-printing"
-                        method="post"
-                        class="switch-printing-finish-form"
-                        hx-post="/decks/{{ deck.id }}/rows/{{ row.id }}/switch-printing"
-                        hx-target="#deck-card-list"
-                        hx-swap="innerHTML"
-                        hx-on::after-request="document.dispatchEvent(new Event('switchprinting:close'))">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                    <input type="hidden" name="scryfall_id" value="{{ p.scryfall_id }}">
-                    <input type="hidden" name="finish" value="{{ finish }}">
-                    {% set owned_count = p.owned_finishes.get(finish, 0) %}
-                    <button type="submit"
-                            class="switch-printing-finish-btn finish-{{ finish }}
-                                   {% if owned_count %}owned{% endif %}"
-                            {% if p.set_code == current_set_code
-                                  and p.collector_number == current_collector_number
-                                  and finish == current_finish %}disabled{% endif %}>
-                      {{ finish|capitalize }}{% if owned_count %} <span class="switch-printing-owned-count">({{ owned_count }})</span>{% endif %}
-                    </button>
-                  </form>
-                {% endfor %}
-              </span>
-            </li>
-          {% endfor %}
-        </ul>
+                  {% if entry.set_code == current_set_code
+                    and entry.collector_number == current_collector_number
+                    and entry.finish == current_finish %}disabled{% endif %}>
+                    {{ entry.finish|capitalize }} · Qty {{ entry.quantity }}
+                  </button>
+                </form>
+              </li>
+            {% endfor %}
+          </ul>
+        </section>
       {% endif %}
-    </section>
-  </div>
-  <div class="switch-printing-modal-backdrop" data-modal-close aria-hidden="true"></div>
-</article>
+      <section class="switch-printing-section">
+        <h4 class="switch-printing-section-title">All printings</h4>
+        {% if not printings %}
+          <p class="muted">No printings returned from Scryfall.</p>
+        {% else %}
+          <p class="muted switch-printing-section-blurb">
+            Newest reprint first. Finish buttons show only the finishes that
+            actually exist for that printing.
+          </p>
+          <ul class="switch-printing-list">
+            {% for p in printings %}
+              <li class="switch-printing-row {% if p.set_code == current_set_code and p.collector_number == current_collector_number %}current{% endif %}"
+                  data-card-image="{{ p.image_uri_normal or p.image_uri_small or '' }}"
+                  data-card-name="{{ card_name }}">
+                <span class="switch-printing-row-set">
+                  {{ p.set_name }}
+                  <span class="muted">({{ p.set_code|upper }} #{{ p.collector_number }})</span>
+                  {% if p.set_code == current_set_code and p.collector_number == current_collector_number %}
+                    <span class="switch-printing-row-current-badge">current</span>
+                  {% endif %}
+                </span>
+                <span class="switch-printing-row-meta muted">
+                  {% if p.released_at %}{{ p.released_at }}{% endif %}
+                  {% if p.frame_effects %}
+                    {% for eff in p.frame_effects %}<span class="switch-printing-frame-effect">{{ eff }}</span>{% endfor %}
+                  {% endif %}
+                </span>
+                <span class="switch-printing-row-finishes">
+                  {% for finish in p.finishes %}
+                    <form action="/decks/{{ deck.id }}/rows/{{ row.id }}/switch-printing"
+                          method="post"
+                          class="switch-printing-finish-form"
+                          hx-post="/decks/{{ deck.id }}/rows/{{ row.id }}/switch-printing"
+                          hx-target="#deck-card-list"
+                          hx-swap="innerHTML"
+                          hx-on::after-request="document.dispatchEvent(new Event('switchprinting:close'))">
+                      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                      <input type="hidden" name="scryfall_id" value="{{ p.scryfall_id }}">
+                      <input type="hidden" name="finish" value="{{ finish }}">
+                      {% set owned_count = p.owned_finishes.get(finish, 0) %}
+                      <button type="submit"
+                        class="switch-printing-finish-btn finish-{{ finish }}
+                        {% if owned_count %}owned{% endif %}"
+                        {% if p.set_code == current_set_code
+                          and p.collector_number == current_collector_number
+                          and finish == current_finish %}disabled{% endif %}>
+                          {{ finish|capitalize }}
+                          {% if owned_count %}<span class="switch-printing-owned-count">({{ owned_count }})</span>{% endif %}
+                        </button>
+                      </form>
+                    {% endfor %}
+                  </span>
+                </li>
+              {% endfor %}
+            </ul>
+          {% endif %}
+        </section>
+      </div>
+      <div class="switch-printing-modal-backdrop"
+           data-modal-close
+           aria-hidden="true"></div>
+    </article>

@@ -18,32 +18,32 @@
     {% if batches %}
       <div class="table-wrap">
         <table>
-        <thead>
-          <tr>
-            <th>Batch ID</th>
-            <th>Filename</th>
-            <th>Imported At</th>
-            <th>Rows</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for batch in batches %}
+          <thead>
             <tr>
-              <td>{{ batch.id }}</td>
-              <td>{{ batch.filename }}</td>
-              <td>{{ batch.imported_at }}</td>
-              <td>{{ batch.row_count }}</td>
-              <td style="text-align: right;">
-                <form action="/imports/undo-batch" method="post" class="inline-form">
-                  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                  <input type="hidden" name="batch_id" value="{{ batch.id }}">
-                  <button type="submit" class="btn-danger-small">Undo Batch</button>
-                </form>
-              </td>
+              <th>Batch ID</th>
+              <th>Filename</th>
+              <th>Imported At</th>
+              <th>Rows</th>
+              <th></th>
             </tr>
-          {% endfor %}
-        </tbody>
+          </thead>
+          <tbody>
+            {% for batch in batches %}
+              <tr>
+                <td>{{ batch.id }}</td>
+                <td>{{ batch.filename }}</td>
+                <td>{{ batch.imported_at }}</td>
+                <td>{{ batch.row_count }}</td>
+                <td style="text-align: right;">
+                  <form action="/imports/undo-batch" method="post" class="inline-form">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                    <input type="hidden" name="batch_id" value="{{ batch.id }}">
+                    <button type="submit" class="btn-danger-small">Undo Batch</button>
+                  </form>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
         </table>
       </div>
     {% else %}
@@ -55,36 +55,36 @@
     {% if logs %}
       <div class="table-wrap">
         <table>
-        <thead>
-          <tr>
-            <th>ID</th>
-            <th>Event</th>
-            <th>Card</th>
-            <th>Finish</th>
-            <th>Qty Δ</th>
-            <th>From</th>
-            <th>To</th>
-            <th>Batch</th>
-            <th>When</th>
-            <th>Note</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for log in logs %}
+          <thead>
             <tr>
-              <td>{{ log.id }}</td>
-              <td>{{ log.event_type }}</td>
-              <td>{{ log.card_id or '—' }}</td>
-              <td>{{ log.finish or '—' }}</td>
-              <td>{{ log.quantity_delta }}</td>
-              <td>{{ log.source_location or '—' }}</td>
-              <td>{{ log.destination_location or '—' }}</td>
-              <td>{{ log.batch_id or '—' }}</td>
-              <td>{{ log.created_at }}</td>
-              <td>{{ log.note or '—' }}</td>
+              <th>ID</th>
+              <th>Event</th>
+              <th>Card</th>
+              <th>Finish</th>
+              <th>Qty Δ</th>
+              <th>From</th>
+              <th>To</th>
+              <th>Batch</th>
+              <th>When</th>
+              <th>Note</th>
             </tr>
-          {% endfor %}
-        </tbody>
+          </thead>
+          <tbody>
+            {% for log in logs %}
+              <tr>
+                <td>{{ log.id }}</td>
+                <td>{{ log.event_type }}</td>
+                <td>{{ log.card_id or '—' }}</td>
+                <td>{{ log.finish or '—' }}</td>
+                <td>{{ log.quantity_delta }}</td>
+                <td>{{ log.source_location or '—' }}</td>
+                <td>{{ log.destination_location or '—' }}</td>
+                <td>{{ log.batch_id or '—' }}</td>
+                <td>{{ log.created_at }}</td>
+                <td>{{ log.note or '—' }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
         </table>
       </div>
     {% else %}

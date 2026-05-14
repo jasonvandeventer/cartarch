@@ -50,9 +50,7 @@
         {% if item.language and item.language != 'en' %}
           <span class="language-badge" title="Physical language">{{ item.language|upper }}</span>
         {% endif %}
-        {% if item.is_proxy %}
-          <span class="proxy-badge" title="Marked as proxy">PROXY</span>
-        {% endif %}
+        {% if item.is_proxy %}<span class="proxy-badge" title="Marked as proxy">PROXY</span>{% endif %}
         {% if item.card.mana_cost %}· {{ item.card.mana_cost }}{% endif %}
         · Qty {{ item.quantity }} ·
         {% if item.price_status is defined and item.price_status %}
@@ -67,9 +65,7 @@
           ${{ '%.2f'|format(item.effective_price) }} each
         {% endif %}
       </div>
-      {% if item.card.type_line %}
-        <div class="muted" style="margin-top: 0.15rem;">{{ item.card.type_line }}</div>
-      {% endif %}
+      {% if item.card.type_line %}<div class="muted" style="margin-top: 0.15rem;">{{ item.card.type_line }}</div>{% endif %}
       {% if show_location_label %}
         <div class="inventory-location">
           {{ item.drawer_label if item.drawer_label else '' }}
@@ -178,7 +174,11 @@
                     class="inline-form">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                 <button type="submit">
-                  {% if item.is_proxy %}Unmark Proxy{% else %}Mark Proxy{% endif %}
+                  {% if item.is_proxy %}
+                    Unmark Proxy
+                  {% else %}
+                    Mark Proxy
+                  {% endif %}
                 </button>
               </form>
             </div>
@@ -272,8 +272,8 @@
                     hx-swap="innerHTML">Switch Printing</button>
             {% set _tl = (item.card.type_line or '')|lower %}
             {% if 'basic' in _tl and (
-                'plains' in _tl or 'island' in _tl or 'swamp' in _tl
-                or 'mountain' in _tl or 'forest' in _tl or 'wastes' in _tl) %}
+              'plains' in _tl or 'island' in _tl or 'swamp' in _tl
+              or 'mountain' in _tl or 'forest' in _tl or 'wastes' in _tl) %}
               <form method="post"
                     class="inline-form basic-qty-form"
                     action="/decks/{{ deck.id }}/rows/{{ item.id }}/bump-qty"

@@ -9,7 +9,9 @@
       </p>
       <p class="muted">
         Finish: {{ finish|capitalize }} &nbsp;·&nbsp; Quantity: {{ quantity }}
-        {% if language and language != 'en' %}&nbsp;·&nbsp; Language: <span class="language-badge">{{ language|upper }}</span>{% endif %}
+        {% if language and language != 'en' %}
+          &nbsp;·&nbsp; Language: <span class="language-badge">{{ language|upper }}</span>
+        {% endif %}
         &nbsp;·&nbsp; Normal: ${{ card.price_usd or "0.00" }}
         &nbsp;·&nbsp; Foil: ${{ card.price_usd_foil or "0.00" }}
         &nbsp;·&nbsp; Etched: ${{ card.price_usd_etched or "0.00" }}
@@ -49,7 +51,8 @@
               {% endfor %}
             </optgroup>
           </select>
-          <button type="submit" id="import-submit-btn"
+          <button type="submit"
+                  id="import-submit-btn"
                   {% if not use_drawer_sorter and not placeable and not decks %}disabled{% endif %}>
             Commit Import
           </button>

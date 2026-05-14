@@ -49,14 +49,19 @@
 {% set mode = reconcile_mode | default("deck") %}
 {% if rows and mode == "deck" %}
   <section class="panel"
-           style="margin-top: 0.75rem;"
+           style="margin-top: 0.75rem"
            id="reconciliation-content">
     <h3 class="panel-title" style="margin-bottom: 0.4rem">Reconciliation</h3>
     <p class="muted" style="margin-top: 0">
       {% if total_to_move > 0 and total_to_import_new > 0 %}
         <strong>{{ total_to_move }}</strong> {{ "card" if total_to_move == 1 else "cards" }}
         in your collection can be moved to
-        {% if deck_name %}<strong>{{ deck_name }}</strong>{% else %}this deck{% endif %}.
+        {% if deck_name %}
+          <strong>{{ deck_name }}</strong>
+        {% else %}
+          this deck
+        {% endif %}
+        .
         <strong>{{ total_to_import_new }}</strong>
         {{ "card" if total_to_import_new == 1 else "cards" }} will be imported new.
       {% elif total_to_move > 0 %}
@@ -72,7 +77,12 @@
         <br>
         <strong>{{ total_to_merge }}</strong>
         {{ "copy" if total_to_merge == 1 else "copies" }} will merge into
-        {% if deck_name %}<strong>{{ deck_name }}</strong>{% else %}this deck{% endif %}'s
+        {% if deck_name %}
+          <strong>{{ deck_name }}</strong>
+        {% else %}
+          this deck
+        {% endif %}
+        's
         existing row{{ "" if total_to_merge == 1 else "s" }} rather than
         creating a duplicate.
       {% endif %}
@@ -99,7 +109,8 @@
                   {% if row.matches %}
                     <div class="muted small-text">
                       {% for m in row.matches %}
-                        {{ m.quantity_available }}× in {{ m.location_name }}{% if not loop.last %},{% endif %}
+                        {{ m.quantity_available }}× in {{ m.location_name }}
+                        {% if not loop.last %},{% endif %}
                       {% endfor %}
                     </div>
                   {% endif %}
@@ -116,7 +127,8 @@
                   {% if row.total_in_target_deck and row.total_in_target_deck > 0 %}
                     <div class="muted small-text">
                       Already in this deck: <strong>{{ row.total_in_target_deck }}×</strong>
-                      <br>(import will merge into the existing row)
+                      <br>
+                      (import will merge into the existing row)
                     </div>
                   {% endif %}
                   {% if row.other_deck_matches %}
@@ -124,7 +136,8 @@
                       In another deck:
                       {% for m in row.other_deck_matches %}
                         <strong>{{ m.quantity_available }}×</strong> in
-                        <em>{{ m.location_name }}</em>{% if not loop.last %},{% endif %}
+                        <em>{{ m.location_name }}</em>
+                        {% if not loop.last %},{% endif %}
                       {% endfor %}
                     </div>
                   {% endif %}
@@ -133,16 +146,19 @@
                   <select name="reconcile_action" class="reconcile-action-select">
                     {% set action = row.recommended_action %}
                     {% if row.total_available >= row.quantity_needed %}
-                      <option value="move_existing" {% if action == "move_existing" %}selected{% endif %}>
+                      <option value="move_existing"
+                              {% if action == "move_existing" %}selected{% endif %}>
                         Move {{ row.quantity_needed }} (default)
                       </option>
                     {% elif row.total_available > 0 %}
-                      <option value="move_existing_plus_new" {% if action == "move_existing_plus_new" %}selected{% endif %}>
+                      <option value="move_existing_plus_new"
+                              {% if action == "move_existing_plus_new" %}selected{% endif %}>
                         Move {{ row.total_available }} + new {{ row.quantity_needed - row.total_available }} (default)
                       </option>
                     {% endif %}
                     <option value="import_new" {% if action == "import_new" %}selected{% endif %}>
-                      Import {{ row.quantity_needed }} new{% if action != "import_new" %} (override){% endif %}
+                      Import {{ row.quantity_needed }} new
+                      {% if action != "import_new" %}(override){% endif %}
                     </option>
                   </select>
                   {# Hidden fields encode the actual move/new split for the commit handler.
@@ -212,7 +228,7 @@
      from the form would shift the actions onto the wrong cards. #}
   {% set _show_dupes_only = has_deck_only_dupes | default(false) %}
   <section class="panel"
-           style="margin-top: 0.75rem;"
+           style="margin-top: 0.75rem"
            id="reconciliation-content">
     <h3 class="panel-title" style="margin-bottom: 0.4rem">Reconciliation</h3>
     <p class="muted" style="margin-top: 0">
@@ -222,16 +238,12 @@
       {% set _row_count = rows | length %}
       Importing
       <strong>{{ _row_count }}</strong>
-      {{ "card" if _row_count == 1 else "cards" }}{% if deck_name %} into <strong>{{ deck_name }}</strong>{% endif %}:
-      {% if _to_new > 0 %}
-        <strong>{{ _to_new }}</strong> new,
-      {% endif %}
-      {% if _to_delta > 0 %}
-        <strong>{{ _to_delta }}</strong> partial (your collection is short),
-      {% endif %}
-      {% if _to_skip > 0 %}
-        <strong>{{ _to_skip }}</strong> already owned (will skip).
-      {% endif %}
+      {{ "card" if _row_count == 1 else "cards" }}
+      {% if deck_name %}into <strong>{{ deck_name }}</strong>{% endif %}
+      :
+      {% if _to_new > 0 %}<strong>{{ _to_new }}</strong> new,{% endif %}
+      {% if _to_delta > 0 %}<strong>{{ _to_delta }}</strong> partial (your collection is short),{% endif %}
+      {% if _to_skip > 0 %}<strong>{{ _to_skip }}</strong> already owned (will skip).{% endif %}
     </p>
     {% if _show_dupes_only %}
       <p class="warning-text"
@@ -239,7 +251,7 @@
                 padding: 0.55rem 0.85rem;
                 border-radius: 8px;
                 background: rgba(244, 158, 76, 0.12);
-                border: 1px solid rgba(244, 158, 76, 0.35);">
+                border: 1px solid rgba(244, 158, 76, 0.35)">
         <strong>Some of these are already in a deck.</strong>
         Deck copies are allocated, so an auto-skip might not be what you want.
         Review the per-card list below and confirm what to do with each.
@@ -282,7 +294,8 @@
                   {% if row.owned_breakdown %}
                     <div class="muted small-text">
                       {% for entry in row.owned_breakdown %}
-                        {{ entry.quantity }}× in {{ entry.location_name }}{% if not loop.last %},{% endif %}
+                        {{ entry.quantity }}× in {{ entry.location_name }}
+                        {% if not loop.last %},{% endif %}
                       {% endfor %}
                     </div>
                   {% endif %}
@@ -304,16 +317,22 @@
                   {% set default_action = "import_new" if manual_mode else rec %}
                   <select name="reconcile_action" class="reconcile-action-select">
                     {% if row.total_user_owned >= row.quantity_needed %}
-                      <option value="skip_already_owned" {% if default_action == "skip_already_owned" %}selected{% endif %}>
-                        Skip — already owned{% if default_action == "skip_already_owned" %} (default){% endif %}
+                      <option value="skip_already_owned"
+                              {% if default_action == "skip_already_owned" %}selected{% endif %}>
+                        Skip — already owned
+                        {% if default_action == "skip_already_owned" %}(default){% endif %}
                       </option>
                     {% elif row.total_user_owned > 0 %}
-                      <option value="import_delta" {% if default_action == "import_delta" %}selected{% endif %}>
-                        Import {{ row.quantity_needed - row.total_user_owned }} more{% if default_action == "import_delta" %} (default){% endif %}
+                      <option value="import_delta"
+                              {% if default_action == "import_delta" %}selected{% endif %}>
+                        Import {{ row.quantity_needed - row.total_user_owned }} more
+                        {% if default_action == "import_delta" %}(default){% endif %}
                       </option>
                     {% endif %}
-                    <option value="import_new" {% if default_action == "import_new" %}selected{% endif %}>
-                      Import {{ row.quantity_needed }} new{% if default_action == "import_new" %} (default){% endif %}
+                    <option value="import_new"
+                            {% if default_action == "import_new" %}selected{% endif %}>
+                      Import {{ row.quantity_needed }} new
+                      {% if default_action == "import_new" %}(default){% endif %}
                     </option>
                   </select>
                   {# Hidden fields encode the new_qty for the commit handler.

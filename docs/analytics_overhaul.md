@@ -43,24 +43,24 @@ roadmap.
 
 ### 1.1 Python modules and functions
 
-| Location | What | Disposition |
-|---|---|---|
-| [app/bracket_v2_service.py](../app/bracket_v2_service.py) | Entire module (~970 lines). Exports `tag_card_from_oracle`, `upsert_card_tags`, `estimate_bracket_v1`, `estimate_bracket_v2`, `derive_intent_bracket`, `resolve_mechanics_intent`, `compute_soft_score`, `derive_combo_role`, `persist_estimate`. Dataclasses `AutoTag`, `Finding`, `BracketEstimate`. | **Delete entirely.** A subset of the oracle-text auto-tagger logic (`tag_card_from_oracle`) is salvageable as a private helper inside the new analytics module if needed — but the `card_tags` table that backs it is also being dropped (see §6), so the auto-tagger has nowhere to write. Per-row tags on `InventoryRow.tags` (drives Synergy/Health) are unchanged. |
-| [app/deck_service.py:873-956](../app/deck_service.py#L873-L956) | `compute_deck_bracket(all_rows, combos)` — legacy V1 floor-based estimator. Returns `{bracket, reasons, signals}`. | **Delete.** |
-| [app/deck_service.py:1084-1085](../app/deck_service.py#L1084-L1085) | In `list_decks()`: `combos = compute_deck_combos(all_rows); deck.bracket = compute_deck_bracket(...)`. | **Replace.** `list_decks` will attach the new `deck.composition_signals` + `deck.play_record` summary objects instead. The expensive `compute_deck_combos` call moves out of `list_decks` — it does not need to fire on every Decks page load. |
-| [app/main.py:43](../app/main.py#L43) | `from app.deck_service import compute_deck_bracket` | **Remove import.** |
-| [app/main.py:1660-1732](../app/main.py#L1660-L1732) | `deck_detail_page` initial render: lazy-loads V2 estimate, populates `bracket_v2` template var (mechanics_bracket, intent_bracket, score, confidence, findings, rules_version). | **Delete the entire `bracket_v2` block.** Replace with composition/play/comparison context. |
-| [app/main.py:1776-1820](../app/main.py#L1776-L1820) | `panels_endpoint`: re-runs V2 estimator with combo data, persists, builds legacy `bracket` dict for the lazy-loaded badge in the hero. | **Delete the V3 re-run block.** The panels endpoint still computes combos + tokens; it just stops persisting bracket estimates. |
-| [app/main.py:1964-1986](../app/main.py#L1964-L1986) | `POST /decks/{id}/intent` — persists the 5-answer intent survey. | **Delete the route.** Survey is gone. |
+| Location                                                            | What                                                                                                                                                                                                                                                                                                   | Disposition                                                                                                                                                                                                                                                                                                                                                            |
+| ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [app/bracket_v2_service.py](../app/bracket_v2_service.py)           | Entire module (~970 lines). Exports `tag_card_from_oracle`, `upsert_card_tags`, `estimate_bracket_v1`, `estimate_bracket_v2`, `derive_intent_bracket`, `resolve_mechanics_intent`, `compute_soft_score`, `derive_combo_role`, `persist_estimate`. Dataclasses `AutoTag`, `Finding`, `BracketEstimate`. | **Delete entirely.** A subset of the oracle-text auto-tagger logic (`tag_card_from_oracle`) is salvageable as a private helper inside the new analytics module if needed — but the `card_tags` table that backs it is also being dropped (see §6), so the auto-tagger has nowhere to write. Per-row tags on `InventoryRow.tags` (drives Synergy/Health) are unchanged. |
+| [app/deck_service.py:873-956](../app/deck_service.py#L873-L956)     | `compute_deck_bracket(all_rows, combos)` — legacy V1 floor-based estimator. Returns `{bracket, reasons, signals}`.                                                                                                                                                                                     | **Delete.**                                                                                                                                                                                                                                                                                                                                                            |
+| [app/deck_service.py:1084-1085](../app/deck_service.py#L1084-L1085) | In `list_decks()`: `combos = compute_deck_combos(all_rows); deck.bracket = compute_deck_bracket(...)`.                                                                                                                                                                                                 | **Replace.** `list_decks` will attach the new `deck.composition_signals` + `deck.play_record` summary objects instead. The expensive `compute_deck_combos` call moves out of `list_decks` — it does not need to fire on every Decks page load.                                                                                                                         |
+| [app/main.py:43](../app/main.py#L43)                                | `from app.deck_service import compute_deck_bracket`                                                                                                                                                                                                                                                    | **Remove import.**                                                                                                                                                                                                                                                                                                                                                     |
+| [app/main.py:1660-1732](../app/main.py#L1660-L1732)                 | `deck_detail_page` initial render: lazy-loads V2 estimate, populates `bracket_v2` template var (mechanics_bracket, intent_bracket, score, confidence, findings, rules_version).                                                                                                                        | **Delete the entire `bracket_v2` block.** Replace with composition/play/comparison context.                                                                                                                                                                                                                                                                            |
+| [app/main.py:1776-1820](../app/main.py#L1776-L1820)                 | `panels_endpoint`: re-runs V2 estimator with combo data, persists, builds legacy `bracket` dict for the lazy-loaded badge in the hero.                                                                                                                                                                 | **Delete the V3 re-run block.** The panels endpoint still computes combos + tokens; it just stops persisting bracket estimates.                                                                                                                                                                                                                                        |
+| [app/main.py:1964-1986](../app/main.py#L1964-L1986)                 | `POST /decks/{id}/intent` — persists the 5-answer intent survey.                                                                                                                                                                                                                                       | **Delete the route.** Survey is gone.                                                                                                                                                                                                                                                                                                                                  |
 
 ### 1.2 Templates
 
-| File | What | Disposition |
-|---|---|---|
-| [app/templates/deck_detail.html:54-199](../app/templates/deck_detail.html#L54-L199) | `bracket-v2-panel` section: badge, mechanics/intent rows, signal-density + mechanics-clarity + intent-alignment confidence bars, findings list, 5-question intent survey form. | **Delete the entire `{% if bracket_v2 %}` block.** Replace with the new analytics panel (§5). |
-| [app/templates/deck_detail.html:45-46](../app/templates/deck_detail.html#L45-L46) | `#deck-bracket-placeholder` lazy-load span in the hero. | **Delete.** |
-| [app/templates/_deck_panels.html:2-15](../app/templates/_deck_panels.html#L2-L15) | `#deck-bracket-fragment` lazy-loaded bracket badge fragment. | **Delete the fragment.** The panels endpoint keeps emitting tokens/combos/synergy/upgrade-targets. |
-| [app/templates/decks.html:49,64-78](../app/templates/decks.html#L49-L78) | "Bracket" column header + per-row `bracket-badge` with reasons popover. | **Replace.** Column becomes "Record" (W-L from `get_deck_record`) — see §5.2. |
+| File                                                                                | What                                                                                                                                                                           | Disposition                                                                                        |
+| ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------- |
+| [app/templates/deck_detail.html:54-199](../app/templates/deck_detail.html#L54-L199) | `bracket-v2-panel` section: badge, mechanics/intent rows, signal-density + mechanics-clarity + intent-alignment confidence bars, findings list, 5-question intent survey form. | **Delete the entire `{% if bracket_v2 %}` block.** Replace with the new analytics panel (§5).      |
+| [app/templates/deck_detail.html:45-46](../app/templates/deck_detail.html#L45-L46)   | `#deck-bracket-placeholder` lazy-load span in the hero.                                                                                                                        | **Delete.**                                                                                        |
+| [app/templates/\_deck_panels.html:2-15](../app/templates/_deck_panels.html#L2-L15)  | `#deck-bracket-fragment` lazy-loaded bracket badge fragment.                                                                                                                   | **Delete the fragment.** The panels endpoint keeps emitting tokens/combos/synergy/upgrade-targets. |
+| [app/templates/decks.html:49,64-78](../app/templates/decks.html#L49-L78)            | "Bracket" column header + per-row `bracket-badge` with reasons popover.                                                                                                        | **Replace.** Column becomes "Record" (W-L from `get_deck_record`) — see §5.2.                      |
 
 ### 1.3 CSS
 
@@ -74,14 +74,14 @@ layout). All are dead after the templates are updated — strip the block. Keep
 Five tables created by `scripts/migrate_v3_15_0_bracket_v2_tables.py` and one
 column set added by `scripts/migrate_v3_15_1_bracket_v2_intent_confidence.py`:
 
-| Table / column | Purpose | Disposition |
-|---|---|---|
-| `commander_bracket_rules` | Tier thresholds (max_game_changers, allows_mld, etc.) | **Drop table.** No replacement. |
-| `game_changer_cards` | WotC Game Changer list seeded from Scryfall `is:gamechanger`. | **Keep table, repurpose.** The list itself is still a useful signal (Layer 1 surfaces "this deck contains N WotC Game Changers" as a fact). Source-of-truth for the list. |
-| `card_tags` | Per-card intrinsic auto-tags from oracle-text rules. | **Drop table.** Layer 1 reads oracle text directly during a one-shot pass per deck load and consults frozenset name lists + a small regex set — no precomputed cache. Total deck is ~100 cards; oracle-text scanning is fast enough not to need a denormalized cache. The per-row `InventoryRow.tags` (user-assigned, drives Synergy/Health) remains untouched. |
-| `deck_bracket_estimates` | Persisted bracket + score + confidence per deck per rules version. | **Drop table.** Analytics are computed on read; nothing to persist. |
-| `deck_bracket_findings` | Per-estimate findings list. | **Drop table.** |
-| `decks.intent_pod`, `intent_speed`, `intent_combo`, `intent_winning`, `intent_played` | 5-answer survey columns. | **Drop columns.** The survey produced an "intent_bracket" that fed mechanics-vs-intent reconciliation logic. With brackets gone, intent has nothing to reconcile against. (If you want to keep a single user-defined free-text label, see §7.) |
+| Table / column                                                                        | Purpose                                                            | Disposition                                                                                                                                                                                                                                                                                                                                                     |
+| ------------------------------------------------------------------------------------- | ------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `commander_bracket_rules`                                                             | Tier thresholds (max_game_changers, allows_mld, etc.)              | **Drop table.** No replacement.                                                                                                                                                                                                                                                                                                                                 |
+| `game_changer_cards`                                                                  | WotC Game Changer list seeded from Scryfall `is:gamechanger`.      | **Keep table, repurpose.** The list itself is still a useful signal (Layer 1 surfaces "this deck contains N WotC Game Changers" as a fact). Source-of-truth for the list.                                                                                                                                                                                       |
+| `card_tags`                                                                           | Per-card intrinsic auto-tags from oracle-text rules.               | **Drop table.** Layer 1 reads oracle text directly during a one-shot pass per deck load and consults frozenset name lists + a small regex set — no precomputed cache. Total deck is ~100 cards; oracle-text scanning is fast enough not to need a denormalized cache. The per-row `InventoryRow.tags` (user-assigned, drives Synergy/Health) remains untouched. |
+| `deck_bracket_estimates`                                                              | Persisted bracket + score + confidence per deck per rules version. | **Drop table.** Analytics are computed on read; nothing to persist.                                                                                                                                                                                                                                                                                             |
+| `deck_bracket_findings`                                                               | Per-estimate findings list.                                        | **Drop table.**                                                                                                                                                                                                                                                                                                                                                 |
+| `decks.intent_pod`, `intent_speed`, `intent_combo`, `intent_winning`, `intent_played` | 5-answer survey columns.                                           | **Drop columns.** The survey produced an "intent_bracket" that fed mechanics-vs-intent reconciliation logic. With brackets gone, intent has nothing to reconcile against. (If you want to keep a single user-defined free-text label, see §7.)                                                                                                                  |
 
 ### 1.5 Migration scripts and runner
 
@@ -135,25 +135,25 @@ cards, each independently meaningful.
 
 Each signal returns `{count: int, cards: list[str]}` unless noted. Counts use
 "distinct named cards" (not row quantity sums) — a deck with 4 copies of Sol
-Ring still shows "1 fast mana card" because the *signal* is "deck contains Sol
+Ring still shows "1 fast mana card" because the _signal_ is "deck contains Sol
 Ring," not "deck has 4 Sol Rings."
 
-| Signal | Source | Notes |
-|---|---|---|
-| **Game Changers** | `game_changer_cards.card_name` join (table kept from §1.4). | The WotC-curated list. Surface count + names. |
-| **Fast mana** | Frozenset of names: Mana Crypt, Mox Diamond, Chrome Mox, Mox Opal, Jeweled Lotus, Grim Monolith, Mana Vault, Lotus Petal, Ancient Tomb, plus the rest of the existing `_FAST_MANA` list. | Already exists in `deck_service.py`. |
-| **Free interaction** | Frozenset: Force of Will, Force of Negation, Mana Drain, Fierce Guardianship, Deflecting Swat, Flusterstorm, Mental Misstep, Pact of Negation, Commandeer. | Already exists. |
-| **Mass land denial** | Frozenset: Armageddon, Ravages of War, Jokulhaups, Devastation, Obliterate, Decree of Annihilation, Catastrophe, Ruination, Boom // Bust. | Already exists. |
-| **Extra-turn spells** | Oracle text contains `take an extra turn`. | Already exists. |
-| **Tutors (unconditional)** | Oracle text `search your library for a card` — minus the "land" disambiguation lookbehind already in `compute_deck_bracket`. | Same logic as today. |
-| **Tutors (restricted)** | Oracle text matches `search your library for (a|an|up to N) (creature|artifact|enchantment|instant|sorcery|planeswalker)` etc. | Optional separate row; if implementation complexity isn't worth the visual distinction, fold into a single "tutors" count. |
-| **Counterspells** | Oracle text starts with `counter target` OR contains `counter target spell`. | New signal. |
-| **Board wipes** | Existing `_WIPE_RE` pattern from `deck_service.py`. Reuse `compute_deck_health` already counts this. | Pull from the same place Health uses; do not re-implement. |
-| **Combos present** | `len(compute_deck_combos(rows)["included"])`. | Cache via existing panels-cache so the Decks page doesn't fire the Spellbook API per deck. |
-| **Average CMC** | Existing `compute_deck_analytics` already returns `avg_cmc`. | Reuse. |
-| **Mana curve** | Existing `compute_deck_analytics.curve`. | Reuse. |
-| **Land count** | Count of cards with `Land` in `type_line` (quantity-weighted). | Easy add. |
-| **Color identity** | Already on `Deck.color_identity` (set by `list_decks`). | Reuse. |
+| Signal                     | Source                                                                                                                                                                                   | Notes                                                                                      |
+| -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ | ------------------ | -------- | ----------- | ------- | ------- | ------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| **Game Changers**          | `game_changer_cards.card_name` join (table kept from §1.4).                                                                                                                              | The WotC-curated list. Surface count + names.                                              |
+| **Fast mana**              | Frozenset of names: Mana Crypt, Mox Diamond, Chrome Mox, Mox Opal, Jeweled Lotus, Grim Monolith, Mana Vault, Lotus Petal, Ancient Tomb, plus the rest of the existing `_FAST_MANA` list. | Already exists in `deck_service.py`.                                                       |
+| **Free interaction**       | Frozenset: Force of Will, Force of Negation, Mana Drain, Fierce Guardianship, Deflecting Swat, Flusterstorm, Mental Misstep, Pact of Negation, Commandeer.                               | Already exists.                                                                            |
+| **Mass land denial**       | Frozenset: Armageddon, Ravages of War, Jokulhaups, Devastation, Obliterate, Decree of Annihilation, Catastrophe, Ruination, Boom // Bust.                                                | Already exists.                                                                            |
+| **Extra-turn spells**      | Oracle text contains `take an extra turn`.                                                                                                                                               | Already exists.                                                                            |
+| **Tutors (unconditional)** | Oracle text `search your library for a card` — minus the "land" disambiguation lookbehind already in `compute_deck_bracket`.                                                             | Same logic as today.                                                                       |
+| **Tutors (restricted)**    | Oracle text matches `search your library for (a                                                                                                                                          | an                                                                                         | up to N) (creature | artifact | enchantment | instant | sorcery | planeswalker)` etc. | Optional separate row; if implementation complexity isn't worth the visual distinction, fold into a single "tutors" count. |
+| **Counterspells**          | Oracle text starts with `counter target` OR contains `counter target spell`.                                                                                                             | New signal.                                                                                |
+| **Board wipes**            | Existing `_WIPE_RE` pattern from `deck_service.py`. Reuse `compute_deck_health` already counts this.                                                                                     | Pull from the same place Health uses; do not re-implement.                                 |
+| **Combos present**         | `len(compute_deck_combos(rows)["included"])`.                                                                                                                                            | Cache via existing panels-cache so the Decks page doesn't fire the Spellbook API per deck. |
+| **Average CMC**            | Existing `compute_deck_analytics` already returns `avg_cmc`.                                                                                                                             | Reuse.                                                                                     |
+| **Mana curve**             | Existing `compute_deck_analytics.curve`.                                                                                                                                                 | Reuse.                                                                                     |
+| **Land count**             | Count of cards with `Land` in `type_line` (quantity-weighted).                                                                                                                           | Easy add.                                                                                  |
+| **Color identity**         | Already on `Deck.color_identity` (set by `list_decks`).                                                                                                                                  | Reuse.                                                                                     |
 
 ### 2.2 Where the computation lives
 
@@ -190,16 +190,16 @@ played. This is the layer that distinguishes "looks scary on paper" from
 All derived from existing `Game` + `GameSeat` rows. Schema is sufficient as-is
 ([app/models.py:171-204](../app/models.py#L171-L204)):
 
-| Stat | Definition |
-|---|---|
-| **Games played** | Count of `GameSeat` rows where `deck_id = X` AND `placement IS NOT NULL` (placement-set implies the game ended). |
-| **Wins** | Same scope, `placement = 1`. |
-| **Losses** | `games_played - wins`. |
-| **Win rate** | `wins / games_played` (display as percentage; show N/A below ~3 games). |
-| **Average finish** | Mean of `placement` across all ended games. Lower = better. |
-| **Last played** | `MAX(Game.played_at)` joined on the deck's seats. |
-| **Average game length when won / lost** | `AVG(Game.turn_count)` partitioned by win/loss. Tells you whether this deck wins quickly or grinds out long games. |
-| **Final-life-when-lost** | `AVG(GameSeat.final_life)` where `placement > 1`. Negative final lives suggest you got combo-killed; close-to-zero suggests grindy losses. Informational. |
+| Stat                                    | Definition                                                                                                                                                |
+| --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Games played**                        | Count of `GameSeat` rows where `deck_id = X` AND `placement IS NOT NULL` (placement-set implies the game ended).                                          |
+| **Wins**                                | Same scope, `placement = 1`.                                                                                                                              |
+| **Losses**                              | `games_played - wins`.                                                                                                                                    |
+| **Win rate**                            | `wins / games_played` (display as percentage; show N/A below ~3 games).                                                                                   |
+| **Average finish**                      | Mean of `placement` across all ended games. Lower = better.                                                                                               |
+| **Last played**                         | `MAX(Game.played_at)` joined on the deck's seats.                                                                                                         |
+| **Average game length when won / lost** | `AVG(Game.turn_count)` partitioned by win/loss. Tells you whether this deck wins quickly or grinds out long games.                                        |
+| **Final-life-when-lost**                | `AVG(GameSeat.final_life)` where `placement > 1`. Negative final lives suggest you got combo-killed; close-to-zero suggests grindy losses. Informational. |
 
 ### 3.2 Where the computation lives
 
@@ -250,7 +250,7 @@ distort percentiles.
 Decks with 0 games played are excluded from the comparison cohort entirely
 (they have no Layer 2 data and would skew Layer 1 distributions, since
 build-but-don't-play decks tend toward casual). They still get their own
-detail page with Layer 1 signals; they just can't *compare to others* until
+detail page with Layer 1 signals; they just can't _compare to others_ until
 they're played.
 
 If the user has fewer than 3 active decks, the comparison panel collapses to
@@ -278,21 +278,21 @@ parentheses ("vs your other 6 active decks").
 
 ### 4.3 What gets compared
 
-| Signal | Compared? | Why |
-|---|---|---|
-| Game Changers (count) | Yes | The whole point of WotC's list is comparative. |
-| Fast mana (count) | Yes | Same. |
-| Free interaction (count) | Yes | |
-| Tutors (count) | Yes | |
-| Mass land denial (count) | Yes | |
-| Counterspells (count) | Yes | |
-| Combos (count) | Yes | |
-| Average CMC | Yes | Above-median CMC vs the user's casual decks is a useful self-knowledge signal. |
-| Land count | No | Comparison isn't meaningful — depends on deck type. |
-| Win rate | Yes | Most important comparison. |
-| Average finish | Yes | (Reversed — lower is better.) |
-| Average game length | Yes | "This deck wins faster than your other winning decks" — meaningful. |
-| Games played | No | Comparing play counts produces "use this deck more" advice that doesn't belong in analytics. |
+| Signal                   | Compared? | Why                                                                                          |
+| ------------------------ | --------- | -------------------------------------------------------------------------------------------- |
+| Game Changers (count)    | Yes       | The whole point of WotC's list is comparative.                                               |
+| Fast mana (count)        | Yes       | Same.                                                                                        |
+| Free interaction (count) | Yes       |                                                                                              |
+| Tutors (count)           | Yes       |                                                                                              |
+| Mass land denial (count) | Yes       |                                                                                              |
+| Counterspells (count)    | Yes       |                                                                                              |
+| Combos (count)           | Yes       |                                                                                              |
+| Average CMC              | Yes       | Above-median CMC vs the user's casual decks is a useful self-knowledge signal.               |
+| Land count               | No        | Comparison isn't meaningful — depends on deck type.                                          |
+| Win rate                 | Yes       | Most important comparison.                                                                   |
+| Average finish           | Yes       | (Reversed — lower is better.)                                                                |
+| Average game length      | Yes       | "This deck wins faster than your other winning decks" — meaningful.                          |
+| Games played             | No        | Comparing play counts produces "use this deck more" advice that doesn't belong in analytics. |
 
 ### 4.4 Where the computation lives
 
@@ -350,7 +350,7 @@ Implementation notes:
 
 - "Composition" is a flat list of signal rows. Each row shows count + sample
   card names (truncated to 2-3 with "and N more" link) + the qualitative
-  comparison label inline. Zero-count signals are still shown (the *absence*
+  comparison label inline. Zero-count signals are still shown (the _absence_
   of mass land denial is itself a fact users want to see) but greyed.
 - "Play Record" renders nothing but the "no games yet" prompt when the deck
   has 0 games.
@@ -358,13 +358,13 @@ Implementation notes:
   Compose deterministically from the percentile dict — pick the 2-3 most
   outlying signals and write a templated sentence. No LLM, no fuzziness.
   If the user has <3 active decks, this sub-panel is replaced by a single
-  line: *"Need 3+ active decks for playgroup comparison."*
+  line: _"Need 3+ active decks for playgroup comparison."_
 
 ### 5.2 Decks list page
 
 Today's columns: Name · Format · Total Cards · **Bracket** · Health · Edit.
 
-After:                  Name · Format · Total Cards · **Record** · Health · Edit.
+After: Name · Format · Total Cards · **Record** · Health · Edit.
 
 - **Record column** renders `5W-3L` for decks with games. `—` for unplayed
   decks. Color the cell green if win rate ≥ 60%, neutral otherwise.
@@ -440,7 +440,7 @@ deploy via the startup hook in `main.py:on_startup()`.
 
 The Bracket V2 estimates are derived data — nothing in `deck_bracket_estimates`
 or `deck_bracket_findings` is user-authored. Dropping the tables loses nothing
-the user would care about. The intent-survey columns *are* user-authored
+the user would care about. The intent-survey columns _are_ user-authored
 (5 dropdowns per deck) — but they only existed to feed the
 mechanics-vs-intent reconciliation that this overhaul deletes. Honest
 conversation in the release notes: "the intent survey is being removed because
@@ -452,7 +452,7 @@ preserve a deck-level note, they have the existing `Deck.notes` text field.
 Provide a one-shot script `scripts/export_bracket_v2_estimates.py` that dumps
 the contents of `deck_bracket_estimates` + `deck_bracket_findings` +
 `decks.intent_*` to a CSV per user under `/data/legacy/`. Run it once during
-the migration *before* the drops. Users who want to see "what bracket did the
+the migration _before_ the drops. Users who want to see "what bracket did the
 old system think this deck was" can read the CSV. The export is a courtesy,
 not a feature — there's no UI for reading it back.
 
@@ -496,7 +496,7 @@ deck Edit popout.
 
 - It's exactly the thing this overhaul is rejecting: a user-supplied fuzzy
   label that has no measurable definition. Surfacing it next to objective
-  signals risks dragging the eye back to "what's the *real* number" thinking.
+  signals risks dragging the eye back to "what's the _real_ number" thinking.
 - `Deck.notes` (existing free-text field) already handles this use case for
   the small minority of users who want it. They can write `[Casual]` at the
   top of their notes; the analytics layer doesn't need to care.

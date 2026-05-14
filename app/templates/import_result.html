@@ -44,16 +44,18 @@
       </div>
     </div>
     {% if _nothing_new %}
-      <p class="muted" style="margin-top: 0.75rem;">
-        Nothing new to import — every card was already in your collection.
-      </p>
+      <p class="muted" style="margin-top: 0.75rem;">Nothing new to import — every card was already in your collection.</p>
     {% elif placed_in %}
       <p class="muted" style="margin-top: 0.75rem;">
         {% if _moved > 0 or _merged > 0 or _skipped > 0 %}
           Added <strong>{{ _total_added }}</strong>
           {{ "card" if _total_added == 1 else "cards" }} to
           <strong>{{ placed_in }}</strong>
-          ({{ _new }} imported new{% if _moved > 0 %}, {{ _moved }} moved from collection{% endif %}{% if _merged > 0 %}, {{ _merged }} merged into existing rows{% endif %}{% if _skipped > 0 %}, {{ _skipped }} skipped — already owned{% endif %}).
+          ({{ _new }} imported new
+          {% if _moved > 0 %}, {{ _moved }} moved from collection{% endif %}
+          {% if _merged > 0 %}, {{ _merged }} merged into existing rows{% endif %}
+          {% if _skipped > 0 %}, {{ _skipped }} skipped — already owned{% endif %}
+          ).
         {% else %}
           All cards placed directly into <strong>{{ placed_in }}</strong>.
         {% endif %}
@@ -72,7 +74,9 @@
       <ul class="muted small-text">
         {% for row in stale_match_rows %}
           {% if row.expected_skip is defined %}
-            <li>{{ row.name }}: expected to skip {{ row.expected_skip }} (already owned), but found fewer in inventory — imported {{ row.actual_new_qty }} new instead.</li>
+            <li>
+              {{ row.name }}: expected to skip {{ row.expected_skip }} (already owned), but found fewer in inventory — imported {{ row.actual_new_qty }} new instead.
+            </li>
           {% else %}
             <li>{{ row.name }}: expected {{ row.expected_move }} from inventory, found {{ row.actual_move }}</li>
           {% endif %}
@@ -86,11 +90,11 @@
       {% set destination_url = placed_in_url if placed_in_url is defined else ('/pending' if not placed_in else '/collection') %}
       {% set kind = placed_in_kind if placed_in_kind is defined else none %}
       {% if kind == 'deck' %}
-        {% set primary_label = 'View deck' %}
+        {% set primary_label = "View deck" %}
       {% elif kind == 'location' %}
-        {% set primary_label = 'View location' %}
+        {% set primary_label = "View location" %}
       {% else %}
-        {% set primary_label = 'View pending' %}
+        {% set primary_label = "View pending" %}
       {% endif %}
       <a href="{{ destination_url }}">
         <button type="button">{{ primary_label }}</button>

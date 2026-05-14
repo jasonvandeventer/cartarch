@@ -22,10 +22,10 @@
       <div class="inventory-grid">
         {% for item in items %}
           {{ inventory_card(item, csrf_token,
-                        show_deck_actions=true,
-                        deck=deck,
-                        use_drawer_sorter=use_drawer_sorter,
-                        locations=locations) }}
+                    show_deck_actions=true,
+                    deck=deck,
+                    use_drawer_sorter=use_drawer_sorter,
+                    locations=locations) }}
         {% endfor %}
       </div>
     </section>

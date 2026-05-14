@@ -44,14 +44,14 @@ import-wizard "Create new deck/location" popouts, image previews, etc.
 
 Behavior summary:
 
-| Above 768px | Below 768px |
-|---|---|
+| Above 768px                                                                         | Below 768px                                                                              |
+| ----------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
 | Element keeps its existing `position: absolute` (or whatever the desktop CSS sets). | `position: fixed`, centered via `top: 50%; left: 50%; transform: translate(-50%, -50%)`. |
-| No backdrop. | Semi-transparent backdrop (`rgba(0,0,0,0.4)`) injected behind it. |
-| No close button. | × button auto-injected top-right (44×44 tap target). |
-| Width unconstrained beyond what desktop CSS already sets. | `width: min(90vw, 400px)`. |
-| Page scrolls normally. | `body` scroll locked while open. |
-| Closes via the trigger only. | Closes on backdrop tap, Escape key, ×-button tap, or trigger tap. |
+| No backdrop.                                                                        | Semi-transparent backdrop (`rgba(0,0,0,0.4)`) injected behind it.                        |
+| No close button.                                                                    | × button auto-injected top-right (44×44 tap target).                                     |
+| Width unconstrained beyond what desktop CSS already sets.                           | `width: min(90vw, 400px)`.                                                               |
+| Page scrolls normally.                                                              | `body` scroll locked while open.                                                         |
+| Closes via the trigger only.                                                        | Closes on backdrop tap, Escape key, ×-button tap, or trigger tap.                        |
 
 ### How to add a new popover
 
@@ -79,7 +79,7 @@ If you load a popover after `DOMContentLoaded` (e.g. via `fetch()` →
 `replaceWith`), dispatch the scan event so the new element gets wired:
 
 ```js
-document.dispatchEvent(new Event('mobilepopover:scan'));
+document.dispatchEvent(new Event("mobilepopover:scan"));
 ```
 
 [deck_detail.html](../app/templates/deck_detail.html) does this after the
@@ -92,8 +92,8 @@ If you build a popover that isn't wrapped in `<details>` (e.g. you toggle
 visibility via a button + JS class), use the imperative API exposed on `window`:
 
 ```js
-window.MobilePopover.open(el);   // attach backdrop, lock body, inject × — mobile only
-window.MobilePopover.close(el);  // detach everything
+window.MobilePopover.open(el); // attach backdrop, lock body, inject × — mobile only
+window.MobilePopover.close(el); // detach everything
 window.MobilePopover.isMobile(); // -> bool, viewport ≤ 768px
 ```
 

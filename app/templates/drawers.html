@@ -27,28 +27,28 @@
     {% if drawer_summaries %}
       <div class="table-wrap">
         <table>
-        <thead>
-          <tr>
-            <th>Drawer</th>
-            <th>Rows</th>
-            <th>Total Value</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for drawer in drawer_summaries %}
+          <thead>
             <tr>
-              <td>
-                <strong>{{ drawer.drawer }}</strong>
-              </td>
-              <td>{{ drawer.row_count }}</td>
-              <td>${{ '%.2f'|format(drawer.total_value) }}</td>
-              <td style="text-align: right;">
-                <a href="/drawers/{{ drawer.drawer }}">Open</a>
-              </td>
+              <th>Drawer</th>
+              <th>Rows</th>
+              <th>Total Value</th>
+              <th></th>
             </tr>
-          {% endfor %}
-        </tbody>
+          </thead>
+          <tbody>
+            {% for drawer in drawer_summaries %}
+              <tr>
+                <td>
+                  <strong>{{ drawer.drawer }}</strong>
+                </td>
+                <td>{{ drawer.row_count }}</td>
+                <td>${{ '%.2f'|format(drawer.total_value) }}</td>
+                <td style="text-align: right;">
+                  <a href="/drawers/{{ drawer.drawer }}">Open</a>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
         </table>
       </div>
     {% else %}

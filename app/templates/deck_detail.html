@@ -88,13 +88,16 @@
         </div>
         <div class="add-card-finish-row">
           <label class="add-card-finish-label">
-            <input type="radio" name="finish" value="normal" checked> Nonfoil
+            <input type="radio" name="finish" value="normal" checked>
+            Nonfoil
           </label>
           <label class="add-card-finish-label">
-            <input type="radio" name="finish" value="foil"> Foil
+            <input type="radio" name="finish" value="foil">
+            Foil
           </label>
           <label class="add-card-finish-label">
-            <input type="radio" name="finish" value="etched"> Etched
+            <input type="radio" name="finish" value="etched">
+            Etched
           </label>
         </div>
         <div id="deck-add-results"
@@ -577,18 +580,19 @@
          the group-by selector, which we leave to the search form above.
          A successful POST 303s back to the current URL via the Referer,
          so the user lands on the same deck with the new view. #}
-      <form action="/account/deck-view-pref" method="post"
+      <form action="/account/deck-view-pref"
+            method="post"
             class="filter-row deck-view-toggle"
             style="margin-top: 0.5rem">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-        <button type="submit" name="view" value="grid"
-                class="deck-view-toggle-btn {% if view_mode == 'grid' %}active{% endif %}">
-          Grid
-        </button>
-        <button type="submit" name="view" value="list"
-                class="deck-view-toggle-btn {% if view_mode == 'list' %}active{% endif %}">
-          List
-        </button>
+        <button type="submit"
+                name="view"
+                value="grid"
+                class="deck-view-toggle-btn {% if view_mode == 'grid' %}active{% endif %}">Grid</button>
+        <button type="submit"
+                name="view"
+                value="list"
+                class="deck-view-toggle-btn {% if view_mode == 'list' %}active{% endif %}">List</button>
       </form>
     </section>
     {% if deck %}
@@ -597,55 +601,53 @@
         {% if token_requirements %}
           <div class="table-wrap">
             <table>
-            <thead>
-              <tr>
-                <th>Token</th>
-                <th>Needed</th>
-                <th>Owned</th>
-                <th>Location</th>
-                <th>Status</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for r in token_requirements %}
+              <thead>
                 <tr>
-                  <td>
-                    <strong>{{ r.token_name }}</strong>
-                    {% if r.notes %}
-                      <br>
-                      <span class="muted">{{ r.notes }}</span>
-                    {% endif %}
-                  </td>
-                  <td>{{ r.quantity_needed }}</td>
-                  <td>{{ r.owned }}</td>
-                  <td>{{ r.location or '—' }}</td>
-                  <td>
-                    {% if r.deficit == 0 %}
-                      <span class="token-status-ok">OK</span>
-                    {% else %}
-                      <span class="token-status-missing">Missing {{ r.deficit }}</span>
-                    {% endif %}
-                  </td>
-                  <td>
-                    <form action="/decks/{{ deck.id }}/tokens/{{ r.id }}/delete"
-                          method="post"
-                          style="display:inline">
-                      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                      <button type="submit"
-                              class="btn-danger-small"
-                              onclick="return confirm('Remove this token requirement?')">×</button>
-                    </form>
-                  </td>
+                  <th>Token</th>
+                  <th>Needed</th>
+                  <th>Owned</th>
+                  <th>Location</th>
+                  <th>Status</th>
+                  <th></th>
                 </tr>
-              {% endfor %}
-            </tbody>
+              </thead>
+              <tbody>
+                {% for r in token_requirements %}
+                  <tr>
+                    <td>
+                      <strong>{{ r.token_name }}</strong>
+                      {% if r.notes %}
+                        <br>
+                        <span class="muted">{{ r.notes }}</span>
+                      {% endif %}
+                    </td>
+                    <td>{{ r.quantity_needed }}</td>
+                    <td>{{ r.owned }}</td>
+                    <td>{{ r.location or '—' }}</td>
+                    <td>
+                      {% if r.deficit == 0 %}
+                        <span class="token-status-ok">OK</span>
+                      {% else %}
+                        <span class="token-status-missing">Missing {{ r.deficit }}</span>
+                      {% endif %}
+                    </td>
+                    <td>
+                      <form action="/decks/{{ deck.id }}/tokens/{{ r.id }}/delete"
+                            method="post"
+                            style="display:inline">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                        <button type="submit"
+                                class="btn-danger-small"
+                                onclick="return confirm('Remove this token requirement?')">×</button>
+                      </form>
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
             </table>
           </div>
         {% else %}
-          <p class="muted">
-            No token requirements declared. Add one below if this deck creates tokens you want to track.
-          </p>
+          <p class="muted">No token requirements declared. Add one below if this deck creates tokens you want to track.</p>
         {% endif %}
         <details style="margin-top: 0.5rem">
           <summary class="btn-like btn-like-muted" style="display:inline-block">+ Add token requirement</summary>

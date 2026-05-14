@@ -94,94 +94,94 @@
     <h3 class="panel-title">Users</h3>
     <div class="table-wrap">
       <table>
-      <thead>
-        <tr>
-          <th>Name / Email</th>
-          <th>Status</th>
-          <th>Role</th>
-          <th>Joined</th>
-          <th>Cards</th>
-          <th>Decks</th>
-          <th>Last Activity</th>
-          <th>Actions</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for row in user_rows %}
+        <thead>
           <tr>
-            <td>
-              <strong>{{ row.user.display_name or row.user.username }}</strong>
-              {% if row.user.display_name %}<div class="muted">{{ row.user.username }}</div>{% endif %}
-            </td>
-            <td>
-              {% if row.user.is_active %}
-                <span style="color: #2f9e44; font-weight: 600;">Active</span>
-              {% else %}
-                <span style="color: #b45309; font-weight: 600;">Inactive</span>
-              {% endif %}
-            </td>
-            <td>
-              {% if row.user.is_admin %}
-                <span style="color: #7fb0ff; font-weight: 600;">Admin</span>
-              {% else %}
-                <span class="muted">User</span>
-              {% endif %}
-            </td>
-            <td class="muted">{{ row.user.created_at.strftime("%Y-%m-%d") if row.user.created_at else '—' }}</td>
-            <td>{{ row.card_count }}</td>
-            <td>{{ row.deck_count }}</td>
-            <td class="muted">{{ row.last_activity.strftime("%Y-%m-%d") if row.last_activity else '—' }}</td>
-            <td>
-              {% if row.user.id != current_user.id %}
-                <div style="display: flex; flex-wrap: wrap; gap: 0.4rem;">
-                  <form action="/admin/users/{{ row.user.id }}/toggle-active"
-                        method="post"
-                        class="inline-form">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                    <button type="submit" class="btn-danger-small">{{ 'Deactivate' if row.user.is_active else 'Activate' }}</button>
-                  </form>
-                  <form action="/admin/users/{{ row.user.id }}/toggle-admin"
-                        method="post"
-                        class="inline-form">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                    <button type="submit" class="btn-danger-small">{{ 'Remove Admin' if row.user.is_admin else 'Make Admin' }}</button>
-                  </form>
-                  <form action="/admin/users/{{ row.user.id }}/delete"
-                        method="post"
-                        class="inline-form">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                    <button type="submit"
-                            class="btn-danger-small"
-                            style="background: #7f1d1d"
-                            onclick="return confirm('Delete {{ row.user.username }}? This removes all their cards, decks, and history. This cannot be undone.');">
-                      Delete
-                    </button>
-                  </form>
-                </div>
-              {% else %}
-                <span class="muted" style="font-size: 0.85rem;">You</span>
-              {% endif %}
-            </td>
+            <th>Name / Email</th>
+            <th>Status</th>
+            <th>Role</th>
+            <th>Joined</th>
+            <th>Cards</th>
+            <th>Decks</th>
+            <th>Last Activity</th>
+            <th>Actions</th>
           </tr>
-          {% if row.user.id != current_user.id %}
-            <tr style="background: rgba(8,19,35,0.3);">
-              <td colspan="8" style="padding: 0.4rem 0.5rem 0.75rem;">
-                <form action="/admin/users/{{ row.user.id }}/reset-password"
-                      method="post"
-                      class="filter-row">
-                  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                  <span style="font-size: 0.85rem; color: var(--muted); white-space: nowrap;">Reset {{ row.user.username }}'s password:</span>
-                  <input type="password"
-                         name="new_password"
-                         placeholder="New password (min 8 chars)"
-                         style="max-width: 240px">
-                  <button type="submit">Set Password</button>
-                </form>
+        </thead>
+        <tbody>
+          {% for row in user_rows %}
+            <tr>
+              <td>
+                <strong>{{ row.user.display_name or row.user.username }}</strong>
+                {% if row.user.display_name %}<div class="muted">{{ row.user.username }}</div>{% endif %}
+              </td>
+              <td>
+                {% if row.user.is_active %}
+                  <span style="color: #2f9e44; font-weight: 600;">Active</span>
+                {% else %}
+                  <span style="color: #b45309; font-weight: 600;">Inactive</span>
+                {% endif %}
+              </td>
+              <td>
+                {% if row.user.is_admin %}
+                  <span style="color: #7fb0ff; font-weight: 600;">Admin</span>
+                {% else %}
+                  <span class="muted">User</span>
+                {% endif %}
+              </td>
+              <td class="muted">{{ row.user.created_at.strftime("%Y-%m-%d") if row.user.created_at else '—' }}</td>
+              <td>{{ row.card_count }}</td>
+              <td>{{ row.deck_count }}</td>
+              <td class="muted">{{ row.last_activity.strftime("%Y-%m-%d") if row.last_activity else '—' }}</td>
+              <td>
+                {% if row.user.id != current_user.id %}
+                  <div style="display: flex; flex-wrap: wrap; gap: 0.4rem;">
+                    <form action="/admin/users/{{ row.user.id }}/toggle-active"
+                          method="post"
+                          class="inline-form">
+                      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                      <button type="submit" class="btn-danger-small">{{ 'Deactivate' if row.user.is_active else 'Activate' }}</button>
+                    </form>
+                    <form action="/admin/users/{{ row.user.id }}/toggle-admin"
+                          method="post"
+                          class="inline-form">
+                      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                      <button type="submit" class="btn-danger-small">{{ 'Remove Admin' if row.user.is_admin else 'Make Admin' }}</button>
+                    </form>
+                    <form action="/admin/users/{{ row.user.id }}/delete"
+                          method="post"
+                          class="inline-form">
+                      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                      <button type="submit"
+                              class="btn-danger-small"
+                              style="background: #7f1d1d"
+                              onclick="return confirm('Delete {{ row.user.username }}? This removes all their cards, decks, and history. This cannot be undone.');">
+                        Delete
+                      </button>
+                    </form>
+                  </div>
+                {% else %}
+                  <span class="muted" style="font-size: 0.85rem;">You</span>
+                {% endif %}
               </td>
             </tr>
-          {% endif %}
-        {% endfor %}
-      </tbody>
+            {% if row.user.id != current_user.id %}
+              <tr style="background: rgba(8,19,35,0.3);">
+                <td colspan="8" style="padding: 0.4rem 0.5rem 0.75rem;">
+                  <form action="/admin/users/{{ row.user.id }}/reset-password"
+                        method="post"
+                        class="filter-row">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                    <span style="font-size: 0.85rem; color: var(--muted); white-space: nowrap;">Reset {{ row.user.username }}'s password:</span>
+                    <input type="password"
+                           name="new_password"
+                           placeholder="New password (min 8 chars)"
+                           style="max-width: 240px">
+                    <button type="submit">Set Password</button>
+                  </form>
+                </td>
+              </tr>
+            {% endif %}
+          {% endfor %}
+        </tbody>
       </table>
     </div>
   </section>

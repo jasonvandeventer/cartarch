@@ -27,18 +27,18 @@ The fix is not a single regex tweak. It's a structured upgrade to:
 
 ### 1.1 The tag taxonomy (unchanged)
 
-| Tag | Intent |
-|---|---|
-| Ramp | Mana acceleration that is not basic land |
-| Draw | Card draw of any kind |
-| Removal | Targeted removal |
-| Wipe | Mass removal (board wipes) |
-| Tutor | Library search effects |
-| Engine | Repeating value source |
-| Synergy | Card whose value depends on interaction with deck strategy |
-| Threat | Finisher / win condition |
-| Hate | Graveyard hate, artifact hate, stax-adjacent |
-| Protection | Protects creatures or commander |
+| Tag        | Intent                                                     |
+| ---------- | ---------------------------------------------------------- |
+| Ramp       | Mana acceleration that is not basic land                   |
+| Draw       | Card draw of any kind                                      |
+| Removal    | Targeted removal                                           |
+| Wipe       | Mass removal (board wipes)                                 |
+| Tutor      | Library search effects                                     |
+| Engine     | Repeating value source                                     |
+| Synergy    | Card whose value depends on interaction with deck strategy |
+| Threat     | Finisher / win condition                                   |
+| Hate       | Graveyard hate, artifact hate, stax-adjacent               |
+| Protection | Protects creatures or commander                            |
 
 These tags are correct in concept. The accuracy problem is in how they're assigned, not what they are.
 
@@ -48,9 +48,9 @@ These tags are correct in concept. The accuracy problem is in how they're assign
 
 ```json
 [
-  {"tag": "Ramp", "confidence": "certain", "source": "auto"},
-  {"tag": "Synergy", "confidence": "medium", "source": "auto"},
-  {"tag": "Engine", "confidence": "high", "source": "user"}
+  { "tag": "Ramp", "confidence": "certain", "source": "auto" },
+  { "tag": "Synergy", "confidence": "medium", "source": "auto" },
+  { "tag": "Engine", "confidence": "high", "source": "user" }
 ]
 ```
 
@@ -136,7 +136,7 @@ Specific known issues to address (from §1.4):
 
 - **Engine pattern misses replacement effects.** Add a pattern for "if you would [gain life|create a token|put a counter] ... instead". This is the Leyline of Hope class.
 - **Engine pattern misses repeated triggers without explicit recursion or sacrifice.** "At the beginning of your upkeep, [draw a card | create a token | put a counter]" is repeating value. Match these.
-- **Draw pattern's trigger-condition exclusion is good but conservative.** Cards like Sheoldred's Edict that *cause* drawing as a consequence (rather than punishing drawing as a condition) are handled correctly today, but the audit may surface edge cases.
+- **Draw pattern's trigger-condition exclusion is good but conservative.** Cards like Sheoldred's Edict that _cause_ drawing as a consequence (rather than punishing drawing as a condition) are handled correctly today, but the audit may surface edge cases.
 - **Threat pattern is intentionally narrow.** Soft threats (large creatures, evasion) aren't detected because the schema doesn't include power/toughness. This is by design and stays.
 
 ### 2.4 Commander theme extraction expansion
@@ -145,24 +145,24 @@ This is the biggest accuracy lever and the largest scope item in the overhaul.
 
 The current `extract_commander_themes` detects six mechanics. Add detection for at least these themes that real playgroup commanders care about:
 
-| Theme | Detection cue in commander oracle |
-|---|---|
-| lifegain | "gain X life", "whenever you gain life", "lifelink" |
-| food | "food token", "sacrifice a food", "foods you control" |
-| treasure | "treasure token", "sacrifice a treasure" |
-| clue | "clue token", "sacrifice a clue" |
-| blood | "blood token" |
-| ring | "the ring tempts you", "ring-bearer" |
-| +1/+1 counters | "+1/+1 counter" (split from generic "counters") |
-| -1/-1 counters | "-1/-1 counter" |
-| spells_cast | "whenever you cast", "spells you cast cost", "storm", "prowess" |
-| landfall | "whenever a land enters", "lands you control enter" |
-| attack | "whenever a creature attacks", "whenever you attack" |
-| blocking | "whenever a creature blocks", "whenever ~ is blocked" |
-| equip | "equip", "equipped creature", "attached creature" (for equipment) |
-| aura | "enchant creature", "enchanted creature" |
-| energy | "energy counter", "{E}" |
-| saga | "saga", "lore counter" |
+| Theme          | Detection cue in commander oracle                                 |
+| -------------- | ----------------------------------------------------------------- |
+| lifegain       | "gain X life", "whenever you gain life", "lifelink"               |
+| food           | "food token", "sacrifice a food", "foods you control"             |
+| treasure       | "treasure token", "sacrifice a treasure"                          |
+| clue           | "clue token", "sacrifice a clue"                                  |
+| blood          | "blood token"                                                     |
+| ring           | "the ring tempts you", "ring-bearer"                              |
+| +1/+1 counters | "+1/+1 counter" (split from generic "counters")                   |
+| -1/-1 counters | "-1/-1 counter"                                                   |
+| spells_cast    | "whenever you cast", "spells you cast cost", "storm", "prowess"   |
+| landfall       | "whenever a land enters", "lands you control enter"               |
+| attack         | "whenever a creature attacks", "whenever you attack"              |
+| blocking       | "whenever a creature blocks", "whenever ~ is blocked"             |
+| equip          | "equip", "equipped creature", "attached creature" (for equipment) |
+| aura           | "enchant creature", "enchanted creature"                          |
+| energy         | "energy counter", "{E}"                                           |
+| saga           | "saga", "lore counter"                                            |
 
 The detection should sit in `extract_commander_themes` alongside the existing mechanics detection. Output structure: add each new theme as a string key into the `mechanics` set, so existing consumers see them without API changes.
 
@@ -172,7 +172,7 @@ A few of these (the token types) are likely also surfaced by Spellbook combos or
 
 The current implementation matches by substring. Tighten it to reduce false-positive Synergy:
 
-For each mechanic theme, define an inclusion pattern *and* an exclusion pattern. A card matches the theme if its oracle text matches the inclusion pattern AND does not match the exclusion pattern.
+For each mechanic theme, define an inclusion pattern _and_ an exclusion pattern. A card matches the theme if its oracle text matches the inclusion pattern AND does not match the exclusion pattern.
 
 Examples:
 
@@ -196,12 +196,14 @@ The patterns should be data-driven (a dict keyed by mechanic name) rather than e
 Wire confidence into the analytics functions that currently ignore it.
 
 **`compute_deck_synergy`:** Currently treats Synergy/Threat tags as binary. Change to weight them by confidence:
+
 - `certain` / `high` confidence Synergy → direct (full credit)
 - `medium` confidence Synergy → direct only when the card also has another supporting tag, otherwise supporting
 - `low` confidence Synergy → supporting (treat as "auto-tagger guessed, don't trust as direct synergy")
 - User-confirmed tags always win over auto-suggested tags of the same confidence
 
 **`compute_dead_cards`:** The current rule is "no role tags AND classified unrelated → flag as dead." Change to:
+
 - No tags at all → flag
 - Only `low` confidence tags from auto-tagger → flag (treat as effectively untagged for purposes of upgrade-target detection)
 - Any `medium`+ tag from any source → not flagged
@@ -215,10 +217,12 @@ This directly addresses the user complaint that Upgrade Targets is inaccurate: m
 Add a UI surface on the deck detail page that surfaces tags requiring user review.
 
 A tag needs review when:
+
 - Confidence is `low` from any source, OR
 - Confidence is `medium` from `source: "auto"` AND the user has never explicitly interacted with this card's tags
 
 For each card in the review queue, show:
+
 - Card name
 - The auto-applied tags with their confidence indicators
 - A one-click "confirm" button that upgrades all tags on the card to `source: "user"`, `confidence: "high"`

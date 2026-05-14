@@ -27,9 +27,7 @@
   </section>
   <section>
     <div>
-      {% if card.image_url %}
-        <img src="{{ card.image_url }}" alt="{{ card.name }}" loading="lazy">
-      {% endif %}
+      {% if card.image_url %}<img src="{{ card.image_url }}" alt="{{ card.name }}" loading="lazy">{% endif %}
     </div>
     <div>
       {% if card.oracle_text %}

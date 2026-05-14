@@ -54,7 +54,6 @@ Items with concrete demand or that close known gaps. Each is contained scope.
 - **Deck view list mode with grouping.** Add a list/grid toggle to the deck detail page card display. List mode renders cards as text rows grouped by a user-selectable axis (type, mana value, role tag, color, subtype). Card image shown on hover (desktop) or tap (mobile). Sub-group counts surfaced inline ("Creatures (35) · Humans (6)"). The existing image grid stays available as the alternate view. User preference persisted per-user (not per-deck). Addresses a direct request from the playgroup: Moxfield-style scanning is the use case being filled.
 
 - **In-place card editing in decks.** Users currently have to delete a card and re-add it to swap printings, change finish (foil/etched/nonfoil), or adjust basic land counts. Add inline edit affordances on cards in a deck:
-
   - Change printing: a dropdown control on each card (or row, in list view) offers a "Switch printing" option. Selecting it opens a modal listing every printing of that card. Printings the user already owns are sorted to the top of the modal as a separate section ("In your collection") above the full printings list. Selecting a printing updates the `InventoryRow` in place, preserving the card's place in the deck and any user-applied tags. The "owned at top" sort is a deliberate source-of-truth feature: Mana Archive knows the user's inventory authoritatively and surfaces owned options first, which is something generic deckbuilders cannot do well.
   - Change finish: each printing in the switch-printing modal shows nonfoil / foil / etched options as toggleable buttons, restricted to the finishes that actually exist for that printing. Foil availability is queried from Scryfall's per-printing data. The toggle also indicates which finishes the user owns of that specific printing.
   - Adjust basic land quantity: basic land rows show +/- controls to bump count up or down without re-entering the card name. Bumping past zero removes the row; bumping past available inventory creates a new row from the imported-cards path.
@@ -68,7 +67,6 @@ Larger arcs that need design conversations before implementation. Both have desi
 - **Tag system accuracy overhaul.** The auto-tagger (`suggest_card_roles` in `deck_service.py`) and the user-applied row tag system (`InventoryRow.tags`) are the foundation for Synergy, Health, the existing Upgrade Targets feature, and the future AI recommendation engine. Users have surfaced concerns that these are not reliable in practice.
 
   Scope:
-
   - Audit the existing auto-tagger rules against a sample of 100 real-world cards. Document false positives and false negatives.
   - Define a more precise tag taxonomy. The current 10-tag system stays, but with clearer rules for ambiguous cases: hybrid mana costs, cards with multiple modes, cards whose role depends on commander.
   - Add a tag confidence indicator (high / medium / low) so downstream consumers (Synergy, Health, Upgrade Targets, AI engine) can choose to use only high-confidence tags.
@@ -118,12 +116,12 @@ A multi-phase feature spanning deck building, collection analysis, and playgroup
 
 **Scope (phased):**
 
-- *Phase 1:* Deck upgrade suggestions. Given a deck and the user's collection, suggest cards from the collection that fit the deck's themes. Simple LLM API call with a thoughtful prompt; ships in 1-2 weekends. (promoted to Tier 3 — see Tier 3 entry above).
-- *Phase 2:* Architectural foundation. Provider abstraction (so the app can swap between Claude, OpenAI, local models), caching by deck-contents hash, request/response logging, cost tracking. Doesn't change user-visible behavior; builds the foundation for everything that follows.
-- *Phase 3:* Embedding-based card similarity. Compute and cache embeddings for cards. Use vector similarity for candidate selection, then LLM for ranking and explanation (retrieval-augmented generation pattern).
-- *Phase 4:* Combo and synergy discovery beyond what CommanderSpellbook surfaces. Use the LLM to identify unexpected interactions among cards in the user's collection.
-- *Phase 5:* Playgroup meta analysis. Given the play record data from the analytics overhaul, suggest deck adjustments based on what's winning or losing in the playgroup over time.
-- *Phase 6:* New deck ideas from collection. "Here are five Commander decks you could build with what you own." More speculative; deepest creative use of the LLM.
+- _Phase 1:_ Deck upgrade suggestions. Given a deck and the user's collection, suggest cards from the collection that fit the deck's themes. Simple LLM API call with a thoughtful prompt; ships in 1-2 weekends. (promoted to Tier 3 — see Tier 3 entry above).
+- _Phase 2:_ Architectural foundation. Provider abstraction (so the app can swap between Claude, OpenAI, local models), caching by deck-contents hash, request/response logging, cost tracking. Doesn't change user-visible behavior; builds the foundation for everything that follows.
+- _Phase 3:_ Embedding-based card similarity. Compute and cache embeddings for cards. Use vector similarity for candidate selection, then LLM for ranking and explanation (retrieval-augmented generation pattern).
+- _Phase 4:_ Combo and synergy discovery beyond what CommanderSpellbook surfaces. Use the LLM to identify unexpected interactions among cards in the user's collection.
+- _Phase 5:_ Playgroup meta analysis. Given the play record data from the analytics overhaul, suggest deck adjustments based on what's winning or losing in the playgroup over time.
+- _Phase 6:_ New deck ideas from collection. "Here are five Commander decks you could build with what you own." More speculative; deepest creative use of the LLM.
 
 **Dependencies:**
 

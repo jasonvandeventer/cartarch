@@ -13,9 +13,7 @@
   <section class="panel">
     <h3 class="panel-title">Format</h3>
     <p class="muted">One line per physical token. Whitespace-separated. Field count picks the line type:</p>
-    <ul class="muted"
-        style="margin: 0 0 0.5rem 0;
-               padding-left: 1.2rem">
+    <ul class="muted" style="margin: 0 0 0.5rem 0; padding-left: 1.2rem">
       <li>
         <code>set collector</code> — single-sided (uses default qty)
       </li>
@@ -92,30 +90,30 @@ tblb 1 tblc 8 2</pre>
         <h4 class="muted" style="margin-top:0.5rem">Created</h4>
         <div class="table-wrap">
           <table>
-          <thead>
-            <tr>
-              <th>Front</th>
-              <th>Back</th>
-              <th>Qty</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for r in result.created %}
+            <thead>
               <tr>
-                <td>
-                  <strong>{{ r.front_name }}</strong> <span class="muted">{{ r.front_id }}</span>
-                </td>
-                <td>
-                  {% if r.is_dfc %}
-                    <strong>{{ r.back_name }}</strong> <span class="muted">{{ r.back_id }}</span>
-                  {% else %}
-                    <span class="muted">— (single-sided)</span>
-                  {% endif %}
-                </td>
-                <td>{{ r.quantity }}</td>
+                <th>Front</th>
+                <th>Back</th>
+                <th>Qty</th>
               </tr>
-            {% endfor %}
-          </tbody>
+            </thead>
+            <tbody>
+              {% for r in result.created %}
+                <tr>
+                  <td>
+                    <strong>{{ r.front_name }}</strong> <span class="muted">{{ r.front_id }}</span>
+                  </td>
+                  <td>
+                    {% if r.is_dfc %}
+                      <strong>{{ r.back_name }}</strong> <span class="muted">{{ r.back_id }}</span>
+                    {% else %}
+                      <span class="muted">— (single-sided)</span>
+                    {% endif %}
+                  </td>
+                  <td>{{ r.quantity }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
           </table>
         </div>
       {% endif %}
@@ -123,22 +121,22 @@ tblb 1 tblc 8 2</pre>
         <h4 class="muted" style="margin-top:0.75rem">Errors</h4>
         <div class="table-wrap">
           <table>
-          <thead>
-            <tr>
-              <th>Line</th>
-              <th>Error</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for e in result.errors %}
+            <thead>
               <tr>
-                <td>
-                  <code>{{ e.raw }}</code>
-                </td>
-                <td class="token-status-missing">{{ e.error }}</td>
+                <th>Line</th>
+                <th>Error</th>
               </tr>
-            {% endfor %}
-          </tbody>
+            </thead>
+            <tbody>
+              {% for e in result.errors %}
+                <tr>
+                  <td>
+                    <code>{{ e.raw }}</code>
+                  </td>
+                  <td class="token-status-missing">{{ e.error }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
           </table>
         </div>
         <p class="muted" style="margin-top:0.5rem">

@@ -58,7 +58,8 @@
               {% endfor %}
             </optgroup>
           </select>
-          <button type="submit" id="import-submit-btn"
+          <button type="submit"
+                  id="import-submit-btn"
                   {% if not use_drawer_sorter and not placeable and not decks %}disabled{% endif %}>
             Import Valid Rows
           </button>
@@ -78,46 +79,46 @@
     {% if valid_rows %}
       <div class="table-wrap">
         <table>
-        <thead>
-          <tr>
-            <th>Line</th>
-            <th>Name</th>
-            <th>Set</th>
-            <th>Collector #</th>
-            <th>Finish</th>
-            <th>Lang</th>
-            <th>Qty</th>
-            <th>Warnings</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for row in valid_rows %}
+          <thead>
             <tr>
-              <td>{{ row.line_number }}</td>
-              <td>{{ row.name or '-' }}</td>
-              <td>{{ row.set_code or '-' }}</td>
-              <td>{{ row.collector_number or '-' }}</td>
-              <td>
-                <span class="finish-badge">{{ row.finish|capitalize }}</span>
-              </td>
-              <td>
-                {% if row.language and row.language != 'en' %}
-                  <span class="language-badge">{{ row.language|upper }}</span>
-                {% else %}
-                  <span class="muted">EN</span>
-                {% endif %}
-              </td>
-              <td>{{ row.quantity }}</td>
-              <td>
-                {% if row.warnings %}
-                  {% for warning in row.warnings %}<div class="warning-text">{{ warning }}</div>{% endfor %}
-                {% else %}
-                  <span class="muted">—</span>
-                {% endif %}
-              </td>
+              <th>Line</th>
+              <th>Name</th>
+              <th>Set</th>
+              <th>Collector #</th>
+              <th>Finish</th>
+              <th>Lang</th>
+              <th>Qty</th>
+              <th>Warnings</th>
             </tr>
-          {% endfor %}
-        </tbody>
+          </thead>
+          <tbody>
+            {% for row in valid_rows %}
+              <tr>
+                <td>{{ row.line_number }}</td>
+                <td>{{ row.name or '-' }}</td>
+                <td>{{ row.set_code or '-' }}</td>
+                <td>{{ row.collector_number or '-' }}</td>
+                <td>
+                  <span class="finish-badge">{{ row.finish|capitalize }}</span>
+                </td>
+                <td>
+                  {% if row.language and row.language != 'en' %}
+                    <span class="language-badge">{{ row.language|upper }}</span>
+                  {% else %}
+                    <span class="muted">EN</span>
+                  {% endif %}
+                </td>
+                <td>{{ row.quantity }}</td>
+                <td>
+                  {% if row.warnings %}
+                    {% for warning in row.warnings %}<div class="warning-text">{{ warning }}</div>{% endfor %}
+                  {% else %}
+                    <span class="muted">—</span>
+                  {% endif %}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
         </table>
       </div>
     {% else %}
@@ -129,30 +130,30 @@
       <h3 class="panel-title">Invalid Rows</h3>
       <div class="table-wrap">
         <table>
-        <thead>
-          <tr>
-            <th>Line</th>
-            <th>Name</th>
-            <th>Set</th>
-            <th>Collector #</th>
-            <th>Finish</th>
-            <th>Qty</th>
-            <th>Reason</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for row in invalid_rows %}
+          <thead>
             <tr>
-              <td>{{ row.line_number }}</td>
-              <td>{{ row.name or '-' }}</td>
-              <td>{{ row.set_code or '-' }}</td>
-              <td>{{ row.collector_number or '-' }}</td>
-              <td>{{ row.finish }}</td>
-              <td>{{ row.quantity }}</td>
-              <td style="color: #b45309;">{{ row.reason or 'Invalid row' }}</td>
+              <th>Line</th>
+              <th>Name</th>
+              <th>Set</th>
+              <th>Collector #</th>
+              <th>Finish</th>
+              <th>Qty</th>
+              <th>Reason</th>
             </tr>
-          {% endfor %}
-        </tbody>
+          </thead>
+          <tbody>
+            {% for row in invalid_rows %}
+              <tr>
+                <td>{{ row.line_number }}</td>
+                <td>{{ row.name or '-' }}</td>
+                <td>{{ row.set_code or '-' }}</td>
+                <td>{{ row.collector_number or '-' }}</td>
+                <td>{{ row.finish }}</td>
+                <td>{{ row.quantity }}</td>
+                <td style="color: #b45309;">{{ row.reason or 'Invalid row' }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
         </table>
       </div>
     </section>

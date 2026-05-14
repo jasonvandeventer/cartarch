@@ -52,6 +52,7 @@ Then [app/inventory_service.py:814-837](../app/inventory_service.py#L814-L837) (
 **Scenario 2: User manually adds a card to a deck via the deck detail page.**
 
 [app/deck_service.py:1103-1185](../app/deck_service.py#L1103-L1185) (`pull_card_to_deck`) is invoked from `POST /decks/pull` (called from the Search Collection panel on the deck detail page). It:
+
 1. Finds the source `InventoryRow` (the row the user owns in some collection location).
 2. Decrements the source row's `quantity` by the requested amount; deletes the row if quantity reaches 0.
 3. Finds-or-creates a destination `InventoryRow` at the deck's `storage_location_id` and increments its `quantity`.
@@ -64,6 +65,7 @@ Then [app/inventory_service.py:814-837](../app/inventory_service.py#L814-L837) (
 **Scenario 3: User removes a card from a deck.**
 
 [app/deck_service.py:1188-1277](../app/deck_service.py#L1188-L1277) (`return_card_from_deck`) is the inverse:
+
 1. Find the deck row.
 2. Find-or-create a destination row in the user's collection as `is_pending=True, storage_location_id=None`.
 3. Delete the deck row.
@@ -95,20 +97,20 @@ So the current behavior is **Model A with a bug in the import flow.** The user's
 
 Each row is a use case or evaluation dimension. Each column is one model. Score is qualitative: ✅ handled, ⚠ awkward, ❌ broken.
 
-| Dimension | Model A (decks ref inventory) | Model B (decks independent) | Model C (hybrid + join) |
-|---|---|---|---|
-| User's stated need: import without duplicating | ✅ if import reconciles — current bug is fixable | ✅ by definition — import never touches inventory | ✅ default behavior is "don't add to inventory" |
-| Wishlist deck (cards user doesn't own) | ⚠ requires phantom inventory rows | ✅ natural | ✅ natural |
-| Move a card from one deck to another | ✅ change `storage_location_id` | ⚠ depends on how cross-deck moves are defined | ⚠ need to decide if "move" means anything at the deck-list level |
-| Sell a card that's in a deck | ✅ decrement deck row → log sell event | ❌ deck still lists the card, inventory rows say sold — drift | ⚠ user has to remember to remove the card from both places |
-| "This card is in 3 of your decks" on card detail | ✅ join `InventoryRow` filtered to `storage_location_type='deck'` | ⚠ join via `DeckCard` table (new table) | ✅ same join as A via the deck-list table |
-| Total collection value reflects reality | ✅ — every card with a quantity is "owned" | ❌ — deck cards are double-counted or invisible | ⚠ depends on whether the join considers deck-only entries as owned |
-| Drawer sorter logic stays correct | ✅ — already works | ❌ — drawer sorter can't know what's "in a deck" without joining a separate table | ✅ — join works |
-| Cross-format games tracker (which deck won?) | ✅ existing wiring | ✅ unchanged (deck table still exists) | ✅ unchanged |
-| Schema simplicity | ✅ — one table for cards | ⚠ — add `DeckCard` table (or similar) | ⚠ — same, plus join logic in every read path |
-| Migration cost from current state | ✅ — fix import only, no schema change | ❌ — drop `storage_location_id='deck'` rows, populate new `DeckCard` table, rewrite every read | ⚠ — add `DeckCard` alongside existing, dual writes during transition |
-| Implementation complexity to land | ✅ — 2-3 sessions for import reconciliation | ❌ — 6+ sessions, touches every deck read path, schema migration with data movement | ⚠ — 4-5 sessions, plus permanent sync burden |
-| Implementation complexity to maintain | ✅ — same code paths as today | ⚠ — separate code paths for deck content vs inventory | ❌ — every "add card to deck" has to ask: also update inventory? |
+| Dimension                                        | Model A (decks ref inventory)                                     | Model B (decks independent)                                                                    | Model C (hybrid + join)                                              |
+| ------------------------------------------------ | ----------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| User's stated need: import without duplicating   | ✅ if import reconciles — current bug is fixable                  | ✅ by definition — import never touches inventory                                              | ✅ default behavior is "don't add to inventory"                      |
+| Wishlist deck (cards user doesn't own)           | ⚠ requires phantom inventory rows                                 | ✅ natural                                                                                     | ✅ natural                                                           |
+| Move a card from one deck to another             | ✅ change `storage_location_id`                                   | ⚠ depends on how cross-deck moves are defined                                                  | ⚠ need to decide if "move" means anything at the deck-list level     |
+| Sell a card that's in a deck                     | ✅ decrement deck row → log sell event                            | ❌ deck still lists the card, inventory rows say sold — drift                                  | ⚠ user has to remember to remove the card from both places           |
+| "This card is in 3 of your decks" on card detail | ✅ join `InventoryRow` filtered to `storage_location_type='deck'` | ⚠ join via `DeckCard` table (new table)                                                        | ✅ same join as A via the deck-list table                            |
+| Total collection value reflects reality          | ✅ — every card with a quantity is "owned"                        | ❌ — deck cards are double-counted or invisible                                                | ⚠ depends on whether the join considers deck-only entries as owned   |
+| Drawer sorter logic stays correct                | ✅ — already works                                                | ❌ — drawer sorter can't know what's "in a deck" without joining a separate table              | ✅ — join works                                                      |
+| Cross-format games tracker (which deck won?)     | ✅ existing wiring                                                | ✅ unchanged (deck table still exists)                                                         | ✅ unchanged                                                         |
+| Schema simplicity                                | ✅ — one table for cards                                          | ⚠ — add `DeckCard` table (or similar)                                                          | ⚠ — same, plus join logic in every read path                         |
+| Migration cost from current state                | ✅ — fix import only, no schema change                            | ❌ — drop `storage_location_id='deck'` rows, populate new `DeckCard` table, rewrite every read | ⚠ — add `DeckCard` alongside existing, dual writes during transition |
+| Implementation complexity to land                | ✅ — 2-3 sessions for import reconciliation                       | ❌ — 6+ sessions, touches every deck read path, schema migration with data movement            | ⚠ — 4-5 sessions, plus permanent sync burden                         |
+| Implementation complexity to maintain            | ✅ — same code paths as today                                     | ⚠ — separate code paths for deck content vs inventory                                          | ❌ — every "add card to deck" has to ask: also update inventory?     |
 
 ### 2.1 Model A — Decks reference inventory
 
@@ -166,17 +168,20 @@ This is what the existing schema, `pull_card_to_deck`, and `return_card_from_dec
 When a user imports a deck-list (paste-list, CSV, or Moxfield export) and selects a deck as the destination, the import preview page gains a **reconciliation table** before commit:
 
 For each card in the import:
+
 1. Query the user's existing `InventoryRow`s that match `(card_id, finish)` and are NOT already in the destination deck location.
 2. If matches exist, show a row in the reconciliation table:
    `Lightning Bolt — you own 4 in Drawer 2. Move 4 of them to this deck? [✓ Yes (default) / No, import new copies]`
 3. If no matches exist, the card is treated as a new addition (current behavior, creating a new pending row).
 
 The user sees the reconciliation list at preview time, alongside the existing "valid rows" preview. They can:
+
 - Accept all defaults (move existing copies where available, import new only for cards they don't own)
 - Override per-card (e.g., "I'm buying a second copy of this for the deck — import new")
 - Cancel and rethink
 
 On commit:
+
 - Cards marked "move existing" call `pull_card_to_deck` internally (quantity transfer from source to deck — exact same code path as the deck-detail Search Collection flow).
 - Cards marked "import new" go through the current `persist_import_rows` + `place_imported_rows` path.
 
@@ -196,7 +201,7 @@ A subtle case: user imports Moxfield deck A and already has the cards in deck B.
 
 Unchanged. Importing a CSV "Auto-sort to drawers" or to a specific binder/box continues to behave as today — new rows are created, no reconciliation against existing inventory. This is intentional: a "collection import" is the user telling the system about cards they've acquired, not asking it to deduplicate against what they already had logged.
 
-If a Helvault export is *partially* overlapping with the existing collection (user re-exports their full collection on top of an old import), they'd see doubled counts. That's a known pattern with collection imports and isn't part of the user's complaint. A separate "merge/replace collection import" feature is out of scope for this design.
+If a Helvault export is _partially_ overlapping with the existing collection (user re-exports their full collection on top of an old import), they'd see doubled counts. That's a known pattern with collection imports and isn't part of the user's complaint. A separate "merge/replace collection import" feature is out of scope for this design.
 
 ### 3.4 What changes — the deck-detail page
 
@@ -207,11 +212,13 @@ This is small and additive; it doesn't change anything else.
 ### 3.5 Wishlist (deferred — not in initial implementation)
 
 The cleanest extension: add `InventoryRow.is_wishlist: Boolean default False`. Wishlist rows:
+
 - Are excluded from `total_value`, `total_cards`, `Unique Cardnames`, drawer-sorter assignment, and the price-refresh loop.
 - Appear in deck-detail with a "Wishlist" badge.
 - Get a "I bought this" action that flips the flag to false and prompts the user to confirm placement.
 
 A "Add wishlist card to deck" button on deck detail creates an `is_wishlist=True` row in the deck location. Removing from the deck either:
+
 - Deletes the wishlist row (default — wishlist cards aren't kept around when not in a deck), or
 - Returns to pending with `is_wishlist=True` (if the user wants to track unowned cards across decks)
 
@@ -251,6 +258,7 @@ Current preview (`import_preview.html`) shows valid rows + invalid rows. After t
 ```
 
 Per-row action options (selectable per row):
+
 - **Move N**: transfer N copies from a non-deck location to this deck. Default when user owns ≥ deck-required quantity in a non-deck location.
 - **Move N + new M**: transfer N owned copies, import M new ones. Default when user owns FEWER than deck requires in non-deck locations.
 - **Import N (new)**: ignore existing inventory, create new rows. User override.
@@ -259,11 +267,13 @@ Per-row action options (selectable per row):
 ### 4.3 Step 3: Commit
 
 Backend processes the reconciliation list:
+
 - For "Move N" rows: call the equivalent of `pull_card_to_deck` per source row (split across multiple sources if the user owns the card in multiple drawers).
 - For "Import N" rows: create new `InventoryRow` as today.
 - For "Move + new" rows: do both.
 
 The import-complete page (`import_result.html`) reports both counts:
+
 > Imported 100 cards (95 unique). 18 cards moved from your collection, 82 new copies imported. [View deck] [Import more cards]
 
 ### 4.4 What collection-CSV import looks like (unchanged)
@@ -303,16 +313,16 @@ The fix to roll back the code is a single revert. No migration to unwind because
 
 **Refined Model A — import reconciliation:** 2-3 sessions.
 
-| Session | Work |
-|---|---|
-| 1 | Backend: extend the preview-parse step to query existing inventory and decorate each parsed row with a `match` list (existing rows that could be sources). New service function `find_inventory_matches_for_deck_import(session, user_id, deck_id, parsed_rows)`. Returns per-row source candidates. |
-| 2 | UI: extend `import_preview.html` with the reconciliation table when destination is a deck. Add per-row action dropdowns (default behavior + override). Add new form fields to encode the user's choices. Extend `/import/commit` and `/import/manual/commit` to read the reconciliation choices and dispatch to `pull_card_to_deck` vs `persist_import_rows`+`place_imported_rows` per row. |
+| Session      | Work                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1            | Backend: extend the preview-parse step to query existing inventory and decorate each parsed row with a `match` list (existing rows that could be sources). New service function `find_inventory_matches_for_deck_import(session, user_id, deck_id, parsed_rows)`. Returns per-row source candidates.                                                                                                                      |
+| 2            | UI: extend `import_preview.html` with the reconciliation table when destination is a deck. Add per-row action dropdowns (default behavior + override). Add new form fields to encode the user's choices. Extend `/import/commit` and `/import/manual/commit` to read the reconciliation choices and dispatch to `pull_card_to_deck` vs `persist_import_rows`+`place_imported_rows` per row.                               |
 | 3 (probable) | Edge cases: rows where user owns the card in MULTIPLE non-deck locations (split-source moves), rows where the source-row quantity changes between preview and commit (concurrent edits), rows where the destination deck is brand-new (no existing deck rows yet but the user has the card in a drawer). Plus the small UX addition on the deck-detail page (offer "add new copies" when collection search returns zero). |
 
 **Wishlist feature (deferred):** 1 session.
 
-| Session | Work |
-|---|---|
+| Session        | Work                                                                                                                                                                                                                                               |
+| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 1 (when ready) | Add `InventoryRow.is_wishlist` column + migration. Update queries that compute total_value, total_cards, drawer-sorter, price-refresh to exclude wishlist rows. Add wishlist badge in deck-detail UI. Add "Add wishlist card to deck" entry point. |
 
 **Total to fully address the user's complaint:** 2-3 sessions. **Total to also have wishlist support:** +1 session.
