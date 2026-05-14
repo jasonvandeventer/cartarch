@@ -1,24 +1,35 @@
-{# Partial: the filtered deck-card grid.
+{# Partial: the filtered deck-card display.
+
    Rendered both as part of /decks/{id} (full page) AND as the HTMX response
    from /decks/{id}/cards-partial. Keep the markup inside the wrapper div
    identical in both contexts so HTMX `innerHTML` swap produces no visual
    diff vs the full-page render.
 
-   The wrapper #deck-card-list is the hx-target on the search form.
+   The wrapper #deck-card-list is the hx-target on the search form and the
+   view/group-by controls.
+
+   Dispatches by `view_mode`:
+     - 'list' → _deck_card_list_text.html (Moxfield-style text rows grouped
+       by user's group-by axis, with hover-for-image preview on desktop)
+     - 'grid' (default) → existing image-card grid via inventory_card macro
 #}
 {% from "_macros.html" import inventory_card %}
 {% if items %}
-  <section class="card-grid-section">
-    <div class="inventory-grid">
-      {% for item in items %}
-        {{ inventory_card(item, csrf_token,
-                      show_deck_actions=true,
-                      deck=deck,
-                      use_drawer_sorter=use_drawer_sorter,
-                      locations=locations) }}
-      {% endfor %}
-    </div>
-  </section>
+  {% if view_mode == 'list' %}
+    {% include "_deck_card_list_text.html" %}
+  {% else %}
+    <section class="card-grid-section">
+      <div class="inventory-grid">
+        {% for item in items %}
+          {{ inventory_card(item, csrf_token,
+                        show_deck_actions=true,
+                        deck=deck,
+                        use_drawer_sorter=use_drawer_sorter,
+                        locations=locations) }}
+        {% endfor %}
+      </div>
+    </section>
+  {% endif %}
 {% else %}
   {% if not commanders %}
     <section class="panel">

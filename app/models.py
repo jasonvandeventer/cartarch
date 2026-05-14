@@ -25,6 +25,9 @@ class User(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
+    deck_view_mode: Mapped[str] = mapped_column(String(16), default="grid", nullable=False)
+    deck_group_by: Mapped[str] = mapped_column(String(16), default="type", nullable=False)
+
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     inventory_rows: Mapped[list[InventoryRow]] = relationship(back_populates="user")

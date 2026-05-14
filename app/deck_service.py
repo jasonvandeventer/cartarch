@@ -250,6 +250,183 @@ _TYPE_ORDER = [
 ]
 
 
+# Valid values for the deck-list view's group-by axis. The deck_detail page
+# accepts these from the URL query (?group=X) and the user's persisted
+# preference. Anything outside this set falls back to "type".
+DECK_GROUP_BY_OPTIONS = ("type", "cmc", "color", "role", "subtype")
+
+DECK_VIEW_MODES = ("grid", "list")
+
+
+def _primary_card_type(card) -> str:
+    """Return the dominant card type ('Creature', 'Instant', etc.) used for
+    type-grouping and other type-aware analytics. Matches the existing
+    ``_TYPE_ORDER`` priority: Creature > Planeswalker > Battle > Instant >
+    Sorcery > Enchantment > Artifact > Land. Falls back to 'Other' when no
+    known type word appears in ``type_line``.
+    """
+    tl = card.type_line or ""
+    # Type line shape: "Supertype Type — Subtype" (em-dash). Strip everything
+    # after the em-dash so subtypes don't poison the type match (e.g. "Land
+    # — Forest" should still match "Land", and a creature subtype "Wizard"
+    # shouldn't accidentally match anything).
+    head = tl.split("—")[0]
+    for t in _TYPE_ORDER:
+        if t.lower() in head.lower():
+            return t
+    return "Other"
+
+
+def _card_subtypes(card) -> list[str]:
+    """Subtypes after the em-dash. Empty list when none present."""
+    tl = card.type_line or ""
+    if "—" not in tl:
+        return []
+    tail = tl.split("—", 1)[1].strip()
+    return [s.strip() for s in tail.split() if s.strip()]
+
+
+def _card_color_bucket(card) -> str:
+    """Color bucket for grouping: 'White', 'Blue', etc. for monocolor;
+    'Multicolor' when two or more colors are present; 'Colorless' otherwise.
+    """
+    colors = (card.colors or "").strip().upper()
+    if not colors:
+        return "Colorless"
+    letters = [c for c in colors.split() if c in {"W", "U", "B", "R", "G"}]
+    if len(letters) >= 2:
+        return "Multicolor"
+    if len(letters) == 1:
+        return {
+            "W": "White",
+            "U": "Blue",
+            "B": "Black",
+            "R": "Red",
+            "G": "Green",
+        }[letters[0]]
+    return "Colorless"
+
+
+def _cmc_bucket(card) -> str:
+    """CMC bucket label. 0-5 own buckets, 6+ pooled."""
+    cmc = card.cmc
+    if cmc is None:
+        return "Unknown CMC"
+    try:
+        n = int(cmc)
+    except (TypeError, ValueError):
+        return "Unknown CMC"
+    if n >= 6:
+        return "6+"
+    return str(n)
+
+
+_COLOR_BUCKET_ORDER = [
+    "White",
+    "Blue",
+    "Black",
+    "Red",
+    "Green",
+    "Multicolor",
+    "Colorless",
+]
+
+
+def group_deck_items(items: list[dict], group_by: str) -> list[dict]:
+    """Bucket deck-detail items by the chosen axis and return ordered groups.
+
+    Each group dict carries:
+      - ``label``: human-readable group title
+      - ``count``: sum of item quantities in the group (total cards, not
+        unique-name count, so "4 Lightning Bolt" contributes 4)
+      - ``unique``: count of distinct items (rows) in the group
+      - ``subgroups``: list of {label, count} dicts for the inline breakdown
+        line shown beneath the group header. Only meaningful for the type
+        group when the bucket is 'Creature' (subtype counts). Empty list
+        for everything else in v1.
+      - ``rows``: the items themselves, preserving the caller's input order.
+        Named ``rows`` rather than ``items`` to dodge Jinja2's attribute
+        lookup priority — ``group.items`` on a dict resolves to the
+        ``dict.items()`` method, not the value at key "items".
+    """
+    if group_by not in DECK_GROUP_BY_OPTIONS:
+        group_by = "type"
+
+    buckets: dict[str, list[dict]] = {}
+    for item in items:
+        card = item.get("card")
+        if not card:
+            continue
+        if group_by == "type":
+            key = _primary_card_type(card)
+        elif group_by == "cmc":
+            key = _cmc_bucket(card)
+        elif group_by == "color":
+            key = _card_color_bucket(card)
+        elif group_by == "role":
+            tags = item.get("tags") or []
+            key = tags[0] if tags else "Untagged"
+        elif group_by == "subtype":
+            subtypes = _card_subtypes(card)
+            key = subtypes[0] if subtypes else "No subtype"
+        else:
+            key = "Other"
+        buckets.setdefault(key, []).append(item)
+
+    # Stable ordering per group_by axis.
+    if group_by == "type":
+        ordered_keys = [k for k in _TYPE_ORDER if k in buckets]
+        ordered_keys += sorted(k for k in buckets if k not in _TYPE_ORDER)
+    elif group_by == "cmc":
+        # Numeric order: 0, 1, 2, 3, 4, 5, 6+, Unknown
+        def _cmc_sort(k: str) -> tuple[int, str]:
+            if k == "6+":
+                return (6, "")
+            if k == "Unknown CMC":
+                return (99, "")
+            try:
+                return (int(k), "")
+            except ValueError:
+                return (100, k)
+
+        ordered_keys = sorted(buckets.keys(), key=_cmc_sort)
+    elif group_by == "color":
+        ordered_keys = [k for k in _COLOR_BUCKET_ORDER if k in buckets]
+        ordered_keys += sorted(k for k in buckets if k not in _COLOR_BUCKET_ORDER)
+    else:
+        ordered_keys = sorted(buckets.keys())
+
+    groups: list[dict] = []
+    for key in ordered_keys:
+        group_items = buckets[key]
+        total_count = sum(int(i.get("quantity") or 0) for i in group_items)
+        subgroups: list[dict] = []
+        # Sub-group breakdown: only for type=Creature when group_by='type'.
+        # Creature subtypes (Human, Elf, etc.) get individual counts; sorted
+        # by count desc so the most-prevalent subtype is surfaced first.
+        if group_by == "type" and key == "Creature":
+            sub_counts: dict[str, int] = {}
+            for it in group_items:
+                qty = int(it.get("quantity") or 0)
+                for st in _card_subtypes(it["card"]):
+                    sub_counts[st] = sub_counts.get(st, 0) + qty
+            subgroups = [
+                {"label": label, "count": count}
+                for label, count in sorted(sub_counts.items(), key=lambda kv: (-kv[1], kv[0]))
+            ]
+        groups.append(
+            {
+                "label": key,
+                "count": total_count,
+                "unique": len(group_items),
+                "subgroups": subgroups,
+                "rows": group_items,
+            }
+        )
+
+    return groups
+
+
 def compute_deck_analytics(rows: list) -> dict:
     """Compute mana curve, type breakdown, and color pip counts from a list of InventoryRow ORM objects."""
     curve: dict[int, int] = {i: 0 for i in range(7)}

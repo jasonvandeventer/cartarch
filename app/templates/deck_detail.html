@@ -558,10 +558,37 @@
           <option value="asc" {% if direction == 'asc' %}selected{% endif %}>Ascending</option>
           <option value="desc" {% if direction == 'desc' %}selected{% endif %}>Descending</option>
         </select>
+        <input type="hidden" name="view" value="{{ view_mode }}">
+        <select name="group" {% if view_mode != 'list' %}disabled{% endif %}>
+          <option value="type" {% if group_by == 'type' %}selected{% endif %}>Group: Type</option>
+          <option value="cmc" {% if group_by == 'cmc' %}selected{% endif %}>Group: Mana Value</option>
+          <option value="color" {% if group_by == 'color' %}selected{% endif %}>Group: Color</option>
+          <option value="role" {% if group_by == 'role' %}selected{% endif %}>Group: Role Tag</option>
+          <option value="subtype" {% if group_by == 'subtype' %}selected{% endif %}>Group: Subtype</option>
+        </select>
         <button type="submit">Apply</button>
         <a href="/decks/{{ deck.id }}?collection_search={{ collection_search }}">
           <button type="button">Clear</button>
         </a>
+      </form>
+      {# View-mode toggle. Two buttons that POST to the pref-update route
+         and persist the choice on the User row. Both buttons send the
+         destination view as `view=`; the route also accepts `group=` for
+         the group-by selector, which we leave to the search form above.
+         A successful POST 303s back to the current URL via the Referer,
+         so the user lands on the same deck with the new view. #}
+      <form action="/account/deck-view-pref" method="post"
+            class="filter-row deck-view-toggle"
+            style="margin-top: 0.5rem">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <button type="submit" name="view" value="grid"
+                class="deck-view-toggle-btn {% if view_mode == 'grid' %}active{% endif %}">
+          Grid
+        </button>
+        <button type="submit" name="view" value="list"
+                class="deck-view-toggle-btn {% if view_mode == 'list' %}active{% endif %}">
+          List
+        </button>
       </form>
     </section>
     {% if deck %}
@@ -885,6 +912,107 @@
         });
 
         resetSelection();
+      })();
+      </script>
+    {% endif %}
+    {% if deck %}
+      <script>
+      /* Deck list-view image preview (v3.20.0).
+         Event-delegated so it survives HTMX swaps of #deck-card-list when
+         the user changes the search filter or group-by axis. Desktop:
+         hover a .deck-list-row → floating tooltip with card image, follows
+         the cursor. Mobile (≤768px, hover not available): tap a row →
+         centered modal overlay; tap-outside or scroll dismisses. */
+      (function () {
+        var DESKTOP = window.matchMedia('(hover: hover) and (pointer: fine)');
+        var previewEl, previewImg, mobileBackdrop;
+
+        function ensurePreview() {
+          previewEl = document.getElementById('deck-list-image-preview');
+          previewImg = document.getElementById('deck-list-image-preview-img');
+          if (!previewEl || !previewImg) return false;
+          return true;
+        }
+
+        function showPreview(row, event) {
+          if (!ensurePreview()) return;
+          var src = row.getAttribute('data-card-image');
+          if (!src) return;
+          previewImg.src = src;
+          previewImg.alt = row.getAttribute('data-card-name') || '';
+          previewEl.hidden = false;
+          if (DESKTOP.matches && event) {
+            positionPreview(event);
+          }
+        }
+
+        function hidePreview() {
+          if (!ensurePreview()) return;
+          previewEl.hidden = true;
+          previewImg.src = '';
+        }
+
+        function positionPreview(event) {
+          if (!previewEl) return;
+          var pad = 18;
+          var w = previewEl.offsetWidth || 240;
+          var h = previewEl.offsetHeight || 340;
+          var x = event.clientX + pad;
+          var y = event.clientY + pad;
+          if (x + w > window.innerWidth - pad) x = event.clientX - w - pad;
+          if (y + h > window.innerHeight - pad) y = window.innerHeight - h - pad;
+          if (y < pad) y = pad;
+          previewEl.style.left = x + 'px';
+          previewEl.style.top = y + 'px';
+          previewEl.style.transform = 'none';
+        }
+
+        function resetPreviewPosition() {
+          // For mobile modal mode the CSS centers via translate. Wipe inline
+          // styles so subsequent desktop hovers reset cleanly.
+          if (previewEl) {
+            previewEl.style.left = '';
+            previewEl.style.top = '';
+            previewEl.style.transform = '';
+          }
+        }
+
+        document.addEventListener('mouseover', function (e) {
+          if (!DESKTOP.matches) return;
+          var row = e.target.closest('.deck-list-row');
+          if (!row) return;
+          showPreview(row, e);
+        });
+
+        document.addEventListener('mousemove', function (e) {
+          if (!DESKTOP.matches) return;
+          if (!previewEl || previewEl.hidden) return;
+          if (!e.target.closest('.deck-list-row')) return;
+          positionPreview(e);
+        });
+
+        document.addEventListener('mouseout', function (e) {
+          if (!DESKTOP.matches) return;
+          var row = e.target.closest('.deck-list-row');
+          if (!row) return;
+          // Hide only when leaving the row entirely (not when moving within).
+          if (!row.contains(e.relatedTarget)) hidePreview();
+        });
+
+        document.addEventListener('click', function (e) {
+          if (DESKTOP.matches) return;
+          var row = e.target.closest('.deck-list-row');
+          if (row) {
+            e.preventDefault();
+            resetPreviewPosition();
+            showPreview(row);
+            return;
+          }
+          // Tap outside dismisses the modal preview.
+          if (previewEl && !previewEl.hidden) {
+            hidePreview();
+          }
+        }, true);
       })();
       </script>
     {% endif %}

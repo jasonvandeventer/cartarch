@@ -38,6 +38,8 @@ from app.auth import hash_password
 from app.db import DATA_DIR, SessionLocal, init_db
 from app.deck_service import (
     CARD_ROLE_TAGS,
+    DECK_GROUP_BY_OPTIONS,
+    DECK_VIEW_MODES,
     compute_consistency,
     compute_dead_cards,
     compute_deck_analytics,
@@ -53,6 +55,7 @@ from app.deck_service import (
     get_card_legality,
     get_deck,
     get_row_tags,
+    group_deck_items,
     list_decks,
     pull_card_to_deck,
     return_card_from_deck,
@@ -2573,9 +2576,17 @@ def deck_detail_page(
     direction: str = "asc",
     collection_search: str = "",
     health_filter: str = "",
+    view: str = "",
+    group: str = "",
     session: Session = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
 ):
+    # Resolve view mode + group axis: explicit query param wins over the
+    # user's persisted preference, which wins over the hardcoded defaults.
+    # The query-param path is what the HTMX toggle/group-by controls use to
+    # change view without an extra round-trip.
+    view_mode = view if view in DECK_VIEW_MODES else (current_user.deck_view_mode or "grid")
+    group_by = group if group in DECK_GROUP_BY_OPTIONS else (current_user.deck_group_by or "type")
     deck = get_deck(session, deck_id=deck_id, user_id=current_user.id)
     items = []
     collection_results = []
@@ -2760,8 +2771,41 @@ def deck_detail_page(
             "current_user": current_user,
             "use_drawer_sorter": use_drawer_sorter,
             "locations": list_locations(session, user_id=current_user.id),
+            "view_mode": view_mode,
+            "group_by": group_by,
+            "deck_card_groups": group_deck_items(deck_cards, group_by) if deck else [],
         },
     )
+
+
+@app.post("/account/deck-view-pref")
+async def update_deck_view_pref(
+    request: Request,
+    view: str = Form(""),
+    group: str = Form(""),
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+    _: None = CsrfRequired,
+):
+    """Persist the user's deck-view preferences (view mode + group-by axis).
+
+    Called by the toggle / group-by controls on the deck detail page. Either
+    or both fields can be sent in a single POST; missing fields leave the
+    existing preference untouched. Invalid values are ignored.
+
+    Returns 303 to the Referer so the user lands back on whichever deck
+    they were viewing.
+    """
+    changed = False
+    if view and view in DECK_VIEW_MODES and current_user.deck_view_mode != view:
+        current_user.deck_view_mode = view
+        changed = True
+    if group and group in DECK_GROUP_BY_OPTIONS and current_user.deck_group_by != group:
+        current_user.deck_group_by = group
+        changed = True
+    if changed:
+        session.commit()
+    return RedirectResponse(url=safe_redirect_url(request), status_code=303)
 
 
 @app.get("/decks/{deck_id}/cards-partial")
@@ -2771,20 +2815,40 @@ def deck_cards_partial(
     search: str = "",
     sort: str = "name",
     direction: str = "asc",
+    view: str = "",
+    group: str = "",
     session: Session = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
 ):
-    """HTMX-driven partial: re-renders ONLY the filtered deck-card grid.
+    """HTMX-driven partial: re-renders ONLY the filtered deck-card display.
 
-    Triggered by the search form on /decks/{id} via `hx-get` so the user gets
-    in-place filter results without losing scroll position or collapsing
-    expanded panels. The full deck-detail route remains the no-JS fallback —
-    the form keeps `method="get" action="/decks/{id}"` so users without
-    HTMX get the original full-page reload behavior.
+    Triggered by the search form and the view/group-by controls on
+    /decks/{id} via `hx-get` so the user gets in-place updates without
+    losing scroll position or collapsing expanded panels. The full
+    deck-detail route remains the no-JS fallback — the form keeps
+    `method="get" action="/decks/{id}"` so users without HTMX get the
+    original full-page reload behavior.
     """
     deck = get_deck(session, deck_id=deck_id, user_id=current_user.id)
     if not deck:
         raise HTTPException(status_code=404, detail="Deck not found")
+
+    view_mode = view if view in DECK_VIEW_MODES else (current_user.deck_view_mode or "grid")
+    group_by = group if group in DECK_GROUP_BY_OPTIONS else (current_user.deck_group_by or "type")
+
+    # Side-effect persistence: if the URL explicitly carries a view/group
+    # value that differs from the user's saved preference, write it back.
+    # Means the group-by selector in the search form auto-persists on
+    # Apply, rather than the user having to find a separate "save" affordance.
+    pref_changed = False
+    if view in DECK_VIEW_MODES and current_user.deck_view_mode != view:
+        current_user.deck_view_mode = view
+        pref_changed = True
+    if group in DECK_GROUP_BY_OPTIONS and current_user.deck_group_by != group:
+        current_user.deck_group_by = group
+        pref_changed = True
+    if pref_changed:
+        session.commit()
 
     items, _, _ = _build_deck_card_items(session, deck, current_user.id, search, sort, direction)
     use_drawer_sorter = current_user.username in DRAWER_SORTER_USERNAMES
@@ -2794,6 +2858,9 @@ def deck_cards_partial(
         {
             "deck": deck,
             "items": items,
+            "deck_card_groups": group_deck_items(items, group_by),
+            "view_mode": view_mode,
+            "group_by": group_by,
             "commanders": [],  # the partial only re-renders deck cards, not commanders
             "use_drawer_sorter": use_drawer_sorter,
             "locations": list_locations(session, user_id=current_user.id),
@@ -2803,7 +2870,12 @@ def deck_cards_partial(
     # endpoint URL) so bookmarks / shares hit the real page on a cold visit.
     # `hx-push-url="true"` on the form would otherwise push /cards-partial?...
     # which only serves a fragment.
-    qs = urlencode({"search": search, "sort": sort, "direction": direction})
+    qs_params = {"search": search, "sort": sort, "direction": direction}
+    if view in DECK_VIEW_MODES:
+        qs_params["view"] = view
+    if group in DECK_GROUP_BY_OPTIONS:
+        qs_params["group"] = group
+    qs = urlencode(qs_params)
     response.headers["HX-Push-Url"] = f"/decks/{deck_id}?{qs}"
     return response
 

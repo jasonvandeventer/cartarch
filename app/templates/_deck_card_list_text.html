@@ -1,0 +1,77 @@
+{# List-view rendering of the deck. Moxfield-style compact rows grouped
+   by the user's chosen axis (type / cmc / color / role / subtype),
+   arranged in CSS multi-columns so many cards fit on one screen.
+
+   Each row is a single line: qty × name + mana cost + tiny badges. Detail
+   (set, type, price, tags) surfaces via the hover/tap image preview rather
+   than crowding the row.
+
+   `data-card-image` is the hook the JS hover-preview listener in
+   deck_detail.html uses to show the floating card-image tooltip (desktop)
+   or centered modal (mobile).
+
+   Group dicts come from `group_deck_items` in deck_service.py and have:
+     label, count, unique, subgroups (only populated for Creature when
+     group_by='type'), rows.
+#}
+<section class="deck-list-view">
+  {% for group in deck_card_groups %}
+    <article class="deck-list-group">
+      <header class="deck-list-group-header">
+        <h3 class="deck-list-group-title">
+          {{ group.label }}
+          <span class="deck-list-group-count">{{ group.count }}</span>
+        </h3>
+        {% if group.subgroups %}
+          <div class="deck-list-subgroups">
+            {% for sub in group.subgroups %}
+              <span class="deck-list-subgroup">{{ sub.label }} ({{ sub.count }})</span>{% if not loop.last %} · {% endif %}
+            {% endfor %}
+          </div>
+        {% endif %}
+      </header>
+      <ul class="deck-list-rows">
+        {% for item in group.rows %}
+          <li class="deck-list-row"
+              data-card-image="{{ item.card.image_url or '' }}"
+              data-card-name="{{ item.card.name }}">
+            <span class="dlr-qty">{{ item.quantity }}</span>
+            <a class="dlr-name" href="/cards/{{ item.card.id }}">{{ item.card.name }}</a>
+            {% if item.card.mana_cost %}
+              <span class="dlr-mana">{{ item.card.mana_cost }}</span>
+            {% endif %}
+            {% if (item.finish and item.finish != 'normal')
+                  or (item.language and item.language != 'en')
+                  or item.is_proxy
+                  or item.get('legality_status') in ('banned', 'restricted', 'not_legal') %}
+              <span class="dlr-meta">
+                {% if item.finish and item.finish != 'normal' %}
+                  <span class="dlr-tag finish">{{ item.finish[:1]|upper }}</span>
+                {% endif %}
+                {% if item.language and item.language != 'en' %}
+                  <span class="dlr-tag lang">{{ item.language|upper }}</span>
+                {% endif %}
+                {% if item.is_proxy %}
+                  <span class="dlr-tag proxy">P</span>
+                {% endif %}
+                {% set leg = item.get('legality_status') %}
+                {% if leg == 'banned' %}
+                  <span class="dlr-tag bad">!</span>
+                {% elif leg == 'restricted' %}
+                  <span class="dlr-tag warn">R</span>
+                {% elif leg == 'not_legal' %}
+                  <span class="dlr-tag warn">NL</span>
+                {% endif %}
+              </span>
+            {% endif %}
+          </li>
+        {% endfor %}
+      </ul>
+    </article>
+  {% endfor %}
+</section>
+{# Floating image-preview element. Lives at the bottom of the list view so
+   the JS hover/tap handler can position/show it. Hidden by default. #}
+<div id="deck-list-image-preview" class="deck-list-image-preview" hidden>
+  <img id="deck-list-image-preview-img" src="" alt="">
+</div>
