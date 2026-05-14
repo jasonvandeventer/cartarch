@@ -67,26 +67,117 @@ def basic_land_type_sort_key(card: Card) -> tuple[int, str]:
     return (order.get(name, 99), name)
 
 
+def _is_basic_land_any_kind(card: Card) -> bool:
+    """True for any basic-land variant — plain, snow, full-art, showcase, etc.
+
+    Detected via the type_line carrying both a "Basic" supertype AND a basic
+    land subtype (Plains/Island/Swamp/Mountain/Forest/Wastes). This handles
+    snow basics (whose type_line reads "Basic Snow Land — Plains", *without*
+    the "Basic Land" substring) alongside ordinary basics.
+    """
+    type_line = (card.type_line or "").lower()
+    if "basic" not in type_line:
+        return False
+    return any(name in type_line for name in _BASIC_LAND_NAMES)
+
+
 def is_basic_land_candidate(card: Card, finish: str) -> bool:
+    """True for *plain* basic lands only — normal finish, non-full-art, non-snow.
+
+    Premium basics (foil, full-art, snow, showcase, extended-art) are filtered
+    out here and routed to drawer 6's "premium basics" section by
+    ``is_premium_basic`` instead.
+    """
     if (finish or "").strip().lower() != "normal":
         return False
+    if not _is_basic_land_any_kind(card):
+        return False
     type_line = (card.type_line or "").lower()
-    if "basic land" not in type_line:
-        return False
-    if (card.name or "").strip().lower() not in _BASIC_LAND_NAMES:
-        return False
     traits = fetch_card_traits(card.scryfall_id)
     if traits is not None:
-        return traits["is_basic_land"] and not traits["is_full_art"]
-    return True
+        if (
+            traits.get("is_full_art")
+            or traits.get("is_snow")
+            or traits.get("has_showcase_frame")
+            or traits.get("has_extended_art_frame")
+        ):
+            return False
+        return True
+    # No Scryfall traits available — fall back to type_line. Snow basics
+    # carry "snow" in the supertype string ("Basic Snow Land — ..."), so
+    # excluding "snow" here correctly fails them.
+    return "snow" not in type_line
 
 
-def assign_drawer(card: Card, finish: str) -> int:
+def is_premium_basic(card: Card, finish: str) -> bool:
+    """True for any non-plain basic land variant.
+
+    Matches when the card is a basic land (any kind, including snow) AND
+    at least one of: finish != normal, full_art, snow, showcase frame,
+    extended-art frame. Mirror image of :func:`is_basic_land_candidate`.
+    """
+    if not _is_basic_land_any_kind(card):
+        return False
+    if (finish or "").strip().lower() != "normal":
+        return True
+    type_line = (card.type_line or "").lower()
+    traits = fetch_card_traits(card.scryfall_id)
+    if traits is not None:
+        return bool(
+            traits.get("is_full_art")
+            or traits.get("is_snow")
+            or traits.get("has_showcase_frame")
+            or traits.get("has_extended_art_frame")
+        )
+    return "snow" in type_line
+
+
+def is_token_card(card: Card) -> bool:
+    """True when the inventory row holds a token card (vs. a real spell).
+
+    Tokens generally have ``type_line`` starting with "Token" (or containing
+    "Token" plus the creature subtype). The separate ``token_inventory`` table
+    holds tokens not tracked as collectibles; this helper covers the case
+    where a token printing slipped into ``inventory_rows`` via CSV import.
+    """
+    return "token" in (card.type_line or "").lower()
+
+
+def assign_drawer(row: InventoryRow) -> int:
+    """Return the target drawer number (1-6) for an InventoryRow.
+
+    Priority order (first match wins):
+      1. value >= VALUE_THRESHOLD ($5) → drawer 1
+      2. is_proxy=True → drawer 6 (proxies section)
+      3. token card → drawer 6 (tokens section)
+      4. foreign language (language not en/None) → drawer 6 (foreign section)
+      5. premium basic → drawer 6 (premium basics section)
+      6. plain basic → drawer 6 (plain basics section)
+      7. numeric set code or empty set → drawer 6 (numeric sets section)
+      8. otherwise: letter-range routes to drawers 2-5
+
+    The drawer-6 *section* (vs the drawer number) is determined by
+    ``drawer_sort_key`` for the in-drawer sort ordering.
+    """
+    card = row.card
+    finish = row.finish
+
     price = effective_price(card, finish) or 0.0
     if price >= VALUE_THRESHOLD:
         return 1
+
+    if row.is_proxy:
+        return 6
+    if is_token_card(card):
+        return 6
+    language = (row.language or "en").lower()
+    if language != "en":
+        return 6
+    if is_premium_basic(card, finish):
+        return 6
     if is_basic_land_candidate(card, finish):
         return 6
+
     first_char = (card.set_code or "").strip().lower()[:1]
     if not first_char or first_char.isdigit():
         return 6
@@ -102,8 +193,12 @@ def assign_drawer(card: Card, finish: str) -> int:
 
 
 def drawer_sort_key(row: InventoryRow) -> tuple:
+    """In-drawer sort key. For drawer 6, a leading section number controls
+    top-to-bottom physical layout: 0=numeric sets, 1=foreign, 2=premium
+    basics, 3=plain basics, 4=tokens, 5=proxies.
+    """
     card = row.card
-    drawer = assign_drawer(card, row.finish)
+    drawer = assign_drawer(row)
     set_code = (card.set_code or "").strip().lower()
     collector = collector_sort_key(card.collector_number)
     name = (card.name or "").strip().lower()
@@ -112,17 +207,35 @@ def drawer_sort_key(row: InventoryRow) -> tuple:
         return (set_code, collector, name, row.id)
 
     if drawer == 6:
+        # Section ordering matches the layout the drawer-sorter user
+        # physically arranged: numeric → foreign → premium → plain → tokens
+        # → proxies. Same priority as assign_drawer but encoded as a sort
+        # prefix so all section-0 rows sort before section-1 rows, etc.
         first_char = set_code[:1]
-        is_numeric_set = first_char.isdigit()
+        is_numeric_set = bool(first_char) and first_char.isdigit()
+        language = (row.language or "en").lower()
+        is_foreign = language != "en"
+        is_premium = is_premium_basic(card, row.finish)
         is_basic = is_basic_land_candidate(card, row.finish)
+        is_token = is_token_card(card)
 
+        # Highest-priority classifications win the section assignment when
+        # multiple apply (matches assign_drawer's first-match-wins ordering).
+        if row.is_proxy:
+            return (5, set_code, collector, name, row.id)
+        if is_token:
+            return (4, set_code, collector, name, row.id)
+        if is_foreign:
+            return (1, language, set_code, collector, name, row.id)
+        if is_premium:
+            return (2, basic_land_type_sort_key(card), set_code, collector, name, row.id)
+        if is_basic:
+            return (3, basic_land_type_sort_key(card), set_code, collector, name, row.id)
         if is_numeric_set:
             return (0, set_code, collector, name, row.id)
-
-        if is_basic:
-            return (1, basic_land_type_sort_key(card), set_code, collector, name, row.id)
-
-        return (2, set_code, collector, name, row.id)
+        # Fallback — shouldn't happen given assign_drawer's exhaustive rules,
+        # but guard against future drift by sorting after every named section.
+        return (6, set_code, collector, name, row.id)
 
     return (set_code, collector, name, row.id)
 
@@ -642,7 +755,7 @@ def list_inventory_rows(
     elif sort == "placement":
         rows = base_query.all()
         rows.sort(
-            key=lambda r: (assign_drawer(r.card, r.finish), drawer_sort_key(r)),
+            key=lambda r: (assign_drawer(r), drawer_sort_key(r)),
             reverse=reverse,
         )
         rows = rows[(page - 1) * per_page : (page - 1) * per_page + per_page]
@@ -824,6 +937,7 @@ def move_inventory_row_to_location(
             InventoryRow.card_id == row.card_id,
             InventoryRow.finish == row.finish,
             func.coalesce(InventoryRow.language, "en") == (row.language or "en"),
+            InventoryRow.is_proxy == bool(row.is_proxy),
             InventoryRow.storage_location_id == new_location.id,
             InventoryRow.is_pending.is_(False),
             InventoryRow.id != row.id,
@@ -940,6 +1054,7 @@ def place_imported_rows(
                 InventoryRow.card_id == row.card_id,
                 InventoryRow.finish == row.finish,
                 func.coalesce(InventoryRow.language, "en") == (row.language or "en"),
+                InventoryRow.is_proxy == bool(row.is_proxy),
                 InventoryRow.storage_location_id == location.id,
                 InventoryRow.is_pending.is_(False),
                 InventoryRow.id != row.id,
@@ -1233,7 +1348,7 @@ def list_pending_rows(session: Session, user_id: int) -> list[InventoryRow]:
         )
         .all()
     )
-    rows.sort(key=lambda r: (assign_drawer(r.card, r.finish), drawer_sort_key(r)))
+    rows.sort(key=lambda r: (assign_drawer(r), drawer_sort_key(r)))
     return rows
 
 
@@ -1571,9 +1686,7 @@ def resort_collection(
             pass
 
     # Compute target drawer once per row and sort.
-    row_target_drawer: dict[int, int] = {
-        row.id: assign_drawer(row.card, row.finish) for row in rows
-    }
+    row_target_drawer: dict[int, int] = {row.id: assign_drawer(row) for row in rows}
     rows.sort(key=lambda r: (row_target_drawer[r.id], drawer_sort_key(r)))
 
     grouped: dict[int, list[InventoryRow]] = {i: [] for i in range(1, 7)}

@@ -369,9 +369,16 @@ def fetch_card_traits(scryfall_id: str) -> dict[str, bool] | None:
     if not type_line and card_faces:
         type_line = " // ".join((face.get("type_line") or "") for face in card_faces).lower()
 
+    frame_effects = raw.get("frame_effects") or []
+    frame_effects_lc = {(eff or "").lower() for eff in frame_effects}
+
     return {
         "is_basic_land": "basic land" in type_line,
         "is_full_art": bool(raw.get("full_art")),
+        "is_snow": "snow" in type_line,
+        "has_showcase_frame": "showcase" in frame_effects_lc,
+        "has_extended_art_frame": "extendedart" in frame_effects_lc,
+        "is_token": "token" in type_line,
     }
 
 

@@ -471,12 +471,15 @@ def persist_import_rows(
             .all()
         )
 
-    inventory_map: dict[tuple[int, int, str, str, str | None, str | None, bool], InventoryRow] = {
+    inventory_map: dict[
+        tuple[int, int, str, str, bool, str | None, str | None, bool], InventoryRow
+    ] = {
         (
             row.user_id,
             row.card_id,
             row.finish,
             row.language or "en",
+            bool(row.is_proxy),
             row.drawer,
             row.slot,
             row.is_pending,
@@ -504,7 +507,10 @@ def persist_import_rows(
         language = normalize_language(row.get("language"))
         location_note = (row.get("location") or "").strip() or None
 
-        key = (user_id, card.id, finish, language, None, None, True)
+        # Imports always create non-proxy rows (CSV/manual flows don't surface
+        # is_proxy); the existing-row lookup keys on is_proxy=False so a
+        # manually-flagged proxy row never silently absorbs a fresh import.
+        key = (user_id, card.id, finish, language, False, None, None, True)
         target_row = inventory_map.get(key)
 
         if target_row:

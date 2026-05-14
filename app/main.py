@@ -1464,6 +1464,26 @@ def remove_inventory_row_action(
     return RedirectResponse(url=safe_redirect_url(request), status_code=303)
 
 
+@app.post("/inventory/rows/{row_id}/toggle-proxy")
+def toggle_inventory_row_proxy(
+    request: Request,
+    row_id: int,
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+    _: None = CsrfRequired,
+):
+    row = (
+        session.query(InventoryRow)
+        .filter(InventoryRow.id == row_id, InventoryRow.user_id == current_user.id)
+        .first()
+    )
+    if not row:
+        raise HTTPException(status_code=404, detail="Inventory row not found")
+    row.is_proxy = not bool(row.is_proxy)
+    session.commit()
+    return RedirectResponse(url=safe_redirect_url(request), status_code=303)
+
+
 @app.post("/inventory/rows/{row_id}/sell")
 def sell_inventory_row_action(
     request: Request,
@@ -1614,6 +1634,7 @@ def collection_page(
                 "card": row.card,
                 "finish": row.finish,
                 "language": row.language or "en",
+                "is_proxy": bool(row.is_proxy),
                 "quantity": row.quantity,
                 "drawer": row.drawer,
                 "slot": row.slot,
@@ -2125,6 +2146,7 @@ def location_detail_page(
                 "card": row.card,
                 "finish": row.finish,
                 "language": row.language or "en",
+                "is_proxy": bool(row.is_proxy),
                 "quantity": row.quantity,
                 "slot": row.slot,
                 "effective_price": price,
@@ -2264,6 +2286,7 @@ def drawer_detail_page(
                 "card": row.card,
                 "finish": row.finish,
                 "language": row.language or "en",
+                "is_proxy": bool(row.is_proxy),
                 "quantity": row.quantity,
                 "slot": row.slot,
                 "is_pending": row.is_pending,
@@ -2527,6 +2550,7 @@ def _build_deck_card_items(
                 "card": row.card,
                 "finish": row.finish,
                 "language": row.language or "en",
+                "is_proxy": bool(row.is_proxy),
                 "quantity": row.quantity,
                 "effective_price": price,
                 "total_value": row_total,
@@ -2618,6 +2642,7 @@ def deck_detail_page(
                     "card": row.card,
                     "finish": row.finish,
                     "language": row.language or "en",
+                    "is_proxy": bool(row.is_proxy),
                     "quantity": row.quantity,
                     "location_label": get_location_label(row),
                     "effective_price": price,
@@ -3333,6 +3358,7 @@ def card_detail_page(
                 "id": row.id,
                 "finish": row.finish,
                 "language": row.language or "en",
+                "is_proxy": bool(row.is_proxy),
                 "quantity": row.quantity,
                 "drawer": row.drawer,
                 "slot": row.slot,

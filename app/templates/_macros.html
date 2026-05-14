@@ -50,6 +50,9 @@
         {% if item.language and item.language != 'en' %}
           <span class="language-badge" title="Physical language">{{ item.language|upper }}</span>
         {% endif %}
+        {% if item.is_proxy %}
+          <span class="proxy-badge" title="Marked as proxy">PROXY</span>
+        {% endif %}
         {% if item.card.mana_cost %}· {{ item.card.mana_cost }}{% endif %}
         · Qty {{ item.quantity }} ·
         {% if item.price_status is defined and item.price_status %}
@@ -169,6 +172,14 @@
                 <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                 <input type="hidden" name="card_id" value="{{ item.card.id }}">
                 <button type="submit">Refresh Price</button>
+              </form>
+              <form action="/inventory/rows/{{ item.id }}/toggle-proxy"
+                    method="post"
+                    class="inline-form">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <button type="submit">
+                  {% if item.is_proxy %}Unmark Proxy{% else %}Mark Proxy{% endif %}
+                </button>
               </form>
             </div>
           </div>

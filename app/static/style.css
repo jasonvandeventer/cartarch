@@ -1789,6 +1789,22 @@ td {
   margin-left: 0.2rem;
 }
 
+/* Proxy badge (v3.19.0). Shown when InventoryRow.is_proxy is True.
+   Muted gray so the badge reads as "physical-attribute note" rather
+   than "warning" — proxies aren't problems, just a category. */
+.proxy-badge {
+  display: inline-block;
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  background: rgba(120, 120, 130, 0.18);
+  border: 1px solid rgba(120, 120, 130, 0.55);
+  color: #9ca3af;
+  letter-spacing: 0.04em;
+  margin-left: 0.2rem;
+}
+
 .warning-text {
   color: #b45309;
   font-size: 0.9rem;

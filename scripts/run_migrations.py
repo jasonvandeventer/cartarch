@@ -25,6 +25,7 @@ from scripts.migrate_v3_16_1_token_back_set_collector import (
     main as migrate_v3_16_1_token_back_set_collector,
 )
 from scripts.migrate_v3_18_0_inventory_language import main as migrate_v3_18_0_inventory_language
+from scripts.migrate_v3_19_0_inventory_is_proxy import main as migrate_v3_19_0_inventory_is_proxy
 
 
 def _is_applied(name: str) -> bool:
@@ -188,6 +189,13 @@ def run():
         _mark_applied("v3_18_0_inventory_language")
     else:
         print("v3.18.0 inventory_language already applied, skipping")
+
+    if not _is_applied("v3_19_0_inventory_is_proxy"):
+        print("Running v3.19.0 inventory is_proxy column migration...")
+        migrate_v3_19_0_inventory_is_proxy()
+        _mark_applied("v3_19_0_inventory_is_proxy")
+    else:
+        print("v3.19.0 inventory_is_proxy already applied, skipping")
 
     print("Migration runner complete")
 

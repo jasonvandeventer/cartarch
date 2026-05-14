@@ -53,6 +53,14 @@ Items with concrete demand or that close known gaps. Each is contained scope.
 
 - **Deck view list mode with grouping.** Add a list/grid toggle to the deck detail page card display. List mode renders cards as text rows grouped by a user-selectable axis (type, mana value, role tag, color, subtype). Card image shown on hover (desktop) or tap (mobile). Sub-group counts surfaced inline ("Creatures (35) · Humans (6)"). The existing image grid stays available as the alternate view. User preference persisted per-user (not per-deck). Addresses a direct request from the playgroup: Moxfield-style scanning is the use case being filled.
 
+- **In-place card editing in decks.** Users currently have to delete a card and re-add it to swap printings, change finish (foil/etched/nonfoil), or adjust basic land counts. Add inline edit affordances on cards in a deck:
+
+  - Change printing: a dropdown control on each card (or row, in list view) offers a "Switch printing" option. Selecting it opens a modal listing every printing of that card. Printings the user already owns are sorted to the top of the modal as a separate section ("In your collection") above the full printings list. Selecting a printing updates the `InventoryRow` in place, preserving the card's place in the deck and any user-applied tags. The "owned at top" sort is a deliberate source-of-truth feature: Mana Archive knows the user's inventory authoritatively and surfaces owned options first, which is something generic deckbuilders cannot do well.
+  - Change finish: each printing in the switch-printing modal shows nonfoil / foil / etched options as toggleable buttons, restricted to the finishes that actually exist for that printing. Foil availability is queried from Scryfall's per-printing data. The toggle also indicates which finishes the user owns of that specific printing.
+  - Adjust basic land quantity: basic land rows show +/- controls to bump count up or down without re-entering the card name. Bumping past zero removes the row; bumping past available inventory creates a new row from the imported-cards path.
+
+  Two users requested this directly. The edit affordance lives on both the existing image-grid view and the new list view (see the "Deck view list mode with grouping" item above), so the two features are sequenced together — implement the list view first since the inline-edit control fits more naturally in a list row than overlaid on a card image.
+
 ## Tier 2: Significant features (next 1-2 months)
 
 Larger arcs that need design conversations before implementation. Both have design docs in place; both are sequential rather than parallel.
