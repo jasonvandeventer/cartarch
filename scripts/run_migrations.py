@@ -38,6 +38,9 @@ from scripts.migrate_v3_20_0_user_deck_view_prefs import (
 from scripts.migrate_v3_22_0_tag_confidence_model import (
     main as migrate_v3_22_0_tag_confidence_model,
 )
+from scripts.migrate_v3_23_3_promote_intrinsic_auto_certain import (
+    main as migrate_v3_23_3_promote_intrinsic_auto_certain,
+)
 
 
 def _is_applied(name: str) -> bool:
@@ -236,6 +239,13 @@ def run():
         _mark_applied("v3_22_0_tag_confidence_model")
     else:
         print("v3.22.0 tag_confidence_model already applied, skipping")
+
+    if not _is_applied("v3_23_3_promote_intrinsic_auto_certain"):
+        print("Running v3.23.3 intrinsic-tag promotion migration...")
+        migrate_v3_23_3_promote_intrinsic_auto_certain()
+        _mark_applied("v3_23_3_promote_intrinsic_auto_certain")
+    else:
+        print("v3.23.3 promote_intrinsic_auto_certain already applied, skipping")
 
     print("Migration runner complete")
 

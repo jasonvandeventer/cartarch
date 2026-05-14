@@ -4442,3 +4442,161 @@ body.game-mode {
     flex-wrap: wrap;
   }
 }
+
+/* === Review-tags panel (v3.23.3) ===
+   Surfaces auto/medium tags awaiting user review on deck detail.
+   Collapsed by default via <details>; chip-row inside each row lets
+   the user confirm or remove per-tag, with a row-level "Confirm row"
+   shortcut for cards with multiple auto-suggestions. */
+.review-tags-panel {
+  border-left: 3px solid rgba(245, 158, 11, 0.5); /* amber accent — "needs attention" */
+}
+.review-tags-details {
+  display: block;
+}
+.review-tags-summary {
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  font-weight: 600;
+  list-style: none;
+  padding: 0.1rem 0;
+}
+.review-tags-summary::-webkit-details-marker { display: none; }
+.review-tags-summary::before {
+  content: "▸";
+  display: inline-block;
+  margin-right: 0.4rem;
+  transition: transform 0.15s ease;
+  color: #94a3b8;
+}
+.review-tags-details[open] .review-tags-summary::before {
+  transform: rotate(90deg);
+}
+.review-tags-summary-label {
+  flex: 1 1 auto;
+}
+.review-tags-summary-count {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.15rem 0.55rem;
+  background: rgba(245, 158, 11, 0.18);
+  color: #f59e0b;
+  border: 1px solid rgba(245, 158, 11, 0.4);
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 500;
+}
+.review-tags-help {
+  margin: 0.5rem 0 0.85rem 0;
+  font-size: 0.85rem;
+  line-height: 1.45;
+}
+.review-tags-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.review-tags-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.4rem 0.6rem;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 6px;
+}
+.review-tags-row-card {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+.review-tags-row-name {
+  font-weight: 500;
+  color: inherit;
+  text-decoration: none;
+}
+.review-tags-row-name:hover { text-decoration: underline; }
+.review-tags-row-confirmed {
+  font-size: 0.78rem;
+}
+.review-tags-chip-row {
+  display: flex;
+  gap: 0.35rem;
+  align-items: center;
+  flex-wrap: wrap;
+  flex: 0 0 auto;
+}
+.review-tags-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.1rem;
+  padding: 0.15rem 0.1rem 0.15rem 0.55rem;
+  background: rgba(120, 120, 130, 0.14);
+  border: 1px dashed rgba(120, 120, 130, 0.5);
+  border-radius: 999px;
+  font-size: 0.8rem;
+  color: #cbd5e1;
+}
+.review-tags-chip-label {
+  padding-right: 0.2rem;
+}
+.review-tags-chip-form {
+  display: inline-flex;
+  margin: 0;
+}
+.review-tags-chip-btn {
+  background: transparent;
+  border: 0;
+  padding: 0.1rem 0.35rem;
+  cursor: pointer;
+  font-size: 0.78rem;
+  line-height: 1;
+  border-radius: 999px;
+  color: #94a3b8;
+  min-height: 0;
+}
+.review-tags-chip-btn:hover { background: rgba(255, 255, 255, 0.06); }
+.review-tags-chip-confirm:hover { color: #22c55e; }
+.review-tags-chip-remove:hover { color: #ef4444; }
+.review-tags-row-confirm-all-form {
+  display: inline-flex;
+  margin: 0 0 0 0.35rem;
+}
+.review-tags-row-confirm-all-btn {
+  background: rgba(34, 197, 94, 0.18);
+  color: #22c55e;
+  border: 1px solid rgba(34, 197, 94, 0.45);
+  padding: 0.22rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  cursor: pointer;
+  min-height: 0;
+}
+.review-tags-row-confirm-all-btn:hover {
+  background: rgba(34, 197, 94, 0.28);
+}
+.review-tags-empty {
+  margin: 0.5rem 0;
+  font-style: italic;
+}
+
+@media (max-width: 640px) {
+  .review-tags-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.4rem;
+  }
+  .review-tags-chip-row {
+    width: 100%;
+  }
+}

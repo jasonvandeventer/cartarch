@@ -1,0 +1,23 @@
+{# Review-tags panel (v3.23.3). Shown inline in deck_detail.html.
+   Outer wrapper stays in the DOM across HTMX swaps; inner content is
+   the swap target. When `review_tag_items` is empty on initial render,
+   the panel is hidden entirely. #}
+{% if review_tag_items %}
+<section class="panel review-tags-panel">
+  <details class="review-tags-details">
+    <summary class="review-tags-summary">
+      <span class="review-tags-summary-label">Review auto-suggested tags</span>
+      <span class="review-tags-summary-count">{{ review_tag_items | length }} card{{ "" if review_tag_items | length == 1 else "s" }}</span>
+    </summary>
+    <p class="review-tags-help muted">
+      These are auto-suggested tags awaiting your review. Confirm to mark
+      them as user-verified (won't be re-suggested) or remove if they're
+      wrong. Intrinsic patterns (Ramp/Draw/etc.) are already certain and
+      don't show up here — only heuristic matches do.
+    </p>
+    <div id="review-tags-panel-content">
+      {% include "_review_tags_panel_content.html" %}
+    </div>
+  </details>
+</section>
+{% endif %}

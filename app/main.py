@@ -2484,6 +2484,53 @@ def _write_panels_cache(deck_id: int, cache_key: str, payload: dict) -> None:
         print(f"[panels] disk write failed deck={deck_id}: {e}", flush=True)
 
 
+def _build_review_tag_items(rows: list) -> list[dict]:
+    """Build the deck-detail review-tags panel data (v3.23.3).
+
+    Surfaces rows that carry at least one auto/medium tag. These are the
+    auto-tagger's heuristic suggestions (currently always Synergy via
+    `card_matches_theme` — intrinsic role tags land at auto/certain after
+    v3.23.2 so they don't appear here). The user reviews each, then either
+    confirms (promoting to user/high) or removes (deleting that tag from
+    the row's tag list).
+
+    Each item carries the row id and a list of `{tag, all_other_tags}`
+    entries — the partial template uses these to render per-tag chip
+    actions plus a row-level "Confirm row" shortcut.
+
+    Commander rows are excluded — their tags don't drive Synergy/Health
+    classification.
+    """
+    from app.deck_service import get_row_tag_details
+
+    out: list[dict] = []
+    for row in rows:
+        if row.role == "commander":
+            continue
+        if not row.card:
+            continue
+        details = get_row_tag_details(row)
+        review_tags = [
+            d["tag"]
+            for d in details
+            if d.get("source") == "auto" and d.get("confidence") == "medium"
+        ]
+        if not review_tags:
+            continue
+        confirmed_tags = [d["tag"] for d in details if d["tag"] not in review_tags]
+        out.append(
+            {
+                "row_id": row.id,
+                "card_id": row.card.id,
+                "card_name": row.card.name or "Unknown",
+                "review_tags": sorted(review_tags),
+                "confirmed_tags": sorted(confirmed_tags),
+            }
+        )
+    out.sort(key=lambda item: item["card_name"].lower())
+    return out
+
+
 def _build_deck_card_items(
     session: Session,
     deck: Deck,
@@ -2785,6 +2832,9 @@ def deck_detail_page(
             "view_mode": view_mode,
             "group_by": group_by,
             "deck_card_groups": group_deck_items(deck_cards, group_by) if deck else [],
+            "review_tag_items": (
+                _build_review_tag_items(locals().get("all_deck_rows") or []) if deck else []
+            ),
         },
     )
 
@@ -3558,6 +3608,103 @@ async def update_row_tags(
         set_row_tags(row, [t for t in tags if t in CARD_ROLE_TAGS])
         row.updated_at = datetime.utcnow()
         session.commit()
+    return RedirectResponse(url=f"/decks/{deck_id}", status_code=303)
+
+
+@app.post("/decks/{deck_id}/rows/{row_id}/review-tag")
+async def review_tag_action(
+    request: Request,
+    deck_id: int,
+    row_id: int,
+    action: str = Form(...),
+    tag: str = Form(""),
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+    _: None = CsrfRequired,
+):
+    """Per-row review-tags actions (v3.23.3).
+
+    Three action variants, all single-row scoped (no deck-wide bulk —
+    Synergy can over-tag, the user should commit per card):
+
+      - action="confirm" + tag=Name → promote that tag from auto/medium
+        to user/high. Other tags on the row unchanged.
+      - action="remove" + tag=Name → delete that tag from the row's tag
+        list. Other tags unchanged.
+      - action="confirm_row" → promote every auto/medium tag on the row
+        to user/high in one shot.
+
+    On HX-Request, returns the updated review-tags panel HTML (HTMX
+    swaps `#review-tags-panel-content`). Otherwise 303-redirects back
+    to /decks/{deck_id}.
+    """
+    from app.deck_service import get_row_tag_details
+
+    deck = session.query(Deck).filter(Deck.id == deck_id, Deck.user_id == current_user.id).first()
+    if not deck:
+        raise HTTPException(status_code=404, detail="Deck not found")
+
+    row = (
+        session.query(InventoryRow)
+        .options(joinedload(InventoryRow.card))
+        .filter(InventoryRow.id == row_id, InventoryRow.user_id == current_user.id)
+        .first()
+    )
+    if not row:
+        raise HTTPException(status_code=404, detail="Row not found")
+
+    details = get_row_tag_details(row)
+    changed = False
+
+    if action == "confirm" and tag in CARD_ROLE_TAGS:
+        promoted: list[dict] = []
+        for d in details:
+            if d["tag"] == tag and d.get("source") == "auto":
+                promoted.append({"tag": tag, "confidence": "high", "source": "user"})
+                changed = True
+            else:
+                promoted.append(d)
+        if changed:
+            set_row_tags(row, promoted)
+    elif action == "remove" and tag in CARD_ROLE_TAGS:
+        kept = [d for d in details if d["tag"] != tag]
+        if len(kept) != len(details):
+            set_row_tags(row, kept)
+            changed = True
+    elif action == "confirm_row":
+        # Promote every auto/medium tag on the row in one shot.
+        promoted = []
+        for d in details:
+            if d.get("source") == "auto" and d.get("confidence") == "medium":
+                promoted.append({"tag": d["tag"], "confidence": "high", "source": "user"})
+                changed = True
+            else:
+                promoted.append(d)
+        if changed:
+            set_row_tags(row, promoted)
+
+    if changed:
+        row.updated_at = datetime.utcnow()
+        session.commit()
+
+    # HTMX response: re-render the panel content from fresh deck state.
+    if request.headers.get("HX-Request"):
+        all_rows = (
+            session.query(InventoryRow)
+            .options(joinedload(InventoryRow.card))
+            .filter(
+                InventoryRow.user_id == current_user.id,
+                InventoryRow.storage_location_id == deck.storage_location_id,
+            )
+            .all()
+        )
+        items = _build_review_tag_items(all_rows)
+        return render(
+            request,
+            "_review_tags_panel_content.html",
+            {"deck": deck, "review_tag_items": items},
+        )
+
     return RedirectResponse(url=f"/decks/{deck_id}", status_code=303)
 
 
