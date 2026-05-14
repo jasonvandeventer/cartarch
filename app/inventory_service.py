@@ -1405,6 +1405,10 @@ def confirm_pending_row(
 
     row.storage_location_id = location.id
     row.is_pending = False
+    # Clear the previous-position breadcrumbs — the row is now physically
+    # placed at its new home, so the FROM hints stop being useful.
+    row.from_drawer = None
+    row.from_slot = None
     row.updated_at = datetime.utcnow()
 
     if row.drawer:
@@ -1706,8 +1710,16 @@ def resort_collection(
                 continue
 
             old_drawer = row.drawer
+            old_slot = row.slot
             old_is_pending = row.is_pending
-            new_is_pending = bool(old_is_pending or old_drawer != target_drawer)
+            is_cross_drawer_move = not old_is_pending and old_drawer != target_drawer
+            new_is_pending = bool(old_is_pending or is_cross_drawer_move)
+            # Capture the old position when a placed row is pulled to pending
+            # so the pending page can show the user where to physically pull
+            # the card from. Imported rows (already pending) never had a
+            # previous physical location, so they leave from_drawer NULL.
+            new_from_drawer = old_drawer if is_cross_drawer_move else row.from_drawer
+            new_from_slot = old_slot if is_cross_drawer_move else row.from_slot
 
             bulk_updates.append(
                 {
@@ -1717,6 +1729,8 @@ def resort_collection(
                     "slot": target_slot,
                     "storage_location_id": loc_id,
                     "is_pending": new_is_pending,
+                    "from_drawer": new_from_drawer,
+                    "from_slot": new_from_slot,
                     "updated_at": now,
                 }
             )
@@ -1747,7 +1761,8 @@ def resort_collection(
         text(
             "UPDATE inventory_rows"
             " SET drawer=:drawer, slot=:slot, storage_location_id=:storage_location_id,"
-            "     is_pending=:is_pending, updated_at=:updated_at"
+            "     is_pending=:is_pending, from_drawer=:from_drawer, from_slot=:from_slot,"
+            "     updated_at=:updated_at"
             " WHERE id=:id AND user_id=:user_id"
         ),
         bulk_updates,

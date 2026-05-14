@@ -94,7 +94,7 @@
                   </div>
                   {% if use_drawer_sorter %}
                     <div class="pending-location">
-                      <div class="pending-location-from">FROM: {{ item.current_location_label }}</div>
+                      <div class="pending-location-from">FROM: {{ item.current_location_label }}{% if item.from_slot %} · Slot {{ item.from_slot }}{% endif %}</div>
                       <div class="pending-location-to">TO: {{ item.target_location_label }} · Slot {{ item.slot or '?' }}</div>
                     </div>
                   {% endif %}

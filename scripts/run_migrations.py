@@ -26,6 +26,9 @@ from scripts.migrate_v3_16_1_token_back_set_collector import (
 )
 from scripts.migrate_v3_18_0_inventory_language import main as migrate_v3_18_0_inventory_language
 from scripts.migrate_v3_19_0_inventory_is_proxy import main as migrate_v3_19_0_inventory_is_proxy
+from scripts.migrate_v3_19_1_inventory_from_position import (
+    main as migrate_v3_19_1_inventory_from_position,
+)
 
 
 def _is_applied(name: str) -> bool:
@@ -196,6 +199,13 @@ def run():
         _mark_applied("v3_19_0_inventory_is_proxy")
     else:
         print("v3.19.0 inventory_is_proxy already applied, skipping")
+
+    if not _is_applied("v3_19_1_inventory_from_position"):
+        print("Running v3.19.1 inventory from_drawer/from_slot migration...")
+        migrate_v3_19_1_inventory_from_position()
+        _mark_applied("v3_19_1_inventory_from_position")
+    else:
+        print("v3.19.1 inventory_from_position already applied, skipping")
 
     print("Migration runner complete")
 

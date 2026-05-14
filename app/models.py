@@ -101,6 +101,8 @@ class InventoryRow(Base):
     tags: Mapped[str | None] = mapped_column(Text, nullable=True)
     language: Mapped[str | None] = mapped_column(String(8), nullable=True, default="en", index=True)
     is_proxy: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, index=True)
+    from_drawer: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    from_slot: Mapped[str | None] = mapped_column(String(32), nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
