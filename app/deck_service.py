@@ -203,6 +203,38 @@ _TAG_SET = set(CARD_ROLE_TAGS)
 TAG_CONFIDENCE_VALUES = ("certain", "high", "medium", "low")
 TAG_SOURCE_VALUES = ("user", "auto")
 
+# Numeric rank for threshold comparisons (v3.23.2). Used by
+# `get_row_tags_at_or_above()` so downstream consumers can require
+# tags ≥ a given confidence — filters out low-confidence noise without
+# requiring user-confirmation of every auto-suggestion.
+_CONFIDENCE_RANK: dict[str, int] = {
+    "low": 0,
+    "medium": 1,
+    "high": 2,
+    "certain": 3,
+}
+
+# Per-pattern auto-tagger confidence (v3.23.2). The intrinsic regex patterns
+# (Ramp via _RAMP_*, Draw via _DRAW_RE, Tutor via "search your library for",
+# Removal/Wipe/Protection/Engine/Threat/Hate) are unambiguous oracle-text
+# rules — when they match, the classification is essentially certain.
+# Synergy via `card_matches_theme` is a heuristic over the commander themes
+# and carries a meaningful false-positive risk (a tangential mention of
+# "treasure" doesn't make a card a treasure-deck payoff), so it lands as
+# medium until a user confirms it.
+_AUTO_TAG_CONFIDENCE: dict[str, str] = {
+    "Ramp": "certain",
+    "Draw": "certain",
+    "Tutor": "certain",
+    "Removal": "certain",
+    "Wipe": "certain",
+    "Protection": "certain",
+    "Engine": "certain",
+    "Threat": "certain",
+    "Hate": "certain",
+    "Synergy": "medium",
+}
+
 
 def get_row_tags(row) -> list[str]:
     """Backward-compatible tag-name list. Reads either the legacy
@@ -210,6 +242,23 @@ def get_row_tags(row) -> list[str]:
     just the tag names. All existing consumers keep working unchanged.
     """
     return [entry["tag"] for entry in get_row_tag_details(row)]
+
+
+def get_row_tags_at_or_above(row, min_confidence: str = "medium") -> list[str]:
+    """Return tag names whose confidence meets or exceeds the threshold.
+
+    Default `medium` matches the current downstream-consumer behavior
+    (synergy/health/dead-cards all treat any auto-tag as load-bearing).
+    Future low-confidence patterns (Session E expansions) will land at
+    `low` so they don't poison analytics by default; callers can pass
+    `high` to require user-confirmed (or pattern-certain) tags only.
+    """
+    threshold = _CONFIDENCE_RANK.get(min_confidence, 1)
+    return [
+        d["tag"]
+        for d in get_row_tag_details(row)
+        if _CONFIDENCE_RANK.get(d.get("confidence", "medium"), 1) >= threshold
+    ]
 
 
 def get_row_tag_details(row) -> list[dict]:
@@ -295,24 +344,38 @@ def set_row_tags(
     row.tags = json.dumps(structured) if structured else None
 
 
-def add_auto_tags(row, suggested: list[str]) -> bool:
+def add_auto_tags(row, suggested) -> bool:
     """Union new auto-tagger suggestions into a row's existing tag list.
 
     Preserves existing tag entries (including their confidence/source) so
-    user-confirmed tags don't get downgraded to auto/medium on a retag
-    pass. Newly-added tags (not previously on the row) get
-    `source="auto"`, `confidence="medium"`.
+    user-confirmed tags don't get downgraded on a retag pass. Newly-added
+    tags use per-pattern confidence when `suggested` is `list[dict]` (the
+    v3.23.2+ `suggest_card_roles_with_confidence` output); legacy `list[str]`
+    callers get the old `source="auto", confidence="medium"` default for
+    every entry (matches pre-v3.23.2 behavior — no regression).
 
     Returns True when the row's tags actually changed, False when every
     suggested tag was already present.
     """
     existing = get_row_tag_details(row)
     existing_names = {entry["tag"] for entry in existing}
-    new_entries = [
-        {"tag": t, "confidence": "medium", "source": "auto"}
-        for t in suggested
-        if t in _TAG_SET and t not in existing_names
-    ]
+    new_entries: list[dict] = []
+    for entry in suggested or []:
+        if isinstance(entry, str):
+            if entry in _TAG_SET and entry not in existing_names:
+                new_entries.append({"tag": entry, "confidence": "medium", "source": "auto"})
+                existing_names.add(entry)
+        elif isinstance(entry, dict):
+            tag = entry.get("tag")
+            if isinstance(tag, str) and tag in _TAG_SET and tag not in existing_names:
+                confidence = entry.get("confidence") or "medium"
+                source = entry.get("source") or "auto"
+                if confidence not in TAG_CONFIDENCE_VALUES:
+                    confidence = "medium"
+                if source not in TAG_SOURCE_VALUES:
+                    source = "auto"
+                new_entries.append({"tag": tag, "confidence": confidence, "source": source})
+                existing_names.add(tag)
     if not new_entries:
         return False
     set_row_tags(row, existing + new_entries)
@@ -377,6 +440,34 @@ def suggest_card_roles(card, themes: dict | None = None) -> list[str]:
         if synergy_match:
             suggestions.append("Synergy")
     return suggestions
+
+
+def suggest_card_roles_with_confidence(card, themes: dict | None = None) -> list[dict]:
+    """Return auto-tagger suggestions as structured `{tag, confidence, source}` dicts.
+
+    Each tag's confidence is looked up in `_AUTO_TAG_CONFIDENCE` — intrinsic
+    patterns (Ramp / Draw / Tutor / Removal / Wipe / Protection / Engine /
+    Threat / Hate) are `certain` because they fire on unambiguous oracle
+    text. Synergy is `medium` because it's a heuristic over commander themes
+    and can produce false positives on tangential keyword mentions.
+
+    Source is always `auto`. Callers pass the result directly to
+    `set_row_tags(row, result)` — per-entry confidence/source wins over
+    the function's default kwargs.
+
+    Use this instead of `suggest_card_roles` when writing tags. Reads (the
+    tag-editor suggestion checklist, audit script, etc.) keep using
+    `suggest_card_roles` for just the names.
+    """
+    names = suggest_card_roles(card, themes=themes)
+    return [
+        {
+            "tag": name,
+            "confidence": _AUTO_TAG_CONFIDENCE.get(name, "medium"),
+            "source": "auto",
+        }
+        for name in names
+    ]
 
 
 _TYPE_ORDER = [
@@ -692,7 +783,7 @@ def compute_consistency(rows: list) -> dict:
         tl = (card.type_line or "").lower()
         is_land = "land" in tl
         is_basic = "basic land" in tl
-        tags = get_row_tags(row)
+        tags = get_row_tags_at_or_above(row, "medium")
 
         if not is_land and card.cmc is not None:
             spell_cmcs.extend([card.cmc] * row.quantity)
@@ -799,7 +890,7 @@ def compute_deck_health(rows: list) -> dict:
         is_land = "land" in type_line
         is_basic = "basic land" in type_line
         qty = row.quantity
-        tags = get_row_tags(row)
+        tags = get_row_tags_at_or_above(row, "medium")
 
         if not is_land and card.mana_cost:
             for color in ("W", "U", "B", "R", "G"):
@@ -1301,7 +1392,7 @@ def compute_deck_synergy(all_rows: list, combos: dict) -> dict | None:
         if not card:
             continue
         name = card.name or ""
-        tags = get_row_tags(row)
+        tags = get_row_tags_at_or_above(row, "medium")
         tl = card.type_line or ""
 
         is_direct = (
@@ -1379,7 +1470,7 @@ def compute_dead_cards(all_rows: list, synergy: dict | None) -> list[dict] | Non
         card = row.card
         if not card or card.name not in unrelated_names:
             continue
-        if get_row_tags(row):
+        if get_row_tags_at_or_above(row, "medium"):
             continue
 
         oracle = (card.oracle_text or "").lower()

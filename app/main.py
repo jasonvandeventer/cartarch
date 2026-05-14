@@ -65,6 +65,7 @@ from app.deck_service import (
     return_card_from_deck,
     set_row_tags,
     suggest_card_roles,
+    suggest_card_roles_with_confidence,
     switch_deck_row_printing,
     update_deck,
 )
@@ -2632,12 +2633,12 @@ def deck_detail_page(
         )
         _auto_tagged = False
         for _row in _untagged:
-            _suggested = suggest_card_roles(_row.card, themes=_themes)
+            # v3.23.2: per-pattern confidence — intrinsic role tags emit as
+            # auto/certain (unambiguous oracle-text rules), Synergy emits as
+            # auto/medium (themes-match heuristic with false-positive risk).
+            _suggested = suggest_card_roles_with_confidence(_row.card, themes=_themes)
             if _suggested:
-                # First-time auto-tag for a NULL-tag row: emit at auto/medium
-                # so it shows up in the review queue (v3.24.0) and downstream
-                # consumers can filter on confidence (v3.25.0).
-                set_row_tags(_row, _suggested, source="auto", confidence="medium")
+                set_row_tags(_row, _suggested)
                 _auto_tagged = True
         if _auto_tagged:
             session.commit()
@@ -3438,11 +3439,11 @@ def decks_retag(
 
     changed = False
     for row in rows:
-        suggested = suggest_card_roles(row.card, themes=themes)
-        # add_auto_tags unions new suggestions WITHOUT downgrading the
-        # confidence/source of tags the user has already confirmed —
-        # important now that the structured tag schema (v3.22.0) tracks
-        # those values per tag.
+        # v3.23.2: use structured per-pattern confidence so the Retag pass
+        # emits intrinsic role tags as auto/certain and Synergy as
+        # auto/medium. add_auto_tags reads per-entry confidence from the
+        # dict shape and preserves user-confirmed tags unchanged.
+        suggested = suggest_card_roles_with_confidence(row.card, themes=themes)
         if add_auto_tags(row, suggested):
             changed = True
 
