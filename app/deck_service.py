@@ -38,6 +38,9 @@ _RAMP_NON_LAND_RE = re.compile(
 )
 _DRAW_RE = re.compile(
     r"\bdraws? (?:a|an|x|\d+|two|three|four|five|six|seven|that many|an additional)\b.{0,30}\bcards?\b"
+    # "Draw cards equal to that creature's power" — Greater Good, Life's Legacy.
+    # No quantifier between "draw" and "cards"; the existing pattern requires one.
+    r"|\bdraws? cards? equal to\b"
     r"|exile the top (?:\w+ )?cards?.{0,80}(?:may )?(?:cast|play)"
     r"|each player draws"
     r"|(?:reveal|look at) the top \w+ cards?.{0,80}put .{0,30}into your hand",
@@ -120,6 +123,22 @@ _THREAT_RE = re.compile(
     r"|\binfect\b"
     r"|\btoxic \d+\b"
     r"|\bextra (?:combat phase|turn)\b",
+    re.IGNORECASE,
+)
+# Death-trigger drain payoffs — Blood Artist, Zulaport Cutthroat, Syr Konrad,
+# Vindictive Vampire, Bastion of Remembrance, Mirkwood Bats, etc. These are the
+# deliberate wincons in aristocrats decks: every creature death pings opponents
+# until they die. Pattern: "whenever <anything> creature <anything> dies
+# <anything> <drain consequence>". Trigger must contain both "creature" and
+# "dies" so ETB pingers (Impact Tremors), attack/combat triggers, and life-gain
+# triggers (Marauding Blight-Priest) don't false-positive into Threat. The
+# `[^.]` clamp keeps matches within a single sentence.
+_DEATH_TRIGGER_DRAIN_RE = re.compile(
+    r"whenever [^.]{0,80}\bcreature[^.]{0,40}\bdies\b[^.]{0,80}"
+    r"(?:deals? \d+ damage to (?:each opponent|target|any target)"
+    r"|each opponent loses \d+ life"
+    r"|target opponent loses \d+ life"
+    r"|target player loses \d+ life)",
     re.IGNORECASE,
 )
 # Disruption against opponents: graveyard hate, opp-stax, draw hate, stop-effects,
@@ -337,6 +356,8 @@ def suggest_card_roles(card, themes: dict | None = None) -> list[str]:
     if _ENGINE_RE.search(oracle):
         suggestions.append("Engine")
     if _THREAT_RE.search(oracle):
+        suggestions.append("Threat")
+    elif _DEATH_TRIGGER_DRAIN_RE.search(oracle):
         suggestions.append("Threat")
     if _HATE_RE.search(oracle):
         suggestions.append("Hate")
@@ -995,6 +1016,17 @@ def card_matches_theme(card, themes: dict) -> bool:
         return True
     if "death_triggers" in themes["mechanics"] and re.search(
         r"when(?:ever)?[^.;]*\bdies\b", oracle
+    ):
+        return True
+    # Death-triggers decks synergize with cards that force sacrifices — every
+    # forced sac causes a death trigger. Catches Demon's Disciple, Plaguecrafter,
+    # Fleshbag Marauder. Restricted to forced-sac wording ("each player /
+    # opponent / target opponent sacrifices …") so self-sac costs on your own
+    # cards don't double-fire here (they already match via "sacrifice" mechanic
+    # when extracted).
+    if "death_triggers" in themes["mechanics"] and re.search(
+        r"(?:each player|target opponent|opponents?)\s+sacrifices?\s+(?:a|an|another)",
+        oracle,
     ):
         return True
 
