@@ -891,6 +891,229 @@ _CMC_MIN_RE = re.compile(r"mana value (?:of )?(\d+) or greater")
 _CMC_MAX_RE = re.compile(r"mana value (?:of )?(\d+) or less")
 _NON_SUBTYPE_RE = re.compile(r"\bnon-([A-Z][a-z]+)")
 
+# === Data-driven theme detectors (v3.23.1) — per docs/tag_system_overhaul.md §2.4 ===
+#
+# Each theme entry carries:
+#   commander_pattern — fired against commander oracle. When it matches, the
+#       theme name is added to `themes["mechanics"]` and `signal_label` is
+#       appended to `themes["signals"]`.
+#   card_include — fired against candidate card oracle in `card_matches_theme`.
+#       Looser than commander_pattern: the commander needs a strong cue
+#       ("Whenever you gain life"), but a candidate card just needs to
+#       participate in the theme ("gain 1 life", "lifelink").
+#   card_exclude — optional regex; when it matches, the card is rejected as
+#       Synergy even if card_include matched. Per §2.5 precision work, this
+#       blocks removal-on-opponent wording from polluting sacrifice/lifegain
+#       synergy classification.
+#   signal_label — human-readable string shown in the "Detected:" panel.
+#
+# Existing six mechanics (counters / tokens / graveyard / sacrifice / discard /
+# death_triggers) stay as inline branches further down. They're not migrated
+# here — the audit baseline is built on them, and rewriting them risks
+# regression. New themes go through the data-driven path; future additions
+# only need a new dict entry.
+_THEME_DETECTORS: dict[str, dict] = {
+    "lifegain": {
+        # Commander must have an explicit lifegain-payoff trigger. Bare
+        # "lifelink" on tokens (Teysa) is NOT a deckbuilding-around-lifegain
+        # signal — it's an incidental keyword grant. The lifegain theme should
+        # only fire for Soul-Sisters / Karlov / Trelasarra-style commanders
+        # that deliberately reward life gained as a recurring effect.
+        "commander_pattern": re.compile(
+            r"\bwhenever you gain (?:any amount of )?life\b"
+            r"|\byou gained \d+ or more life\b"
+            r"|\bfor each \d+ life you gained\b",
+            re.IGNORECASE,
+        ),
+        "card_include": re.compile(
+            r"\bgains? \d+ life\b"
+            r"|\bwhenever you gain (?:any amount of )?life\b"
+            r"|\bif you would gain life\b"
+            r"|\blifelink\b"
+            r"|\bgain life equal to\b",
+            re.IGNORECASE,
+        ),
+        # Pure opponent-life-loss effects ("each opponent loses N life") aren't
+        # lifegain synergy — they're drain wincons captured by Threat already.
+        # Allow co-mention (Blood Artist style: "target player loses 1 life
+        # AND you gain 1 life") via the include pattern still matching.
+        "card_exclude": None,
+        "signal_label": "lifegain",
+    },
+    "food": {
+        "commander_pattern": re.compile(r"\bfoods?\b", re.IGNORECASE),
+        "card_include": re.compile(r"\bfoods?\b", re.IGNORECASE),
+        "card_exclude": None,
+        "signal_label": "food",
+    },
+    "treasure": {
+        "commander_pattern": re.compile(r"\btreasures?\b", re.IGNORECASE),
+        "card_include": re.compile(r"\btreasures?\b", re.IGNORECASE),
+        "card_exclude": None,
+        "signal_label": "treasure",
+    },
+    "clue": {
+        # Plural form matters for commanders like Lonis ("Sacrifice X clues").
+        # Card-side also catches "investigate" since investigate creates a Clue
+        # token and is the canonical signal for Clue-theme participation.
+        "commander_pattern": re.compile(r"\bclues?\b|\binvestigate\b", re.IGNORECASE),
+        "card_include": re.compile(r"\bclues?\b|\binvestigate\b", re.IGNORECASE),
+        "card_exclude": None,
+        "signal_label": "clue",
+    },
+    "blood": {
+        # "Blood token" specifically — "blood" alone is too noisy
+        # (Vampires / "blood counter" / lore text "blood of his enemies").
+        "commander_pattern": re.compile(r"\bblood tokens?\b", re.IGNORECASE),
+        "card_include": re.compile(r"\bblood tokens?\b", re.IGNORECASE),
+        "card_exclude": None,
+        "signal_label": "blood",
+    },
+    "ring": {
+        "commander_pattern": re.compile(
+            r"\bthe ring tempts you\b|\bring-bearer\b|\byour ring-bearer\b",
+            re.IGNORECASE,
+        ),
+        "card_include": re.compile(
+            r"\bthe ring tempts you\b|\bring-bearer\b",
+            re.IGNORECASE,
+        ),
+        "card_exclude": None,
+        "signal_label": "ring",
+    },
+    "minus_one_counters": {
+        "commander_pattern": re.compile(r"-1/-1 counter", re.IGNORECASE),
+        "card_include": re.compile(r"-1/-1 counter", re.IGNORECASE),
+        "card_exclude": None,
+        "signal_label": "-1/-1 counters",
+    },
+    "spells_cast": {
+        "commander_pattern": re.compile(
+            r"\bwhenever you cast (?:a|an|your)\b"
+            r"|\bspells you cast cost\b"
+            r"|\bstorm\b"
+            r"|\bprowess\b"
+            r"|\bmagecraft\b",
+            re.IGNORECASE,
+        ),
+        "card_include": re.compile(
+            r"\bwhenever you cast (?:a|an|your)\b"
+            r"|\bspells you cast cost\b"
+            r"|\bstorm\b"
+            r"|\bprowess\b"
+            r"|\bmagecraft\b"
+            r"|\bcopy that spell\b"
+            r"|\bwhenever you cast (?:a|an|your)[^.]{0,40}spell\b",
+            re.IGNORECASE,
+        ),
+        "card_exclude": None,
+        "signal_label": "spells you cast",
+    },
+    "landfall": {
+        "commander_pattern": re.compile(
+            r"\blandfall\b"
+            r"|\bwhenever a land enters\b"
+            r"|\bwhenever a land you control enters\b"
+            r"|\blands you control enter\b",
+            re.IGNORECASE,
+        ),
+        "card_include": re.compile(
+            r"\blandfall\b"
+            r"|\bwhenever a land (?:you control )?enters\b"
+            r"|\blands you control enter\b"
+            r"|\bplay an additional land\b"
+            r"|\bput[^.]{0,30}\bland[^.]{0,40}onto the battlefield\b",
+            re.IGNORECASE,
+        ),
+        "card_exclude": None,
+        "signal_label": "landfall",
+    },
+    "attack": {
+        # Wider than "Whenever a creature attacks" — commanders also use:
+        #   "Whenever <name> attacks" (Magda)
+        #   "When <name> enters or attacks" (Sam, Loyal Attendant)
+        #   "Whenever you attack" (newer wording)
+        # The 0-80 char window between when(ever) and "attacks" allows any
+        # subject phrasing while staying inside a single sentence.
+        "commander_pattern": re.compile(
+            r"\bwhen(?:ever)? [^.;]{0,80}\battacks?\b"
+            r"|\battacking creatures? (?:you control )?(?:gets?|have)\b"
+            r"|\battacking creatures? you control\b"
+            r"|\bcreatures? you control have menace\b",
+            re.IGNORECASE,
+        ),
+        "card_include": re.compile(
+            r"\bwhen(?:ever)? [^.;]{0,80}\battacks?\b"
+            r"|\battacking creatures? (?:you control )?gets?\b"
+            r"|\bcreatures? you control (?:have menace|have trample|have double strike|gain trample)\b"
+            r"|\b(?:can'?t|cannot) be blocked\b",
+            re.IGNORECASE,
+        ),
+        "card_exclude": None,
+        "signal_label": "attack triggers",
+    },
+    "blocking": {
+        "commander_pattern": re.compile(
+            r"\bwhenever (?:a |\w+ )?creatures? (?:you control )?blocks?\b"
+            r"|\bwhenever (?:a |\w+ )?creatures? (?:you control )?is blocked\b",
+            re.IGNORECASE,
+        ),
+        "card_include": re.compile(
+            r"\bwhenever (?:a |\w+ )?creatures? (?:you control )?blocks?\b"
+            r"|\b(?:can(?: also)?|may) block (?:an additional|two|any number)\b",
+            re.IGNORECASE,
+        ),
+        "card_exclude": None,
+        "signal_label": "blocking",
+    },
+    "equip": {
+        "commander_pattern": re.compile(
+            r"\bequipped creature\b"
+            r"|\bequipment you control\b"
+            r"|\battached creature\b"
+            r"|\bwhenever equipment becomes attached\b",
+            re.IGNORECASE,
+        ),
+        "card_include": re.compile(
+            r"\bequipment\b" r"|\bequipped creature\b" r"|\bequip[ —]\{",
+            re.IGNORECASE,
+        ),
+        "card_exclude": None,
+        "signal_label": "equip",
+    },
+    "aura": {
+        "commander_pattern": re.compile(
+            r"\benchanted creature\b"
+            r"|\bauras? you control\b"
+            r"|\bwhenever an aura\b"
+            r"|\benchant creature\b",
+            re.IGNORECASE,
+        ),
+        "card_include": re.compile(
+            r"\bauras?\b" r"|\benchanted creature\b" r"|\benchant creature\b",
+            re.IGNORECASE,
+        ),
+        "card_exclude": None,
+        "signal_label": "aura",
+    },
+    "energy": {
+        # Energy counters use the {E} mana-symbol-style notation. Match either
+        # the spelled-out form or the symbol.
+        "commander_pattern": re.compile(r"\benergy counter\b|\{e\}", re.IGNORECASE),
+        "card_include": re.compile(r"\benergy counter\b|\{e\}", re.IGNORECASE),
+        "card_exclude": None,
+        "signal_label": "energy",
+    },
+    "saga": {
+        # "Saga" appears in the type line of Saga cards, but commanders that
+        # care about sagas mention them in oracle text.
+        "commander_pattern": re.compile(r"\bsagas?\b|\blore counters?\b", re.IGNORECASE),
+        "card_include": re.compile(r"\bsagas?\b|\blore counters?\b", re.IGNORECASE),
+        "card_exclude": None,
+        "signal_label": "saga",
+    },
+}
+
 
 def extract_commander_themes(commander_rows: list) -> dict:
     """Parse commander oracle text to extract what the deck is built to care about."""
@@ -966,6 +1189,12 @@ def extract_commander_themes(commander_rows: list) -> dict:
             mechanics.add("death_triggers")
             signals.append("death triggers")
 
+        # Data-driven theme detection (v3.23.1) — see _THEME_DETECTORS docstring.
+        for theme_name, det in _THEME_DETECTORS.items():
+            if det["commander_pattern"].search(oracle):
+                mechanics.add(theme_name)
+                signals.append(det["signal_label"])
+
     return {
         "card_types": card_types,
         "excluded_subtypes": excluded_subtypes,
@@ -1028,6 +1257,20 @@ def card_matches_theme(card, themes: dict) -> bool:
         r"(?:each player|target opponent|opponents?)\s+sacrifices?\s+(?:a|an|another)",
         oracle,
     ):
+        return True
+
+    # Data-driven theme matching (v3.23.1) — handles the 15 new themes added
+    # in _THEME_DETECTORS. For each theme that's in this deck's mechanics, the
+    # candidate must match card_include AND not match card_exclude.
+    for theme_name in themes["mechanics"]:
+        det = _THEME_DETECTORS.get(theme_name)
+        if not det:
+            continue
+        if not det["card_include"].search(oracle):
+            continue
+        excl = det.get("card_exclude")
+        if excl is not None and excl.search(oracle):
+            continue
         return True
 
     return False
