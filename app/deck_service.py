@@ -102,27 +102,65 @@ _PROTECTION_RE = re.compile(
     r"|regenerate target",
     re.IGNORECASE,
 )
-# Sac outlets (activation cost includes sacrifice — colon-delimited) and graveyard
-# recursion engines. Colon-only avoids matching Bargain-style cast costs ("sacrifice
-# an artifact, enchantment, or token as you cast this spell"). Recursion catches
-# Reassembling Skeleton, Junji-style, and Victimize-style ("creature cards in
-# your graveyard ... return ... to the battlefield") wordings.
+# Engine recognizers. The first three were the original v3.x set:
+#   1) Sac outlets — activation cost includes sacrifice, colon-delimited. The
+#      colon avoids matching Bargain-style cast costs ("sacrifice X as you cast
+#      this spell").
+#   2) Graveyard recursion — Reanimate / Sun Titan / Phyrexian Reclamation
+#      shape.
+#   3) Recursion via "creature cards in your graveyard" subject — Victimize,
+#      Twilight's Call, Living Death.
+# v3.23.4 audit-driven additions (#3 in docs/tag_audit_findings.md):
+#   4) Cast-trigger token engines — Primeval Bounty / Mondrak ("Whenever you
+#      cast a … spell, create a … token").
+#   5) ETB-trigger token engines — Tireless Provisioner / Hangarback Walker
+#      ("Whenever a land enters under your control, create a Treasure token").
+#   6) Free-cast effects — Sunbird's Invocation / Bolas's Citadel ("you may
+#      cast a … without paying its mana cost"). The subject restriction
+#      (`that|a|an|target|the chosen|those|them`) avoids matching Force of
+#      Will-style alternate costs where the subject is the spell itself.
+#   7) Trigger-based draw on creature death — Grim Haruspex / Dark Prophecy
+#      ("Whenever … creature … dies … draw a card"). Distinct from Skullclamp
+#      (one-time "When" trigger on a specific creature, already gets Draw).
+#   8) Non-graveyard recursion — Luminous Broodmoth / Adarkar Valkyrie
+#      ("Whenever … creature … dies … return … to the battlefield"). One-shot
+#      reanimate spells (Reanimate, Animate Dead) use "Return target creature
+#      card from your graveyard" wording — those match (2) above, not (8).
 _ENGINE_RE = re.compile(
     r"\bsacrifice (?:a|an|another)\s+(?:[\w'-]+\s+){0,3}(?:creature|permanent|artifact|token|treasure|food|clue|blood)\s*:"
     r"|(?:return|put) [^.]{0,80}from [^.]{0,30}graveyards?[^.]{0,30}(?:to|onto) the battlefield"
-    r"|(?:creature|permanent) cards? in your graveyard.{0,80}return [^.]{0,80}(?:to|onto) the battlefield",
+    r"|(?:creature|permanent) cards? in your graveyard.{0,80}return [^.]{0,80}(?:to|onto) the battlefield"
+    r"|\bwhenever you cast (?:a|an|your)[^.]{0,40}\bcreate\b"
+    r"|\bwhenever (?:a|an|another)[^.]{0,40}\benters\b[^.]{0,40}\bcreate\b"
+    r"|\b(?:cast|play) (?:that|a|an?|the chosen|target|those|them)[^.]{0,80}without paying (?:its|their) mana costs?\b"
+    r"|\bwhenever [^.]{0,40}creatures?[^.]{0,40}\bdies\b[^.]{0,60}draw (?:a card|\w+ cards?|cards? equal)"
+    r"|\bwhen(?:ever)? [^.]{0,40}\bcreature[^.]{0,40}\bdies\b[^.]{0,60}return [^.]{0,40}to the battlefield",
     re.IGNORECASE,
 )
 # Hard threat indicators only. Power/toughness aren't in the Card model so
 # soft "this is a big creature" threats are missed by design — manual tagging.
 # Per-trigger drains ("each opponent loses 1 life") and free-cast tutors
 # ("cast without paying") were dropped — too noisy.
+# v3.23.4 audit-driven additions (#4 in docs/tag_audit_findings.md):
+#   - Damage doublers — Gratuitous Violence, Furnace of Rath, Fiery
+#     Emancipation, Wound Reflection ("deals double that damage", "double the
+#     damage").
+#   - P/T doublers — Unnatural Growth ("double the power and toughness").
+#     The "(?:power and toughness|power|toughness)" suffix excludes
+#     "double the amount of mana" (Doubling Cube — ramp, not threat).
+#   - ETB damage equal to power — Terror of the Peaks / Warstorm Surge. The
+#     `enters … damage to … equal to … power` shape is specific enough that
+#     Lightning Bolt-style direct-damage spells don't false-positive.
 _THREAT_RE = re.compile(
     r"\byou win the game\b"
     r"|(?:target |each |that )?(?:opponents?|players?)\s+loses? the game\b"
     r"|\binfect\b"
     r"|\btoxic \d+\b"
-    r"|\bextra (?:combat phase|turn)\b",
+    r"|\bextra (?:combat phase|turn)\b"
+    r"|\bdeals? double that (?:much )?damage\b"
+    r"|\b(?:double|triple) (?:the |that )?(?:amount of )?damage\b"
+    r"|\bdouble the (?:power and toughness|power|toughness)\b"
+    r"|\bwhenever [^.]{0,60}\benters\b[^.]{0,80}\bdamage to (?:any target|target)[^.]{0,40}\bequal to (?:its|that creature'?s) power\b",
     re.IGNORECASE,
 )
 # Death-trigger drain payoffs — Blood Artist, Zulaport Cutthroat, Syr Konrad,
