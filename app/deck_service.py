@@ -164,20 +164,140 @@ CARD_ROLE_TAGS = [
 
 _TAG_SET = set(CARD_ROLE_TAGS)
 
+# Tag-detail schema (v3.22.0 onward):
+#   InventoryRow.tags stores a JSON list of dicts:
+#     [{"tag": "Ramp", "confidence": "medium", "source": "auto"}, ...]
+#   Older rows store the legacy shape (list[str]) until the migration runs,
+#   and `get_row_tags` / `get_row_tag_details` read both shapes transparently.
+#
+# Valid confidence values:
+#   - "certain"  — unambiguous oracle-text rule (e.g. "Search your library
+#                  for any card" → Tutor). Reserved for pattern-specific
+#                  high-confidence rules (Session 2 will assign these).
+#   - "high"     — user-confirmed, OR a community-consensus pattern.
+#   - "medium"   — auto-tagger guess, context-dependent.
+#   - "low"      — weak match; downstream consumers should ignore by default.
+#
+# Valid source values:
+#   - "user"     — explicit edit via the tag editor (highest authority).
+#   - "auto"     — produced by `suggest_card_roles`.
+TAG_CONFIDENCE_VALUES = ("certain", "high", "medium", "low")
+TAG_SOURCE_VALUES = ("user", "auto")
+
 
 def get_row_tags(row) -> list[str]:
+    """Backward-compatible tag-name list. Reads either the legacy
+    `["Ramp", "Draw"]` shape or the v3.22.0 structured shape and returns
+    just the tag names. All existing consumers keep working unchanged.
+    """
+    return [entry["tag"] for entry in get_row_tag_details(row)]
+
+
+def get_row_tag_details(row) -> list[dict]:
+    """Full structured tag list: each entry is `{tag, confidence, source}`.
+
+    Reads either the legacy list-of-strings shape (defaulting to
+    user/high — the safest assumption for pre-migration data the user
+    has been seeing in the UI without complaint) or the new dict shape.
+    Unknown tag names are skipped silently.
+    """
     if not row.tags:
         return []
     try:
         raw = json.loads(row.tags)
     except (json.JSONDecodeError, TypeError):
         return []
-    return [t for t in raw if t in _TAG_SET]
+    if not isinstance(raw, list):
+        return []
+    out: list[dict] = []
+    for entry in raw:
+        if isinstance(entry, str):
+            if entry in _TAG_SET:
+                out.append({"tag": entry, "confidence": "high", "source": "user"})
+        elif isinstance(entry, dict):
+            tag = entry.get("tag")
+            if isinstance(tag, str) and tag in _TAG_SET:
+                confidence = entry.get("confidence") or "medium"
+                source = entry.get("source") or "auto"
+                if confidence not in TAG_CONFIDENCE_VALUES:
+                    confidence = "medium"
+                if source not in TAG_SOURCE_VALUES:
+                    source = "auto"
+                out.append({"tag": tag, "confidence": confidence, "source": source})
+    return out
 
 
-def set_row_tags(row, tags: list[str]) -> None:
-    valid = sorted({t for t in tags if t in _TAG_SET})
-    row.tags = json.dumps(valid) if valid else None
+def set_row_tags(
+    row,
+    tags,
+    *,
+    source: str = "user",
+    confidence: str = "high",
+) -> None:
+    """Write tags to a row in the v3.22.0 structured shape.
+
+    Accepts either:
+      - list[str]    — legacy callers; each tag is wrapped with the kwargs'
+        `source` + `confidence`. Default user/high matches the explicit-edit
+        flow (the existing tag editor form, which still sends `list[str]`).
+        Auto-tagger callers should pass `source="auto", confidence="medium"`.
+      - list[dict]   — new callers; each entry's own `confidence`/`source`
+        wins, falling back to the kwargs defaults if a field is missing.
+
+    Duplicate tag names are deduplicated keeping the FIRST occurrence (so
+    a caller passing a mix of dict + string forms gets a deterministic
+    result). Output is sorted by tag name for stable JSON.
+    """
+    if source not in TAG_SOURCE_VALUES:
+        source = "user"
+    if confidence not in TAG_CONFIDENCE_VALUES:
+        confidence = "high"
+
+    seen: set[str] = set()
+    structured: list[dict] = []
+    for entry in tags or []:
+        if isinstance(entry, str):
+            if entry in _TAG_SET and entry not in seen:
+                seen.add(entry)
+                structured.append({"tag": entry, "confidence": confidence, "source": source})
+        elif isinstance(entry, dict):
+            tag = entry.get("tag")
+            if isinstance(tag, str) and tag in _TAG_SET and tag not in seen:
+                seen.add(tag)
+                c = entry.get("confidence") or confidence
+                s = entry.get("source") or source
+                if c not in TAG_CONFIDENCE_VALUES:
+                    c = confidence
+                if s not in TAG_SOURCE_VALUES:
+                    s = source
+                structured.append({"tag": tag, "confidence": c, "source": s})
+
+    structured.sort(key=lambda d: d["tag"])
+    row.tags = json.dumps(structured) if structured else None
+
+
+def add_auto_tags(row, suggested: list[str]) -> bool:
+    """Union new auto-tagger suggestions into a row's existing tag list.
+
+    Preserves existing tag entries (including their confidence/source) so
+    user-confirmed tags don't get downgraded to auto/medium on a retag
+    pass. Newly-added tags (not previously on the row) get
+    `source="auto"`, `confidence="medium"`.
+
+    Returns True when the row's tags actually changed, False when every
+    suggested tag was already present.
+    """
+    existing = get_row_tag_details(row)
+    existing_names = {entry["tag"] for entry in existing}
+    new_entries = [
+        {"tag": t, "confidence": "medium", "source": "auto"}
+        for t in suggested
+        if t in _TAG_SET and t not in existing_names
+    ]
+    if not new_entries:
+        return False
+    set_row_tags(row, existing + new_entries)
+    return True
 
 
 def get_card_legality(card, format_name: str) -> str | None:

@@ -40,6 +40,7 @@ from app.deck_service import (
     CARD_ROLE_TAGS,
     DECK_GROUP_BY_OPTIONS,
     DECK_VIEW_MODES,
+    add_auto_tags,
     bump_deck_row_quantity,
     compute_consistency,
     compute_dead_cards,
@@ -55,6 +56,7 @@ from app.deck_service import (
     find_inventory_matches_for_deck_import,
     get_card_legality,
     get_deck,
+    get_row_tag_details,
     get_row_tags,
     group_deck_items,
     list_decks,
@@ -2563,6 +2565,7 @@ def _build_deck_card_items(
                 "total_value": row_total,
                 "role": row.role,
                 "tags": get_row_tags(row),
+                "tag_details": get_row_tag_details(row),
                 "suggested_tags": suggest_card_roles(row.card, themes=themes),
                 "legality_status": get_card_legality(row.card, deck.format),
             }
@@ -2631,7 +2634,10 @@ def deck_detail_page(
         for _row in _untagged:
             _suggested = suggest_card_roles(_row.card, themes=_themes)
             if _suggested:
-                set_row_tags(_row, _suggested)
+                # First-time auto-tag for a NULL-tag row: emit at auto/medium
+                # so it shows up in the review queue (v3.24.0) and downstream
+                # consumers can filter on confidence (v3.25.0).
+                set_row_tags(_row, _suggested, source="auto", confidence="medium")
                 _auto_tagged = True
         if _auto_tagged:
             session.commit()
@@ -3433,10 +3439,11 @@ def decks_retag(
     changed = False
     for row in rows:
         suggested = suggest_card_roles(row.card, themes=themes)
-        existing = get_row_tags(row)
-        merged = sorted(set(suggested) | set(existing))
-        if set(merged) != set(existing):
-            set_row_tags(row, merged)
+        # add_auto_tags unions new suggestions WITHOUT downgrading the
+        # confidence/source of tags the user has already confirmed —
+        # important now that the structured tag schema (v3.22.0) tracks
+        # those values per tag.
+        if add_auto_tags(row, suggested):
             changed = True
 
     if changed:

@@ -200,9 +200,19 @@
         {% endif %}
         {% set row_tags = item.get('tags', []) %}
         {% set suggestions = item.get('suggested_tags', []) %}
-        {% if row_tags %}
+        {# tag_details carries the v3.22.0 structured form ({tag, confidence,
+           source}); the older `tags` string list is kept alongside for the
+           tag-editor checkbox state below. Only the deck-detail item
+           builder (`_build_deck_card_items`) populates tag_details, and
+           that's the only path that flips `show_deck_actions=true`, so
+           a missing tag_details means the row has no tags either. #}
+        {% set tag_details = item.get('tag_details', []) %}
+        {% if tag_details %}
           <div class="card-tag-row">
-            {% for tag in row_tags %}<span class="card-tag card-tag-{{ tag|lower }}">{{ tag }}</span>{% endfor %}
+            {% for entry in tag_details %}
+              <span class="card-tag card-tag-{{ entry.tag|lower }} tag-source-{{ entry.source }} tag-conf-{{ entry.confidence }}"
+                    title="{{ entry.source|capitalize }} · {{ entry.confidence|capitalize }} confidence">{{ entry.tag }}</span>
+            {% endfor %}
           </div>
         {% endif %}
         <details class="card-actions-drawer">

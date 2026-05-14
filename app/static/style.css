@@ -1698,6 +1698,26 @@ td {
 .card-tag-hate {
   background: #4a5060;
 }
+
+/* Tag source / confidence indicators (v3.22.0).
+   User-confirmed tags read at full opacity with solid borders — the default.
+   Auto-tagged tags get a dashed inner border + slight opacity drop so they
+   read as "system-suggested, not yet confirmed" at a glance without
+   adding decorative iconography. Tooltips on the badges (set in the
+   template) give the full source/confidence story on hover.
+   Session 2+ will start producing `low`-confidence tags; that case
+   subdues further. */
+.card-tag.tag-source-user {
+  border: 1px solid rgba(255, 255, 255, 0.18);
+}
+.card-tag.tag-source-auto {
+  border: 1px dashed rgba(255, 255, 255, 0.35);
+  opacity: 0.78;
+}
+.card-tag.tag-conf-low {
+  opacity: 0.55;
+}
+
 .legality-badge {
   display: inline-block;
   font-size: 0.7rem;

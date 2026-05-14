@@ -35,6 +35,9 @@ from scripts.migrate_v3_19_2_backfill_from_position import (
 from scripts.migrate_v3_20_0_user_deck_view_prefs import (
     main as migrate_v3_20_0_user_deck_view_prefs,
 )
+from scripts.migrate_v3_22_0_tag_confidence_model import (
+    main as migrate_v3_22_0_tag_confidence_model,
+)
 
 
 def _is_applied(name: str) -> bool:
@@ -226,6 +229,13 @@ def run():
         _mark_applied("v3_20_0_user_deck_view_prefs")
     else:
         print("v3.20.0 user_deck_view_prefs already applied, skipping")
+
+    if not _is_applied("v3_22_0_tag_confidence_model"):
+        print("Running v3.22.0 tag confidence model migration...")
+        migrate_v3_22_0_tag_confidence_model()
+        _mark_applied("v3_22_0_tag_confidence_model")
+    else:
+        print("v3.22.0 tag_confidence_model already applied, skipping")
 
     print("Migration runner complete")
 
