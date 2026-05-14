@@ -2426,7 +2426,7 @@ async def decks_create(
 
 _VALID_HEALTH_FILTERS = {"ramp", "draw", "removal", "wipes"}
 
-_PANELS_CACHE_VERSION = 2
+_PANELS_CACHE_VERSION = 3
 _PANELS_CACHE_DIR = DATA_DIR / "panels_cache"
 _panels_memory: dict[str, dict] = {}  # in-process cache; survives navigation, cleared on reload
 

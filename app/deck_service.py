@@ -1318,6 +1318,88 @@ def extract_commander_themes(commander_rows: list) -> dict:
             mechanics.add("death_triggers")
             signals.append("death triggers")
 
+        # Counter-type specificity (v3.23.5). Generic "counters" above stays for
+        # back-compat with non-P/T counter themes (charge / loyalty / time / etc.)
+        # — these specific themes add a parallel classification so cluster
+        # matching in card_matches_theme can hit related keyword mechanics.
+        if re.search(r"\+1/\+1 counters?\b", oracle):
+            mechanics.add("plus_one_plus_one_counters")
+            signals.append("+1/+1 counters")
+        if re.search(r"-1/-1 counters?\b", oracle):
+            mechanics.add("minus_one_minus_one_counters")
+            signals.append("-1/-1 counters")
+
+        # Counter-related keywords (v3.23.5). Each implies a specific counter
+        # cluster: proliferate touches any existing counter (broad);
+        # wither/infect/blight write -1/-1 counters; undying writes +1/+1
+        # counters; persist writes -1/-1 (and synergizes with +1/+1 via
+        # cancellation, hence cross-cluster matching in card_matches_theme).
+        if re.search(r"\bproliferate\b", oracle):
+            mechanics.add("proliferate")
+            signals.append("proliferate")
+        if re.search(r"\bwither\b", oracle):
+            mechanics.add("wither")
+            signals.append("wither")
+        if re.search(r"\binfect\b", oracle):
+            mechanics.add("infect")
+            signals.append("infect")
+        if re.search(r"\bblight \d+\b", oracle):
+            mechanics.add("blight")
+            signals.append("blight")
+        if re.search(r"\bpersist\b", oracle):
+            mechanics.add("persist")
+            signals.append("persist")
+        if re.search(r"\bundying\b", oracle):
+            mechanics.add("undying")
+            signals.append("undying")
+
+        # === v3.23.5: narrow Gorma-style lifegain rule (Option C) ===
+        # Adds the `lifegain` theme ONLY when the commander has BOTH:
+        #   (1) "lifelink" as a bare keyword on itself (not a grant to tokens
+        #       or creatures — Teysa Karlov says "tokens have lifelink", which
+        #       must NOT trigger this).
+        #   (2) a self-referential death or sacrifice trigger (Whenever a
+        #       creature you control dies / Whenever you sacrifice).
+        # The pair is the structural signature of a Gorma / Karlov of the
+        # Ghost Council / Trostani Discordant-style lifegain payoff deck.
+        # Bare lifelink alone (vanilla beater) is not enough; a self-death
+        # trigger alone (aristocrats) is not enough.
+        bare_lifelink_re = re.compile(
+            r"(?<!have )(?<!gain )(?<!with )(?<!give )(?<!gains )(?<!have\n)\blifelink\b",
+            re.IGNORECASE,
+        )
+        # Manual word-before check covers variable-length prefixes ("creatures
+        # you control have lifelink", "tokens have lifelink", etc.) that
+        # fixed-width lookbehinds can't express.
+        grant_prefixes = {
+            "have",
+            "gain",
+            "gains",
+            "with",
+            "give",
+            "creatures",
+            "tokens",
+            "permanents",
+            "they",
+            "and",
+        }
+        has_bare_lifelink = False
+        for m in bare_lifelink_re.finditer(oracle):
+            before = oracle[: m.start()].rstrip()
+            words = re.split(r"\W+", before) if before else []
+            last_word = words[-1].lower() if words else ""
+            if last_word not in grant_prefixes:
+                has_bare_lifelink = True
+                break
+        self_death_or_sac_re = re.compile(
+            r"\bwhenever (?:another |a )?(?:nontoken )?(?:creature|permanent)[^.]{0,40}you control[^.]{0,30}\bdies\b"
+            r"|\bwhenever you sacrifice\b",
+            re.IGNORECASE,
+        )
+        if has_bare_lifelink and self_death_or_sac_re.search(oracle):
+            mechanics.add("lifegain")
+            signals.append("lifegain (Gorma-style)")
+
         # Data-driven theme detection (v3.23.1) — see _THEME_DETECTORS docstring.
         for theme_name, det in _THEME_DETECTORS.items():
             if det["commander_pattern"].search(oracle):
@@ -1387,6 +1469,87 @@ def card_matches_theme(card, themes: dict) -> bool:
         oracle,
     ):
         return True
+
+    # === v3.23.5: counter-cluster matching ===
+    # When the commander cares about a SPECIFIC counter type, the cluster
+    # of related keyword mechanics also counts as Synergy.
+    #
+    # +1/+1 cluster: direct mentions + the keywords that grow with or
+    # produce +1/+1 counters. Persist is included for the counter-cancellation
+    # interaction (a persist creature carrying a -1/-1 counter can be reset
+    # by adding a +1/+1 to it — Gorma-style decks deliberately exploit this).
+    if "plus_one_plus_one_counters" in themes["mechanics"]:
+        if re.search(r"\+1/\+1 counters?\b", oracle):
+            return True
+        if re.search(r"\b(?:proliferate|undying|persist)\b", oracle):
+            return True
+    # -1/-1 cluster: direct mentions + keywords that write -1/-1 counters or
+    # spread/exploit them. Blight N puts N -1/-1 counters per the keyword
+    # (Lorwyn Eclipsed). Infect deals damage as -1/-1 counters to creatures.
+    if "minus_one_minus_one_counters" in themes["mechanics"]:
+        if re.search(r"-1/-1 counters?\b", oracle):
+            return True
+        if re.search(r"\b(?:proliferate|wither|infect|persist)\b", oracle):
+            return True
+        if re.search(r"\bblight \d+\b", oracle):
+            return True
+
+    # === v3.23.5: broader counter-interaction (Option B) ===
+    # Counter-themed decks also want cards that manipulate counters generically
+    # — counter-doublers (Ferrafor "Double the number of each kind of counter"),
+    # counter-trigger payoffs (Lasting Tarfire "if you put a counter on a
+    # creature"), counter-of-any-kind synergy (Puca's Covenant "creature you
+    # control with a counter on it dies"), counter-removal (Eventide's Shadow
+    # "Remove any number of counters"). Loyalty/lore/energy counters can
+    # false-positive here but are rare in +1/+1 or -1/-1 themed decks.
+    if (
+        "plus_one_plus_one_counters" in themes["mechanics"]
+        or "minus_one_minus_one_counters" in themes["mechanics"]
+    ):
+        if re.search(
+            r"\bif you (?:put|move|placed?) [^.]{0,40}counters?\b"
+            r"|\b(?:doubles?|twice (?:as many|the (?:number of )?))[^.]{0,40}counters?\b"
+            r"|\bdouble the (?:number of )?[^.]{0,40}counters?\b"
+            r"|\bremove [^.]{0,30}counters?\b"
+            r"|\bmoves? [^.]{0,30}counters?\b"
+            r"|\bcreatures? (?:you control )?with (?:a |\w+ )?counters?\b"
+            r"|\bcreatures? with (?:a |\w+ )?counters?\b",
+            oracle,
+        ):
+            return True
+
+    # === v3.23.5: sac-cost recognition for death-trigger decks (Option B) ===
+    # Cards like Immoral Bargain ("As an additional cost to cast this spell,
+    # sacrifice X creatures") feed the death-trigger engine even though they
+    # don't say "Whenever … dies" or "each player sacrifices". The existing
+    # mass-edict rule only catches forced-OPPONENT sacrifices; this branch
+    # catches SELF-sac as a cost.
+    if "death_triggers" in themes["mechanics"]:
+        if re.search(
+            r"\bas an additional cost[^.]{0,80}sacrifice [^.]{0,40}creatures?\b"
+            r"|\bsacrifice [\dx]+ creatures?\b",
+            oracle,
+        ):
+            return True
+
+    # === v3.23.5: creature-token engines in death-trigger / sacrifice decks ===
+    # Cards that create creature tokens feed the death/sac engine even when
+    # the card itself doesn't trigger on death. Jadar (Zombie tokens at end
+    # step), Ophiomancer (Snake tokens at upkeep), Tendershoot Dryad
+    # (Saprolings at upkeep), Creakwood Liege (Worm tokens at upkeep) all
+    # match here.
+    #
+    # Magic's templating uses "creature token" specifically for creature
+    # tokens; Treasure / Food / Clue / Blood / etc. never carry "creature
+    # token" in their wording, so substring on "creature token" is a clean
+    # discriminator. Cards that create BOTH (e.g. Tireless Provisioner ->
+    # Food OR Treasure) say "Food token or a Treasure token" with no
+    # "creature token", and correctly DON'T match here.
+    if "death_triggers" in themes["mechanics"] or "sacrifice" in themes["mechanics"]:
+        if re.search(r"\bcreates? [^.]{0,80}creature tokens?\b", oracle):
+            return True
+        if re.search(r"\bputs? [^.]{0,80}creature tokens? onto the battlefield\b", oracle):
+            return True
 
     # Data-driven theme matching (v3.23.1) — handles the 15 new themes added
     # in _THEME_DETECTORS. For each theme that's in this deck's mechanics, the
