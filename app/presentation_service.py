@@ -60,14 +60,19 @@ def build_pending_view_model(rows) -> dict:
 
     for row in rows:
         price = effective_price(row.card, row.finish)
-        # FROM should describe where the card physically is right now. When
-        # resort_collection pulled a placed row to pending, it stashed the
-        # previous drawer/slot in from_drawer/from_slot. Prefer those when
-        # present; fall back to the row's current placement for imported
-        # pending rows (which never had a previous location).
-        from_label = None
+        # FROM should describe where the card physically is right now. Three
+        # cases, in priority order:
+        #   1. row.from_drawer set (resort_collection captured an old drawer
+        #      when pulling a placed row to pending — or v3.19.2's audit-log
+        #      backfill recovered it). Show that drawer.
+        #   2. row.from_drawer NULL but the row is imported and has no
+        #      previous physical position. Show "New import" so it reads
+        #      distinctly from a real-drawer source rather than collapsing
+        #      onto the same label as TO.
         if row.from_drawer:
             from_label = get_drawer_label(row.from_drawer)
+        else:
+            from_label = "New import"
         item = {
             "id": row.id,
             "card": row.card,
@@ -75,7 +80,7 @@ def build_pending_view_model(rows) -> dict:
             "language": row.language or "en",
             "is_proxy": bool(row.is_proxy),
             "quantity": row.quantity,
-            "current_location_label": from_label or get_location_label(row),
+            "current_location_label": from_label,
             "from_slot": row.from_slot,
             "target_location_label": get_drawer_label(row.drawer),
             "drawer": row.drawer,
