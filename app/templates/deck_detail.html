@@ -767,6 +767,12 @@
       <div id="deck-lazy-panels" class="lazy-loading-panels">
         <div class="lazy-loading">Loading panels…</div>
       </div>
+      {# Switch-printing modal host. The actual modal markup is loaded into
+         this div via HTMX when the user clicks a "Switch printing" / ⇄
+         control. The container is always present so HTMX has a stable
+         hx-target. CSS gives it position:fixed coverage of the viewport;
+         when empty there's nothing visible. #}
+      <div id="switch-printing-modal-host"></div>
     {% endif %}
   {% endblock %}
   {% block extra_scripts %}
@@ -977,9 +983,14 @@
           }
         }
 
+        // Hover preview fires on anything with [data-card-image] so the
+        // same handler covers both the deck list-view rows and the
+        // switch-printing modal rows. The selector is data-attribute
+        // rather than class so future surfaces can opt-in without
+        // editing this handler.
         document.addEventListener('mouseover', function (e) {
           if (!DESKTOP.matches) return;
-          var row = e.target.closest('.deck-list-row');
+          var row = e.target.closest('[data-card-image]');
           if (!row) return;
           showPreview(row, e);
         });
@@ -987,13 +998,13 @@
         document.addEventListener('mousemove', function (e) {
           if (!DESKTOP.matches) return;
           if (!previewEl || previewEl.hidden) return;
-          if (!e.target.closest('.deck-list-row')) return;
+          if (!e.target.closest('[data-card-image]')) return;
           positionPreview(e);
         });
 
         document.addEventListener('mouseout', function (e) {
           if (!DESKTOP.matches) return;
-          var row = e.target.closest('.deck-list-row');
+          var row = e.target.closest('[data-card-image]');
           if (!row) return;
           // Hide only when leaving the row entirely (not when moving within).
           if (!row.contains(e.relatedTarget)) hidePreview();
@@ -1001,6 +1012,14 @@
 
         document.addEventListener('click', function (e) {
           if (DESKTOP.matches) return;
+          // Tap-on-row-blank-space shows the card image. Tap on actual
+          // interactive controls (the ⇄ switch-printing button, the
+          // basic-land +/- buttons, the card name link, anything inside
+          // .dlr-actions) lets the click propagate normally so HTMX can
+          // load the printings modal / bump qty / navigate.
+          if (e.target.closest('button, a, input, select, form, .dlr-actions')) {
+            return;
+          }
           var row = e.target.closest('.deck-list-row');
           if (row) {
             e.preventDefault();
@@ -1008,11 +1027,45 @@
             showPreview(row);
             return;
           }
-          // Tap outside dismisses the modal preview.
+          // Tap outside dismisses the image preview.
           if (previewEl && !previewEl.hidden) {
             hidePreview();
           }
         }, true);
+      })();
+      </script>
+      <script>
+      /* Switch-printing modal open/close (v3.21.0).
+
+         Open: an HTMX-loaded fragment lands in #switch-printing-modal-host;
+         the fragment carries .modal-open which the CSS uses to display the
+         backdrop + centered card. No JS needed for open — HTMX does it.
+
+         Close: triggered by clicking any element with [data-modal-close]
+         (the × button and the backdrop) OR by pressing Escape OR by the
+         `switchprinting:close` custom event fired by the form's
+         hx-on::after-request hook after a successful printing swap.
+
+         Listeners are document-level + event-delegated so they survive
+         HTMX swaps of the host element. */
+      (function () {
+        function closeModal() {
+          var host = document.getElementById('switch-printing-modal-host');
+          if (host) host.innerHTML = '';
+        }
+        document.addEventListener('click', function (e) {
+          var target = e.target.closest('[data-modal-close]');
+          if (target) {
+            e.preventDefault();
+            closeModal();
+          }
+        });
+        document.addEventListener('keydown', function (e) {
+          if (e.key !== 'Escape') return;
+          var host = document.getElementById('switch-printing-modal-host');
+          if (host && host.querySelector('.switch-printing-modal')) closeModal();
+        });
+        document.addEventListener('switchprinting:close', closeModal);
       })();
       </script>
     {% endif %}

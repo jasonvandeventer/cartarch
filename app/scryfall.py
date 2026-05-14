@@ -641,6 +641,78 @@ def search_cards_by_name(name: str, limit: int = 500) -> list[dict[str, Any]]:
     ]
 
 
+@lru_cache(maxsize=2048)
+def fetch_card_printings(name: str) -> list[dict[str, Any]]:
+    """Every printing of an exact card name, with per-printing finish data.
+
+    Powers the deck "Switch printing" modal: the user picks a different
+    printing of the same card name to swap into a deck row in place.
+    Scryfall's `unique=prints` mode plus an exact-name match (`!"Name"`)
+    returns one entry per (set, collector, frame variation). Ordered by
+    release date desc so the newest reprint is at the top.
+
+    Each entry carries `finishes` — the actual finish list Scryfall reports
+    for that printing (e.g. `["nonfoil", "foil"]` or `["foil", "etched"]`).
+    The modal uses this to gate the foil/etched toggle buttons so users
+    can't pick a finish that doesn't exist for the chosen printing.
+
+    Cached aggressively (LRU 2048) since printing lists rarely change.
+    Returns [] when the name resolves to no Scryfall cards.
+
+    No DB writes; pure Scryfall passthrough. Pagination would only matter
+    for the most-reprinted cards (Sol Ring ~80 prints, Forest ~1000) —
+    follow the `next_page` cursor when present so we return everything.
+    """
+    cleaned = (name or "").strip()
+    if not cleaned:
+        return []
+
+    # Exact-name match: !"Name" produces all printings of that one card.
+    # Quoting the name guards against names with special tokens (e.g.
+    # "Lim-Dûl's Vault", "Borborygmos").
+    quoted = cleaned.replace('"', '\\"')
+    url = (
+        "https://api.scryfall.com/cards/search"
+        f'?q=!"{requests.utils.quote(quoted)}"&unique=prints'
+        "&order=released&dir=desc"
+    )
+    out: list[dict[str, Any]] = []
+    while url:
+        data = _get_json(url)
+        if not data:
+            break
+        for card in data.get("data", []):
+            image_small = None
+            image_normal = None
+            image_uris = card.get("image_uris") or {}
+            if image_uris:
+                image_small = image_uris.get("small")
+                image_normal = image_uris.get("normal") or image_uris.get("large")
+            else:
+                faces = card.get("card_faces") or []
+                if faces and isinstance(faces[0], dict):
+                    front_uris = faces[0].get("image_uris") or {}
+                    image_small = front_uris.get("small")
+                    image_normal = front_uris.get("normal") or front_uris.get("large")
+            out.append(
+                {
+                    "scryfall_id": card.get("id"),
+                    "name": card.get("name"),
+                    "set_code": (card.get("set") or "").lower(),
+                    "set_name": card.get("set_name"),
+                    "collector_number": card.get("collector_number"),
+                    "released_at": card.get("released_at"),
+                    "finishes": card.get("finishes") or ["nonfoil"],
+                    "frame_effects": card.get("frame_effects") or [],
+                    "promo_types": card.get("promo_types") or [],
+                    "image_uri_small": image_small,
+                    "image_uri_normal": image_normal,
+                }
+            )
+        url = data.get("next_page") if data.get("has_more") else None
+    return out
+
+
 def autocomplete_cards_for_add(query: str, limit: int = 50) -> list[dict[str, Any]]:
     """Slim card-autocomplete payload for the deck "Add card" UI.
 

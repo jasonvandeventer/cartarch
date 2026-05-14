@@ -251,6 +251,40 @@
                 {% endif %}
               </button>
             </form>
+            {# In-place card edit affordances (v3.21.0). Switch-printing
+               loads a modal listing every printing of this card name;
+               basic-land rows also get +/- quantity controls so users
+               don't have to delete-and-re-add to bump a Plains count. #}
+            <button type="button"
+                    class="inline-form"
+                    hx-get="/decks/{{ deck.id }}/rows/{{ item.id }}/printings-modal"
+                    hx-target="#switch-printing-modal-host"
+                    hx-swap="innerHTML">Switch Printing</button>
+            {% set _tl = (item.card.type_line or '')|lower %}
+            {% if 'basic' in _tl and (
+                'plains' in _tl or 'island' in _tl or 'swamp' in _tl
+                or 'mountain' in _tl or 'forest' in _tl or 'wastes' in _tl) %}
+              <form method="post"
+                    class="inline-form basic-qty-form"
+                    action="/decks/{{ deck.id }}/rows/{{ item.id }}/bump-qty"
+                    hx-post="/decks/{{ deck.id }}/rows/{{ item.id }}/bump-qty"
+                    hx-target="#deck-card-list"
+                    hx-swap="innerHTML">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <input type="hidden" name="delta" value="-1">
+                <button type="submit" aria-label="Decrement quantity">−1</button>
+              </form>
+              <form method="post"
+                    class="inline-form basic-qty-form"
+                    action="/decks/{{ deck.id }}/rows/{{ item.id }}/bump-qty"
+                    hx-post="/decks/{{ deck.id }}/rows/{{ item.id }}/bump-qty"
+                    hx-target="#deck-card-list"
+                    hx-swap="innerHTML">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <input type="hidden" name="delta" value="1">
+                <button type="submit" aria-label="Increment quantity">+1</button>
+              </form>
+            {% endif %}
             <form action="/decks/return" method="post" class="return-form">
               <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
               <input type="hidden" name="deck_id" value="{{ deck.id }}">

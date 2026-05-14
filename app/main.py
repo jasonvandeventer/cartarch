@@ -40,6 +40,7 @@ from app.deck_service import (
     CARD_ROLE_TAGS,
     DECK_GROUP_BY_OPTIONS,
     DECK_VIEW_MODES,
+    bump_deck_row_quantity,
     compute_consistency,
     compute_dead_cards,
     compute_deck_analytics,
@@ -57,10 +58,12 @@ from app.deck_service import (
     get_row_tags,
     group_deck_items,
     list_decks,
+    list_user_printings_for_card,
     pull_card_to_deck,
     return_card_from_deck,
     set_row_tags,
     suggest_card_roles,
+    switch_deck_row_printing,
     update_deck,
 )
 from app.dependencies import (
@@ -126,6 +129,7 @@ from app.scryfall import (
     bulk_refresh_prices,
     fetch_card_by_scryfall_id,
     fetch_card_by_set_and_number,
+    fetch_card_printings,
     fetch_token_by_set_number,
     refresh_card_from_scryfall,
     search_cards_by_name,
@@ -2808,6 +2812,44 @@ async def update_deck_view_pref(
     return RedirectResponse(url=safe_redirect_url(request), status_code=303)
 
 
+def _deck_cards_partial_response(
+    request: Request, session: Session, current_user: User, deck_id: int
+) -> HTMLResponse:
+    """Render the deck-card-list partial for HTMX swap-in.
+
+    Used by mutation routes (switch-printing, bump-qty) that need to
+    re-render the deck card display after the underlying row changes.
+    Uses the user's persisted view/group prefs (not URL params — those
+    only matter on the dedicated cards-partial GET endpoint).
+
+    Caller is responsible for ensuring the deck exists; this helper does
+    a defensive re-check anyway so it can be invoked from anywhere.
+    """
+    deck = get_deck(session, deck_id=deck_id, user_id=current_user.id)
+    if not deck:
+        raise HTTPException(status_code=404, detail="Deck not found")
+    view_mode = current_user.deck_view_mode or "grid"
+    group_by = current_user.deck_group_by or "type"
+    items, _, _ = _build_deck_card_items(
+        session, deck, current_user.id, search="", sort="name", direction="asc"
+    )
+    use_drawer_sorter = current_user.username in DRAWER_SORTER_USERNAMES
+    return render(
+        request,
+        "_deck_card_list.html",
+        {
+            "deck": deck,
+            "items": items,
+            "deck_card_groups": group_deck_items(items, group_by),
+            "view_mode": view_mode,
+            "group_by": group_by,
+            "commanders": [],
+            "use_drawer_sorter": use_drawer_sorter,
+            "locations": list_locations(session, user_id=current_user.id),
+        },
+    )
+
+
 @app.get("/decks/{deck_id}/cards-partial")
 def deck_cards_partial(
     deck_id: int,
@@ -3191,6 +3233,137 @@ async def decks_add_card(
         response.headers["HX-Push-Url"] = f"/decks/{deck_id}"
         return response
 
+    return RedirectResponse(url=f"/decks/{deck_id}", status_code=303)
+
+
+@app.get("/decks/{deck_id}/rows/{row_id}/printings-modal")
+def deck_row_printings_modal(
+    deck_id: int,
+    row_id: int,
+    request: Request,
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+):
+    """HTMX fragment: the Switch Printing modal contents.
+
+    Triggered from the deck-detail list/grid view via `hx-get`, swapped
+    into a viewport-fixed `#switch-printing-modal` host element. The
+    modal lists every printing of the row's card, with the user's owned
+    printings surfaced in an "In your collection" section at the top
+    (source-of-truth positioning per the roadmap entry).
+    """
+    deck = get_deck(session, deck_id=deck_id, user_id=current_user.id)
+    if not deck or not deck.storage_location_id:
+        raise HTTPException(status_code=404, detail="Deck not found")
+
+    row = (
+        session.query(InventoryRow)
+        .options(joinedload(InventoryRow.card))
+        .filter(
+            InventoryRow.id == row_id,
+            InventoryRow.user_id == current_user.id,
+            InventoryRow.storage_location_id == deck.storage_location_id,
+        )
+        .first()
+    )
+    if not row:
+        raise HTTPException(status_code=404, detail="Deck row not found")
+
+    card_name = row.card.name if row.card else ""
+    printings = fetch_card_printings(card_name) if card_name else []
+    owned_printings = list_user_printings_for_card(session, current_user.id, card_name)
+    # Build a lookup of owned (set, collector) → list of finish entries so
+    # the template can mark which finishes the user owns of each printing.
+    owned_by_key: dict[tuple[str, str], dict[str, int]] = {}
+    for entry in owned_printings:
+        key = (entry["set_code"], entry["collector_number"])
+        owned_by_key.setdefault(key, {})[entry["finish"]] = entry["quantity"]
+    # Annotate every printing with owned_finishes so the template renders
+    # toggle buttons with owned-count hints (e.g. "Foil (2)").
+    for p in printings:
+        key = (p["set_code"], p["collector_number"])
+        p["owned_finishes"] = owned_by_key.get(key, {})
+
+    return render(
+        request,
+        "_switch_printing_modal.html",
+        {
+            "deck": deck,
+            "row": row,
+            "card_name": card_name,
+            "current_set_code": (row.card.set_code or "").lower() if row.card else "",
+            "current_collector_number": (row.card.collector_number or "") if row.card else "",
+            "current_finish": (row.finish or "normal").lower(),
+            "printings": printings,
+            "owned_printings": owned_printings,
+        },
+    )
+
+
+@app.post("/decks/{deck_id}/rows/{row_id}/switch-printing")
+async def deck_row_switch_printing(
+    deck_id: int,
+    row_id: int,
+    request: Request,
+    scryfall_id: str = Form(...),
+    finish: str = Form("normal"),
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+    _: None = CsrfRequired,
+):
+    """Swap the printing on a deck row to a different (set, collector, finish).
+
+    Preserves row.id / quantity / tags / role / notes — only card_id and
+    finish change. After the swap, returns the re-rendered deck card list
+    partial when HTMX is the caller; otherwise 303s back to the deck page.
+    """
+    ok = switch_deck_row_printing(
+        session,
+        user_id=current_user.id,
+        deck_id=deck_id,
+        row_id=row_id,
+        new_scryfall_id=scryfall_id.strip(),
+        new_finish=finish,
+    )
+    if not ok:
+        raise HTTPException(status_code=400, detail="Could not switch printing.")
+
+    if request.headers.get("HX-Request"):
+        return _deck_cards_partial_response(request, session, current_user, deck_id)
+    return RedirectResponse(url=f"/decks/{deck_id}", status_code=303)
+
+
+@app.post("/decks/{deck_id}/rows/{row_id}/bump-qty")
+async def deck_row_bump_qty(
+    deck_id: int,
+    row_id: int,
+    request: Request,
+    delta: int = Form(...),
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+    _: None = CsrfRequired,
+):
+    """Increment / decrement a deck row's quantity by ±1.
+
+    Used by the basic-land +/- controls on the deck-detail page. Quantity
+    of 0 deletes the row. Anything other than ±1 is rejected so the
+    button can't accidentally page through quantities.
+    """
+    if delta not in (-1, 1):
+        raise HTTPException(status_code=400, detail="delta must be ±1")
+
+    result = bump_deck_row_quantity(
+        session,
+        user_id=current_user.id,
+        deck_id=deck_id,
+        row_id=row_id,
+        delta=delta,
+    )
+    if not result:
+        raise HTTPException(status_code=404, detail="Deck row not found")
+
+    if request.headers.get("HX-Request"):
+        return _deck_cards_partial_response(request, session, current_user, deck_id)
     return RedirectResponse(url=f"/decks/{deck_id}", status_code=303)
 
 

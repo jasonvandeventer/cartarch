@@ -32,6 +32,10 @@
       </header>
       <ul class="deck-list-rows">
         {% for item in group.rows %}
+          {% set tl = (item.card.type_line or '')|lower %}
+          {% set is_basic = 'basic' in tl and (
+              'plains' in tl or 'island' in tl or 'swamp' in tl
+              or 'mountain' in tl or 'forest' in tl or 'wastes' in tl) %}
           <li class="deck-list-row"
               data-card-image="{{ item.card.image_url or '' }}"
               data-card-name="{{ item.card.name }}">
@@ -64,6 +68,42 @@
                 {% endif %}
               </span>
             {% endif %}
+            <span class="dlr-actions">
+              {% if is_basic %}
+                {# Basic land +/- controls. Hits the bump-qty route; HTMX swaps
+                   the whole card list so the row count updates in place. #}
+                <form method="post"
+                      class="dlr-qty-form"
+                      action="/decks/{{ deck.id }}/rows/{{ item.id }}/bump-qty"
+                      hx-post="/decks/{{ deck.id }}/rows/{{ item.id }}/bump-qty"
+                      hx-target="#deck-card-list"
+                      hx-swap="innerHTML">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                  <input type="hidden" name="delta" value="-1">
+                  <button type="submit" class="dlr-qty-btn"
+                          aria-label="Decrement quantity">−</button>
+                </form>
+                <form method="post"
+                      class="dlr-qty-form"
+                      action="/decks/{{ deck.id }}/rows/{{ item.id }}/bump-qty"
+                      hx-post="/decks/{{ deck.id }}/rows/{{ item.id }}/bump-qty"
+                      hx-target="#deck-card-list"
+                      hx-swap="innerHTML">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                  <input type="hidden" name="delta" value="1">
+                  <button type="submit" class="dlr-qty-btn"
+                          aria-label="Increment quantity">+</button>
+                </form>
+              {% endif %}
+              {# Switch-printing trigger. Loads the modal contents into the
+                 viewport-fixed host element at the bottom of deck_detail.html. #}
+              <button type="button"
+                      class="dlr-switch-btn"
+                      title="Switch printing"
+                      hx-get="/decks/{{ deck.id }}/rows/{{ item.id }}/printings-modal"
+                      hx-target="#switch-printing-modal-host"
+                      hx-swap="innerHTML">⇄</button>
+            </span>
           </li>
         {% endfor %}
       </ul>

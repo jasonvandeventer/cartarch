@@ -1620,6 +1620,188 @@ def find_inventory_matches_for_deck_import(
     return output
 
 
+def list_user_printings_for_card(session: Session, user_id: int, card_name: str) -> list[dict]:
+    """Aggregate the user's owned rows for a given card name.
+
+    Used by the Switch Printing modal — the "In your collection" section
+    sorts owned printings to the top so the user picks what they actually
+    have first (the source-of-truth positioning the roadmap calls out).
+
+    Returns one entry per (set_code, collector_number, finish) combo, with
+    aggregate `quantity` summed across however many rows hold that exact
+    printing+finish (deck rows, drawer rows, pending rows all count). Each
+    entry also carries a brief `locations` list — short labels describing
+    where the user has those copies, used by the modal to show "2 in
+    deck, 1 in Binder A". Sorted with deck rows first (most likely to
+    swap right back into the deck) then non-deck rows, both by set_code +
+    collector_number for stable presentation.
+    """
+    cleaned = (card_name or "").strip()
+    if not cleaned:
+        return []
+
+    rows = (
+        session.query(InventoryRow)
+        .options(joinedload(InventoryRow.card), joinedload(InventoryRow.storage_location))
+        .join(Card)
+        .filter(
+            InventoryRow.user_id == user_id,
+            Card.name == cleaned,
+        )
+        .all()
+    )
+
+    buckets: dict[tuple[str, str, str], dict] = {}
+    for r in rows:
+        key = (
+            (r.card.set_code or "").lower(),
+            (r.card.collector_number or ""),
+            (r.finish or "normal").lower(),
+        )
+        entry = buckets.get(key)
+        if entry is None:
+            entry = {
+                "set_code": key[0],
+                "set_name": r.card.set_name,
+                "collector_number": key[1],
+                "finish": key[2],
+                "scryfall_id": r.card.scryfall_id,
+                "image_url": r.card.image_url,
+                "quantity": 0,
+                "locations": [],
+                "in_deck": False,
+            }
+            buckets[key] = entry
+        entry["quantity"] += int(r.quantity or 0)
+        loc = r.storage_location
+        if loc is not None:
+            label = loc.name
+            if loc.type == "deck":
+                entry["in_deck"] = True
+                label = f"Deck: {loc.name}"
+            entry["locations"].append(label)
+        elif r.is_pending:
+            entry["locations"].append("Pending")
+
+    # Stable order: deck-located rows first (a deck swap to a printing the
+    # user already has in *another* deck is the very-most-common case), then
+    # everything else by set_code + collector_number.
+    def _sort_key(entry: dict) -> tuple:
+        return (
+            0 if entry["in_deck"] else 1,
+            entry["set_code"],
+            entry["collector_number"],
+            entry["finish"],
+        )
+
+    return sorted(buckets.values(), key=_sort_key)
+
+
+def switch_deck_row_printing(
+    session: Session,
+    user_id: int,
+    deck_id: int,
+    row_id: int,
+    new_scryfall_id: str,
+    new_finish: str,
+) -> bool:
+    """Swap the printing on an existing deck row in place.
+
+    Preserves the row's id, quantity, tags, role, and notes — only the
+    `card_id` and `finish` change. The card's place in the deck stays
+    fixed and downstream analytics that key on row id (e.g. cached panel
+    fragments) continue to address the same row.
+
+    `new_scryfall_id` must already exist as a Card in the local DB. The
+    caller is responsible for fetching+upserting it from Scryfall first
+    (the route handler does this via `get_or_create_card`).
+
+    Returns True on success, False if the row, deck, or new card can't
+    be resolved or if the deck doesn't belong to this user.
+    """
+    from app.inventory_service import get_or_create_card  # local import: avoid cycle
+
+    deck = session.query(Deck).filter(Deck.id == deck_id, Deck.user_id == user_id).first()
+    if not deck or not deck.storage_location_id:
+        return False
+
+    row = (
+        session.query(InventoryRow)
+        .filter(
+            InventoryRow.id == row_id,
+            InventoryRow.user_id == user_id,
+            InventoryRow.storage_location_id == deck.storage_location_id,
+        )
+        .first()
+    )
+    if not row:
+        return False
+
+    new_card = get_or_create_card(session, new_scryfall_id)
+    if not new_card:
+        return False
+
+    finish_clean = (new_finish or "normal").strip().lower()
+    if finish_clean not in {"normal", "foil", "etched"}:
+        finish_clean = "normal"
+
+    row.card_id = new_card.id
+    row.finish = finish_clean
+    row.updated_at = datetime.utcnow()
+    session.commit()
+    return True
+
+
+def bump_deck_row_quantity(
+    session: Session, user_id: int, deck_id: int, row_id: int, delta: int
+) -> dict:
+    """Bump (or decrement) a deck row's quantity by ``delta`` (±1).
+
+    Powers the basic-land +/- controls on the deck-detail page. Restricted
+    to deck-located rows owned by this user. When the new quantity reaches
+    zero the row is deleted entirely; the caller's UI is expected to
+    re-render the deck card list after.
+
+    Returns ``{"row_id": id, "quantity": new_qty, "deleted": bool}`` so
+    the caller can decide whether to swap the row out of the rendered
+    list. Empty dict on validation failure (row not found, not in deck,
+    not owned by user) so the caller can 404.
+
+    v1 keeps this simple — no cross-row inventory accounting. A `+` just
+    bumps the deck row's quantity by 1; user is responsible for physically
+    placing the additional copy.
+    """
+    if delta not in (-1, 1):
+        return {}
+
+    deck = session.query(Deck).filter(Deck.id == deck_id, Deck.user_id == user_id).first()
+    if not deck or not deck.storage_location_id:
+        return {}
+
+    row = (
+        session.query(InventoryRow)
+        .filter(
+            InventoryRow.id == row_id,
+            InventoryRow.user_id == user_id,
+            InventoryRow.storage_location_id == deck.storage_location_id,
+        )
+        .first()
+    )
+    if not row:
+        return {}
+
+    new_qty = (row.quantity or 0) + delta
+    if new_qty <= 0:
+        session.delete(row)
+        session.commit()
+        return {"row_id": row_id, "quantity": 0, "deleted": True}
+
+    row.quantity = new_qty
+    row.updated_at = datetime.utcnow()
+    session.commit()
+    return {"row_id": row_id, "quantity": new_qty, "deleted": False}
+
+
 def pull_card_to_deck(
     session: Session,
     user_id: int,

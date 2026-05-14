@@ -4136,10 +4136,12 @@ body.game-mode {
 }
 
 /* Floating image-preview tooltip — fixed positioned by JS. Desktop: floats
-   near the cursor; mobile: centered modal-style overlay. */
+   near the cursor; mobile: centered modal-style overlay. z-index sits ABOVE
+   the switch-printing modal (1300) so hovering a printing row inside the
+   modal still surfaces the card image instead of being occluded. */
 .deck-list-image-preview {
   position: fixed;
-  z-index: 1200;
+  z-index: 1400;
   pointer-events: none;
   width: 240px;
   border-radius: 12px;
@@ -4159,5 +4161,264 @@ body.game-mode {
     left: 50%;
     transform: translate(-50%, -50%);
     pointer-events: auto;
+  }
+}
+
+/* ============================================================================
+   In-place card editing (v3.21.0)
+   ----------------------------------------------------------------------------
+   Switch-printing modal + basic-land +/- controls. Modal is loaded into a
+   viewport-fixed host via HTMX; CSS shows the backdrop + centered card via
+   the .modal-open class on the partial's root. Both the list view and the
+   grid view's actions drawer drive the same modal endpoint.
+   ============================================================================ */
+
+/* List-view per-row actions (⇄ + basic-land +/−). Lives next to .dlr-meta
+   in the deck-list-row flex layout. */
+.dlr-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
+  flex: 0 0 auto;
+}
+.dlr-qty-form,
+.dlr-qty-form button,
+.dlr-switch-btn {
+  margin: 0;
+  padding: 0;
+}
+.dlr-qty-form {
+  display: inline-block;
+}
+.dlr-qty-btn,
+.dlr-switch-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--muted, #94a3b8);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  line-height: 1;
+}
+.dlr-qty-btn:hover,
+.dlr-switch-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text);
+}
+.dlr-switch-btn {
+  width: 24px;
+  font-size: 0.95rem;
+}
+
+/* Grid-view basic-land qty form: same compact button shape inside the
+   existing card-actions-drawer's card-actions-body. */
+.card-actions-body .basic-qty-form button {
+  padding: 0.35rem 0.65rem;
+}
+
+/* ---- Switch-printing modal ---- */
+
+.switch-printing-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1300;
+  display: none;
+  align-items: center;
+  justify-content: center;
+}
+.switch-printing-modal.modal-open {
+  display: flex;
+}
+.switch-printing-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  z-index: -1;
+  cursor: pointer;
+}
+.switch-printing-modal-card {
+  position: relative;
+  background: var(--panel-bg, #13161c);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.6);
+  width: min(92vw, 760px);
+  max-height: 86vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.switch-printing-modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 1rem 1.25rem 0.75rem;
+  gap: 1rem;
+  border-bottom: 1px solid var(--border);
+}
+.switch-printing-modal-title {
+  margin: 0.15rem 0 0;
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+.switch-printing-modal-close {
+  background: transparent;
+  border: none;
+  color: var(--muted, #94a3b8);
+  font-size: 1.6rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0.1rem 0.4rem;
+  border-radius: 6px;
+}
+.switch-printing-modal-close:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+}
+
+.switch-printing-section {
+  padding: 0.75rem 1.25rem;
+  border-bottom: 1px solid var(--border);
+  overflow-y: auto;
+}
+.switch-printing-section:last-of-type {
+  border-bottom: none;
+}
+.switch-printing-section-owned {
+  background: rgba(96, 165, 250, 0.04);
+}
+.switch-printing-section-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  margin: 0 0 0.25rem;
+  color: var(--text);
+}
+.switch-printing-section-blurb {
+  margin: 0 0 0.6rem;
+  font-size: 0.8rem;
+}
+
+.switch-printing-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.switch-printing-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.4rem 0.5rem;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.02);
+  font-size: 0.86rem;
+}
+.switch-printing-row.current {
+  border-color: rgba(96, 165, 250, 0.5);
+  background: rgba(96, 165, 250, 0.08);
+}
+.switch-printing-row.owned {
+  border-color: rgba(34, 197, 94, 0.35);
+}
+.switch-printing-row-set {
+  font-weight: 500;
+}
+.switch-printing-row-locations,
+.switch-printing-row-meta {
+  font-size: 0.78rem;
+}
+.switch-printing-row-finishes,
+.switch-printing-row-form {
+  display: inline-flex;
+  gap: 0.3rem;
+  justify-self: end;
+}
+.switch-printing-finish-form {
+  display: inline-block;
+  margin: 0;
+}
+.switch-printing-finish-btn,
+.switch-printing-pick {
+  padding: 0.3rem 0.7rem;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  font-size: 0.8rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.switch-printing-finish-btn:hover,
+.switch-printing-pick:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+.switch-printing-finish-btn:disabled,
+.switch-printing-pick:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.switch-printing-finish-btn.owned {
+  border-color: rgba(34, 197, 94, 0.5);
+  color: #86efac;
+}
+.switch-printing-owned-count {
+  opacity: 0.75;
+  font-weight: 400;
+}
+.switch-printing-row-current-badge {
+  display: inline-block;
+  margin-left: 0.4rem;
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 0.05rem 0.4rem;
+  border-radius: 999px;
+  background: rgba(96, 165, 250, 0.18);
+  border: 1px solid rgba(96, 165, 250, 0.55);
+  color: #93c5fd;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.switch-printing-frame-effect {
+  display: inline-block;
+  font-size: 0.7rem;
+  padding: 0.05rem 0.35rem;
+  margin-left: 0.3rem;
+  border-radius: 999px;
+  background: rgba(120, 120, 130, 0.18);
+  border: 1px solid rgba(120, 120, 130, 0.5);
+  color: #cbd5e1;
+}
+
+@media (max-width: 640px) {
+  .switch-printing-modal-card {
+    width: 96vw;
+    max-height: 92vh;
+  }
+  .switch-printing-row {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "set"
+      "meta"
+      "finishes";
+    gap: 0.3rem;
+  }
+  .switch-printing-row-set { grid-area: set; }
+  .switch-printing-row-meta,
+  .switch-printing-row-locations { grid-area: meta; }
+  .switch-printing-row-finishes,
+  .switch-printing-row-form {
+    grid-area: finishes;
+    justify-self: start;
+    flex-wrap: wrap;
   }
 }
