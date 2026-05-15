@@ -31,6 +31,10 @@ _Deck detail — hero with Bracket V2 badge, Analytics (mana curve, types, pips)
 
 _Collection page with Scryfall-syntax search applied (`t:creature c:WU cmc:<=3`)._
 
+![Live game tracker](docs/screenshots/game-tracker.png)
+
+_Live game tracker — tablet-oriented life/poison/commander-damage UI with per-seat rotations._
+
 See [docs/screenshots/](docs/screenshots/) for capture guidelines and additional shots.
 
 ---

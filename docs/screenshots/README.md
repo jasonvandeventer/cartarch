@@ -6,10 +6,10 @@ This folder holds UI captures referenced from the top-level README.
 
 - `deck-detail.png` — Deck detail page for a representative Commander deck. Show the hero (name, format, bracket badge, totals), Analytics panel (mana curve + types + pips), and the top of the card grid. Best capture: a tagged deck with combos detected so Win Conditions and Synergy panels visibly render.
 - `collection.png` — Collection page with a non-trivial filter applied (e.g. `t:creature c:WU cmc:<=3`) so the search syntax is showcased. Mid-scroll, with cards visible, sort dropdown in view.
+- `game-tracker.png` — Live game tracker on tablet landscape, 4-player layout, mid-game (life totals diverged, a commander damage cell or two populated).
 
 Optional follow-ups:
 
-- `game-tracker.png` — Live game tracker on tablet landscape, 4-player layout, mid-game (life totals diverged, a commander damage cell or two populated).
 - `import-reconciliation.png` — Import preview with reconciliation panel expanded for a deck destination, showing the move-existing / import-new per-row choices.
 
 ## Capture settings
