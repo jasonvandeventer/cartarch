@@ -205,7 +205,6 @@ def _run_price_refresh_batch() -> None:
                 (Card.updated_at < cutoff)
                 | (Card.color_identity == None)  # noqa: E711
                 | (Card.legalities == None)  # noqa: E711
-                | (Card.set_type == None)  # noqa: E711
             )
             .order_by(Card.updated_at.asc())
             .limit(_PRICE_REFRESH_BATCH)
@@ -251,6 +250,77 @@ def _price_refresh_loop() -> None:
         time.sleep(_PRICE_REFRESH_INTERVAL_SECONDS)
 
 
+_TRAIT_BACKFILL_BATCH = 75
+_TRAIT_BACKFILL_BUSY_SECONDS = 3  # between batches while work remains
+_TRAIT_BACKFILL_IDLE_SECONDS = 600  # re-check after catching up (new imports)
+
+
+def _run_trait_backfill_batch() -> int:
+    """Backfill Card printing traits (set_type/layout/full_art/frame_effects)
+    for owned cards that don't have them yet.
+
+    Runs entirely off the request path — the drawer sorter resolves traits
+    strictly from these local columns, so this loop is what makes it
+    accurate without ever putting Scryfall I/O in a request (the v3.23.8
+    pod-lockup fix). Commits per batch so progress is durable across pod
+    restarts; a card Scryfall won't return gets set_type="" so it's marked
+    done and the loop always makes forward progress. Returns the batch
+    size processed (0 when nothing left to backfill).
+    """
+    session = SessionLocal()
+    try:
+        pending = (
+            session.query(Card)
+            .join(InventoryRow, InventoryRow.card_id == Card.id)
+            .filter(Card.set_type == None)  # noqa: E711
+            .order_by(Card.id.asc())
+            .limit(_TRAIT_BACKFILL_BATCH)
+            .distinct()
+            .all()
+        )
+        if not pending:
+            return 0
+
+        fresh_by_id = bulk_refresh_prices([c.scryfall_id for c in pending])
+        now = datetime.utcnow()
+        for card in pending:
+            fresh = fresh_by_id.get(card.scryfall_id)
+            if fresh:
+                card.price_usd = fresh["price_usd"]
+                card.price_usd_foil = fresh["price_usd_foil"]
+                card.price_usd_etched = fresh["price_usd_etched"]
+                card.colors = fresh.get("colors")
+                card.color_identity = fresh.get("color_identity")
+                card.mana_cost = fresh.get("mana_cost")
+                card.cmc = fresh.get("cmc")
+                card.legalities = fresh.get("legalities")
+                card.full_art = fresh.get("full_art")
+                card.frame_effects = fresh.get("frame_effects")
+                card.set_type = fresh.get("set_type")
+                card.layout = fresh.get("layout")
+                card.updated_at = now
+            else:
+                # Scryfall didn't return it — mark done (non-NULL) so the
+                # loop doesn't re-select it forever and stall convergence.
+                card.set_type = ""
+        session.commit()
+        print(f"[trait-backfill] processed {len(pending)} cards")
+        return len(pending)
+    except Exception as exc:
+        session.rollback()
+        print(f"[trait-backfill] error: {exc}")
+        return 0
+    finally:
+        session.close()
+
+
+def _trait_backfill_loop() -> None:
+    time.sleep(30)  # after migrations/init, before steady-state work
+    while True:
+        processed = _run_trait_backfill_batch()
+        time.sleep(_TRAIT_BACKFILL_BUSY_SECONDS if processed else _TRAIT_BACKFILL_IDLE_SECONDS)
+
+
 @app.on_event("startup")
 def on_startup() -> None:
     # Prevent accidental deploys with the default dev secret — sessions would be forgeable.
@@ -262,6 +332,7 @@ def on_startup() -> None:
     run_migrations()
     init_db()
     threading.Thread(target=_price_refresh_loop, daemon=True, name="price-refresh").start()
+    threading.Thread(target=_trait_backfill_loop, daemon=True, name="trait-backfill").start()
 
 
 @app.get("/")
