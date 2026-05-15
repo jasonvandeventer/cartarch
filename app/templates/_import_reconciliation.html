@@ -48,9 +48,7 @@
 #}
 {% set mode = reconcile_mode | default("deck") %}
 {% if rows and mode == "deck" %}
-  <section class="panel"
-           style="margin-top: 0.75rem"
-           id="reconciliation-content">
+  <section class="panel" style="margin-top: 0.75rem" id="reconciliation-content">
     <h3 class="panel-title" style="margin-bottom: 0.4rem">Reconciliation</h3>
     <p class="muted" style="margin-top: 0">
       {% if total_to_move > 0 and total_to_import_new > 0 %}
@@ -227,9 +225,7 @@
      commit handler indexes by parsed_rows position, so dropping rows
      from the form would shift the actions onto the wrong cards. #}
   {% set _show_dupes_only = has_deck_only_dupes | default(false) %}
-  <section class="panel"
-           style="margin-top: 0.75rem"
-           id="reconciliation-content">
+  <section class="panel" style="margin-top: 0.75rem" id="reconciliation-content">
     <h3 class="panel-title" style="margin-bottom: 0.4rem">Reconciliation</h3>
     <p class="muted" style="margin-top: 0">
       {% set _to_skip = total_to_skip | default(0) %}
