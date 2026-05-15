@@ -143,6 +143,22 @@ def is_token_card(card: Card) -> bool:
     return "token" in (card.type_line or "").lower()
 
 
+def is_substitute_card(card: Card) -> bool:
+    """True when the inventory row holds a Scryfall "substitute" printing.
+
+    Substitute cards (set codes like ``sznr``, ``slci``) are physical
+    standard-back cards that represent something else in play — most commonly
+    used as proxies for DFC tokens in clear sleeves. Scryfall marks them as
+    ``set_type=token`` with ``layout=normal`` and an MTG-style ``type_line``
+    (no "token" supertype). They look like regular cards by type_line alone,
+    so this check consults the cached Scryfall traits to detect them.
+    """
+    traits = fetch_card_traits(card.scryfall_id)
+    if traits is None:
+        return False
+    return bool(traits.get("is_token_substitute"))
+
+
 def assign_drawer(row: InventoryRow) -> int:
     """Return the target drawer number (1-6) for an InventoryRow.
 
@@ -150,11 +166,12 @@ def assign_drawer(row: InventoryRow) -> int:
       1. value >= VALUE_THRESHOLD ($5) → drawer 1
       2. is_proxy=True → drawer 6 (proxies section)
       3. token card → drawer 6 (tokens section)
-      4. foreign language (language not en/None) → drawer 6 (foreign section)
-      5. premium basic → drawer 6 (premium basics section)
-      6. plain basic → drawer 6 (plain basics section)
-      7. numeric set code or empty set → drawer 6 (numeric sets section)
-      8. otherwise: letter-range routes to drawers 2-5
+      4. substitute card → drawer 6 (substitutes section)
+      5. foreign language (language not en/None) → drawer 6 (foreign section)
+      6. premium basic → drawer 6 (premium basics section)
+      7. plain basic → drawer 6 (plain basics section)
+      8. numeric set code or empty set → drawer 6 (numeric sets section)
+      9. otherwise: letter-range routes to drawers 2-5
 
     The drawer-6 *section* (vs the drawer number) is determined by
     ``drawer_sort_key`` for the in-drawer sort ordering.
@@ -169,6 +186,8 @@ def assign_drawer(row: InventoryRow) -> int:
     if row.is_proxy:
         return 6
     if is_token_card(card):
+        return 6
+    if is_substitute_card(card):
         return 6
     language = (row.language or "en").lower()
     if language != "en":
@@ -195,7 +214,7 @@ def assign_drawer(row: InventoryRow) -> int:
 def drawer_sort_key(row: InventoryRow) -> tuple:
     """In-drawer sort key. For drawer 6, a leading section number controls
     top-to-bottom physical layout: 0=numeric sets, 1=foreign, 2=premium
-    basics, 3=plain basics, 4=tokens, 5=proxies.
+    basics, 3=plain basics, 4=tokens, 5=substitutes, 6=proxies.
     """
     card = row.card
     drawer = assign_drawer(row)
@@ -209,8 +228,8 @@ def drawer_sort_key(row: InventoryRow) -> tuple:
     if drawer == 6:
         # Section ordering matches the layout the drawer-sorter user
         # physically arranged: numeric → foreign → premium → plain → tokens
-        # → proxies. Same priority as assign_drawer but encoded as a sort
-        # prefix so all section-0 rows sort before section-1 rows, etc.
+        # → substitutes → proxies. Same priority as assign_drawer but encoded
+        # as a sort prefix so all section-0 rows sort before section-1 rows.
         first_char = set_code[:1]
         is_numeric_set = bool(first_char) and first_char.isdigit()
         language = (row.language or "en").lower()
@@ -218,13 +237,16 @@ def drawer_sort_key(row: InventoryRow) -> tuple:
         is_premium = is_premium_basic(card, row.finish)
         is_basic = is_basic_land_candidate(card, row.finish)
         is_token = is_token_card(card)
+        is_substitute = is_substitute_card(card)
 
         # Highest-priority classifications win the section assignment when
         # multiple apply (matches assign_drawer's first-match-wins ordering).
         if row.is_proxy:
-            return (5, set_code, collector, name, row.id)
+            return (6, set_code, collector, name, row.id)
         if is_token:
             return (4, set_code, collector, name, row.id)
+        if is_substitute:
+            return (5, set_code, collector, name, row.id)
         if is_foreign:
             return (1, language, set_code, collector, name, row.id)
         if is_premium:
@@ -235,7 +257,7 @@ def drawer_sort_key(row: InventoryRow) -> tuple:
             return (0, set_code, collector, name, row.id)
         # Fallback — shouldn't happen given assign_drawer's exhaustive rules,
         # but guard against future drift by sorting after every named section.
-        return (6, set_code, collector, name, row.id)
+        return (7, set_code, collector, name, row.id)
 
     return (set_code, collector, name, row.id)
 

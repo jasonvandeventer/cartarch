@@ -49,6 +49,25 @@ def get_token(session: Session, token_id: int, user_id: int) -> TokenInventory |
     )
 
 
+def _infer_double_sided(
+    is_double_sided: bool,
+    back_set_code: str | None,
+    back_collector_number: str | None,
+) -> bool:
+    """Coerce ``is_double_sided`` to True when back fields are populated.
+
+    The new-token form has a "Double-sided" checkbox that users can forget to
+    tick after filling in the back-face set + collector inputs. Without this
+    coercion, ``_get_owned_token_map`` skips the back side (filter requires
+    ``is_double_sided.is_(True)``) and the Sets page shows only the front
+    face as owned. Inferring True from non-empty back fields closes that gap
+    while leaving truly single-sided tokens (no back fields) unaffected.
+    """
+    if is_double_sided:
+        return True
+    return bool((back_set_code or "").strip() and (back_collector_number or "").strip())
+
+
 def create_token(
     session: Session,
     *,
@@ -74,6 +93,8 @@ def create_token(
     if quantity < 0:
         raise ValueError("Quantity cannot be negative")
 
+    is_double_sided = _infer_double_sided(is_double_sided, back_set_code, back_collector_number)
+
     token = TokenInventory(
         user_id=user_id,
         name=name.strip(),
@@ -84,7 +105,7 @@ def create_token(
         collector_number=collector_number.strip() if collector_number else None,
         scryfall_id=scryfall_id.strip() if scryfall_id else None,
         image_url=image_url.strip() if image_url else None,
-        is_double_sided=bool(is_double_sided),
+        is_double_sided=is_double_sided,
         back_name=back_name.strip() if back_name else None,
         back_image_url=back_image_url.strip() if back_image_url else None,
         back_set_code=back_set_code.strip() if back_set_code else None,
@@ -113,6 +134,15 @@ def update_token(
         if isinstance(v, str):
             v = v.strip() or None
         setattr(token, k, v)
+    # Apply the same DFC inference as create_token. Whether the caller passed
+    # is_double_sided, back_set_code, and back_collector_number explicitly or
+    # left them untouched, the row's final state should satisfy the invariant
+    # "back fields populated → is_double_sided=True".
+    token.is_double_sided = _infer_double_sided(
+        bool(token.is_double_sided),
+        token.back_set_code,
+        token.back_collector_number,
+    )
     token.updated_at = datetime.utcnow()
     session.commit()
     return token

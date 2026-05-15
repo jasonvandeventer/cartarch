@@ -372,6 +372,10 @@ def fetch_card_traits(scryfall_id: str) -> dict[str, bool] | None:
     frame_effects = raw.get("frame_effects") or []
     frame_effects_lc = {(eff or "").lower() for eff in frame_effects}
 
+    set_type = (raw.get("set_type") or "").lower()
+    layout = (raw.get("layout") or "").lower()
+    is_token_substitute = set_type == "token" and layout == "normal" and "token" not in type_line
+
     return {
         "is_basic_land": "basic land" in type_line,
         "is_full_art": bool(raw.get("full_art")),
@@ -379,6 +383,7 @@ def fetch_card_traits(scryfall_id: str) -> dict[str, bool] | None:
         "has_showcase_frame": "showcase" in frame_effects_lc,
         "has_extended_art_frame": "extendedart" in frame_effects_lc,
         "is_token": "token" in type_line,
+        "is_token_substitute": is_token_substitute,
     }
 
 

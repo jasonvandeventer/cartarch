@@ -41,6 +41,9 @@ from scripts.migrate_v3_22_0_tag_confidence_model import (
 from scripts.migrate_v3_23_3_promote_intrinsic_auto_certain import (
     main as migrate_v3_23_3_promote_intrinsic_auto_certain,
 )
+from scripts.migrate_v3_23_7_token_dfc_backfill import (
+    main as migrate_v3_23_7_token_dfc_backfill,
+)
 
 
 def _is_applied(name: str) -> bool:
@@ -246,6 +249,13 @@ def run():
         _mark_applied("v3_23_3_promote_intrinsic_auto_certain")
     else:
         print("v3.23.3 promote_intrinsic_auto_certain already applied, skipping")
+
+    if not _is_applied("v3_23_7_token_dfc_backfill"):
+        print("Running v3.23.7 token DFC backfill migration...")
+        migrate_v3_23_7_token_dfc_backfill()
+        _mark_applied("v3_23_7_token_dfc_backfill")
+    else:
+        print("v3.23.7 token_dfc_backfill already applied, skipping")
 
     print("Migration runner complete")
 
