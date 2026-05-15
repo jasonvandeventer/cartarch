@@ -60,6 +60,7 @@ from app.deck_service import (
     get_row_tags,
     group_deck_items,
     list_decks,
+    list_decks_basic,
     list_user_printings_for_card,
     pull_card_to_deck,
     return_card_from_deck,
@@ -204,6 +205,7 @@ def _run_price_refresh_batch() -> None:
                 (Card.updated_at < cutoff)
                 | (Card.color_identity == None)  # noqa: E711
                 | (Card.legalities == None)  # noqa: E711
+                | (Card.set_type == None)  # noqa: E711
             )
             .order_by(Card.updated_at.asc())
             .limit(_PRICE_REFRESH_BATCH)
@@ -227,6 +229,10 @@ def _run_price_refresh_batch() -> None:
                 card.mana_cost = fresh.get("mana_cost")
                 card.cmc = fresh.get("cmc")
                 card.legalities = fresh.get("legalities")
+                card.full_art = fresh.get("full_art")
+                card.frame_effects = fresh.get("frame_effects")
+                card.set_type = fresh.get("set_type")
+                card.layout = fresh.get("layout")
                 card.updated_at = now
                 updated += 1
         session.commit()
@@ -243,18 +249,6 @@ def _price_refresh_loop() -> None:
     while True:
         _run_price_refresh_batch()
         time.sleep(_PRICE_REFRESH_INTERVAL_SECONDS)
-
-
-def _bg_resort(user_id: int) -> None:
-    """Full collection resort in a background thread using its own DB session."""
-    session = SessionLocal()
-    try:
-        resort_collection(session, user_id=user_id)
-    except Exception as exc:
-        session.rollback()
-        print(f"[resort] error for user {user_id}: {exc}")
-    finally:
-        session.close()
 
 
 @app.on_event("startup")
@@ -378,7 +372,7 @@ async def import_preview(
             "current_user": current_user,
             "use_drawer_sorter": current_user.username in DRAWER_SORTER_USERNAMES,
             "locations": list_locations(session, current_user.id),
-            "decks": list_decks(session, user_id=current_user.id),
+            "decks": list_decks_basic(session, user_id=current_user.id),
         },
     )
 
@@ -404,7 +398,7 @@ async def import_list_preview(
             "current_user": current_user,
             "use_drawer_sorter": current_user.username in DRAWER_SORTER_USERNAMES,
             "locations": list_locations(session, current_user.id),
-            "decks": list_decks(session, user_id=current_user.id),
+            "decks": list_decks_basic(session, user_id=current_user.id),
         },
     )
 
@@ -1181,7 +1175,7 @@ async def manual_import_preview(
             "current_user": current_user,
             "use_drawer_sorter": current_user.username in DRAWER_SORTER_USERNAMES,
             "locations": list_locations(session, current_user.id),
-            "decks": list_decks(session, user_id=current_user.id),
+            "decks": list_decks_basic(session, user_id=current_user.id),
         },
     )
 
@@ -1617,7 +1611,7 @@ def collection_page(
     if stats["unassigned_count"] > 0:
         location_counts["Unassigned"] = stats["unassigned_count"]
 
-    decks = list_decks(session, user_id=current_user.id)
+    decks = list_decks_basic(session, user_id=current_user.id)
     locations = list_locations(session, user_id=current_user.id)
     items = []
 
@@ -2166,7 +2160,7 @@ def location_detail_page(
         )
 
     all_locations = list_locations(session, user_id=current_user.id)
-    decks = list_decks(session, user_id=current_user.id)
+    decks = list_decks_basic(session, user_id=current_user.id)
 
     return render(
         request,
@@ -2978,7 +2972,11 @@ def bulk_move_deck_cards(
             return RedirectResponse(f"/decks/{deck_id}", status_code=303)
         for row_id in row_ids:
             return_card_from_deck(session, user_id=current_user.id, deck_row_id=row_id)
-        threading.Thread(target=_bg_resort, args=(current_user.id,), daemon=True).start()
+        # Resort synchronously in the request (same as the import flow,
+        # v3.11.18). A background thread races the redirect → /pending and
+        # contends with concurrent removals for the SQLite write lock,
+        # leaving returned rows unsorted ("Drawer - · Slot ?").
+        resort_collection(session, user_id=current_user.id)
         return RedirectResponse(f"/decks/{deck_id}", status_code=303)
 
     try:
@@ -3432,7 +3430,7 @@ async def decks_return(
     )
 
     if current_user.username in DRAWER_SORTER_USERNAMES:
-        threading.Thread(target=_bg_resort, args=(current_user.id,), daemon=True).start()
+        resort_collection(session, user_id=current_user.id)
 
     return RedirectResponse(url=f"/decks/{deck_id}", status_code=303)
 

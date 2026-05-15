@@ -44,6 +44,7 @@ from scripts.migrate_v3_23_3_promote_intrinsic_auto_certain import (
 from scripts.migrate_v3_23_7_token_dfc_backfill import (
     main as migrate_v3_23_7_token_dfc_backfill,
 )
+from scripts.migrate_v3_23_8_card_traits import main as migrate_v3_23_8_card_traits
 
 
 def _is_applied(name: str) -> bool:
@@ -256,6 +257,13 @@ def run():
         _mark_applied("v3_23_7_token_dfc_backfill")
     else:
         print("v3.23.7 token_dfc_backfill already applied, skipping")
+
+    if not _is_applied("v3_23_8_card_traits"):
+        print("Running v3.23.8 card-traits column migration...")
+        migrate_v3_23_8_card_traits()
+        _mark_applied("v3_23_8_card_traits")
+    else:
+        print("v3.23.8 card_traits already applied, skipping")
 
     print("Migration runner complete")
 

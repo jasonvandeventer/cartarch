@@ -58,6 +58,13 @@ class Card(Base):
     mana_cost: Mapped[str | None] = mapped_column(String(128), nullable=True)
     cmc: Mapped[float | None] = mapped_column(Float, nullable=True)
     legalities: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Scryfall-only printing traits the drawer sorter needs. NULL = not yet
+    # fetched (live-fetch fallback); populated by every card-write path so
+    # the sorter needs zero network calls once backfilled.
+    full_art: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    frame_effects: Mapped[str | None] = mapped_column(Text, nullable=True)
+    set_type: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    layout: Mapped[str | None] = mapped_column(String(64), nullable=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     inventory_rows: Mapped[list[InventoryRow]] = relationship(back_populates="card")

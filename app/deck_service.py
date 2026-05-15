@@ -1896,6 +1896,24 @@ def update_deck(
     return deck
 
 
+def list_decks_basic(session: Session, user_id: int) -> list[Deck]:
+    """Lightweight deck list for destination dropdowns.
+
+    ``list_decks`` runs ~3 queries plus combos/bracket/consistency *per
+    deck* — only the /decks table needs that. Dropdown contexts
+    (collection, import preview, location detail) just need id / name /
+    format / storage_location_id, so this is a single query with zero
+    per-deck analytics and no CommanderSpellbook network calls.
+    """
+    return (
+        session.query(Deck)
+        .options(joinedload(Deck.storage_location))
+        .filter(Deck.user_id == user_id)
+        .order_by(Deck.name.asc())
+        .all()
+    )
+
+
 def list_decks(session: Session, user_id: int) -> list[Deck]:
     decks = (
         session.query(Deck)

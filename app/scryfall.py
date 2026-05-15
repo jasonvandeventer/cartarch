@@ -99,6 +99,10 @@ def _normalize_card_payload(raw: dict[str, Any]) -> dict[str, Any]:
         "mana_cost": mana_cost,
         "cmc": raw.get("cmc"),
         "legalities": json.dumps(raw.get("legalities") or {}),
+        "full_art": bool(raw.get("full_art")),
+        "frame_effects": json.dumps(raw.get("frame_effects") or []),
+        "set_type": (raw.get("set_type") or "").lower(),
+        "layout": (raw.get("layout") or "").lower(),
     }
 
 
@@ -350,6 +354,10 @@ def refresh_card_from_scryfall(session: Session, card_id: int) -> bool:
     card.mana_cost = fresh["mana_cost"]
     card.cmc = fresh["cmc"]
     card.legalities = fresh["legalities"]
+    card.full_art = fresh["full_art"]
+    card.frame_effects = fresh["frame_effects"]
+    card.set_type = fresh["set_type"]
+    card.layout = fresh["layout"]
     card.updated_at = datetime.utcnow()
     return True
 
@@ -384,6 +392,7 @@ def fetch_card_traits(scryfall_id: str) -> dict[str, bool] | None:
         "has_extended_art_frame": "extendedart" in frame_effects_lc,
         "is_token": "token" in type_line,
         "is_token_substitute": is_token_substitute,
+        "is_token_set": set_type == "token",
     }
 
 

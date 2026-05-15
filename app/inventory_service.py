@@ -13,7 +13,11 @@ from app.audit_service import log_transaction
 from app.import_service import coerce_language_code_strict
 from app.models import Card, InventoryRow, StorageLocation, TransactionLog
 from app.pricing import effective_price
-from app.scryfall import fetch_card_by_scryfall_id, fetch_card_traits
+from app.scryfall import (
+    bulk_refresh_prices,
+    fetch_card_by_scryfall_id,
+    fetch_card_traits,
+)
 
 PRICE_STALE_DAYS = 7
 VALUE_THRESHOLD = 5.0
@@ -82,6 +86,53 @@ def _is_basic_land_any_kind(card: Card) -> bool:
     return any(name in type_line for name in _BASIC_LAND_NAMES)
 
 
+_CARD_TRAIT_KEYS = ("full_art", "frame_effects", "set_type", "layout")
+
+
+def _apply_card_traits(card: Card, payload: dict) -> None:
+    """Copy the Scryfall-only trait fields from a normalized payload onto a
+    Card, skipping keys the payload doesn't carry so a partial dict never
+    clobbers existing values with None."""
+    for key in _CARD_TRAIT_KEYS:
+        if key in payload:
+            setattr(card, key, payload[key])
+
+
+def card_traits(card: Card) -> dict[str, bool] | None:
+    """Resolve printing traits for a Card, local-first.
+
+    When the Card's ``set_type`` has been backfilled, derive every trait
+    from local columns (zero network — this is what makes the drawer
+    sorter fast). Only when ``set_type`` is still NULL (legacy card not
+    yet refreshed) do we fall back to the throttled live Scryfall fetch;
+    the price-refresh loop backfills those over time.
+    """
+    if card.set_type is None:
+        return fetch_card_traits(card.scryfall_id)
+
+    type_line = (card.type_line or "").lower()
+    try:
+        frame_effects = json.loads(card.frame_effects or "[]")
+    except (ValueError, TypeError):
+        frame_effects = []
+    frame_effects_lc = {str(eff).lower() for eff in frame_effects}
+    set_type = (card.set_type or "").lower()
+    layout = (card.layout or "").lower()
+
+    return {
+        "is_basic_land": "basic land" in type_line,
+        "is_full_art": bool(card.full_art),
+        "is_snow": "snow" in type_line,
+        "has_showcase_frame": "showcase" in frame_effects_lc,
+        "has_extended_art_frame": "extendedart" in frame_effects_lc,
+        "is_token": "token" in type_line,
+        "is_token_substitute": (
+            set_type == "token" and layout == "normal" and "token" not in type_line
+        ),
+        "is_token_set": set_type == "token",
+    }
+
+
 def is_basic_land_candidate(card: Card, finish: str) -> bool:
     """True for *plain* basic lands only — normal finish, non-full-art, non-snow.
 
@@ -94,7 +145,7 @@ def is_basic_land_candidate(card: Card, finish: str) -> bool:
     if not _is_basic_land_any_kind(card):
         return False
     type_line = (card.type_line or "").lower()
-    traits = fetch_card_traits(card.scryfall_id)
+    traits = card_traits(card)
     if traits is not None:
         if (
             traits.get("is_full_art")
@@ -122,7 +173,7 @@ def is_premium_basic(card: Card, finish: str) -> bool:
     if (finish or "").strip().lower() != "normal":
         return True
     type_line = (card.type_line or "").lower()
-    traits = fetch_card_traits(card.scryfall_id)
+    traits = card_traits(card)
     if traits is not None:
         return bool(
             traits.get("is_full_art")
@@ -140,8 +191,19 @@ def is_token_card(card: Card) -> bool:
     "Token" plus the creature subtype). The separate ``token_inventory`` table
     holds tokens not tracked as collectibles; this helper covers the case
     where a token printing slipped into ``inventory_rows`` via CSV import.
+
+    Most tokens carry "Token" in the type_line (fast path, no network).
+    Token-set helper cards like "Day // Night" have an *empty* type_line,
+    so fall back to the Scryfall ``set_type == "token"`` trait — but
+    exclude substitute cards, which share that set_type yet belong in the
+    separate substitutes section (see ``is_substitute_card``).
     """
-    return "token" in (card.type_line or "").lower()
+    if "token" in (card.type_line or "").lower():
+        return True
+    traits = card_traits(card)
+    if traits is None:
+        return False
+    return bool(traits.get("is_token_set")) and not bool(traits.get("is_token_substitute"))
 
 
 def is_substitute_card(card: Card) -> bool:
@@ -154,7 +216,7 @@ def is_substitute_card(card: Card) -> bool:
     (no "token" supertype). They look like regular cards by type_line alone,
     so this check consults the cached Scryfall traits to detect them.
     """
-    traits = fetch_card_traits(card.scryfall_id)
+    traits = card_traits(card)
     if traits is None:
         return False
     return bool(traits.get("is_token_substitute"))
@@ -287,6 +349,7 @@ def get_or_create_card(
             existing.color_identity = payload.get("color_identity")
             existing.mana_cost = payload.get("mana_cost")
             existing.cmc = payload.get("cmc")
+            _apply_card_traits(existing, payload)
             existing.updated_at = datetime.utcnow()
             session.flush()
         elif (
@@ -294,6 +357,7 @@ def get_or_create_card(
             or not existing.type_line
             or not existing.oracle_text
             or existing.color_identity is None
+            or existing.set_type is None
         ):
             payload = fetch_card_by_scryfall_id(scryfall_id)
             if payload:
@@ -312,6 +376,7 @@ def get_or_create_card(
                 existing.color_identity = payload.get("color_identity")
                 existing.mana_cost = payload.get("mana_cost")
                 existing.cmc = payload.get("cmc")
+                _apply_card_traits(existing, payload)
                 existing.updated_at = datetime.utcnow()
                 session.flush()
         return existing
@@ -1704,6 +1769,25 @@ def resort_collection(
     rows = query.all()
     if not rows:
         return 0
+
+    # Cold-path: batch-backfill printing traits for any card that hasn't
+    # been fetched yet, so assign_drawer / drawer_sort_key resolve traits
+    # locally (zero network per row). Without this, a cold-cache resort
+    # makes one throttled Scryfall GET per distinct card — minutes for a
+    # large collection. bulk_refresh_prices makes ceil(N/75) requests and
+    # degrades gracefully (empty result → per-card live fallback).
+    cards_by_sid: dict[str, Card] = {}
+    for row in rows:
+        card = row.card
+        if card is not None and card.set_type is None and card.scryfall_id:
+            cards_by_sid[card.scryfall_id] = card
+    if cards_by_sid:
+        fresh_by_id = bulk_refresh_prices(list(cards_by_sid))
+        for sid, fresh in fresh_by_id.items():
+            card = cards_by_sid.get(sid)
+            if card is not None:
+                _apply_card_traits(card, fresh)
+        session.flush()
 
     # Pre-load all drawer StorageLocations in one query instead of 6 separate ones.
     drawer_loc_ids: dict[int, int | None] = {i: None for i in range(1, 7)}
