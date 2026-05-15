@@ -1,5 +1,12 @@
 """Bracket Estimator V2 — V1 implementation.
 
+DEPRECATED: This module is targeted for removal in the analytics overhaul
+(see docs/analytics_overhaul.md). Do not extend or add new callers. The
+replacement is a three-layer composition-signals + play-record + playgroup-
+context display anchored in the user's own data rather than a single power
+score. Existing callers in deck_detail_page should remain in place until
+the overhaul ships.
+
 Per the Bracket Estimator spec (Section 7), V1 covers:
   - Hard rule detection (banned cards, Game Changers, mass land denial, extra turns)
   - Auto-tagging from oracle text rules

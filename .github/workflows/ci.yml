@@ -31,3 +31,9 @@ jobs:
 
       - name: Run Black check
         run: black --check .
+
+      - name: Run unit tests
+        env:
+          DATA_DIR: dev-data
+          DEV_MODE: "true"
+        run: python -m tests.test_deck_service

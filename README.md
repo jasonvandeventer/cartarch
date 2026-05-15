@@ -2,7 +2,36 @@
 
 Self-hosted web application for managing a physical Magic: The Gathering collection.
 
-**Current version: v3.16.23** · [Platform repo](https://github.com/jasonvandeventer/mana-archive-platform)
+**Current version: v3.23.6** · [Platform repo](https://github.com/jasonvandeventer/mana-archive-platform)
+
+---
+
+## North Star
+
+Mana Archive is the source of truth for the playgroup. Authoritative data about who owns what, what's in which deck, and how decks have performed in our games lives here. External services (Scryfall, Commander Spellbook, EDHREC) are integrated as enrichment for that data, not as replacements.
+
+Practical implications:
+
+- Recommendation features ground their suggestions in the user's collection first, the playgroup's data second, and external aggregators last.
+- Analytics compare a deck against the user's other decks and the playgroup's game history, not against community averages.
+- External service data appears as inline enrichment (per-card hover, combo detection, inclusion percentages) rather than as primary navigation surfaces.
+- Features that would route users away from Mana Archive's data toward an aggregator's data are scrutinized closely. Enrichment is welcome; replacement is not.
+
+See [docs/ROADMAP.md](docs/ROADMAP.md) for the prioritized backlog.
+
+---
+
+## Screenshots
+
+![Deck detail page](docs/screenshots/deck-detail.png)
+
+_Deck detail — hero with Bracket V2 badge, Analytics (mana curve, types, pips), Health, Synergy, and Win Conditions panels._
+
+![Collection with boolean search](docs/screenshots/collection.png)
+
+_Collection page with Scryfall-syntax search applied (`t:creature c:WU cmc:<=3`)._
+
+See [docs/screenshots/](docs/screenshots/) for capture guidelines and additional shots.
 
 ---
 
@@ -37,7 +66,7 @@ Self-hosted web application for managing a physical Magic: The Gathering collect
 - **Synergy classification**: cards split into Direct / Supporting / Unrelated based on commander themes (death triggers, tokens, sacrifice, +1/+1 counters, tribal subtypes)
 - **Win condition detection**: live integration with CommanderSpellbook to surface combos present in the deck
 - **Bracket Estimator V2** (v3.15.0+): multi-stage pipeline producing a 1-5 bracket with explainable findings. Mechanics floor (Game Changer count via Scryfall `is:gamechanger`, mass land denial, extra-turn chains) + 5-question intent survey + combo role classification (none/incidental/backup/primary/compact via Commander Spellbook). Mechanics-vs-intent mismatch warnings; multi-dimensional confidence (tagging coverage, mechanics clarity, intent alignment, combo detection depth)
-- **Role tag system** with 10 tags (Ramp, Draw, Tutor, Removal, Wipe, Protection, Engine, Synergy, Threat, Hate); auto-detected from oracle text and commander themes; **Retag** button re-runs detection over already-tagged rows additively
+- **Role tag system** with 10 tags (Ramp, Draw, Tutor, Removal, Wipe, Protection, Engine, Synergy, Threat, Hate); auto-detected from oracle text and commander themes with per-tag source + confidence tracking (auto/medium vs user/high vs auto/certain); **Retag** button re-runs detection over already-tagged rows additively; **Review tags** panel on deck detail surfaces auto/medium suggestions for one-click confirm or remove
 - Click any health metric count to filter the deck grid to just those cards
 
 ### Organization
