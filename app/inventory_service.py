@@ -10,6 +10,7 @@ from sqlalchemy import and_, cast, func, not_, or_, text, tuple_
 from sqlalchemy.orm import Session, joinedload
 
 from app.audit_service import log_transaction
+from app.import_service import coerce_language_code_strict
 from app.models import Card, InventoryRow, StorageLocation, TransactionLog
 from app.pricing import effective_price
 from app.scryfall import fetch_card_by_scryfall_id, fetch_card_traits
@@ -508,9 +509,15 @@ def _term_to_clause(key: str | None, value: str):
     if key == "drawer":
         return InventoryRow.drawer == value
     if key in ("lang", "language"):
-        code = (value or "").strip().lower()
-        if not code:
-            return None
+        # Accept Scryfall codes ("ja"), long names ("japanese"), and country-
+        # code aliases ("jp") — same alias surface as the paste-list `*XX*`
+        # marker. Unknown input returns a clause that matches nothing rather
+        # than silently coercing to English.
+        code = coerce_language_code_strict(value)
+        if code is None:
+            if not (value or "").strip():
+                return None
+            return InventoryRow.language == "__no_match__"
         # Treat NULL as "en" so historic rows imported before the language
         # column existed answer `lang:en` correctly.
         if code == "en":

@@ -140,6 +140,22 @@ def normalize_language(value: str | None) -> str:
     return "en"
 
 
+def coerce_language_code_strict(value: str | None) -> str | None:
+    """Coerce a language string to a Scryfall code, returning None on unknown.
+
+    Same alias logic as ``normalize_language`` but does NOT fall back to "en"
+    for unrecognized input — search callers want a strict result so they can
+    treat unknown input as "match nothing" rather than silently returning
+    English rows. Empty/None input also returns None.
+    """
+    cleaned = (value or "").strip().lower()
+    if not cleaned:
+        return None
+    if cleaned in _SUPPORTED_LANGUAGES:
+        return cleaned
+    return _LANGUAGE_NAME_TO_CODE.get(cleaned)
+
+
 def detect_csv_format(headers: list[str]) -> str:
     """Return a human-readable format name based on raw CSV header names."""
     lower = {(h or "").strip().lower() for h in headers}
