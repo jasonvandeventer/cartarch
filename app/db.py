@@ -16,9 +16,6 @@ DATA_DIR = Path(os.getenv("DATA_DIR", "/data"))
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 DB_PATH = DATA_DIR / "mana_archive.db"
-if not DB_PATH.exists():
-    raise RuntimeError(f"Database not found at {DB_PATH}")
-
 DATABASE_URL = f"sqlite:///{DB_PATH}"
 
 engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
@@ -33,6 +30,9 @@ Base = declarative_base()
 
 def init_db() -> None:
     """Create missing tables and validate that at least one user exists."""
+    if not DB_PATH.exists():
+        raise RuntimeError(f"Database not found at {DB_PATH}")
+
     from app import models  # noqa: F401
     from app.models import User
 
