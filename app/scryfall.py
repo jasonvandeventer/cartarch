@@ -30,7 +30,14 @@ _retry = Retry(
     read=4,
     backoff_factor=0.6,
     status_forcelist=(429, 500, 502, 503, 504),
-    allowed_methods=frozenset(["GET"]),
+    # POST is included because the only POSTs we make are to
+    # /cards/collection — an idempotent read-only batch *lookup* (it
+    # mutates nothing server-side), so retrying it on 429/5xx is safe and
+    # correct. Without this, a single transient 429/503 on a 75-id batch
+    # POST raised immediately and silently dropped all 75 ids to the
+    # per-row fallback path (the 5,758-row Helvault /import/preview 524
+    # timeout: 56 of ~75 batches lost, 4,301 sequential GET fallbacks).
+    allowed_methods=frozenset(["GET", "POST"]),
     respect_retry_after_header=True,
 )
 _adapter = HTTPAdapter(max_retries=_retry)
@@ -122,7 +129,16 @@ def _post_json(url: str, payload: dict[str, Any]) -> dict[str, Any] | None:
         response = _session.post(url, json=payload, headers=HEADERS, timeout=30)
         response.raise_for_status()
         return response.json()
-    except requests.RequestException:
+    except requests.RequestException as exc:
+        # Case (a): HTTP/network error AFTER the retry adapter exhausted its
+        # attempts. With POST now retried, reaching here means Scryfall was
+        # persistently unreachable for this batch — make it observable
+        # instead of silently dropping the whole chunk.
+        n = len(payload.get("identifiers", []))
+        print(
+            f"[scryfall-bulk] POST failed after retries ({n} identifiers): {exc}",
+            flush=True,
+        )
         return None
 
 
@@ -225,12 +241,36 @@ def bulk_refresh_prices(scryfall_ids: list[str]) -> dict[str, dict[str, Any]]:
     ids = [sid for sid in scryfall_ids if sid]
 
     for i in range(0, len(ids), _COLLECTION_BATCH_SIZE):
+        bn = i // _COLLECTION_BATCH_SIZE
         batch = ids[i : i + _COLLECTION_BATCH_SIZE]
         payload = {"identifiers": [{"id": sid} for sid in batch]}
         data = _post_json(f"{SCRYFALL_CARD_URL}/collection", payload)
         if not data:
+            # (a) follow-on: _post_json already logged the cause; record
+            # that this whole batch is unresolved for this call.
+            print(
+                f"[scryfall-bulk] bulk_refresh_prices batch {bn} dropped "
+                f"({len(batch)} ids unresolved this call)",
+                flush=True,
+            )
             continue
-        for card in data.get("data", []):
+        found = data.get("data", [])
+        not_found = data.get("not_found", [])
+        if not found:
+            # (b) successful response, zero cards matched.
+            print(
+                f"[scryfall-bulk] bulk_refresh_prices batch {bn} empty data "
+                f"({len(batch)} ids, {len(not_found)} not_found)",
+                flush=True,
+            )
+        elif not_found:
+            # (c) partial: some identifiers genuinely unknown to Scryfall.
+            print(
+                f"[scryfall-bulk] bulk_refresh_prices batch {bn}: "
+                f"{len(found)} resolved, {len(not_found)} not_found",
+                flush=True,
+            )
+        for card in found:
             normalized = _normalize_card_payload(card)
             if normalized.get("scryfall_id"):
                 results[normalized["scryfall_id"]] = normalized
@@ -255,12 +295,35 @@ def bulk_fetch_by_set_number(
     unique = list(seen.keys())
 
     for i in range(0, len(unique), _COLLECTION_BATCH_SIZE):
+        bn = i // _COLLECTION_BATCH_SIZE
         batch = unique[i : i + _COLLECTION_BATCH_SIZE]
         payload = {"identifiers": [{"set": s, "collector_number": c} for s, c in batch]}
         data = _post_json(f"{SCRYFALL_CARD_URL}/collection", payload)
         if not data:
+            # (a) follow-on: _post_json already logged the cause.
+            print(
+                f"[scryfall-bulk] bulk_fetch_by_set_number batch {bn} dropped "
+                f"({len(batch)} pairs unresolved this call)",
+                flush=True,
+            )
             continue
-        for card in data.get("data", []):
+        found = data.get("data", [])
+        not_found = data.get("not_found", [])
+        if not found:
+            # (b) successful response, zero cards matched.
+            print(
+                f"[scryfall-bulk] bulk_fetch_by_set_number batch {bn} empty data "
+                f"({len(batch)} pairs, {len(not_found)} not_found)",
+                flush=True,
+            )
+        elif not_found:
+            # (c) partial: some pairs genuinely unknown to Scryfall.
+            print(
+                f"[scryfall-bulk] bulk_fetch_by_set_number batch {bn}: "
+                f"{len(found)} resolved, {len(not_found)} not_found",
+                flush=True,
+            )
+        for card in found:
             normalized = _normalize_card_payload(card)
             if normalized.get("scryfall_id"):
                 key = (
