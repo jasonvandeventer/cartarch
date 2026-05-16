@@ -12,6 +12,7 @@ from __future__ import annotations
 import csv
 import io
 import re
+import time
 from datetime import datetime
 from typing import Any
 
@@ -212,6 +213,10 @@ def build_finish_warnings(card_data: dict | None, finish: str) -> list[str]:
 
 
 def parse_scanner_csv(file_bytes: bytes) -> dict[str, Any]:
+    # [import-preview] diagnostic instrumentation (no logic changes) — added to
+    # localize the 1,176-row Helvault CSV /import/preview 524 timeout.
+    _t_start = time.perf_counter()
+
     text = file_bytes.decode("utf-8-sig", errors="replace")
     stream = io.StringIO(text)
     reader = csv.DictReader(stream)
@@ -221,6 +226,7 @@ def parse_scanner_csv(file_bytes: bytes) -> dict[str, Any]:
     invalid_rows: list[dict[str, Any]] = []
 
     # --- Pass 1: parse rows without touching Scryfall ---
+    _t_p1 = time.perf_counter()
     pre_rows: list[dict[str, Any]] = []
     for line_number, raw_row in enumerate(reader, start=2):
         row = {normalize_header(k): (v or "").strip() for k, v in raw_row.items()}
@@ -252,6 +258,12 @@ def parse_scanner_csv(file_bytes: bytes) -> dict[str, Any]:
             }
         )
 
+    print(
+        f"[import-preview] pass1 parse: {len(pre_rows)} rows "
+        f"in {time.perf_counter() - _t_p1:.2f}s format={format_name}",
+        flush=True,
+    )
+
     # --- Pass 2: batch-fetch card data ---
     # Separate rows by identifier type; batch each group.
     id_rows = [r for r in pre_rows if r["scryfall_id"]]
@@ -263,15 +275,31 @@ def parse_scanner_csv(file_bytes: bytes) -> dict[str, Any]:
     id_map: dict[str, dict[str, Any]] = {}
     if id_rows:
         unique_ids = list({r["scryfall_id"] for r in id_rows})
+        _t_bulk = time.perf_counter()
         id_map = bulk_refresh_prices(unique_ids)
+        print(
+            f"[import-preview] pass2 bulk_refresh_prices: {len(unique_ids)} unique ids "
+            f"-> {len(id_map)} resolved in {time.perf_counter() - _t_bulk:.2f}s "
+            f"({len(unique_ids) - len(id_map)} unresolved -> per-row fallback in pass3)",
+            flush=True,
+        )
 
     # Batch-fetch by set+collector
     set_map: dict[tuple[str, str], dict[str, Any]] = {}
     if set_rows:
         pairs = [(r["set_code"], r["collector_number"]) for r in set_rows]
+        _t_setbulk = time.perf_counter()
         set_map = bulk_fetch_by_set_number(pairs)
+        print(
+            f"[import-preview] pass2 bulk_fetch_by_set_number: {len(pairs)} pairs "
+            f"-> {len(set_map)} resolved in {time.perf_counter() - _t_setbulk:.2f}s",
+            flush=True,
+        )
 
     # --- Pass 3: build output rows ---
+    _t_p3 = time.perf_counter()
+    _id_fallback_count = 0
+    _set_fallback_count = 0
     for r in pre_rows:
         cleaned = {
             "line_number": r["line_number"],
@@ -292,10 +320,12 @@ def parse_scanner_csv(file_bytes: bytes) -> dict[str, Any]:
             card_data = id_map.get(r["scryfall_id"])
             # Fall back to individual fetch for any the batch missed
             if card_data is None:
+                _id_fallback_count += 1
                 card_data = fetch_card_by_scryfall_id(r["scryfall_id"])
         elif r["set_code"] and r["collector_number"]:
             card_data = set_map.get((r["set_code"], r["collector_number"]))
             if card_data is None:
+                _set_fallback_count += 1
                 card_data = fetch_card_by_set_and_number(r["set_code"], r["collector_number"])
             if card_data and not cleaned["scryfall_id"]:
                 cleaned["scryfall_id"] = card_data.get("scryfall_id", "")
@@ -312,6 +342,20 @@ def parse_scanner_csv(file_bytes: bytes) -> dict[str, Any]:
         else:
             cleaned["reason"] = "Missing Scryfall ID and set/collector fallback fields."
             invalid_rows.append(cleaned)
+
+    print(
+        f"[import-preview] pass3 build: {len(pre_rows)} rows "
+        f"in {time.perf_counter() - _t_p3:.2f}s "
+        f"id_fallback_fetches={_id_fallback_count} "
+        f"set_fallback_fetches={_set_fallback_count} "
+        f"(each fallback = 1 throttled Scryfall GET inside the loop)",
+        flush=True,
+    )
+    print(
+        f"[import-preview] parse_scanner_csv TOTAL {time.perf_counter() - _t_start:.2f}s "
+        f"valid={len(valid_rows)} invalid={len(invalid_rows)}",
+        flush=True,
+    )
 
     return {"valid_rows": valid_rows, "invalid_rows": invalid_rows, "format_name": format_name}
 

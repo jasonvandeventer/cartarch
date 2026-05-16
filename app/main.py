@@ -428,24 +428,37 @@ async def import_preview(
     current_user: User = Depends(get_current_user),
     _: None = CsrfRequired,
 ):
+    # [import-preview] diagnostic instrumentation (no logic changes) — splits
+    # parser time from render/serialization time to localize the 524 timeout.
+    _t0 = time.perf_counter()
     file_bytes = await file.read()
+    _t_read = time.perf_counter()
     result = parse_scanner_csv(file_bytes)
+    _t_parsed = time.perf_counter()
 
-    return render(
-        request,
-        "import_preview.html",
-        {
-            "title": "Import Preview",
-            "valid_rows": result["valid_rows"],
-            "invalid_rows": result["invalid_rows"],
-            "format_name": result["format_name"],
-            "filename": file.filename,
-            "current_user": current_user,
-            "use_drawer_sorter": current_user.username in DRAWER_SORTER_USERNAMES,
-            "locations": list_locations(session, current_user.id),
-            "decks": list_decks_basic(session, user_id=current_user.id),
-        },
+    context = {
+        "title": "Import Preview",
+        "valid_rows": result["valid_rows"],
+        "invalid_rows": result["invalid_rows"],
+        "format_name": result["format_name"],
+        "filename": file.filename,
+        "current_user": current_user,
+        "use_drawer_sorter": current_user.username in DRAWER_SORTER_USERNAMES,
+        "locations": list_locations(session, current_user.id),
+        "decks": list_decks_basic(session, user_id=current_user.id),
+    }
+    _t_ctx = time.perf_counter()
+    response = render(request, "import_preview.html", context)
+    _t_rendered = time.perf_counter()
+    print(
+        f"[import-preview] route: file.read={_t_read - _t0:.2f}s "
+        f"parse_scanner_csv={_t_parsed - _t_read:.2f}s "
+        f"context_build(locations+decks)={_t_ctx - _t_parsed:.2f}s "
+        f"render={_t_rendered - _t_ctx:.2f}s "
+        f"valid={len(result['valid_rows'])} invalid={len(result['invalid_rows'])}",
+        flush=True,
     )
+    return response
 
 
 @app.post("/import/list/preview")
