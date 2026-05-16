@@ -24,8 +24,6 @@ from app.scryfall import (
     BulkFetchResult,
     bulk_fetch_by_set_number,
     bulk_refresh_prices,
-    fetch_card_by_name,
-    fetch_card_by_scryfall_id,
     fetch_card_by_set_and_number,
 )
 
@@ -301,10 +299,16 @@ def parse_scanner_csv(file_bytes: bytes) -> dict[str, Any]:
             flush=True,
         )
 
-    # --- Pass 3: build output rows ---
+    # --- Pass 3: build output rows (batch-only resolution; NO network) ---
+    # Invariant: nothing in this loop may call Scryfall. Pass 2's batched
+    # lookup is the single resolution point. A row that Pass 2 did not
+    # resolve becomes an invalid_row the user sees — it must never trigger
+    # a per-row live fetch (the v3.23.9 request-path-immunity principle;
+    # the per-row fallback here was the 5,758-row /import/preview 524).
     _t_p3 = time.perf_counter()
-    _id_fallback_count = 0
-    _set_fallback_count = 0
+    _id_failed = set(id_result.failed)
+    _set_failed = set(set_result.failed)
+    _unresolved_count = 0
     for r in pre_rows:
         cleaned = {
             "line_number": r["line_number"],
@@ -323,37 +327,49 @@ def parse_scanner_csv(file_bytes: bytes) -> dict[str, Any]:
         card_data: dict[str, Any] | None = None
         if r["scryfall_id"]:
             card_data = id_map.get(r["scryfall_id"])
-            # Fall back to individual fetch for any the batch missed
-            if card_data is None:
-                _id_fallback_count += 1
-                card_data = fetch_card_by_scryfall_id(r["scryfall_id"])
         elif r["set_code"] and r["collector_number"]:
             card_data = set_map.get((r["set_code"], r["collector_number"]))
-            if card_data is None:
-                _set_fallback_count += 1
-                card_data = fetch_card_by_set_and_number(r["set_code"], r["collector_number"])
             if card_data and not cleaned["scryfall_id"]:
                 cleaned["scryfall_id"] = card_data.get("scryfall_id", "")
 
-        if r["scryfall_id"] or (r["set_code"] and r["collector_number"]):
+        has_identifier = bool(r["scryfall_id"]) or bool(r["set_code"] and r["collector_number"])
+
+        if card_data:
             cleaned["warnings"] = build_finish_warnings(card_data, r["finish"])
-            if card_data:
-                cleaned["name"] = card_data.get("name") or cleaned["name"]
-                cleaned["set_code"] = card_data.get("set_code") or cleaned["set_code"]
-                cleaned["collector_number"] = (
-                    card_data.get("collector_number") or cleaned["collector_number"]
-                )
+            cleaned["name"] = card_data.get("name") or cleaned["name"]
+            cleaned["set_code"] = card_data.get("set_code") or cleaned["set_code"]
+            cleaned["collector_number"] = (
+                card_data.get("collector_number") or cleaned["collector_number"]
+            )
             valid_rows.append(cleaned)
-        else:
+        elif not has_identifier:
             cleaned["reason"] = "Missing Scryfall ID and set/collector fallback fields."
+            invalid_rows.append(cleaned)
+        else:
+            # Had an identifier but Pass 2's batch did not resolve it.
+            # Distinguish transient (batch errored after retries — re-import
+            # may fix) from permanent (Scryfall genuinely has no such card).
+            _unresolved_count += 1
+            if (
+                r["scryfall_id"] in _id_failed
+                or (
+                    r["set_code"],
+                    r["collector_number"],
+                )
+                in _set_failed
+            ):
+                cleaned["reason"] = (
+                    "Scryfall lookup temporarily failed for this batch — " "re-import to retry."
+                )
+            else:
+                cleaned["reason"] = "Card not found in Scryfall data."
             invalid_rows.append(cleaned)
 
     print(
         f"[import-preview] pass3 build: {len(pre_rows)} rows "
         f"in {time.perf_counter() - _t_p3:.2f}s "
-        f"id_fallback_fetches={_id_fallback_count} "
-        f"set_fallback_fetches={_set_fallback_count} "
-        f"(each fallback = 1 throttled Scryfall GET inside the loop)",
+        f"unresolved_to_invalid={_unresolved_count} "
+        f"(zero in-loop network — batch-only resolution)",
         flush=True,
     )
     print(
@@ -794,6 +810,27 @@ def _parse_list_line(line: str) -> dict[str, Any] | None:
     }
 
 
+def _text_list_unresolved_reason(
+    parsed: dict[str, Any], label: str, set_failed: set[tuple[str, str]]
+) -> str:
+    """Reason string for a paste-list line Pass 2's batch did not resolve.
+
+    Distinguishes the three post-v3.23.x cases so the user knows what to do:
+    transient batch failure (retry), bare name (no batch path — needs a
+    set+collector or the name-search import UI), or genuinely-unknown card.
+    """
+    if parsed["set_code"] and parsed["collector_number"]:
+        if (parsed["set_code"], parsed["collector_number"]) in set_failed:
+            return f"Scryfall lookup temporarily failed — re-import to retry: {label}"
+        return f"Card not found on Scryfall: {label}"
+    # No set+collector: a bare name line. There is no batch name endpoint,
+    # and per-line live name lookup was removed (request-path immunity).
+    return (
+        f"Bare card names can't be batch-resolved — add a set + collector "
+        f'(e.g. "MH3 145") or use Import by name: {label}'
+    )
+
+
 def parse_text_list(text: str) -> dict[str, Any]:
     """Parse a pasted card list in Moxfield / MTGA / MTGO format.
 
@@ -828,20 +865,17 @@ def parse_text_list(text: str) -> dict[str, Any]:
         set_result = bulk_fetch_by_set_number(batchable)
         set_map = set_result.cards
 
-    # --- Pass 3: resolve each line, falling back to name search for misses ---
+    # --- Pass 3: resolve each line from Pass 2's batch ONLY (no network) ---
+    # Same invariant as parse_scanner_csv: nothing in this loop calls
+    # Scryfall. Bare card-name lines (no set/collector) cannot be
+    # batch-resolved — Scryfall has no batch name endpoint — so they now
+    # surface as invalid rows instead of triggering a per-line live name
+    # lookup (the v3.23.9 request-path-immunity principle).
+    _set_failed = set(set_result.failed)
     for line_number, parsed in pre_lines:
         card_data: dict[str, Any] | None = None
-        try:
-            if parsed["set_code"] and parsed["collector_number"]:
-                card_data = set_map.get((parsed["set_code"], parsed["collector_number"]))
-                if card_data is None:
-                    card_data = fetch_card_by_set_and_number(
-                        parsed["set_code"], parsed["collector_number"]
-                    )
-            if not card_data and parsed["name"]:
-                card_data = fetch_card_by_name(parsed["name"], set_code=parsed["set_code"])
-        except Exception:
-            card_data = None
+        if parsed["set_code"] and parsed["collector_number"]:
+            card_data = set_map.get((parsed["set_code"], parsed["collector_number"]))
 
         if card_data:
             valid_rows.append(
@@ -875,7 +909,7 @@ def parse_text_list(text: str) -> dict[str, Any]:
                     "collector_number": parsed["collector_number"],
                     "finish": parsed["finish"],
                     "quantity": parsed["quantity"],
-                    "reason": f"Card not found on Scryfall: {label}",
+                    "reason": _text_list_unresolved_reason(parsed, label, _set_failed),
                 }
             )
 

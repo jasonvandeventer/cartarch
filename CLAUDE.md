@@ -57,6 +57,21 @@ The `decks` list (from `list_decks()`) is passed to all three preview templates:
 
 `InventoryRow.role` (nullable String(32)) marks a card's role within a deck. Currently only value used is `"commander"`. Set via `POST /decks/rows/{row_id}/toggle-commander`. In `deck_detail.html`, cards with `role=="commander"` appear in a separate **Commander(s)** panel above the main deck grid. Added via `scripts/migrate_v3_5_inventory_role.py`.
 
+### Request-path network invariant
+
+**No code reachable from an HTTP request handler may make a Scryfall (or any external) call inside a loop.** A request handler does at most a *fixed, batched* number of external calls (e.g. `bulk_refresh_prices` / `bulk_fetch_by_set_number`, which are `ceil(N/75)` POSTs), never one-per-row. Per-row external I/O on the request path is the recurring outage class in this codebase:
+
+- v3.23.9: `resort_collection` live-fetched traits per card while holding the SQLite write transaction → pod lockup.
+- v3.23.x import: `parse_scanner_csv`/`parse_text_list` Pass 3 fell back to `fetch_card_by_*` per unresolved row → 4,301 sequential throttled GETs on a 5,758-row Helvault import → Cloudflare 524.
+
+The structural rule that prevents recurrence:
+
+1. **Resolve in one batched pass.** Make the batch reliable (e.g. the retry adapter must cover POST — `/cards/collection` is an idempotent read-only lookup) and return *what failed*, not just what succeeded (`BulkFetchResult.cards/not_found/failed`).
+2. **A batch miss fails fast and visibly.** Unresolved rows become `invalid_rows` shown to the user (transient-vs-permanent reason from `.failed` vs `.not_found`); they must never degrade into per-row live fetches.
+3. **Backfill belongs off the request path.** Anything needing per-item external data converges via a background daemon loop (the `_price_refresh_loop` / `_trait_backfill_loop` pattern: bounded batch, commit-per-batch, terminating), not inside the request.
+
+Background daemon loops are the *only* place per-item external fetching is allowed, and even there it is batched + bounded. Note the deliberate consequence: bare-name paste-list lines (no set/collector) have no batch endpoint, so they now resolve to `invalid_rows` directing the user to add a set+collector or use the name-search import UI — accepted as the cost of request-path immunity.
+
 ### Migrations
 
 Idempotent migration scripts live in `scripts/`. `scripts/run_migrations.py` is the runner — add new migrations there in order. Each migration is tracked by name in the `schema_migrations` SQLite table. `run_migrations()` is called from `on_startup()` in `main.py`, so every deploy automatically applies pending migrations before the app serves traffic.
