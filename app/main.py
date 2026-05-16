@@ -1188,8 +1188,11 @@ async def import_commit(
             placed_in = loc.name if loc else None
             placed_in_url = f"/locations/{target_location_id}" if loc else "/pending"
             placed_in_kind = ("deck" if loc.type == "deck" else "location") if loc else None
-            if loc and loc.type != "deck" and current_user.username in DRAWER_SORTER_USERNAMES:
-                resort_collection(session, user_id=current_user.id)
+            # No resort here: an explicit destination (box/binder/other or a
+            # deck) was chosen, so the cards belong THERE. Running the drawer
+            # sorter would yank them straight back out into the drawers. The
+            # sorter only runs on the "Auto-sort to drawers" path (the elif
+            # below, where no target_location_id was selected).
         elif row_ids and current_user.username in DRAWER_SORTER_USERNAMES:
             resort_collection(session, user_id=current_user.id)
             return RedirectResponse(url="/pending", status_code=303)
@@ -1206,8 +1209,11 @@ async def import_commit(
             placed_in = loc.name if loc else None
             placed_in_url = f"/locations/{target_location_id}" if loc else "/pending"
             placed_in_kind = ("deck" if loc.type == "deck" else "location") if loc else None
-            if loc and loc.type != "deck" and current_user.username in DRAWER_SORTER_USERNAMES:
-                resort_collection(session, user_id=current_user.id)
+            # No resort here: an explicit destination (box/binder/other or a
+            # deck) was chosen, so the cards belong THERE. Running the drawer
+            # sorter would yank them straight back out into the drawers. The
+            # sorter only runs on the "Auto-sort to drawers" path (the elif
+            # below, where no target_location_id was selected).
 
         elif row_ids and current_user.username in DRAWER_SORTER_USERNAMES:
             resort_collection(session, user_id=current_user.id)
@@ -1494,8 +1500,11 @@ async def manual_import_commit(
             placed_in = loc.name if loc else None
             placed_in_url = f"/locations/{target_location_id}" if loc else "/pending"
             placed_in_kind = ("deck" if loc.type == "deck" else "location") if loc else None
-            if loc and loc.type != "deck" and current_user.username in DRAWER_SORTER_USERNAMES:
-                resort_collection(session, user_id=current_user.id)
+            # No resort here: an explicit destination (box/binder/other or a
+            # deck) was chosen, so the cards belong THERE. Running the drawer
+            # sorter would yank them straight back out into the drawers. The
+            # sorter only runs on the "Auto-sort to drawers" path (the elif
+            # below, where no target_location_id was selected).
         elif row_ids and current_user.username in DRAWER_SORTER_USERNAMES:
             resort_collection(session, user_id=current_user.id)
     else:
@@ -1512,8 +1521,11 @@ async def manual_import_commit(
             placed_in = loc.name if loc else None
             placed_in_url = f"/locations/{target_location_id}" if loc else "/pending"
             placed_in_kind = ("deck" if loc.type == "deck" else "location") if loc else None
-            if loc and loc.type != "deck" and current_user.username in DRAWER_SORTER_USERNAMES:
-                resort_collection(session, user_id=current_user.id)
+            # No resort here: an explicit destination (box/binder/other or a
+            # deck) was chosen, so the cards belong THERE. Running the drawer
+            # sorter would yank them straight back out into the drawers. The
+            # sorter only runs on the "Auto-sort to drawers" path (the elif
+            # below, where no target_location_id was selected).
         elif row_ids and current_user.username in DRAWER_SORTER_USERNAMES:
             resort_collection(session, user_id=current_user.id)
 

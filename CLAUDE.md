@@ -30,6 +30,8 @@ To add a user to the auto-sorter, update `DRAWER_SORTER_USERNAMES` in `app/depen
 
 All import paths (CSV, paste list, and manual) present a **Destination** dropdown at commit time. For drawer-sorter users the first option is "Auto-sort to drawers" (existing behaviour); any other selection places cards directly into that StorageLocation and skips pending entirely. For other users, a location must be chosen.
 
+**`resort_collection` runs only on the "Auto-sort to drawers" path** (no explicit `target_location_id`). When a drawer-sorter user explicitly picks any other destination — a box, binder, other StorageLocation, or a deck — the cards stay where they were placed and the sorter does NOT run; running it would immediately pull them back into the drawers. This supersedes the v3.11.17 "auto-resort on any non-deck import" behaviour, which incorrectly hijacked explicit box/binder imports.
+
 **Decks appear as destinations** in the dropdown (as a separate `<optgroup>`), using the deck's `storage_location_id` as the value. This lets users import directly into a deck without the placement step. `place_imported_rows()` in `inventory_service.py` handles bulk placement to any location, including deck locations.
 
 The `decks` list (from `list_decks()`) is passed to all three preview templates: `import_preview.html`, `manual_preview.html`.
@@ -59,18 +61,18 @@ The `decks` list (from `list_decks()`) is passed to all three preview templates:
 
 ### Request-path network invariant
 
-**No code reachable from an HTTP request handler may make a Scryfall (or any external) call inside a loop.** A request handler does at most a *fixed, batched* number of external calls (e.g. `bulk_refresh_prices` / `bulk_fetch_by_set_number`, which are `ceil(N/75)` POSTs), never one-per-row. Per-row external I/O on the request path is the recurring outage class in this codebase:
+**No code reachable from an HTTP request handler may make a Scryfall (or any external) call inside a loop.** A request handler does at most a _fixed, batched_ number of external calls (e.g. `bulk_refresh_prices` / `bulk_fetch_by_set_number`, which are `ceil(N/75)` POSTs), never one-per-row. Per-row external I/O on the request path is the recurring outage class in this codebase:
 
 - v3.23.9: `resort_collection` live-fetched traits per card while holding the SQLite write transaction → pod lockup.
 - v3.23.x import: `parse_scanner_csv`/`parse_text_list` Pass 3 fell back to `fetch_card_by_*` per unresolved row → 4,301 sequential throttled GETs on a 5,758-row Helvault import → Cloudflare 524.
 
 The structural rule that prevents recurrence:
 
-1. **Resolve in one batched pass.** Make the batch reliable (e.g. the retry adapter must cover POST — `/cards/collection` is an idempotent read-only lookup) and return *what failed*, not just what succeeded (`BulkFetchResult.cards/not_found/failed`).
+1. **Resolve in one batched pass.** Make the batch reliable (e.g. the retry adapter must cover POST — `/cards/collection` is an idempotent read-only lookup) and return _what failed_, not just what succeeded (`BulkFetchResult.cards/not_found/failed`).
 2. **A batch miss fails fast and visibly.** Unresolved rows become `invalid_rows` shown to the user (transient-vs-permanent reason from `.failed` vs `.not_found`); they must never degrade into per-row live fetches.
 3. **Backfill belongs off the request path.** Anything needing per-item external data converges via a background daemon loop (the `_price_refresh_loop` / `_trait_backfill_loop` pattern: bounded batch, commit-per-batch, terminating), not inside the request.
 
-Background daemon loops are the *only* place per-item external fetching is allowed, and even there it is batched + bounded. Note the deliberate consequence: bare-name paste-list lines (no set/collector) have no batch endpoint, so they now resolve to `invalid_rows` directing the user to add a set+collector or use the name-search import UI — accepted as the cost of request-path immunity.
+Background daemon loops are the _only_ place per-item external fetching is allowed, and even there it is batched + bounded. Note the deliberate consequence: bare-name paste-list lines (no set/collector) have no batch endpoint, so they now resolve to `invalid_rows` directing the user to add a set+collector or use the name-search import UI — accepted as the cost of request-path immunity.
 
 ### Migrations
 
