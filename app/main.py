@@ -214,7 +214,14 @@ def _run_price_refresh_batch() -> None:
         if not stale:
             return
 
-        fresh_by_id = bulk_refresh_prices([c.scryfall_id for c in stale])
+        _bulk = bulk_refresh_prices([c.scryfall_id for c in stale])
+        fresh_by_id = _bulk.cards
+        if _bulk.not_found or _bulk.failed:
+            print(
+                f"[price-refresh] bulk: {len(fresh_by_id)} resolved, "
+                f"{len(_bulk.not_found)} not_found, {len(_bulk.failed)} failed",
+                flush=True,
+            )
         now = datetime.utcnow()
         updated = 0
         for card in stale:
@@ -281,7 +288,14 @@ def _run_trait_backfill_batch() -> int:
         if not pending:
             return 0
 
-        fresh_by_id = bulk_refresh_prices([c.scryfall_id for c in pending])
+        _bulk = bulk_refresh_prices([c.scryfall_id for c in pending])
+        fresh_by_id = _bulk.cards
+        if _bulk.not_found or _bulk.failed:
+            print(
+                f"[trait-backfill] bulk: {len(fresh_by_id)} resolved, "
+                f"{len(_bulk.not_found)} not_found, {len(_bulk.failed)} failed",
+                flush=True,
+            )
         now = datetime.utcnow()
         for card in pending:
             fresh = fresh_by_id.get(card.scryfall_id)

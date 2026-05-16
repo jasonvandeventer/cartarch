@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import time
+from dataclasses import dataclass, field
 from datetime import datetime
 from functools import lru_cache
 from typing import Any
@@ -231,13 +232,43 @@ def fetch_deck_tokens(scryfall_ids: list[str]) -> list[dict[str, str]]:
     return result
 
 
-def bulk_refresh_prices(scryfall_ids: list[str]) -> dict[str, dict[str, Any]]:
-    """Fetch fresh price data for many cards using the /cards/collection batch endpoint.
+@dataclass(frozen=True)
+class BulkFetchResult:
+    """Result of a batched /cards/collection lookup.
 
-    Returns a dict keyed by scryfall_id with normalized card payloads.
-    Makes ceil(N/75) requests instead of N individual requests.
+    ``cards`` is the resolved payload map (the previous bare return value —
+    callers that only need lookups read ``.cards``). ``not_found`` and
+    ``failed`` make the resolution gap structurally visible:
+
+    - ``not_found``: identifiers Scryfall explicitly returned in its
+      ``not_found`` array — genuinely unknown to Scryfall. Permanent;
+      retrying will not resolve them.
+    - ``failed``: identifiers whose batch POST errored after the retry
+      adapter exhausted its attempts (Scryfall unreachable/persistently
+      5xx for that chunk). Transient; a later import may resolve them.
+
+    The identifier element type matches the function: ``str`` scryfall_id
+    for :func:`bulk_refresh_prices`, ``(set_lower, collector)`` tuple for
+    :func:`bulk_fetch_by_set_number`. Keeping the two distinct lets the
+    caller tell "this card does not exist" apart from "Scryfall was down"
+    when reporting to the user.
+    """
+
+    cards: dict = field(default_factory=dict)
+    not_found: list = field(default_factory=list)
+    failed: list = field(default_factory=list)
+
+
+def bulk_refresh_prices(scryfall_ids: list[str]) -> BulkFetchResult:
+    """Fetch fresh card payloads for many ids via the /cards/collection batch endpoint.
+
+    Returns a :class:`BulkFetchResult`; ``.cards`` is keyed by scryfall_id.
+    Makes ceil(N/75) requests instead of N individual requests. (Name is
+    historical — it fetches payloads; it does not write the DB.)
     """
     results: dict[str, dict[str, Any]] = {}
+    not_found: list[str] = []
+    failed: list[str] = []
     ids = [sid for sid in scryfall_ids if sid]
 
     for i in range(0, len(ids), _COLLECTION_BATCH_SIZE):
@@ -246,8 +277,9 @@ def bulk_refresh_prices(scryfall_ids: list[str]) -> dict[str, dict[str, Any]]:
         payload = {"identifiers": [{"id": sid} for sid in batch]}
         data = _post_json(f"{SCRYFALL_CARD_URL}/collection", payload)
         if not data:
-            # (a) follow-on: _post_json already logged the cause; record
-            # that this whole batch is unresolved for this call.
+            # (a) follow-on: _post_json already logged the cause; this whole
+            # batch is unresolved-but-retryable for this call.
+            failed.extend(batch)
             print(
                 f"[scryfall-bulk] bulk_refresh_prices batch {bn} dropped "
                 f"({len(batch)} ids unresolved this call)",
@@ -255,19 +287,22 @@ def bulk_refresh_prices(scryfall_ids: list[str]) -> dict[str, dict[str, Any]]:
             )
             continue
         found = data.get("data", [])
-        not_found = data.get("not_found", [])
+        batch_not_found = [
+            nf.get("id", "") for nf in data.get("not_found", []) if isinstance(nf, dict)
+        ]
+        not_found.extend(sid for sid in batch_not_found if sid)
         if not found:
             # (b) successful response, zero cards matched.
             print(
                 f"[scryfall-bulk] bulk_refresh_prices batch {bn} empty data "
-                f"({len(batch)} ids, {len(not_found)} not_found)",
+                f"({len(batch)} ids, {len(batch_not_found)} not_found)",
                 flush=True,
             )
-        elif not_found:
+        elif batch_not_found:
             # (c) partial: some identifiers genuinely unknown to Scryfall.
             print(
                 f"[scryfall-bulk] bulk_refresh_prices batch {bn}: "
-                f"{len(found)} resolved, {len(not_found)} not_found",
+                f"{len(found)} resolved, {len(batch_not_found)} not_found",
                 flush=True,
             )
         for card in found:
@@ -275,18 +310,22 @@ def bulk_refresh_prices(scryfall_ids: list[str]) -> dict[str, dict[str, Any]]:
             if normalized.get("scryfall_id"):
                 results[normalized["scryfall_id"]] = normalized
 
-    return results
+    return BulkFetchResult(cards=results, not_found=not_found, failed=failed)
 
 
 def bulk_fetch_by_set_number(
     pairs: list[tuple[str, str]],
-) -> dict[tuple[str, str], dict[str, Any]]:
+) -> BulkFetchResult:
     """Batch-fetch cards by (set_code, collector_number) via /cards/collection.
 
-    Returns a dict keyed by (set_code_lower, collector_number).
+    Returns a :class:`BulkFetchResult`; ``.cards`` is keyed by
+    (set_code_lower, collector_number), and ``.not_found`` / ``.failed``
+    hold the same tuple key shape.
     Makes ceil(N/75) requests instead of N individual requests.
     """
     results: dict[tuple[str, str], dict[str, Any]] = {}
+    not_found: list[tuple[str, str]] = []
+    failed: list[tuple[str, str]] = []
     seen: dict[tuple[str, str], None] = {}
     for s, c in pairs:
         key = ((s or "").strip().lower(), (c or "").strip())
@@ -300,7 +339,9 @@ def bulk_fetch_by_set_number(
         payload = {"identifiers": [{"set": s, "collector_number": c} for s, c in batch]}
         data = _post_json(f"{SCRYFALL_CARD_URL}/collection", payload)
         if not data:
-            # (a) follow-on: _post_json already logged the cause.
+            # (a) follow-on: _post_json already logged the cause;
+            # unresolved-but-retryable for this call.
+            failed.extend(batch)
             print(
                 f"[scryfall-bulk] bulk_fetch_by_set_number batch {bn} dropped "
                 f"({len(batch)} pairs unresolved this call)",
@@ -308,19 +349,24 @@ def bulk_fetch_by_set_number(
             )
             continue
         found = data.get("data", [])
-        not_found = data.get("not_found", [])
+        batch_not_found = [
+            ((nf.get("set") or "").lower(), nf.get("collector_number") or "")
+            for nf in data.get("not_found", [])
+            if isinstance(nf, dict)
+        ]
+        not_found.extend(k for k in batch_not_found if k[0] and k[1])
         if not found:
             # (b) successful response, zero cards matched.
             print(
                 f"[scryfall-bulk] bulk_fetch_by_set_number batch {bn} empty data "
-                f"({len(batch)} pairs, {len(not_found)} not_found)",
+                f"({len(batch)} pairs, {len(batch_not_found)} not_found)",
                 flush=True,
             )
-        elif not_found:
+        elif batch_not_found:
             # (c) partial: some pairs genuinely unknown to Scryfall.
             print(
                 f"[scryfall-bulk] bulk_fetch_by_set_number batch {bn}: "
-                f"{len(found)} resolved, {len(not_found)} not_found",
+                f"{len(found)} resolved, {len(batch_not_found)} not_found",
                 flush=True,
             )
         for card in found:
@@ -332,7 +378,7 @@ def bulk_fetch_by_set_number(
                 )
                 results[key] = normalized
 
-    return results
+    return BulkFetchResult(cards=results, not_found=not_found, failed=failed)
 
 
 @lru_cache(maxsize=8192)

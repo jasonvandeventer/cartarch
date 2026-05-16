@@ -21,6 +21,7 @@ from sqlalchemy.orm import Session
 from app.audit_service import create_import_batch, log_transaction
 from app.models import Card, InventoryRow
 from app.scryfall import (
+    BulkFetchResult,
     bulk_fetch_by_set_number,
     bulk_refresh_prices,
     fetch_card_by_name,
@@ -273,10 +274,12 @@ def parse_scanner_csv(file_bytes: bytes) -> dict[str, Any]:
 
     # Batch-fetch by scryfall_id
     id_map: dict[str, dict[str, Any]] = {}
+    id_result = BulkFetchResult()
     if id_rows:
         unique_ids = list({r["scryfall_id"] for r in id_rows})
         _t_bulk = time.perf_counter()
-        id_map = bulk_refresh_prices(unique_ids)
+        id_result = bulk_refresh_prices(unique_ids)
+        id_map = id_result.cards
         print(
             f"[import-preview] pass2 bulk_refresh_prices: {len(unique_ids)} unique ids "
             f"-> {len(id_map)} resolved in {time.perf_counter() - _t_bulk:.2f}s "
@@ -286,10 +289,12 @@ def parse_scanner_csv(file_bytes: bytes) -> dict[str, Any]:
 
     # Batch-fetch by set+collector
     set_map: dict[tuple[str, str], dict[str, Any]] = {}
+    set_result = BulkFetchResult()
     if set_rows:
         pairs = [(r["set_code"], r["collector_number"]) for r in set_rows]
         _t_setbulk = time.perf_counter()
-        set_map = bulk_fetch_by_set_number(pairs)
+        set_result = bulk_fetch_by_set_number(pairs)
+        set_map = set_result.cards
         print(
             f"[import-preview] pass2 bulk_fetch_by_set_number: {len(pairs)} pairs "
             f"-> {len(set_map)} resolved in {time.perf_counter() - _t_setbulk:.2f}s",
@@ -399,7 +404,7 @@ def persist_import_rows(
     if no_id_rows:
         fallback_set_map = bulk_fetch_by_set_number(
             [(r["set_code"], r["collector_number"]) for r in no_id_rows]
-        )
+        ).cards
 
     candidate_rows: list[dict[str, Any]] = []
     for row in rows:
@@ -458,7 +463,7 @@ def persist_import_rows(
         }
         need_fetch = [sid for sid in missing_ids if sid not in prefetch_map]
         if need_fetch:
-            prefetch_map.update(bulk_refresh_prices(need_fetch))
+            prefetch_map.update(bulk_refresh_prices(need_fetch).cards)
 
         for sid in missing_ids:
             payload = prefetch_map.get(sid)
@@ -813,13 +818,15 @@ def parse_text_list(text: str) -> dict[str, Any]:
 
     # --- Pass 2: batch-fetch all set+collector pairs at once ---
     set_map: dict[tuple[str, str], dict[str, Any]] = {}
+    set_result = BulkFetchResult()
     batchable = [
         (p["set_code"], p["collector_number"])
         for _, p in pre_lines
         if p["set_code"] and p["collector_number"]
     ]
     if batchable:
-        set_map = bulk_fetch_by_set_number(batchable)
+        set_result = bulk_fetch_by_set_number(batchable)
+        set_map = set_result.cards
 
     # --- Pass 3: resolve each line, falling back to name search for misses ---
     for line_number, parsed in pre_lines:
