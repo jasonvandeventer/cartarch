@@ -10,3 +10,11 @@ dev-data/
 backups/
 .claude/scheduled_tasks.lock
 memory/
+
+# Vault-symlinked project memory — CLAUDE.md / current-status.md are absolute
+# symlinks into /home/jason/lab/ai-context/mana-archive/ (the ai-context vault,
+# its own repo). Tracking out-of-bounds symlinks is bad hygiene: fresh clones
+# get dangling links and it's the ArgoCD repo-server failure class if ever
+# rendered as manifests. Local symlinks stay for the vault workflow.
+CLAUDE.md
+current-status.md
