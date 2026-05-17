@@ -13,6 +13,7 @@ from datetime import datetime
 from functools import lru_cache
 from typing import Any
 
+import ijson
 import requests
 from requests.adapters import HTTPAdapter
 from sqlalchemy import bindparam, text
@@ -507,6 +508,144 @@ def bulk_fetch_by_set_number(
                 results[key] = normalized
 
     return BulkFetchResult(cards=results, not_found=not_found, failed=failed)
+
+
+# ---------------------------------------------------------------------------
+# Local cache population daemon (v3.25.0).
+#
+# Off the request path entirely: a background thread that mirrors Scryfall's
+# `default-cards` bulk export into the local scryfall_cards table so the
+# request-path resolvers above become local-first SQLite reads. Modeled on
+# main._trait_backfill_loop: initial sleep, while True, per-batch commit,
+# never dies silently. No VACUUM anywhere (the 5 Gi PVC cannot absorb a 2x
+# transient rewrite).
+# ---------------------------------------------------------------------------
+
+SCRYFALL_BULK_URL = "https://api.scryfall.com/bulk-data"
+_BULK_META_KEY = "default_cards_updated_at"
+# 1000 normalized dicts × ~2 KB ≈ ~2 MB transient — well under the pod
+# memory limit, and a transaction-size sweet spot for SQLite write
+# throughput that does not hold the write lock long enough to matter (the
+# v3.23.9 lock-hold lesson).
+_BULK_UPSERT_BATCH = 1000
+_BULK_INITIAL_SLEEP_SECONDS = 60  # let the app come up before the first poll
+_BULK_POLL_INTERVAL_SECONDS = 24 * 60 * 60  # Scryfall rebuilds ~daily
+
+# Built once from _CACHE_COLUMNS so the upsert can never drift from the
+# normalizer/seam contract. scryfall_id is the conflict target, never updated.
+_BULK_COLS = [c.strip() for c in _CACHE_COLUMNS.split(",")]
+_BULK_UPSERT_SQL = text(
+    f"INSERT INTO scryfall_cards ({_CACHE_COLUMNS}) "
+    f"VALUES ({', '.join(':' + c for c in _BULK_COLS)}) "
+    "ON CONFLICT(scryfall_id) DO UPDATE SET "
+    + ", ".join(f"{c} = excluded.{c}" for c in _BULK_COLS if c != "scryfall_id")
+)
+_BULK_META_UPSERT_SQL = text(
+    "INSERT INTO scryfall_bulk_meta (key, value) VALUES (:key, :value) "
+    "ON CONFLICT(key) DO UPDATE SET value = excluded.value"
+)
+
+
+def _bulk_meta_get(key: str) -> str | None:
+    with engine.connect() as conn:
+        row = conn.execute(
+            text("SELECT value FROM scryfall_bulk_meta WHERE key = :k"), {"k": key}
+        ).fetchone()
+    return row[0] if row else None
+
+
+def _flush_bulk_batch(batch: list[dict[str, Any]]) -> None:
+    """Upsert one batch and commit it. ``engine.begin()`` commits on context
+    exit, so a crash mid-population leaves every prior batch durably written
+    and the next pass simply no-ops over them (partial-write recovery).
+    """
+    if not batch:
+        return
+    with engine.begin() as conn:
+        conn.execute(_BULK_UPSERT_SQL, batch)
+
+
+def refresh_bulk_cache() -> int:
+    """One freshness-guarded population pass over the default-cards export.
+
+    Returns the number of cards upserted: 0 when the cache is already current
+    (freshness guard skipped the download) or the bulk listing could not be
+    read. Raises on download/parse failure so the caller logs it and the meta
+    row stays at the OLD updated_at — the next pass then re-attempts the same
+    export from scratch (upsert makes the re-run idempotent).
+    """
+    # download_uri changes every rebuild — it MUST come from the live
+    # /bulk-data listing, never a constructed/hardcoded URL.
+    listing = _get_json(SCRYFALL_BULK_URL)
+    if not listing:
+        print("[bulk-data] GET /bulk-data failed; will retry next cycle", flush=True)
+        return 0
+    entry = next(
+        (d for d in listing.get("data", []) if d.get("type") == "default_cards"),
+        None,
+    )
+    if not entry:
+        print("[bulk-data] no default_cards entry in /bulk-data response", flush=True)
+        return 0
+    updated_at = entry.get("updated_at")
+    download_uri = entry.get("download_uri")
+    if not updated_at or not download_uri:
+        print("[bulk-data] default_cards entry missing updated_at/download_uri", flush=True)
+        return 0
+
+    if _bulk_meta_get(_BULK_META_KEY) == updated_at:
+        print(
+            f"[bulk-data] cache current (updated_at={updated_at}); skipping download",
+            flush=True,
+        )
+        return 0
+
+    print(f"[bulk-data] new export {updated_at}; streaming {download_uri}", flush=True)
+    _throttle()
+    resp = _session.get(download_uri, headers=HEADERS, stream=True, timeout=(30, 600))
+    resp.raise_for_status()
+    resp.raw.decode_content = True  # transparently inflate gzip/deflate
+
+    total = 0
+    batch: list[dict[str, Any]] = []
+    try:
+        # Stream one card object at a time — the export is a single ~2 GB
+        # JSON array; it is NEVER json.load()ed. use_float=True yields float
+        # (not Decimal) so cmc round-trips byte-identically with the API path.
+        for card in ijson.items(resp.raw, "item", use_float=True):
+            normalized = _normalize_card_payload(card)
+            if not normalized.get("scryfall_id"):
+                continue  # PK cannot be NULL — skip malformed/idless entries
+            batch.append(normalized)
+            if len(batch) >= _BULK_UPSERT_BATCH:
+                _flush_bulk_batch(batch)
+                total += len(batch)
+                batch = []
+        _flush_bulk_batch(batch)
+        total += len(batch)
+    finally:
+        resp.close()
+
+    # Meta is written ONLY after a fully successful population. If anything
+    # above raised we never reach here: the meta row keeps its old value and
+    # the next pass re-downloads the same export from scratch.
+    with engine.begin() as conn:
+        conn.execute(_BULK_META_UPSERT_SQL, {"key": _BULK_META_KEY, "value": updated_at})
+    print(f"[bulk-data] populated {total} cards; meta -> {updated_at}", flush=True)
+    return total
+
+
+def _bulk_data_loop() -> None:
+    time.sleep(_BULK_INITIAL_SLEEP_SECONDS)
+    while True:
+        try:
+            refresh_bulk_cache()
+        except Exception as exc:  # noqa: BLE001 — daemon must never die silently
+            print(
+                f"[bulk-data] refresh error (will retry next cycle): {exc}",
+                flush=True,
+            )
+        time.sleep(_BULK_POLL_INTERVAL_SECONDS)
 
 
 @lru_cache(maxsize=8192)

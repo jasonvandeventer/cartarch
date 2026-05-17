@@ -126,6 +126,7 @@ from app.presentation_service import build_pending_view_model
 from app.pricing import effective_price
 from app.routes import account, admin, auth, drawers
 from app.scryfall import (
+    _bulk_data_loop,
     autocomplete_cards_for_add,
     autocomplete_token_names,
     bulk_refresh_prices,
@@ -347,6 +348,7 @@ def on_startup() -> None:
     init_db()
     threading.Thread(target=_price_refresh_loop, daemon=True, name="price-refresh").start()
     threading.Thread(target=_trait_backfill_loop, daemon=True, name="trait-backfill").start()
+    threading.Thread(target=_bulk_data_loop, daemon=True, name="bulk-data").start()
 
 
 @app.get("/")
