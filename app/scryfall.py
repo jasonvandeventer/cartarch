@@ -15,9 +15,11 @@ from typing import Any
 
 import requests
 from requests.adapters import HTTPAdapter
+from sqlalchemy import bindparam, text
 from sqlalchemy.orm import Session
 from urllib3.util.retry import Retry
 
+from app.db import engine
 from app.models import Card
 
 SCRYFALL_CARD_URL = "https://api.scryfall.com/cards"
@@ -259,21 +261,144 @@ class BulkFetchResult:
     failed: list = field(default_factory=list)
 
 
+# Local Scryfall bulk-data cache (v3.25.0).
+#
+# These helpers turn the two batch resolvers into local-first lookups: a
+# SQLite SELECT against `scryfall_cards` resolves what it can, and ONLY the
+# miss subset falls through to the existing /cards/collection POST. No new
+# network call is introduced on the request path — the only added
+# request-path code is the SELECT below. An empty/missing cache returns {}
+# from every helper, so every identifier misses and the functions behave
+# exactly as they do on `main` today (the safe first-deploy default). Any
+# cache error is logged and degraded to {} for the same reason — a cache
+# problem can never make resolution worse than the pre-cache behavior.
+
+# Column list in the EXACT order _normalize_card_payload emits its keys.
+# _cached_row_to_payload rebuilds the dict in this order so a cache-path
+# value is indistinguishable from an API-path value.
+_CACHE_COLUMNS = (
+    "scryfall_id, name, set_code, set_name, collector_number, rarity, "
+    "image_url, type_line, oracle_text, price_usd, price_usd_foil, "
+    "price_usd_etched, colors, color_identity, mana_cost, cmc, legalities, "
+    "full_art, frame_effects, set_type, layout"
+)
+
+
+def _cached_row_to_payload(m) -> dict[str, Any]:
+    """Reconstruct a normalized payload from a `scryfall_cards` row.
+
+    Byte-identical to _normalize_card_payload's return value:
+    - same key order (built explicitly below);
+    - TEXT columns pass through verbatim, so NULL→None and ""→"" are
+      preserved (e.g. a colorless card has colors=None but
+      color_identity="" exactly as the normalizer produced them);
+    - `legalities` / `frame_effects` are returned as the stored JSON text,
+      not parsed — identical to the API path, which also returns
+      json.dumps(...) strings for the caller to parse if needed;
+    - `cmc` round-trips as REAL (float|None);
+    - `full_art` is cast INTEGER 0/1 → Python bool to match
+      bool(raw.get("full_art")) on the API path (bool(None) is False,
+      consistent with a missing field).
+    """
+    return {
+        "scryfall_id": m["scryfall_id"],
+        "name": m["name"],
+        "set_code": m["set_code"],
+        "set_name": m["set_name"],
+        "collector_number": m["collector_number"],
+        "rarity": m["rarity"],
+        "image_url": m["image_url"],
+        "type_line": m["type_line"],
+        "oracle_text": m["oracle_text"],
+        "price_usd": m["price_usd"],
+        "price_usd_foil": m["price_usd_foil"],
+        "price_usd_etched": m["price_usd_etched"],
+        "colors": m["colors"],
+        "color_identity": m["color_identity"],
+        "mana_cost": m["mana_cost"],
+        "cmc": m["cmc"],
+        "legalities": m["legalities"],
+        "full_art": bool(m["full_art"]),
+        "frame_effects": m["frame_effects"],
+        "set_type": m["set_type"],
+        "layout": m["layout"],
+    }
+
+
+def _cache_get_by_ids(ids: list[str]) -> dict[str, dict[str, Any]]:
+    """Resolve scryfall_ids from the local cache. Missing/empty → {}."""
+    if not ids:
+        return {}
+    try:
+        stmt = text(
+            f"SELECT {_CACHE_COLUMNS} FROM scryfall_cards WHERE scryfall_id IN :ids"
+        ).bindparams(bindparam("ids", expanding=True))
+        with engine.connect() as conn:
+            rows = conn.execute(stmt, {"ids": ids}).mappings().all()
+        return {m["scryfall_id"]: _cached_row_to_payload(m) for m in rows if m["scryfall_id"]}
+    except Exception as exc:  # noqa: BLE001 — degrade to network (today's behavior)
+        print(f"[scryfall-cache] id lookup failed, falling through to API: {exc}", flush=True)
+        return {}
+
+
+def _cache_get_by_set_number(
+    keys: list[tuple[str, str]],
+) -> dict[tuple[str, str], dict[str, Any]]:
+    """Resolve (set_lower, collector) pairs from the local cache.
+
+    `keys` are already (lowercased set, stripped collector) tuples — the same
+    key shape bulk_fetch_by_set_number builds. Scryfall `set` codes are
+    lowercase by API contract and stored verbatim, so an equality match on
+    set_code is correct and uses the (set_code, collector_number) index; the
+    candidate rows are filtered back down to the exact requested pairs.
+    Missing/empty → {}.
+    """
+    if not keys:
+        return {}
+    try:
+        sets = sorted({s for s, _ in keys})
+        cols = sorted({c for _, c in keys})
+        stmt = text(
+            f"SELECT {_CACHE_COLUMNS} FROM scryfall_cards "
+            "WHERE set_code IN :sets AND collector_number IN :cols"
+        ).bindparams(bindparam("sets", expanding=True), bindparam("cols", expanding=True))
+        with engine.connect() as conn:
+            rows = conn.execute(stmt, {"sets": sets, "cols": cols}).mappings().all()
+        want = set(keys)
+        out: dict[tuple[str, str], dict[str, Any]] = {}
+        for m in rows:
+            key = ((m["set_code"] or "").lower(), m["collector_number"] or "")
+            if key in want and key not in out:
+                out[key] = _cached_row_to_payload(m)
+        return out
+    except Exception as exc:  # noqa: BLE001 — degrade to network (today's behavior)
+        print(
+            f"[scryfall-cache] set/number lookup failed, falling through to API: {exc}",
+            flush=True,
+        )
+        return {}
+
+
 def bulk_refresh_prices(scryfall_ids: list[str]) -> BulkFetchResult:
     """Fetch fresh card payloads for many ids via the /cards/collection batch endpoint.
 
     Returns a :class:`BulkFetchResult`; ``.cards`` is keyed by scryfall_id.
-    Makes ceil(N/75) requests instead of N individual requests. (Name is
-    historical — it fetches payloads; it does not write the DB.)
+    Local-first: the cache resolves what it can; only the miss subset makes
+    the (unchanged) batched POST. Makes ceil(M/75) requests where M is the
+    number of cache misses. (Name is historical — it fetches payloads; it
+    does not write the DB.)
     """
     results: dict[str, dict[str, Any]] = {}
     not_found: list[str] = []
     failed: list[str] = []
     ids = [sid for sid in scryfall_ids if sid]
 
-    for i in range(0, len(ids), _COLLECTION_BATCH_SIZE):
+    results.update(_cache_get_by_ids(ids))
+    miss_ids = [sid for sid in ids if sid not in results]
+
+    for i in range(0, len(miss_ids), _COLLECTION_BATCH_SIZE):
         bn = i // _COLLECTION_BATCH_SIZE
-        batch = ids[i : i + _COLLECTION_BATCH_SIZE]
+        batch = miss_ids[i : i + _COLLECTION_BATCH_SIZE]
         payload = {"identifiers": [{"id": sid} for sid in batch]}
         data = _post_json(f"{SCRYFALL_CARD_URL}/collection", payload)
         if not data:
@@ -333,9 +458,12 @@ def bulk_fetch_by_set_number(
             seen[key] = None
     unique = list(seen.keys())
 
-    for i in range(0, len(unique), _COLLECTION_BATCH_SIZE):
+    results.update(_cache_get_by_set_number(unique))
+    miss = [k for k in unique if k not in results]
+
+    for i in range(0, len(miss), _COLLECTION_BATCH_SIZE):
         bn = i // _COLLECTION_BATCH_SIZE
-        batch = unique[i : i + _COLLECTION_BATCH_SIZE]
+        batch = miss[i : i + _COLLECTION_BATCH_SIZE]
         payload = {"identifiers": [{"set": s, "collector_number": c} for s, c in batch]}
         data = _post_json(f"{SCRYFALL_CARD_URL}/collection", payload)
         if not data:
