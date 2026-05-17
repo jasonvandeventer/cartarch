@@ -45,6 +45,7 @@ from scripts.migrate_v3_23_7_token_dfc_backfill import (
     main as migrate_v3_23_7_token_dfc_backfill,
 )
 from scripts.migrate_v3_23_8_card_traits import main as migrate_v3_23_8_card_traits
+from scripts.migrate_v3_25_0_scryfall_cards import main as migrate_v3_25_0_scryfall_cards
 
 
 def _is_applied(name: str) -> bool:
@@ -264,6 +265,13 @@ def run():
         _mark_applied("v3_23_8_card_traits")
     else:
         print("v3.23.8 card_traits already applied, skipping")
+
+    if not _is_applied("v3_25_0_scryfall_cards"):
+        print("Running v3.25.0 scryfall_cards cache schema migration...")
+        migrate_v3_25_0_scryfall_cards()
+        _mark_applied("v3_25_0_scryfall_cards")
+    else:
+        print("v3.25.0 scryfall_cards already applied, skipping")
 
     print("Migration runner complete")
 
