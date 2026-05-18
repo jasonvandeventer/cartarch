@@ -2536,20 +2536,17 @@ body.game-mode {
   flex-shrink: 0;
 }
 
-/* Rotations — 180° (far side): flip content for readability.
-   tc-header is NOT reversed: elim stays at unrotated TR so it ends up
-   at every player's TR after rotation (and the seat badge at unrotated TL
-   ends up at every player's TL). */
+/* Rotations — 180° (far side). rotate(180deg) ALONE is correct: the
+   rotation and the opposite-side viewer cancel, restoring the same
+   screen-left = player-left mapping as the 0° (near) case. v3.25.1 bug 2:
+   the previous row-reverse (.tc-life-section) + column-reverse
+   (.tc-life-btn-col) rules double-flipped this, swapping PLUS/MINUS on the
+   far players' side — removed. tc-header is intentionally NOT reversed
+   (elim button stays TR, seat badge stays TL after rotation). */
 .tracker-card[data-rotate="180"] {
   transform: rotate(180deg);
   border-top: none;
   border-bottom: 4px solid var(--player-color);
-}
-.tracker-card[data-rotate="180"] .tc-life-section {
-  flex-direction: row-reverse;
-}
-.tracker-card[data-rotate="180"] .tc-life-btn-col {
-  flex-direction: column-reverse;
 }
 
 /* 90°/270° rotated cards (side players): override the base inset:0 + margin:auto
@@ -2569,9 +2566,12 @@ body.game-mode {
   border-top: none;
   border-right: 4px solid var(--player-color);
 }
-.tracker-card[data-rotate="90"] .tc-life-section {
-  flex-direction: row-reverse;
-}
+/* 90°/270°: symmetric — NEITHER carries a life-section flex rule.
+   Dev-verified from both p4 (right-end, 90°) and p8 (left-end, 270°)
+   physical seats — PLUS/MINUS columns render correctly. If a future
+   change appears to regress this, the symmetric contract is "both have
+   row-reverse" or "neither does" — never asymmetric. Re-verify from
+   both side-seats before flipping. */
 .tracker-card[data-rotate="270"] {
   transform: translate(-50%, -50%) rotate(270deg);
   border-top: none;

@@ -4374,6 +4374,7 @@ def game_create(
     deck_ids: list[str] = Form(...),
     grid_positions: list[str] = Form(default=[]),
     starting_life: int = Form(40),
+    first_seat_number: int | None = Form(None),
     session: Session = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
     _: None = CsrfRequired,
@@ -4396,7 +4397,20 @@ def game_create(
             }
         )
 
-    game = create_game(session, user_id=current_user.id, format=format, seats=seats)
+    # First-player pick is optional and non-critical: an absent or
+    # out-of-range value falls back to None so the game tracker keeps its
+    # existing clockwise-seat default rather than blocking game creation.
+    fsn = first_seat_number
+    if fsn is not None and not (1 <= fsn <= player_count):
+        fsn = None
+
+    game = create_game(
+        session,
+        user_id=current_user.id,
+        format=format,
+        seats=seats,
+        first_seat_number=fsn,
+    )
     return RedirectResponse(f"/games/{game.id}", status_code=303)
 
 
