@@ -46,6 +46,7 @@ from scripts.migrate_v3_23_7_token_dfc_backfill import (
 )
 from scripts.migrate_v3_23_8_card_traits import main as migrate_v3_23_8_card_traits
 from scripts.migrate_v3_25_0_scryfall_cards import main as migrate_v3_25_0_scryfall_cards
+from scripts.migrate_v3_25_1_first_seat_number import main as migrate_v3_25_1_first_seat_number
 
 
 def _is_applied(name: str) -> bool:
@@ -272,6 +273,13 @@ def run():
         _mark_applied("v3_25_0_scryfall_cards")
     else:
         print("v3.25.0 scryfall_cards already applied, skipping")
+
+    if not _is_applied("v3_25_1_first_seat_number"):
+        print("Running v3.25.1 games.first_seat_number migration...")
+        migrate_v3_25_1_first_seat_number()
+        _mark_applied("v3_25_1_first_seat_number")
+    else:
+        print("v3.25.1 first_seat_number already applied, skipping")
 
     print("Migration runner complete")
 
