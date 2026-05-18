@@ -15,13 +15,20 @@ def create_game(
     user_id: int,
     format: str,
     seats: list[dict[str, Any]],
+    first_seat_number: int | None = None,
 ) -> Game:
-    """Create a game and its seats. seats is a list of {player_name, deck_id, starting_life}."""
+    """Create a game and its seats. seats is a list of {player_name, deck_id, starting_life}.
+
+    ``first_seat_number`` (the starting seat's ``seat_number``, 1..N) is
+    optional; ``None`` leaves turn order to the game tracker's existing
+    clockwise-seat default (preserves pre-v3.25.1 behavior).
+    """
     now = datetime.utcnow()
     game = Game(
         user_id=user_id,
         played_at=now,
         format=format or None,
+        first_seat_number=first_seat_number,
         created_at=now,
     )
     session.add(game)

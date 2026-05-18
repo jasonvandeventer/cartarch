@@ -36,6 +36,8 @@
                     onclick="setPlayerCount({{ n }}, event)">{{ n }}</button>
           {% endfor %}
         </div>
+        <label>First Player</label>
+        <select name="first_seat_number" id="first_seat_number"></select>
       </div>
       {# Seat topology diagram #}
       <div class="seat-diagram-wrap">
@@ -148,6 +150,22 @@ function initSeats() {
   }
   renderSeats();
   renderDiagram();
+  renderFirstPlayer();
+}
+
+function renderFirstPlayer() {
+  const sel = document.getElementById('first_seat_number');
+  if (!sel) return;
+  const prev = parseInt(sel.value) || 1;
+  let opts = '';
+  for (let n = 1; n <= playerCount; n++) {
+    const selected = (n === prev && prev <= playerCount) ? ' selected' : '';
+    opts += `<option value="${n}"${selected}>Seat ${n}</option>`;
+  }
+  sel.innerHTML = opts;
+  // Default to Seat 1 on first render or when the player count dropped below
+  // the previous pick (no valid prior selection to preserve).
+  if (!(prev >= 1 && prev <= playerCount)) sel.value = '1';
 }
 
 function renderSeats() {
