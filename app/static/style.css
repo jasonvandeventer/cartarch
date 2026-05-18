@@ -2566,13 +2566,12 @@ body.game-mode {
   border-top: none;
   border-right: 4px solid var(--player-color);
 }
-/* 90°/270° life-section is SYMMETRIC by design: both cases must either
-   carry flex-direction:row-reverse or neither — never asymmetric (the
-   v3.25.1 bug 2 starting state was 90°=row-reverse, 270°=nothing).
-   First pass = NEITHER (lower disruption, unverified). If a dev visual
-   check from the p4 (90°) and p8 (270°) side seats shows PLUS/MINUS on
-   the wrong sides, add `flex-direction: row-reverse` to .tc-life-section
-   under BOTH the 90° and 270° rules. */
+/* 90°/270°: symmetric — NEITHER carries a life-section flex rule.
+   Dev-verified from both p4 (right-end, 90°) and p8 (left-end, 270°)
+   physical seats — PLUS/MINUS columns render correctly. If a future
+   change appears to regress this, the symmetric contract is "both have
+   row-reverse" or "neither does" — never asymmetric. Re-verify from
+   both side-seats before flipping. */
 .tracker-card[data-rotate="270"] {
   transform: translate(-50%, -50%) rotate(270deg);
   border-top: none;
