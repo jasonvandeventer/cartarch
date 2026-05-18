@@ -277,7 +277,7 @@ const SEAT_COLORS = ['#3b82f6','#ef4444','#22c55e','#f59e0b','#8b5cf6','#ec4899'
 const gameId = {{ game.id }};
 const seatDefs = [
   {% for seat in game.seats %}
-  { id: {{ seat.id }}, name: {{ seat.player_name | tojson }},
+  { id: {{ seat.id }}, seatNumber: {{ seat.seat_number }}, name: {{ seat.player_name | tojson }},
     startingLife: {{ seat.starting_life }},
     storedPosition: {{ (seat.grid_position or '') | tojson }},
     otherIds: [{% for o in game.seats if o.id != seat.id %}{{ o.id }}{% if not loop.last %},{% endif %}{% endfor %}] },
@@ -298,6 +298,16 @@ seatDefs.forEach((s, i) => {
 });
 // Seats sorted in clockwise order (for turn sequencing and badges)
 const clockwiseSeats = seatDefs.slice().sort((a, b) => a.turnOrder - b.turnOrder);
+
+// v3.25.1 — explicit first player (GameSeat.seat_number). Falls back to the
+// pre-v3.25.1 default (lowest clockwise seat) when unset or unmatched, so
+// existing games and any game without a pick behave exactly as before.
+const firstSeatNumber = {{ game.first_seat_number | tojson }};
+const firstSeatId =
+  (firstSeatNumber != null
+    ? seatDefs.find(s => s.seatNumber === firstSeatNumber)?.id
+    : null)
+  ?? clockwiseSeats[0]?.id ?? seatDefs[0]?.id;
 
 // Logical row and column rank for each position in the 3×3 topology
 const ROW_OF = { p1: 0, p2: 0, p3: 0, p8: 1, p4: 1, p7: 2, p6: 2, p5: 2 };
@@ -484,9 +494,12 @@ function freshState() {
     s.otherIds.forEach(oid => { cmd[s.id][oid] = 0; });
   });
   return { _fp: gameFingerprint(), lives, poison, exp, eliminated, cmd, history: [],
-           turn: 1, currentTurnId: clockwiseSeats[0]?.id ?? seatDefs[0]?.id };
+           turn: 1, currentTurnId: firstSeatId };
 }
 
+// v3.25.1 deliberately did not bump this fingerprint.
+// first_seat_number changes only the initial seed for new games in
+// freshState(); saved-state shape and semantics are unchanged.
 function gameFingerprint() {
   return seatDefs.map(s => `${s.id}:${s.startingLife}:${s.name}`).join('|');
 }
@@ -496,7 +509,7 @@ try {
   const raw = localStorage.getItem(storageKey);
   const loaded = raw ? JSON.parse(raw) : null;
   state = (loaded && loaded._fp === gameFingerprint()) ? loaded : freshState();
-  if (state.currentTurnId === undefined) state.currentTurnId = clockwiseSeats[0]?.id ?? seatDefs[0]?.id;
+  if (state.currentTurnId === undefined) state.currentTurnId = firstSeatId;
 } catch(e) { state = freshState(); }
 
 function save() { localStorage.setItem(storageKey, JSON.stringify(state)); }
