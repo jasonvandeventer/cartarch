@@ -63,7 +63,8 @@
                 </td>
                 <td class="notes-cell"
                     data-label="Notes"
-                    onclick="openNotesModal({{ game.id }}, {{ (game.notes or '') | tojson }})">
+                    data-game-id="{{ game.id }}"
+                    data-notes="{{ game.notes or '' }}">
                   {% if game.notes %}
                     {% if game.notes|length > 80 %}
                       <span class="notes-cell-preview">{{ game.notes[:80] }}…</span>
@@ -146,6 +147,14 @@
       notesModal.style.display = 'none';
     }
 
+    // Bind click handlers via data attributes — avoids inline-onclick HTML
+    // escaping hazards (|tojson is safe inside <script>, not inside onclick="…").
+    document.querySelectorAll('.notes-cell').forEach(cell => {
+      cell.addEventListener('click', () => {
+        openNotesModal(cell.dataset.gameId, cell.dataset.notes || '');
+      });
+    });
+
     // Click outside the inner card closes the modal
     notesModal?.addEventListener('click', (e) => {
       if (e.target === notesModal) closeNotesModal();
@@ -156,5 +165,5 @@
         closeNotesModal();
       }
     });
-  </script>
+</script>
 {% endblock %}
