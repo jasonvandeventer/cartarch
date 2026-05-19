@@ -32,6 +32,7 @@
               <th>Players</th>
               <th>Turns</th>
               <th>Winner</th>
+              <th>Notes</th>
               <th></th>
             </tr>
           </thead>
@@ -60,6 +61,19 @@
                     <span class="muted">In progress</span>
                   {% endif %}
                 </td>
+                <td class="notes-cell"
+                    data-label="Notes"
+                    onclick="openNotesModal({{ game.id }}, {{ (game.notes or '') | tojson }})">
+                  {% if game.notes %}
+                    {% if game.notes|length > 80 %}
+                      <span class="notes-cell-preview">{{ game.notes[:80] }}…</span>
+                    {% else %}
+                      <span class="notes-cell-preview">{{ game.notes }}</span>
+                    {% endif %}
+                  {% else %}
+                    <span class="notes-cell-add">Add notes…</span>
+                  {% endif %}
+                </td>
                 <td>
                   <form method="post"
                         action="/games/{{ game.id }}/delete"
@@ -83,4 +97,64 @@
       </p>
     </section>
   {% endif %}
+  {# ── Notes modal — view/edit Game.notes (v3.26.0); one shared modal across rows ── #}
+  <div id="notes-modal" class="notes-modal" style="display:none">
+    <div class="notes-modal-inner">
+      <h3 style="margin:0 0 0.75rem;font-size:1.15rem">Game Notes</h3>
+      <div id="notes-modal-display"
+           style="margin-bottom:0.75rem;
+                  padding:0.5rem 0.75rem;
+                  background:rgba(255,255,255,0.04);
+                  border-radius:6px;
+                  white-space:pre-wrap;
+                  font-size:0.9rem;
+                  color:var(--muted);
+                  min-height:1.5rem"></div>
+      <form id="notes-modal-form" method="post" action="">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <textarea id="notes-modal-textarea"
+                  name="notes"
+                  class="notes-modal-textarea"
+                  placeholder="Notes for this game…"></textarea>
+        <div style="display:flex;
+                    justify-content:flex-end;
+                    gap:0.5rem;
+                    margin-top:0.5rem">
+          <button type="button" onclick="closeNotesModal()">Cancel</button>
+          <button type="submit">Save Notes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+{% endblock %}
+{% block extra_scripts %}
+  <script>
+    const notesModal = document.getElementById('notes-modal');
+    const notesForm = document.getElementById('notes-modal-form');
+    const notesTextarea = document.getElementById('notes-modal-textarea');
+    const notesDisplay = document.getElementById('notes-modal-display');
+
+    function openNotesModal(gameId, currentNotes) {
+      notesForm.action = `/games/${gameId}/notes`;
+      notesTextarea.value = currentNotes || '';
+      notesDisplay.textContent = currentNotes || 'No notes recorded.';
+      notesModal.style.display = 'flex';
+      notesTextarea.focus();
+    }
+
+    function closeNotesModal() {
+      notesModal.style.display = 'none';
+    }
+
+    // Click outside the inner card closes the modal
+    notesModal?.addEventListener('click', (e) => {
+      if (e.target === notesModal) closeNotesModal();
+    });
+    // ESC closes when modal is open
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && notesModal && notesModal.style.display !== 'none') {
+        closeNotesModal();
+      }
+    });
+  </script>
 {% endblock %}
