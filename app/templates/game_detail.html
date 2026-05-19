@@ -185,6 +185,42 @@
         {% endif %}
       </div>
     </div>
+    {# ── Notes (finalized) ─────────────────────────────────────── #}
+    {% if is_ended %}
+      <div style="max-width:720px;
+                  margin:1rem auto;
+                  padding:0.75rem 1rem;
+                  background:var(--panel);
+                  border:1px solid var(--border);
+                  border-radius:6px">
+        <div style="margin-bottom:0.5rem">
+          {% if game.notes %}
+            <strong>Notes:</strong>
+            <span style="white-space:pre-wrap">{{ game.notes }}</span>
+          {% else %}
+            <em style="color:var(--muted)">No notes recorded.</em>
+          {% endif %}
+        </div>
+        <details>
+          <summary style="cursor:pointer; color:var(--muted)">
+            {% if game.notes %}
+              Edit notes ▾
+            {% else %}
+              Add notes ▾
+            {% endif %}
+          </summary>
+          <form method="post"
+                action="/games/{{ game.id }}/notes"
+                style="margin-top:0.5rem">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <textarea name="notes" rows="3" style="width:100%; max-width:680px">{{ game.notes or '' }}</textarea>
+            <div style="margin-top:0.5rem">
+              <button type="submit">Save Notes</button>
+            </div>
+          </form>
+        </details>
+      </div>
+    {% endif %}
     {# ── History bar ───────────────────────────────────────────── #}
     {% if not is_ended %}
       <div class="game-histbar" id="game-histbar">
