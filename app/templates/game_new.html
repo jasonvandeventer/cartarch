@@ -288,6 +288,100 @@ function escHtml(s) {
   return (s || '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
 }
 
+// ── First-player picker modal (v3.25.2) ──────────────────────────
+// Replaces the old inline <select>. Opened by Start Game; the form
+// submits ONLY from confirmFirstPlayerAndStart(), with the chosen
+// seat_number written into hidden #first_seat_number. No backend change
+// — reuses the v3.25.1 first_seat_number plumbing. Decision 1: Start is
+// disabled until a roll or a tap (no implicit default).
+let fpSelectedSeat = null;   // 1..N seat_number, or null until roll/tap
+let fpRollTimer = null;
+
+function fpSeatName(i) {      // i is 0-based; seat_number = i + 1
+  const nm = ((seats[i] && seats[i].playerName) || '').trim();
+  return nm || `Player ${i + 1}`;
+}
+
+function renderFirstPlayerChips() {
+  const wrap = document.getElementById('fp-seat-chips');
+  if (!wrap) return;
+  wrap.innerHTML = seats.map((s, i) => {
+    const n = i + 1;
+    const sel = fpSelectedSeat === n ? ' selected' : '';
+    return `<button type="button" class="fp-chip${sel}" data-seat="${n}" ` + `onclick="selectFirstPlayerSeat(${n})">` +
+           `<span class="fp-chip-seat">Seat ${n}</span>` +
+           `<span class="fp-chip-name">${escHtml(fpSeatName(i))}</span></button>`;
+  }).join('');
+}
+
+function openFirstPlayerModal() {
+  if (fpRollTimer) { clearInterval(fpRollTimer); fpRollTimer = null; }
+  fpSelectedSeat = null;
+  document.getElementById('first_seat_number').value = '';
+  document.getElementById('fp-result').textContent = '';
+  document.getElementById('fp-start-btn').disabled = true;   // decision 1
+  document.getElementById('fp-roll-btn').disabled = false;
+  renderFirstPlayerChips();
+  document.getElementById('first-player-modal').style.display = 'flex';
+}
+
+function closeFirstPlayerModal() {
+  if (fpRollTimer) { clearInterval(fpRollTimer); fpRollTimer = null; }
+  document.getElementById('first-player-modal').style.display = 'none';
+}
+
+function fpApplySelection(n) {
+  fpSelectedSeat = n;
+  document.getElementById('first_seat_number').value = String(n);
+  document.getElementById('fp-result').textContent =
+    `${fpSeatName(n - 1)} goes first (Seat ${n}).`;
+  document.getElementById('fp-start-btn').disabled = false;
+  renderFirstPlayerChips();
+}
+
+function selectFirstPlayerSeat(n) {
+  if (fpRollTimer) return;        // ignore taps mid-roll
+  fpApplySelection(n);
+}
+
+function rollFirstPlayer() {
+  if (fpRollTimer) return;
+  const count = seats.length;
+  if (count < 1) return;
+  const rollBtn = document.getElementById('fp-roll-btn');
+  rollBtn.disabled = true;
+  document.getElementById('fp-start-btn').disabled = true;
+  fpSelectedSeat = null;
+  document.getElementById('first_seat_number').value = '';
+  const result = document.getElementById('fp-result');
+  const landing = Math.floor(Math.random() * count) + 1;   // decision 3
+  let ticks = 0;
+  const total = 15;              // ~15 × 80ms ≈ 1.2s shuffle
+  fpRollTimer = setInterval(() => {
+    ticks++;
+    const cur = (ticks % count) + 1;
+    document.querySelectorAll('#fp-seat-chips .fp-chip').forEach(c => {
+      c.classList.toggle('rolling', parseInt(c.dataset.seat) === cur);
+    });
+    result.textContent = '🎲 rolling…';
+    if (ticks >= total) {
+      clearInterval(fpRollTimer);
+      fpRollTimer = null;
+      document.querySelectorAll('#fp-seat-chips .fp-chip')
+        .forEach(c => c.classList.remove('rolling'));
+      rollBtn.disabled = false;
+      fpApplySelection(landing);   // decision 2: lands, announces, enables Start
+    }
+  }, 80);
+}
+
+function confirmFirstPlayerAndStart() {
+  if (fpSelectedSeat == null) return;   // defense; button disabled otherwise
+  document.getElementById('fp-start-btn').disabled = true;   // no double-submit
+  document.getElementById('first_seat_number').value = String(fpSelectedSeat);
+  document.getElementById('game-new-form').submit();
+}
+
 // Dismiss pending assign on outside click
 document.addEventListener('click', e => {
   if (pendingAssignIdx !== null &&
