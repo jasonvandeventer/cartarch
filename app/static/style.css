@@ -2379,9 +2379,18 @@ body.game-mode {
   }
 }
 
-/* Portrait turn controls — hidden in landscape */
+/* Portrait turn controls — hidden in landscape.
+   v3.26.0 step 2: the whole row is the click target (onclick="nextTurn()");
+   the inner .portrait-next-btn is decorative-but-clickable (clicks bubble). */
 .portrait-turn-row {
   display: none;
+  cursor: pointer;
+  border-radius: 6px;
+  padding: 0.05rem 0.25rem;
+  transition: background-color 0.12s ease;
+}
+.portrait-turn-row:hover {
+  background: rgba(255, 255, 255, 0.06);
 }
 .portrait-turn-name {
   font-weight: 700;
@@ -2437,7 +2446,9 @@ body.game-mode {
   pointer-events: auto;
 }
 
-/* Turn indicator content inside the floating overlay */
+/* Turn indicator content inside the floating overlay.
+   v3.26.0 step 2: the whole panel is the click target (onclick="nextTurn()");
+   the inner .turn-next-btn is decorative-but-clickable (clicks bubble). */
 .turn-center {
   display: flex;
   flex-direction: column;
@@ -2445,6 +2456,12 @@ body.game-mode {
   gap: 0.5rem;
   text-align: center;
   padding: 0.8rem 1.4rem;
+  cursor: pointer;
+  border-radius: 10px;
+  transition: background-color 0.12s ease;
+}
+.turn-center:hover {
+  background: rgba(255, 255, 255, 0.04);
 }
 .turn-center-round {
   font-size: 0.75rem;
@@ -3095,6 +3112,62 @@ body.game-mode {
 .fp-start-btn:disabled {
   opacity: 0.45;
   cursor: not-allowed;
+}
+
+/* Notes modal — opens from games-list rows to view/edit Game.notes (v3.26.0).
+   Mirrors the .fp-modal overlay idiom; left-aligned content with a wider
+   max-width to give the textarea room. */
+.notes-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 700;
+  background: rgba(0, 0, 0, 0.88);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+.notes-modal-inner {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 1.5rem;
+  max-width: 560px;
+  width: 100%;
+  max-height: 85vh;
+  overflow-y: auto;
+}
+.notes-modal-textarea {
+  width: 100%;
+  min-height: 6rem;
+  padding: 0.5rem;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: inherit;
+  font: inherit;
+  resize: vertical;
+}
+.notes-cell {
+  cursor: pointer;
+  max-width: 240px;
+}
+.notes-cell-preview {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+.notes-cell-add {
+  font-size: 0.85rem;
+  color: var(--muted);
+  font-style: italic;
+}
+.notes-cell:hover .notes-cell-preview,
+.notes-cell:hover .notes-cell-add {
+  color: var(--accent-2);
 }
 
 /* New game form */

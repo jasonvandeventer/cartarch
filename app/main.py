@@ -84,6 +84,7 @@ from app.game_service import (
     get_deck_record,
     get_game,
     list_games,
+    update_game_notes,
 )
 from app.import_service import (
     normalize_finish,
@@ -4471,6 +4472,35 @@ async def game_end(
 
     end_game(session, game_id, current_user.id, placements, final_lives, tc, notes)
     return RedirectResponse(f"/games/{game_id}", status_code=303)
+
+
+@app.post("/games/{game_id}/notes")
+def game_update_notes(
+    request: Request,
+    game_id: int,
+    notes: str = Form(""),
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+    _: None = CsrfRequired,
+):
+    """Update ``Game.notes`` independent of finalization state (v3.26.0).
+
+    Lets users revise notes after a game is finalized without touching
+    placements/turn_count — :func:`end_game` couples notes to those fields
+    and would clobber recorded results.
+
+    Redirect target is referer-based via :func:`safe_redirect_url` so the
+    games-list modal returns the user to ``/games``; the game-detail
+    fallback default preserves prior behavior when Referer is missing or
+    invalid.
+    """
+    game = get_game(session, game_id, current_user.id)
+    if not game:
+        raise HTTPException(status_code=404, detail="Game not found")
+    update_game_notes(session, game_id, current_user.id, notes)
+    return RedirectResponse(
+        url=safe_redirect_url(request, default=f"/games/{game_id}"), status_code=303
+    )
 
 
 @app.post("/games/{game_id}/delete")

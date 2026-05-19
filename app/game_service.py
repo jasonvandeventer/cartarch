@@ -99,6 +99,30 @@ def end_game(
     return True
 
 
+def update_game_notes(
+    session: Session,
+    game_id: int,
+    user_id: int,
+    notes: str,
+) -> bool:
+    """Update ``Game.notes`` independent of finalization state.
+
+    Unlike :func:`end_game`, this touches only ``notes`` — placements,
+    final_life, and turn_count are untouched, so it is safe to call on
+    finalized games without clobbering recorded results.
+
+    Empty/whitespace notes resolve to NULL, matching ``end_game``'s behavior.
+    Returns True on success, False if the game is not found or not owned
+    by ``user_id``.
+    """
+    game = session.query(Game).filter(Game.id == game_id, Game.user_id == user_id).first()
+    if not game:
+        return False
+    game.notes = notes.strip() or None
+    session.commit()
+    return True
+
+
 def delete_game(session: Session, game_id: int, user_id: int) -> bool:
     game = session.query(Game).filter(Game.id == game_id, Game.user_id == user_id).first()
     if not game:
