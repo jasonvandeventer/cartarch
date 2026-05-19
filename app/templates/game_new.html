@@ -36,8 +36,7 @@
                     onclick="setPlayerCount({{ n }}, event)">{{ n }}</button>
           {% endfor %}
         </div>
-        <label>First Player</label>
-        <select name="first_seat_number" id="first_seat_number"></select>
+        <input type="hidden" name="first_seat_number" id="first_seat_number">
       </div>
       {# Seat topology diagram #}
       <div class="seat-diagram-wrap">
@@ -93,10 +92,30 @@
       </div>
       <div id="seat-rows" style="margin-top:1.5rem"></div>
       <div style="margin-top:1.5rem">
-        <button type="submit">Start Game</button>
+        <button type="button" id="start-game-btn" onclick="openFirstPlayerModal()">Start Game</button>
         <a href="/games">
           <button type="button" style="margin-left:0.5rem">Cancel</button>
         </a>
+      </div>
+      {# First-player picker modal — opened by Start Game; Step 2 wires the JS #}
+      <div id="first-player-modal" class="fp-modal" style="display:none">
+        <div class="fp-modal-inner">
+          <h3 class="fp-modal-title">Who goes first?</h3>
+          <div id="fp-seat-chips" class="fp-seat-chips"></div>
+          <button type="button"
+                  id="fp-roll-btn"
+                  class="fp-roll-btn"
+                  onclick="rollFirstPlayer()">🎲 Roll for first player</button>
+          <div id="fp-result" class="fp-result" aria-live="polite"></div>
+          <div class="fp-modal-actions">
+            <button type="button" class="fp-cancel-btn" onclick="closeFirstPlayerModal()">Cancel</button>
+            <button type="button"
+                    id="fp-start-btn"
+                    class="fp-start-btn"
+                    onclick="confirmFirstPlayerAndStart()"
+                    disabled>Start ▶</button>
+          </div>
+        </div>
       </div>
     </form>
   </section>
@@ -150,22 +169,6 @@ function initSeats() {
   }
   renderSeats();
   renderDiagram();
-  renderFirstPlayer();
-}
-
-function renderFirstPlayer() {
-  const sel = document.getElementById('first_seat_number');
-  if (!sel) return;
-  const prev = parseInt(sel.value) || 1;
-  let opts = '';
-  for (let n = 1; n <= playerCount; n++) {
-    const selected = (n === prev && prev <= playerCount) ? ' selected' : '';
-    opts += `<option value="${n}"${selected}>Seat ${n}</option>`;
-  }
-  sel.innerHTML = opts;
-  // Default to Seat 1 on first render or when the player count dropped below
-  // the previous pick (no valid prior selection to preserve).
-  if (!(prev >= 1 && prev <= playerCount)) sel.value = '1';
 }
 
 function renderSeats() {
