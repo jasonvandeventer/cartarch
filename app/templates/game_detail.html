@@ -21,11 +21,11 @@
                 onclick="undoLast()"
                 disabled>↩ Undo</button>
         <button type="button" class="game-topbar-end-btn" onclick="toggleEndGame()">End Game</button>
-        <span class="portrait-turn-row">
+        <span class="portrait-turn-row" onclick="nextTurn()" title="Next turn">
           <span class="game-topbar-sep">|</span>
           <span class="turn-label">T<span id="portrait-turn-counter">1</span></span>
           <span id="portrait-turn-name" class="portrait-turn-name">—</span>
-          <button type="button" class="portrait-next-btn" onclick="nextTurn()">→</button>
+          <button type="button" class="portrait-next-btn">→</button>
         </span>
       {% else %}
         <span>{{ game.played_at.strftime("%Y-%m-%d") }}</span>
@@ -175,12 +175,12 @@
       {# ── Center cell — turn indicator ──────────────────────── #}
       <div class="card-slot card-slot-center" id="slot-center">
         {% if not is_ended %}
-          <div class="turn-center">
+          <div class="turn-center" onclick="nextTurn()" title="Next turn">
             <div class="turn-center-round">
               TURN <span id="turn-counter">1</span>
             </div>
             <div class="turn-center-name" id="turn-center-name">—</div>
-            <button type="button" class="turn-next-btn" onclick="nextTurn()">→ Next</button>
+            <button type="button" class="turn-next-btn">→ Next</button>
           </div>
         {% endif %}
       </div>
