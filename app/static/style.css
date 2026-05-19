@@ -2971,6 +2971,132 @@ body.game-mode {
   flex-shrink: 0;
 }
 
+/* First-player picker modal (v3.25.2 — new-game flow). Overlay/sizing
+   mirror .end-game-modal; uses the defined theme tokens (--panel,
+   --muted) rather than the undefined --bg-card/--text-muted the legacy
+   .end-game-inner references (pre-existing bug, tracked separately). */
+.fp-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 700;
+  background: rgba(0, 0, 0, 0.88);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+.fp-modal-inner {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 1.5rem;
+  max-width: 460px;
+  width: 100%;
+  max-height: 85vh;
+  overflow-y: auto;
+  text-align: center;
+}
+.fp-modal-title {
+  margin: 0 0 1rem;
+  font-size: 1.15rem;
+}
+.fp-seat-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: center;
+  margin-bottom: 1rem;
+}
+.fp-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+  min-width: 5.5rem;
+  padding: 0.6rem 0.75rem;
+  border: 2px solid var(--border);
+  border-radius: 10px;
+  background: #ffffff10;
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+}
+.fp-chip:hover {
+  border-color: var(--accent);
+}
+.fp-chip.selected {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #fff;
+}
+.fp-chip.rolling {
+  border-color: var(--accent);
+  background: #ffffff28;
+  transform: scale(1.06);
+}
+.fp-chip-seat {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+.fp-chip.selected .fp-chip-seat {
+  color: #ffffffcc;
+}
+.fp-chip-name {
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+.fp-roll-btn {
+  display: block;
+  width: 100%;
+  padding: 0.7rem 1rem;
+  margin-bottom: 0.75rem;
+  border: 1px solid var(--accent);
+  border-radius: 10px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.fp-roll-btn:disabled {
+  opacity: 0.55;
+  cursor: progress;
+}
+.fp-result {
+  min-height: 1.4rem;
+  margin-bottom: 1rem;
+  font-weight: 600;
+  color: var(--text);
+}
+.fp-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+.fp-cancel-btn,
+.fp-start-btn {
+  padding: 0.55rem 1.1rem;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+}
+.fp-cancel-btn {
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+}
+.fp-start-btn {
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: #fff;
+}
+.fp-start-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 /* New game form */
 .player-count-row {
   display: flex;
