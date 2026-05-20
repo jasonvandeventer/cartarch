@@ -280,6 +280,7 @@ const seatDefs = [
   { id: {{ seat.id }}, seatNumber: {{ seat.seat_number }}, name: {{ seat.player_name | tojson }},
     startingLife: {{ seat.starting_life }},
     storedPosition: {{ (seat.grid_position or '') | tojson }},
+    commanderImageUrls: {{ (seat_commander_images.get(seat.id) or []) | tojson }},
     otherIds: [{% for o in game.seats if o.id != seat.id %}{{ o.id }}{% if not loop.last %},{% endif %}{% endfor %}] },
   {% endfor %}
 ];
@@ -638,6 +639,28 @@ function render() {
     card.style.setProperty('--player-color', SEAT_COLORS[i % SEAT_COLORS.length]);
     card.classList.toggle('tc-active-turn', s.id === state.currentTurnId);
 
+    // v3.26.1: commander art panel background. Scryfall URL pattern is
+    // stable — swap /normal/ → /art_crop/ for the art-only endpoint.
+    // Empty list → both classes removed, falls back to the color gradient.
+    // 1 URL → .has-commander-art (full-card cover). 2 URLs → also
+    // .has-partner-art (top/bottom vertical halves for Partner /
+    // Choose-a-Background / Friends Forever decks).
+    const cmdUrls = (s.commanderImageUrls || []).map(u => u.replace('/normal/', '/art_crop/'));
+    if (cmdUrls.length >= 1) {
+      card.style.setProperty('--commander-art-url-primary', `url("${cmdUrls[0]}")`);
+      card.classList.add('has-commander-art');
+    } else {
+      card.style.removeProperty('--commander-art-url-primary');
+      card.classList.remove('has-commander-art');
+    }
+    if (cmdUrls.length >= 2) {
+      card.style.setProperty('--commander-art-url-secondary', `url("${cmdUrls[1]}")`);
+      card.classList.add('has-partner-art');
+    } else {
+      card.style.removeProperty('--commander-art-url-secondary');
+      card.classList.remove('has-partner-art');
+    }
+
     const lifeEl = document.getElementById(`life-${s.id}`);
     if (lifeEl) {
       lifeEl.textContent = state.lives[s.id] ?? s.startingLife;
@@ -697,6 +720,20 @@ function render() {
   const undoBtn = document.getElementById('undo-btn');
   if (undoBtn) undoBtn.disabled = !state.history.length;
 
+  // v3.26.1 (iteration): center turn indicator border tracks the current-turn
+  // player's seat color via --current-player-color CSS var on .card-slot-center.
+  // The 0.3s border-color transition (in CSS) animates the flip on turn advance.
+  const centerEl = document.getElementById('slot-center');
+  if (centerEl) {
+    const currentSeatIdx = seatDefs.findIndex(s => s.id === state.currentTurnId);
+    if (currentSeatIdx >= 0) {
+      centerEl.style.setProperty(
+        '--current-player-color',
+        SEAT_COLORS[currentSeatIdx % SEAT_COLORS.length]
+      );
+    }
+  }
+
   checkWinCondition();
 }
 
@@ -704,7 +741,20 @@ render();
 {% else %}
 seatDefs.forEach((s, i) => {
   const card = document.getElementById(`card-${s.id}`);
-  if (card) card.style.setProperty('--player-color', SEAT_COLORS[i % SEAT_COLORS.length]);
+  if (!card) return;
+  card.style.setProperty('--player-color', SEAT_COLORS[i % SEAT_COLORS.length]);
+  // v3.26.1: commander art panel background for finalized games — same
+  // /normal/ → /art_crop/ Scryfall URL swap as the active-game render() path,
+  // and same single/partner branching for 1 vs 2 tagged commanders.
+  const cmdUrls = (s.commanderImageUrls || []).map(u => u.replace('/normal/', '/art_crop/'));
+  if (cmdUrls.length >= 1) {
+    card.style.setProperty('--commander-art-url-primary', `url("${cmdUrls[0]}")`);
+    card.classList.add('has-commander-art');
+  }
+  if (cmdUrls.length >= 2) {
+    card.style.setProperty('--commander-art-url-secondary', `url("${cmdUrls[1]}")`);
+    card.classList.add('has-partner-art');
+  }
 });
 {% endif %}
   </script>

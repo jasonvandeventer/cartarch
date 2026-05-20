@@ -83,6 +83,7 @@ from app.game_service import (
     end_game,
     get_deck_record,
     get_game,
+    get_seat_commander_image_urls,
     list_games,
     update_game_notes,
 )
@@ -4426,10 +4427,17 @@ def game_detail_page(
     if not game:
         raise HTTPException(status_code=404, detail="Game not found")
     decks = session.query(Deck).filter(Deck.user_id == current_user.id).order_by(Deck.name).all()
+    seat_commander_images = get_seat_commander_image_urls(session, game)
     return render(
         request,
         "game_detail.html",
-        {"title": f"Game {game_id}", "game": game, "decks": decks, "current_user": current_user},
+        {
+            "title": f"Game {game_id}",
+            "game": game,
+            "decks": decks,
+            "current_user": current_user,
+            "seat_commander_images": seat_commander_images,
+        },
     )
 
 

@@ -7,7 +7,7 @@ from typing import Any
 
 from sqlalchemy.orm import Session, joinedload
 
-from app.models import Game, GameSeat
+from app.models import Card, Game, GameSeat, InventoryRow
 
 
 def create_game(
@@ -143,3 +143,50 @@ def get_deck_record(session: Session, deck_id: int) -> dict[str, int]:
     wins = sum(1 for s in seats if s.placement == 1)
     total = len(seats)
     return {"wins": wins, "losses": total - wins, "total": total}
+
+
+def get_seat_commander_image_urls(session: Session, game: Game) -> dict[int, list[str]]:
+    """Return ``{seat_id: [commander_image_url, ...]}`` for the seats in ``game``.
+
+    For each seat with a deck, looks up the commander rows via
+    ``InventoryRow.role == 'commander'`` in the deck's storage location and
+    returns the associated :attr:`Card.image_url` values, ordered by
+    ``InventoryRow.id`` (creation order in the deck) and capped at two — the
+    Partner / Choose-a-Background / Friends Forever ceiling that MTG rules
+    permit. Seats with no deck, no commander tagged, or commanders with no
+    cached image URL get an empty list.
+
+    Filters by the deck's owner (``deck.user_id``) — not the game's owner —
+    because game seats can reference decks owned by other users (see
+    ``game_create`` in ``main.py``, which builds the deck dropdown from all
+    decks, not just the requesting user's).
+
+    Used by ``game_detail_page`` to thread commander art into the game-tracker
+    ``seatDefs`` for the v3.26.1 panel-background visual treatment. One URL
+    yields the full-card cover treatment; two URLs yield a vertical-halves
+    split (top = primary, bottom = secondary).
+    """
+    result: dict[int, list[str]] = {}
+    for seat in game.seats:
+        if not seat.deck_id or not seat.deck or not seat.deck.storage_location_id:
+            result[seat.id] = []
+            continue
+        commander_rows = (
+            session.query(InventoryRow)
+            .join(Card)
+            .filter(
+                InventoryRow.user_id == seat.deck.user_id,
+                InventoryRow.storage_location_id == seat.deck.storage_location_id,
+                InventoryRow.role == "commander",
+            )
+            .order_by(InventoryRow.id)
+            .all()
+        )
+        urls: list[str] = []
+        for row in commander_rows:
+            if row.card and row.card.image_url:
+                urls.append(row.card.image_url)
+            if len(urls) >= 2:
+                break
+        result[seat.id] = urls
+    return result
