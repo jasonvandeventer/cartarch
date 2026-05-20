@@ -639,6 +639,20 @@ function render() {
     card.style.setProperty('--player-color', SEAT_COLORS[i % SEAT_COLORS.length]);
     card.classList.toggle('tc-active-turn', s.id === state.currentTurnId);
 
+    // v3.26.1: commander art panel background. Scryfall URL pattern is
+    // stable — swap /normal/ → /art_crop/ to use the art-only endpoint.
+    // If Scryfall ever changes format, the replace is a no-op and the
+    // full card image is used as graceful fallback. Empty URL → class
+    // removed, falls back to the base color gradient.
+    if (s.commanderImageUrl) {
+      const artUrl = s.commanderImageUrl.replace('/normal/', '/art_crop/');
+      card.style.setProperty('--commander-art-url', `url("${artUrl}")`);
+      card.classList.add('has-commander-art');
+    } else {
+      card.style.removeProperty('--commander-art-url');
+      card.classList.remove('has-commander-art');
+    }
+
     const lifeEl = document.getElementById(`life-${s.id}`);
     if (lifeEl) {
       lifeEl.textContent = state.lives[s.id] ?? s.startingLife;
@@ -705,7 +719,15 @@ render();
 {% else %}
 seatDefs.forEach((s, i) => {
   const card = document.getElementById(`card-${s.id}`);
-  if (card) card.style.setProperty('--player-color', SEAT_COLORS[i % SEAT_COLORS.length]);
+  if (!card) return;
+  card.style.setProperty('--player-color', SEAT_COLORS[i % SEAT_COLORS.length]);
+  // v3.26.1: commander art panel background for finalized games — same
+  // /normal/ → /art_crop/ Scryfall URL swap as the active-game render() path.
+  if (s.commanderImageUrl) {
+    const artUrl = s.commanderImageUrl.replace('/normal/', '/art_crop/');
+    card.style.setProperty('--commander-art-url', `url("${artUrl}")`);
+    card.classList.add('has-commander-art');
+  }
 });
 {% endif %}
   </script>

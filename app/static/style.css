@@ -2534,6 +2534,47 @@ body.game-mode {
     color-mix(in srgb, var(--player-color) 32%, #0d100a);
   border-top-width: 6px;
 }
+/* v3.26.1: commander art panel background — opt-in via .has-commander-art class
+   set in JS render() when seatDefs[i].commanderImageUrl is non-empty. Layered
+   background composition (top → bottom in source order = top → bottom in
+   rendered z-order): player-color radial tint preserves seat identity; dark
+   linear gradient from bottom upward keeps life total + buttons readable;
+   commander art via --commander-art-url is the bottom layer. The element-
+   relative `to top` gradient direction rotates with the card via
+   transform: rotate(...), so the dark band lands at the player's
+   reading-bottom for all four seat rotations. */
+.tracker-card.has-commander-art {
+  background:
+    radial-gradient(
+      ellipse at 50% 45%,
+      color-mix(in srgb, var(--player-color) 22%, transparent) 0%,
+      transparent 65%
+    ),
+    linear-gradient(
+      to top,
+      rgba(13, 16, 10, 0.92) 0%,
+      rgba(13, 16, 10, 0.72) 30%,
+      rgba(13, 16, 10, 0.35) 60%,
+      rgba(13, 16, 10, 0.12) 100%
+    ),
+    var(--commander-art-url, none) center / cover no-repeat;
+}
+.tracker-card.tc-active-turn.has-commander-art {
+  background:
+    radial-gradient(
+      ellipse at 50% 45%,
+      color-mix(in srgb, var(--player-color) 38%, transparent) 0%,
+      transparent 65%
+    ),
+    linear-gradient(
+      to top,
+      rgba(13, 16, 10, 0.92) 0%,
+      rgba(13, 16, 10, 0.72) 30%,
+      rgba(13, 16, 10, 0.35) 60%,
+      rgba(13, 16, 10, 0.12) 100%
+    ),
+    var(--commander-art-url, none) center / cover no-repeat;
+}
 /* Seat order badge — absolute, top-left corner */
 .tc-seat-badge {
   position: absolute;
