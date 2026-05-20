@@ -2428,7 +2428,11 @@ body.game-mode {
   border: 1px solid rgba(255, 255, 255, 0.03);
 }
 /* Floating center turn-indicator overlay — sits on top of the playmat grid,
-   not a grid cell, so it doesn't consume a quadrant. */
+   not a grid cell, so it doesn't consume a quadrant.
+   v3.26.1 (iteration): border tracks the current-turn player's seat color via
+   --current-player-color, set per-render() from SEAT_COLORS[seatIdx]. Falls
+   back to the original faint-white border when the var isn't set (e.g. before
+   first render). 0.3s transition keeps the color flip smooth as turns advance. */
 .card-slot-center {
   position: fixed;
   top: 50%;
@@ -2439,11 +2443,12 @@ body.game-mode {
   align-items: center;
   justify-content: center;
   background: rgba(13, 17, 8, 0.92);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 2px solid var(--current-player-color, rgba(255, 255, 255, 0.12));
   border-radius: 14px;
   box-shadow: 0 6px 24px rgba(0, 0, 0, 0.55);
   padding: 0;
   pointer-events: auto;
+  transition: border-color 0.3s ease;
 }
 
 /* Turn indicator content inside the floating overlay.
@@ -2545,11 +2550,13 @@ body.game-mode {
    reading-bottom for all four seat rotations.
 
    Partner / Choose-a-Background / Friends Forever decks (two commander rows
-   tagged) additionally get .has-partner-art — vertical-halves treatment:
-   primary art_crop fills the top half, secondary fills the bottom, each at
-   100% width × 50% height (explicit size, not cover) so the landscape
-   art_crop aspect (~1.37) matches each half's aspect (~1.36) with minimal
-   cropping. */
+   tagged) additionally get .has-partner-art — side-by-side treatment:
+   primary art_crop fills the left half, secondary fills the right, each at
+   50% width × 100% height (explicit size, not cover). NOTE: this distorts
+   the source aspect (art_crop is landscape ~1.37; each card half is portrait
+   ~0.34) — commander faces stretch vertically. Iteration knob: switch to
+   per-half overlay divs with object-fit:cover for aspect-preserving display
+   at the cost of heavier cropping per half. */
 .tracker-card.has-commander-art {
   background:
     radial-gradient(
@@ -2596,8 +2603,8 @@ body.game-mode {
       rgba(13, 16, 10, 0.35) 60%,
       rgba(13, 16, 10, 0.12) 100%
     ),
-    var(--commander-art-url-primary, none) center top / 100% 50% no-repeat,
-    var(--commander-art-url-secondary, none) center bottom / 100% 50% no-repeat;
+    var(--commander-art-url-primary, none) left center / 50% 100% no-repeat,
+    var(--commander-art-url-secondary, none) right center / 50% 100% no-repeat;
 }
 .tracker-card.tc-active-turn.has-commander-art.has-partner-art {
   background:
@@ -2613,8 +2620,8 @@ body.game-mode {
       rgba(13, 16, 10, 0.35) 60%,
       rgba(13, 16, 10, 0.12) 100%
     ),
-    var(--commander-art-url-primary, none) center top / 100% 50% no-repeat,
-    var(--commander-art-url-secondary, none) center bottom / 100% 50% no-repeat;
+    var(--commander-art-url-primary, none) left center / 50% 100% no-repeat,
+    var(--commander-art-url-secondary, none) right center / 50% 100% no-repeat;
 }
 /* Seat order badge — absolute, top-left corner */
 .tc-seat-badge {

@@ -720,6 +720,20 @@ function render() {
   const undoBtn = document.getElementById('undo-btn');
   if (undoBtn) undoBtn.disabled = !state.history.length;
 
+  // v3.26.1 (iteration): center turn indicator border tracks the current-turn
+  // player's seat color via --current-player-color CSS var on .card-slot-center.
+  // The 0.3s border-color transition (in CSS) animates the flip on turn advance.
+  const centerEl = document.getElementById('slot-center');
+  if (centerEl) {
+    const currentSeatIdx = seatDefs.findIndex(s => s.id === state.currentTurnId);
+    if (currentSeatIdx >= 0) {
+      centerEl.style.setProperty(
+        '--current-player-color',
+        SEAT_COLORS[currentSeatIdx % SEAT_COLORS.length]
+      );
+    }
+  }
+
   checkWinCondition();
 }
 
