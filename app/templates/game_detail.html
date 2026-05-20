@@ -280,6 +280,7 @@ const seatDefs = [
   { id: {{ seat.id }}, seatNumber: {{ seat.seat_number }}, name: {{ seat.player_name | tojson }},
     startingLife: {{ seat.starting_life }},
     storedPosition: {{ (seat.grid_position or '') | tojson }},
+    commanderImageUrl: {{ (seat_commander_images.get(seat.id) or '') | tojson }},
     otherIds: [{% for o in game.seats if o.id != seat.id %}{{ o.id }}{% if not loop.last %},{% endif %}{% endfor %}] },
   {% endfor %}
 ];
