@@ -2535,14 +2535,21 @@ body.game-mode {
   border-top-width: 6px;
 }
 /* v3.26.1: commander art panel background — opt-in via .has-commander-art class
-   set in JS render() when seatDefs[i].commanderImageUrl is non-empty. Layered
+   set in JS render() when seatDefs[i].commanderImageUrls is non-empty. Layered
    background composition (top → bottom in source order = top → bottom in
    rendered z-order): player-color radial tint preserves seat identity; dark
    linear gradient from bottom upward keeps life total + buttons readable;
-   commander art via --commander-art-url is the bottom layer. The element-
-   relative `to top` gradient direction rotates with the card via
+   commander art via --commander-art-url-primary is the bottom layer. The
+   element-relative `to top` gradient direction rotates with the card via
    transform: rotate(...), so the dark band lands at the player's
-   reading-bottom for all four seat rotations. */
+   reading-bottom for all four seat rotations.
+
+   Partner / Choose-a-Background / Friends Forever decks (two commander rows
+   tagged) additionally get .has-partner-art — vertical-halves treatment:
+   primary art_crop fills the top half, secondary fills the bottom, each at
+   100% width × 50% height (explicit size, not cover) so the landscape
+   art_crop aspect (~1.37) matches each half's aspect (~1.36) with minimal
+   cropping. */
 .tracker-card.has-commander-art {
   background:
     radial-gradient(
@@ -2557,7 +2564,7 @@ body.game-mode {
       rgba(13, 16, 10, 0.35) 60%,
       rgba(13, 16, 10, 0.12) 100%
     ),
-    var(--commander-art-url, none) center / cover no-repeat;
+    var(--commander-art-url-primary, none) center / cover no-repeat;
 }
 .tracker-card.tc-active-turn.has-commander-art {
   background:
@@ -2573,7 +2580,41 @@ body.game-mode {
       rgba(13, 16, 10, 0.35) 60%,
       rgba(13, 16, 10, 0.12) 100%
     ),
-    var(--commander-art-url, none) center / cover no-repeat;
+    var(--commander-art-url-primary, none) center / cover no-repeat;
+}
+.tracker-card.has-commander-art.has-partner-art {
+  background:
+    radial-gradient(
+      ellipse at 50% 45%,
+      color-mix(in srgb, var(--player-color) 22%, transparent) 0%,
+      transparent 65%
+    ),
+    linear-gradient(
+      to top,
+      rgba(13, 16, 10, 0.92) 0%,
+      rgba(13, 16, 10, 0.72) 30%,
+      rgba(13, 16, 10, 0.35) 60%,
+      rgba(13, 16, 10, 0.12) 100%
+    ),
+    var(--commander-art-url-primary, none) center top / 100% 50% no-repeat,
+    var(--commander-art-url-secondary, none) center bottom / 100% 50% no-repeat;
+}
+.tracker-card.tc-active-turn.has-commander-art.has-partner-art {
+  background:
+    radial-gradient(
+      ellipse at 50% 45%,
+      color-mix(in srgb, var(--player-color) 38%, transparent) 0%,
+      transparent 65%
+    ),
+    linear-gradient(
+      to top,
+      rgba(13, 16, 10, 0.92) 0%,
+      rgba(13, 16, 10, 0.72) 30%,
+      rgba(13, 16, 10, 0.35) 60%,
+      rgba(13, 16, 10, 0.12) 100%
+    ),
+    var(--commander-art-url-primary, none) center top / 100% 50% no-repeat,
+    var(--commander-art-url-secondary, none) center bottom / 100% 50% no-repeat;
 }
 /* Seat order badge — absolute, top-left corner */
 .tc-seat-badge {
@@ -2702,7 +2743,7 @@ body.game-mode {
 .tc-player {
   font-weight: 700;
   font-size: clamp(0.95rem, 1.7vw, 1.3rem);
-  color: #000;
+  color: var(--player-color);
 }
 .tc-deck {
   font-size: 0.75rem;

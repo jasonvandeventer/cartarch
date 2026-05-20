@@ -145,14 +145,16 @@ def get_deck_record(session: Session, deck_id: int) -> dict[str, int]:
     return {"wins": wins, "losses": total - wins, "total": total}
 
 
-def get_seat_commander_image_urls(session: Session, game: Game) -> dict[int, str | None]:
-    """Return ``{seat_id: commander_image_url_or_None}`` for the seats in ``game``.
+def get_seat_commander_image_urls(session: Session, game: Game) -> dict[int, list[str]]:
+    """Return ``{seat_id: [commander_image_url, ...]}`` for the seats in ``game``.
 
-    For each seat with a deck, looks up the commander row via
-    ``InventoryRow.role == 'commander'`` in the deck's storage location (the
-    established pattern in :func:`app.deck_service.list_decks`) and returns the
-    associated :attr:`Card.image_url`. Seats with no deck, decks with no
-    commander tagged, or commanders with no cached image URL get ``None``.
+    For each seat with a deck, looks up the commander rows via
+    ``InventoryRow.role == 'commander'`` in the deck's storage location and
+    returns the associated :attr:`Card.image_url` values, ordered by
+    ``InventoryRow.id`` (creation order in the deck) and capped at two — the
+    Partner / Choose-a-Background / Friends Forever ceiling that MTG rules
+    permit. Seats with no deck, no commander tagged, or commanders with no
+    cached image URL get an empty list.
 
     Filters by the deck's owner (``deck.user_id``) — not the game's owner —
     because game seats can reference decks owned by other users (see
@@ -160,14 +162,16 @@ def get_seat_commander_image_urls(session: Session, game: Game) -> dict[int, str
     decks, not just the requesting user's).
 
     Used by ``game_detail_page`` to thread commander art into the game-tracker
-    ``seatDefs`` for the v3.26.1 panel-background visual treatment.
+    ``seatDefs`` for the v3.26.1 panel-background visual treatment. One URL
+    yields the full-card cover treatment; two URLs yield a vertical-halves
+    split (top = primary, bottom = secondary).
     """
-    result: dict[int, str | None] = {}
+    result: dict[int, list[str]] = {}
     for seat in game.seats:
         if not seat.deck_id or not seat.deck or not seat.deck.storage_location_id:
-            result[seat.id] = None
+            result[seat.id] = []
             continue
-        commander_row = (
+        commander_rows = (
             session.query(InventoryRow)
             .join(Card)
             .filter(
@@ -175,10 +179,14 @@ def get_seat_commander_image_urls(session: Session, game: Game) -> dict[int, str
                 InventoryRow.storage_location_id == seat.deck.storage_location_id,
                 InventoryRow.role == "commander",
             )
-            .first()
+            .order_by(InventoryRow.id)
+            .all()
         )
-        if commander_row and commander_row.card and commander_row.card.image_url:
-            result[seat.id] = commander_row.card.image_url
-        else:
-            result[seat.id] = None
+        urls: list[str] = []
+        for row in commander_rows:
+            if row.card and row.card.image_url:
+                urls.append(row.card.image_url)
+            if len(urls) >= 2:
+                break
+        result[seat.id] = urls
     return result
