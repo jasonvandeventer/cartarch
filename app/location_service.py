@@ -5,6 +5,30 @@ from app.pricing import effective_price
 
 VALID_LOCATION_TYPES = {"root", "drawer", "binder", "box", "deck", "other"}
 
+# v3.26.2 — per-location sorter modes. Validated at this layer (matches the
+# existing VALID_LOCATION_TYPES pattern; no DB-level CHECK constraint).
+VALID_LOCATION_MODES = {"managed", "manual", "sink", "ignored"}
+
+
+def is_sortable_target(location: StorageLocation) -> bool:
+    """Return True if the drawer sorter may PLACE cards INTO this location.
+
+    Per v3.26.2 mode semantics: only ``managed`` locations are sorter targets.
+    ``manual`` keeps existing contents in place but accepts no new placement;
+    ``sink`` is a source-only catch-all; ``ignored`` is invisible to the sorter.
+    """
+    return location.mode == "managed"
+
+
+def is_sortable_source(location: StorageLocation) -> bool:
+    """Return True if the drawer sorter may MOVE cards OUT OF this location.
+
+    Per v3.26.2 mode semantics: ``managed`` locations can be rebalanced out
+    of, and ``sink`` locations can be drained during rebalancing. ``manual``
+    locks contents in place; ``ignored`` is invisible.
+    """
+    return location.mode in {"managed", "sink"}
+
 
 def list_locations(session: Session, user_id: int) -> list[StorageLocation]:
     return (
@@ -36,15 +60,20 @@ def create_location(
     type: str,
     parent_id: int | None = None,
     sort_order: int = 0,
+    mode: str = "managed",
 ) -> StorageLocation:
     name = name.strip()
     type = type.strip().lower() or "other"
+    mode = (mode or "managed").strip().lower()
 
     if not name:
         raise ValueError("Location name is required.")
 
     if type not in VALID_LOCATION_TYPES:
         raise ValueError(f"Invalid location type: {type}")
+
+    if mode not in VALID_LOCATION_MODES:
+        raise ValueError(f"Invalid location mode: {mode}")
 
     existing = (
         session.query(StorageLocation)
@@ -68,6 +97,7 @@ def create_location(
         type=type,
         parent_id=parent_id,
         sort_order=sort_order,
+        mode=mode,
     )
     session.add(location)
     session.commit()
@@ -128,6 +158,7 @@ def update_location(
     type: str,
     parent_id: int | None = None,
     sort_order: int = 0,
+    mode: str | None = None,
 ) -> StorageLocation:
     location = get_location(session, location_id, user_id)
     if location is None:
@@ -146,6 +177,11 @@ def update_location(
         raise ValueError(f"Cannot set type to '{type}'.")
     if type not in VALID_LOCATION_TYPES:
         raise ValueError(f"Invalid location type: {type}")
+
+    if mode is not None:
+        mode = mode.strip().lower()
+        if mode not in VALID_LOCATION_MODES:
+            raise ValueError(f"Invalid location mode: {mode}")
 
     existing = (
         session.query(StorageLocation)
@@ -170,6 +206,8 @@ def update_location(
     location.type = type
     location.parent_id = parent_id
     location.sort_order = sort_order
+    if mode is not None:
+        location.mode = mode
     session.commit()
     return location
 

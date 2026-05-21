@@ -1835,6 +1835,10 @@ def create_deck(
         type="deck",
         parent_id=None,
         sort_order=0,
+        # v3.26.2: deck locations are "manual" — the user explicitly places
+        # cards via Add-to-Deck; the drawer sorter must never touch them.
+        # The column default ("managed") would be semantically wrong here.
+        mode="manual",
     )
     session.add(location)
     session.flush()

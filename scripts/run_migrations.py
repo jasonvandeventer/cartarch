@@ -47,6 +47,9 @@ from scripts.migrate_v3_23_7_token_dfc_backfill import (
 from scripts.migrate_v3_23_8_card_traits import main as migrate_v3_23_8_card_traits
 from scripts.migrate_v3_25_0_scryfall_cards import main as migrate_v3_25_0_scryfall_cards
 from scripts.migrate_v3_25_1_first_seat_number import main as migrate_v3_25_1_first_seat_number
+from scripts.migrate_v3_26_2_storage_location_mode import (
+    main as migrate_v3_26_2_storage_location_mode,
+)
 
 
 def _is_applied(name: str) -> bool:
@@ -280,6 +283,13 @@ def run():
         _mark_applied("v3_25_1_first_seat_number")
     else:
         print("v3.25.1 first_seat_number already applied, skipping")
+
+    if not _is_applied("v3_26_2_storage_location_mode"):
+        print("Running v3.26.2 storage_locations.mode migration...")
+        migrate_v3_26_2_storage_location_mode()
+        _mark_applied("v3_26_2_storage_location_mode")
+    else:
+        print("v3.26.2 storage_location_mode already applied, skipping")
 
     print("Migration runner complete")
 
