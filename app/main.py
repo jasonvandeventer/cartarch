@@ -98,6 +98,7 @@ from app.inventory_service import (
     PRICE_STALE_DAYS,
     adjust_inventory_row_quantity,
     apply_collection_search_filters,
+    bulk_delete_inventory_rows,
     confirm_all_pending,
     confirm_pending_row,
     delete_inventory_row,
@@ -2204,6 +2205,81 @@ def bulk_move_location_cards(
     return RedirectResponse(f"/locations/{location_id}", status_code=303)
 
 
+def _build_bulk_delete_items(session: Session, row_ids: list[int], user_id: int) -> list[dict]:
+    """Build the dict shape that ``inventory_card`` expects, owned-filtered.
+
+    Mirrors the per-row dict construction used by ``location_detail_page``
+    / deck routes so the bulk-delete confirmation page can render the
+    same ``inventory_card`` macro without per-row ORM-attribute drift.
+    """
+    rows = (
+        session.query(InventoryRow)
+        .filter(InventoryRow.id.in_(row_ids), InventoryRow.user_id == user_id)
+        .all()
+    )
+    items = []
+    for row in rows:
+        price = effective_price(row.card, row.finish) or 0.0
+        items.append(
+            {
+                "id": row.id,
+                "card": row.card,
+                "finish": row.finish,
+                "language": row.language or "en",
+                "is_proxy": bool(row.is_proxy),
+                "quantity": row.quantity,
+                "slot": row.slot,
+                "effective_price": price,
+                "total_value": price * row.quantity,
+                "is_pending": row.is_pending,
+                "storage_location_id": row.storage_location_id,
+            }
+        )
+    return items
+
+
+@app.post("/locations/{location_id}/bulk-delete-preview")
+def bulk_delete_location_preview(
+    request: Request,
+    location_id: int,
+    row_ids: list[int] = Form(...),
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+    _: None = CsrfRequired,
+):
+    location = get_location(session, location_id=location_id, user_id=current_user.id)
+    if location is None:
+        return RedirectResponse("/locations", status_code=303)
+
+    items = _build_bulk_delete_items(session, row_ids, current_user.id)
+    return render(
+        request,
+        "bulk_delete_confirm.html",
+        {
+            "title": f"Confirm Delete — {location.name}",
+            "current_user": current_user,
+            "items": items,
+            "source_kind": "location",
+            "source_id": location.id,
+            "source_name": location.name,
+            "back_url": f"/locations/{location.id}",
+            "commit_url": f"/locations/{location.id}/bulk-delete-commit",
+        },
+    )
+
+
+@app.post("/locations/{location_id}/bulk-delete-commit")
+def bulk_delete_location_commit(
+    location_id: int,
+    row_ids: list[int] = Form(...),
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+    _: None = CsrfRequired,
+):
+    bulk_delete_inventory_rows(session, row_ids=row_ids, user_id=current_user.id)
+    return RedirectResponse(f"/locations/{location_id}", status_code=303)
+
+
 @app.get("/locations/{location_id}")
 def location_detail_page(
     request: Request,
@@ -3108,6 +3184,52 @@ def bulk_move_deck_cards(
             )
         except ValueError:
             pass
+    return RedirectResponse(f"/decks/{deck_id}", status_code=303)
+
+
+@app.post("/decks/{deck_id}/bulk-delete-preview")
+def bulk_delete_deck_preview(
+    request: Request,
+    deck_id: int,
+    row_ids: list[int] = Form(...),
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+    _: None = CsrfRequired,
+):
+    deck = (
+        session.query(Deck)
+        .filter(Deck.id == deck_id, Deck.user_id == current_user.id)
+        .one_or_none()
+    )
+    if deck is None:
+        return RedirectResponse("/decks", status_code=303)
+
+    items = _build_bulk_delete_items(session, row_ids, current_user.id)
+    return render(
+        request,
+        "bulk_delete_confirm.html",
+        {
+            "title": f"Confirm Delete — {deck.name}",
+            "current_user": current_user,
+            "items": items,
+            "source_kind": "deck",
+            "source_id": deck.id,
+            "source_name": deck.name,
+            "back_url": f"/decks/{deck.id}",
+            "commit_url": f"/decks/{deck.id}/bulk-delete-commit",
+        },
+    )
+
+
+@app.post("/decks/{deck_id}/bulk-delete-commit")
+def bulk_delete_deck_commit(
+    deck_id: int,
+    row_ids: list[int] = Form(...),
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+    _: None = CsrfRequired,
+):
+    bulk_delete_inventory_rows(session, row_ids=row_ids, user_id=current_user.id)
     return RedirectResponse(f"/decks/{deck_id}", status_code=303)
 
 

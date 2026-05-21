@@ -747,6 +747,51 @@
           </details>
         </section>
       {% endif %}
+      {% if items %}
+        <section class="panel">
+          <details>
+            <summary style="cursor: pointer;
+                            user-select: none;
+                            font-weight: 600;
+                            list-style: none;
+                            padding: 0.2rem 0">▸ Bulk Delete</summary>
+            <form action="/decks/{{ deck.id }}/bulk-delete-preview"
+                  method="post"
+                  style="margin-top: 0.75rem">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+              <div style="display: flex;
+                          flex-direction: column;
+                          gap: 0.3rem;
+                          margin-bottom: 0.75rem;
+                          max-height: 260px;
+                          overflow-y: auto">
+                <label style="font-size: 0.8rem; color: #94a3b8; cursor: pointer;">
+                  <input type="checkbox"
+                         onclick="document.querySelectorAll('.deck-bulk-delete-cb').forEach(cb => cb.checked = this.checked)">
+                  Select all
+                </label>
+                {% for item in items %}
+                  <label style="display: flex;
+                                align-items: center;
+                                gap: 0.4rem;
+                                font-size: 0.875rem;
+                                cursor: pointer">
+                    <input type="checkbox"
+                           name="row_ids"
+                           value="{{ item.id }}"
+                           class="deck-bulk-delete-cb">
+                    {{ item.card.name }}
+                    {% if item.finish != 'normal' %}<span class="finish-badge">{{ item.finish }}</span>{% endif %}
+                  </label>
+                {% endfor %}
+              </div>
+              <div class="filter-row">
+                <button type="submit" class="btn-danger-small">Continue to delete confirmation</button>
+              </div>
+            </form>
+          </details>
+        </section>
+      {% endif %}
       {% include "_review_tags_panel.html" %}
       {# #deck-card-list is the hx-target for the search form above.
          Initial render uses the same _deck_card_list.html partial that

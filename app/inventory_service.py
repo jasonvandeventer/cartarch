@@ -1641,6 +1641,50 @@ def delete_inventory_row(session: Session, row_id: int, user_id: int) -> bool:
     return True
 
 
+def bulk_delete_inventory_rows(session: Session, row_ids: list[int], user_id: int) -> int:
+    """Hard-delete multiple inventory rows in a single transaction.
+
+    Per-row ownership validation: rows not owned by ``user_id`` (or not
+    found) are silently skipped, mirroring the existing bulk-move
+    pattern. Each deleted row produces one ``row_deleted`` TransactionLog
+    entry, matching the single-row ``delete_inventory_row`` behavior;
+    the difference is the entire operation commits exactly once, so a
+    partial failure rolls back the whole batch.
+
+    Returns the count of rows actually deleted.
+    """
+    if not row_ids:
+        return 0
+
+    rows = (
+        session.query(InventoryRow)
+        .filter(InventoryRow.id.in_(row_ids), InventoryRow.user_id == user_id)
+        .all()
+    )
+
+    for row in rows:
+        source_location = (
+            "pending" if row.is_pending else f"drawer={row.drawer or '-'} slot={row.slot or '-'}"
+        )
+        log_transaction(
+            session=session,
+            user_id=user_id,
+            event_type="row_deleted",
+            card_id=row.card_id,
+            finish=row.finish,
+            quantity_delta=-row.quantity,
+            source_location=source_location,
+            destination_location=None,
+            inventory_row_id=row.id,
+            note=f"Bulk-deleted inventory row {row.id}",
+            flush=False,
+        )
+        session.delete(row)
+
+    session.commit()
+    return len(rows)
+
+
 def undo_last_import(session: Session, user_id: int) -> bool:
     last_import = (
         session.query(TransactionLog)
