@@ -60,6 +60,7 @@ from scripts.migrate_v3_27_0b_1_deck_identity_snapshot import (
 from scripts.migrate_v3_27_2_format_normalization import (
     main as migrate_v3_27_2_format_normalization,
 )
+from scripts.migrate_v3_27_3_game_status import main as migrate_v3_27_3_game_status
 
 
 def _is_applied(name: str) -> bool:
@@ -328,6 +329,13 @@ def run():
         _mark_applied("v3_27_2_format_normalization")
     else:
         print("v3.27.2 format_normalization already applied, skipping")
+
+    if not _is_applied("v3_27_3_game_status"):
+        print("Running v3.27.3 games.status enum migration...")
+        migrate_v3_27_3_game_status()
+        _mark_applied("v3_27_3_game_status")
+    else:
+        print("v3.27.3 game_status already applied, skipping")
 
     print("Migration runner complete")
 

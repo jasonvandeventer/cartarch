@@ -207,6 +207,15 @@ class Game(Base):
     # migration backfills existing rows to canonical values too. NULL is
     # effectively unreachable after migration but the column type permits it.
     format: Mapped[str | None] = mapped_column(String(64), nullable=True, default="Commander")
+    # v3.27.3 — service-layer enum (CANONICAL_GAME_STATUSES in game_service.py).
+    # Replaces the brittle "any seat has placement → game is finalized"
+    # derivation that lived in game_detail.html line 3. Column nullable=True
+    # at the DB level (additive ALTER under SQLite-until-v4 can't tighten
+    # nullability without table rebuild); Python-side default + service-
+    # layer setters (create_game → "created"; end_game → "finalized")
+    # ensure new rows always carry a canonical value, and the v3.27.3
+    # migration backfills existing rows.
+    status: Mapped[str | None] = mapped_column(String(32), nullable=True, default="created")
     turn_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
     first_seat_number: Mapped[int | None] = mapped_column(Integer, nullable=True)
     # v3.27.0 — collision-proof localStorage key for the game tracker.
