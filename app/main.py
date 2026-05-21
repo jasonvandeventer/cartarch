@@ -2148,11 +2148,17 @@ def locations_create_inline(
 @app.post("/locations/{location_id}/delete")
 def delete_location_route(
     location_id: int,
+    destination_id: int | None = Form(None),
     session: Session = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
     _: None = CsrfRequired,
 ):
-    delete_location(session, location_id=location_id, user_id=current_user.id)
+    delete_location(
+        session,
+        location_id=location_id,
+        user_id=current_user.id,
+        destination_id=destination_id,
+    )
     return RedirectResponse("/locations", status_code=303)
 
 
