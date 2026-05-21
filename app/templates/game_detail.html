@@ -25,6 +25,8 @@
           <span class="game-topbar-sep">|</span>
           <span class="turn-label">T<span id="portrait-turn-counter">1</span></span>
           <span id="portrait-turn-name" class="portrait-turn-name">—</span>
+          <span class="game-topbar-sep">·</span>
+          <span class="portrait-timer" id="portrait-timer">0:00</span>
           <button type="button" class="portrait-next-btn">→</button>
         </span>
       {% else %}
@@ -117,6 +119,11 @@
                 <div class="tc-names">
                   <div class="tc-player">{{ seat.player_name }}</div>
                   {% if seat.deck %}<div class="tc-deck">{{ seat.deck.name }}</div>{% endif %}
+                  {% if not is_ended %}
+                    <div class="tc-on-clock" title="Total time on clock this game">
+                      ⏱ <span id="timer-on-clock-{{ seat.id }}">0:00</span>
+                    </div>
+                  {% endif %}
                 </div>
                 <div class="tc-life" id="life-{{ seat.id }}">
                   {{ seat.final_life if seat.final_life is not none else seat.starting_life }}
@@ -191,6 +198,13 @@
               TURN <span id="turn-counter">1</span>
             </div>
             <div class="turn-center-name" id="turn-center-name">—</div>
+            <div class="turn-center-timer">
+              <span class="turn-timer-label">⏱</span>
+              <span id="timer-current-turn">0:00</span>
+              <span class="turn-timer-sep">·</span>
+              <span class="turn-timer-game-label">Game</span>
+              <span id="timer-game-elapsed">0:00</span>
+            </div>
             <button type="button" class="turn-next-btn">→ Next</button>
           </div>
         {% endif %}
@@ -523,8 +537,14 @@ function freshState() {
   // poison/exp kept as empty objects (not iterated) so a stale browser tab
   // running pre-v3.26.5 code that reads state.poison[seatId] sees undefined
   // (falls back to 0 via `|| 0`) instead of crashing on undefined.poison.
+  // v3.26.7 — turnEvents seeded with the first-seat anchor so game-length and
+  // current-turn-elapsed are defined from the moment the page renders. Each
+  // event marks the START of that seat's turn; subsequent events come from
+  // nextTurn(). Per-turn durations are derived at render time, never stored.
   return { _fp: gameFingerprint(), lives, poison: {}, exp: {}, eliminated, cmd,
-           extraCounter, history: [], turn: 1, currentTurnId: firstSeatId };
+           extraCounter, history: [],
+           turnEvents: [{ ts: Date.now(), seatId: firstSeatId }],
+           turn: 1, currentTurnId: firstSeatId };
 }
 
 // v3.25.1 deliberately did not bump this fingerprint, and v3.26.5 doesn't
@@ -565,6 +585,14 @@ try {
         state.extraCounter[s.id] = { type: 'poison', value: (ec && ec.value) || 0 };
       }
     });
+  }
+  // v3.26.7 — turnEvents is an additive optional field; pre-v3.26.7 saved
+  // state has no events. Synthesize a single "current turn starts now"
+  // anchor so the timer is well-defined from this render forward. The
+  // game-length tally restarts from this point — the real prior duration
+  // is lost (it was never tracked), and back-dating would be a fabrication.
+  if (state.turnEvents === undefined) {
+    state.turnEvents = [{ ts: Date.now(), seatId: state.currentTurnId }];
   }
 } catch(e) { state = freshState(); }
 
@@ -663,6 +691,12 @@ function nextTurn() {
   if (nextIdx === 0) state.turn = (state.turn || 1) + 1;
   state.currentTurnId = alive[nextIdx].id;
   pushHistory({ type: 'nextTurn', seatId: state.currentTurnId, prevTurnId, delta: 0 });
+  // v3.26.7 — record turn-transition event AFTER currentTurnId is updated, so
+  // the event's seatId is the seat whose turn is starting. Undo pops this
+  // entry (see undoLast).
+  (state.turnEvents = state.turnEvents || []).push({
+    ts: Date.now(), seatId: state.currentTurnId,
+  });
   save(); render();
 }
 function undoLast() {
@@ -701,6 +735,14 @@ function undoLast() {
     const nextIdx = clockwiseSeats.findIndex(s => s.id === last.seatId);
     if (nextIdx === 0) state.turn = Math.max(1, (state.turn || 1) - 1);
     state.currentTurnId = last.prevTurnId;
+    // v3.26.7 — drop the turnEvents entry pushed by nextTurn(). Guarded against
+    // empty/missing array because pre-v3.26.7 history entries from a session
+    // that loaded before turnEvents existed could in theory still be in the
+    // history buffer; in that case there's nothing to pop and we leave the
+    // (synthetic-anchored) events alone.
+    if (state.turnEvents && state.turnEvents.length > 1) {
+      state.turnEvents.pop();
+    }
   }
   save(); render();
 }
@@ -735,6 +777,39 @@ function checkWinCondition() {
     if (el) el.value = String(i + 2);
   });
   toggleEndGame();
+}
+
+// ── Turn timing (v3.26.7) ─────────────────────────────────────
+// Durations are a derived view of state.turnEvents — never stored. Same data
+// yields game length, current-turn elapsed, and per-player time-on-clock.
+// This shape ports forward to the v4 event-sourced tracker for near-zero
+// migration cost.
+function turnDurations() {
+  const events = state.turnEvents || [];
+  const now = Date.now();
+  if (events.length === 0) {
+    return { gameElapsed: 0, currentTurnElapsed: 0, perSeat: {} };
+  }
+  const perSeat = {};
+  for (let i = 0; i < events.length; i++) {
+    const startTs = events[i].ts;
+    const endTs = i < events.length - 1 ? events[i + 1].ts : now;
+    perSeat[events[i].seatId] = (perSeat[events[i].seatId] || 0) + (endTs - startTs);
+  }
+  return {
+    gameElapsed: now - events[0].ts,
+    currentTurnElapsed: now - events[events.length - 1].ts,
+    perSeat,
+  };
+}
+function fmtDuration(ms) {
+  const totalSec = Math.max(0, Math.floor(ms / 1000));
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = totalSec % 60;
+  return h > 0
+    ? `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
+    : `${m}:${s.toString().padStart(2, '0')}`;
 }
 
 // ── Render ────────────────────────────────────────────────────
@@ -828,6 +903,20 @@ function render() {
   const portraitNameEl = document.getElementById('portrait-turn-name');
   if (portraitNameEl) portraitNameEl.textContent = activeName;
 
+  // v3.26.7 — turn-timing DOM updates. Live-tick comes from the setInterval
+  // below, which just calls render() once per second.
+  const dur = turnDurations();
+  const ttEl = document.getElementById('timer-current-turn');
+  if (ttEl) ttEl.textContent = fmtDuration(dur.currentTurnElapsed);
+  const ptEl = document.getElementById('portrait-timer');
+  if (ptEl) ptEl.textContent = fmtDuration(dur.currentTurnElapsed);
+  const geEl = document.getElementById('timer-game-elapsed');
+  if (geEl) geEl.textContent = fmtDuration(dur.gameElapsed);
+  seatDefs.forEach(s => {
+    const el = document.getElementById(`timer-on-clock-${s.id}`);
+    if (el) el.textContent = fmtDuration(dur.perSeat[s.id] || 0);
+  });
+
   const histEl = document.getElementById('history-list');
   if (histEl) {
     histEl.innerHTML = state.history.slice(-12).reverse().map(h => {
@@ -876,6 +965,13 @@ function render() {
 }
 
 render();
+
+// v3.26.7 — 1Hz tick re-runs render() so the active-turn timer + per-seat
+// time-on-clock + total game elapsed values advance live. render() is
+// idempotent against state (just writes textContent / className) so doing
+// it on a 1s cadence has no side effects. Skipped on finalized games (the
+// whole block is gated by the Jinja not-is-ended branch).
+const _turnTimerTick = setInterval(render, 1000);
 {% else %}
 seatDefs.forEach((s, i) => {
   const card = document.getElementById(`card-${s.id}`);
