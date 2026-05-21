@@ -85,6 +85,18 @@
                         class="tc-elim-btn"
                         onclick="toggleEliminate({{ seat.id }})"
                         title="Eliminate / revive">☠</button>
+                {% if seat_commander_images.get(seat.id) %}
+                  <form action="/games/{{ game.id }}/seats/{{ seat.id }}/art-toggle"
+                        method="post"
+                        class="tc-art-toggle-form">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                    <button type="submit"
+                            class="tc-art-toggle-btn{% if seat.art_background_hidden %} tc-art-toggle-off{% endif %}"
+                            title="{% if seat.art_background_hidden %}Show commander art{% else %}Hide commander art{% endif %}">
+                      🖼
+                    </button>
+                  </form>
+                {% endif %}
               {% endif %}
             </div>
             <div class="tc-life-section">
@@ -280,6 +292,7 @@ const seatDefs = [
     startingLife: {{ seat.starting_life }},
     storedPosition: {{ (seat.grid_position or '') | tojson }},
     commanderImageUrls: {{ (seat_commander_images.get(seat.id) or []) | tojson }},
+    artBackgroundHidden: {{ (seat.art_background_hidden or false) | tojson }},
     otherIds: [{% for o in game.seats if o.id != seat.id %}{{ o.id }}{% if not loop.last %},{% endif %}{% endfor %}] },
   {% endfor %}
 ];
@@ -738,7 +751,12 @@ function render() {
     // 1 URL → .has-commander-art (full-card cover). 2 URLs → also
     // .has-partner-art (top/bottom vertical halves for Partner /
     // Choose-a-Background / Friends Forever decks).
-    const cmdUrls = (s.commanderImageUrls || []).map(u => u.replace('/normal/', '/art_crop/'));
+    // v3.26.6 — per-seat art_background_hidden is opt-OUT (default FALSE
+    // preserves v3.26.1 behavior). When TRUE the seat falls back to the
+    // legacy color gradient regardless of whether commander art is cached.
+    const cmdUrls = s.artBackgroundHidden
+      ? []
+      : (s.commanderImageUrls || []).map(u => u.replace('/normal/', '/art_crop/'));
     if (cmdUrls.length >= 1) {
       card.style.setProperty('--commander-art-url-primary', `url("${cmdUrls[0]}")`);
       card.classList.add('has-commander-art');
@@ -866,7 +884,10 @@ seatDefs.forEach((s, i) => {
   // v3.26.1: commander art panel background for finalized games — same
   // /normal/ → /art_crop/ Scryfall URL swap as the active-game render() path,
   // and same single/partner branching for 1 vs 2 tagged commanders.
-  const cmdUrls = (s.commanderImageUrls || []).map(u => u.replace('/normal/', '/art_crop/'));
+  // v3.26.6 — respect art_background_hidden on the finalized-game path too.
+  const cmdUrls = s.artBackgroundHidden
+    ? []
+    : (s.commanderImageUrls || []).map(u => u.replace('/normal/', '/art_crop/'));
   if (cmdUrls.length >= 1) {
     card.style.setProperty('--commander-art-url-primary', `url("${cmdUrls[0]}")`);
     card.classList.add('has-commander-art');

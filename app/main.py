@@ -85,6 +85,7 @@ from app.game_service import (
     get_game,
     get_seat_commander_image_urls,
     list_games,
+    toggle_seat_art_background,
     update_game_notes,
 )
 from app.import_service import (
@@ -4612,6 +4613,32 @@ async def game_end(
 
     end_game(session, game_id, current_user.id, placements, final_lives, tc, notes)
     return RedirectResponse(f"/games/{game_id}", status_code=303)
+
+
+@app.post("/games/{game_id}/seats/{seat_id}/art-toggle")
+def game_seat_art_toggle(
+    request: Request,
+    game_id: int,
+    seat_id: int,
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+    _: None = CsrfRequired,
+):
+    """Flip ``GameSeat.art_background_hidden`` for a single seat (v3.26.6).
+
+    Per-seat opt-out for the v3.26.1 commander art panel background.
+    Ownership enforced via :func:`toggle_seat_art_background` — game must
+    belong to ``current_user`` and the seat must be on that game; either
+    miss → 404.
+
+    Returns 303 back to the game detail page; the v3.26.1 art-rendering
+    JS reads the new value from the freshly-rendered ``seatDefs`` array
+    on the next page paint.
+    """
+    new_value = toggle_seat_art_background(session, game_id, seat_id, current_user.id)
+    if new_value is None:
+        raise HTTPException(status_code=404, detail="Game or seat not found")
+    return RedirectResponse(url=f"/games/{game_id}", status_code=303)
 
 
 @app.post("/games/{game_id}/notes")

@@ -8,7 +8,17 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import (
+    Boolean,
+    DateTime,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+    text,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
@@ -215,6 +225,13 @@ class GameSeat(Base):
     starting_life: Mapped[int] = mapped_column(Integer, default=40, nullable=False)
     final_life: Mapped[int | None] = mapped_column(Integer, nullable=True)
     grid_position: Mapped[str | None] = mapped_column(String(4), nullable=True)
+    # v3.26.6 — per-seat opt-out for the v3.26.1 commander art panel background.
+    # Stored as INTEGER 0/1 (SQLite's idiomatic boolean shape); SQLAlchemy
+    # exposes it as bool via the Boolean type. server_default="0" matches the
+    # ALTER TABLE DEFAULT 0 the migration applied.
+    art_background_hidden: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=text("0")
+    )
 
     game: Mapped[Game] = relationship(back_populates="seats")
     deck: Mapped[Deck | None] = relationship()
