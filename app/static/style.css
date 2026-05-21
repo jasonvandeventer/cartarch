@@ -2777,6 +2777,7 @@ body.game-mode {
   justify-content: flex-end;
   align-items: flex-start;
   flex-shrink: 0;
+  gap: 0.3rem;
 }
 .tc-names {
   text-align: center;
@@ -2810,6 +2811,40 @@ body.game-mode {
   opacity: 1;
   background: #ef444420;
   border-color: #ef4444;
+}
+/* v3.26.6 — per-seat commander art panel toggle. Mirrors .tc-elim-btn shape
+   but hovers cyan (opt-in/visual control affordance vs the destructive
+   red elim button). Inline-form wrapper has no styling of its own — exists
+   only to carry the CSRF token + POST target. The .tc-art-toggle-off
+   modifier dims further when the seat is currently in art-hidden mode,
+   communicating state without a separate icon. */
+.tc-art-toggle-form {
+  display: inline-flex;
+  margin: 0;
+  padding: 0;
+}
+.tc-art-toggle-btn {
+  background: #000;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+  padding: 0.25rem 0.55rem;
+  font-size: 1rem;
+  opacity: 0.55;
+  color: var(--text);
+  min-width: 36px;
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.tc-art-toggle-btn.tc-art-toggle-off {
+  opacity: 0.3;
+}
+.tc-art-toggle-btn:hover {
+  opacity: 1;
+  background: #06b6d420;
+  border-color: #06b6d4;
 }
 .tc-placement {
   font-size: 1rem;
@@ -4165,13 +4200,14 @@ body.game-mode {
    styled as buttons).
 
    Out-of-scope by design: .tc-cpill-btn, .tc-ctr-btn, .tc-elim-btn, .tc-life-btn,
-   .fs-btn (per audit Issue 7.7 — tracker is tablet-landscape-first).
+   .tc-art-toggle-btn (v3.26.6), .fs-btn (per audit Issue 7.7 — tracker is
+   tablet-landscape-first).
    ============================================================================ */
 @media (max-width: 768px) {
   body:not(.game-mode)
     button:not(.tc-cpill-btn):not(.tc-ctr-btn):not(.tc-elim-btn):not(
       .tc-life-btn
-    ):not(.fs-btn) {
+    ):not(.tc-art-toggle-btn):not(.fs-btn) {
     min-height: 44px;
   }
   body:not(.game-mode) .btn-like,

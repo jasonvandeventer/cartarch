@@ -50,6 +50,9 @@ from scripts.migrate_v3_25_1_first_seat_number import main as migrate_v3_25_1_fi
 from scripts.migrate_v3_26_2_storage_location_mode import (
     main as migrate_v3_26_2_storage_location_mode,
 )
+from scripts.migrate_v3_26_6_game_seats_art_background_hidden import (
+    main as migrate_v3_26_6_game_seats_art_background_hidden,
+)
 
 
 def _is_applied(name: str) -> bool:
@@ -290,6 +293,13 @@ def run():
         _mark_applied("v3_26_2_storage_location_mode")
     else:
         print("v3.26.2 storage_location_mode already applied, skipping")
+
+    if not _is_applied("v3_26_6_game_seats_art_background_hidden"):
+        print("Running v3.26.6 game_seats.art_background_hidden migration...")
+        migrate_v3_26_6_game_seats_art_background_hidden()
+        _mark_applied("v3_26_6_game_seats_art_background_hidden")
+    else:
+        print("v3.26.6 art_background_hidden already applied, skipping")
 
     print("Migration runner complete")
 

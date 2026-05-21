@@ -123,6 +123,30 @@ def update_game_notes(
     return True
 
 
+def toggle_seat_art_background(
+    session: Session,
+    game_id: int,
+    seat_id: int,
+    user_id: int,
+) -> bool | None:
+    """Flip ``GameSeat.art_background_hidden`` for a single seat.
+
+    v3.26.6 per-seat opt-out for the v3.26.1 commander art panel background.
+    Returns the new value (True = hidden, falls back to color gradient;
+    False = art shown). Returns None if the game/seat is not found or not
+    owned by ``user_id`` — route handler maps to 404.
+    """
+    game = session.query(Game).filter(Game.id == game_id, Game.user_id == user_id).first()
+    if not game:
+        return None
+    seat = next((s for s in game.seats if s.id == seat_id), None)
+    if seat is None:
+        return None
+    seat.art_background_hidden = not bool(seat.art_background_hidden)
+    session.commit()
+    return seat.art_background_hidden
+
+
 def delete_game(session: Session, game_id: int, user_id: int) -> bool:
     game = session.query(Game).filter(Game.id == game_id, Game.user_id == user_id).first()
     if not game:
