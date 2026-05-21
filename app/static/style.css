@@ -2518,6 +2518,45 @@ body.game-mode {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* v3.26.7 — turn timing in the center turn marker. Two values: the active
+   turn's elapsed time (primary, with ⏱ glyph) and the total game elapsed
+   (secondary, after a ·). Both live-tick at 1Hz via the setInterval that
+   re-calls render(). Tabular-nums so seconds advancing don't shift
+   horizontal layout. */
+.turn-center-timer {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 0.3rem;
+  margin-top: 0.2rem;
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+}
+.turn-timer-label {
+  font-size: 0.85rem;
+}
+.turn-timer-sep {
+  opacity: 0.4;
+}
+.turn-timer-game-label {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  opacity: 0.7;
+}
+.portrait-timer {
+  font-variant-numeric: tabular-nums;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+.tc-on-clock {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  margin-top: 0.1rem;
+  opacity: 0.75;
+}
 .turn-next-btn {
   padding: 0.5rem 1.2rem;
   border-radius: 8px;
