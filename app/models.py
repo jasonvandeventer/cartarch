@@ -82,6 +82,7 @@ class StorageLocation(Base):
         ForeignKey("storage_locations.id"), nullable=True, index=True
     )
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
+    mode: Mapped[str] = mapped_column(String(16), default="managed", nullable=False, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     user: Mapped[User] = relationship(back_populates="storage_locations")

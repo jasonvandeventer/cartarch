@@ -2059,6 +2059,7 @@ def create_location_route(
     type: str = Form("other"),
     parent_id: int | None = Form(None),
     sort_order: int = Form(0),
+    mode: str = Form("managed"),
     session: Session = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
     _: None = CsrfRequired,
@@ -2073,6 +2074,7 @@ def create_location_route(
         type=type,
         parent_id=parent_id,
         sort_order=sort_order,
+        mode=mode,
     )
     return RedirectResponse("/locations", status_code=303)
 
@@ -2160,6 +2162,7 @@ def edit_location_route(
     type: str = Form("other"),
     parent_id: int | None = Form(None),
     sort_order: int = Form(0),
+    mode: str | None = Form(None),
     session: Session = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
     _: None = CsrfRequired,
@@ -2175,6 +2178,7 @@ def edit_location_route(
             type=type,
             parent_id=parent_id,
             sort_order=sort_order,
+            mode=mode,
         )
     except ValueError:
         pass

@@ -999,7 +999,11 @@ td {
   right: 0;
   top: calc(100% + 4px);
   z-index: 200;
-  background: var(--surface);
+  /* var(--surface) was undefined since v3.10.6 — popout has been
+     functionally transparent. Same Known-Problem class as --bg-card /
+     --text-muted (current-status.md). Swapped to the defined --panel
+     token (matches v3.25.2 .fp-modal-inner, v3.26.0 .notes-modal-inner). */
+  background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 1rem;
@@ -1762,6 +1766,36 @@ td {
 .legality-not-legal {
   background: #5a4a00;
   color: #ffe880;
+}
+/* v3.26.2 — per-location sorter-mode badge on the locations table.
+   Mirrors the .legality-badge visual pattern (inline pill, dark-theme
+   palette). One color per mode: green = managed (sorter active), amber =
+   manual (hands-off), blue = sink (source-only catch-all), gray =
+   ignored (invisible to sorter). */
+.location-mode-badge {
+  display: inline-block;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  padding: 0.1rem 0.45rem;
+  border-radius: 3px;
+  text-transform: uppercase;
+}
+.location-mode-managed {
+  background: #2d6e2d;
+  color: #d0ffd0;
+}
+.location-mode-manual {
+  background: #7a5a1a;
+  color: #ffe0b0;
+}
+.location-mode-sink {
+  background: #1a4a7a;
+  color: #b0d0ff;
+}
+.location-mode-ignored {
+  background: #444;
+  color: #ccc;
 }
 .tag-editor-details {
   margin-top: 0.3rem;
