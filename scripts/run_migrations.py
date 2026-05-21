@@ -54,6 +54,9 @@ from scripts.migrate_v3_26_6_game_seats_art_background_hidden import (
     main as migrate_v3_26_6_game_seats_art_background_hidden,
 )
 from scripts.migrate_v3_27_0_client_token import main as migrate_v3_27_0_client_token
+from scripts.migrate_v3_27_0b_1_deck_identity_snapshot import (
+    main as migrate_v3_27_0b_1_deck_identity_snapshot,
+)
 
 
 def _is_applied(name: str) -> bool:
@@ -308,6 +311,13 @@ def run():
         _mark_applied("v3_27_0_client_token")
     else:
         print("v3.27.0 client_token already applied, skipping")
+
+    if not _is_applied("v3_27_0b_1_deck_identity_snapshot"):
+        print("Running v3.27.0b-1 game_seats deck identity snapshot migration...")
+        migrate_v3_27_0b_1_deck_identity_snapshot()
+        _mark_applied("v3_27_0b_1_deck_identity_snapshot")
+    else:
+        print("v3.27.0b-1 deck_identity_snapshot already applied, skipping")
 
     print("Migration runner complete")
 
