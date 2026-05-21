@@ -199,7 +199,14 @@ class Game(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
     played_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    format: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    # v3.27.2 — service-layer enum (CANONICAL_GAME_FORMATS in game_service.py).
+    # Column stays nullable=True at the DB level because SQLite can't alter
+    # NULL→NOT NULL on an existing column without a table rebuild (reserved
+    # for v4). The Python-side default + game_create's normalize_game_format
+    # validation ensure new rows always carry a canonical value; the v3.27.2
+    # migration backfills existing rows to canonical values too. NULL is
+    # effectively unreachable after migration but the column type permits it.
+    format: Mapped[str | None] = mapped_column(String(64), nullable=True, default="Commander")
     turn_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
     first_seat_number: Mapped[int | None] = mapped_column(Integer, nullable=True)
     # v3.27.0 — collision-proof localStorage key for the game tracker.

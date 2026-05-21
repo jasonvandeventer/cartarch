@@ -12,8 +12,12 @@
       <input type="hidden" name="player_count" id="player_count_hidden" value="4">
       <div class="stack-form">
         <label>Format</label>
+        {# v3.27.2 — canonical format taxonomy. The previous "— any —" empty
+           option became misleading once empty resolves to Commander via
+           service-layer normalize_game_format. 'Other' is backfill-only
+           (not user-selectable) — see CANONICAL_GAME_FORMATS in
+           game_service.py. #}
         <select name="format">
-          <option value="">— any —</option>
           <option value="Commander" selected>Commander</option>
           <option value="Standard">Standard</option>
           <option value="Modern">Modern</option>
