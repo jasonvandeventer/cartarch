@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session, joinedload
 
 from app.audit_service import log_transaction
 from app.import_service import coerce_language_code_strict
+from app.location_service import SORTABLE_SOURCE_MODES
 from app.models import Card, InventoryRow, StorageLocation, TransactionLog
 from app.pricing import effective_price
 from app.scryfall import fetch_card_by_scryfall_id
@@ -1760,7 +1761,18 @@ def resort_collection(
         .outerjoin(StorageLocation, InventoryRow.storage_location_id == StorageLocation.id)
         .filter(
             InventoryRow.user_id == user_id,
-            or_(InventoryRow.storage_location_id.is_(None), StorageLocation.type != "deck"),
+            # v3.26.2: respect per-location sorter modes. Pending rows (no
+            # storage_location_id) are always sortable. Rows in a non-deck
+            # location are sortable only if that location's mode is in
+            # SORTABLE_SOURCE_MODES (``managed`` or ``sink``). ``manual`` and
+            # ``ignored`` locations keep their contents in place.
+            or_(
+                InventoryRow.storage_location_id.is_(None),
+                and_(
+                    StorageLocation.type != "deck",
+                    StorageLocation.mode.in_(SORTABLE_SOURCE_MODES),
+                ),
+            ),
         )
     )
     if row_ids is not None:

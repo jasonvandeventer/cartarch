@@ -9,6 +9,17 @@ VALID_LOCATION_TYPES = {"root", "drawer", "binder", "box", "deck", "other"}
 # existing VALID_LOCATION_TYPES pattern; no DB-level CHECK constraint).
 VALID_LOCATION_MODES = {"managed", "manual", "sink", "ignored"}
 
+# Modes the drawer sorter will PLACE INTO. Single source of truth for
+# is_sortable_target (Python predicate) AND the equivalent SQL filter in
+# resort_collection() (inventory_service.py). Currently only ``managed``.
+SORTABLE_TARGET_MODES = frozenset({"managed"})
+
+# Modes the drawer sorter will MOVE OUT OF. Single source of truth for
+# is_sortable_source (Python predicate) AND the equivalent SQL filter in
+# resort_collection() (inventory_service.py). ``managed`` locations can be
+# rebalanced; ``sink`` locations can be drained during rebalancing.
+SORTABLE_SOURCE_MODES = frozenset({"managed", "sink"})
+
 
 def is_sortable_target(location: StorageLocation) -> bool:
     """Return True if the drawer sorter may PLACE cards INTO this location.
@@ -16,8 +27,12 @@ def is_sortable_target(location: StorageLocation) -> bool:
     Per v3.26.2 mode semantics: only ``managed`` locations are sorter targets.
     ``manual`` keeps existing contents in place but accepts no new placement;
     ``sink`` is a source-only catch-all; ``ignored`` is invisible to the sorter.
+
+    Consults ``SORTABLE_TARGET_MODES``; the DB-level filter in
+    ``resort_collection()`` consults the same constant so the Python predicate
+    and the SQL query stay aligned.
     """
-    return location.mode == "managed"
+    return location.mode in SORTABLE_TARGET_MODES
 
 
 def is_sortable_source(location: StorageLocation) -> bool:
@@ -26,8 +41,12 @@ def is_sortable_source(location: StorageLocation) -> bool:
     Per v3.26.2 mode semantics: ``managed`` locations can be rebalanced out
     of, and ``sink`` locations can be drained during rebalancing. ``manual``
     locks contents in place; ``ignored`` is invisible.
+
+    Consults ``SORTABLE_SOURCE_MODES``; the DB-level filter in
+    ``resort_collection()`` consults the same constant so the Python predicate
+    and the SQL query stay aligned.
     """
-    return location.mode in {"managed", "sink"}
+    return location.mode in SORTABLE_SOURCE_MODES
 
 
 def list_locations(session: Session, user_id: int) -> list[StorageLocation]:
