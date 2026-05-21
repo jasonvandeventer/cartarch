@@ -118,7 +118,9 @@
               <div class="tc-life-center">
                 <div class="tc-names">
                   <div class="tc-player">{{ seat.player_name }}</div>
-                  {% if seat.deck %}<div class="tc-deck">{{ seat.deck.name }}</div>{% endif %}
+                  {# v3.27.0b-1 — snapshot-first deck name with live-deck fallback for legacy seats. #}
+                  {% set deck_display = seat.deck_name_at_game or (seat.deck.name if seat.deck else None) %}
+                  {% if deck_display %}<div class="tc-deck">{{ deck_display }}</div>{% endif %}
                   {% if not is_ended %}
                     <div class="tc-on-clock" title="Total time on clock this game">
                       ⏱ <span id="timer-on-clock-{{ seat.id }}">0:00</span>

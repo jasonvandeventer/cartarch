@@ -232,6 +232,16 @@ class GameSeat(Base):
     starting_life: Mapped[int] = mapped_column(Integer, default=40, nullable=False)
     final_life: Mapped[int | None] = mapped_column(Integer, nullable=True)
     grid_position: Mapped[str | None] = mapped_column(String(4), nullable=True)
+    # v3.27.0b-1 — deck identity captured at game creation. Analytics read
+    # these instead of joining through the live ``deck_id`` FK (which mutates
+    # whenever a deck is edited or deleted). The FK stays in place for "what
+    # deck was this?" navigation; the snapshots are the analytics truth.
+    # NULL = no deck assigned at seat creation, or legacy seat predating this
+    # column. commander_name_at_game joins multi-commander pairs with " + "
+    # (Partner / Background / Friends Forever, capped at 2 — mirrors
+    # get_seat_commander_image_urls' two-URL cap).
+    deck_name_at_game: Mapped[str | None] = mapped_column(Text, nullable=True)
+    commander_name_at_game: Mapped[str | None] = mapped_column(Text, nullable=True)
     # v3.26.6 — per-seat opt-out for the v3.26.1 commander art panel background.
     # Stored as INTEGER 0/1 (SQLite's idiomatic boolean shape); SQLAlchemy
     # exposes it as bool via the Boolean type. server_default="0" matches the
