@@ -113,25 +113,24 @@
                   {% if seat.final_life is not none %}<div class="tc-final-note">Final life: {{ seat.final_life }}</div>{% endif %}
                 {% else %}
                   <div class="tc-cpill-row">
-                    <div class="tc-cpill tc-cpill-p">
-                      <span class="tc-cpill-lbl">☣</span>
+                    <div class="tc-cpill tc-cpill-x">
+                      <select class="tc-extra-type"
+                              id="extra-type-{{ seat.id }}"
+                              onchange="setExtraCounterType({{ seat.id }}, this.value)">
+                        <option value="rad">☢ Rad</option>
+                        <option value="poison">☠ Poison</option>
+                        <option value="experience">✦ Experience</option>
+                        <option value="energy">⚡ Energy</option>
+                        <option value="storm">⛈ Storm</option>
+                        <option value="custom">● Custom…</option>
+                      </select>
                       <button type="button"
                               class="tc-cpill-btn"
-                              onclick="adjustPoison({{ seat.id }}, -1)">−</button>
-                      <span class="tc-cpill-val" id="poison-{{ seat.id }}">0</span>
+                              onclick="adjustExtraCounter({{ seat.id }}, -1)">−</button>
+                      <span class="tc-cpill-val" id="extra-{{ seat.id }}">0</span>
                       <button type="button"
                               class="tc-cpill-btn"
-                              onclick="adjustPoison({{ seat.id }}, 1)">+</button>
-                    </div>
-                    <div class="tc-cpill tc-cpill-e">
-                      <span class="tc-cpill-lbl">⚡</span>
-                      <button type="button"
-                              class="tc-cpill-btn"
-                              onclick="adjustExp({{ seat.id }}, -1)">−</button>
-                      <span class="tc-cpill-val" id="exp-{{ seat.id }}">0</span>
-                      <button type="button"
-                              class="tc-cpill-btn"
-                              onclick="adjustExp({{ seat.id }}, 1)">+</button>
+                              onclick="adjustExtraCounter({{ seat.id }}, 1)">+</button>
                     </div>
                   </div>
                 {% endif %}
@@ -486,21 +485,41 @@ portraitMQ.addEventListener('change', () => { applyLayout(); });
 
 {% if not is_ended %}
 // ── State ─────────────────────────────────────────────────────
+// v3.26.5 — extraCounter replaces the v3.x fixed poison/exp slots.
+// Per-seat shape: { type: 'rad'|'poison'|'experience'|'energy'|'storm'|
+//   'custom', value: number, customLabel?: string }.
+// Lossy type-switch by design (the spec calls for a single typed counter,
+// not per-type retention).
+// Blood / Monarch / Ticket deliberately excluded — Blood is a token, not a
+// counter; Monarch is a game-state toggle better tracked elsewhere; Ticket
+// is too format-specific. Add via Custom… if needed.
+const EXTRA_TYPES = ['rad','poison','experience','energy','storm','custom'];
+const EXTRA_SYMBOLS = {
+  rad:'☢', poison:'☠', experience:'✦', energy:'⚡', storm:'⛈', custom:'●'
+};
+
 function freshState() {
-  const lives = {}, poison = {}, exp = {}, eliminated = {}, cmd = {};
+  const lives = {}, eliminated = {}, cmd = {}, extraCounter = {};
   seatDefs.forEach(s => {
     lives[s.id] = s.startingLife;
-    poison[s.id] = 0; exp[s.id] = 0; eliminated[s.id] = false;
+    eliminated[s.id] = false;
     cmd[s.id] = {};
     s.otherIds.forEach(oid => { cmd[s.id][oid] = 0; });
+    extraCounter[s.id] = { type: 'poison', value: 0 };
   });
-  return { _fp: gameFingerprint(), lives, poison, exp, eliminated, cmd, history: [],
-           turn: 1, currentTurnId: firstSeatId };
+  // poison/exp kept as empty objects (not iterated) so a stale browser tab
+  // running pre-v3.26.5 code that reads state.poison[seatId] sees undefined
+  // (falls back to 0 via `|| 0`) instead of crashing on undefined.poison.
+  return { _fp: gameFingerprint(), lives, poison: {}, exp: {}, eliminated, cmd,
+           extraCounter, history: [], turn: 1, currentTurnId: firstSeatId };
 }
 
-// v3.25.1 deliberately did not bump this fingerprint.
-// first_seat_number changes only the initial seed for new games in
-// freshState(); saved-state shape and semantics are unchanged.
+// v3.25.1 deliberately did not bump this fingerprint, and v3.26.5 doesn't
+// either. extraCounter is an additive optional field; on load we hoist
+// any legacy state.poison/state.exp values into it (see the try block
+// below), so old saved games adopt the new shape without a wipe.
+// Bumping for a feature add would be the exact mistake v3.25.1 warned
+// against.
 function gameFingerprint() {
   return seatDefs.map(s => `${s.id}:${s.startingLife}:${s.name}`).join('|');
 }
@@ -511,6 +530,29 @@ try {
   const loaded = raw ? JSON.parse(raw) : null;
   state = (loaded && loaded._fp === gameFingerprint()) ? loaded : freshState();
   if (state.currentTurnId === undefined) state.currentTurnId = firstSeatId;
+  // Hoist legacy state.poison / state.exp into the new extraCounter shape.
+  // First non-zero wins; if both zero, default to {type:'poison', value:0}.
+  if (state.extraCounter === undefined) {
+    state.extraCounter = {};
+    seatDefs.forEach(s => {
+      const p = (state.poison && state.poison[s.id]) || 0;
+      const e = (state.exp && state.exp[s.id]) || 0;
+      if (p > 0) state.extraCounter[s.id] = { type: 'poison', value: p };
+      else if (e > 0) state.extraCounter[s.id] = { type: 'energy', value: e };
+      else state.extraCounter[s.id] = { type: 'poison', value: 0 };
+    });
+  } else {
+    // Defensive: a saved state may carry a type that's no longer in
+    // EXTRA_TYPES (e.g. v3.26.5 dev iterations briefly included monarch /
+    // ticket / blood). Coerce unknown types back to 'poison' with the
+    // value preserved — better than rendering a blank dropdown.
+    seatDefs.forEach(s => {
+      const ec = state.extraCounter[s.id];
+      if (!ec || !EXTRA_TYPES.includes(ec.type)) {
+        state.extraCounter[s.id] = { type: 'poison', value: (ec && ec.value) || 0 };
+      }
+    });
+  }
 } catch(e) { state = freshState(); }
 
 function save() { localStorage.setItem(storageKey, JSON.stringify(state)); }
@@ -527,7 +569,12 @@ function pushHistory(entry) {
 function checkElimination(seatId) {
   if (state.eliminated[seatId]) return;
   const life = state.lives[seatId];
-  const poison = state.poison[seatId] || 0;
+  // Auto-elim on 10 poison counters fires only when Poison is the actively
+  // tracked counter for that seat. Switching to a different counter type
+  // resets the value to 0 — same lossy-switch tradeoff documented at
+  // setExtraCounterType.
+  const ec = state.extraCounter[seatId] || { type: 'poison', value: 0 };
+  const poison = (ec.type === 'poison') ? (ec.value || 0) : 0;
   const cmdMap = state.cmd[seatId] || {};
   const cmdValues = Object.values(cmdMap);
   const maxCmd = cmdValues.length ? Math.max(...cmdValues) : 0;
@@ -542,15 +589,42 @@ function adjustLife(seatId, delta) {
   checkElimination(seatId);
   save(); render();
 }
-function adjustPoison(seatId, delta) {
-  state.poison[seatId] = Math.max(0, (state.poison[seatId] || 0) + delta);
-  pushHistory({ type: 'poison', seatId, delta });
+function adjustExtraCounter(seatId, delta) {
+  const ec = state.extraCounter[seatId] || { type: 'poison', value: 0 };
+  const newValue = Math.max(0, (ec.value || 0) + delta);
+  // Preserve the actual delta after the Math.max clamp — undo replays it
+  // verbatim, so clamping at + here means the negative undo of an already-
+  // clamped-at-zero increment becomes a no-op rather than going negative.
+  const actualDelta = newValue - (ec.value || 0);
+  state.extraCounter[seatId] = { ...ec, value: newValue };
+  pushHistory({ type: 'extra', seatId, delta: actualDelta, counterType: ec.type });
   checkElimination(seatId);
   save(); render();
 }
-function adjustExp(seatId, delta) {
-  state.exp[seatId] = Math.max(0, (state.exp[seatId] || 0) + delta);
-  pushHistory({ type: 'exp', seatId, delta });
+
+// Lossy type-switch by design (the v3.26.5 spec calls for a single typed
+// counter, not per-type retention). Switching from Poison-at-8 to Energy
+// drops the 8; the prior value is recoverable only via the history-undo
+// stack (the 'extraType' entry stores the full prev state).
+function setExtraCounterType(seatId, newType) {
+  const prev = state.extraCounter[seatId] || { type: 'poison', value: 0 };
+  if (newType === 'custom') {
+    const raw = prompt('Counter name:', prev.type === 'custom' ? (prev.customLabel || '') : '');
+    if (raw === null) {
+      // User cancelled — restore the select's displayed value to the prior type
+      // so the UI doesn't lie about what's tracked.
+      const sel = document.getElementById(`extra-type-${seatId}`);
+      if (sel) sel.value = prev.type;
+      return;
+    }
+    const label = raw.trim() || 'Custom';
+    state.extraCounter[seatId] = { type: 'custom', value: 0, customLabel: label };
+  } else if (EXTRA_TYPES.includes(newType)) {
+    state.extraCounter[seatId] = { type: newType, value: 0 };
+  } else {
+    return;
+  }
+  pushHistory({ type: 'extraType', seatId, prev, next: state.extraCounter[seatId] });
   save(); render();
 }
 function adjustCmd(receiverId, senderId, delta) {
@@ -583,10 +657,29 @@ function undoLast() {
   const last = state.history.pop();
   if (last.type === 'life') {
     state.lives[last.seatId] -= last.delta;
+  } else if (last.type === 'extra') {
+    const ec = state.extraCounter[last.seatId] || { type: 'poison', value: 0 };
+    state.extraCounter[last.seatId] = {
+      ...ec,
+      value: Math.max(0, (ec.value || 0) - last.delta),
+    };
+  } else if (last.type === 'extraType') {
+    // Whole-state restore — handles the lossy-switch case correctly because
+    // the prev entry captured the full counter object (type, value, label).
+    state.extraCounter[last.seatId] = last.prev;
   } else if (last.type === 'poison') {
-    state.poison[last.seatId] = Math.max(0, (state.poison[last.seatId] || 0) - last.delta);
+    // Legacy history entries from pre-v3.26.5 saved state. Replay the inverse
+    // into extraCounter when Poison is the active counter; otherwise no-op
+    // (the old counter is no longer surfaced anywhere). Same for 'exp'.
+    const ec = state.extraCounter[last.seatId];
+    if (ec && ec.type === 'poison') {
+      state.extraCounter[last.seatId] = { ...ec, value: Math.max(0, (ec.value || 0) - last.delta) };
+    }
   } else if (last.type === 'exp') {
-    state.exp[last.seatId] = Math.max(0, (state.exp[last.seatId] || 0) - last.delta);
+    const ec = state.extraCounter[last.seatId];
+    if (ec && ec.type === 'energy') {
+      state.extraCounter[last.seatId] = { ...ec, value: Math.max(0, (ec.value || 0) - last.delta) };
+    }
   } else if (last.type === 'cmd') {
     state.cmd[last.seatId][last.senderId] = Math.max(0,
       (state.cmd[last.seatId][last.senderId] || 0) - last.delta);
@@ -667,14 +760,29 @@ function render() {
       lifeEl.className = 'tc-life' + ((state.lives[s.id] ?? s.startingLife) <= 0 ? ' tc-life-dead' : '');
     }
 
-    const pv = state.poison[s.id] ?? 0;
-    const poisonEl = document.getElementById(`poison-${s.id}`);
-    if (poisonEl) {
-      poisonEl.textContent = pv;
-      poisonEl.className = 'tc-cpill-val' + (pv >= 10 ? ' tc-counter-danger' : pv >= 7 ? ' tc-counter-warn' : '');
+    const ec = state.extraCounter[s.id] || { type: 'poison', value: 0 };
+    const extraEl = document.getElementById(`extra-${s.id}`);
+    if (extraEl) {
+      extraEl.textContent = ec.value || 0;
+      // Counter-danger / counter-warn styling applies only when Poison is
+      // the active counter (matches the loss-condition threshold semantics
+      // in checkElimination — non-poison counters have no inherent threshold).
+      const dangerCls = ec.type === 'poison' && ec.value >= 10 ? ' tc-counter-danger'
+                      : ec.type === 'poison' && ec.value >= 7 ? ' tc-counter-warn' : '';
+      extraEl.className = 'tc-cpill-val' + dangerCls;
     }
-    const expEl = document.getElementById(`exp-${s.id}`);
-    if (expEl) expEl.textContent = state.exp[s.id] ?? 0;
+    const typeSel = document.getElementById(`extra-type-${s.id}`);
+    if (typeSel) {
+      // Rewrite the custom option's label so the dropdown reads
+      // "● Custom: <label>" when the user named the counter, while keeping
+      // the option's value="custom" stable so onchange still fires correctly.
+      const customOpt = typeSel.querySelector('option[value="custom"]');
+      if (customOpt) {
+        customOpt.textContent = (ec.type === 'custom' && ec.customLabel)
+          ? `● Custom: ${ec.customLabel}` : '● Custom…';
+      }
+      typeSel.value = ec.type;
+    }
 
     s.otherIds.forEach(oid => {
       const el = document.getElementById(`cmd-${s.id}-${oid}`);
@@ -712,7 +820,19 @@ function render() {
         const from = seatDefs.find(s => s.id === h.senderId)?.name ?? '?';
         return `<span class="history-entry">${name} CMD(${from}) ${sign}${h.delta}</span>`;
       }
-      const label = h.type === 'poison' ? '☣' : h.type === 'exp' ? '⚡' : '♥';
+      if (h.type === 'extra') {
+        const sym = EXTRA_SYMBOLS[h.counterType] || '●';
+        return `<span class="history-entry">${name} ${sym}${sign}${h.delta}</span>`;
+      }
+      if (h.type === 'extraType') {
+        const newType = h.next?.type || 'poison';
+        const sym = EXTRA_SYMBOLS[newType] || '●';
+        return `<span class="history-entry">${name} →${sym}</span>`;
+      }
+      // Legacy entries from pre-v3.26.5 saved state. Poison legacy entries
+      // render with the new ☠ symbol (semantically still Poison; the visual
+      // is what v3.26.5 unified on).
+      const label = h.type === 'poison' ? '☠' : h.type === 'exp' ? '⚡' : '♥';
       return `<span class="history-entry">${name} ${label}${sign}${h.delta}</span>`;
     }).join('');
   }

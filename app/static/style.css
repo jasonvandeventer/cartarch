@@ -2963,6 +2963,30 @@ body.game-mode {
   border-color: #2d3d1e;
   color: #86efac;
 }
+/* v3.26.5 — single typed counter pill replacing the fixed Poison + Energy
+   slots. Neutral palette (no semantic color tied to a specific counter type;
+   the .tc-counter-danger override on the value still surfaces threshold
+   when Poison is the active counter). */
+.tc-cpill-x {
+  background: #181820;
+  border-color: #2a2a35;
+  color: #cbd5e1;
+}
+.tc-cpill-x .tc-extra-type {
+  background: transparent;
+  color: inherit;
+  border: none;
+  font: inherit;
+  font-weight: 700;
+  padding: 0 0.15rem;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.tc-cpill-x .tc-extra-type:focus {
+  outline: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 3px;
+}
 .tc-cpill-val {
   min-width: 1.6ch;
   text-align: center;
