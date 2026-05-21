@@ -999,7 +999,11 @@ td {
   right: 0;
   top: calc(100% + 4px);
   z-index: 200;
-  background: var(--surface);
+  /* var(--surface) was undefined since v3.10.6 — popout has been
+     functionally transparent. Same Known-Problem class as --bg-card /
+     --text-muted (current-status.md). Swapped to the defined --panel
+     token (matches v3.25.2 .fp-modal-inner, v3.26.0 .notes-modal-inner). */
+  background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 1rem;
