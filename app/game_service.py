@@ -9,6 +9,59 @@ from sqlalchemy.orm import Session, joinedload
 
 from app.models import Card, Deck, Game, GameSeat, InventoryRow
 
+# v3.27.2 — Game.format canonical taxonomy. Service-layer enforcement
+# (matches the existing VALID_LOCATION_TYPES / VALID_LOCATION_MODES pattern
+# in app/location_service.py — no DB-level CHECK constraint, since adding
+# one to an existing column would require a SQLite table rebuild reserved
+# for the v4 Postgres migration).
+#
+# CANONICAL_GAME_FORMATS includes ``Other`` as the backfill catch-all for
+# historical free-text values that don't match anything in the canonical
+# set. NEW_GAME_FORMAT_CHOICES is the subset the game_new.html ``<select>``
+# exposes — ``Other`` is not user-selectable; it only appears when the
+# backfill migration writes it for unrecognized prior data.
+CANONICAL_GAME_FORMATS = (
+    "Commander",
+    "Standard",
+    "Modern",
+    "Legacy",
+    "Vintage",
+    "Draft",
+    "Sealed",
+    "Other",
+)
+NEW_GAME_FORMAT_CHOICES = CANONICAL_GAME_FORMATS[:-1]  # excludes 'Other'
+DEFAULT_GAME_FORMAT = "Commander"
+_FORMAT_LOOKUP = {f.casefold(): f for f in CANONICAL_GAME_FORMATS}
+
+
+def normalize_game_format(raw: str | None, unknown_to: str = DEFAULT_GAME_FORMAT) -> str:
+    """Normalize a submitted/stored format value to the canonical taxonomy.
+
+    Trim whitespace, case-fold, match case-insensitively against
+    ``CANONICAL_GAME_FORMATS``. Empty / whitespace-only / None resolves
+    to ``DEFAULT_GAME_FORMAT`` (Commander) — the v3.25.1 non-blocking
+    philosophy for ``first_seat_number`` applied to format too: a bad
+    value never blocks game creation.
+
+    ``unknown_to`` controls what happens when a non-empty value doesn't
+    match anything in the canonical set:
+
+    - Default (``DEFAULT_GAME_FORMAT``) is for runtime submission via
+      ``game_create``: garbage / form-tampered / future-unknown values
+      silently resolve to Commander so creation never fails.
+    - The migration backfill passes ``unknown_to="Other"`` instead, so
+      historical free-text values that don't match the canonical set
+      are preserved as a distinct signal rather than collapsed into
+      the default.
+    """
+    if raw is None:
+        return DEFAULT_GAME_FORMAT
+    cleaned = raw.strip()
+    if not cleaned:
+        return DEFAULT_GAME_FORMAT
+    return _FORMAT_LOOKUP.get(cleaned.casefold(), unknown_to)
+
 
 def _capture_deck_identity(session: Session, deck_id: int | None) -> tuple[str | None, str | None]:
     """Snapshot deck name + commander names for a seat (v3.27.0b-1).

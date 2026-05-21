@@ -57,6 +57,9 @@ from scripts.migrate_v3_27_0_client_token import main as migrate_v3_27_0_client_
 from scripts.migrate_v3_27_0b_1_deck_identity_snapshot import (
     main as migrate_v3_27_0b_1_deck_identity_snapshot,
 )
+from scripts.migrate_v3_27_2_format_normalization import (
+    main as migrate_v3_27_2_format_normalization,
+)
 
 
 def _is_applied(name: str) -> bool:
@@ -318,6 +321,13 @@ def run():
         _mark_applied("v3_27_0b_1_deck_identity_snapshot")
     else:
         print("v3.27.0b-1 deck_identity_snapshot already applied, skipping")
+
+    if not _is_applied("v3_27_2_format_normalization"):
+        print("Running v3.27.2 games.format normalization migration...")
+        migrate_v3_27_2_format_normalization()
+        _mark_applied("v3_27_2_format_normalization")
+    else:
+        print("v3.27.2 format_normalization already applied, skipping")
 
     print("Migration runner complete")
 

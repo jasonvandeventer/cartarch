@@ -86,6 +86,7 @@ from app.game_service import (
     get_game,
     get_seat_commander_image_urls,
     list_games,
+    normalize_game_format,
     toggle_seat_art_background,
     update_game_notes,
 )
@@ -4547,10 +4548,17 @@ def game_create(
     # tracker, so a recycled id cannot resurface a deleted game's saved
     # state. Key-only — NOT added to the saved-state blob; the
     # gameFingerprint() (``_fp``) value stays unchanged.
+    # v3.27.2 — format normalization. Trim + case-fold + match against
+    # CANONICAL_GAME_FORMATS; unknown / empty / form-tampered values
+    # resolve to DEFAULT_GAME_FORMAT (Commander). Game creation must
+    # never fail due to a format problem, matching the v3.25.1 non-
+    # blocking philosophy for first_seat_number.
+    canonical_format = normalize_game_format(format)
+
     game = create_game(
         session,
         user_id=current_user.id,
-        format=format,
+        format=canonical_format,
         seats=seats,
         first_seat_number=fsn,
         client_token=secrets.token_urlsafe(8),
