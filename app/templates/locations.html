@@ -18,6 +18,12 @@
       <select name="type">
         {% for t in location_types %}<option value="{{ t }}">{{ t.capitalize() }}</option>{% endfor %}
       </select>
+      <select name="mode" title="Sorter mode">
+        <option value="managed" selected>Managed — sorter places &amp; rebalances</option>
+        <option value="manual">Manual — sorter never touches</option>
+        <option value="sink">Sink — sorter pulls from only</option>
+        <option value="ignored">Ignored — invisible to sorter</option>
+      </select>
       <select name="parent_id">
         <option value="0">No parent</option>
         {% for loc in parent_locations %}<option value="{{ loc.id }}">{{ loc.name }} ({{ loc.type }})</option>{% endfor %}
@@ -54,6 +60,7 @@
             <tr>
               <th>Name</th>
               <th>Type</th>
+              <th>Mode</th>
               <th>Parent</th>
               <th>Rows</th>
               <th>Qty</th>
@@ -69,6 +76,9 @@
                   <a href="/locations/{{ loc.id }}">{{ loc.name }}</a>
                 </td>
                 <td data-label="Type">{{ loc.type }}</td>
+                <td data-label="Mode">
+                  <span class="location-mode-badge location-mode-{{ loc.mode }}">{{ loc.mode }}</span>
+                </td>
                 <td data-label="Parent">{{ loc.parent.name if loc.parent else '—' }}</td>
                 <td data-label="Rows">{{ summary.row_count }}</td>
                 <td data-label="Qty">{{ summary.quantity }}</td>
@@ -109,6 +119,15 @@
                                  name="sort_order"
                                  value="{{ loc.sort_order }}"
                                  style="width: 80px">
+                          <label>Sorter mode</label>
+                          <select name="mode">
+                            <option value="managed" {% if loc.mode == "managed" %}selected{% endif %}>
+                              Managed — sorter places &amp; rebalances
+                            </option>
+                            <option value="manual" {% if loc.mode == "manual" %}selected{% endif %}>Manual — sorter never touches</option>
+                            <option value="sink" {% if loc.mode == "sink" %}selected{% endif %}>Sink — sorter pulls from only</option>
+                            <option value="ignored" {% if loc.mode == "ignored" %}selected{% endif %}>Ignored — invisible to sorter</option>
+                          </select>
                           <button type="submit" style="margin-top: 0.25rem">Save</button>
                         </form>
                       </div>

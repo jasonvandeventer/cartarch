@@ -1763,6 +1763,36 @@ td {
   background: #5a4a00;
   color: #ffe880;
 }
+/* v3.26.2 — per-location sorter-mode badge on the locations table.
+   Mirrors the .legality-badge visual pattern (inline pill, dark-theme
+   palette). One color per mode: green = managed (sorter active), amber =
+   manual (hands-off), blue = sink (source-only catch-all), gray =
+   ignored (invisible to sorter). */
+.location-mode-badge {
+  display: inline-block;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  padding: 0.1rem 0.45rem;
+  border-radius: 3px;
+  text-transform: uppercase;
+}
+.location-mode-managed {
+  background: #2d6e2d;
+  color: #d0ffd0;
+}
+.location-mode-manual {
+  background: #7a5a1a;
+  color: #ffe0b0;
+}
+.location-mode-sink {
+  background: #1a4a7a;
+  color: #b0d0ff;
+}
+.location-mode-ignored {
+  background: #444;
+  color: #ccc;
+}
 .tag-editor-details {
   margin-top: 0.3rem;
 }
