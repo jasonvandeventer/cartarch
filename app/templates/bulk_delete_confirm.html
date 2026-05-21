@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% from "_macros.html" import inventory_card %}
+{% block content %}
+  <section class="panel page-hero">
+    <div>
+      <div class="eyebrow">Confirm</div>
+      <h2 class="panel-title">
+        Delete {{ items|length }} card{{ '' if items|length == 1 else 's' }} from {{ source_name }}?
+      </h2>
+      <p class="muted">
+        This permanently deletes the selected inventory row{{ '' if items|length == 1 else 's' }}.
+        One TransactionLog entry is recorded per row, but the deletion itself cannot be undone here —
+        the row{{ '' if items|length == 1 else 's' }} {{ 'is' if items|length == 1 else 'are' }} gone.
+        Review the list below before confirming.
+      </p>
+    </div>
+  </section>
+  {% if items %}
+    <section class="panel">
+      <h3 class="panel-title">Selected for deletion</h3>
+      <div class="inventory-grid" style="margin-top: 0.75rem">
+        {% for item in items %}{{ inventory_card(item, csrf_token) }}{% endfor %}
+      </div>
+    </section>
+    <section class="panel controls-panel">
+      <form action="{{ commit_url }}"
+            method="post"
+            class="filter-row"
+            style="margin-top: 0.5rem">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        {% for item in items %}<input type="hidden" name="row_ids" value="{{ item.id }}">{% endfor %}
+        <button type="submit"
+                class="btn-danger-small"
+                onclick="return confirm('Permanently delete {{ items|length }} row{{ '' if items|length == 1 else 's' }}?');">
+          Confirm Delete ({{ items|length }})
+        </button>
+        <a href="{{ back_url }}">
+          <button type="button">Cancel</button>
+        </a>
+      </form>
+    </section>
+  {% else %}
+    <section class="panel">
+      <p class="muted">No rows selected, or the selected rows were not found.</p>
+      <a href="{{ back_url }}">
+        <button type="button">Back</button>
+      </a>
+    </section>
+  {% endif %}
+{% endblock %}

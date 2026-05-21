@@ -143,6 +143,46 @@
                               class="btn-danger-small"
                               onclick="return confirm('Delete location \'{{ loc.name }}\'?');">Delete</button>
                     </form>
+                  {% elif summary.is_redirectable %}
+                    {% set redirect_storage = locations | rejectattr("type", "equalto", "root") | rejectattr("type", "equalto", "deck") | rejectattr("id", "equalto", loc.id) | list %}
+                    {% set redirect_decks = locations | selectattr("type", "equalto", "deck") | list %}
+                    {% if redirect_storage or redirect_decks %}
+                      <details class="inline-details"
+                               style="display: inline-block;
+                                      margin-left: 0.4rem">
+                        <summary class="btn-like btn-danger-small">Delete…</summary>
+                        <div class="edit-popout mobile-popover">
+                          <form action="/locations/{{ loc.id }}/delete"
+                                method="post"
+                                class="stack-form">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                            <p class="muted" style="margin: 0 0 0.5rem">
+                              <strong>{{ loc.name }}</strong> holds {{ summary.row_count }} row{{ '' if summary.row_count == 1 else 's' }} ({{ summary.quantity }} card{{ '' if summary.quantity == 1 else 's' }}). Choose a destination to move them into before this location is deleted.
+                            </p>
+                            <label>Move cards to</label>
+                            <select name="destination_id" required>
+                              <option value="">— Destination —</option>
+                              {% if redirect_storage %}
+                                <optgroup label="Storage Locations">
+                                  {% for d in redirect_storage %}<option value="{{ d.id }}">{{ d.name }} ({{ d.type }})</option>{% endfor %}
+                                </optgroup>
+                              {% endif %}
+                              {% if redirect_decks %}
+                                <optgroup label="Decks">
+                                  {% for d in redirect_decks %}<option value="{{ d.id }}">{{ d.name }}</option>{% endfor %}
+                                </optgroup>
+                              {% endif %}
+                            </select>
+                            <button type="submit"
+                                    class="btn-danger-small"
+                                    style="margin-top: 0.25rem"
+                                    onclick="return confirm('Move {{ summary.row_count }} row{{ '' if summary.row_count == 1 else 's' }} and delete location \'{{ loc.name }}\'?');">
+                              Move {{ summary.row_count }} and delete
+                            </button>
+                          </form>
+                        </div>
+                      </details>
+                    {% endif %}
                   {% endif %}
                 </td>
               </tr>

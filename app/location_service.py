@@ -150,10 +150,22 @@ def get_location_summary(session: Session, user_id: int) -> list[dict]:
             location.type == "deck"
             and not session.query(Deck).filter(Deck.storage_location_id == location.id).first()
         )
+        has_children = (
+            session.query(StorageLocation).filter(StorageLocation.parent_id == location.id).first()
+            is not None
+        )
         is_deletable = (
             len(rows) == 0
             and location.type not in ("root",)
             and (location.type != "deck" or is_orphaned_deck)
+            and not has_children
+        )
+        # Non-empty non-root non-deck (and no children) → delete-with-redirect.
+        # Deck-typed locations route through the Decks page even when orphaned-
+        # with-rows, matching the v3.26.4 spec ("no change to deck-typed
+        # location deletion").
+        is_redirectable = (
+            len(rows) > 0 and location.type not in ("root", "deck") and not has_children
         )
 
         summaries.append(
@@ -163,6 +175,7 @@ def get_location_summary(session: Session, user_id: int) -> list[dict]:
                 "quantity": quantity,
                 "total_value": total_value,
                 "is_deletable": is_deletable,
+                "is_redirectable": is_redirectable,
             }
         )
 
@@ -231,7 +244,26 @@ def update_location(
     return location
 
 
-def delete_location(session: Session, location_id: int, user_id: int) -> None:
+def delete_location(
+    session: Session,
+    location_id: int,
+    user_id: int,
+    destination_id: int | None = None,
+) -> None:
+    """Delete a location. When ``destination_id`` is provided, any rows
+    currently in the location are moved to that destination first, then
+    the now-empty location is deleted.
+
+    Per-row moves go through ``move_inventory_row_to_location``, which
+    commits per row (matching the existing bulk-move pattern); the
+    final ``session.delete(location)`` + commit happens only after all
+    moves succeed. A mid-loop failure leaves the rows that already
+    moved at the destination — the source location stays (and still has
+    the unmoved tail), so the operation is safely re-runnable.
+
+    Empty-location deletion (the original v3.10.6 path) keeps its
+    behavior unchanged when ``destination_id`` is None.
+    """
     location = get_location(session, location_id=location_id, user_id=user_id)
     if location is None:
         raise ValueError("Location not found.")
@@ -241,23 +273,50 @@ def delete_location(session: Session, location_id: int, user_id: int) -> None:
         linked_deck = session.query(Deck).filter(Deck.storage_location_id == location_id).first()
         if linked_deck:
             raise ValueError("Delete the deck from the Decks page to remove this location.")
-    has_rows = (
-        session.query(InventoryRow)
-        .filter(
-            InventoryRow.user_id == user_id,
-            InventoryRow.storage_location_id == location_id,
-        )
-        .first()
-    )
-    if has_rows:
-        raise ValueError(
-            "Cannot delete a location that still contains cards. Move or remove them first."
-        )
     has_children = (
         session.query(StorageLocation).filter(StorageLocation.parent_id == location_id).first()
     )
     if has_children:
         raise ValueError("Cannot delete a location that has child locations.")
+
+    if destination_id is not None:
+        if destination_id == location_id:
+            raise ValueError("Cannot redirect a location's contents into itself.")
+        destination = get_location(session, location_id=destination_id, user_id=user_id)
+        if destination is None:
+            raise ValueError("Destination location not found.")
+
+        # Local import avoids the inventory_service ↔ location_service
+        # circular at module load.
+        from app.inventory_service import move_inventory_row_to_location
+
+        row_ids = [
+            row_id
+            for (row_id,) in session.query(InventoryRow.id)
+            .filter(
+                InventoryRow.user_id == user_id,
+                InventoryRow.storage_location_id == location_id,
+            )
+            .all()
+        ]
+        for row_id in row_ids:
+            move_inventory_row_to_location(
+                session, row_id=row_id, user_id=user_id, location_id=destination_id
+            )
+    else:
+        has_rows = (
+            session.query(InventoryRow)
+            .filter(
+                InventoryRow.user_id == user_id,
+                InventoryRow.storage_location_id == location_id,
+            )
+            .first()
+        )
+        if has_rows:
+            raise ValueError(
+                "Cannot delete a location that still contains cards. Move or remove them first."
+            )
+
     session.delete(location)
     session.commit()
 
