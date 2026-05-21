@@ -310,7 +310,21 @@ const seatDefs = [
     otherIds: [{% for o in game.seats if o.id != seat.id %}{{ o.id }}{% if not loop.last %},{% endif %}{% endfor %}] },
   {% endfor %}
 ];
-const storageKey = `mana-game-${gameId}`;
+// v3.27.0 — collision-proof localStorage key. SQLite reuses ``games.id``
+// rowids after a game is deleted, so the bare ``mana-game-${gameId}`` key
+// can collide with a recycled id and resurface a deleted game's saved
+// state (the bug fix). The ``clientToken`` is a per-game URL-safe random
+// string the server generates once at game creation and never regenerates;
+// pairing it with the rowid makes the composite key unique across the
+// table's lifetime even with rowid reuse. NULL clientToken means a legacy
+// game predating this fix — fall back to the OLD bare key so existing
+// in-progress trackers keep their saved state and are NOT wiped. New games
+// always have a token (see ``game_create`` in main.py). Mirrors the NULL-
+// fallback approach v3.25.1 used for ``first_seat_number``.
+const clientToken = {{ game.client_token | tojson }};
+const storageKey = clientToken
+  ? `mana-game-${gameId}-${clientToken}`
+  : `mana-game-${gameId}`;
 
 // ── Assign physical positions ──────────────────────────────────
 // Use stored positions if all seats have them; otherwise auto-map by count.
@@ -552,7 +566,10 @@ function freshState() {
 // any legacy state.poison/state.exp values into it (see the try block
 // below), so old saved games adopt the new shape without a wipe.
 // Bumping for a feature add would be the exact mistake v3.25.1 warned
-// against.
+// against. v3.27.0 also deliberately does not bump: the clientToken is
+// a localStorage KEY namespace (lookup-only), NOT part of the saved-state
+// blob — state shape and semantics are unchanged, so bumping would mid-
+// game-wipe live trackers for zero benefit.
 function gameFingerprint() {
   return seatDefs.map(s => `${s.id}:${s.startingLife}:${s.name}`).join('|');
 }

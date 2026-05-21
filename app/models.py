@@ -202,6 +202,13 @@ class Game(Base):
     format: Mapped[str | None] = mapped_column(String(64), nullable=True)
     turn_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
     first_seat_number: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # v3.27.0 — collision-proof localStorage key for the game tracker.
+    # Server-generated once at create time (secrets.token_urlsafe(8)); never
+    # regenerated; NEVER added to the localStorage-saved state blob (key-only,
+    # so gameFingerprint() stays unchanged — same rationale as
+    # first_seat_number above). NULL = legacy game predating this fix; client
+    # falls back to the bare ``mana-game-${gameId}`` key.
+    client_token: Mapped[str | None] = mapped_column(String(32), nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 

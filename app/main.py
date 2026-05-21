@@ -14,6 +14,7 @@ import io
 import json
 import math
 import os
+import secrets
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -4539,12 +4540,20 @@ def game_create(
     if fsn is not None and not (1 <= fsn <= player_count):
         fsn = None
 
+    # v3.27.0 — collision-proof localStorage key namespace. Generated
+    # server-side exactly once per game and never regenerated. Pairs with
+    # the bare ``games.id`` rowid (which SQLite reuses after a game is
+    # deleted) to form ``mana-game-${gameId}-${clientToken}`` in the
+    # tracker, so a recycled id cannot resurface a deleted game's saved
+    # state. Key-only — NOT added to the saved-state blob; the
+    # gameFingerprint() (``_fp``) value stays unchanged.
     game = create_game(
         session,
         user_id=current_user.id,
         format=format,
         seats=seats,
         first_seat_number=fsn,
+        client_token=secrets.token_urlsafe(8),
     )
     return RedirectResponse(f"/games/{game.id}", status_code=303)
 
