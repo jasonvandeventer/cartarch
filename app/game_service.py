@@ -63,6 +63,41 @@ def normalize_game_format(raw: str | None, unknown_to: str = DEFAULT_GAME_FORMAT
     return _FORMAT_LOOKUP.get(cleaned.casefold(), unknown_to)
 
 
+# v3.27.3 — Game.status canonical taxonomy. Same service-layer enum pattern
+# as v3.27.2 CANONICAL_GAME_FORMATS (no DB-level CHECK; adding one to the
+# new column would constrain it now but every later schema change to games
+# would carry the same table-rebuild caveat — defer to v4 Postgres).
+#
+# Replaces the brittle "any seat has placement → is_ended=True" derivation
+# in game_detail.html. Distinguishes ``finalized`` (end_game was called) from
+# ``abandoned`` (game created but never ended) — both have no placements in
+# the old derivation, indistinguishable then. ``created`` is the default for
+# newly-inserted rows; ``in_progress`` is reserved for a future tracker-
+# server integration that explicitly marks a game as actively being played.
+CANONICAL_GAME_STATUSES = ("created", "in_progress", "finalized", "abandoned")
+DEFAULT_GAME_STATUS = "created"
+_STATUS_LOOKUP = {s.casefold(): s for s in CANONICAL_GAME_STATUSES}
+
+
+def normalize_game_status(raw: str | None, unknown_to: str = DEFAULT_GAME_STATUS) -> str:
+    """Normalize a status value to the canonical taxonomy.
+
+    Same shape as :func:`normalize_game_format`: trim + case-fold + lookup,
+    empty/None → ``DEFAULT_GAME_STATUS`` regardless of ``unknown_to``,
+    non-empty unknown obeys ``unknown_to``. There's no current user-input
+    surface for status (it's set by code paths: ``create_game`` →
+    ``created``, ``end_game`` → ``finalized``), but the normalizer is here
+    for symmetry with the format pattern and for any future surface that
+    accepts status input.
+    """
+    if raw is None:
+        return DEFAULT_GAME_STATUS
+    cleaned = raw.strip()
+    if not cleaned:
+        return DEFAULT_GAME_STATUS
+    return _STATUS_LOOKUP.get(cleaned.casefold(), unknown_to)
+
+
 def _capture_deck_identity(session: Session, deck_id: int | None) -> tuple[str | None, str | None]:
     """Snapshot deck name + commander names for a seat (v3.27.0b-1).
 
@@ -205,6 +240,10 @@ def end_game(
 
     game.turn_count = turn_count or None
     game.notes = notes.strip() or None
+    # v3.27.3 — mark the game as finalized. Replaces the "any seat has
+    # placement → is_ended" derivation that templates used to compute;
+    # template-side now reads game.status == "finalized" directly.
+    game.status = "finalized"
     session.commit()
     return True
 

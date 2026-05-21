@@ -1,6 +1,12 @@
 {% extends "base.html" %}
 {% block content %}
-  {% set is_ended = game.seats | selectattr('placement', 'ne', none) | list | length > 0 %}
+  {# v3.27.3 — is_ended now reads game.status directly. Replaces the
+     brittle "any seat has placement → ended" derivation that conflated
+     finalized games with abandoned ones (both had no placements when
+     viewed from the seat-placement angle). Templates downstream of this
+     line are unchanged — the variable name is_ended is preserved as the
+     read seam for the 21 consumer sites below. #}
+  {% set is_ended = game.status == 'finalized' %}
   {% set winner = game.seats | selectattr('placement', 'eq', 1) | first | default(none) %}
   <div class="game-app"
        id="game-app"
