@@ -44,6 +44,10 @@
         </form>
       {% endif %}
     </div>
+    {# v3.27.10: headline numbers count PLACED cards only. Pending — cards
+       imported but not yet filed into a storage location — surfaces as an
+       explicit sub-stat below, never folded silently into the headline.
+       Same canon applies to the dashboard tiles. #}
     <div class="stat-grid collection-stats-grid">
       <div class="stat-card compact">
         <div class="stat-label">Total value</div>
@@ -58,6 +62,13 @@
         <div class="stat-number">{{ unique_cards }}</div>
       </div>
     </div>
+    {% if pending_cards > 0 %}
+      <div class="pending-substat">
+        <a href="/pending">
+          {{ pending_cards }} card{{ '' if pending_cards == 1 else 's' }} / ${{ '%.2f'|format(pending_value) }} pending placement →
+        </a>
+      </div>
+    {% endif %}
     <div class="drawer-pill-row">
       {% for location, count in location_counts.items() %}
         <span class="drawer-pill">

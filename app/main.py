@@ -35,6 +35,7 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from app.audit_service import list_transaction_logs, log_transaction
 from app.auth import hash_password
+from app.dashboard_service import get_dashboard_tiles
 from app.db import DATA_DIR, SessionLocal, init_db
 from app.deck_service import (
     CARD_ROLE_TAGS,
@@ -369,6 +370,13 @@ def home(
         session.query(InventoryRow.id).filter(InventoryRow.user_id == current_user.id).first()
         is None
     )
+    # v3.27.10 — three dashboard tiles (Collection Value, Sets Collected,
+    # Recent Activity). Live aggregation; total cost <10ms on prod data
+    # shape (see app/dashboard_service.py header for the per-query
+    # measurements). Computed only when the populated dashboard renders —
+    # the show_onboarding empty state skips the work since a brand-new
+    # account has nothing to surface.
+    tiles = None if show_onboarding else get_dashboard_tiles(session, user_id=current_user.id)
     return render(
         request,
         "home.html",
@@ -377,6 +385,7 @@ def home(
             "current_user": current_user,
             "use_drawer_sorter": current_user.username in DRAWER_SORTER_USERNAMES,
             "show_onboarding": show_onboarding,
+            "tiles": tiles,
         },
     )
 
@@ -1799,6 +1808,8 @@ def collection_page(
             "total_pages": total_pages,
             "total_value": stats["total_value"],
             "total_cards": stats["total_cards"],
+            "pending_value": stats["pending_value"],
+            "pending_cards": stats["pending_cards"],
             "unique_cards": stats["unique_cards"],
             "drawer_counts": stats["drawer_counts"],
             "unassigned_count": stats["unassigned_count"],

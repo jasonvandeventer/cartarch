@@ -100,9 +100,52 @@
         <span class="action-cta">View games</span>
       </a>
     </section>
-    {# Stat row + Recent Activity / Storage Snapshot panels intentionally
-       deferred to v3.27.9 dashboard-data-tiles. v3.27.8 lays the layout
-       (sidebar + topbar + pagehead + quick-actions); v3.27.9 wires the
-       data. #}
+    {# v3.27.10 — three dashboard tiles wiring the slots v3.27.8 left
+       empty: Collection Value, Sets Collected, Recent Activity. Tiles
+       render only on the populated dashboard; the show_onboarding empty
+       state stays unchanged so a brand-new account never sees a wall of
+       zero-value tiles. Token reuse only — no aesthetic restyling (that
+       work is v3.27.13). #}
+    {% if tiles %}
+      <div class="section-label">At a glance</div>
+      <section class="dashboard-tiles">
+        <a href="/collection" class="dash-tile dash-tile-stat">
+          <div class="dash-tile-eyebrow">Collection Value</div>
+          <div class="dash-tile-number">${{ '%.2f'|format(tiles.collection.placed_value) }}</div>
+          <div class="dash-tile-sublabel">{{ tiles.collection.placed_cards }} cards placed</div>
+          {% if tiles.collection.pending_cards > 0 %}
+            <div class="dash-tile-pending">
+              {{ tiles.collection.pending_cards }} card{{ '' if tiles.collection.pending_cards == 1 else 's' }} / ${{ '%.2f'|format(tiles.collection.pending_value) }} pending placement
+            </div>
+          {% endif %}
+        </a>
+        <a href="/sets" class="dash-tile dash-tile-stat">
+          <div class="dash-tile-eyebrow">Sets Collected</div>
+          <div class="dash-tile-number">{{ tiles.sets.owned }}</div>
+          <div class="dash-tile-sublabel">of {{ tiles.sets.total }} tracked · {{ tiles.sets.completion_pct }}%</div>
+          <div class="dash-tile-progress" aria-hidden="true">
+            <div class="dash-tile-progress-fill"
+                 style="width: {{ tiles.sets.completion_pct }}%"></div>
+          </div>
+        </a>
+        <a href="{% if use_drawer_sorter %}/audit{% else %}/collection{% endif %}"
+           class="dash-tile dash-tile-activity">
+          <div class="dash-tile-eyebrow">Recent Activity</div>
+          {% if tiles.activity %}
+            <ul class="dash-tile-activity-list">
+              {% for event in tiles.activity[:5] %}
+                <li>
+                  <span class="dash-tile-activity-type">{{ event.event_type | replace('_', ' ') }}</span>
+                  {% if event.card_name %}<span class="dash-tile-activity-card">{{ event.card_name }}</span>{% endif %}
+                  <span class="dash-tile-activity-when">{{ event.created_at | format_local_datetime("%Y-%m-%d") }}</span>
+                </li>
+              {% endfor %}
+            </ul>
+          {% else %}
+            <div class="dash-tile-empty">No recent activity yet.</div>
+          {% endif %}
+        </a>
+      </section>
+    {% endif %}
   {% endif %}
 {% endblock %}
