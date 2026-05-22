@@ -26,17 +26,100 @@
                           tracker buttons (see exception list in the rule).
    ============================================================================ */
 
+/* ============================================================================
+   Design tokens (v3.27.7 foundation pass)
+   ----------------------------------------------------------------------------
+   Two parallel concerns live here:
+
+   1. The WORKING token set the v3.x stylesheet has been built on for years —
+      ``--bg``, ``--panel``, ``--panel-2``, ``--border``, ``--text``, ``--muted``,
+      ``--link``, ``--accent``, ``--accent-2``, ``--danger``, plus the
+      breakpoint trio. These tokens stay at their current values. The
+      v3.27.7 foundation pass reconciled (not replaced) them: appearance
+      across the app is unchanged outside the explicit bug-fix sites.
+
+   2. A NEW Cartarch brand palette (off-white / blue / near-black / red /
+      green / gold / dark-navy bg) prefixed ``--brand-*``. Forward-looking,
+      consumed by the later v3.27.x aesthetic restyling release. NOT yet
+      referenced by any CSS rule — adding the tokens here so the brand
+      vocabulary exists when the restyle work begins.
+
+   Two additional v3.27.7 cleanups, both folded into Part 3 of the
+   foundation pass: the previously-undefined ``--bg-card`` /
+   ``--text-muted`` references documented in current-status.md Known
+   Problems were repointed to ``--panel`` / ``--muted`` respectively (the
+   End Game modal's transparent-background bug is the one the user
+   actually sees fixed); and three additional undefined tokens the v3.27.7
+   inventory caught (``--surface2``, ``--surface3``, ``--surface-muted``)
+   were repointed to ``--panel-2`` / ``--panel`` / ``--panel-2``
+   respectively. See style.css Part 3 fix sites inline.
+
+   Tokens NOT in :root that legitimately exist as CSS custom properties:
+   ``--player-color`` (set per-seat by game_detail.html JS for the v3.26.1
+   commander art panel work), ``--commander-art-url-primary`` /
+   ``--commander-art-url-secondary`` (same), ``--current-player-color``
+   (set on turn change by game_detail.html render()). Dynamic JS-set
+   props; do NOT belong in :root.
+   ============================================================================ */
 :root {
+  /* --- Working palette (v3.x, unchanged) --- */
   --bg: #07111f;
   --panel: #12243f;
   --panel-2: #0f1f36;
   --border: #2c3e60;
+
+  /* --- Working text scale (v3.x, unchanged) --- */
   --text: #ecf2ff;
   --muted: #9ca9c7;
   --link: #a9c8ff;
+
+  /* --- Working accents + danger (v3.x, unchanged) --- */
   --accent: #2f6df6;
   --accent-2: #ffd57a;
   --danger: #ff5d57;
+
+  /* --- Cartarch brand palette (v3.27.7, forward-looking; not yet consumed) ---
+     Defined now so the aesthetic-restyling release later in the v3.27.x
+     cluster can repoint working rules to these without re-doing the
+     palette decision. Source: approved brand sheet 2026-05-20. */
+  --brand-off-white: #f5f1d7;
+  --brand-blue: #1e5aa8;
+  --brand-near-black: #1c1c1e;
+  --brand-red: #c73d3d;
+  --brand-green: #2e7d46;
+  --brand-gold: #c8a15a;
+  --brand-gold-soft: rgba(200, 161, 90, 0.18);
+  --brand-bg-navy: #081321;
+
+  /* --- Radius scale (v3.27.7, forward-looking; values seen in current CSS) ---
+     The stylesheet currently inlines radius values (6px, 10px, 12px, 14px,
+     16px, 18px, 20px, 999px) across ~40 rules. Capturing the common ones
+     as tokens for the aesthetic-restyling release to consolidate around. */
+  --radius-sm: 6px;
+  --radius: 10px;
+  --radius-lg: 18px;
+  --radius-pill: 999px;
+
+  /* --- Shadow scale (v3.27.7, forward-looking) ---
+     One shadow value seen in current CSS (.panel at line 282). Capturing
+     a small scale for consistency. */
+  --shadow-sm: 0 4px 12px rgba(0, 0, 0, 0.18);
+  --shadow: 0 10px 28px rgba(0, 0, 0, 0.22);
+
+  /* --- Spacing scale (v3.27.7, forward-looking) ---
+     Stylesheet currently inlines rem values throughout. Documented common
+     steps for the aesthetic-restyling release to consolidate around. */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+
+  /* --- Breakpoints (v3.x, unchanged) ---
+     Documentation only — CSS doesn't allow custom properties inside @media
+     conditions. See the big top-of-file comment for the full @media usage
+     map. */
   --bp-tablet: 768px;
   --bp-phone: 480px;
   --bp-desktop-narrow: 980px;
@@ -961,7 +1044,7 @@ td {
   user-select: none;
   display: inline-block;
   padding: 0.35rem 0.75rem;
-  background: var(--surface2);
+  background: var(--panel-2);
   border: 1px solid var(--border);
   border-radius: 4px;
   font-size: 0.88rem;
@@ -980,7 +1063,7 @@ td {
   user-select: none;
   display: inline-block;
   padding: 0.35rem 0.75rem;
-  background: var(--surface2);
+  background: var(--panel-2);
   border: 1px solid var(--border);
   border-radius: 4px;
   font-size: 0.88rem;
@@ -1072,7 +1155,7 @@ td {
 }
 
 .nav-logout-button:hover {
-  background: var(--surface-muted);
+  background: var(--panel-2);
 }
 
 .controls-panel {
@@ -1912,7 +1995,7 @@ td {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.07em;
-  color: var(--text-muted);
+  color: var(--muted);
   margin-bottom: 0.6rem;
 }
 .combo-section-label-gap {
@@ -1923,7 +2006,7 @@ td {
   border-radius: 10px;
   padding: 0.75rem 1rem;
   margin-bottom: 0.6rem;
-  background: var(--surface2);
+  background: var(--panel-2);
 }
 .combo-item-almost {
   border-color: rgba(86, 113, 160, 0.3);
@@ -1936,7 +2019,7 @@ td {
   margin-bottom: 0.45rem;
 }
 .combo-card-name {
-  background: var(--surface3);
+  background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 6px;
   padding: 0.2rem 0.55rem;
@@ -1968,7 +2051,7 @@ td {
 }
 .combo-summary {
   font-size: 0.82rem;
-  color: var(--text-muted);
+  color: var(--muted);
   cursor: pointer;
   user-select: none;
 }
@@ -1977,7 +2060,7 @@ td {
 }
 .combo-description {
   font-size: 0.85rem;
-  color: var(--text-muted);
+  color: var(--muted);
   margin-top: 0.4rem;
   line-height: 1.55;
   padding-left: 0.5rem;
@@ -1985,7 +2068,7 @@ td {
 }
 .combo-prereq {
   font-size: 0.82rem;
-  color: var(--text-muted);
+  color: var(--muted);
   margin-top: 0.4rem;
   padding-left: 0.5rem;
   border-left: 2px solid var(--border);
@@ -2078,7 +2161,7 @@ td {
 .bracket-popout-title {
   font-size: 0.82rem;
   font-weight: 700;
-  color: var(--text-muted);
+  color: var(--muted);
   text-transform: uppercase;
   letter-spacing: 0.06em;
   margin-bottom: 0.5rem;
@@ -2094,7 +2177,7 @@ td {
 /* Commander Synergy panel */
 .synergy-subtype-note {
   font-size: 0.82rem;
-  color: var(--text-muted);
+  color: var(--muted);
   margin: 0 0 0.75rem;
 }
 .synergy-bar {
@@ -2170,7 +2253,7 @@ td {
 .synergy-stat-label {
   font-size: 0.9rem;
   font-weight: 600;
-  color: var(--text-muted);
+  color: var(--muted);
   flex: 1;
 }
 .synergy-stat-count {
@@ -2180,13 +2263,13 @@ td {
 }
 .synergy-stat-pct {
   font-weight: 400;
-  color: var(--text-muted);
+  color: var(--muted);
 }
 .synergy-card-list {
   margin: 0.4rem 0 0.25rem;
   padding-left: 1.4rem;
   font-size: 0.82rem;
-  color: var(--text-muted);
+  color: var(--muted);
   line-height: 1.65;
   max-height: 220px;
   overflow-y: auto;
@@ -2196,7 +2279,7 @@ td {
 /* Dead card / upgrade targets panel */
 .dead-cards-note {
   font-size: 0.88rem;
-  color: var(--text-muted);
+  color: var(--muted);
   margin: 0 0 0.6rem;
 }
 .dead-cards-details {
@@ -2204,7 +2287,7 @@ td {
 }
 .dead-cards-summary {
   cursor: pointer;
-  color: var(--text-muted);
+  color: var(--muted);
   font-size: 0.85rem;
   padding: 0.2rem 0;
 }
@@ -2225,7 +2308,7 @@ td {
 .dead-card-tag {
   font-size: 0.72rem;
   background: var(--border);
-  color: var(--text-muted);
+  color: var(--muted);
   border-radius: 3px;
   padding: 0 4px;
   margin-left: 4px;
@@ -2274,7 +2357,7 @@ body.game-mode {
 }
 .game-launch-format {
   font-size: 1.1rem;
-  color: var(--text-muted);
+  color: var(--muted);
   letter-spacing: 0.04em;
 }
 .game-launch-btn {
@@ -2298,7 +2381,7 @@ body.game-mode {
 }
 .game-launch-skip {
   font-size: 0.78rem;
-  color: var(--text-muted);
+  color: var(--muted);
   background: none;
   border: none;
   cursor: pointer;
@@ -2313,7 +2396,7 @@ body.game-mode {
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid var(--border);
   border-radius: 5px;
-  color: var(--text-muted);
+  color: var(--muted);
   cursor: pointer;
   line-height: 1;
   touch-action: manipulation;
@@ -2344,7 +2427,7 @@ body.game-mode {
   backdrop-filter: blur(10px);
 }
 .game-topbar-link {
-  color: var(--text-muted);
+  color: var(--muted);
   text-decoration: none;
   font-size: 0.78rem;
 }
@@ -2506,7 +2589,7 @@ body.game-mode {
   font-size: 0.75rem;
   font-weight: 700;
   letter-spacing: 0.12em;
-  color: var(--text-muted);
+  color: var(--muted);
   text-transform: uppercase;
 }
 .turn-center-name {
@@ -2531,7 +2614,7 @@ body.game-mode {
   margin-top: 0.2rem;
   font-size: 0.78rem;
   font-variant-numeric: tabular-nums;
-  color: var(--text-muted);
+  color: var(--muted);
 }
 .turn-timer-label {
   font-size: 0.85rem;
@@ -2548,11 +2631,11 @@ body.game-mode {
 .portrait-timer {
   font-variant-numeric: tabular-nums;
   font-size: 0.8rem;
-  color: var(--text-muted);
+  color: var(--muted);
 }
 .tc-on-clock {
   font-size: 0.7rem;
-  color: var(--text-muted);
+  color: var(--muted);
   font-variant-numeric: tabular-nums;
   margin-top: 0.1rem;
   opacity: 0.75;
@@ -2763,7 +2846,7 @@ body.game-mode {
   padding: 0.2rem 0.55rem;
   background: #ffffff10;
   border-color: var(--border);
-  color: var(--text-muted);
+  color: var(--muted);
 }
 .layout-picker-btn:hover {
   color: var(--text);
@@ -2787,7 +2870,7 @@ body.game-mode {
 }
 .layout-picker-title {
   font-size: 0.72rem;
-  color: var(--text-muted);
+  color: var(--muted);
   text-transform: uppercase;
   letter-spacing: 0.08em;
   margin-bottom: 0.1rem;
@@ -2828,7 +2911,7 @@ body.game-mode {
 }
 .tc-deck {
   font-size: 0.75rem;
-  color: var(--text-muted);
+  color: var(--muted);
   margin-top: 0.1rem;
 }
 .tc-elim-btn {
@@ -3109,7 +3192,7 @@ body.game-mode {
 }
 .tc-cmd-summary {
   cursor: pointer;
-  color: var(--text-muted);
+  color: var(--muted);
   font-size: 0.78rem;
   list-style: none;
   user-select: none;
@@ -3131,11 +3214,11 @@ body.game-mode {
 .tc-cmd-from {
   flex: 1;
   font-size: 0.78rem;
-  color: var(--text-muted);
+  color: var(--muted);
 }
 .tc-final-note {
   font-size: 0.8rem;
-  color: var(--text-muted);
+  color: var(--muted);
   text-align: center;
 }
 
@@ -3170,7 +3253,7 @@ body.game-mode {
   padding: 1px 6px;
   white-space: nowrap;
   font-size: 0.75rem;
-  color: var(--text-muted);
+  color: var(--muted);
 }
 
 /* End game modal */
@@ -3185,7 +3268,7 @@ body.game-mode {
   padding: 1rem;
 }
 .end-game-inner {
-  background: var(--bg-card);
+  background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 14px;
   padding: 1.5rem;
@@ -3400,7 +3483,7 @@ body.game-mode {
 .player-count-btn {
   padding: 0.3rem 0.8rem;
   border: 1px solid var(--border);
-  background: var(--bg-card);
+  background: var(--panel);
   border-radius: 4px;
   cursor: pointer;
   color: var(--text);
@@ -3423,7 +3506,7 @@ body.game-mode {
   width: 70px;
   font-weight: 700;
   font-size: 0.9rem;
-  color: var(--text-muted);
+  color: var(--muted);
   padding-top: 0.3rem;
   flex-shrink: 0;
 }
@@ -3453,7 +3536,7 @@ body.game-mode {
   touch-action: manipulation;
 }
 .seat-pos-pill.unassigned {
-  color: var(--text-muted);
+  color: var(--muted);
   background: rgba(255, 255, 255, 0.03);
 }
 .seat-pos-pill.assigned {
@@ -3469,7 +3552,7 @@ body.game-mode {
 }
 .seat-diagram-label {
   font-size: 0.78rem;
-  color: var(--text-muted);
+  color: var(--muted);
   margin-bottom: 0.5rem;
 }
 .seat-diagram {
@@ -3510,7 +3593,7 @@ body.game-mode {
 }
 .sd-seat:hover:not(.sd-seat-inactive) {
   background: rgba(255, 255, 255, 0.07);
-  border-color: var(--text-muted);
+  border-color: var(--muted);
 }
 .sd-seat.sd-seat-filled {
   border-color: var(--accent);
@@ -3536,7 +3619,7 @@ body.game-mode {
 .sd-pos {
   font-size: 0.7rem;
   font-weight: 700;
-  color: var(--text-muted);
+  color: var(--muted);
   letter-spacing: 0.05em;
 }
 .sd-name {
@@ -3551,7 +3634,7 @@ body.game-mode {
   align-items: center;
   justify-content: center;
   font-size: 0.75rem;
-  color: var(--text-muted);
+  color: var(--muted);
 }
 
 /* Deck record badge on deck detail */
@@ -4313,7 +4396,7 @@ body.game-mode {
     height: 44px;
     background: transparent;
     border: none;
-    color: var(--text-muted);
+    color: var(--muted);
     font-size: 1.6rem;
     line-height: 1;
     padding: 0;
