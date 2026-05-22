@@ -119,13 +119,19 @@
             </div>
           {% endif %}
         </a>
-        <a href="/sets" class="dash-tile dash-tile-stat">
-          <div class="dash-tile-eyebrow">Sets Collected</div>
-          <div class="dash-tile-number">{{ tiles.sets.owned }}</div>
-          <div class="dash-tile-sublabel">of {{ tiles.sets.total }} tracked · {{ tiles.sets.completion_pct }}%</div>
-          <div class="dash-tile-progress" aria-hidden="true">
-            <div class="dash-tile-progress-fill"
-                 style="width: {{ tiles.sets.completion_pct }}%"></div>
+        {# v3.27.11 — replaced the Sets Collected tile. The Sets data was
+           cross-user-shared via the `cards` table denominator, so the
+           percentage moved on other users' imports — signal the current
+           user didn't generate. Sets remains its own page at /sets. #}
+        <a href="/decks" class="dash-tile dash-tile-stat">
+          <div class="dash-tile-eyebrow">Decks Owned</div>
+          <div class="dash-tile-number">{{ tiles.decks.total }}</div>
+          <div class="dash-tile-sublabel">
+            {% if tiles.decks.total == 0 %}
+              No decks yet
+            {% else %}
+              Commander: {{ tiles.decks.commander_format }}
+            {% endif %}
           </div>
         </a>
         <a href="{% if use_drawer_sorter %}/audit{% else %}/collection{% endif %}"
