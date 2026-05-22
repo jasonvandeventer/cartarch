@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 
 from app.inventory_service import get_owned_cards_by_set, list_owned_sets
 from app.models import TokenInventory
-from app.scryfall import fetch_set_cards
+from app.scryfall import fetch_set_cards_from_cache
 
 
 def _get_owned_token_map(session: Session, set_code: str, user_id: int) -> dict[str, int]:
@@ -68,7 +68,17 @@ def get_set_completion(
     set_code = (set_code or "").strip().lower()
     view = view if view in {"all", "owned", "missing"} else "all"
 
-    set_cards = fetch_set_cards(set_code)
+    # v3.27.13 — read from the v3.25.0 scryfall_cards bulk cache instead
+    # of paginating Scryfall live. Closes the 18-27s request-path latency
+    # on /sets/{set_code} (one rate-limited Scryfall pagination per visit,
+    # plus another for the token set, plus a third for substitutes — all
+    # on the request path, every visit). The bulk cache is kept current
+    # by the v3.25.0 _bulk_data_loop daemon and indexed on set_code +
+    # collector_number, so this becomes a single SQLite SELECT. Cache
+    # miss returns [] (no fallback to a live request-path Scryfall fetch
+    # — the request-path network invariant requires misses fail visibly,
+    # not degrade into per-row live fetches).
+    set_cards = fetch_set_cards_from_cache(set_code)
     owned_map = get_owned_cards_by_set(session, set_code=set_code, user_id=user_id)
 
     owned_cards_list = []
@@ -100,7 +110,11 @@ def get_set_completion(
     if include_tokens:
         is_already_token_set = set_code.startswith("t")
         token_set_code = "t" + set_code if not is_already_token_set else set_code
-        token_cards = list(fetch_set_cards(token_set_code))
+        # v3.27.13 — token set ALSO reads from scryfall_cards. The
+        # pre-fix path made a separate Scryfall pagination call for
+        # t{set_code} on every visit; with the bulk cache this is one
+        # more SELECT.
+        token_cards = list(fetch_set_cards_from_cache(token_set_code))
         token_owned_map = _get_owned_token_map(session, token_set_code, user_id)
         for token in token_cards:
             cn_key = (token["collector_number"] or "").lstrip("0") or "0"
@@ -108,12 +122,14 @@ def get_set_completion(
             token["is_substitute"] = False
 
         # Append substitute cards (s{code}) at the end of the token list. Not
-        # every set has substitutes; fetch_set_cards returns [] for unknown
-        # sets so this is safe even when the substitute set doesn't exist.
+        # every set has substitutes; fetch_set_cards_from_cache returns []
+        # for unknown sets so this is safe even when the substitute set
+        # doesn't exist. v3.27.13 — substitute set ALSO reads from the
+        # bulk cache (was the third request-path Scryfall pagination call).
         substitute_set_code = "s" + set_code if not is_already_token_set else None
         substitute_cards: list = []
         if substitute_set_code:
-            substitute_cards = list(fetch_set_cards(substitute_set_code))
+            substitute_cards = list(fetch_set_cards_from_cache(substitute_set_code))
             if substitute_cards:
                 sub_owned_map = _get_owned_token_map(session, substitute_set_code, user_id)
                 for sub in substitute_cards:
@@ -191,13 +207,21 @@ def _compute_rarity_breakdown(set_cards: list[dict]) -> list[dict]:
 
 
 def list_set_completion_summaries(session: Session, user_id: int) -> list[dict]:
-    """Build set-completion summaries for one user's owned sets."""
+    """Build set-completion summaries for one user's owned sets.
+
+    Note: this function is currently unused (no callers as of v3.27.13);
+    it was scaffolding for a dashboard surface that didn't ship. Kept
+    importable for potential future use. The per-set ``fetch_set_cards``
+    call originally here was repointed to ``fetch_set_cards_from_cache``
+    as part of v3.27.13's request-path-network-invariant restoration so
+    any future wiring inherits the cache-read path by default.
+    """
     owned_sets = list_owned_sets(session, user_id=user_id)
     summaries = []
 
     for owned_set in owned_sets:
         set_code = owned_set["set_code"]
-        set_cards = fetch_set_cards(set_code)
+        set_cards = fetch_set_cards_from_cache(set_code)
         owned_map = get_owned_cards_by_set(session, set_code=set_code, user_id=user_id)
 
         total_cards = len(set_cards)
