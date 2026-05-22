@@ -2,7 +2,7 @@
 
 Self-hosted web application for managing a physical Magic: The Gathering collection.
 
-**Current version: v3.27.4** · [Platform repo](https://github.com/jasonvandeventer/mana-archive-platform)
+**Current version: v3.27.5** · [Platform repo](https://github.com/jasonvandeventer/mana-archive-platform)
 
 ---
 
