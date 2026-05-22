@@ -7,7 +7,15 @@ from sqlalchemy.orm import Session
 
 from app.auth import hash_password
 from app.dependencies import CsrfRequired, get_db_session, render, require_admin
-from app.models import Deck, ImportBatch, InventoryRow, StorageLocation, TransactionLog, User
+from app.models import (
+    Deck,
+    GameSeat,
+    ImportBatch,
+    InventoryRow,
+    StorageLocation,
+    TransactionLog,
+    User,
+)
 
 router = APIRouter(prefix="/admin")
 
@@ -164,6 +172,19 @@ def delete_user(
     session.query(ImportBatch).filter(ImportBatch.user_id == user_id).delete()
     session.query(Deck).filter(Deck.user_id == user_id).delete()
     session.query(StorageLocation).filter(StorageLocation.user_id == user_id).delete()
+    # v3.27.5 — null seat→user FK on this user's historical seats. The
+    # ``ondelete="SET NULL"`` clause on ``GameSeat.user_id`` is declared on
+    # the model for documentation + v4 Postgres forward-compat but SQLite
+    # doesn't enforce it (the project runs with ``PRAGMA foreign_keys`` OFF
+    # — see app/db.py). This explicit UPDATE guarantees the outcome
+    # regardless of engine: deleting a user nulls the FK on their seats,
+    # leaving ``user_name_at_game`` untouched (the v3.27.5 snapshot column
+    # SURVIVES deletion — that's its entire purpose). Seats in games owned
+    # by OTHER users now correctly show the deleted user's historical name
+    # via the snapshot.
+    session.query(GameSeat).filter(GameSeat.user_id == user_id).update(
+        {GameSeat.user_id: None}, synchronize_session=False
+    )
     session.delete(target)
     session.commit()
     return RedirectResponse(url="/admin?success=user_deleted", status_code=303)

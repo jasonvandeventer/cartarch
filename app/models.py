@@ -256,6 +256,19 @@ class GameSeat(Base):
     starting_life: Mapped[int] = mapped_column(Integer, default=40, nullable=False)
     final_life: Mapped[int | None] = mapped_column(Integer, nullable=True)
     grid_position: Mapped[str | None] = mapped_column(String(4), nullable=True)
+    # v3.27.5 — seat→user attribution. Two-column design mirrors v3.27.1's
+    # deck-identity snapshot (live FK + analytics-stable snapshot).
+    # ``user_id`` is the live navigational link; ``ondelete="SET NULL"`` is
+    # declared for documentation + v4 Postgres forward-compat, but SQLite
+    # doesn't enforce it (PRAGMA foreign_keys is OFF project-wide). The
+    # cascade is enforced explicitly in the admin user-deletion path —
+    # see ``delete_user`` in ``app/routes/admin.py``. ``user_name_at_game``
+    # is captured at game creation and SURVIVES account deletion (the
+    # whole point of the snapshot).
+    user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    user_name_at_game: Mapped[str | None] = mapped_column(Text, nullable=True)
     # v3.27.0b-1 — deck identity captured at game creation. Analytics read
     # these instead of joining through the live ``deck_id`` FK (which mutates
     # whenever a deck is edited or deleted). The FK stays in place for "what

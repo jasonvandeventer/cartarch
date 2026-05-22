@@ -7,7 +7,7 @@ from typing import Any
 
 from sqlalchemy.orm import Session, joinedload
 
-from app.models import Card, Deck, Game, GameSeat, InventoryRow
+from app.models import Card, Deck, Game, GameSeat, InventoryRow, User
 
 # v3.27.2 — Game.format canonical taxonomy. Service-layer enforcement
 # (matches the existing VALID_LOCATION_TYPES / VALID_LOCATION_MODES pattern
@@ -140,6 +140,45 @@ def _capture_deck_identity(session: Session, deck_id: int | None) -> tuple[str |
     return deck.name, commander_name
 
 
+def _capture_user_attribution(
+    session: Session, user_id: int | None
+) -> tuple[int | None, str | None]:
+    """Snapshot user attribution for a seat (v3.27.5).
+
+    Returns ``(user_id, user_name_at_game)`` for a seat. Validates
+    that ``user_id`` refers to a real ``User`` row; an invalid /
+    absent / unknown id resolves to ``(None, None)`` so seat creation
+    never fails over an attribution problem (mirrors the v3.25.1
+    non-blocking philosophy for ``first_seat_number`` and the v3.27.2
+    one for ``format``).
+
+    The snapshot value uses ``user.display_name or user.username``,
+    matching the project-wide template convention ("display name
+    falls back to username"). Captured AT CREATION TIME so it
+    survives later display-name edits and account deletion — same
+    capture-at-game-start pattern as the v3.27.1 deck/commander
+    snapshot.
+
+    Cross-user permissive: this does NOT require ``user_id`` to be
+    the game owner. Seats may legitimately reference another
+    account, mirroring the existing all-decks dropdown precedent in
+    ``game_new.html`` and the cross-user-deck pattern documented in
+    ``get_seat_commander_image_urls``.
+
+    Inactive (``User.is_active = False``) accounts are still valid
+    targets — matches the deck precedent, which doesn't filter by
+    is_active either. The snapshot column carries the historical
+    fact regardless.
+    """
+    if not user_id:
+        return None, None
+    user = session.query(User).filter(User.id == user_id).first()
+    if user is None:
+        return None, None
+    name = (user.display_name or user.username or "").strip() or None
+    return user.id, name
+
+
 def create_game(
     session: Session,
     user_id: int,
@@ -178,6 +217,10 @@ def create_game(
     for i, seat in enumerate(seats, start=1):
         deck_id = seat.get("deck_id") or None
         deck_name, commander_name = _capture_deck_identity(session, deck_id)
+        # v3.27.5 — seat→user attribution. Returns (None, None) for unknown /
+        # absent / invalid user_id, so the seat ships unattributed rather
+        # than failing the whole game creation.
+        seat_user_id, user_name = _capture_user_attribution(session, seat.get("user_id"))
         session.add(
             GameSeat(
                 game_id=game.id,
@@ -186,6 +229,8 @@ def create_game(
                 deck_id=deck_id,
                 deck_name_at_game=deck_name,
                 commander_name_at_game=commander_name,
+                user_id=seat_user_id,
+                user_name_at_game=user_name,
                 starting_life=int(seat.get("starting_life") or 40),
                 grid_position=seat.get("grid_position") or None,
             )
