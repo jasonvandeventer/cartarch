@@ -39,6 +39,14 @@ class User(Base):
     deck_group_by: Mapped[str] = mapped_column(String(16), default="type", nullable=False)
 
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    # v3.27.4 — replaces the misleading "last activity" proxy on the Admin
+    # page (which was `func.max(TransactionLog.created_at)`, i.e. last
+    # inventory event — users who only play games / edit decks / log in
+    # showed stale dates). Set by POST /login on every successful auth.
+    # NULL until next login for existing users (no backfill: the proxy
+    # data is semantically different and copying it under the new name
+    # would import the same misleading signal).
+    last_signed_in_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     inventory_rows: Mapped[list[InventoryRow]] = relationship(back_populates="user")
     decks: Mapped[list[Deck]] = relationship(back_populates="user")

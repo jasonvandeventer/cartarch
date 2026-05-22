@@ -61,6 +61,9 @@ from scripts.migrate_v3_27_2_format_normalization import (
     main as migrate_v3_27_2_format_normalization,
 )
 from scripts.migrate_v3_27_3_game_status import main as migrate_v3_27_3_game_status
+from scripts.migrate_v3_27_4_user_last_signed_in_at import (
+    main as migrate_v3_27_4_user_last_signed_in_at,
+)
 
 
 def _is_applied(name: str) -> bool:
@@ -336,6 +339,13 @@ def run():
         _mark_applied("v3_27_3_game_status")
     else:
         print("v3.27.3 game_status already applied, skipping")
+
+    if not _is_applied("v3_27_4_user_last_signed_in_at"):
+        print("Running v3.27.4 users.last_signed_in_at migration...")
+        migrate_v3_27_4_user_last_signed_in_at()
+        _mark_applied("v3_27_4_user_last_signed_in_at")
+    else:
+        print("v3.27.4 last_signed_in_at already applied, skipping")
 
     print("Migration runner complete")
 

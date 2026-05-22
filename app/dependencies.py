@@ -4,6 +4,8 @@ import os
 import secrets
 import subprocess
 from collections.abc import Generator
+from datetime import UTC, datetime
+from zoneinfo import ZoneInfo
 
 from fastapi import Depends, Form, HTTPException, Request, status
 from fastapi.templating import Jinja2Templates
@@ -59,6 +61,37 @@ def static_v(path: str) -> str:
 
 
 templates.env.globals["static_v"] = static_v
+
+
+# v3.27.4 — local-time display filter for naive-UTC ``datetime`` values.
+# The project's convention is ``datetime.utcnow()`` for all stored timestamps
+# (naive UTC); template-side ``strftime`` therefore renders UTC dates labeled
+# as if local, which displays evening activity as the following day from a
+# Central Time perspective. This filter attaches UTC, converts to
+# ``America/Chicago``, then formats. NULL-safe (returns ``''`` for None) so
+# templates can chain it without an outer conditional.
+#
+# Scope: registered globally as a Jinja filter, but only the Admin template
+# consumes it in this patch. Broader rollout to other UTC-displaying
+# templates (created_at, played_at, imported_at, …) is a separate roadmap
+# item — the cost of a project-wide sweep isn't worth taking on for a
+# single-tenant install. Upgrade path to per-user timezone is a one-line
+# filter swap if a wider user base demands it.
+_LOCAL_TZ = ZoneInfo("America/Chicago")
+
+
+def format_local_datetime(dt: datetime | None, fmt: str = "%Y-%m-%d") -> str:
+    if dt is None:
+        return ""
+    # Naive-UTC → aware-UTC → Chicago. ``replace(tzinfo=UTC)`` on an
+    # already-aware datetime would overwrite the existing tz, but the
+    # project only ever stores naive UTC, so this is safe.
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=UTC)
+    return dt.astimezone(_LOCAL_TZ).strftime(fmt)
+
+
+templates.env.filters["format_local_datetime"] = format_local_datetime
 
 
 def get_csrf_token(request: Request) -> str:
