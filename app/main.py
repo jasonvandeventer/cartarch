@@ -4509,6 +4509,7 @@ def game_create(
     format: str = Form(""),
     player_names: list[str] = Form(...),
     deck_ids: list[str] = Form(...),
+    user_ids: list[str] = Form(default=[]),
     grid_positions: list[str] = Form(default=[]),
     starting_life: int = Form(40),
     first_seat_number: int | None = Form(None),
@@ -4524,11 +4525,29 @@ def game_create(
             deck_id = int(did_raw) if did_raw else None
         except ValueError:
             deck_id = None
+        # v3.27.5 — seat→user attribution. ``user_ids`` has been submitted
+        # by game_new.html since well before this patch but was silently
+        # dropped by the route handler (the bug surfaced in v3.25.1 recon).
+        # Parse as nullable int; invalid / absent / unauthorized values
+        # resolve to None and the seat ships unattributed — game creation
+        # never fails over an attribution problem (mirrors the v3.25.1
+        # first_seat_number non-blocking philosophy). Validation that the
+        # id refers to a real User happens inside ``_capture_user_attribution``
+        # in game_service.py — same pattern as deck_id validation, and same
+        # cross-user permissive stance (a seat may legitimately reference
+        # another user's account, matching the existing all-decks dropdown
+        # precedent in game_new.html).
+        uid_raw = user_ids[i] if i < len(user_ids) else ""
+        try:
+            user_id = int(uid_raw) if uid_raw else None
+        except ValueError:
+            user_id = None
         pos_raw = grid_positions[i].strip() if i < len(grid_positions) else ""
         seats.append(
             {
                 "player_name": name or f"Player {i + 1}",
                 "deck_id": deck_id,
+                "user_id": user_id,
                 "starting_life": starting_life,
                 "grid_position": pos_raw or None,
             }

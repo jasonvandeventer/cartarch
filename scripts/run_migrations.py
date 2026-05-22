@@ -64,6 +64,9 @@ from scripts.migrate_v3_27_3_game_status import main as migrate_v3_27_3_game_sta
 from scripts.migrate_v3_27_4_user_last_signed_in_at import (
     main as migrate_v3_27_4_user_last_signed_in_at,
 )
+from scripts.migrate_v3_27_5_seat_user_attribution import (
+    main as migrate_v3_27_5_seat_user_attribution,
+)
 
 
 def _is_applied(name: str) -> bool:
@@ -346,6 +349,13 @@ def run():
         _mark_applied("v3_27_4_user_last_signed_in_at")
     else:
         print("v3.27.4 last_signed_in_at already applied, skipping")
+
+    if not _is_applied("v3_27_5_seat_user_attribution"):
+        print("Running v3.27.5 game_seats seat→user attribution migration...")
+        migrate_v3_27_5_seat_user_attribution()
+        _mark_applied("v3_27_5_seat_user_attribution")
+    else:
+        print("v3.27.5 seat_user_attribution already applied, skipping")
 
     print("Migration runner complete")
 
