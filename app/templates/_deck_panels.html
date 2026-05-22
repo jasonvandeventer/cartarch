@@ -1,19 +1,7 @@
-{# HTML fragment — returned by GET /decks/{id}/panels; not a full page #}
-<div id="deck-bracket-fragment">
-  {% if bracket %}
-    <details class="bracket-details">
-      <summary class="bracket-badge bracket-{{ bracket.bracket }}">Bracket {{ bracket.bracket }}</summary>
-      {% if bracket.reasons %}
-        <div class="bracket-popout mobile-popover">
-          <div class="bracket-popout-title">Why Bracket {{ bracket.bracket }}</div>
-          <ul class="bracket-reasons">
-            {% for r in bracket.reasons %}<li>{{ r }}</li>{% endfor %}
-          </ul>
-        </div>
-      {% endif %}
-    </details>
-  {% endif %}
-</div>
+{# HTML fragment — returned by GET /decks/{id}/panels; not a full page.
+   v3.27.9: bracket fragment removed (bracket panel hidden pending the
+   analytics rebuild — see roadmap.md Deferred / latent items "Deck
+   Analytics Rebuild"). #}
 <div id="deck-lazy-panels-content">
   {% if synergy %}
     <section class="panel synergy-panel">
@@ -105,34 +93,10 @@
       </details>
     </section>
   {% endif %}
-  {% if combos and combos.included %}
-    <section class="panel combo-panel">
-      <h3 class="panel-title">Combos</h3>
-      {% for combo in combos.included %}
-        <div class="combo-item">
-          <div class="combo-cards">
-            {% for name in combo.card_names %}<span class="combo-card-name">{{ name }}</span>{% endfor %}
-          </div>
-          <div class="combo-results">
-            {% for r in combo.results %}<span class="combo-result-badge">{{ r }}</span>{% endfor %}
-          </div>
-          {% if combo.description %}
-            <details class="combo-details">
-              <summary class="combo-summary">How it works</summary>
-              <div class="combo-description">
-                {{ combo.description | replace('\n', '<br>') | safe }}
-              </div>
-              {% if combo.prerequisites %}
-                <div class="combo-prereq">
-                  <strong>Setup:</strong> {{ combo.prerequisites }}
-                </div>
-              {% endif %}
-            </details>
-          {% endif %}
-        </div>
-      {% endfor %}
-    </section>
-  {% endif %}
+  {# v3.27.9: combos panel removed pending analytics rebuild (see roadmap.md
+     Deferred / latent items "Deck Analytics Rebuild"). The render-context
+     `combos` value is now always {included: [], almost: []}; the synergy
+     classifier still consumes it but contributes nothing via the combo path. #}
   {% if tokens %}
     <section class="panel">
       <h3 class="panel-title">Tokens</h3>

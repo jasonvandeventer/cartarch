@@ -17,7 +17,6 @@ import os
 import secrets
 import threading
 import time
-from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta
 from urllib.parse import urlencode, urlparse
 
@@ -46,8 +45,6 @@ from app.deck_service import (
     compute_consistency,
     compute_dead_cards,
     compute_deck_analytics,
-    compute_deck_bracket,
-    compute_deck_combos,
     compute_deck_health,
     compute_deck_synergy,
     compute_deck_tokens,
@@ -2857,51 +2854,15 @@ def deck_detail_page(
             health = compute_deck_health(all_deck_rows)
             consistency = compute_consistency(all_deck_rows)
 
+    # v3.27.9: bracket_v2 estimator no longer runs on the request path. The
+    # bracket display rolled up to "untrusted" pending a dedicated analytics
+    # rebuild (see roadmap.md Deferred / latent items "Deck Analytics
+    # Rebuild"). bracket_v2_service / its tables / its migrations are left
+    # dormant for the rebuild to reuse — same pattern as the retired
+    # .site-header CSS from v3.27.8. The render-context passthrough below
+    # keeps the dormant {% if bracket_v2 %} panel in deck_detail.html as a
+    # no-op so the template doesn't need stripping.
     bracket_v2 = None
-    if deck and deck.storage_location_id:
-        from app.bracket_v2_service import estimate_bracket_v2, persist_estimate
-
-        # Pull combos from the panels cache if warm. Cold-cache decks fall back to
-        # mechanics+intent-only on first load; the lazy panels endpoint
-        # repopulates the cache + re-runs V3 for next time.
-        _cached_combos: dict | None = None
-        _all_rows = locals().get("all_deck_rows")
-        if _all_rows:
-            try:
-                _ck = _panels_cache_key(_all_rows)
-                _cached = _read_panels_cache(deck.id, _ck)
-                if _cached:
-                    _cached_combos = _cached.get("combos")
-            except Exception:
-                _cached_combos = None
-
-        _est = estimate_bracket_v2(session, deck, current_user.id, combos=_cached_combos)
-        try:
-            persist_estimate(session, deck.id, _est)
-        except Exception as exc:  # noqa: BLE001 — persistence isn't user-facing
-            print(f"[bracket_v2] persist failed deck={deck.id}: {exc}", flush=True)
-        bracket_v2 = {
-            "bracket": _est.final_bracket,
-            "mechanics_bracket": _est.mechanics_bracket,
-            "intent_bracket": _est.intent_bracket,
-            "rules_version": _est.rules_version,
-            "score": _est.score,
-            "confidence": {
-                "tagging_coverage": _est.confidence_tagging_coverage,
-                "mechanics_clarity": _est.confidence_mechanics_clarity,
-                "intent_alignment": _est.confidence_intent_alignment,
-                "combo_detection_depth": _est.confidence_combo_detection_depth,
-            },
-            "findings": [
-                {
-                    "type": f.finding_type,
-                    "severity": f.severity,
-                    "message": f.message,
-                    "value": f.finding_value,
-                }
-                for f in _est.findings
-            ],
-        }
 
     # Apply health filter before splitting into commanders/deck_cards
     if health and health_filter in _VALID_HEALTH_FILTERS:
@@ -3119,6 +3080,17 @@ def deck_panels_fragment(
         .all()
     )
 
+    # v3.27.9: combos + bracket no longer compute on the panels endpoint.
+    # compute_deck_combos issued a Spellbook /find-my-combos POST per deck
+    # (request-path network invariant violation surfaced on /decks cold load;
+    # see roadmap.md Deferred / latent items "Deck Analytics Rebuild").
+    # Synergy + dead-cards still render: synergy reads combos as a dict but
+    # tolerates an empty .included gracefully (loses the "Direct via combo
+    # membership" classification path, keeps tribal / payoff / engine paths).
+    # tokens / synergy / dead_cards are all local computations against the
+    # bulk Scryfall cache and stay on the request path. compute_deck_combos
+    # / compute_deck_bracket / bracket_v2_service are dormant code — left
+    # importable for the analytics rebuild to reuse.
     bracket = None
     synergy = None
     combos: dict = {"included": [], "almost": []}
@@ -3130,31 +3102,12 @@ def deck_panels_fragment(
 
         if cached:
             tokens = cached.get("tokens", [])
-            combos = cached.get("combos", {"included": [], "almost": []})
         else:
-            with ThreadPoolExecutor(max_workers=2) as pool:
-                tokens_future = pool.submit(compute_deck_tokens, all_deck_rows)
-                combos_future = pool.submit(compute_deck_combos, all_deck_rows)
-                tokens = tokens_future.result()
-                combos = combos_future.result()
+            tokens = compute_deck_tokens(all_deck_rows)
             _write_panels_cache(deck_id, ck, {"tokens": tokens, "combos": combos})
 
-        bracket = compute_deck_bracket(all_deck_rows, combos)
         synergy = compute_deck_synergy(all_deck_rows, combos)
         dead_cards = compute_dead_cards(all_deck_rows, synergy)
-
-        # V3: re-run the bracket V2 estimator with combo data and persist the
-        # combo-aware result. The deck-detail bracket panel rendered on initial
-        # page load is mechanics+intent only; this overwrites the persisted
-        # estimate so the next page load shows the V3 result.
-        try:
-            from app.bracket_v2_service import estimate_bracket_v2 as _v2_est
-            from app.bracket_v2_service import persist_estimate as _v2_persist
-
-            _est = _v2_est(session, deck, current_user.id, combos=combos)
-            _v2_persist(session, deck.id, _est)
-        except Exception as exc:  # noqa: BLE001
-            print(f"[bracket_v3] persist failed deck={deck.id}: {exc}", flush=True)
     else:
         dead_cards = None
 
@@ -3713,19 +3666,13 @@ async def toggle_commander(
         row.role = None if row.role == "commander" else "commander"
         session.commit()
 
-        # Changing a row's role invalidates the panels disk cache (the cache
-        # key includes role), but the V2 bracket panel rendered server-side
-        # on the next page load reads combos from that same cache. A cold
-        # miss means estimate_bracket_v2 runs without combo data, so the
-        # panel shows a mechanics+intent-only bracket until the next refresh
-        # (when the cache is warm from the lazy panels endpoint).
-        #
-        # Warm the cache here synchronously so the redirect lands on a
-        # deck-detail page that finds combos in the cache. Spellbook +
-        # Scryfall calls have in-memory caches, so this is cheap on
-        # warm-server / repeat-deck paths. Failures are swallowed; the
-        # lazy panels endpoint will repopulate the cache on the next page
-        # load if this warm-up fails.
+        # v3.27.9: tokens-only cache warm-up. The pre-v3.27.9 path also
+        # warmed combos for the bracket_v2 panel; bracket + combos are now
+        # off the deck-facing surfaces pending the analytics rebuild (see
+        # roadmap.md Deferred / latent items "Deck Analytics Rebuild"), so
+        # we only warm the tokens slot the panels endpoint still consumes.
+        # Failures are swallowed; the lazy panels endpoint repopulates if
+        # this warm-up fails.
         try:
             deck = get_deck(session, deck_id=deck_id, user_id=current_user.id)
             if deck and deck.storage_location_id:
@@ -3742,12 +3689,12 @@ async def toggle_commander(
                 if all_rows:
                     ck = _panels_cache_key(all_rows)
                     if not _read_panels_cache(deck_id, ck):
-                        with ThreadPoolExecutor(max_workers=2) as pool:
-                            tokens_future = pool.submit(compute_deck_tokens, all_rows)
-                            combos_future = pool.submit(compute_deck_combos, all_rows)
-                            tokens = tokens_future.result()
-                            combos = combos_future.result()
-                        _write_panels_cache(deck_id, ck, {"tokens": tokens, "combos": combos})
+                        tokens = compute_deck_tokens(all_rows)
+                        _write_panels_cache(
+                            deck_id,
+                            ck,
+                            {"tokens": tokens, "combos": {"included": [], "almost": []}},
+                        )
         except Exception as exc:  # noqa: BLE001 — non-critical warm-up
             print(
                 f"[toggle_commander] panels cache warm-up failed deck={deck_id}: {exc}",

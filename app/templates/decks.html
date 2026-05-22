@@ -46,7 +46,6 @@
               <th>Name</th>
               <th>Format</th>
               <th>Total Cards</th>
-              <th>Bracket</th>
               <th>Health</th>
               <th></th>
             </tr>
@@ -60,23 +59,7 @@
                 </td>
                 <td data-label="Format">{{ deck.format or '—' }}</td>
                 <td data-label="Total Cards">{{ deck.card_count or 0 }}</td>
-                <td data-label="Bracket">
-                  {% if deck.bracket %}
-                    <details class="bracket-details">
-                      <summary class="bracket-badge bracket-{{ deck.bracket.bracket }}">Bracket {{ deck.bracket.bracket }}</summary>
-                      {% if deck.bracket.reasons %}
-                        <div class="bracket-popout mobile-popover">
-                          <div class="bracket-popout-title">Why Bracket {{ deck.bracket.bracket }}</div>
-                          <ul class="bracket-reasons">
-                            {% for r in deck.bracket.reasons %}<li>{{ r }}</li>{% endfor %}
-                          </ul>
-                        </div>
-                      {% endif %}
-                    </details>
-                  {% else %}
-                    —
-                  {% endif %}
-                </td>
+                {# v3.27.9: Bracket column removed pending analytics rebuild (see roadmap.md Deferred / latent items "Deck Analytics Rebuild"). #}
                 <td data-label="Health">
                   {% if deck.consistency %}
                     <span class="consistency-badge cs-{{ deck.consistency.tier }}"
