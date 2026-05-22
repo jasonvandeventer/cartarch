@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% block content %}
+  <section class="panel pagehead">
+    <div class="pagehead-eyebrow">Overview</div>
+    <h1 class="pagehead-title">Watchlist</h1>
+    <p class="pagehead-tagline">
+      Cards you're tracking — to acquire later, compare prices on, or just remember. Add a card to your watchlist from any card detail page.
+    </p>
+  </section>
+  {% if items %}
+    <section class="panel">
+      <div class="table-wrap">
+        <table class="stacking-table">
+          <thead>
+            <tr>
+              <th>Card</th>
+              <th>Watch type</th>
+              <th>Owned</th>
+              <th>Added</th>
+              <th>Note</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in items %}
+              <tr>
+                <td>
+                  {% if item.identity_mode == 'card' %}
+                    <a href="/cards/{{ item.card.id }}">{{ item.display_name }}</a>
+                    <div class="muted" style="font-size: 0.78rem">
+                      {{ item.card.set_name }} · {{ item.card.set_code|upper }} #{{ item.card.collector_number }}
+                    </div>
+                  {% else %}
+                    <span>{{ item.display_name }}</span>
+                  {% endif %}
+                </td>
+                <td data-label="Watch type">
+                  {% if item.identity_mode == 'card' %}
+                    <span class="watch-type-badge watch-type-printing">Specific printing</span>
+                  {% else %}
+                    <span class="watch-type-badge watch-type-name">Any printing</span>
+                  {% endif %}
+                </td>
+                <td data-label="Owned">
+                  {% if item.placed_count > 0 %}
+                    <strong>{{ item.placed_count }}</strong> placed
+                  {% else %}
+                    <span class="muted">none placed</span>
+                  {% endif %}
+                  {% if item.pending_count > 0 %}
+                    <div class="muted" style="font-size: 0.78rem">+{{ item.pending_count }} pending</div>
+                  {% endif %}
+                </td>
+                <td data-label="Added">{{ item.added_at | format_local_datetime("%Y-%m-%d") }}</td>
+                <td data-label="Note">
+                  <details class="inline-details">
+                    <summary class="btn-like">
+                      {% if item.note %}
+                        {{ item.note[:40] }}
+                        {% if item.note|length > 40 %}…{% endif %}
+                      {% else %}
+                        <span class="muted">+ note</span>
+                      {% endif %}
+                    </summary>
+                    <div class="edit-popout mobile-popover">
+                      <form action="/watchlist/{{ item.id }}/note"
+                            method="post"
+                            class="stack-form">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                        <label>Note</label>
+                        <textarea name="note" rows="3">{{ item.note or '' }}</textarea>
+                        <button type="submit" style="margin-top: 0.25rem">Save</button>
+                      </form>
+                    </div>
+                  </details>
+                </td>
+                <td style="text-align: right; white-space: nowrap;">
+                  <form action="/watchlist/{{ item.id }}/delete"
+                        method="post"
+                        style="display: inline">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                    <button type="submit"
+                            class="btn-danger-small"
+                            onclick="return confirm('Remove {{ item.display_name }} from your watchlist?');">
+                      Remove
+                    </button>
+                  </form>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  {% else %}
+    <section class="panel">
+      <h3 class="panel-title">Your watchlist is empty</h3>
+      <p class="muted">
+        Find a card via <a href="/collection">Collection</a> or <a href="/sets">Sets</a>, open its detail page, and click <strong>Watch this printing</strong> or <strong>Watch any printing</strong>. The card will appear here with the count you currently own.
+      </p>
+    </section>
+  {% endif %}
+{% endblock %}

@@ -67,6 +67,7 @@ from scripts.migrate_v3_27_4_user_last_signed_in_at import (
 from scripts.migrate_v3_27_5_seat_user_attribution import (
     main as migrate_v3_27_5_seat_user_attribution,
 )
+from scripts.migrate_v3_27_12_watchlist import main as migrate_v3_27_12_watchlist
 
 
 def _is_applied(name: str) -> bool:
@@ -356,6 +357,13 @@ def run():
         _mark_applied("v3_27_5_seat_user_attribution")
     else:
         print("v3.27.5 seat_user_attribution already applied, skipping")
+
+    if not _is_applied("v3_27_12_watchlist"):
+        print("Running v3.27.12 watchlist table migration...")
+        migrate_v3_27_12_watchlist()
+        _mark_applied("v3_27_12_watchlist")
+    else:
+        print("v3.27.12 watchlist already applied, skipping")
 
     print("Migration runner complete")
 

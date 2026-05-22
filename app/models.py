@@ -53,6 +53,7 @@ class User(Base):
     import_batches: Mapped[list[ImportBatch]] = relationship(back_populates="user")
     transaction_logs: Mapped[list[TransactionLog]] = relationship(back_populates="user")
     storage_locations: Mapped[list[StorageLocation]] = relationship(back_populates="user")
+    watchlist_items: Mapped[list[WatchlistItem]] = relationship(back_populates="user")
 
 
 class Card(Base):
@@ -345,3 +346,46 @@ class DeckTokenRequirement(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     token_inventory: Mapped[TokenInventory | None] = relationship()
+
+
+class WatchlistItem(Base):
+    """A user's watchlist entry — a card they want to track.
+
+    v3.27.12. Two identity modes, XOR-shaped:
+
+    - ``card_id`` set, ``card_name`` NULL: a printing-specific watch.
+      References a single Scryfall printing via ``cards.id``. Useful
+      for collectors after a specific border / promo / set version.
+    - ``card_id`` NULL, ``card_name`` set: a printing-agnostic watch.
+      Matches any printing whose ``Card.name`` equals the stored
+      canonical name. Useful for the more common "I want a Sol Ring"
+      mental model.
+
+    Exactly one of ``card_id`` / ``card_name`` is populated per row —
+    enforced at the service layer in ``app/watchlist_service.py`` (the
+    project convention from v3.10.6 / v3.27.2 for free-text validation;
+    SQLite ``CHECK`` constraints stay out of the schema to preserve the
+    SQLite-until-v4 no-rebuild constraint). Two partial-unique indexes
+    in the v3.27.12 migration enforce one-row-per-identity per user.
+
+    ``card_id`` is a nominal FK to ``cards.id``; SQLite's
+    ``PRAGMA foreign_keys`` defaults OFF and the project doesn't turn
+    it on, so the FK declaration is documentary + v4-Postgres
+    forward-compat (same pattern as the v3.27.5 ``GameSeat.user_id``
+    FK). Card deletion is essentially never observed in production
+    (the ``cards`` table is shared and append-only in practice), so
+    the dangling-FK risk is theoretical. User deletion is handled
+    explicitly by the cascade in ``routes/admin.py``.
+    """
+
+    __tablename__ = "watchlist"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    card_id: Mapped[int | None] = mapped_column(ForeignKey("cards.id"), nullable=True)
+    card_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    added_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    user: Mapped[User] = relationship(back_populates="watchlist_items")
+    card: Mapped[Card | None] = relationship()

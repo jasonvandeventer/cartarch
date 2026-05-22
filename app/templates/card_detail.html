@@ -24,6 +24,40 @@
         </div>
       </div>
     </div>
+    {# v3.27.12 — watch toggles. Two identity modes per the v3.27.12 spec:
+       printing-specific (card_id) and printing-agnostic (name). Both can
+       be active independently; the buttons reflect whichever are
+       currently watched. #}
+    <div class="card-watch-row">
+      {% if watch_printing_id %}
+        <form method="post"
+              action="/watchlist/{{ watch_printing_id }}/delete"
+              style="display: inline">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <button type="submit" class="btn-like watch-btn watch-btn-on">★ Watching this printing — stop</button>
+        </form>
+      {% else %}
+        <form method="post" action="/watchlist/add" style="display: inline">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <input type="hidden" name="card_id" value="{{ card.id }}">
+          <button type="submit" class="btn-like watch-btn">☆ Watch this printing</button>
+        </form>
+      {% endif %}
+      {% if watch_name_id %}
+        <form method="post"
+              action="/watchlist/{{ watch_name_id }}/delete"
+              style="display: inline">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <button type="submit" class="btn-like watch-btn watch-btn-on">★ Watching any printing — stop</button>
+        </form>
+      {% else %}
+        <form method="post" action="/watchlist/add" style="display: inline">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <input type="hidden" name="card_name" value="{{ card.name }}">
+          <button type="submit" class="btn-like watch-btn">☆ Watch any printing</button>
+        </form>
+      {% endif %}
+    </div>
   </section>
   <section>
     <div>

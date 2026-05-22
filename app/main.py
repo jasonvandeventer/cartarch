@@ -155,6 +155,12 @@ from app.token_service import (
     total_token_count,
     update_token,
 )
+from app.watchlist_service import (
+    add_to_watchlist,
+    list_watchlist,
+    remove_from_watchlist,
+    update_note,
+)
 from scripts.run_migrations import run as run_migrations
 
 app = FastAPI(title="Cartarch")
@@ -3897,6 +3903,14 @@ def card_detail_page(
         total_copies += row.quantity
         total_value += total
 
+    # v3.27.12 — surface watchlist state to the card detail template.
+    # One call returns both identity-mode watch row ids (or None) so the
+    # template can render "Watch" or "Stop watching" affordances for
+    # both the printing-specific and printing-agnostic paths.
+    from app.watchlist_service import get_watch_ids_for_card
+
+    watch_ids = get_watch_ids_for_card(session, current_user.id, target_card.id, target_card.name)
+
     return render(
         request,
         "card_detail.html",
@@ -3907,6 +3921,8 @@ def card_detail_page(
             "total_copies": total_copies,
             "total_value": total_value,
             "current_user": current_user,
+            "watch_printing_id": watch_ids["printing_id"],
+            "watch_name_id": watch_ids["name_id"],
         },
     )
 
@@ -4684,3 +4700,99 @@ def game_delete(
 ):
     delete_game(session, game_id, current_user.id)
     return RedirectResponse("/games", status_code=303)
+
+
+# v3.27.12 — Watchlist. A per-user list of cards the user wants to track.
+# Two identity modes (XOR-shaped per row): printing-specific (card_id) or
+# printing-agnostic (card_name). Service-layer XOR enforcement; partial-
+# unique indexes from the v3.27.12 migration enforce one-row-per-identity.
+# v1 add-flow is card-detail-only — broader add surfaces (collection card
+# actions, manual name autocomplete on /watchlist) are deferred.
+@app.get("/watchlist")
+def watchlist_page(
+    request: Request,
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+):
+    items = list_watchlist(session, current_user.id)
+    return render(
+        request,
+        "watchlist.html",
+        {
+            "title": "Watchlist",
+            "items": items,
+            "current_user": current_user,
+        },
+    )
+
+
+@app.post("/watchlist/add")
+def watchlist_add(
+    request: Request,
+    card_id: str = Form(""),
+    card_name: str = Form(""),
+    note: str = Form(""),
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+    _: None = CsrfRequired,
+):
+    """Add a watchlist entry. Form posts EITHER card_id OR card_name.
+
+    Empty / blank inputs are treated as not-provided so the XOR check
+    in ``add_to_watchlist`` can validate correctly. Duplicate-watch
+    (IntegrityError from the partial-unique indexes) is caught and
+    converted to a quiet redirect — the user has already expressed
+    the intent to watch this card; no need to surface an error.
+    """
+    cid_int: int | None = None
+    if card_id.strip():
+        try:
+            cid_int = int(card_id.strip())
+        except ValueError:
+            cid_int = None
+    name_str: str | None = card_name.strip() or None
+    note_str: str | None = note.strip() or None
+    try:
+        add_to_watchlist(
+            session,
+            current_user.id,
+            card_id=cid_int,
+            card_name=name_str,
+            note=note_str,
+        )
+        session.commit()
+    except IntegrityError:
+        # Duplicate — partial-unique index hit. Already on the watchlist;
+        # treat as a no-op.
+        session.rollback()
+    redirect_target = safe_redirect_url(request, default="/watchlist")
+    return RedirectResponse(url=redirect_target, status_code=303)
+
+
+@app.post("/watchlist/{watchlist_id}/delete")
+def watchlist_delete(
+    request: Request,
+    watchlist_id: int,
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+    _: None = CsrfRequired,
+):
+    remove_from_watchlist(session, current_user.id, watchlist_id)
+    session.commit()
+    redirect_target = safe_redirect_url(request, default="/watchlist")
+    return RedirectResponse(url=redirect_target, status_code=303)
+
+
+@app.post("/watchlist/{watchlist_id}/note")
+def watchlist_update_note(
+    request: Request,
+    watchlist_id: int,
+    note: str = Form(""),
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+    _: None = CsrfRequired,
+):
+    update_note(session, current_user.id, watchlist_id, note)
+    session.commit()
+    redirect_target = safe_redirect_url(request, default="/watchlist")
+    return RedirectResponse(url=redirect_target, status_code=303)
