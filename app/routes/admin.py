@@ -15,6 +15,7 @@ from app.models import (
     StorageLocation,
     TransactionLog,
     User,
+    WatchlistItem,
 )
 
 router = APIRouter(prefix="/admin")
@@ -185,6 +186,11 @@ def delete_user(
     session.query(GameSeat).filter(GameSeat.user_id == user_id).update(
         {GameSeat.user_id: None}, synchronize_session=False
     )
+    # v3.27.12 — watchlist rows are per-user with no historical retention
+    # value (no "X was watching Y when their account was deleted" meaning
+    # to preserve, unlike GameSeat.user_name_at_game). Plain DELETE here,
+    # same shape as InventoryRow / Deck / etc. above.
+    session.query(WatchlistItem).filter(WatchlistItem.user_id == user_id).delete()
     session.delete(target)
     session.commit()
     return RedirectResponse(url="/admin?success=user_deleted", status_code=303)
