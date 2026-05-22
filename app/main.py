@@ -34,7 +34,7 @@ from sqlalchemy.orm import Session, joinedload
 from starlette.middleware.sessions import SessionMiddleware
 
 from app.audit_service import list_transaction_logs, log_transaction
-from app.auth import hash_password
+from app.auth import hash_password, validate_password_strength
 from app.dashboard_service import get_dashboard_tiles
 from app.db import DATA_DIR, SessionLocal, init_db
 from app.deck_service import (
@@ -126,6 +126,13 @@ from app.location_service import (
     update_location,
 )
 from app.models import Card, Deck, ImportBatch, InventoryRow, User
+from app.password_reset_service import (
+    check_rate_limits,
+    consume_token,
+    create_reset_token,
+    find_valid_token,
+    queue_reset_email,
+)
 from app.presentation_service import build_pending_view_model
 from app.pricing import effective_price
 from app.routes import account, admin, auth, drawers
@@ -354,6 +361,20 @@ def on_startup() -> None:
         and os.getenv("SESSION_SECRET_KEY", "dev-only-change-me") == "dev-only-change-me"
     ):
         raise RuntimeError("SESSION_SECRET_KEY must be set in production (DEV_MODE is not 'true')")
+    # v3.27.14 — Resend API key startup check. Same shape as the
+    # SESSION_SECRET_KEY check above: refuse to boot in production
+    # without it. The key is consumed by app/password_reset_service.py
+    # for outbound /forgot-password emails. DEV_MODE skips the check
+    # and falls back to logging the reset URL to stdout instead of
+    # sending — preserves the local-dev story without a fake-SMTP
+    # dependency.
+    if os.getenv("DEV_MODE", "false").lower() != "true" and not os.getenv("RESEND_API_KEY"):
+        raise RuntimeError(
+            "RESEND_API_KEY must be set in production (DEV_MODE is not 'true'). "
+            "Wire it via Kubernetes Secret + secretKeyRef — see the "
+            "mana-archive-platform deployment.yaml for the SESSION_SECRET_KEY "
+            "pattern this mirrors."
+        )
     run_migrations()
     init_db()
     threading.Thread(target=_price_refresh_loop, daemon=True, name="price-refresh").start()
@@ -413,6 +434,16 @@ def register(
             request,
             "register.html",
             {"title": "Register", "error": "Please enter a valid email address."},
+        )
+
+    # v3.27.14 — shared password-strength check; same rules now apply
+    # to /reset-password.
+    password_error = validate_password_strength(password)
+    if password_error:
+        return render(
+            request,
+            "register.html",
+            {"title": "Register", "error": password_error},
         )
 
     if not display_name:
@@ -4796,3 +4827,213 @@ def watchlist_update_note(
     session.commit()
     redirect_target = safe_redirect_url(request, default="/watchlist")
     return RedirectResponse(url=redirect_target, status_code=303)
+
+
+# v3.27.14 — Password recovery routes. Four routes total: request form,
+# request POST (queues async email + neutral identical response for
+# enumeration defense), reset form (validates token from URL), reset
+# POST (re-validates, sets new password, marks token used).
+#
+# Security-critical contract — do NOT change these without re-reading
+# app/password_reset_service.py:
+# 1. POST /forgot-password is identical in response shape and timing
+#    for registered vs unregistered emails (enumeration defense). The
+#    email send is asynchronous via daemon thread; the request handler
+#    never blocks on the Resend API call.
+# 2. Tokens are hashed at rest (SHA-256). Only the raw token sees the
+#    network — in the emailed link.
+# 3. Rate-limited per-email AND per-IP. Exceeded limits silently drop
+#    (still return the neutral response) — leaking rate-limit info
+#    would itself be an enumeration oracle.
+# 4. CSRF protection via the existing CsrfRequired dependency on every
+#    POST.
+
+
+def _client_ip_for(request: Request) -> str | None:
+    """Best-effort client IP for rate-limiting.
+
+    Prefers X-Forwarded-For (Cloudflare Tunnel sets it) → falls back
+    to request.client.host. Used only for rate-limit keying — not for
+    auth, not surfaced anywhere user-facing.
+    """
+    xff = request.headers.get("x-forwarded-for")
+    if xff:
+        return xff.split(",")[0].strip()
+    return request.client.host if request.client else None
+
+
+@app.get("/forgot-password")
+def forgot_password_page(request: Request):
+    return render(request, "forgot_password.html", {"title": "Forgot password"})
+
+
+@app.post("/forgot-password")
+def forgot_password_submit(
+    request: Request,
+    email: str = Form(...),
+    session: Session = Depends(get_db_session),
+    _: None = CsrfRequired,
+):
+    """Identical response shape for registered vs unregistered emails.
+
+    See app/password_reset_service.py for the full security-critical
+    rationale. The neutral response is rendered regardless of whether
+    we find a user, queue a token, get rate-limited, or fail any
+    intermediate check — only the side-effects differ.
+    """
+    email_clean = (email or "").strip().lower()
+    client_ip = _client_ip_for(request)
+    neutral_response = render(
+        request,
+        "forgot_password.html",
+        {
+            "title": "Forgot password",
+            "submitted": True,
+            "submitted_email": email_clean,
+        },
+    )
+
+    # Rate limit silently — exceeded → still neutral response, no
+    # token created, no email queued. Failed requests get logged
+    # inside check_rate_limits via the printed warning if you want
+    # to add one; for now silent drop is enough.
+    if not check_rate_limits(email_clean, client_ip):
+        print(
+            f"[password-reset] rate-limited request for email={email_clean!r} " f"ip={client_ip!r}",
+            flush=True,
+        )
+        return neutral_response
+
+    # Look up user. Missing → just return neutral response (no token,
+    # no email, no nothing). Found → create token + queue email.
+    if email_clean and "@" in email_clean:
+        user = session.query(User).filter(User.username == email_clean).first()
+        if user is not None and user.is_active:
+            raw_token = create_reset_token(session, user)
+            session.commit()
+            # Build the reset URL on the same base the request came in on.
+            # Use request.url_for so we work behind the Cloudflare Tunnel
+            # without hard-coding cartarch.com.
+            reset_path = request.url_for("reset_password_page").include_query_params(
+                token=raw_token
+            )
+            reset_url = str(reset_path)
+            queue_reset_email(
+                email=email_clean,
+                reset_url=reset_url,
+                expires_at=datetime.utcnow() + timedelta(minutes=30),
+            )
+
+    return neutral_response
+
+
+@app.get("/reset-password")
+def reset_password_page(
+    request: Request,
+    token: str = "",
+    session: Session = Depends(get_db_session),
+):
+    """Validate the token from the URL; render the new-password form
+    or the invalid/expired/used branch.
+
+    Never 500, never blank. Invalid / expired / used → clear message
+    page with a link to /forgot-password to request a new one.
+    """
+    token_row = find_valid_token(session, token)
+    if token_row is None:
+        return render(
+            request,
+            "reset_password.html",
+            {
+                "title": "Reset password",
+                "invalid": True,
+            },
+        )
+    return render(
+        request,
+        "reset_password.html",
+        {
+            "title": "Reset password",
+            "invalid": False,
+            "token": token,
+        },
+    )
+
+
+@app.post("/reset-password")
+def reset_password_submit(
+    request: Request,
+    token: str = Form(...),
+    password: str = Form(...),
+    password_confirm: str = Form(...),
+    session: Session = Depends(get_db_session),
+    _: None = CsrfRequired,
+):
+    """Re-validate the token, set the new password, mark used.
+
+    The re-validate step is essential — the token might have been used
+    or expired between GET render and POST submit (different tab open
+    for hours, etc.). Same find_valid_token call, same invalid-state
+    branch on the rendered page.
+    """
+    token_row = find_valid_token(session, token)
+    if token_row is None:
+        return render(
+            request,
+            "reset_password.html",
+            {
+                "title": "Reset password",
+                "invalid": True,
+            },
+        )
+
+    if password != password_confirm:
+        return render(
+            request,
+            "reset_password.html",
+            {
+                "title": "Reset password",
+                "invalid": False,
+                "token": token,
+                "error": "Passwords don't match.",
+            },
+        )
+
+    strength_error = validate_password_strength(password)
+    if strength_error:
+        return render(
+            request,
+            "reset_password.html",
+            {
+                "title": "Reset password",
+                "invalid": False,
+                "token": token,
+                "error": strength_error,
+            },
+        )
+
+    user = session.query(User).filter(User.id == token_row.user_id).first()
+    if user is None:
+        # The token's user was deleted between issue and reset.
+        # Same invalid-state page — don't leak account-existence info.
+        return render(
+            request,
+            "reset_password.html",
+            {
+                "title": "Reset password",
+                "invalid": True,
+            },
+        )
+
+    user.password_hash = hash_password(password)
+    consume_token(session, token_row)
+    session.commit()
+
+    return render(
+        request,
+        "reset_password.html",
+        {
+            "title": "Reset password",
+            "done": True,
+        },
+    )

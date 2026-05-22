@@ -68,6 +68,9 @@ from scripts.migrate_v3_27_5_seat_user_attribution import (
     main as migrate_v3_27_5_seat_user_attribution,
 )
 from scripts.migrate_v3_27_12_watchlist import main as migrate_v3_27_12_watchlist
+from scripts.migrate_v3_27_14_password_reset_tokens import (
+    main as migrate_v3_27_14_password_reset_tokens,
+)
 
 
 def _is_applied(name: str) -> bool:
@@ -364,6 +367,13 @@ def run():
         _mark_applied("v3_27_12_watchlist")
     else:
         print("v3.27.12 watchlist already applied, skipping")
+
+    if not _is_applied("v3_27_14_password_reset_tokens"):
+        print("Running v3.27.14 password_reset_tokens migration...")
+        migrate_v3_27_14_password_reset_tokens()
+        _mark_applied("v3_27_14_password_reset_tokens")
+    else:
+        print("v3.27.14 password_reset_tokens already applied, skipping")
 
     print("Migration runner complete")
 

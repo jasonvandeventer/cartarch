@@ -11,6 +11,33 @@ def hash_password(password: str) -> str:
     return password_hash.hash(password)
 
 
+# v3.27.14 — shared password strength validation. Used by /register
+# (POST /register in app/main.py) and the new /reset-password POST.
+# NIST SP 800-63B-aligned: enforce a reasonable minimum length and a
+# reasonable maximum (to prevent absurd-payload DoS), but NO
+# composition requirements (forced upper/lower/digit/symbol mixes).
+# Modern guidance is that length matters and composition rules push
+# users toward weaker, easier-to-attack patterns. Returns None on
+# success or a human-readable error message string on failure.
+#
+# Existing users whose passwords don't meet these rules continue to
+# log in fine — verify_password just compares against the stored
+# hash. The validator only fires on /register and /reset-password
+# WRITE paths.
+PASSWORD_MIN_LENGTH = 8
+PASSWORD_MAX_LENGTH = 256
+
+
+def validate_password_strength(password: str) -> str | None:
+    if not password:
+        return "Password is required."
+    if len(password) < PASSWORD_MIN_LENGTH:
+        return f"Password must be at least {PASSWORD_MIN_LENGTH} characters."
+    if len(password) > PASSWORD_MAX_LENGTH:
+        return f"Password must be {PASSWORD_MAX_LENGTH} characters or fewer."
+    return None
+
+
 def verify_password(password: str, stored_hash: str | None) -> bool:
     if not stored_hash:
         return False

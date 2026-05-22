@@ -12,6 +12,7 @@ from app.models import (
     GameSeat,
     ImportBatch,
     InventoryRow,
+    PasswordResetToken,
     StorageLocation,
     TransactionLog,
     User,
@@ -191,6 +192,12 @@ def delete_user(
     # to preserve, unlike GameSeat.user_name_at_game). Plain DELETE here,
     # same shape as InventoryRow / Deck / etc. above.
     session.query(WatchlistItem).filter(WatchlistItem.user_id == user_id).delete()
+    # v3.27.14 — password reset tokens. Same reasoning as watchlist:
+    # no retention value (no "X reset Y's password" snapshot semantics).
+    # Plain DELETE. Even already-used tokens (kept for the brief audit
+    # breadcrumb the service-layer single-use enforcement uses) go away
+    # with the user — no user, no point.
+    session.query(PasswordResetToken).filter(PasswordResetToken.user_id == user_id).delete()
     session.delete(target)
     session.commit()
     return RedirectResponse(url="/admin?success=user_deleted", status_code=303)

@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
-from app.auth import hash_password, verify_password
+from app.auth import hash_password, validate_password_strength, verify_password
 from app.dependencies import CsrfRequired, get_current_user, get_db_session, render
 from app.models import User
 
@@ -43,7 +43,14 @@ def change_password(
     if not verify_password(current_password, current_user.password_hash):
         return RedirectResponse(url="/account?error=wrong_password", status_code=303)
 
-    if len(new_password) < 8:
+    # v3.27.14 — route the third password-set path through the shared
+    # validator from app/auth.py. The pre-v3.27.14 hardcoded `len < 8`
+    # check enforced the same minimum but lived independently — three
+    # separate password-set paths drift apart over time if they each
+    # carry their own rules. Now all three (/register, /reset-password,
+    # /account/change-password) call validate_password_strength.
+    strength_error = validate_password_strength(new_password)
+    if strength_error:
         return RedirectResponse(url="/account?error=password_too_short", status_code=303)
 
     if new_password != confirm_password:
