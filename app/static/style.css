@@ -222,6 +222,391 @@ body {
   color: var(--text);
 }
 
+/* ============================================================================
+   App shell (v3.27.8)
+   ----------------------------------------------------------------------------
+   Two-column grid: left sidebar + main pane. Desktop ≥768px shows the
+   sidebar; <768px hides it and the existing .bottom-nav handles mobile
+   nav (unchanged from prior releases). The slim .app-topbar sits above
+   the page content inside the main pane and carries the version pill
+   + logout control (relocated from the floating top-right per spec).
+   ============================================================================ */
+.app-shell {
+  display: grid;
+  grid-template-columns: 236px 1fr;
+  min-height: 100vh;
+}
+/* v3.27.8 fix — anon variant (login / register, no current_user): the
+   .app-sidebar element does not render, so the grid would place the lone
+   .app-main into the first 236px column and squeeze the topbar contents
+   (wordmark + version pill) into that narrow track, wrapping the pill.
+   Collapse to a single full-width column when the sidebar is absent. */
+.app-shell-anon {
+  grid-template-columns: 1fr;
+}
+.app-shell > .app-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.app-sidebar {
+  background: linear-gradient(180deg, #0b1729 0%, var(--bg) 100%);
+  border-right: 1px solid var(--border);
+  padding: 1.25rem 0.75rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+.sidebar-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.25rem 0.5rem 0.5rem;
+  text-decoration: none;
+}
+.sidebar-wordmark {
+  height: 36px;
+  width: auto;
+  display: block;
+}
+.sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+}
+.nav-group {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.nav-label {
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding: 0 0.65rem 0.35rem;
+}
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.5rem 0.7rem;
+  border-radius: var(--radius-sm);
+  border-left: 2px solid transparent;
+  color: var(--muted);
+  font-size: 0.86rem;
+  font-weight: 500;
+  text-decoration: none;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
+}
+.nav-item:hover {
+  background: var(--panel-2);
+  color: var(--text);
+}
+.nav-item.active {
+  background: var(--brand-gold-soft);
+  color: var(--text);
+  border-left-color: var(--brand-gold);
+  font-weight: 600;
+}
+
+.app-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.85rem;
+  padding: 0.7rem 1.5rem;
+  border-bottom: 1px solid var(--border);
+}
+.app-topbar-anon {
+  justify-content: space-between;
+}
+.sidebar-brand-anon .sidebar-wordmark {
+  height: 32px;
+}
+
+@media (max-width: 768px) {
+  .app-shell {
+    grid-template-columns: 1fr;
+  }
+  .app-sidebar {
+    display: none;
+  }
+  .app-topbar {
+    padding: 0.5rem 1rem;
+  }
+}
+
+/* ============================================================================
+   Dashboard homepage (v3.27.8 layout)
+   ----------------------------------------------------------------------------
+   Two states gated by show_onboarding in home.html:
+   - Populated: .pagehead + .section-label + .action-grid of .action-card
+   - Empty: .welcome-panel + .firststep-panel + .next-steps of .next-step
+   The stat-row + recent-activity / storage-snapshot panels from the v3.27.8
+   mockup are intentionally NOT here yet — v3.27.9 dashboard-data-tiles
+   owns them and has its own data-aggregation prereqs.
+   ============================================================================ */
+.pagehead {
+  margin-bottom: 0.25rem;
+}
+.pagehead-eyebrow {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--brand-gold);
+  margin-bottom: 0.3rem;
+}
+.pagehead-title {
+  font-size: clamp(1.4rem, 2.4vw, 1.7rem);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--text);
+  margin: 0;
+}
+.pagehead-tagline {
+  color: var(--muted);
+  font-size: 0.88rem;
+  margin-top: 0.25rem;
+}
+
+.section-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 1rem 0 0.5rem;
+}
+
+.action-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-3);
+}
+.action-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  text-decoration: none;
+  color: var(--text);
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease;
+}
+.action-card:hover {
+  border-color: #2e4a73;
+  background: var(--panel-2);
+}
+.action-card .action-tag {
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.action-card h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 0;
+}
+.action-card p {
+  font-size: 0.81rem;
+  color: var(--muted);
+  line-height: 1.5;
+  margin: 0;
+  flex: 1;
+}
+.action-card .action-cta {
+  align-self: flex-start;
+  margin-top: 0.25rem;
+  font-size: 0.81rem;
+  font-weight: 600;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.45rem 0.9rem;
+}
+.action-card-highlight {
+  border-color: var(--brand-gold);
+  background: linear-gradient(180deg, var(--brand-gold-soft), var(--panel));
+}
+.action-card-highlight .action-cta {
+  background: var(--brand-gold);
+  color: #1a1205;
+  border-color: var(--brand-gold);
+}
+
+/* ============================================================================
+   Empty-state homepage (v3.27.8)
+   ----------------------------------------------------------------------------
+   Shown when show_onboarding is True for the home route. Replaces the
+   populated dashboard with a single clear first step + numbered "what
+   comes next" path — first-run UX that was missing.
+   ============================================================================ */
+.welcome-panel {
+  background: linear-gradient(135deg, var(--panel-2), var(--panel));
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.75rem 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  position: relative;
+  overflow: hidden;
+}
+.welcome-panel::after {
+  content: "";
+  position: absolute;
+  right: -40px;
+  top: -40px;
+  width: 220px;
+  height: 220px;
+  background: radial-gradient(
+    circle,
+    rgba(200, 161, 90, 0.13),
+    transparent 65%
+  );
+  pointer-events: none;
+}
+.welcome-eyebrow {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--brand-gold);
+}
+.welcome-title {
+  font-size: clamp(1.5rem, 3vw, 1.75rem);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  margin: 0;
+}
+.welcome-tagline {
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.55;
+  max-width: 38rem;
+}
+
+.firststep-panel {
+  background: linear-gradient(180deg, var(--brand-gold-soft), var(--panel));
+  border: 1px solid var(--brand-gold);
+  border-radius: var(--radius);
+  padding: 1.25rem 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+}
+.firststep-num {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: var(--brand-gold);
+  color: #1a1205;
+  font-weight: 800;
+  font-size: 1.15rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.firststep-body {
+  flex: 1;
+}
+.firststep-body h3 {
+  font-size: 1.05rem;
+  font-weight: 600;
+  margin: 0 0 0.15rem;
+}
+.firststep-body p {
+  font-size: 0.85rem;
+  color: var(--muted);
+  line-height: 1.5;
+  margin: 0;
+}
+.firststep-go {
+  font-size: 0.86rem;
+  font-weight: 700;
+  background: var(--brand-gold);
+  color: #1a1205;
+  border-radius: var(--radius-sm);
+  padding: 0.7rem 1.2rem;
+  text-decoration: none;
+  flex-shrink: 0;
+}
+
+.next-steps {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-3);
+}
+.next-step {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  opacity: 0.7;
+}
+.next-step-num {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.next-step h4 {
+  font-size: 0.95rem;
+  font-weight: 600;
+  margin: 0;
+}
+.next-step p {
+  font-size: 0.8rem;
+  color: var(--muted);
+  line-height: 1.5;
+  margin: 0;
+}
+
+@media (max-width: 768px) {
+  .action-grid,
+  .next-steps {
+    grid-template-columns: 1fr;
+  }
+  .firststep-panel {
+    flex-direction: column;
+    align-items: stretch;
+    text-align: center;
+  }
+  .firststep-num {
+    align-self: center;
+  }
+  .firststep-go {
+    text-align: center;
+  }
+}
+
+/* ============================================================================
+   .site-header / .header-shell / .header-left / .header-right (v3.x, retired)
+   ----------------------------------------------------------------------------
+   Rules below are deprecated as of v3.27.8 — the DOM no longer renders any
+   of those elements (the new .app-shell + .app-sidebar + .app-topbar
+   replaces them). Kept in the stylesheet to avoid a destructive sweep in a
+   layout-focused release; the cascade has nothing to apply them to, so they
+   have no visual effect. The v3.27.12 aesthetic-pass release is the natural
+   home to strike the dead rules entirely.
+   ============================================================================ */
 .site-header {
   position: sticky;
   top: 0;
@@ -232,7 +617,23 @@ body {
 
 .header-shell,
 .page-shell {
-  width: min(96vw, 1800px);
+  /* v3.27.8 fix — was `width: min(96vw, 1800px)`. The 96vw is viewport-
+     relative, sized for the pre-v3.27.8 no-sidebar layout where this
+     wrapper had the full viewport to fill. Post-v3.27.8, .page-shell
+     lives inside .app-main (the 1fr column of a 236px 1fr grid), so
+     its container is viewport−236px on the authenticated shell. 96vw
+     of the FULL viewport then bleeds past the container — at 1280px
+     viewport the wrapper computes 1229px in a 1044px container,
+     clipping ~185px off the right edge. Decks page's Edit/Delete
+     column landed in that overflow region (the visible regression).
+     100% + max-width fills the container correctly on both authed
+     (viewport−236px) and anon (full viewport) shells; the 1800px cap
+     still applies on ultrawide displays; margin:0 auto still centers
+     when narrower than max-width. The .header-shell selector is
+     dormant DOM as of v3.27.8 (the old top header is retired) but
+     kept for cascade safety. */
+  width: 100%;
+  max-width: 1800px;
   margin: 0 auto;
   padding-left: 1rem;
   padding-right: 1rem;
@@ -272,6 +673,12 @@ body {
   font-size: 0.82rem;
   font-weight: 700;
   letter-spacing: 0.04em;
+  /* v3.27.8 fix — safeguard against text wrap. The dev-environment value
+     is git-short-hash-prefixed (e.g. "dev-ce9cbd0"), longer than the prod
+     version-string value ("v3.27.7"); under any unexpected width-squeeze
+     the multi-segment text could wrap to two lines. nowrap forces it to
+     stay on one line and overflow visibly rather than break. */
+  white-space: nowrap;
 }
 
 .page-shell {

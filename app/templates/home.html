@@ -1,59 +1,108 @@
 {% extends "base.html" %}
 {% block content %}
-  <section class="panel page-hero">
-    <div>
-      <div class="eyebrow">Dashboard</div>
-      <h2 class="panel-title">Welcome back</h2>
-      <p class="muted">
-        Everything important is one click away: import cards, place them in your collection, build decks, and track your inventory.
+  {# v3.27.8 layout restructure. Two states driven by show_onboarding:
+     - populated: pagehead + quick-actions grid (existing action cards
+       restructured into a tighter hierarchy). Stat row + lower panels
+       (recent-activity / storage-snapshot) are deliberately NOT rendered
+       in v3.27.8 — those slots are owned by v3.27.9 dashboard-data-tiles
+       which has its own data-aggregation prereqs. The layout makes room
+       for them; the data wiring is v3.27.9's job.
+     - empty (show_onboarding): welcome panel + first-step CTA + numbered
+       what-comes-next steps. Replaces the wall-of-zeros that the
+       populated dashboard would show a brand-new account. #}
+  {% if show_onboarding %}
+    <section class="welcome-panel">
+      <div class="welcome-eyebrow">Getting started</div>
+      <h1 class="welcome-title">Welcome to Cartarch</h1>
+      <p class="welcome-tagline">
+        Your collection is empty right now — that's expected. Cartarch tracks every card you own, where it's physically stored, and what it's worth. Let's get your first cards in.
       </p>
-    </div>
-  </section>
-  <section class="feature-grid">
-    <a href="/import" class="feature-card">
-      <div class="feature-kicker">Import</div>
-      <div class="feature-title">Import Cards</div>
-      <p>Import from Helvault, Moxfield, or paste a card list directly. Preview and confirm before committing.</p>
-    </a>
-    <a href="/pending" class="feature-card">
-      <div class="feature-kicker">Place</div>
-      <div class="feature-title">Pending Placement</div>
-      <p>See what still needs to be filed and confirm placement into your storage locations.</p>
-    </a>
-    <a href="/collection" class="feature-card">
-      <div class="feature-kicker">Browse</div>
-      <div class="feature-title">Collection View</div>
-      <p>Browse the full collection with pricing, exact images, and storage location assignments.</p>
-    </a>
-    {% if use_drawer_sorter %}
-      <a href="/drawers" class="feature-card">
-        <div class="feature-kicker">Organize</div>
-        <div class="feature-title">Drawer Layout</div>
-        <p>See the physical organization of the collection by drawer and slot.</p>
+    </section>
+    <section class="firststep-panel">
+      <div class="firststep-num">1</div>
+      <div class="firststep-body">
+        <h3>Import your collection</h3>
+        <p>
+          Upload a CSV from Helvault or Moxfield, or paste a card list. Nothing is committed until you preview and confirm it.
+        </p>
+      </div>
+      <a href="/import" class="firststep-go">Import cards →</a>
+    </section>
+    <div class="section-label">Then — what comes next</div>
+    <section class="next-steps">
+      <div class="next-step">
+        <div class="next-step-num">Step 2</div>
+        <h4>Set up storage</h4>
+        <p>Create drawers, binders, and boxes that mirror how you physically store your cards.</p>
+      </div>
+      <div class="next-step">
+        <div class="next-step-num">Step 3</div>
+        <h4>Place your cards</h4>
+        <p>Cartarch tells you which drawer each imported card belongs in. Confirm as you file them.</p>
+      </div>
+      <div class="next-step">
+        <div class="next-step-num">Step 4</div>
+        <h4>Build &amp; play</h4>
+        <p>Assemble decks from your collection, then log your Commander games and track results.</p>
+      </div>
+    </section>
+  {% else %}
+    <section class="pagehead">
+      <div class="pagehead-eyebrow">Dashboard</div>
+      <h1 class="pagehead-title">Welcome back, {{ current_user.display_name or current_user.username }}</h1>
+      <p class="pagehead-tagline">Everything important is one click away — import, place, build, and track.</p>
+    </section>
+    <div class="section-label">Quick actions</div>
+    <section class="action-grid">
+      <a href="/pending" class="action-card action-card-highlight">
+        <span class="action-tag">Place</span>
+        <h3>Pending Placement</h3>
+        <p>See imported cards waiting to be filed into your drawers, and confirm each once it's physically placed.</p>
+        <span class="action-cta">Review now</span>
       </a>
-    {% else %}
-      <a href="/locations" class="feature-card">
-        <div class="feature-kicker">Organize</div>
-        <div class="feature-title">Storage Locations</div>
-        <p>Manage your binders, boxes, and other storage locations and see what's in each.</p>
+      <a href="/import" class="action-card">
+        <span class="action-tag">Import</span>
+        <h3>Import Cards</h3>
+        <p>Import from Helvault, Moxfield, or paste a card list. Preview and confirm before committing.</p>
+        <span class="action-cta">Import cards</span>
       </a>
-    {% endif %}
-    <a href="/decks" class="feature-card">
-      <div class="feature-kicker">Build</div>
-      <div class="feature-title">Deck Management</div>
-      <p>Track cards pulled into decks and return them cleanly to collection.</p>
-    </a>
-    {% if use_drawer_sorter %}
-      <a href="/audit" class="feature-card">
-        <div class="feature-kicker">Review</div>
-        <div class="feature-title">Audit &amp; Undo</div>
-        <p>Review imports and transaction history, then undo the last mistake fast.</p>
+      <a href="/collection" class="action-card">
+        <span class="action-tag">Browse</span>
+        <h3>Collection View</h3>
+        <p>Browse the full collection with pricing, exact printings, and storage-location assignments.</p>
+        <span class="action-cta">View collection</span>
       </a>
-    {% endif %}
-    <a href="/sets" class="feature-card">
-      <div class="feature-kicker">Track</div>
-      <div class="feature-title">Set Collection Status</div>
-      <p>Track set completion, owned/missing cards, and progress by expansion.</p>
-    </a>
-  </section>
+      {% if use_drawer_sorter %}
+        <a href="/drawers" class="action-card">
+          <span class="action-tag">Organize</span>
+          <h3>Drawer Layout</h3>
+          <p>See the physical organization of the collection grouped by drawer and slot.</p>
+          <span class="action-cta">Open drawers</span>
+        </a>
+      {% else %}
+        <a href="/locations" class="action-card">
+          <span class="action-tag">Organize</span>
+          <h3>Storage Locations</h3>
+          <p>Manage your binders, boxes, and other storage locations and see what's in each.</p>
+          <span class="action-cta">Open locations</span>
+        </a>
+      {% endif %}
+      <a href="/decks" class="action-card">
+        <span class="action-tag">Build</span>
+        <h3>Deck Management</h3>
+        <p>Track cards pulled into decks and return them cleanly to your collection.</p>
+        <span class="action-cta">Open decks</span>
+      </a>
+      <a href="/games" class="action-card">
+        <span class="action-tag">Play</span>
+        <h3>Game History</h3>
+        <p>Log Commander games, track win/loss records, and review deck performance.</p>
+        <span class="action-cta">View games</span>
+      </a>
+    </section>
+    {# Stat row + Recent Activity / Storage Snapshot panels intentionally
+       deferred to v3.27.9 dashboard-data-tiles. v3.27.8 lays the layout
+       (sidebar + topbar + pagehead + quick-actions); v3.27.9 wires the
+       data. #}
+  {% endif %}
 {% endblock %}

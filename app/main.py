@@ -360,8 +360,18 @@ def on_startup() -> None:
 @app.get("/")
 def home(
     request: Request,
+    session: Session = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
 ):
+    # v3.27.8 — empty-state signal for the dashboard homepage. Mirrors the
+    # established show_onboarding pattern from collection_page (main.py:1775)
+    # and decks_page (main.py:2500): a single-row existence check, cheap
+    # under SQLite, used by the template to switch between the populated
+    # dashboard and the new-user welcome state.
+    show_onboarding = (
+        session.query(InventoryRow.id).filter(InventoryRow.user_id == current_user.id).first()
+        is None
+    )
     return render(
         request,
         "home.html",
@@ -369,6 +379,7 @@ def home(
             "title": "Cartarch",
             "current_user": current_user,
             "use_drawer_sorter": current_user.username in DRAWER_SORTER_USERNAMES,
+            "show_onboarding": show_onboarding,
         },
     )
 
