@@ -159,7 +159,7 @@ from app.token_service import (
 )
 from scripts.run_migrations import run as run_migrations
 
-app = FastAPI(title="Mana Archive")
+app = FastAPI(title="Cartarch")
 
 app.add_middleware(
     SessionMiddleware,
@@ -366,7 +366,7 @@ def home(
         request,
         "home.html",
         {
-            "title": "Mana Archive",
+            "title": "Cartarch",
             "current_user": current_user,
             "use_drawer_sorter": current_user.username in DRAWER_SORTER_USERNAMES,
         },
