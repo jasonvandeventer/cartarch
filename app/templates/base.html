@@ -29,51 +29,105 @@
     <script src="/static/vendor/htmx-1.9.12.min.js?v={{ static_v('vendor/htmx-1.9.12.min.js') }}"></script>
   </head>
   <body>
-    <header class="site-header">
-      <div class="header-shell">
-        <div class="header-left">
-          <a href="/" class="brand-logo-link">
-            {# v3.27.6 — alt text reads "Cartarch" though the wordmark image
-               still shows "Mana Archive"; the asset swap lives in v3.27.12
-               (gated on designer deliverable). Deliberate half-swap. #}
+    {# v3.27.8 — left-sidebar + slim-topbar app shell. Replaces the
+       horizontal site-header layout. Desktop (≥768px): two-column grid
+       with sidebar fixed-width on the left, main pane filling the rest.
+       Mobile (<768px): sidebar hides, main pane goes full-width, the
+       existing .bottom-nav element below takes over as the mobile nav
+       (unchanged from prior releases). Nav grouping follows the
+       v3.27.8 mockups: OVERVIEW / COLLECTION / STORAGE / PLAY / SYSTEM.
+       Every nav destination from the pre-v3.27.8 horizontal nav is
+       still reachable (Home → Dashboard, Account moved into SYSTEM).
+       Plain-text nav items — the unified icon language is the v3.27.12
+       aesthetic-pass's job per the v3.27.8 spec. #}
+    {% set path = request.url.path if request else '/' %}
+    <div class="app-shell{% if not current_user %} app-shell-anon{% endif %}">
+      {% if current_user %}
+        <aside class="app-sidebar" aria-label="Primary navigation">
+          <a href="/" class="sidebar-brand">
+            {# v3.27.6 alt+v3.27.8 layout: alt reads "Cartarch" but the
+               wordmark image still shows "Mana Archive"; the asset swap
+               lives in v3.27.13 (gated on designer deliverable). #}
             <img src="/static/icons/wordmark-1024.png"
                  alt="Cartarch"
-                 class="brand-wordmark">
+                 class="sidebar-wordmark">
           </a>
-          <nav>
-            <a href="/">Home</a>
-            <a href="/import">Import</a>
-            <a href="/collection">Collection</a>
-            <a href="/pending">Pending</a>
-            <a href="/locations">Locations</a>
-            {% if current_user and current_user.username in drawer_sorter_usernames %}<a href="/drawers">Drawers</a>{% endif %}
-            <a href="/decks">Decks</a>
-            <a href="/tokens">Tokens</a>
-            <a href="/games">Games</a>
-            {% if current_user and current_user.username in drawer_sorter_usernames %}<a href="/audit">Audit</a>{% endif %}
-            <a href="/sets">Sets</a>
-            {% if current_user %}
-              {% if current_user.is_admin %}<a href="/admin">Admin</a>{% endif %}
-              <a href="/account">Account</a>
-            {% endif %}
+          <nav class="sidebar-nav">
+            <div class="nav-group">
+              <div class="nav-label">Overview</div>
+              <a href="/" class="nav-item{% if path == '/' %} active{% endif %}">Dashboard</a>
+              <a href="/import"
+                 class="nav-item{% if path.startswith('/import') %} active{% endif %}">Import</a>
+              <a href="/pending"
+                 class="nav-item{% if path.startswith('/pending') %} active{% endif %}">Pending</a>
+            </div>
+            <div class="nav-group">
+              <div class="nav-label">Collection</div>
+              <a href="/collection"
+                 class="nav-item{% if path.startswith('/collection') %} active{% endif %}">Collection</a>
+              <a href="/sets"
+                 class="nav-item{% if path.startswith('/sets') %} active{% endif %}">Sets</a>
+              <a href="/tokens"
+                 class="nav-item{% if path.startswith('/tokens') %} active{% endif %}">Tokens</a>
+            </div>
+            <div class="nav-group">
+              <div class="nav-label">Storage</div>
+              <a href="/locations"
+                 class="nav-item{% if path.startswith('/locations') %} active{% endif %}">Locations</a>
+              {% if current_user.username in drawer_sorter_usernames %}
+                <a href="/drawers"
+                   class="nav-item{% if path.startswith('/drawers') %} active{% endif %}">Drawers</a>
+              {% endif %}
+            </div>
+            <div class="nav-group">
+              <div class="nav-label">Play</div>
+              <a href="/decks"
+                 class="nav-item{% if path.startswith('/decks') %} active{% endif %}">Decks</a>
+              <a href="/games"
+                 class="nav-item{% if path.startswith('/games') %} active{% endif %}">Games</a>
+            </div>
+            <div class="nav-group">
+              <div class="nav-label">System</div>
+              {% if current_user.username in drawer_sorter_usernames %}
+                <a href="/audit"
+                   class="nav-item{% if path.startswith('/audit') %} active{% endif %}">Audit</a>
+              {% endif %}
+              {% if current_user.is_admin %}
+                <a href="/admin"
+                   class="nav-item{% if path.startswith('/admin') %} active{% endif %}">Admin</a>
+              {% endif %}
+              <a href="/account"
+                 class="nav-item{% if path.startswith('/account') %} active{% endif %}">Account</a>
+            </div>
           </nav>
-        </div>
-        <div class="header-right">
-          <span class="version-pill">{{ app_version }}</span>
-          {% if current_user %}
+        </aside>
+      {% endif %}
+      <div class="app-main">
+        {% if current_user %}
+          <header class="app-topbar">
+            <span class="version-pill">{{ app_version }}</span>
             <form method="post" action="/logout" class="nav-logout-form">
               <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
               <button type="submit" class="nav-logout-button">
                 Logout ({{ current_user.display_name or current_user.username }})
               </button>
             </form>
-          {% endif %}
-        </div>
+          </header>
+        {% else %}
+          <header class="app-topbar app-topbar-anon">
+            <a href="/" class="sidebar-brand sidebar-brand-anon">
+              <img src="/static/icons/wordmark-1024.png"
+                   alt="Cartarch"
+                   class="sidebar-wordmark">
+            </a>
+            <span class="version-pill">{{ app_version }}</span>
+          </header>
+        {% endif %}
+        <main class="page-shell">
+          {% block content %}{% endblock %}
+        </main>
       </div>
-    </header>
-    <main class="page-shell">
-      {% block content %}{% endblock %}
-    </main>
+    </div>
     <script>
       /* Mobile popover behavior. Applied to elements tagged .mobile-popover
          when viewport ≤ 768px:
@@ -319,6 +373,7 @@
         })();
       </script>
     {% endif %}
-    {% block extra_scripts %}{% endblock %}
+    {% block extra_scripts %}
+    {% endblock %}
   </body>
 </html>
