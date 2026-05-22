@@ -447,6 +447,137 @@ body {
 }
 
 /* ============================================================================
+   Dashboard tiles (v3.27.10)
+   ----------------------------------------------------------------------------
+   Three tiles wired into the home.html populated state, sitting below the
+   Quick Actions grid. Token-reuse only — no parallel tokens, no new visual
+   language (aesthetic restyling is v3.27.13's job).
+
+   Tiles 1 + 2 (Collection Value, Sets Collected) follow the action-card
+   surface contract (--panel background, --border border, --radius corners)
+   but emphasize a single large number instead of a description block. Tile
+   3 (Recent Activity) is wider in content but matches the same surface.
+   ========================================================================= */
+.dashboard-tiles {
+  display: grid;
+  grid-template-columns: 1fr 1fr 2fr;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+@media (max-width: 1024px) {
+  .dashboard-tiles {
+    grid-template-columns: 1fr 1fr;
+  }
+  .dash-tile-activity {
+    grid-column: 1 / -1;
+  }
+}
+@media (max-width: 640px) {
+  .dashboard-tiles {
+    grid-template-columns: 1fr;
+  }
+  .dash-tile-activity {
+    grid-column: auto;
+  }
+}
+.dash-tile {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  text-decoration: none;
+  color: var(--text);
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease;
+}
+.dash-tile:hover {
+  border-color: #2e4a73;
+  background: var(--panel-2);
+}
+.dash-tile-eyebrow {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.dash-tile-number {
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--text);
+}
+.dash-tile-sublabel {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+.dash-tile-pending {
+  font-size: 0.8rem;
+  color: var(--muted);
+  border-top: 1px dashed var(--border);
+  padding-top: 0.5rem;
+  margin-top: 0.2rem;
+}
+.dash-tile-progress {
+  height: 6px;
+  background: var(--panel-2);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  margin-top: 0.35rem;
+}
+.dash-tile-progress-fill {
+  height: 100%;
+  background: var(--brand-gold);
+  border-radius: var(--radius-sm);
+  transition: width 0.4s ease;
+}
+.dash-tile-activity-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.dash-tile-activity-list li {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+.dash-tile-activity-type {
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--muted);
+  flex-shrink: 0;
+  min-width: 5.5rem;
+}
+.dash-tile-activity-card {
+  color: var(--text);
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dash-tile-activity-when {
+  color: var(--muted);
+  font-size: 0.75rem;
+  flex-shrink: 0;
+}
+.dash-tile-empty {
+  font-size: 0.85rem;
+  color: var(--muted);
+  font-style: italic;
+}
+
+/* ============================================================================
    Empty-state homepage (v3.27.8)
    ----------------------------------------------------------------------------
    Shown when show_onboarding is True for the home route. Replaces the
@@ -903,6 +1034,25 @@ textarea {
 }
 .collection-stats-grid {
   margin-top: 0.9rem;
+}
+/* v3.27.10: pending sub-stat. Headline aggregates are placed-only across
+   every cross-page surface; the in-flight slice surfaces here as a small
+   muted line with a gold-hover affordance pointing to /pending. Same
+   visual contract as the dashboard tile's pending sub-stat. */
+.pending-substat {
+  margin-top: var(--space-2);
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+.pending-substat a {
+  color: var(--muted);
+  text-decoration: none;
+  border-bottom: 1px dashed var(--border);
+  padding-bottom: 1px;
+}
+.pending-substat a:hover {
+  color: var(--brand-gold);
+  border-bottom-color: var(--brand-gold);
 }
 .drawer-pill-row {
   display: flex;

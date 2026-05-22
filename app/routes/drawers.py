@@ -22,13 +22,23 @@ def drawers_page(
         raise HTTPException(status_code=403, detail="Not available for your account")
     grouped = list_drawer_groups(session, user_id=current_user.id)
 
+    # v3.27.10 prereq 1: switch the per-drawer headline from len(rows) to
+    # sum(row.quantity) — card-count is the canonical unit across every
+    # cross-page surface (Collection, Decks, Drawers, dashboard tiles all
+    # agree). The visible Drawers-page number changes as a consequence: a
+    # drawer holding 3 rows of a 4-of (qty=4 each) now reads 12 cards, not
+    # 3 rows. Intentional; documented in release-history.md. We still need
+    # the row list for total_value (per-row finish-aware pricing via
+    # effective_price doesn't push cleanly to SQL), so the rows-fetched
+    # cost is unchanged — only the headline computation moves to a sum.
     drawer_summaries = []
     for drawer_name, rows in grouped.items():
+        card_count = sum(row.quantity for row in rows)
         total_value = sum(
             (effective_price(row.card, row.finish) or 0.0) * row.quantity for row in rows
         )
         drawer_summaries.append(
-            {"drawer": drawer_name, "row_count": len(rows), "total_value": total_value}
+            {"drawer": drawer_name, "card_count": card_count, "total_value": total_value}
         )
 
     drawer_summaries.sort(key=lambda d: d["drawer"])

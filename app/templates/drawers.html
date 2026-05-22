@@ -13,8 +13,10 @@
           <div class="stat-label">Drawers</div>
         </div>
         <div class="stat-card">
-          <div class="stat-value">{{ drawer_summaries | sum(attribute='row_count') }}</div>
-          <div class="stat-label">Total Rows</div>
+          {# v3.27.10: canonical unit is card-count (sum of quantity) across
+             Collection / Decks / Drawers / dashboard tiles. #}
+          <div class="stat-value">{{ drawer_summaries | sum(attribute='card_count') }}</div>
+          <div class="stat-label">Total Cards</div>
         </div>
         <div class="stat-card">
           <div class="stat-value">${{ '%.0f'|format(drawer_summaries | sum(attribute='total_value') ) }}</div>
@@ -30,7 +32,7 @@
           <thead>
             <tr>
               <th>Drawer</th>
-              <th>Rows</th>
+              <th>Cards</th>
               <th>Total Value</th>
               <th></th>
             </tr>
@@ -41,7 +43,7 @@
                 <td>
                   <strong>{{ drawer.drawer }}</strong>
                 </td>
-                <td>{{ drawer.row_count }}</td>
+                <td>{{ drawer.card_count }}</td>
                 <td>${{ '%.2f'|format(drawer.total_value) }}</td>
                 <td style="text-align: right;">
                   <a href="/drawers/{{ drawer.drawer }}">Open</a>

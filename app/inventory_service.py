@@ -901,17 +901,33 @@ def get_inventory_row_stats(
 
     rows = query.all()
 
+    # v3.27.10 prereq 2: headline aggregates count PLACED cards only;
+    # pending is surfaced as a separate sub-stat on every relevant surface
+    # (dashboard tiles + the Collection page itself). The pre-v3.27.10
+    # `total_value` / `total_cards` keys included pending — that left the
+    # Collection page disagreeing with where placement actually happens.
+    # New canonical: `total_value` / `total_cards` are placed-only;
+    # `pending_value` / `pending_cards` carry the in-flight slice
+    # separately. unique_cards stays inclusive — it answers "how many
+    # distinct card names do you own", which doesn't care about placement
+    # state.
     total_value = 0.0
     total_cards = 0
+    pending_value = 0.0
+    pending_cards = 0
     seen_names: set[str] = set()
     drawer_counts = {str(i): 0 for i in range(1, 7)}
     unassigned_count = 0
 
     for row in rows:
         price = effective_price(row.card, row.finish)
-        if price is not None:
-            total_value += price * row.quantity
-        total_cards += row.quantity
+        line_value = (price or 0.0) * row.quantity
+        if row.is_pending:
+            pending_value += line_value
+            pending_cards += row.quantity
+        else:
+            total_value += line_value
+            total_cards += row.quantity
         if row.card and row.card.name:
             seen_names.add(row.card.name)
 
@@ -925,6 +941,8 @@ def get_inventory_row_stats(
     return {
         "total_value": total_value,
         "total_cards": total_cards,
+        "pending_value": pending_value,
+        "pending_cards": pending_cards,
         "unique_cards": unique_cards,
         "drawer_counts": drawer_counts,
         "unassigned_count": unassigned_count,
