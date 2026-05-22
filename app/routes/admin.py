@@ -24,18 +24,21 @@ def _build_user_rows(session: Session) -> list[dict]:
     deck_counts = dict(
         session.query(Deck.user_id, func.count(Deck.id)).group_by(Deck.user_id).all()
     )
-    last_activity = dict(
-        session.query(TransactionLog.user_id, func.max(TransactionLog.created_at))
-        .group_by(TransactionLog.user_id)
-        .all()
-    )
 
+    # v3.27.4 — direct read of ``User.last_signed_in_at`` (set by POST /login).
+    # Replaces the previous ``func.max(TransactionLog.created_at)`` aggregate
+    # subquery, which was a misleading proxy for engagement: users who only
+    # play games / edit decks / log in showed stale or NULL dates because
+    # those activities don't write TransactionLog rows. Key renamed
+    # ``last_activity`` → ``last_signed_in_at`` to match the new semantics;
+    # the admin template's column header changes from "Last Activity" to
+    # "Last Signed In" in parallel.
     return [
         {
             "user": u,
             "card_count": card_counts.get(u.id, 0),
             "deck_count": deck_counts.get(u.id, 0),
-            "last_activity": last_activity.get(u.id),
+            "last_signed_in_at": u.last_signed_in_at,
         }
         for u in users
     ]
