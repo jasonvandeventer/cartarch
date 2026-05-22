@@ -54,6 +54,7 @@ class User(Base):
     transaction_logs: Mapped[list[TransactionLog]] = relationship(back_populates="user")
     storage_locations: Mapped[list[StorageLocation]] = relationship(back_populates="user")
     watchlist_items: Mapped[list[WatchlistItem]] = relationship(back_populates="user")
+    password_reset_tokens: Mapped[list[PasswordResetToken]] = relationship(back_populates="user")
 
 
 class Card(Base):
@@ -389,3 +390,48 @@ class WatchlistItem(Base):
 
     user: Mapped[User] = relationship(back_populates="watchlist_items")
     card: Mapped[Card | None] = relationship()
+
+
+class PasswordResetToken(Base):
+    """A self-service password reset token (v3.27.14).
+
+    The raw token (a ``secrets.token_urlsafe(32)`` value) is NEVER
+    stored — only ``hashlib.sha256(token).hexdigest()`` lives in
+    ``token_hash``. The raw token exists only in the emailed link.
+    Validation hashes the incoming token and looks up by hash.
+
+    SHA-256 is the correct choice here (NOT a slow password hasher
+    like the one in ``app/auth.py:hash_password``) because the token
+    is high-entropy random data, not a low-entropy user secret. A
+    slow hash would just make every verification slower for no
+    security gain.
+
+    Lifecycle is enforced at the service layer in
+    ``app/password_reset_service.py``:
+
+    - 30-minute lifetime: ``expires_at = created_at + 30min`` at
+      insert time; validation checks ``expires_at > now()``.
+    - Single-use: ``used_at`` is set on successful reset; rows with
+      ``used_at IS NOT NULL`` never validate again.
+    - Invalidate-on-new-request: a new reset request DELETEs the
+      user's existing unused tokens before inserting the new one,
+      so there's at most one outstanding token per user at any
+      moment.
+
+    ``user_id`` is a documentary FK only (project doesn't enable
+    ``PRAGMA foreign_keys``). User deletion is handled explicitly by
+    the cascade in ``app/routes/admin.py:delete_user`` — plain DELETE,
+    no historical retention value (no "X reset Y's password"
+    snapshot to preserve).
+    """
+
+    __tablename__ = "password_reset_tokens"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    token_hash: Mapped[str] = mapped_column(Text, nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    used_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+
+    user: Mapped[User] = relationship(back_populates="password_reset_tokens")
