@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport"
           content="width=device-width, initial-scale=1, viewport-fit=cover">
-    <title>{{ title or "Mana Archive" }}</title>
+    <title>{{ title or "Cartarch" }}</title>
     <link rel="icon" href="/static/icons/favicon.ico" sizes="any">
     <link rel="icon"
           href="/static/icons/icon-32x32.png"
@@ -33,8 +33,11 @@
       <div class="header-shell">
         <div class="header-left">
           <a href="/" class="brand-logo-link">
+            {# v3.27.6 — alt text reads "Cartarch" though the wordmark image
+               still shows "Mana Archive"; the asset swap lives in v3.27.12
+               (gated on designer deliverable). Deliberate half-swap. #}
             <img src="/static/icons/wordmark-1024.png"
-                 alt="Mana Archive"
+                 alt="Cartarch"
                  class="brand-wordmark">
           </a>
           <nav>
