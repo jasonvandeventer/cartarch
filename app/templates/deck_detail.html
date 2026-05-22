@@ -42,9 +42,7 @@
           {% if deck_record.total > 0 %}
             <span class="deck-record">{{ deck_record.wins }}W–{{ deck_record.losses }}L</span>
           {% endif %}
-          <span id="deck-bracket-placeholder"
-                class="bracket-loading"
-                aria-live="polite"></span>
+          {# v3.27.9: bracket placeholder removed pending analytics rebuild. #}
         </div>
       </div>
     {% else %}
@@ -826,16 +824,14 @@
   {% block extra_scripts %}
     {% if deck %}
       <script>
+      // v3.27.9: bracket-fragment swap removed (no bracket placeholder in
+      // the hero anymore). Panels fetch still runs to lazy-load synergy /
+      // dead_cards / tokens.
       (function () {
         fetch('/decks/{{ deck.id }}/panels')
           .then(function (r) { return r.text(); })
           .then(function (html) {
             var doc = new DOMParser().parseFromString(html, 'text/html');
-            var bracketFrag = doc.getElementById('deck-bracket-fragment');
-            var bracketPlaceholder = document.getElementById('deck-bracket-placeholder');
-            if (bracketFrag && bracketPlaceholder) {
-              bracketPlaceholder.outerHTML = bracketFrag.innerHTML;
-            }
             var panelsContent = doc.getElementById('deck-lazy-panels-content');
             var panelsPlaceholder = document.getElementById('deck-lazy-panels');
             if (panelsContent && panelsPlaceholder) {

@@ -1958,6 +1958,15 @@ def list_decks(session: Session, user_id: int) -> list[Deck]:
                 seen.add(letter)
         deck.color_identity = " ".join(p for p in ["W", "U", "B", "R", "G"] if p in seen)
 
+        # v3.27.9: combos + bracket removed from the per-deck loop. The combo
+        # path made one Spellbook /find-my-combos POST per deck on cold cache
+        # (request-path network invariant violation — 14s /decks load against
+        # 11 decks). The bracket display rolled up to "untrusted" until a
+        # dedicated analytics rebuild lands; see the Deferred / latent items
+        # entry "Deck Analytics Rebuild" in roadmap.md. compute_deck_combos /
+        # compute_deck_bracket are deliberately left importable for the
+        # rebuild (dormant code, same pattern as the retired .site-header CSS
+        # in v3.27.8). consistency stays — it's a local computation.
         all_rows = (
             session.query(InventoryRow)
             .join(Card)
@@ -1967,8 +1976,6 @@ def list_decks(session: Session, user_id: int) -> list[Deck]:
             )
             .all()
         )
-        combos = compute_deck_combos(all_rows)
-        deck.bracket = compute_deck_bracket(all_rows, combos)
         deck.consistency = compute_consistency(all_rows) if all_rows else None
 
     return decks
