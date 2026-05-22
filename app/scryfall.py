@@ -961,6 +961,21 @@ def fetch_game_changer_names() -> list[str]:
 
 
 def fetch_set_cards(set_code: str) -> list[dict[str, Any]]:
+    """Paginate Scryfall's ``/cards/search?q=e:{set_code}`` endpoint.
+
+    Live-network primitive. Returns the normalized 21-key payload shape
+    per ``_normalize_card_payload``. **NOT FOR REQUEST-PATH USE** —
+    pagination is rate-limited (~3 GETs per typical set, throttled),
+    so a single call takes seconds and a request handler that loops
+    over multiple sets will easily blow the Cloudflare 100s ceiling.
+
+    See ``fetch_set_cards_from_cache`` for the v3.27.13 request-path
+    replacement reading the v3.25.0 ``scryfall_cards`` bulk cache. This
+    primitive is preserved for legitimate non-request-path use:
+    background daemons that need fresh Scryfall data (e.g. validating
+    the bulk cache against the live API, or fetching a set the bulk
+    export hasn't propagated yet).
+    """
     set_code = (set_code or "").strip().lower()
     if not set_code:
         return []
@@ -983,6 +998,80 @@ def fetch_set_cards(set_code: str) -> list[dict[str, Any]]:
             url = None
 
     return results
+
+
+def _collector_natural_sort_key(card: dict[str, Any]) -> tuple:
+    """Return a natural-sort key for a card's ``collector_number``.
+
+    Scryfall's ``order=set`` ordering is roughly: parse the leading
+    integer prefix; rows with a numeric prefix sort numerically before
+    rows that start with non-digit characters; the alphabetic suffix
+    (e.g. ``"1a"``, ``"1b"``) breaks ties within a numeric prefix; rows
+    starting with a letter (e.g. ``"T1"``, ``"★1"``) come last sorted
+    by the literal string. The cache table has no natural ordering, so
+    we sort in Python after the SELECT.
+
+    Returns ``(prefix_sentinel, prefix_int, suffix)`` so Python's default
+    tuple comparison gives the right order without any sort-direction
+    flags. ``prefix_sentinel`` is 0 when there's a numeric prefix (sort
+    these first) and 1 when there isn't (sort these after).
+    """
+    raw = (card.get("collector_number") or "").strip()
+    i = 0
+    while i < len(raw) and raw[i].isdigit():
+        i += 1
+    if i == 0:
+        return (1, 0, raw)
+    return (0, int(raw[:i]), raw[i:])
+
+
+def fetch_set_cards_from_cache(set_code: str) -> list[dict[str, Any]]:
+    """Read a set's cards from the v3.25.0 ``scryfall_cards`` bulk cache.
+
+    Replaces the request-path ``fetch_set_cards`` Scryfall pagination —
+    the request-path network invariant violation flagged in the v3.27.13
+    diagnostic (18-27s per ``/sets/{set_code}`` visit, ALL set detail
+    page loads). Local SQLite query; no network call on the request
+    path. The bulk cache is kept current by the ``_bulk_data_loop``
+    daemon (v3.25.0) and mirrors all ~114k Scryfall cards locally.
+
+    Returns the same byte-identical 21-key normalized payload shape that
+    ``fetch_set_cards`` returns (via the shared ``_cached_row_to_payload``
+    helper), so consumers don't care which path produced their list.
+
+    Sort: natural collector-number order matching Scryfall's
+    ``order=set`` (numeric prefixes first numerically; alphabetic
+    suffixes break ties; non-numeric prefixes sort last). See
+    ``_collector_natural_sort_key`` for the parse.
+
+    Cache miss (set not in ``scryfall_cards`` — typical for very new
+    sets the bulk export hasn't propagated yet, or for malformed set
+    codes) returns ``[]``. No fallback to a live Scryfall fetch — the
+    request-path-network-invariant contract requires that misses fail
+    visibly to the user rather than degrade into per-row live fetches.
+    Same shape as the v3.23.x import-path lesson.
+
+    Any cache read error is logged and degrades to ``[]`` — a database
+    problem can never make this path slower than network fallback would
+    have been. (Same defensive pattern as ``_cache_get_by_ids`` /
+    ``_cache_get_by_set_number``.)
+    """
+    set_code = (set_code or "").strip().lower()
+    if not set_code:
+        return []
+    try:
+        stmt = text(f"SELECT {_CACHE_COLUMNS} FROM scryfall_cards WHERE set_code = :set_code")
+        with engine.connect() as conn:
+            rows = conn.execute(stmt, {"set_code": set_code}).mappings().all()
+    except Exception as exc:  # noqa: BLE001 — degrade to empty (request-path safe)
+        print(
+            f"[scryfall-cache] set lookup failed for {set_code}, returning []: {exc}",
+            flush=True,
+        )
+        return []
+    payloads = [_cached_row_to_payload(m) for m in rows]
+    payloads.sort(key=_collector_natural_sort_key)
+    return payloads
 
 
 def search_cards_by_name(name: str, limit: int = 500) -> list[dict[str, Any]]:
