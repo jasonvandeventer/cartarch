@@ -2,7 +2,7 @@
 
 Self-hosted web application for managing a physical Magic: The Gathering collection.
 
-**Current version: v3.27.8** · [Platform repo](https://github.com/jasonvandeventer/mana-archive-platform)
+**Current version: v3.27.16** · [Platform repo](https://github.com/jasonvandeventer/mana-archive-platform)
 
 ---
 
@@ -25,7 +25,7 @@ See [docs/ROADMAP.md](docs/ROADMAP.md) for the prioritized backlog.
 
 ![Deck detail page](docs/screenshots/deck-detail.png)
 
-_Deck detail — hero with Bracket V2 badge, Analytics (mana curve, types, pips), Health, Synergy, and Win Conditions panels._
+_Deck detail — hero with deck stats, Analytics (mana curve, card types, color pips), Health (functional density + pip strain), Synergy classification, dead-cards / upgrade targets, and tokens panels. (Screenshot predates v3.27.9; the bracket badge and combos panel visible in the image were removed pending the Deck Analytics Rebuild.)_
 
 ![Collection with boolean search](docs/screenshots/collection.png)
 
@@ -40,6 +40,17 @@ See [docs/screenshots/](docs/screenshots/) for capture guidelines and additional
 ---
 
 ## Features
+
+### Dashboard
+
+- Left-sidebar app shell with grouped nav (Overview / Collection / Storage / Play / System). Mobile (<768px): sidebar hides, the existing bottom-tab bar takes over
+- **At a Glance** tile row on the populated dashboard surfaces existing data:
+  - **Collection Value** — `SUM(quantity × finish-aware price)` over placed inventory; pending shown as an explicit sub-stat (placed-only headline canon — pending is never folded silently into the number)
+  - **Decks Owned** — total deck count + Commander-format breakdown
+  - **Recent Activity** — last 8 TransactionLog rows with card name, event type, date
+- All three tiles share the same canonical unit: card-count = `SUM(InventoryRow.quantity)` everywhere (Collection / Drawers / Decks / dashboard tiles all reconcile). Drawers page reports cards, not rows, as a consequence (a drawer holding 3 rows of a 4-of reads 12 cards, not 3 rows)
+- **Quick Actions** grid below the tiles for first-class flows (Pending, Import, Collection, Drawers/Locations, Decks, Games)
+- Empty-state for brand-new accounts: welcome + first-step CTA + numbered next-steps replaces the wall-of-zeros that the populated dashboard would otherwise show
 
 ### Collection
 
@@ -64,14 +75,23 @@ See [docs/screenshots/](docs/screenshots/) for capture guidelines and additional
 - **Add card panel** on deck detail — type a card name, pick a printing from the Scryfall autocomplete, click Add. If you already own the card it's moved from your collection automatically; otherwise a new copy is imported. Mobile-first single-column layout
 - Mark commanders; commander cards appear in a dedicated panel above the deck grid
 - Full Scryfall-style search within a deck (HTMX-powered partial update: clicking Apply / pressing Enter swaps just the card grid in place, scroll position preserved, address bar updates for shareable URLs; no-JS fallback to the full-page GET form is preserved)
-- **Analytics panel**: mana curve, card type breakdown, color pip counts, avg CMC, "deck peaks at turn X" insight
-- **Health panel**: ramp/draw/removal/board-wipe density vs recommended thresholds; pip strain analysis (colored pip demand vs land color sources)
-- **Token panel**: auto-discovers tokens produceable by the deck via Scryfall `all_parts`; click a token image to view its detail page
+- **Analytics panel**: mana curve, card type breakdown, color pip counts, avg CMC
+- **Health panel**: ramp/draw/removal/board-wipe density vs recommended thresholds; pip strain analysis (colored pip demand vs land color sources); consistency score
 - **Synergy classification**: cards split into Direct / Supporting / Unrelated based on commander themes (death triggers, tokens, sacrifice, +1/+1 counters, tribal subtypes)
-- **Win condition detection**: live integration with CommanderSpellbook to surface combos present in the deck
-- **Bracket Estimator V2** (v3.15.0+): multi-stage pipeline producing a 1-5 bracket with explainable findings. Mechanics floor (Game Changer count via Scryfall `is:gamechanger`, mass land denial, extra-turn chains) + 5-question intent survey + combo role classification (none/incidental/backup/primary/compact via Commander Spellbook). Mechanics-vs-intent mismatch warnings; multi-dimensional confidence (tagging coverage, mechanics clarity, intent alignment, combo detection depth)
+- **Dead-cards / upgrade-targets panel**: surfaces unrelated cards as replacement candidates
+- **Token panel**: auto-discovers tokens produceable by the deck via Scryfall `all_parts`; click a token image to view its detail page
 - **Role tag system** with 10 tags (Ramp, Draw, Tutor, Removal, Wipe, Protection, Engine, Synergy, Threat, Hate); auto-detected from oracle text and commander themes with per-tag source + confidence tracking (auto/medium vs user/high vs auto/certain); **Retag** button re-runs detection over already-tagged rows additively; **Review tags** panel on deck detail surfaces auto/medium suggestions for one-click confirm or remove
 - Click any health metric count to filter the deck grid to just those cards
+
+> _Brackets and combo display were removed from deck surfaces in v3.27.9 pending the Deck Analytics Rebuild. The underlying `bracket_v2_service` module, Commander Spellbook integration, and `compute_deck_combos` / `compute_deck_bracket` functions are preserved as dormant code for the rebuild to reuse. See `roadmap.md` Deferred / latent items "Deck Analytics Rebuild" for the path back._
+
+### Watchlist
+
+- Per-user list of cards to track (acquire later / compare prices on / remember)
+- **Two identity modes per row** — watch a specific printing (`card_id` FK to `cards.id` — useful for collectors after a particular promo or set version) OR a card name (printing-agnostic — matches the "I want a Sol Ring" mental model). Exactly one identity mode populated per row; both can be active independently for the same card
+- Add a card to the watchlist from any card detail page (`/cards/{id}`); four button states show whether you're already watching this printing and/or any printing of the same name
+- `/watchlist` page shows every watched card with Card / Watch type / Owned / Added / Note columns. Owned count splits placed and pending (printing-specific watches show the printing's count; name watches aggregate across all printings)
+- Optional note per row for context ("for the Bello deck", "$3 target", etc.); inline edit via a popout
 
 ### Organization
 
@@ -91,7 +111,9 @@ See [docs/screenshots/](docs/screenshots/) for capture guidelines and additional
 ### Multi-user
 
 - **Self-service registration** — users sign up with email + display name; no admin involvement required
+- **Self-service password recovery** at `/forgot-password` — email-driven reset via Resend (the project's outbound transactional email path). Tokens are SHA-256 hashed at rest (raw token only ever in the emailed link), 30-minute expiry, single-use, invalidate-on-new-request. POST `/forgot-password` returns an identical neutral response for registered vs unregistered emails; the send is asynchronous via a daemon thread so there's no timing leak. Rate-limited per-email AND per-IP at 5 requests/hour
 - **Update Profile form** at `/account` lets any user change their email and display name without admin DB access
+- **Shared password strength validator** — 8-char minimum, 256-char maximum, no composition requirements (NIST SP 800-63B aligned); applied at `/register`, `/account/change-password`, AND `/reset-password` so the three password-set paths can't drift
 - Admin panel: create/delete users, toggle admin/active, reset passwords
 - Display names shown throughout the UI; email used as login identifier
 - Per-user data isolation; drawer sorter is opt-in per username
@@ -128,8 +150,11 @@ See [docs/screenshots/](docs/screenshots/) for capture guidelines and additional
 - Below 768px the top-bar nav collapses to a 5-tab bottom bar (Home / Collection / Decks / Games / More) with a "More" overlay containing Import, Pending, Locations, Tokens, Sets, Drawers/Audit/Admin (gated), Account, Logout
 - "More" tab shows a red badge with the user's pending-placement count (capped at `99+`)
 - 44px tap-target floor enforced on phone/tablet-portrait; tracker buttons exempt by design
-- Tables scroll horizontally inside their panels; popouts (Edit, Bracket, inline-create) become viewport-centered modals on phones with semi-transparent backdrop, body scroll lock, auto-injected × close button, and dismiss on backdrop tap / Escape / × — see [docs/mobile_patterns.md](docs/mobile_patterns.md)
-- Below 480px, six-column tables (decks, locations, games, card-detail inventory) flip to a stacked-card layout via opt-in `class="stacking-table"` + `data-label` attributes — each row renders as a self-contained card with label/value pairs and action buttons grouped at the bottom, no horizontal scroll required
+- **Two-layer responsive treatment for wide tables**:
+  - **Column-priority hiding** (v3.27.15) — `.col-priority-low` columns drop at ≤980px (laptop-narrow / tablet); `.col-priority-mid` columns drop at ≤768px (tablet portrait / phone). Applied uniformly across Decks, Watchlist, Admin, Games, Locations, Audit, and Tokens so the columns that remain stay readable without sideways scrolling being the primary interaction
+  - **Stacked-card layout** at ≤480px (true phones) — six-column tables (decks, locations, games, card-detail inventory) flip via opt-in `class="stacking-table"` + `data-label` attributes; each row renders as a self-contained card with label/value pairs and action buttons grouped at the bottom
+  - **Horizontal scroll** inside `.table-wrap` panels stays as the final-fallback floor for tables intrinsically wider than the available width even after column drops
+- Popouts (Edit, inline-create) become viewport-centered modals on phones with semi-transparent backdrop, body scroll lock, auto-injected × close button, and dismiss on backdrop tap / Escape / × — see [docs/mobile_patterns.md](docs/mobile_patterns.md)
 - Inventory card thumbnails compact further on true phones (130px below 480px, 170px at 480-768, 138px on desktop); drawer pills enforce a 44px tap-target floor
 - Mobile fundamentals applied globally: 16px input font-size (prevents iOS auto-zoom on focus), `overflow-x: hidden` below 768px (page never horizontal-scrolls; tables still scroll internally), `box-sizing: border-box` on every element including pseudo-elements, `viewport-fit=cover` + `env(safe-area-inset-bottom)` for notched devices, `overflow-wrap: anywhere` on text containers, and a `min-height: 44px` floor on link-styled tap targets in nav, filter, hero, and pagination surfaces
 
