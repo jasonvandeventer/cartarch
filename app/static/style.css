@@ -168,6 +168,47 @@
   box-sizing: border-box;
 }
 
+/* ============================================================================
+   Scrollbar-gutter — v3.27.16 (regression fix from v3.27.15)
+   ----------------------------------------------------------------------------
+   The v3.27.15 aesthetic pass introduced ``body { min-height: 100vh;
+   position: relative; }`` plus the ``body::before`` / ``body::after``
+   fixed-positioned background-texture layers. On pages tall enough to
+   need a vertical scrollbar (Import, Collection, Sets, Tokens, Locations,
+   Audit, Admin all observed), a thin horizontal scrollbar appeared as a
+   regression; pages short enough to fit without vertical scroll
+   (Dashboard, Pending, Watchlist, Drawers, Decks, Games, Account) were
+   unaffected. Symptom fingerprint: horizontal scrollbar present **iff**
+   vertical scrollbar present.
+
+   Root cause — scrollbar-gutter reflow. When the body grows tall enough
+   to require a vertical scrollbar, the browser reserves ~15-17px of
+   layout width for the scrollbar gutter, shrinking the available viewport
+   width. The v3.27.15 changes (especially the fixed-positioned pseudo-
+   elements that paint at viewport bounds + body becoming a positioning
+   context with ``min-height: 100vh``) interact with that reflow in a way
+   the pre-v3.27.15 stylesheet did not — content sized assuming the
+   pre-scrollbar viewport ends up ~17px over the new (reduced) width,
+   triggering horizontal scroll.
+
+   Fix — ``scrollbar-gutter: stable`` on ``html``. Reserves the gutter
+   space whether or not the scrollbar is visible, so viewport width is
+   constant in both states and no reflow happens when the scrollbar
+   appears. Standardized property (Chrome 94+, Firefox 97+, Safari 18.2+);
+   older browsers ignore it gracefully — they revert to the pre-v3.27.15
+   behavior (still has the regression on long pages, but no worse than
+   the regression itself). The reserved gutter shows as a faint inset on
+   non-scrollbar pages; visually acceptable per the v3.27.15 calm-finish
+   direction.
+
+   Why on ``html`` rather than ``body``: the property only takes effect
+   on the scrolling element, which is ``html`` in modern browsers (the
+   ``body`` no longer scrolls by default — it's ``<html>``).
+   ============================================================================ */
+html {
+  scrollbar-gutter: stable;
+}
+
 img {
   max-width: 100%;
   height: auto;
@@ -925,13 +966,18 @@ body::after {
 }
 
 /* ============================================================================
-   .page-shell wrapper (post-v3.27.8 — the .site-header* CSS family removed v3.27.15)
+   .page-shell wrapper (post-v3.27.8 — the .site-header* CSS family removed across v3.27.15 + v3.27.16)
    ----------------------------------------------------------------------------
    v3.27.8 retired the horizontal top header in favor of the .app-shell /
    .app-sidebar / .app-topbar layout. The .site-header / .header-shell /
-   .header-left / .header-right CSS rules went dormant at that point and
-   v3.27.15 (the aesthetic pass) struck them entirely — DOM had not
-   referenced them since v3.27.8, so removal had no visual effect.
+   .header-left / .header-right CSS rules went dormant at that point. The
+   v3.27.15 aesthetic pass struck the main desktop block but left two
+   smaller @media blocks behind (lines ~1589-1612 carrying .header-shell /
+   .header-right / .header-tagline mobile overrides, and lines ~4744-4762
+   carrying .site-header nav / .site-header .header-right /
+   .site-header .brand-wordmark mobile-hide overrides). v3.27.16 finished
+   the deletion. DOM had not referenced any of these since v3.27.8, so
+   removal had no visual effect.
 
    ``.page-shell`` is the surviving wrapper: every interior page (rendered
    inside .app-main) uses it as the content container. v3.27.8 fix history:
@@ -1051,9 +1097,8 @@ body::after {
   font-size: 1.3rem;
   line-height: 1.15;
 }
-.header-tagline {
-  font-size: 0.98rem;
-}
+/* v3.27.16 — .header-tagline removed (was a leftover from the retired
+   v3.x horizontal site-header DOM; no template referenced it post-v3.27.8). */
 .muted {
   color: var(--muted);
 }
@@ -1545,27 +1590,16 @@ td {
 }
 
 @media (max-width: 768px) {
-  .header-shell,
+  /* v3.27.16 — .header-shell / .header-right / .header-tagline rules
+     removed from this @media block (dead DOM since v3.27.8 retired the
+     horizontal top header). .page-shell padding override + .site-title
+     font-size + the .inventory-card mobile rules below are LIVE and stay. */
   .page-shell {
     padding-left: 1rem;
     padding-right: 1rem;
   }
   .site-title {
     font-size: 1.05rem;
-  }
-
-  .header-shell {
-    flex-wrap: wrap;
-  }
-  .header-right {
-    flex-direction: row;
-    align-items: center;
-    justify-content: flex-end;
-    width: 100%;
-  }
-
-  .header-tagline {
-    display: none;
   }
 
   .inventory-card {
@@ -4699,12 +4733,19 @@ body.game-mode {
 /* ============================================================================
    Mobile bottom-tab navigation
    ----------------------------------------------------------------------------
-   Above 768px: bottom nav and More overlay are hidden; existing top-bar
-   nav inside .site-header is used.
-   At or below 768px: top-bar nav is hidden; bottom-nav (Home, Collection,
-   Decks, Games, More) is fixed to the viewport bottom; "More" opens a
-   full-screen overlay containing Import, Pending, Locations, Tokens, Sets,
-   Drawers/Audit (conditional), Admin (conditional), Account, Logout.
+   Above 768px: bottom nav and More overlay are hidden; the v3.27.8 left
+   sidebar (.app-sidebar) is the desktop nav.
+   At or below 768px: the sidebar hides (see the .app-shell @media block
+   above), and bottom-nav (Home, Collection, Decks, Games, More) is fixed
+   to the viewport bottom; "More" opens a full-screen overlay containing
+   Import, Pending, Locations, Tokens, Sets, Drawers/Audit (conditional),
+   Admin (conditional), Account, Logout.
+   v3.27.16 — the .site-header nav / .site-header .header-right /
+   .site-header .brand-wordmark dead rules that used to hide the
+   retired horizontal-header DOM at ≤768px were removed here. The
+   sidebar-hide rule (.app-sidebar { display: none }) lives in the
+   .app-shell @media block; this block now only owns the bottom-nav
+   reveal + the body padding-bottom that makes room for it.
    ============================================================================ */
 .bottom-nav,
 .more-menu {
@@ -4712,15 +4753,6 @@ body.game-mode {
 }
 
 @media (max-width: 768px) {
-  .site-header nav {
-    display: none;
-  }
-  .site-header .header-right {
-    display: none;
-  }
-  .site-header .brand-wordmark {
-    height: 40px;
-  }
   body {
     padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px));
   }

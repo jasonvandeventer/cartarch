@@ -54,10 +54,10 @@
             <thead>
               <tr>
                 <th>Token</th>
-                <th>Subtype</th>
+                <th class="col-priority-low">Subtype</th>
                 <th>Qty</th>
-                <th>Location</th>
-                <th>Notes</th>
+                <th class="col-priority-mid">Location</th>
+                <th class="col-priority-low">Notes</th>
                 <th></th>
               </tr>
             </thead>
@@ -99,12 +99,12 @@
                       </details>
                     {% endif %}
                   </td>
-                  <td>{{ t.subtype or '—' }}</td>
+                  <td class="col-priority-low">{{ t.subtype or '—' }}</td>
                   <td>
                     <strong>{{ t.quantity }}</strong>
                   </td>
-                  <td>{{ t.storage_location.name if t.storage_location else '—' }}</td>
-                  <td class="muted">{{ t.notes or '' }}</td>
+                  <td class="col-priority-mid">{{ t.storage_location.name if t.storage_location else '—' }}</td>
+                  <td class="col-priority-low muted">{{ t.notes or '' }}</td>
                   <td>
                     <details class="inline-details">
                       <summary class="btn-like btn-like-muted">Edit</summary>

@@ -20,9 +20,9 @@
         <table>
           <thead>
             <tr>
-              <th>Batch ID</th>
+              <th class="col-priority-low">Batch ID</th>
               <th>Filename</th>
-              <th>Imported At</th>
+              <th class="col-priority-mid">Imported At</th>
               <th>Rows</th>
               <th></th>
             </tr>
@@ -30,9 +30,9 @@
           <tbody>
             {% for batch in batches %}
               <tr>
-                <td>{{ batch.id }}</td>
+                <td class="col-priority-low">{{ batch.id }}</td>
                 <td>{{ batch.filename }}</td>
-                <td>{{ batch.imported_at }}</td>
+                <td class="col-priority-mid">{{ batch.imported_at }}</td>
                 <td>{{ batch.row_count }}</td>
                 <td style="text-align: right;">
                   <form action="/imports/undo-batch" method="post" class="inline-form">
@@ -57,31 +57,31 @@
         <table>
           <thead>
             <tr>
-              <th>ID</th>
+              <th class="col-priority-low">ID</th>
               <th>Event</th>
               <th>Card</th>
-              <th>Finish</th>
+              <th class="col-priority-mid">Finish</th>
               <th>Qty Δ</th>
-              <th>From</th>
-              <th>To</th>
-              <th>Batch</th>
+              <th class="col-priority-low">From</th>
+              <th class="col-priority-low">To</th>
+              <th class="col-priority-low">Batch</th>
               <th>When</th>
-              <th>Note</th>
+              <th class="col-priority-low">Note</th>
             </tr>
           </thead>
           <tbody>
             {% for log in logs %}
               <tr>
-                <td>{{ log.id }}</td>
+                <td class="col-priority-low">{{ log.id }}</td>
                 <td>{{ log.event_type }}</td>
                 <td>{{ log.card_id or '—' }}</td>
-                <td>{{ log.finish or '—' }}</td>
+                <td class="col-priority-mid">{{ log.finish or '—' }}</td>
                 <td>{{ log.quantity_delta }}</td>
-                <td>{{ log.source_location or '—' }}</td>
-                <td>{{ log.destination_location or '—' }}</td>
-                <td>{{ log.batch_id or '—' }}</td>
+                <td class="col-priority-low">{{ log.source_location or '—' }}</td>
+                <td class="col-priority-low">{{ log.destination_location or '—' }}</td>
+                <td class="col-priority-low">{{ log.batch_id or '—' }}</td>
                 <td>{{ log.created_at }}</td>
-                <td>{{ log.note or '—' }}</td>
+                <td class="col-priority-low">{{ log.note or '—' }}</td>
               </tr>
             {% endfor %}
           </tbody>
