@@ -45,20 +45,41 @@
       {% endif %}
     </div>
   </section>
+  {# v3.27.15 — folded in from the deferred v3.27.13 finding: cards
+     link to their /cards/{card_id} detail page when the local cards
+     table carries the row. card_id is attached in get_set_completion
+     via a batched scryfall_id → cards.id resolution. Cards never
+     imported / never tokenized render without the link (no card_id =
+     plain div). #}
   <div class="card-grid">
     {% for card in data.visible_cards %}
-      <div class="card-tile">
-        {% if card.image_url %}<img src="{{ card.image_url }}" alt="{{ card.name }}" loading="lazy">{% endif %}
-        <div class="card-name">{{ card.name }}</div>
-        <div class="card-meta">
-          #{{ card.collector_number }}
-          {% if card.quantity_owned and card.quantity_owned > 0 %}
-            · Owned: {{ card.quantity_owned }}
-          {% else %}
-            · Missing
-          {% endif %}
+      {% if card.card_id %}
+        <a class="card-tile card-tile-link" href="/cards/{{ card.card_id }}">
+          {% if card.image_url %}<img src="{{ card.image_url }}" alt="{{ card.name }}" loading="lazy">{% endif %}
+          <div class="card-name">{{ card.name }}</div>
+          <div class="card-meta">
+            #{{ card.collector_number }}
+            {% if card.quantity_owned and card.quantity_owned > 0 %}
+              · Owned: {{ card.quantity_owned }}
+            {% else %}
+              · Missing
+            {% endif %}
+          </div>
+        </a>
+      {% else %}
+        <div class="card-tile">
+          {% if card.image_url %}<img src="{{ card.image_url }}" alt="{{ card.name }}" loading="lazy">{% endif %}
+          <div class="card-name">{{ card.name }}</div>
+          <div class="card-meta">
+            #{{ card.collector_number }}
+            {% if card.quantity_owned and card.quantity_owned > 0 %}
+              · Owned: {{ card.quantity_owned }}
+            {% else %}
+              · Missing
+            {% endif %}
+          </div>
         </div>
-      </div>
+      {% endif %}
     {% endfor %}
   </div>
   {% if data.show_tokens %}

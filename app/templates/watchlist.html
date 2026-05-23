@@ -14,10 +14,10 @@
           <thead>
             <tr>
               <th>Card</th>
-              <th>Watch type</th>
+              <th class="col-priority-low">Watch type</th>
               <th>Owned</th>
-              <th>Added</th>
-              <th>Note</th>
+              <th class="col-priority-mid">Added</th>
+              <th class="col-priority-low">Note</th>
               <th></th>
             </tr>
           </thead>
@@ -34,7 +34,7 @@
                     <span>{{ item.display_name }}</span>
                   {% endif %}
                 </td>
-                <td data-label="Watch type">
+                <td class="col-priority-low" data-label="Watch type">
                   {% if item.identity_mode == 'card' %}
                     <span class="watch-type-badge watch-type-printing">Specific printing</span>
                   {% else %}
@@ -51,8 +51,8 @@
                     <div class="muted" style="font-size: 0.78rem">+{{ item.pending_count }} pending</div>
                   {% endif %}
                 </td>
-                <td data-label="Added">{{ item.added_at | format_local_datetime("%Y-%m-%d") }}</td>
-                <td data-label="Note">
+                <td class="col-priority-mid" data-label="Added">{{ item.added_at | format_local_datetime("%Y-%m-%d") }}</td>
+                <td class="col-priority-low" data-label="Note">
                   <details class="inline-details">
                     <summary class="btn-like">
                       {% if item.note %}
