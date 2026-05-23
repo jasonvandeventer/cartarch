@@ -28,11 +28,11 @@
           <thead>
             <tr>
               <th>Date</th>
-              <th>Format</th>
+              <th class="col-priority-low">Format</th>
               <th>Players</th>
-              <th>Turns</th>
+              <th class="col-priority-mid">Turns</th>
               <th>Winner</th>
-              <th>Notes</th>
+              <th class="col-priority-low">Notes</th>
               <th></th>
             </tr>
           </thead>
@@ -43,7 +43,7 @@
                 <td>
                   <a href="/games/{{ game.id }}">{{ game.played_at.strftime("%Y-%m-%d") }}</a>
                 </td>
-                <td data-label="Format">{{ game.format or '—' }}</td>
+                <td class="col-priority-low" data-label="Format">{{ game.format or '—' }}</td>
                 <td data-label="Players">
                   {% for seat in game.seats %}
                     {# v3.27.0b-1 — snapshot-first deck name with live-deck fallback for legacy seats. #}
@@ -54,7 +54,7 @@
                     {% if not loop.last %},{% endif %}
                   {% endfor %}
                 </td>
-                <td data-label="Turns">{{ game.turn_count or '—' }}</td>
+                <td class="col-priority-mid" data-label="Turns">{{ game.turn_count or '—' }}</td>
                 <td data-label="Winner">
                   {% if winner %}
                     <strong>{{ winner.player_name }}</strong>
@@ -63,7 +63,7 @@
                     <span class="muted">In progress</span>
                   {% endif %}
                 </td>
-                <td class="notes-cell"
+                <td class="notes-cell col-priority-low"
                     data-label="Notes"
                     data-game-id="{{ game.id }}"
                     data-notes="{{ game.notes or '' }}">

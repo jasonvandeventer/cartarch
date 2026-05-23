@@ -44,9 +44,9 @@
           <thead>
             <tr>
               <th>Name</th>
-              <th>Format</th>
+              <th class="col-priority-mid">Format</th>
               <th>Total Cards</th>
-              <th>Health</th>
+              <th class="col-priority-low">Health</th>
               <th></th>
             </tr>
           </thead>
@@ -57,10 +57,10 @@
                   <a href="/decks/{{ deck.id }}">{{ deck.name }}</a>
                   <span class="mana-pip-row">{{ mana_pips(deck.color_identity) }}</span>
                 </td>
-                <td data-label="Format">{{ deck.format or '—' }}</td>
+                <td class="col-priority-mid" data-label="Format">{{ deck.format or '—' }}</td>
                 <td data-label="Total Cards">{{ deck.card_count or 0 }}</td>
                 {# v3.27.9: Bracket column removed pending analytics rebuild (see roadmap.md Deferred / latent items "Deck Analytics Rebuild"). #}
-                <td data-label="Health">
+                <td class="col-priority-low" data-label="Health">
                   {% if deck.consistency %}
                     <span class="consistency-badge cs-{{ deck.consistency.tier }}"
                           title="{{ deck.consistency.label }}">{{ deck.consistency.score }}</span>

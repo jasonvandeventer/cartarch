@@ -3,7 +3,7 @@ from __future__ import annotations
 from sqlalchemy.orm import Session
 
 from app.inventory_service import get_owned_cards_by_set, list_owned_sets
-from app.models import TokenInventory
+from app.models import Card, TokenInventory
 from app.scryfall import fetch_set_cards_from_cache
 
 
@@ -81,6 +81,22 @@ def get_set_completion(
     set_cards = fetch_set_cards_from_cache(set_code)
     owned_map = get_owned_cards_by_set(session, set_code=set_code, user_id=user_id)
 
+    # v3.27.15 — attach local Card.id per card so set_detail.html can wrap
+    # the card name/image in /cards/{card_id} links. scryfall_cards rows
+    # carry scryfall_id but NOT the local cards.id; one batched SELECT
+    # against the cards table by scryfall_id resolves the mapping. Cards
+    # never imported / never tokenized are absent from the cards table —
+    # they get card_id=None and render without a link (graceful fallback).
+    set_scryfall_ids = [c["scryfall_id"] for c in set_cards if c.get("scryfall_id")]
+    card_id_map: dict[str, int] = {}
+    if set_scryfall_ids:
+        for row in (
+            session.query(Card.scryfall_id, Card.id)
+            .filter(Card.scryfall_id.in_(set_scryfall_ids))
+            .all()
+        ):
+            card_id_map[row[0]] = row[1]
+
     owned_cards_list = []
     missing_cards = []
 
@@ -88,6 +104,7 @@ def get_set_completion(
         collector_number = card["collector_number"]
         quantity_owned = owned_map.get(collector_number, 0)
         card["quantity_owned"] = quantity_owned
+        card["card_id"] = card_id_map.get(card.get("scryfall_id"))
 
         if quantity_owned > 0:
             owned_cards_list.append(card)

@@ -62,33 +62,40 @@
    props; do NOT belong in :root.
    ============================================================================ */
 :root {
-  /* --- Working palette (v3.x, unchanged) --- */
-  --bg: #07111f;
-  --panel: #12243f;
-  --panel-2: #0f1f36;
-  --border: #2c3e60;
+  /* --- Working palette (v3.27.15 — repointed to the navy target) ---
+     Token NAMES kept verbatim so every existing CSS rule referencing
+     ``var(--bg)`` / ``var(--panel)`` / etc. inherits the new values
+     without a per-rule rewrite. The v3.27.15 aesthetic pass is
+     token-driven; the value change here is what gives the whole app
+     the new visual finish. */
+  --bg: #081321;       /* matches --brand-bg-navy; was #07111f */
+  --panel: #0f1a2e;    /* was #12243f */
+  --panel-2: #13243d;  /* was #0f1f36 */
+  --panel-3: #1a2f4d;  /* NEW (v3.27.15) — third surface tier (mockups 01/03) */
+  --border: #21385a;   /* was #2c3e60 */
 
-  /* --- Working text scale (v3.x, unchanged) --- */
-  --text: #ecf2ff;
-  --muted: #9ca9c7;
-  --link: #a9c8ff;
+  /* --- Working text scale (v3.27.15 — repointed; --text-dim is new) --- */
+  --text: #f5f1d7;     /* off-white; was #ecf2ff */
+  --text-dim: #aeb9cc; /* NEW (v3.27.15) — mid-tier body text per mockups */
+  --muted: #6b7a92;    /* was #9ca9c7 */
+  --link: #a9c8ff;     /* unchanged */
 
   /* --- Working accents + danger (v3.x, unchanged) --- */
   --accent: #2f6df6;
   --accent-2: #ffd57a;
   --danger: #ff5d57;
 
-  /* --- Cartarch brand palette (v3.27.7, forward-looking; not yet consumed) ---
-     Defined now so the aesthetic-restyling release later in the v3.27.x
-     cluster can repoint working rules to these without re-doing the
-     palette decision. Source: approved brand sheet 2026-05-20. */
+  /* --- Cartarch brand palette (defined v3.27.7, consumed app-wide v3.27.15) ---
+     Source: approved brand sheet 2026-05-20. ``--brand-gold-soft`` was
+     defined at 0.18 alpha in v3.27.7; mockup 01/03 use 0.14, so the
+     v3.27.15 aesthetic pass repoints it. */
   --brand-off-white: #f5f1d7;
   --brand-blue: #1e5aa8;
   --brand-near-black: #1c1c1e;
   --brand-red: #c73d3d;
   --brand-green: #2e7d46;
   --brand-gold: #c8a15a;
-  --brand-gold-soft: rgba(200, 161, 90, 0.18);
+  --brand-gold-soft: rgba(200, 161, 90, 0.14);
   --brand-bg-navy: #081321;
 
   /* --- Radius scale (v3.27.7, forward-looking; values seen in current CSS) ---
@@ -210,16 +217,128 @@ img {
 }
 /* === end Mobile Fundamentals === */
 
+/* ============================================================================
+   Typography — self-hosted (v3.27.15)
+   ----------------------------------------------------------------------------
+   Two faces:
+     - Montserrat — UI / body face. Weights 400 / 500 / 600 / 700 / 800 served
+       from a single variable woff2 (the v18 Latin subset Google Fonts now
+       publishes as variable; each @font-face below references the same file
+       and the browser picks the right weight from the variable axis).
+     - Montserrat Alternates — used ONLY for the brand wordmark / sidebar
+       brand name. Weights 600 and 700, each a distinct file. Do NOT set
+       Alternates as body text — it reads poorly at small sizes.
+
+   Files self-hosted under /static/fonts/ — no runtime CDN dependency
+   (per v3.27.15 spec invariant 3: no request-path external calls).
+   font-display: swap so fallback (system-ui) renders immediately and
+   Montserrat takes over when the woff2 loads. SIL OFL — redistribution
+   is fine.
+   ============================================================================ */
+@font-face {
+  font-family: "Montserrat";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/static/fonts/montserrat-variable-latin.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Montserrat";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("/static/fonts/montserrat-variable-latin.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Montserrat";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("/static/fonts/montserrat-variable-latin.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Montserrat";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("/static/fonts/montserrat-variable-latin.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Montserrat";
+  font-style: normal;
+  font-weight: 800;
+  font-display: swap;
+  src: url("/static/fonts/montserrat-variable-latin.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Montserrat Alternates";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("/static/fonts/montserrat-alternates-600-latin.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Montserrat Alternates";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("/static/fonts/montserrat-alternates-700-latin.woff2") format("woff2");
+}
+
 body {
   font-family:
+    "Montserrat",
     system-ui,
     -apple-system,
     BlinkMacSystemFont,
     "Segoe UI",
     sans-serif;
   margin: 0;
-  background: linear-gradient(180deg, #040b16 0%, var(--bg) 100%);
+  background: var(--bg);
   color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+  position: relative;
+}
+
+/* ============================================================================
+   Background texture (v3.27.15 — "calmer texture")
+   ----------------------------------------------------------------------------
+   Two fixed pointer-events:none layers behind app content. Per v3.27.7's
+   stated direction (reduced effects, calmer texture):
+     - body::before: faint SVG fractal-noise overlay so the navy isn't
+       dead-flat. SVG via data: URI (no extra HTTP fetch). Opacity 0.5
+       on the layer, 0.025 inside the SVG rect — the multiplied effect
+       is barely visible but kills the flat-LCD look.
+     - body::after: soft radial brand-color washes — a navy wash top-left
+       (--brand-blue at 0.16 alpha) and a faint gold wash top-right
+       (--brand-gold at 0.05 alpha). Top-corner only, fades to transparent
+       fast so it doesn't compete with content below.
+   z-index: 0 on both layers; .app-shell already establishes its own
+   stacking context so content stays above naturally.
+   ============================================================================ */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.5;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.025'/%3E%3C/svg%3E");
+}
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(900px 520px at 14% -8%, rgba(30, 90, 168, 0.16), transparent 70%),
+    radial-gradient(700px 480px at 102% 0%, rgba(200, 161, 90, 0.05), transparent 62%);
+}
+.app-shell {
+  position: relative;
+  z-index: 1;
 }
 
 /* ============================================================================
@@ -264,6 +383,15 @@ body {
   gap: 0.6rem;
   padding: 0.25rem 0.5rem 0.5rem;
   text-decoration: none;
+  /* v3.27.15 — Montserrat Alternates is the brand-name face. Currently
+     only used here (and the auth-page brand-name surface below) — body
+     text stays Montserrat. The wordmark IMG element doesn't render the
+     CSS font (it's an image), but any text inside .sidebar-brand uses
+     this; when v3.27.16 swaps the PNG for an SVG wordmark with a text
+     fallback, the fallback text will pick up Alternates correctly. */
+  font-family: "Montserrat Alternates", "Montserrat", system-ui, sans-serif;
+  font-weight: 700;
+  letter-spacing: 0.13em;
 }
 .sidebar-wordmark {
   height: 36px;
@@ -295,7 +423,7 @@ body {
   padding: 0.5rem 0.7rem;
   border-radius: var(--radius-sm);
   border-left: 2px solid transparent;
-  color: var(--muted);
+  color: var(--text-dim);
   font-size: 0.86rem;
   font-weight: 500;
   text-decoration: none;
@@ -312,6 +440,24 @@ body {
   color: var(--text);
   border-left-color: var(--brand-gold);
   font-weight: 600;
+}
+/* v3.27.15 — Lucide nav icons. 24x24 viewBox declared on the SVG;
+   rendered at ~17px to match the mockup's visual weight. stroke=currentColor
+   on every path so the icon picks up the nav item's color (inactive
+   --text-dim, hover --text, active --text). Active state lifts opacity
+   slightly and shifts the icon stroke to gold for the visual tie-in. */
+.nav-icon {
+  width: 17px;
+  height: 17px;
+  flex-shrink: 0;
+  opacity: 0.85;
+}
+.nav-item:hover .nav-icon {
+  opacity: 1;
+}
+.nav-item.active .nav-icon {
+  opacity: 1;
+  color: var(--brand-gold);
 }
 
 .app-topbar {
@@ -779,40 +925,29 @@ body {
 }
 
 /* ============================================================================
-   .site-header / .header-shell / .header-left / .header-right (v3.x, retired)
+   .page-shell wrapper (post-v3.27.8 — the .site-header* CSS family removed v3.27.15)
    ----------------------------------------------------------------------------
-   Rules below are deprecated as of v3.27.8 — the DOM no longer renders any
-   of those elements (the new .app-shell + .app-sidebar + .app-topbar
-   replaces them). Kept in the stylesheet to avoid a destructive sweep in a
-   layout-focused release; the cascade has nothing to apply them to, so they
-   have no visual effect. The v3.27.12 aesthetic-pass release is the natural
-   home to strike the dead rules entirely.
-   ============================================================================ */
-.site-header {
-  position: sticky;
-  top: 0;
-  z-index: 20;
-  background: linear-gradient(180deg, #06142a 0%, #071830 100%);
-  border-bottom: 1px solid rgba(86, 115, 168, 0.35);
-}
+   v3.27.8 retired the horizontal top header in favor of the .app-shell /
+   .app-sidebar / .app-topbar layout. The .site-header / .header-shell /
+   .header-left / .header-right CSS rules went dormant at that point and
+   v3.27.15 (the aesthetic pass) struck them entirely — DOM had not
+   referenced them since v3.27.8, so removal had no visual effect.
 
-.header-shell,
+   ``.page-shell`` is the surviving wrapper: every interior page (rendered
+   inside .app-main) uses it as the content container. v3.27.8 fix history:
+   the original rule was ``width: min(96vw, 1800px)``, viewport-relative,
+   sized for the pre-v3.27.8 no-sidebar layout where this wrapper had the
+   full viewport to fill. Post-v3.27.8, .page-shell lives inside .app-main
+   (the 1fr column of a 236px 1fr grid), so its container is viewport−236px
+   on the authenticated shell. 96vw of the FULL viewport then bled past
+   the container — at 1280px viewport the wrapper computed 1229px in a
+   1044px container, clipping ~185px off the right edge. Decks page's
+   Edit/Delete column landed in that overflow region. ``width: 100%`` +
+   max-width fills the container correctly on both authed (viewport−236px)
+   and anon (full viewport) shells; the 1800px cap still applies on
+   ultrawide displays; margin:0 auto centers when narrower than max-width.
+   ============================================================================ */
 .page-shell {
-  /* v3.27.8 fix — was `width: min(96vw, 1800px)`. The 96vw is viewport-
-     relative, sized for the pre-v3.27.8 no-sidebar layout where this
-     wrapper had the full viewport to fill. Post-v3.27.8, .page-shell
-     lives inside .app-main (the 1fr column of a 236px 1fr grid), so
-     its container is viewport−236px on the authenticated shell. 96vw
-     of the FULL viewport then bleeds past the container — at 1280px
-     viewport the wrapper computes 1229px in a 1044px container,
-     clipping ~185px off the right edge. Decks page's Edit/Delete
-     column landed in that overflow region (the visible regression).
-     100% + max-width fills the container correctly on both authed
-     (viewport−236px) and anon (full viewport) shells; the 1800px cap
-     still applies on ultrawide displays; margin:0 auto still centers
-     when narrower than max-width. The .header-shell selector is
-     dormant DOM as of v3.27.8 (the old top header is retired) but
-     kept for cascade safety. */
   width: 100%;
   max-width: 1800px;
   margin: 0 auto;
@@ -820,37 +955,18 @@ body {
   padding-right: 1rem;
 }
 
-.header-shell {
-  padding-top: 0.75rem;
-  padding-bottom: 0.75rem;
-  display: flex;
-  align-items: stretch;
-  justify-content: space-between;
-  gap: 1rem;
-}
-
-.header-left {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  justify-content: space-between;
-}
-
-.header-right {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  justify-content: space-between;
-}
-
 .version-pill {
+  /* v3.27.15 — token-driven: was hardcoded #dbe6ff text + rgba(127,176,255)
+     border + rgba(10,20,36) background; now uses --text-dim + --border +
+     --panel surface tokens so the pill picks up the navy palette
+     automatically. */
   display: inline-flex;
   align-items: center;
   padding: 0.35rem 0.65rem;
-  border-radius: 999px;
-  border: 1px solid rgba(127, 176, 255, 0.35);
-  background: rgba(10, 20, 36, 0.42);
-  color: #dbe6ff;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--text-dim);
   font-size: 0.82rem;
   font-weight: 700;
   letter-spacing: 0.04em;
@@ -903,12 +1019,32 @@ body {
   vertical-align: middle;
 }
 .eyebrow {
+  /* v3.27.15 — repointed from hardcoded #7fb0ff (light blue) to gold to
+     match the dashboard/eyebrow aesthetic that's the v3.27.15 visual
+     reference. Used on multiple pages (login/register/forgot-password/
+     reset-password panel-topline, card-detail hero, set-detail) as the
+     small "PAGE SECTION LABEL" affordance. */
   text-transform: uppercase;
   letter-spacing: 0.16em;
   font-weight: 700;
   font-size: 0.88rem;
-  color: #7fb0ff;
+  color: var(--brand-gold);
   margin-bottom: 0.2rem;
+}
+/* v3.27.15 — auth-page brand-name surface picks up Montserrat Alternates.
+   The "Cartarch" text inside .eyebrow on login/register/forgot/reset uses
+   the brand face; everything else using .eyebrow on non-auth pages stays
+   on Montserrat (body font). One-line override targeting only the auth
+   bracket: a .eyebrow inside a .panel that has a sibling .panel-title
+   reading "Sign In" / "Register" / "Forgot password" / "Reset password"
+   doesn't have a clean selector — keeping the override at the document
+   level lets every existing "Cartarch" eyebrow use Alternates. The text
+   is identical on every auth page; the visual lift is small but matches
+   the brand-face treatment in the sidebar. */
+.auth-brand,
+.eyebrow.brand-name {
+  font-family: "Montserrat Alternates", "Montserrat", system-ui, sans-serif;
+  letter-spacing: 0.18em;
 }
 .site-title {
   margin: 0;
@@ -1135,11 +1271,34 @@ textarea {
 
 .card-tile {
   width: 150px;
+  border-radius: var(--radius-sm);
+  padding: 6px;
+  border: 1px solid transparent;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease,
+    transform 0.15s ease;
+}
+/* v3.27.15 — Cards on /sets/{set_code} are now wrapped in
+   /cards/{card_id} links when the local cards table carries the row
+   (folded in from the deferred v3.27.13 finding). The .card-tile-link
+   variant inherits color, removes the underline, and adds a subtle
+   hover affordance so the interactive distinction is visible without
+   re-styling card-name or card-meta independently. */
+.card-tile-link {
+  display: block;
+  color: inherit;
+  text-decoration: none;
+}
+.card-tile-link:hover {
+  border-color: var(--border);
+  background: var(--panel-2);
+  transform: translateY(-1px);
 }
 
 .card-tile img {
   width: 100%;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
 }
 
 .card-name {
@@ -1328,6 +1487,43 @@ td {
 
 .table-wrap table {
   min-width: 900px;
+}
+
+/* ============================================================================
+   Wide-table responsive treatment (v3.27.15, deferred from v3.27.8)
+   ----------------------------------------------------------------------------
+   v3.27.8 left wide interior tables falling back to raw horizontal scroll
+   inside ``.table-wrap``. v3.27.15 layers column-priority hiding on top:
+   as the viewport narrows, low-priority columns drop entirely (via the
+   ``.col-priority-low`` / ``.col-priority-mid`` classes applied to
+   specific <th>/<td> cells in each wide-table template), so the columns
+   that remain stay readable without horizontal scroll being the primary
+   interaction.
+
+   Two priority tiers:
+     - .col-priority-low   hidden at ≤980px (laptop-narrow / tablet)
+     - .col-priority-mid   hidden at ≤768px (tablet portrait / phone)
+
+   Both classes apply to the matching <th> AND the corresponding <td> in
+   every row. <colgroup><col> would be cleaner but doesn't carry
+   display:none across browsers reliably; per-cell class is the safe shape.
+
+   ``.table-wrap`` horizontal scroll stays as the final-fallback floor for
+   tables intrinsically wider than the viewport even after column drops.
+   Uniform across pages — no per-page card layouts, no per-page interaction
+   model.
+   ============================================================================ */
+@media (max-width: 980px) {
+  th.col-priority-low,
+  td.col-priority-low {
+    display: none !important;
+  }
+}
+@media (max-width: 768px) {
+  th.col-priority-mid,
+  td.col-priority-mid {
+    display: none !important;
+  }
 }
 
 @media (max-width: 980px) {
