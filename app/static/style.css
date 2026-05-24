@@ -542,23 +542,35 @@ body::after {
 }
 .topbar-brand-logo {
   /* Height-constrained to the topbar; width:auto preserves the 5:1
-     aspect ratio. max-width caps the on-screen size at very wide
-     viewports so the logo doesn't grow into the controls; on narrow
-     phones the same max-width plus min-width:0 on .topbar-brand lets
-     flex shrink the image without colliding with the right-side
-     controls. The full tagline ("— the ruler of your collection")
-     is part of the SVG itself and stays visible at every width. */
+     aspect ratio. max-width caps the on-screen size at wide viewports
+     so the logo doesn't grow into the controls; on narrow phones the
+     same max-width plus min-width:0 on .topbar-brand lets flex shrink
+     the image without colliding with the right-side controls. The
+     full tagline ("— the ruler of your collection") is part of the
+     SVG itself and stays visible at every width.
+
+     v3.27.18 — desktop cap unchanged; phone widths get a narrower
+     viewport-relative cap via the ≤480px media query below so the
+     logo steps DOWN at narrow widths rather than holding intrinsic
+     size and colliding with the controls. */
   height: 52px;
   width: auto;
   max-width: min(60vw, 320px);
   display: block;
 }
 .topbar-controls {
-  /* Right cluster — version pill + (authed) logout. Stays as a
-     flex row so the two items keep their existing visual rhythm. */
+  /* Right cluster — version pill + (authed) logout. Stays as a flex
+     row so the two items keep their existing visual rhythm.
+
+     v3.27.18 — gained ``min-width: 0`` so the cluster can actually
+     shrink under flex distribution. Without it the cluster's
+     min-width defaulted to ``auto`` (min-content), which the long
+     "Logout (DisplayName)" string set to a value larger than the
+     topbar could grant at phone widths, forcing a brand collision. */
   display: inline-flex;
   align-items: center;
   gap: 0.85rem;
+  min-width: 0;
 }
 
 @media (max-width: 768px) {
@@ -576,21 +588,44 @@ body::after {
     display: none;
   }
   .app-topbar {
-    padding: 0.5rem 1rem;
+    /* v3.27.18 — restored horizontal padding from the v3.27.17 mobile
+       value (1rem) to 1.25rem so the crest has visible breathing room
+       at the left edge. The SVG's bounding box is tight; 1rem made
+       the crest read as edge-glued at phone widths. */
+    padding: 0.5rem 1.25rem;
   }
 }
-@media (max-width: 420px) {
-  /* v3.27.17 correction — narrow phones: brand and logout always stay;
-     the version pill is the only droppable item per spec when the bar
-     gets cramped. Pre-correction the pill carried white-space:nowrap
-     and dev-environment values like `dev-ce9cbd0` are longer than prod
-     `vX.Y.Z` so a phone-width squeeze is real. Hide the pill below
-     420px (matches the threshold below which the brand starts
-     consuming a meaningful share of width via .topbar-brand-logo's
-     60vw cap). */
+@media (max-width: 480px) {
+  /* v3.27.18 — phone-width sweep of the post-v3.27.17 topbar
+     collision (the bug this patch fixes):
+     - Step the logo cap DOWN so it can't claim more than half the
+       bar at phone widths. 50vw + 200px ceiling means at 360px the
+       logo is at most 180px wide; at 480px at most 200px.
+     - Hide the parenthesized display-name suffix on the logout
+       button (rendered as .nav-logout-suffix in base.html); the
+       button still reads "Logout" so the action remains identified.
+     - Continue hiding the version pill — same v3.27.17 behaviour;
+       brand + logout always stay, pill is the only droppable item.
+     The 480px breakpoint is wider than v3.27.17's 420px because the
+     collision class extends a bit higher than the pre-existing
+     pill-drop class — the controls' min-content with the suffix is
+     larger than the pill alone. */
+  .topbar-brand-logo {
+    max-width: min(50vw, 200px);
+  }
+  .nav-logout-suffix {
+    display: none;
+  }
   .app-topbar .version-pill {
     display: none;
   }
+}
+@media (max-width: 420px) {
+  /* Reserved breakpoint slot — v3.27.17 originally dropped the
+     version pill here, but v3.27.18 promotes that drop to ≤480px
+     alongside the logout-suffix drop and the logo-cap step-down.
+     The rule that lives here now is empty; kept for future
+     phone-width-only refinements. */
 }
 
 /* ============================================================================
@@ -620,6 +655,14 @@ body::after {
   letter-spacing: -0.01em;
   color: var(--text);
   margin: 0;
+  /* v3.27.18 — long single-word display names ("CoruscantSunrise" etc.)
+     would otherwise extend past the viewport on narrow phones since
+     the dashboard heading interpolates the display name without any
+     break opportunity. overflow-wrap: anywhere lets the browser break
+     inside a long word as a last resort (after whitespace breaks),
+     keeping the heading inside the viewport without altering layout
+     for short names. */
+  overflow-wrap: anywhere;
 }
 .pagehead-tagline {
   color: var(--muted);
@@ -640,6 +683,11 @@ body::after {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: var(--space-3);
+  /* v3.27.18 — at ≤768px this grid drops to a single column via the
+     existing pre-v3.27.18 @media rule near line 1075 (which also
+     targets .next-steps). 1-column-at-768px was the right call and
+     stays. Calling it out here so future maintainers don't add
+     parallel breakpoints. */
 }
 .action-card {
   background: var(--panel);

@@ -67,8 +67,15 @@
           {% if current_user %}
             <form method="post" action="/logout" class="nav-logout-form">
               <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+              {# v3.27.18 — the parenthesized display name suffix is the
+                 dominant width consumer in the topbar's right cluster. At
+                 phone widths it pushes the brand into a collision. Wrap
+                 the suffix in a span so CSS can hide it below ~480px,
+                 leaving "Logout" alone — the action remains identified
+                 (button still says Logout) and full identity comes back
+                 above the breakpoint. #}
               <button type="submit" class="nav-logout-button">
-                Logout ({{ current_user.display_name or current_user.username }})
+                Logout<span class="nav-logout-suffix"> ({{ current_user.display_name or current_user.username }})</span>
               </button>
             </form>
           {% endif %}
