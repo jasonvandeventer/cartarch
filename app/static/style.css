@@ -62,41 +62,46 @@
    props; do NOT belong in :root.
    ============================================================================ */
 :root {
-  /* --- Working palette (v3.27.15 — repointed to the navy target) ---
-     Token NAMES kept verbatim so every existing CSS rule referencing
-     ``var(--bg)`` / ``var(--panel)`` / etc. inherits the new values
-     without a per-rule rewrite. The v3.27.15 aesthetic pass is
-     token-driven; the value change here is what gives the whole app
-     the new visual finish. */
-  --bg: #081321;       /* matches --brand-bg-navy; was #07111f */
-  --panel: #0f1a2e;    /* was #12243f */
-  --panel-2: #13243d;  /* was #0f1f36 */
-  --panel-3: #1a2f4d;  /* NEW (v3.27.15) — third surface tier (mockups 01/03) */
-  --border: #21385a;   /* was #2c3e60 */
+  /* --- Working palette (v3.28.1 — repointed to the warm-charcoal Folio target) ---
+     Token NAMES kept verbatim per the v3.28.1 spec — every existing CSS rule
+     referencing ``var(--bg)`` / ``var(--panel)`` / etc. inherits the new
+     values without a per-rule rewrite. v3.28.1 is the second token-value
+     repoint of the v3.27.7 foundation (v3.27.15 was the first, to navy).
+     Folio palette source: the v3.28.0-finalized design package's :root block
+     in foundation.jsx; the Folio package's own token names (--cream / --brass
+     / --oxblood / etc.) are NOT imported — production keeps its names. */
+  --bg: #1A130C;       /* was #081321 navy; Folio --bg, warm charcoal */
+  --panel: #251C12;    /* was #0f1a2e; Folio --panel */
+  --panel-2: #2E2418;  /* was #13243d; Folio --panel-2 */
+  --panel-3: #3A2C1D;  /* was #1a2f4d; Folio --leather (tier-3 surface; v3.27.15 added this token vestigially, v3.28.1 consumed it) */
+  --border: rgba(181, 138, 71, 0.22);  /* was #21385a; Folio --border (translucent brass at 22% — semi-transparent border idiom matches the Folio package) */
 
-  /* --- Working text scale (v3.27.15 — repointed; --text-dim is new) --- */
-  --text: #f5f1d7;     /* off-white; was #ecf2ff */
-  --text-dim: #aeb9cc; /* NEW (v3.27.15) — mid-tier body text per mockups */
-  --muted: #6b7a92;    /* was #9ca9c7 */
-  --link: #a9c8ff;     /* unchanged */
+  /* --- Working text scale (v3.28.1 — repointed to warm cream) --- */
+  --text: #EDE1C4;     /* was #f5f1d7; Folio --cream (anchor value per spec) */
+  --text-dim: #D6C9A8; /* was #aeb9cc; Folio --cream-2 (mid-tier body) */
+  --muted: #A99772;    /* was #6b7a92; Folio --cream-3 (muted captions / secondary) */
+  --link: #D4A85F;     /* was #a9c8ff; Folio --brass-2 (Folio links read as brass, not blue) */
 
-  /* --- Working accents + danger (v3.x, unchanged) --- */
-  --accent: #2f6df6;
-  --accent-2: #ffd57a;
-  --danger: #ff5d57;
+  /* --- Working accents + danger (v3.28.1 — repointed to brass + oxblood) --- */
+  --accent: #B58A47;   /* was #2f6df6 blue; Folio --brass (primary accent) */
+  --accent-2: #D4A85F; /* was #ffd57a; Folio --brass-2 (highlight/active) */
+  --danger: #8A2E22;   /* was #ff5d57; Folio --oxblood (anchor value per spec) */
 
-  /* --- Cartarch brand palette (defined v3.27.7, consumed app-wide v3.27.15) ---
-     Source: approved brand sheet 2026-05-20. ``--brand-gold-soft`` was
-     defined at 0.18 alpha in v3.27.7; mockup 01/03 use 0.14, so the
-     v3.27.15 aesthetic pass repoints it. */
-  --brand-off-white: #f5f1d7;
-  --brand-blue: #1e5aa8;
-  --brand-near-black: #1c1c1e;
-  --brand-red: #c73d3d;
-  --brand-green: #2e7d46;
-  --brand-gold: #c8a15a;
-  --brand-gold-soft: rgba(200, 161, 90, 0.14);
-  --brand-bg-navy: #081321;
+  /* --- Cartarch brand palette (defined v3.27.7, repointed in v3.27.15 and v3.28.1) ---
+     Source: v3.28.0-finalized Folio design package.
+     Awkward names — kept per the v3.28.1 spec's "names preserved" rule:
+       --brand-blue holds brass (no longer blue; 0 consumers — tech debt)
+       --brand-bg-navy holds warm charcoal (no longer navy; 0 consumers — tech debt)
+     These two carry misleading names post-v3.28.1; preserved per spec for
+     potential future cleanup. The repoint is by VALUE only. */
+  --brand-off-white: #EDE1C4;  /* was #f5f1d7; aligned with --text */
+  --brand-blue: #B58A47;       /* was #1e5aa8; now holds brass (name misleading; 0 refs) */
+  --brand-near-black: #211810; /* was #1c1c1e; aligned with Folio bg-2 for warm tone */
+  --brand-red: #8A2E22;        /* was #c73d3d; → Folio oxblood (editorial red) */
+  --brand-green: #6A8253;      /* was #2e7d46; → Folio sage (editorial green) */
+  --brand-gold: #B58A47;       /* was #c8a15a; → Folio brass (primary accent) */
+  --brand-gold-soft: rgba(181, 138, 71, 0.14);  /* was rgba(200,161,90,0.14); brass base, same alpha */
+  --brand-bg-navy: #1A130C;    /* was #081321; now holds warm charcoal (name misleading; 0 refs) */
 
   /* --- Radius scale (v3.27.7, forward-looking; values seen in current CSS) ---
      The stylesheet currently inlines radius values (6px, 10px, 12px, 14px,
@@ -326,6 +331,30 @@ img {
   src: url("/static/fonts/montserrat-alternates-700-latin.woff2") format("woff2");
 }
 
+/* --- Newsreader (v3.28.1) — the Folio editorial face -----------------------
+   Self-hosted variable woff2 (Latin subset) — 2 files cover regular + italic
+   weights 200..800. Newsreader is used ONLY for editorial display surfaces
+   (page H1 titles, italic display copy, stat-figure values). Montserrat
+   stays as the body/UI face. The Folio design package uses Newsreader italic
+   heavily for the editorial register; production opts in selectively to
+   avoid setting a serif on body text (the same judgment v3.27.15 applied to
+   Montserrat Alternates). SIL OFL — redistribution is fine.
+   ============================================================================ */
+@font-face {
+  font-family: "Newsreader";
+  font-style: normal;
+  font-weight: 200 800;
+  font-display: swap;
+  src: url("/static/fonts/newsreader-variable-latin.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Newsreader";
+  font-style: italic;
+  font-weight: 200 800;
+  font-display: swap;
+  src: url("/static/fonts/newsreader-italic-variable-latin.woff2") format("woff2");
+}
+
 body {
   font-family:
     "Montserrat",
@@ -351,10 +380,13 @@ body {
        dead-flat. SVG via data: URI (no extra HTTP fetch). Opacity 0.5
        on the layer, 0.025 inside the SVG rect — the multiplied effect
        is barely visible but kills the flat-LCD look.
-     - body::after: soft radial brand-color washes — a navy wash top-left
-       (--brand-blue at 0.16 alpha) and a faint gold wash top-right
-       (--brand-gold at 0.05 alpha). Top-corner only, fades to transparent
-       fast so it doesn't compete with content below.
+     - body::after: soft radial brand-color washes — repointed in v3.28.1
+       from navy + gold (the v3.27.15 treatment) to brass + brass-2 (the
+       Folio treatment). The dominant top-left wash is now brass at 0.10
+       alpha (slightly softer than v3.27.15's 0.16 alpha because the
+       warm-charcoal ground is lower-contrast and a heavier brass wash
+       reads as muddy); the top-right wash is brass-2 at 0.06 alpha
+       (mildly intensified for the same reason). Same gradient geometry.
    z-index: 0 on both layers; .app-shell already establishes its own
    stacking context so content stays above naturally.
    ============================================================================ */
@@ -374,8 +406,8 @@ body::after {
   z-index: 0;
   pointer-events: none;
   background:
-    radial-gradient(900px 520px at 14% -8%, rgba(30, 90, 168, 0.16), transparent 70%),
-    radial-gradient(700px 480px at 102% 0%, rgba(200, 161, 90, 0.05), transparent 62%);
+    radial-gradient(900px 520px at 14% -8%, rgba(181, 138, 71, 0.10), transparent 70%),
+    radial-gradient(700px 480px at 102% 0%, rgba(212, 168, 95, 0.06), transparent 62%);
 }
 .app-shell {
   position: relative;
@@ -433,7 +465,7 @@ body::after {
 }
 
 .app-sidebar {
-  background: linear-gradient(180deg, #0b1729 0%, var(--bg) 100%);
+  background: linear-gradient(180deg, var(--bg) 0%, var(--bg) 100%);
   border-right: 1px solid var(--border);
   /* v3.27.17 correction — sidebar no longer carries the brand block;
      padding-top is the only padding adjustment needed (was 1.25rem to
@@ -650,9 +682,16 @@ body::after {
   margin-bottom: 0.3rem;
 }
 .pagehead-title {
-  font-size: clamp(1.4rem, 2.4vw, 1.7rem);
-  font-weight: 700;
+  /* v3.28.1 — Newsreader italic for the Folio editorial register
+     (the design package's .ds-pagehead h1 + .dsh-masthead h1 are both
+     Newsreader italic). Nested <b>/<strong> renders upright to mirror
+     the design package's "italic body + upright emphasis" idiom. */
+  font-family: "Newsreader", Georgia, serif;
+  font-style: italic;
+  font-size: clamp(1.6rem, 2.7vw, 2rem);
+  font-weight: 500;
   letter-spacing: -0.01em;
+  line-height: 1.05;
   color: var(--text);
   margin: 0;
   /* v3.27.18 — long single-word display names ("CoruscantSunrise" etc.)
@@ -664,10 +703,20 @@ body::after {
      for short names. */
   overflow-wrap: anywhere;
 }
+.pagehead-title b,
+.pagehead-title strong {
+  font-style: normal;
+  font-weight: 500;
+}
 .pagehead-tagline {
-  color: var(--muted);
-  font-size: 0.88rem;
-  margin-top: 0.25rem;
+  /* v3.28.1 — Newsreader italic for editorial taglines (the design
+     package's .ds-pagehead .lede uses Newsreader italic at this size). */
+  font-family: "Newsreader", Georgia, serif;
+  font-style: italic;
+  color: var(--text-dim);
+  font-size: 0.98rem;
+  line-height: 1.45;
+  margin-top: 0.35rem;
 }
 
 .section-label {
@@ -704,7 +753,7 @@ body::after {
     background 0.15s ease;
 }
 .action-card:hover {
-  border-color: #2e4a73;
+  border-color: var(--border);
   background: var(--panel-2);
 }
 .action-card .action-tag {
@@ -795,7 +844,7 @@ body::after {
     background 0.15s ease;
 }
 .dash-tile:hover {
-  border-color: #2e4a73;
+  border-color: var(--border);
   background: var(--panel-2);
 }
 .dash-tile-eyebrow {
@@ -806,8 +855,12 @@ body::after {
   color: var(--muted);
 }
 .dash-tile-number {
-  font-size: 2rem;
-  font-weight: 700;
+  /* v3.28.1 — Newsreader italic for the editorial stat-figure register
+     (the design package's CollectionMetric .v is Newsreader italic 500). */
+  font-family: "Newsreader", Georgia, serif;
+  font-style: italic;
+  font-size: 2.25rem;
+  font-weight: 500;
   line-height: 1;
   color: var(--text);
 }
@@ -967,14 +1020,27 @@ body::after {
   color: var(--brand-gold);
 }
 .welcome-title {
-  font-size: clamp(1.5rem, 3vw, 1.75rem);
-  font-weight: 700;
+  /* v3.28.1 — Newsreader italic to match the editorial register on
+     the populated-dashboard .pagehead-title. */
+  font-family: "Newsreader", Georgia, serif;
+  font-style: italic;
+  font-size: clamp(1.7rem, 3.2vw, 2rem);
+  font-weight: 500;
   letter-spacing: -0.01em;
+  line-height: 1.05;
   margin: 0;
 }
+.welcome-title b,
+.welcome-title strong {
+  font-style: normal;
+  font-weight: 500;
+}
 .welcome-tagline {
-  color: var(--muted);
-  font-size: 0.9rem;
+  /* v3.28.1 — Newsreader italic, matching .pagehead-tagline register. */
+  font-family: "Newsreader", Georgia, serif;
+  font-style: italic;
+  color: var(--text-dim);
+  font-size: 1rem;
   line-height: 1.55;
   max-width: 38rem;
 }
@@ -1115,7 +1181,7 @@ body::after {
 }
 
 .version-pill {
-  /* v3.27.15 — token-driven: was hardcoded #dbe6ff text + rgba(127,176,255)
+  /* v3.27.15 — token-driven: was hardcoded var(--text) text + rgba(127,176,255)
      border + rgba(10,20,36) background; now uses --text-dim + --border +
      --panel surface tokens so the pill picks up the navy palette
      automatically. */
@@ -1178,7 +1244,7 @@ body::after {
   vertical-align: middle;
 }
 .eyebrow {
-  /* v3.27.15 — repointed from hardcoded #7fb0ff (light blue) to gold to
+  /* v3.27.15 — repointed from hardcoded var(--brand-gold) (light blue) to gold to
      match the dashboard/eyebrow aesthetic that's the v3.27.15 visual
      reference. Used on multiple pages (login/register/forgot-password/
      reset-password panel-topline, card-detail hero, set-detail) as the
@@ -1238,10 +1304,10 @@ a {
 .panel {
   background: linear-gradient(
     180deg,
-    rgba(20, 39, 68, 0.96) 0%,
-    rgba(16, 30, 52, 0.96) 100%
+    rgba(58, 44, 29, 0.96) 0%,
+    rgba(46, 36, 24, 0.96) 100%
   );
-  border: 1px solid rgba(88, 114, 163, 0.32);
+  border: 1px solid rgba(181, 138, 71, 0.32);
   border-radius: 20px;
   padding: 1.15rem 1.2rem;
   box-shadow: 0 10px 28px rgba(0, 0, 0, 0.22);
@@ -1251,7 +1317,7 @@ a {
   padding-bottom: 1rem;
 }
 .panel-topline {
-  color: #86b2ff;
+  color: var(--brand-gold);
   text-transform: uppercase;
   letter-spacing: 0.14em;
   font-size: 0.78rem;
@@ -1262,6 +1328,24 @@ a {
   margin: 0;
   font-size: 1.9rem;
   line-height: 1.05;
+}
+/* v3.28.1 — page-level panel titles (h2.panel-title inside .page-hero
+   containers) get the Folio editorial register (italic Newsreader),
+   matching .pagehead-title. h3.panel-title (sub-section headers like
+   "Upload CSV" inside the page) stays Montserrat so the editorial register
+   reads as a one-time page-entry signal, not a blanket serif sweep that
+   would visually equalize every level. The <b>/<strong> upright override
+   mirrors .pagehead-title's "italic body + upright emphasis" idiom. */
+h2.panel-title {
+  font-family: "Newsreader", Georgia, serif;
+  font-style: italic;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+h2.panel-title b,
+h2.panel-title strong {
+  font-style: normal;
+  font-weight: 500;
 }
 .hero-row {
   display: flex;
@@ -1274,7 +1358,7 @@ a {
   display: flex;
   gap: 1.25rem;
   flex-wrap: wrap;
-  color: #dfe8ff;
+  color: var(--text);
   font-weight: 700;
 }
 
@@ -1292,8 +1376,8 @@ select,
 textarea {
   padding: 0.55rem 0.7rem;
   border-radius: 10px;
-  border: 1px solid #425782;
-  background: #0b1628;
+  border: 1px solid var(--border);
+  background: var(--panel);
   color: var(--text);
 }
 textarea {
@@ -1306,7 +1390,7 @@ textarea {
 }
 .stack-form label {
   font-size: 0.875rem;
-  color: #94a3b8;
+  color: var(--muted);
   margin-bottom: -0.2rem;
 }
 .inline-form {
@@ -1357,8 +1441,8 @@ textarea {
   }
 }
 .stat-card {
-  background: rgba(8, 19, 35, 0.35);
-  border: 1px solid rgba(86, 113, 160, 0.25);
+  background: rgba(26, 19, 12, 0.35);
+  border: 1px solid rgba(181, 138, 71, 0.25);
   border-radius: 16px;
   padding: 0.85rem 1rem;
 }
@@ -1410,9 +1494,9 @@ textarea {
   gap: 0.45rem;
   padding: 0.52rem 0.8rem;
   border-radius: 999px;
-  border: 1px solid rgba(86, 113, 160, 0.32);
-  background: rgba(10, 20, 36, 0.38);
-  color: #dbe6ff;
+  border: 1px solid rgba(181, 138, 71, 0.32);
+  background: rgba(26, 19, 12, 0.38);
+  color: var(--text);
   min-height: 44px;
 }
 
@@ -1473,8 +1557,8 @@ textarea {
 .inventory-card {
   background: linear-gradient(
     180deg,
-    rgba(11, 22, 40, 0.94) 0%,
-    rgba(12, 25, 45, 0.94) 100%
+    rgba(37, 28, 18, 0.94) 0%,
+    rgba(46, 36, 24, 0.94) 100%
   );
   border: 1px solid rgba(70, 95, 140, 0.4);
   border-radius: 18px;
@@ -1500,7 +1584,7 @@ textarea {
   border: 1px solid rgba(104, 131, 181, 0.42);
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.28);
   display: block;
-  background: #0b1423;
+  background: var(--bg);
 }
 .inventory-thumb.placeholder {
   display: block;
@@ -1514,7 +1598,7 @@ textarea {
   line-height: 1.05;
 }
 .inventory-card-title a {
-  color: #f1f5ff;
+  color: var(--text);
   text-decoration: none;
 }
 .inventory-card-title a:hover {
@@ -1527,7 +1611,7 @@ textarea {
 }
 .inventory-meta,
 .inventory-location {
-  color: #dbe6ff;
+  color: var(--text);
   font-size: 0.97rem;
   margin-bottom: 0.45rem;
 }
@@ -1548,7 +1632,7 @@ textarea {
   gap: 1rem;
   flex-wrap: wrap;
   padding-top: 0.75rem;
-  border-top: 1px solid rgba(86, 113, 160, 0.28);
+  border-top: 1px solid rgba(181, 138, 71, 0.28);
 }
 .pending-group details > summary {
   cursor: pointer;
@@ -1586,7 +1670,7 @@ textarea {
 }
 .pending-thumb.placeholder {
   height: 117px;
-  background: #111827;
+  background: var(--panel-2);
 }
 .pending-name {
   font-size: 1.02rem;
@@ -1594,13 +1678,13 @@ textarea {
   margin-bottom: 0.28rem;
 }
 .pending-meta {
-  color: #d1d9ee;
+  color: var(--text-dim);
   margin-bottom: 0.28rem;
 }
 .pending-location {
   display: grid;
   gap: 0.2rem;
-  color: #eef3ff;
+  color: var(--text);
 }
 .pending-location-from {
   color: var(--accent -2);
@@ -1608,7 +1692,7 @@ textarea {
   font-weight: 700;
 }
 .pending-location-to {
-  color: #eef3ff;
+  color: var(--text);
   font-size: 0.95rem;
 }
 .pending-action {
@@ -1632,7 +1716,7 @@ table {
 }
 th,
 td {
-  border-bottom: 1px solid rgba(86, 113, 160, 0.25);
+  border-bottom: 1px solid rgba(181, 138, 71, 0.25);
   padding: 0.65rem 0.5rem;
   vertical-align: top;
   text-align: left;
@@ -1752,8 +1836,8 @@ td {
   color: var(--text);
   background: linear-gradient(
     180deg,
-    rgba(11, 22, 40, 0.94) 0%,
-    rgba(12, 25, 45, 0.94) 100%
+    rgba(37, 28, 18, 0.94) 0%,
+    rgba(46, 36, 24, 0.94) 100%
   );
   border: 1px solid rgba(70, 95, 140, 0.4);
   border-radius: 18px;
@@ -1772,7 +1856,7 @@ td {
 }
 
 .feature-kicker {
-  color: #7fb0ff;
+  color: var(--brand-gold);
   text-transform: uppercase;
   letter-spacing: 0.14em;
   font-size: 0.72rem;
@@ -2254,7 +2338,7 @@ td {
 }
 .analytics-section {
   padding-right: 2.5rem;
-  border-right: 1px solid rgba(86, 113, 160, 0.2);
+  border-right: 1px solid rgba(181, 138, 71, 0.2);
 }
 .analytics-section:last-child {
   padding-right: 0;
@@ -2265,7 +2349,7 @@ td {
   text-transform: uppercase;
   letter-spacing: 0.12em;
   font-weight: 700;
-  color: #7fb0ff;
+  color: var(--brand-gold);
   margin-bottom: 0.5rem;
 }
 .analytics-avg-cmc {
@@ -2417,7 +2501,7 @@ td {
   .analytics-section {
     padding-right: 0;
     border-right: none;
-    border-bottom: 1px solid rgba(86, 113, 160, 0.2);
+    border-bottom: 1px solid rgba(181, 138, 71, 0.2);
     padding-bottom: 1.25rem;
   }
   .analytics-section:last-child {
@@ -2455,7 +2539,7 @@ td {
 }
 .token-card-placeholder {
   background: rgba(255, 255, 255, 0.05);
-  border: 1px dashed rgba(86, 113, 160, 0.3);
+  border: 1px dashed rgba(181, 138, 71, 0.3);
 }
 .token-card-name {
   font-size: 0.82rem;
@@ -2551,7 +2635,7 @@ td {
 }
 .health-divider {
   border: none;
-  border-top: 1px solid rgba(86, 113, 160, 0.2);
+  border-top: 1px solid rgba(181, 138, 71, 0.2);
   margin: 0.85rem 0;
 }
 @media (max-width: 768px) {
@@ -2575,7 +2659,7 @@ td {
   text-transform: uppercase;
   letter-spacing: 0.12em;
   font-weight: 700;
-  color: #7fb0ff;
+  color: var(--brand-gold);
   margin-bottom: 0.55rem;
 }
 .health-pip-note {
@@ -2638,13 +2722,13 @@ td {
   text-decoration: none;
   padding: 0.15rem 0.45rem;
   border-radius: 4px;
-  border: 1px solid rgba(86, 113, 160, 0.3);
+  border: 1px solid rgba(181, 138, 71, 0.3);
 }
 .health-cards-link:hover {
-  background: rgba(86, 113, 160, 0.15);
+  background: rgba(181, 138, 71, 0.15);
 }
 .health-cards-link.active {
-  background: rgba(86, 113, 160, 0.2);
+  background: rgba(181, 138, 71, 0.2);
   color: var(--text);
 }
 .health-cards-empty {
@@ -2665,7 +2749,7 @@ td {
   color: var(--text);
 }
 .health-pips {
-  border-left: 1px solid rgba(86, 113, 160, 0.2);
+  border-left: 1px solid rgba(181, 138, 71, 0.2);
   padding-left: 2.5rem;
 }
 .health-pip-stat {
@@ -2708,7 +2792,7 @@ td {
   .health-pips {
     border-left: none;
     padding-left: 0;
-    border-top: 1px solid rgba(86, 113, 160, 0.2);
+    border-top: 1px solid rgba(181, 138, 71, 0.2);
     padding-top: 1.25rem;
   }
 }
@@ -2881,7 +2965,7 @@ td {
   border-radius: 999px;
   font-size: 0.85rem;
   font-weight: 700;
-  border: 1px solid rgba(86, 113, 160, 0.5);
+  border: 1px solid rgba(181, 138, 71, 0.5);
 }
 
 /* Physical-language badge (v3.18.0). Shown next to the finish badge in
@@ -2959,7 +3043,7 @@ td {
   background: var(--panel-2);
 }
 .combo-item-almost {
-  border-color: rgba(86, 113, 160, 0.3);
+  border-color: rgba(181, 138, 71, 0.3);
   opacity: 0.9;
 }
 .combo-cards {
@@ -3366,7 +3450,7 @@ body.game-mode {
   display: flex;
   align-items: center;
   gap: 0.45rem;
-  background: rgba(12, 14, 22, 0.96);
+  background: rgba(26, 19, 12, 0.96);
   border: 1px solid var(--border);
   border-top: none;
   border-radius: 0 0 10px 10px;
@@ -3808,7 +3892,7 @@ body.game-mode {
   left: 50%;
   transform: translateX(-50%);
   z-index: 700;
-  background: rgba(12, 14, 22, 0.98);
+  background: rgba(26, 19, 12, 0.98);
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 0.75rem 1rem;
@@ -3926,7 +4010,7 @@ body.game-mode {
   color: #f59e0b;
 }
 .placement-2 {
-  color: #94a3b8;
+  color: var(--muted);
 }
 .placement-3 {
   color: #b45309;
@@ -4182,7 +4266,7 @@ body.game-mode {
   display: flex;
   align-items: center;
   gap: 0.35rem;
-  background: rgba(12, 14, 22, 0.94);
+  background: rgba(26, 19, 12, 0.94);
   border: 1px solid var(--border);
   border-bottom: none;
   border-radius: 8px 8px 0 0;
@@ -4621,7 +4705,7 @@ body.game-mode {
 .bracket-v2-findings-details summary {
   cursor: pointer;
   font-size: 0.85rem;
-  color: #94a3b8;
+  color: var(--muted);
   list-style: none;
   padding: 0.25rem 0;
 }
@@ -4687,7 +4771,7 @@ body.game-mode {
   font-size: 0.78rem;
 }
 .bracket-v2-conf-label {
-  color: #94a3b8;
+  color: var(--muted);
 }
 .bracket-v2-conf-bar-wrap {
   height: 6px;
@@ -4701,7 +4785,7 @@ body.game-mode {
 }
 .bracket-v2-conf-val {
   text-align: right;
-  color: #94a3b8;
+  color: var(--muted);
 }
 .bracket-v2-intent-survey summary {
   cursor: pointer;
@@ -4724,7 +4808,7 @@ body.game-mode {
   flex-direction: column;
   gap: 0.2rem;
   font-size: 0.85rem;
-  color: #94a3b8;
+  color: var(--muted);
 }
 .bracket-v2-intent-form button {
   grid-column: 1 / -1;
@@ -4760,7 +4844,7 @@ body.game-mode {
   align-items: center;
   gap: 0.4rem;
   font-size: 0.85rem;
-  color: #94a3b8;
+  color: var(--muted);
   user-select: none;
 }
 .filter-checkbox input {
@@ -4805,7 +4889,7 @@ body.game-mode {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #94a3b8;
+  color: var(--muted);
   font-size: 0.75rem;
 }
 .token-search-meta {
@@ -4957,7 +5041,7 @@ body.game-mode {
     position: fixed;
     inset: 0;
     z-index: 900;
-    background: rgba(4, 11, 22, 0.97);
+    background: rgba(26, 19, 12, 0.97);
     overflow-y: auto;
     padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px));
   }
@@ -4998,8 +5082,8 @@ body.game-mode {
   .more-menu-list a {
     display: block;
     padding: 0.95rem 1rem;
-    background: rgba(20, 39, 68, 0.55);
-    border: 1px solid rgba(88, 114, 163, 0.32);
+    background: rgba(58, 44, 29, 0.55);
+    border: 1px solid rgba(181, 138, 71, 0.32);
     border-radius: 12px;
     color: var(--text);
     text-decoration: none;
@@ -5008,7 +5092,7 @@ body.game-mode {
     min-height: 44px;
   }
   .more-menu-list a:active {
-    background: rgba(20, 39, 68, 0.8);
+    background: rgba(58, 44, 29, 0.8);
   }
   .more-menu-logout {
     margin-top: 1.5rem;
@@ -5512,11 +5596,11 @@ body.game-mode {
 .deck-list-group-count {
   font-size: 0.82rem;
   font-weight: 500;
-  color: var(--muted, #94a3b8);
+  color: var(--muted, var(--muted));
 }
 .deck-list-subgroups {
   font-size: 0.78rem;
-  color: var(--muted, #94a3b8);
+  color: var(--muted, var(--muted));
   flex: 1 1 auto;
   line-height: 1.45;
 }
@@ -5561,7 +5645,7 @@ body.game-mode {
 .dlr-qty {
   font-variant-numeric: tabular-nums;
   font-weight: 600;
-  color: var(--muted, #94a3b8);
+  color: var(--muted, var(--muted));
   min-width: 1.8ch;
   text-align: right;
   flex: 0 0 auto;
@@ -5586,7 +5670,7 @@ body.game-mode {
 .dlr-mana {
   font-family: monospace;
   font-size: 0.78rem;
-  color: var(--muted, #94a3b8);
+  color: var(--muted, var(--muted));
   white-space: nowrap;
   flex: 0 0 auto;
 }
@@ -5620,7 +5704,7 @@ body.game-mode {
 .dlr-tag.proxy {
   background: rgba(148, 163, 184, 0.18);
   border-color: rgba(148, 163, 184, 0.55);
-  color: #94a3b8;
+  color: var(--muted);
 }
 .dlr-tag.warn {
   background: rgba(245, 158, 11, 0.18);
@@ -5698,7 +5782,7 @@ body.game-mode {
   border-radius: 4px;
   border: 1px solid var(--border);
   background: rgba(255, 255, 255, 0.04);
-  color: var(--muted, #94a3b8);
+  color: var(--muted, var(--muted));
   font-size: 0.85rem;
   font-weight: 600;
   cursor: pointer;
@@ -5768,7 +5852,7 @@ body.game-mode {
 .switch-printing-modal-close {
   background: transparent;
   border: none;
-  color: var(--muted, #94a3b8);
+  color: var(--muted, var(--muted));
   font-size: 1.6rem;
   line-height: 1;
   cursor: pointer;
@@ -5954,7 +6038,7 @@ body.game-mode {
   display: inline-block;
   margin-right: 0.4rem;
   transition: transform 0.15s ease;
-  color: #94a3b8;
+  color: var(--muted);
 }
 .review-tags-details[open] .review-tags-summary::before {
   transform: rotate(90deg);
@@ -6048,7 +6132,7 @@ body.game-mode {
   font-size: 0.78rem;
   line-height: 1;
   border-radius: 999px;
-  color: #94a3b8;
+  color: var(--muted);
   min-height: 0;
 }
 .review-tags-chip-btn:hover {

@@ -126,7 +126,7 @@
               </td>
               <td class="col-priority-low">
                 {% if row.user.is_admin %}
-                  <span style="color: #7fb0ff; font-weight: 600;">Admin</span>
+                  <span style="color: var(--brand-gold); font-weight: 600;">Admin</span>
                 {% else %}
                   <span class="muted">User</span>
                 {% endif %}
@@ -168,7 +168,7 @@
               </td>
             </tr>
             {% if row.user.id != current_user.id %}
-              <tr style="background: rgba(8,19,35,0.3);">
+              <tr style="background: rgba(26,19,12,0.3);">
                 <td colspan="8" style="padding: 0.4rem 0.5rem 0.75rem;">
                   <form action="/admin/users/{{ row.user.id }}/reset-password"
                         method="post"

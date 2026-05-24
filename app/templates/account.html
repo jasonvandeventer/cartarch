@@ -7,7 +7,7 @@
       {% if current_user.display_name %}<p class="muted">{{ current_user.username }}</p>{% endif %}
       <p class="muted">
         Member since {{ current_user.created_at.strftime("%B %d, %Y") if current_user.created_at else 'unknown' }}
-        {% if current_user.is_admin %}&nbsp;·&nbsp; <span style="color: #7fb0ff; font-weight: 600;">Admin</span>{% endif %}
+        {% if current_user.is_admin %}&nbsp;·&nbsp; <span style="color: var(--brand-gold); font-weight: 600;">Admin</span>{% endif %}
       </p>
     </div>
   </section>
