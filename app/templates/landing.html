@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>{{ title or "Cartarch — The ruler of your collection" }}</title>
+    {# v3.27.17 — same favicon chain as base.html (the app shell) keeps
+       the asset set in one place; cleanup is naturally centralized when
+       the brand evolves. #}
+    <link rel="icon" href="/static/brand/icon/favicon.ico" sizes="any">
+    <link rel="icon" type="image/svg+xml" href="/static/brand/icon/favicon.svg">
+    <link rel="apple-touch-icon" href="/static/brand/icon/apple-touch-icon.png">
+    <link rel="manifest" href="/static/manifest.json">
+    <meta name="theme-color" content="#081321">
+
+    {# DRAFT meta description — refine when final landing copy lands. #}
+    <meta name="description"
+          content="Cartarch — a premium platform for managing physical Magic: the Gathering collections. Track ownership, analyze decks, and run games at the table.">
+
+    {# Open Graph / Twitter card metadata for link previews. og:image is
+       served from the local /static path; absolute URL points at the
+       production cartarch.com host so social-card scrapers see the
+       finished branded image regardless of which host the user shared
+       from. og-image.png is in the v3.27.17 brand bundle. #}
+    <meta property="og:title" content="Cartarch — The ruler of your collection">
+    <meta property="og:description"
+          content="A premium platform for managing physical Magic: the Gathering collections.">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://cartarch.com/">
+    <meta property="og:image" content="https://cartarch.com/static/brand/og-image.png">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Cartarch — The ruler of your collection">
+    <meta name="twitter:description"
+          content="A premium platform for managing physical Magic: the Gathering collections.">
+    <meta name="twitter:image" content="https://cartarch.com/static/brand/og-image.png">
+
+    <link rel="stylesheet"
+          href="/static/style.css?v={{ static_v('style.css') }}">
+  </head>
+  <body class="landing-body">
+    <header class="landing-header">
+      <a href="/" class="landing-brand" aria-label="Cartarch home">
+        <img src="/static/brand/logo/cartarch-horizontal-white.svg"
+             alt="Cartarch"
+             class="landing-brand-logo">
+      </a>
+      <nav class="landing-header-nav" aria-label="Account">
+        <a href="/login" class="landing-nav-link">Sign in</a>
+        <a href="/register" class="landing-cta-small">Create account</a>
+      </nav>
+    </header>
+
+    <main class="landing-main">
+      <section class="landing-hero">
+        <img src="/static/brand/logo/cartarch-stacked-white.svg"
+             alt=""
+             class="landing-hero-logo"
+             aria-hidden="true">
+        <h1 class="landing-hero-tagline brand-name">The ruler of your collection</h1>
+        <!-- DRAFT COPY — finalize when content lands -->
+        <p class="landing-hero-sub">
+          Cartarch is a premium collectible-management platform built for the
+          physical workflows of serious Magic: the Gathering collectors —
+          track ownership across boxes, binders, and built decks; analyze
+          deck shape and consistency; run games at the table.
+        </p>
+        <div class="landing-hero-ctas">
+          <a href="/register" class="landing-cta-primary">Create your account</a>
+          <a href="#features" class="landing-cta-secondary">See what's inside</a>
+        </div>
+      </section>
+
+      <section id="features" class="landing-features">
+        <h2 class="landing-section-title">Built for the physical workflow</h2>
+        <!-- DRAFT COPY — feature descriptions drawn from the real app surface. -->
+        <div class="landing-feature-grid">
+          <article class="landing-feature">
+            <h3 class="landing-feature-title">Collection tracking</h3>
+            <p class="landing-feature-body">
+              Import from a barcode scanner, Helvault, Moxfield, or a pasted
+              decklist — Cartarch normalizes the format and resolves every
+              card against a local Scryfall mirror. Search with full
+              Scryfall-style syntax (boolean operators, color identity,
+              format legality, price filters) across your whole collection.
+            </p>
+          </article>
+          <article class="landing-feature">
+            <h3 class="landing-feature-title">The drawer sorter</h3>
+            <p class="landing-feature-body">
+              An opt-in physical-layout system that assigns every card a
+              drawer and slot deterministically, so a re-sort always lands
+              at the same place. Tuned for a 6-drawer setup; configurable
+              per-location modes let any storage layout opt in or out of
+              the auto-sort.
+            </p>
+          </article>
+          <article class="landing-feature">
+            <h3 class="landing-feature-title">Deck analytics</h3>
+            <p class="landing-feature-body">
+              Every deck gets a health panel: ramp, draw, removal, and
+              wipe density against tunable thresholds; pip strain across
+              demand vs. land sources; mana curve, card-type breakdown,
+              color pips, avg CMC. Filter by role tags (Ramp / Draw /
+              Removal / Combo piece / Payoff / Protection) for surgical
+              tuning.
+            </p>
+          </article>
+          <article class="landing-feature">
+            <h3 class="landing-feature-title">The game tracker</h3>
+            <p class="landing-feature-body">
+              A landscape tablet-first tracker for the at-table game.
+              Commander art panel backgrounds (loaded from the local
+              Scryfall mirror), per-seat life + counters, turn timing,
+              auto-elimination on lethal poison, history + undo. First-
+              player selection by dice roll or manual tap.
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section class="landing-showcase">
+        <h2 class="landing-section-title">A look inside</h2>
+        <div class="landing-screenshot-grid">
+          <!-- TODO: screenshot — dashboard / At a Glance tiles -->
+          <div class="landing-screenshot-placeholder">
+            <span class="landing-screenshot-label">Dashboard</span>
+          </div>
+          <!-- TODO: screenshot — deck detail with analytics panel -->
+          <div class="landing-screenshot-placeholder">
+            <span class="landing-screenshot-label">Deck analytics</span>
+          </div>
+          <!-- TODO: screenshot — game tracker in landscape -->
+          <div class="landing-screenshot-placeholder">
+            <span class="landing-screenshot-label">Game tracker</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="landing-secondary">
+        <article class="landing-secondary-card">
+          <h3 class="landing-secondary-title">Try the beta</h3>
+          <!-- DRAFT COPY -->
+          <p class="landing-secondary-body">
+            Cartarch is in active development. Email
+            <a href="mailto:support@cartarch.com">support@cartarch.com</a>
+            for an account — include a sentence about how you'd use it.
+          </p>
+        </article>
+        <article class="landing-secondary-card">
+          <h3 class="landing-secondary-title">Support the project</h3>
+          <!-- DRAFT COPY -->
+          <p class="landing-secondary-body">
+            Cartarch is free to use. If it helps your collection,
+            <a href="#" class="landing-secondary-link">
+              <!-- TODO: donation link (Ko-fi or similar) -->
+              consider a tip
+            </a>
+            to keep development going. Donation-only — no paid tiers.
+          </p>
+        </article>
+        <article class="landing-secondary-card">
+          <h3 class="landing-secondary-title">What's new</h3>
+          <!-- DRAFT COPY -->
+          <p class="landing-secondary-body">
+            See the
+            <a href="#" class="landing-secondary-link">
+              <!-- TODO: changelog / devlog link -->
+              public changelog
+            </a>
+            for shipping notes, current direction, and what's next.
+          </p>
+        </article>
+      </section>
+    </main>
+
+    <footer class="landing-footer">
+      <div class="landing-footer-inner">
+        <div class="landing-footer-brand">
+          <img src="/static/brand/logo/cartarch-icon-white.svg"
+               alt=""
+               class="landing-footer-logo"
+               aria-hidden="true">
+          <span class="brand-name">Cartarch</span>
+        </div>
+        <nav class="landing-footer-nav" aria-label="Site">
+          <a href="/login">Sign in</a>
+          <a href="/register">Create account</a>
+          <a href="/privacy">Privacy</a>
+          <a href="/terms">Terms</a>
+          <a href="mailto:support@cartarch.com">Contact</a>
+        </nav>
+        <p class="landing-footer-fineprint muted">
+          Magic: the Gathering™ is © Wizards of the Coast. Cartarch is an
+          independent project, not affiliated with or endorsed by Wizards.
+        </p>
+      </div>
+    </footer>
+  </body>
+</html>

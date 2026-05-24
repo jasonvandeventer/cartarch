@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block content %}
+  <div style="max-width: 720px; margin: 2rem auto;">
+    <section class="panel">
+      <div class="eyebrow">Cartarch</div>
+      <h2 class="panel-title">Privacy</h2>
+      {# v3.27.17 — placeholder content. Final policy will replace this
+         before public launch. Linked from the landing-page footer so
+         footer links aren't dead. #}
+      <p class="muted">
+        <em>This is a placeholder. The final privacy policy will be
+        published before public launch.</em>
+      </p>
+      <p>
+        Cartarch stores the data you provide to manage your collection —
+        card inventory, deck lists, storage locations, game history — and
+        keeps it scoped to your account. Account credentials (email,
+        password hash, optional display name) are used only for signing
+        in and recovering access. No telemetry is collected; no third-
+        party analytics are loaded.
+      </p>
+      <p>
+        Outbound network calls from Cartarch are limited to two services:
+        Scryfall (card data lookups, executed off the request path via a
+        local mirror) and Resend (the transactional-email provider for
+        password resets). Card images render from the local mirror; no
+        third-party trackers are embedded.
+      </p>
+      <p>
+        Questions: <a href="mailto:support@cartarch.com">support@cartarch.com</a>.
+      </p>
+    </section>
+  </div>
+{% endblock %}

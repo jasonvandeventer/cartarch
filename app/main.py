@@ -22,6 +22,7 @@ from urllib.parse import urlencode, urlparse
 
 from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import (
+    FileResponse,
     HTMLResponse,
     JSONResponse,
     PlainTextResponse,
@@ -74,6 +75,7 @@ from app.dependencies import (
     CsrfRequired,
     get_current_user,
     get_db_session,
+    get_optional_current_user,
     render,
 )
 from app.game_service import (
@@ -196,13 +198,39 @@ async def value_error_handler(request: Request, exc: ValueError) -> HTMLResponse
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
 
+@app.get("/favicon.ico", include_in_schema=False)
+def favicon() -> FileResponse:
+    """Resolve the browser's root /favicon.ico probe.
+
+    v3.27.17 — every browser hits /favicon.ico on first contact regardless of
+    what the document's <link rel="icon"> tags say. StaticFiles is mounted at
+    /static, so without this explicit route the root probe would 404. Serves
+    the bundled .ico from the new brand directory.
+    """
+    return FileResponse("app/static/brand/icon/favicon.ico")
+
+
+# v3.27.17 — host allowlist for Referer-based redirect validation.
+# Same-host (request.url.netloc) is always implicitly allowed; this set
+# names the additional hosts cartarch.com lives behind so a user on the
+# legacy hostname can follow a link that bounces them into cartarch.com
+# (or vice versa) without safe_redirect_url() treating the cross-host
+# Referer as an open-redirect attempt and dropping back to the default.
+# No TrustedHostMiddleware in use; this is the only host-allow surface.
+_REDIRECT_ALLOWED_HOSTS: frozenset[str] = frozenset({"cartarch.com", "www.cartarch.com"})
+
+
 def safe_redirect_url(request: Request, default: str = "/collection") -> str:
     # Validate before using Referer as redirect target — an attacker can set it to an external URL.
     referer = request.headers.get("referer", "")
     if not referer:
         return default
     parsed = urlparse(referer)
-    if parsed.netloc and parsed.netloc != request.url.netloc:
+    if (
+        parsed.netloc
+        and parsed.netloc != request.url.netloc
+        and parsed.netloc not in _REDIRECT_ALLOWED_HOSTS
+    ):
         return default
     return referer
 
@@ -386,8 +414,20 @@ def on_startup() -> None:
 def home(
     request: Request,
     session: Session = Depends(get_db_session),
-    current_user: User = Depends(get_current_user),
+    current_user: User | None = Depends(get_optional_current_user),
 ):
+    # v3.27.17 — anon visitors get the public marketing landing page; signed-in
+    # users get the existing dashboard. Two completely different templates: the
+    # landing page does NOT extend base.html (no app shell, no sidebar — it is
+    # a separate marketing surface). The authenticated branch below is the
+    # pre-v3.27.17 behavior unchanged.
+    if current_user is None:
+        return render(
+            request,
+            "landing.html",
+            {"title": "Cartarch — The ruler of your collection"},
+        )
+
     # v3.27.8 — empty-state signal for the dashboard homepage. Mirrors the
     # established show_onboarding pattern from collection_page (main.py:1775)
     # and decks_page (main.py:2500): a single-row existence check, cheap
@@ -414,6 +454,44 @@ def home(
             "show_onboarding": show_onboarding,
             "tiles": tiles,
         },
+    )
+
+
+@app.get("/privacy")
+def privacy_page(
+    request: Request,
+    current_user: User | None = Depends(get_optional_current_user),
+):
+    """v3.27.17 — placeholder privacy policy. Linked from landing-page footer.
+
+    Uses ``get_optional_current_user`` so authed users see the full app
+    shell (with sidebar) while anon users get the anon shell (topbar
+    only, no sidebar). Without threading current_user into the template
+    context, base.html's ``{% if not current_user %}`` would always
+    evaluate truthy and authed users would lose their sidebar on these
+    pages.
+    """
+    return render(
+        request,
+        "privacy.html",
+        {"title": "Privacy — Cartarch", "current_user": current_user},
+    )
+
+
+@app.get("/terms")
+def terms_page(
+    request: Request,
+    current_user: User | None = Depends(get_optional_current_user),
+):
+    """v3.27.17 — placeholder terms of service. Linked from landing-page footer.
+
+    Same ``get_optional_current_user`` pattern as ``privacy_page`` — see
+    that handler's docstring for rationale.
+    """
+    return render(
+        request,
+        "terms.html",
+        {"title": "Terms — Cartarch", "current_user": current_user},
     )
 
 
@@ -449,12 +527,33 @@ def register(
     if not display_name:
         display_name = username.split("@")[0]
 
-    if session.query(User).filter(User.username == username).first():
-        return render(
-            request,
-            "register.html",
-            {"title": "Register", "error": "An account with that email already exists."},
-        )
+    # v3.27.17 — enumeration-oracle fix (Option A). Pre-v3.27.17 a duplicate-
+    # email POST returned a distinguishable "An account with that email
+    # already exists." error, leaking which addresses are registered. Closes
+    # the Known Problem recorded in v3.27.14. The neutral response below is
+    # truthful for both cases: a brand-new account ("an account is ready
+    # for you, sign in") AND a no-op duplicate ("the account exists, sign
+    # in or use forgot-password"). Both lead to /login, where the
+    # appropriate path is one click away.
+    #
+    # Timing parity: the duplicate-email path runs an equivalent-cost
+    # hash_password() and discards the result, so it does not return
+    # measurably faster than the real account-creation path. Without
+    # this throwaway hash, the duplicate path would shortcut around the
+    # bcrypt/argon2 cost of password hashing and become a side-channel
+    # oracle even with the response shapes byte-identical.
+    #
+    # /register does NOT auto-login on success (returns 303 → /login,
+    # NOT a session cookie); so Option A leaves no residual oracle that
+    # would distinguish a real signup landing on the dashboard vs a
+    # duplicate not. Verified pre-implementation.
+    existing = session.query(User).filter(User.username == username).first()
+    if existing:
+        # Equivalent-cost throwaway hash so the timing matches the
+        # account-creation path below.
+        _throwaway = hash_password(password)
+        del _throwaway
+        return RedirectResponse("/login", status_code=303)
 
     user = User(
         username=username,

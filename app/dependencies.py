@@ -182,6 +182,31 @@ def get_current_user(
     return user
 
 
+def get_optional_current_user(
+    request: Request,
+    session: Session = Depends(get_db_session),
+) -> User | None:
+    """Non-redirecting variant of :func:`get_current_user`.
+
+    v3.27.17 — added to support the public landing page at ``/``. The
+    standard ``get_current_user`` raises a 303 redirect to /login for anon
+    visitors, which is correct for protected routes but wrong for routes
+    that want to branch on auth state (e.g. show a marketing page to anon
+    visitors and the dashboard to signed-in users from the same path).
+
+    Returns the authenticated ``User`` instance, or ``None`` if no valid
+    session exists. Inactive accounts also return ``None`` rather than
+    raising — the caller decides what to render in either case.
+    """
+    user_id = request.session.get("user_id")
+    if not user_id:
+        return None
+    user = session.query(User).filter(User.id == user_id).first()
+    if not user or not user.is_active:
+        return None
+    return user
+
+
 def require_admin(current_user: User = Depends(get_current_user)) -> User:
     if not current_user.is_admin:
         raise HTTPException(status_code=403, detail="Admin access required")

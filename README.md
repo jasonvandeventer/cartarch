@@ -1,8 +1,8 @@
-![Mana Archive](app/static/icons/wordmark-512.png)
+![Cartarch](app/static/brand/logo/cartarch-horizontal.svg)
 
-Self-hosted web application for managing a physical Magic: The Gathering collection.
+Self-hosted web application for managing a physical Magic: The Gathering collection. (Identifies as **Cartarch** in user-facing UI as of v3.27.6; the in-repo project identifier is still `mana-archive` pending the full infrastructure rename near actual public launch.)
 
-**Current version: v3.27.16** · [Platform repo](https://github.com/jasonvandeventer/mana-archive-platform)
+**Current version: v3.27.17** · [Platform repo](https://github.com/jasonvandeventer/mana-archive-platform)
 
 ---
 
@@ -40,6 +40,12 @@ See [docs/screenshots/](docs/screenshots/) for capture guidelines and additional
 ---
 
 ## Features
+
+### Public surface
+
+- **Landing page** at `/` for anonymous visitors — separate marketing surface (no app shell, no sidebar). Renders the hero ("The ruler of your collection"), four feature highlights, a 3-tile screenshot showcase, beta-interest + support + changelog cards, and a footer with Privacy / Terms / Contact links. Open Graph + Twitter meta tags make shared links render a branded card. Authenticated users at `/` get the existing dashboard unchanged — the route branches on auth state via a new `get_optional_current_user` dependency
+- **Brand assets** live at `app/static/brand/` — favicon set (`.ico` + vector `.svg` + apple-touch-icon + PWA 192/512/maskable), 19 SVG logo variants, OG image. PWA-installable via `app/static/manifest.json` with `theme_color`/`background_color="#081321"`
+- **`/privacy` + `/terms`** are placeholder stubs today so the landing-page footer links aren't dead; final policy text replaces them before public launch
 
 ### Dashboard
 
@@ -110,7 +116,7 @@ See [docs/screenshots/](docs/screenshots/) for capture guidelines and additional
 
 ### Multi-user
 
-- **Self-service registration** — users sign up with email + display name; no admin involvement required
+- **Self-service registration** — users sign up with email + display name; no admin involvement required. `POST /register` returns a byte-identical response (same 303 + `Location: /login` + body) for both fresh-email and duplicate-email submissions; the duplicate path runs an equivalent-cost throwaway `hash_password()` so a side-channel timing oracle can't distinguish the two paths
 - **Self-service password recovery** at `/forgot-password` — email-driven reset via Resend (the project's outbound transactional email path). Tokens are SHA-256 hashed at rest (raw token only ever in the emailed link), 30-minute expiry, single-use, invalidate-on-new-request. POST `/forgot-password` returns an identical neutral response for registered vs unregistered emails; the send is asynchronous via a daemon thread so there's no timing leak. Rate-limited per-email AND per-IP at 5 requests/hour
 - **Update Profile form** at `/account` lets any user change their email and display name without admin DB access
 - **Shared password strength validator** — 8-char minimum, 256-char maximum, no composition requirements (NIST SP 800-63B aligned); applied at `/register`, `/account/change-password`, AND `/reset-password` so the three password-set paths can't drift

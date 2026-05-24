@@ -391,20 +391,42 @@ body::after {
    the page content inside the main pane and carries the version pill
    + logout control (relocated from the floating top-right per spec).
    ============================================================================ */
+/* v3.27.17 correction — the .app-shell layout was a two-column grid
+   pre-correction; the brand lived inside the sidebar so the topbar was
+   constrained to the main column. The correction makes the topbar a
+   full-width row at the top of the grid, spanning both columns, so the
+   brand stays visible at ≤768px when the sidebar hides. Grid layout: a
+   topbar row above a sidebar+main row, using grid-template-areas so the
+   row-span on the topbar is named, not implicit. The 1fr main row
+   absorbs whatever vertical space remains after the auto-sized topbar,
+   keeping min-height:100vh behavior unchanged. */
 .app-shell {
   display: grid;
   grid-template-columns: 236px 1fr;
+  grid-template-rows: auto 1fr;
+  grid-template-areas:
+    "topbar topbar"
+    "sidebar main";
   min-height: 100vh;
 }
-/* v3.27.8 fix — anon variant (login / register, no current_user): the
-   .app-sidebar element does not render, so the grid would place the lone
-   .app-main into the first 236px column and squeeze the topbar contents
-   (wordmark + version pill) into that narrow track, wrapping the pill.
-   Collapse to a single full-width column when the sidebar is absent. */
+/* Anon variant (login / register / privacy / terms — no current_user):
+   .app-sidebar does not render. Drop to a single column for the
+   sidebar/main row; the topbar row still spans the full width via the
+   collapsed grid-template-areas. */
 .app-shell-anon {
   grid-template-columns: 1fr;
+  grid-template-areas:
+    "topbar"
+    "main";
+}
+.app-shell > .app-topbar {
+  grid-area: topbar;
+}
+.app-shell > .app-sidebar {
+  grid-area: sidebar;
 }
 .app-shell > .app-main {
+  grid-area: main;
   display: flex;
   flex-direction: column;
   min-width: 0;
@@ -413,31 +435,16 @@ body::after {
 .app-sidebar {
   background: linear-gradient(180deg, #0b1729 0%, var(--bg) 100%);
   border-right: 1px solid var(--border);
+  /* v3.27.17 correction — sidebar no longer carries the brand block;
+     padding-top is the only padding adjustment needed (was 1.25rem to
+     account for the brand sitting above the first nav group). The
+     first nav group now sits directly under the topbar separator;
+     padding-top stays tight to keep the nav visually aligned with
+     the topbar baseline. */
   padding: 1.25rem 0.75rem 1.5rem;
   display: flex;
   flex-direction: column;
   gap: 1.25rem;
-}
-.sidebar-brand {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  padding: 0.25rem 0.5rem 0.5rem;
-  text-decoration: none;
-  /* v3.27.15 — Montserrat Alternates is the brand-name face. Currently
-     only used here (and the auth-page brand-name surface below) — body
-     text stays Montserrat. The wordmark IMG element doesn't render the
-     CSS font (it's an image), but any text inside .sidebar-brand uses
-     this; when v3.27.16 swaps the PNG for an SVG wordmark with a text
-     fallback, the fallback text will pick up Alternates correctly. */
-  font-family: "Montserrat Alternates", "Montserrat", system-ui, sans-serif;
-  font-weight: 700;
-  letter-spacing: 0.13em;
-}
-.sidebar-wordmark {
-  height: 36px;
-  width: auto;
-  display: block;
 }
 .sidebar-nav {
   display: flex;
@@ -501,30 +508,88 @@ body::after {
   color: var(--brand-gold);
 }
 
+/* v3.27.17 correction — full-width brand topbar.
+   - Spans both columns via grid-area: topbar (declared above on
+     .app-shell > .app-topbar).
+   - Height nudged taller than the v3.27.8 slim variant so the horizontal
+     logo (5:1 viewBox, 2000×400 — has a "the ruler of your collection"
+     tagline baked into the bottom register) is legible. 72px is inside
+     the spec's 68–76px range; height set as a literal here, NOT a new
+     CSS token, per the v3.27.17 correction spec.
+   - justify-content: space-between puts the brand left and the controls
+     right with the gap absorbed by the flex algorithm — no fixed gap
+     because the available width varies wildly across viewports.
+   - border-bottom preserved from the pre-correction slim topbar to
+     visually separate from the sidebar/main row below. */
 .app-topbar {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
-  gap: 0.85rem;
-  padding: 0.7rem 1.5rem;
+  justify-content: space-between;
+  gap: 1rem;
+  height: 72px;
+  padding: 0.5rem 1.5rem;
   border-bottom: 1px solid var(--border);
 }
-.app-topbar-anon {
-  justify-content: space-between;
+.topbar-brand {
+  /* Anchor wrapping the brand <img>. Matches the wordmark height
+     budget within the 72px bar — 52px image height gives breathing
+     room above and below. min-width:0 lets flex actually shrink the
+     image on narrow phones rather than overflowing the bar. */
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+  min-width: 0;
 }
-.sidebar-brand-anon .sidebar-wordmark {
-  height: 32px;
+.topbar-brand-logo {
+  /* Height-constrained to the topbar; width:auto preserves the 5:1
+     aspect ratio. max-width caps the on-screen size at very wide
+     viewports so the logo doesn't grow into the controls; on narrow
+     phones the same max-width plus min-width:0 on .topbar-brand lets
+     flex shrink the image without colliding with the right-side
+     controls. The full tagline ("— the ruler of your collection")
+     is part of the SVG itself and stays visible at every width. */
+  height: 52px;
+  width: auto;
+  max-width: min(60vw, 320px);
+  display: block;
+}
+.topbar-controls {
+  /* Right cluster — version pill + (authed) logout. Stays as a
+     flex row so the two items keep their existing visual rhythm. */
+  display: inline-flex;
+  align-items: center;
+  gap: 0.85rem;
 }
 
 @media (max-width: 768px) {
   .app-shell {
+    /* Mobile: sidebar hides; the topbar row stays full-width on top of
+       the (now lone) main column. Grid collapses to single-column
+       sidebar/main row, but the topbar row's grid-template-areas
+       continues to work with the single column. */
     grid-template-columns: 1fr;
+    grid-template-areas:
+      "topbar"
+      "main";
   }
   .app-sidebar {
     display: none;
   }
   .app-topbar {
     padding: 0.5rem 1rem;
+  }
+}
+@media (max-width: 420px) {
+  /* v3.27.17 correction — narrow phones: brand and logout always stay;
+     the version pill is the only droppable item per spec when the bar
+     gets cramped. Pre-correction the pill carried white-space:nowrap
+     and dev-environment values like `dev-ce9cbd0` are longer than prod
+     `vX.Y.Z` so a phone-width squeeze is real. Hide the pill below
+     420px (matches the threshold below which the brand starts
+     consuming a meaningful share of width via .topbar-brand-logo's
+     60vw cap). */
+  .app-topbar .version-pill {
+    display: none;
   }
 }
 
@@ -5977,5 +6042,330 @@ body.game-mode {
   }
   .review-tags-chip-row {
     width: 100%;
+  }
+}
+
+/* =================================================================
+   v3.27.17 — Public landing page
+   =================================================================
+   The landing template (templates/landing.html) does NOT extend
+   base.html — it ships its own full HTML document and has no app
+   shell (no sidebar, no .app-topbar). These rules style that surface
+   in isolation. Token reuse only: every value resolves via the
+   v3.27.7/v3.27.15 token layer; zero parallel tokens added.
+
+   Renders the navy palette in the body background through the
+   <body class="landing-body"> hook, then composes the rest of the
+   page from .landing-* prefixed classes so they cannot collide
+   with the app-shell rules above. The fixed-position body::before
+   noise + body::after radial washes from the v3.27.15 reskin
+   continue to render under the landing body — same calmer-finish
+   visual direction. */
+
+.landing-body {
+  background: var(--bg);
+  color: var(--text);
+  margin: 0;
+  font-family: "Montserrat", system-ui, -apple-system, "Segoe UI", sans-serif;
+  min-height: 100vh;
+}
+
+.landing-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.1rem 2rem;
+  border-bottom: 1px solid var(--border);
+  position: relative;
+  z-index: 2;
+}
+.landing-brand {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+}
+.landing-brand-logo {
+  height: 32px;
+  width: auto;
+  display: block;
+}
+.landing-header-nav {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+.landing-nav-link {
+  color: var(--text-dim);
+  text-decoration: none;
+  font-size: 0.95rem;
+  font-weight: 500;
+}
+.landing-nav-link:hover {
+  color: var(--text);
+}
+.landing-cta-small {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.55rem 1.1rem;
+  background: var(--brand-gold);
+  color: var(--brand-near-black);
+  border-radius: var(--radius-sm);
+  font-weight: 700;
+  text-decoration: none;
+  font-size: 0.9rem;
+  letter-spacing: 0.02em;
+  transition: filter 0.15s ease;
+}
+.landing-cta-small:hover {
+  filter: brightness(1.08);
+}
+
+.landing-main {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 2.5rem 1.5rem 4rem;
+  position: relative;
+  z-index: 1;
+}
+
+.landing-hero {
+  text-align: center;
+  padding: 3rem 1rem 4rem;
+}
+.landing-hero-logo {
+  width: 220px;
+  max-width: 50vw;
+  height: auto;
+  margin: 0 auto 2rem;
+  display: block;
+}
+.landing-hero-tagline {
+  font-size: clamp(1.8rem, 4vw, 2.6rem);
+  line-height: 1.15;
+  margin: 0 0 1.25rem;
+  color: var(--brand-gold);
+  letter-spacing: 0.04em;
+  text-transform: none;
+  font-weight: 700;
+}
+.landing-hero-sub {
+  font-size: 1.05rem;
+  line-height: 1.55;
+  max-width: 640px;
+  margin: 0 auto 2rem;
+  color: var(--text-dim);
+}
+.landing-hero-ctas {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  justify-content: center;
+}
+.landing-cta-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.85rem 1.75rem;
+  background: var(--brand-gold);
+  color: var(--brand-near-black);
+  border-radius: var(--radius);
+  font-weight: 700;
+  text-decoration: none;
+  font-size: 1rem;
+  letter-spacing: 0.02em;
+  transition:
+    filter 0.15s ease,
+    transform 0.15s ease;
+  box-shadow: var(--shadow-sm);
+}
+.landing-cta-primary:hover {
+  filter: brightness(1.08);
+  transform: translateY(-1px);
+}
+.landing-cta-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.85rem 1.75rem;
+  background: transparent;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-weight: 600;
+  text-decoration: none;
+  font-size: 1rem;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease;
+}
+.landing-cta-secondary:hover {
+  background: var(--panel-2);
+  border-color: var(--brand-gold-soft);
+}
+
+.landing-section-title {
+  font-size: 1.6rem;
+  margin: 0 0 1.5rem;
+  text-align: center;
+  color: var(--text);
+  letter-spacing: 0.01em;
+}
+
+.landing-features {
+  padding: 2.5rem 0;
+}
+.landing-feature-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: var(--space-4);
+}
+.landing-feature {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--space-5);
+  transition: border-color 0.15s ease;
+}
+.landing-feature:hover {
+  border-color: var(--brand-gold-soft);
+}
+.landing-feature-title {
+  margin: 0 0 0.65rem;
+  color: var(--brand-gold);
+  font-size: 1.1rem;
+  letter-spacing: 0.02em;
+}
+.landing-feature-body {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: 0.93rem;
+  line-height: 1.55;
+}
+
+.landing-showcase {
+  padding: 2.5rem 0;
+}
+.landing-screenshot-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: var(--space-4);
+}
+.landing-screenshot-placeholder {
+  /* Placeholder tile until real screenshots land — keeps the layout
+     honest and gives the eventual <img> swap a known aspect target.
+     16:10-ish ratio via the padding-top trick on the inner span. */
+  background: var(--panel-2);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  aspect-ratio: 16 / 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.landing-screenshot-label {
+  color: var(--muted);
+  font-size: 0.9rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.landing-secondary {
+  padding: 2.5rem 0 1rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: var(--space-4);
+}
+.landing-secondary-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--space-5);
+}
+.landing-secondary-title {
+  margin: 0 0 0.65rem;
+  color: var(--text);
+  font-size: 1.05rem;
+}
+.landing-secondary-body {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: 0.93rem;
+  line-height: 1.55;
+}
+.landing-secondary-link,
+.landing-secondary-body a {
+  color: var(--brand-gold);
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+}
+
+.landing-footer {
+  border-top: 1px solid var(--border);
+  margin-top: 3rem;
+  padding: 2rem 1.5rem;
+  position: relative;
+  z-index: 2;
+}
+.landing-footer-inner {
+  max-width: 1100px;
+  margin: 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+.landing-footer-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--text);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+.landing-footer-logo {
+  height: 26px;
+  width: auto;
+  display: block;
+}
+.landing-footer-nav {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 1.25rem;
+}
+.landing-footer-nav a {
+  color: var(--text-dim);
+  text-decoration: none;
+  font-size: 0.9rem;
+}
+.landing-footer-nav a:hover {
+  color: var(--text);
+}
+.landing-footer-fineprint {
+  flex-basis: 100%;
+  font-size: 0.8rem;
+  color: var(--muted);
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* Mobile — collapse the header nav onto its own row, recenter, tighten
+   hero. Single small breakpoint; the desktop layout already flexes
+   gracefully down to ~600px wide via the auto-fit grid columns. */
+@media (max-width: 600px) {
+  .landing-header {
+    flex-direction: column;
+    gap: 0.75rem;
+    padding: 0.9rem 1rem;
+  }
+  .landing-hero {
+    padding: 1.5rem 0.5rem 2.5rem;
+  }
+  .landing-main {
+    padding: 1.5rem 1rem 3rem;
+  }
+  .landing-footer-inner {
+    justify-content: center;
+    text-align: center;
   }
 }

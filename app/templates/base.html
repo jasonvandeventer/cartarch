@@ -5,12 +5,18 @@
     <meta name="viewport"
           content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>{{ title or "Cartarch" }}</title>
-    <link rel="icon" href="/static/icons/favicon.ico" sizes="any">
-    <link rel="icon"
-          href="/static/icons/icon-32x32.png"
-          type="image/png"
-          sizes="32x32">
-    <link rel="apple-touch-icon" href="/static/icons/icon-180x180.png">
+    {# v3.27.17 — Cartarch favicon set. The v3.x app/static/icons/* pack
+       (Mana Archive era) is retired; the new bundle lives under
+       app/static/brand/. The vector favicon.svg variant gives modern
+       browsers a crisp icon at any zoom level; the .ico is the legacy
+       any-browser fallback. Apple-touch-icon is the high-res tile used
+       when iOS users add to home screen. The PWA manifest below carries
+       the maskable + any-purpose 192/512 PNGs for installable contexts. #}
+    <link rel="icon" href="/static/brand/icon/favicon.ico" sizes="any">
+    <link rel="icon" type="image/svg+xml" href="/static/brand/icon/favicon.svg">
+    <link rel="apple-touch-icon" href="/static/brand/icon/apple-touch-icon.png">
+    <link rel="manifest" href="/static/manifest.json">
+    <meta name="theme-color" content="#081321">
     <link rel="stylesheet"
           href="/static/style.css?v={{ static_v("style.css") }}">
     {# HTMX: small (~14kb) library for server-driven partial page updates via
@@ -29,29 +35,47 @@
     <script src="/static/vendor/htmx-1.9.12.min.js?v={{ static_v('vendor/htmx-1.9.12.min.js') }}"></script>
   </head>
   <body>
-    {# v3.27.8 — left-sidebar + slim-topbar app shell (replaces the
-       horizontal site-header layout). Desktop (≥768px): two-column grid
-       with sidebar fixed-width on the left, main pane filling the rest.
-       Mobile (<768px): sidebar hides, main pane goes full-width, the
-       existing .bottom-nav element below takes over as the mobile nav.
+    {# v3.27.8 — left-sidebar + topbar app shell (replaces the horizontal
+       site-header layout). v3.27.17 correction — the brand moved OUT of
+       the sidebar and into a full-width topbar that spans both grid
+       columns; the sidebar starts directly at its first nav group.
+       Single topbar treatment for both authed and anon (login/register)
+       surfaces — no separate anon variant of the brand markup. At
+       ≤768px the sidebar hides; the topbar stays visible (the whole
+       point of the v3.27.17 correction).
        Nav grouping per the v3.27.8 mockups: OVERVIEW / COLLECTION /
        STORAGE / PLAY / SYSTEM. v3.27.15 — Lucide inline-SVG icons added
        to each nav item (the unified icon language v3.27.8 deferred to
        this aesthetic-pass release). #}
     {% set path = request.url.path if request else '/' %}
     <div class="app-shell{% if not current_user %} app-shell-anon{% endif %}">
+      {# v3.27.17 correction — full-width brand topbar. Spans both grid
+         columns via grid-template-areas. Renders identically for authed
+         and anon surfaces (only the right-side controls differ: anon has
+         the version pill alone; authed adds the logout form). The
+         <img> alt carries the tagline so screen readers and image-load
+         fallback get the full brand string even though the rendered
+         logo is the same horizontal-white SVG for both states. #}
+      <header class="app-topbar">
+        <a href="/" class="topbar-brand">
+          <img src="/static/brand/logo/cartarch-horizontal.svg"
+               alt="Cartarch — the ruler of your collection"
+               class="topbar-brand-logo">
+        </a>
+        <div class="topbar-controls">
+          <span class="version-pill">{{ app_version }}</span>
+          {% if current_user %}
+            <form method="post" action="/logout" class="nav-logout-form">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+              <button type="submit" class="nav-logout-button">
+                Logout ({{ current_user.display_name or current_user.username }})
+              </button>
+            </form>
+          {% endif %}
+        </div>
+      </header>
       {% if current_user %}
         <aside class="app-sidebar" aria-label="Primary navigation">
-          <a href="/" class="sidebar-brand">
-            {# v3.27.6 alt+v3.27.8 layout: alt reads "Cartarch" but the
-               wordmark image still shows "Mana Archive"; the visual
-               asset swap (wordmark / logo / favicons) lives in v3.27.16
-               (gated on designer deliverable). v3.27.15 corrected the
-               stale cross-reference here (was v3.27.13 pre-cascade). #}
-            <img src="/static/icons/wordmark-1024.png"
-                 alt="Cartarch"
-                 class="sidebar-wordmark">
-          </a>
           <nav class="sidebar-nav">
             <div class="nav-group">
               <div class="nav-label">Overview</div>
@@ -147,26 +171,6 @@
         </aside>
       {% endif %}
       <div class="app-main">
-        {% if current_user %}
-          <header class="app-topbar">
-            <span class="version-pill">{{ app_version }}</span>
-            <form method="post" action="/logout" class="nav-logout-form">
-              <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-              <button type="submit" class="nav-logout-button">
-                Logout ({{ current_user.display_name or current_user.username }})
-              </button>
-            </form>
-          </header>
-        {% else %}
-          <header class="app-topbar app-topbar-anon">
-            <a href="/" class="sidebar-brand sidebar-brand-anon">
-              <img src="/static/icons/wordmark-1024.png"
-                   alt="Cartarch"
-                   class="sidebar-wordmark">
-            </a>
-            <span class="version-pill">{{ app_version }}</span>
-          </header>
-        {% endif %}
         <main class="page-shell">
           {% block content %}{% endblock %}
         </main>
