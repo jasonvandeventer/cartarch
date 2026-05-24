@@ -6,6 +6,11 @@ __pycache__/
 logs/
 node_modules/
 data/
+# v3.28.2 — app/data/ is a static-content directory (chronicle.json), NOT
+# the runtime DATA_DIR. The bare ``data/`` rule above is for SQLite databases
+# and runtime state at /data; the app's static content must still be tracked.
+!app/data/
+!app/data/**
 dev-data/
 backups/
 .claude/scheduled_tasks.lock

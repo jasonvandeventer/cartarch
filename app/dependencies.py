@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import re
 import secrets
 import subprocess
 from collections.abc import Generator
@@ -94,6 +95,69 @@ def format_local_datetime(dt: datetime | None, fmt: str = "%Y-%m-%d") -> str:
 templates.env.filters["format_local_datetime"] = format_local_datetime
 
 
+# v3.28.2 — Folio versioning helper. Renders the semantic version
+# (``X.Y.Z`` or ``vX.Y.Z``) as ``Folio X · Issue Y · Entry Z`` with Roman
+# numerals. The production equivalent of the design package's
+# ``utils/folio.js`` (``versionToFolio`` + ``toRoman``). Roman is
+# presentation-only; semantic remains canonical everywhere else (URLs,
+# internal use, ``app_version`` global, CLI / logs).
+#
+# Dev-build safety: when ``app_version`` falls through to ``dev-<git>``
+# (per ``_dev_version`` above), the input is non-semantic and the filter
+# must NOT crash or mangle it — it falls back to rendering the raw input.
+# Same goes for an empty string or any other unparseable value.
+_VERSION_RE = re.compile(r"^v?(\d+)\.(\d+)\.(\d+)$")
+_ROMAN_PAIRS = [
+    (1000, "M"),
+    (900, "CM"),
+    (500, "D"),
+    (400, "CD"),
+    (100, "C"),
+    (90, "XC"),
+    (50, "L"),
+    (40, "XL"),
+    (10, "X"),
+    (9, "IX"),
+    (5, "V"),
+    (4, "IV"),
+    (1, "I"),
+]
+
+
+def to_roman(n: int) -> str:
+    """Convert a non-negative integer to Roman numerals.
+    Returns ``'I'`` for ``n <= 0`` to match the design package's convention
+    (the design's ``toRoman`` returns ``"I"`` for the falsy / zero case)."""
+    n = int(n) if n is not None else 0
+    if n <= 0:
+        return "I"
+    out = []
+    for value, symbol in _ROMAN_PAIRS:
+        while n >= value:
+            out.append(symbol)
+            n -= value
+    return "".join(out)
+
+
+def version_to_folio(version: str | None) -> str:
+    """Render a semantic version as 'Folio X · Issue Y · Entry Z' (Roman).
+    Falls back to the raw input for non-semantic inputs (dev-builds,
+    empty strings). Roman is presentation-only — never use this value
+    in URLs or internal references."""
+    if not version:
+        return ""
+    match = _VERSION_RE.match(version)
+    if not match:
+        return version  # dev-build identity, pass through unchanged
+    folio, issue, entry = (int(g) for g in match.groups())
+    return f"Folio {to_roman(folio)} · Issue {to_roman(issue)} · Entry {to_roman(entry)}"
+
+
+templates.env.filters["folio"] = version_to_folio
+templates.env.globals["version_to_folio"] = version_to_folio
+templates.env.globals["to_roman"] = to_roman
+
+
 def get_csrf_token(request: Request) -> str:
     if "csrf_token" not in request.session:
         request.session["csrf_token"] = secrets.token_hex(32)
@@ -134,14 +198,24 @@ def _pending_count_for(user_id: int | None) -> int:
         session.close()
 
 
-def render(request: Request, template: str, ctx: dict | None = None):
+def render(
+    request: Request,
+    template: str,
+    ctx: dict | None = None,
+    status_code: int = 200,
+):
     context = {
         "csrf_token": get_csrf_token(request),
         "pending_count": _pending_count_for(request.session.get("user_id")),
     }
     if ctx:
         context.update(ctx)
-    return templates.TemplateResponse(request=request, name=template, context=context)
+    return templates.TemplateResponse(
+        request=request,
+        name=template,
+        context=context,
+        status_code=status_code,
+    )
 
 
 def get_db_session() -> Generator[Session, None, None]:

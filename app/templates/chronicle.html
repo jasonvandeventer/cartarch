@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+
+{#  v3.28.2 — Chronicle surface. Translated from the Folio design package's
+    page_chronicle.jsx ChroniclePage. Two-column grid: focused entry on the
+    left, Archive of Issues on the right.
+
+    Context:
+      entry              — the focused entry dict (None when not_found)
+      archive            — [{folio, issues:[{issue, entries:[{version,patch,date,summary}]}]}]
+      not_found_version  — set when /chronicle/v{unknown} hit; renders the
+                           not-found notice in place of the focused entry
+                           and the route returns 404. The Archive still renders
+                           so the user can navigate to a known version.
+      current_user       — None for anon visitors; full User for authed.
+                           base.html renders the anon shell when null.   #}
+
+{% block content %}
+<div class="page-shell">
+  <header class="pagehead">
+    <div class="eyebrow">§ System · Chronicle</div>
+    <h1 class="pagehead-title">The <b>Cartarch Chronicle</b>.</h1>
+    <p class="pagehead-tagline">
+      A journal of releases — what we shipped, what we refined, what we resolved,
+      and a short note from the Archivist on each.
+    </p>
+  </header>
+
+  <div class="chronicle-grid">
+    {# === LEFT: focused entry (or not-found notice) === #}
+    {% if entry %}
+    <article class="chronicle-entry">
+      <div class="chronicle-mast">
+        <div class="chronicle-stamp">
+          {% set parts = entry.version.split('.') %}
+          <span>Folio
+            <b>{{ to_roman(parts[0] | int) }}</b>
+            · Issue <b>{{ to_roman(parts[1] | int) }}</b>
+            · Entry <b>{{ to_roman(parts[2] | int) }}</b>
+          </span>
+        </div>
+        <div class="chronicle-raw">
+          <span>v<b>{{ entry.version }}</b></span>
+          <span>·</span>
+          <span>{{ entry.date }}</span>
+          <span>·</span>
+          <span class="chronicle-status">published</span>
+        </div>
+      </div>
+      <h2 class="chronicle-title">Chronicle of <b>Changes.</b></h2>
+
+      {% if entry.added %}
+      <section class="chronicle-section">
+        <h3><span>Added</span><span class="ct">{{ entry.added | length }} {{ "entry" if entry.added | length == 1 else "entries" }}</span></h3>
+        <ul>{% for item in entry.added %}<li>{{ item }}</li>{% endfor %}</ul>
+      </section>
+      {% endif %}
+
+      {% if entry.refined %}
+      <section class="chronicle-section">
+        <h3><span>Refined</span><span class="ct">{{ entry.refined | length }} {{ "entry" if entry.refined | length == 1 else "entries" }}</span></h3>
+        <ul>{% for item in entry.refined %}<li>{{ item }}</li>{% endfor %}</ul>
+      </section>
+      {% endif %}
+
+      {% if entry.resolved %}
+      <section class="chronicle-section">
+        <h3><span>Resolved</span><span class="ct">{{ entry.resolved | length }} {{ "entry" if entry.resolved | length == 1 else "entries" }}</span></h3>
+        <ul>{% for item in entry.resolved %}<li>{{ item }}</li>{% endfor %}</ul>
+      </section>
+      {% endif %}
+
+      {% if entry.archivist_note %}
+      <div class="chronicle-note">
+        <div class="chronicle-note-label">Notes from the Archivist</div>
+        <p>{{ entry.archivist_note }}</p>
+      </div>
+      {% endif %}
+    </article>
+    {% else %}
+    <div class="chronicle-notfound">
+      {% if not_found_version %}
+      <p>
+        No Chronicle entry for <b>v{{ not_found_version }}</b>.
+        The Cartarch Chronicle covers the v3.27.6 rebrand forward; releases prior to that
+        belong to the project's earlier engineering history.
+      </p>
+      <p style="margin-top: 0.75rem;">
+        <a href="/chronicle">Read the latest entry →</a>
+      </p>
+      {% else %}
+      <p>No Chronicle entries yet.</p>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    {# === RIGHT: Archive of Issues === #}
+    <aside class="chronicle-archive">
+      <div class="chronicle-archive-head">
+        <div class="crumb">§ Archive of Issues</div>
+        <h2>The <b>full record</b>.</h2>
+      </div>
+
+      {% set current_version = entry.version if entry else None %}
+      {% for folio in archive %}
+      <div class="chronicle-folio">
+        <div class="chronicle-folio-h">Folio {{ to_roman(folio.folio) }}</div>
+        {% for issue in folio.issues %}
+        <div class="chronicle-issue">
+          <div class="chronicle-issue-h">
+            <span>Issue {{ to_roman(issue.issue) }}</span>
+            <span class="raw">{{ issue.entries | length }} {{ "entry" if issue.entries | length == 1 else "entries" }}</span>
+          </div>
+          <div class="chronicle-entries">
+            {% for e in issue.entries %}
+            <a class="chronicle-entry-row{% if e.version == current_version %} current{% endif %}"
+               href="/chronicle/v{{ e.version }}">
+              <span class="ent">Entry {{ to_roman(e.patch) }}</span>
+              <span class="nm">{{ e.summary }}</span>
+              <span class="dt">{{ e.date }}</span>
+            </a>
+            {% endfor %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% endfor %}
+    </aside>
+  </div>
+</div>
+{% endblock %}

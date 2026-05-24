@@ -227,6 +227,23 @@ def favicon() -> FileResponse:
 _REDIRECT_ALLOWED_HOSTS: frozenset[str] = frozenset({"cartarch.com", "www.cartarch.com"})
 
 
+# v3.28.2 — Chronicle content artifact. Loaded ONCE at module import.
+# The file is curated (not auto-generated from release-history.md): the
+# release-history.md is the engineering record; chronicle.json is the
+# public-facing reader reframing. Each future release adds an entry as
+# part of the project-memory update — see CLAUDE.md "Forward process".
+# Sorted newest-first; CHRONICLE_ENTRIES[0] is the current release.
+_CHRONICLE_PATH = os.path.join(os.path.dirname(__file__), "data", "chronicle.json")
+try:
+    with open(_CHRONICLE_PATH, encoding="utf-8") as _f:
+        CHRONICLE_ENTRIES: list[dict] = json.load(_f)
+except (FileNotFoundError, json.JSONDecodeError):
+    # A startup-time read miss must not break the app — the Chronicle
+    # surface degrades to "no entries" rather than 500.
+    CHRONICLE_ENTRIES = []
+CHRONICLE_BY_VERSION: dict[str, dict] = {e["version"]: e for e in CHRONICLE_ENTRIES}
+
+
 def safe_redirect_url(request: Request, default: str = "/collection") -> str:
     # Validate before using Referer as redirect target — an attacker can set it to an external URL.
     referer = request.headers.get("referer", "")
@@ -500,6 +517,128 @@ def terms_page(
         "terms.html",
         {"title": "Terms — Cartarch", "current_user": current_user},
     )
+
+
+def _chronicle_archive_groups() -> list[dict]:
+    """Group Chronicle entries by Folio (major version) → Issue (minor) for
+    the Archive sidebar. Entries within each Issue are listed newest-first
+    by Entry (patch); the order of CHRONICLE_ENTRIES is preserved.
+
+    Returns a list shaped like:
+        [
+          {"folio": 3, "issues": [
+            {"issue": 28, "entries": [
+              {"version": "3.28.2", "patch": 2, "date": "...", "summary": "..."},
+              ...
+            ]},
+            ...
+          ]},
+          ...
+        ]
+
+    ``summary`` is the first non-empty bullet from added → refined → resolved,
+    so the archive sidebar can show a short label per entry without needing
+    a separate field in chronicle.json.
+    """
+    by_folio: dict[int, dict[int, list[dict]]] = {}
+    for entry in CHRONICLE_ENTRIES:
+        parts = entry["version"].split(".")
+        if len(parts) != 3:
+            continue
+        try:
+            folio, issue, patch = int(parts[0]), int(parts[1]), int(parts[2])
+        except ValueError:
+            continue
+        bullets = entry.get("added") or entry.get("refined") or entry.get("resolved") or []
+        summary = (bullets[0].split(".")[0] if bullets else "").strip()
+        if len(summary) > 80:
+            summary = summary[:77].rstrip() + "…"
+        by_folio.setdefault(folio, {}).setdefault(issue, []).append(
+            {
+                "version": entry["version"],
+                "patch": patch,
+                "date": entry.get("date", ""),
+                "summary": summary or "—",
+            }
+        )
+    # Folios newest-first; Issues newest-first within folio.
+    return [
+        {
+            "folio": f,
+            "issues": [
+                {"issue": i, "entries": by_folio[f][i]}
+                for i in sorted(by_folio[f].keys(), reverse=True)
+            ],
+        }
+        for f in sorted(by_folio.keys(), reverse=True)
+    ]
+
+
+def _render_chronicle(
+    request: Request,
+    current_user: User | None,
+    entry: dict | None,
+    not_found_version: str | None = None,
+    status_code: int = 200,
+):
+    """Shared Chronicle render path — used by both the latest-entry route
+    and the per-version route's not-found state."""
+    return render(
+        request,
+        "chronicle.html",
+        {
+            "title": "Chronicle — Cartarch",
+            "current_user": current_user,
+            "entry": entry,
+            "archive": _chronicle_archive_groups(),
+            "not_found_version": not_found_version,
+        },
+        status_code=status_code,
+    )
+
+
+@app.get("/chronicle")
+def chronicle_page(
+    request: Request,
+    current_user: User | None = Depends(get_optional_current_user),
+):
+    """v3.28.2 — Chronicle landing route. Shows the latest entry as the
+    focused page; the Archive of Issues sidebar lists every prior entry.
+
+    Public, anon-reachable (uses ``get_optional_current_user`` so authed
+    users see the full app shell with sidebar; anon users get the anon
+    shell — same pattern as ``/privacy`` and ``/terms``)."""
+    entry = CHRONICLE_ENTRIES[0] if CHRONICLE_ENTRIES else None
+    return _render_chronicle(request, current_user, entry)
+
+
+@app.get("/chronicle/v{version}")
+def chronicle_entry_page(
+    request: Request,
+    version: str,
+    current_user: User | None = Depends(get_optional_current_user),
+):
+    """v3.28.2 — per-version Chronicle entry. URL pattern is
+    ``/chronicle/vX.Y.Z`` — the literal ``v`` is part of the path, the
+    ``X.Y.Z`` is captured by the path param.
+
+    Roman-numeral URLs (e.g. ``/chronicle/III/XXVIII/II``) do NOT match
+    this single-segment pattern and return 404 from the router — semantic
+    is canonical; Roman is presentation-only.
+
+    An unknown version renders the Chronicle page with a clean
+    not-found notice in place of the focused entry, plus the full
+    Archive sidebar — never a 500 or a blank page."""
+    entry = CHRONICLE_BY_VERSION.get(version)
+    if entry is None:
+        return _render_chronicle(
+            request,
+            current_user,
+            entry=None,
+            not_found_version=version,
+            status_code=404,
+        )
+    return _render_chronicle(request, current_user, entry)
 
 
 @app.post("/register")

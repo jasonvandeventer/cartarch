@@ -75,6 +75,7 @@
   --panel-2: #2E2418;  /* was #13243d; Folio --panel-2 */
   --panel-3: #3A2C1D;  /* was #1a2f4d; Folio --leather (tier-3 surface; v3.27.15 added this token vestigially, v3.28.1 consumed it) */
   --border: rgba(181, 138, 71, 0.22);  /* was #21385a; Folio --border (translucent brass at 22% — semi-transparent border idiom matches the Folio package) */
+  --border-soft: rgba(181, 138, 71, 0.10);  /* NEW (v3.28.2) — softer inner divider, used by the Chronicle page's editorial dividers */
 
   /* --- Working text scale (v3.28.1 — repointed to warm cream) --- */
   --text: #EDE1C4;     /* was #f5f1d7; Folio --cream (anchor value per spec) */
@@ -6847,4 +6848,357 @@ body.game-mode {
   /* Same footprint as the loaded image so rows without an image_url
      don't reflow shorter than rows with one. */
   border-style: dashed;
+}
+
+/* ============================================================================
+   === Chronicle page (v3.28.2) ===
+   ----------------------------------------------------------------------------
+   Two-column page: Chronicle Entry on the left (1.55fr), Archive of Issues
+   on the right (1fr). Editorial register throughout — Newsreader italic
+   headings, antique-gold hairline rules, brass-soft current-entry highlight.
+   Translated from the Folio design package's chrCss block in page_chronicle.jsx.
+   Token mapping: --cream → --text, --cream-2 → --text-dim, --cream-3 → --muted,
+   --brass-2 → --accent-2, --brass-soft → --brand-gold-soft. --border-soft is
+   a new production token (v3.28.2) for the inner editorial dividers.
+   ============================================================================ */
+.chronicle-grid {
+  display: grid;
+  grid-template-columns: 1.55fr 1fr;
+  gap: 22px;
+  align-items: start;
+}
+@media (max-width: 980px) {
+  .chronicle-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.chronicle-entry {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 26px 32px 28px;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.chronicle-entry::before {
+  content: "";
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  right: 12px;
+  bottom: 12px;
+  border: 1px solid var(--border-soft);
+  border-radius: 4px;
+  pointer-events: none;
+}
+.chronicle-entry > * {
+  position: relative;
+  z-index: 1;
+}
+
+.chronicle-mast {
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--border);
+}
+.chronicle-stamp {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-family: "Newsreader", Georgia, serif;
+  font-style: italic;
+  font-size: 22px;
+  color: var(--text);
+  font-weight: 500;
+}
+.chronicle-stamp b {
+  color: var(--accent-2);
+  font-style: italic;
+  font-weight: 500;
+}
+.chronicle-raw {
+  margin-top: 6px;
+  display: flex;
+  gap: 14px;
+  align-items: baseline;
+  font-family: ui-monospace, "JetBrains Mono", monospace;
+  font-size: 11px;
+  color: var(--muted);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-weight: 600;
+}
+.chronicle-raw b {
+  color: var(--text-dim);
+  font-weight: 600;
+}
+.chronicle-raw .chronicle-status {
+  color: var(--brand-green);
+}
+
+.chronicle-title {
+  font-family: "Newsreader", Georgia, serif;
+  font-style: italic;
+  font-size: 36px;
+  line-height: 1.05;
+  font-weight: 400;
+  color: var(--text);
+  letter-spacing: -0.012em;
+  margin: 0;
+}
+.chronicle-title b {
+  font-style: normal;
+  font-weight: 500;
+}
+
+.chronicle-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.chronicle-section h3 {
+  font-family: "Newsreader", Georgia, serif;
+  font-style: italic;
+  font-size: 18px;
+  color: var(--text);
+  font-weight: 500;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.chronicle-section h3::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--border-soft);
+}
+.chronicle-section h3 .ct {
+  font-family: ui-monospace, "JetBrains Mono", monospace;
+  font-style: normal;
+  font-size: 10px;
+  color: var(--muted);
+  letter-spacing: 0.12em;
+}
+.chronicle-section ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.chronicle-section li {
+  font-family: "Newsreader", Georgia, serif;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text-dim);
+  padding-left: 22px;
+  position: relative;
+}
+.chronicle-section li::before {
+  content: "·";
+  position: absolute;
+  left: 6px;
+  top: 0;
+  font-family: "Newsreader", Georgia, serif;
+  font-style: italic;
+  font-size: 18px;
+  color: var(--accent-2);
+  line-height: 1.4;
+}
+
+.chronicle-note {
+  margin-top: 4px;
+  padding: 16px 18px;
+  background: rgba(0, 0, 0, 0.18);
+  border-left: 2px solid var(--accent-2);
+  border-radius: 0 4px 4px 0;
+}
+.chronicle-note-label {
+  font-size: 9.5px;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  color: var(--accent-2);
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+.chronicle-note p {
+  font-family: "Newsreader", Georgia, serif;
+  font-style: italic;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--text-dim);
+  margin: 0;
+}
+
+/* Not-found state — rendered for /chronicle/v{unknown-version}. */
+.chronicle-notfound {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 26px 32px;
+  font-family: "Newsreader", Georgia, serif;
+  font-style: italic;
+  font-size: 16px;
+  color: var(--muted);
+  line-height: 1.55;
+}
+.chronicle-notfound b {
+  color: var(--text);
+  font-style: normal;
+  font-weight: 500;
+}
+.chronicle-notfound a {
+  color: var(--accent-2);
+  text-decoration: underline;
+  text-decoration-color: var(--border);
+}
+
+/* === Archive of Issues === */
+.chronicle-archive {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 22px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.chronicle-archive-head {
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+.chronicle-archive-head .crumb {
+  font-size: 9px;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--accent-2);
+  font-weight: 700;
+}
+.chronicle-archive-head h2 {
+  margin: 6px 0 0;
+  font-family: "Newsreader", Georgia, serif;
+  font-style: italic;
+  font-size: 24px;
+  color: var(--text);
+  font-weight: 500;
+}
+.chronicle-archive-head h2 b {
+  font-style: normal;
+  font-weight: 500;
+}
+
+.chronicle-folio {
+  display: flex;
+  flex-direction: column;
+}
+.chronicle-folio-h {
+  font-family: "Newsreader", Georgia, serif;
+  font-style: italic;
+  font-size: 17px;
+  color: var(--accent-2);
+  font-weight: 500;
+  margin-bottom: 6px;
+}
+.chronicle-issue {
+  padding: 6px 0;
+}
+.chronicle-issue-h {
+  font-family: "Newsreader", Georgia, serif;
+  font-size: 13px;
+  color: var(--text-dim);
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  padding-bottom: 4px;
+  border-bottom: 1px dotted var(--border-soft);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.chronicle-issue-h .raw {
+  font-family: ui-monospace, "JetBrains Mono", monospace;
+  font-size: 9.5px;
+  color: var(--muted);
+  letter-spacing: 0.04em;
+  margin-left: auto;
+  text-transform: uppercase;
+}
+
+.chronicle-entries {
+  display: flex;
+  flex-direction: column;
+  padding-left: 2px;
+}
+/* Each archive row is a link in production (the design package had them
+   non-clickable as a static mockup). The hover lift signals affordance. */
+.chronicle-entry-row {
+  display: grid;
+  grid-template-columns: 60px 1fr auto;
+  gap: 10px;
+  align-items: baseline;
+  padding: 5px 0;
+  border-bottom: 1px dotted var(--border-soft);
+  text-decoration: none;
+  transition: background 0.12s ease;
+}
+.chronicle-entry-row:last-child {
+  border-bottom: 0;
+}
+.chronicle-entry-row:hover {
+  background: rgba(212, 168, 95, 0.06);
+}
+.chronicle-entry-row.current {
+  background: var(--brand-gold-soft);
+  margin: 0 -8px;
+  padding: 5px 8px;
+  border-radius: 4px;
+  border-bottom: 0;
+  position: relative;
+}
+.chronicle-entry-row.current::before {
+  content: "";
+  position: absolute;
+  left: -10px;
+  top: 50%;
+  width: 3px;
+  height: 18px;
+  transform: translateY(-50%);
+  background: var(--accent-2);
+  border-radius: 0 2px 2px 0;
+}
+.chronicle-entry-row .ent {
+  font-family: "Newsreader", Georgia, serif;
+  font-style: italic;
+  font-size: 13px;
+  color: var(--text);
+  font-weight: 500;
+}
+.chronicle-entry-row .nm {
+  font-family: "Newsreader", Georgia, serif;
+  font-size: 12px;
+  color: var(--text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.chronicle-entry-row.current .nm {
+  color: var(--text);
+}
+.chronicle-entry-row .dt {
+  font-family: ui-monospace, "JetBrains Mono", monospace;
+  font-size: 10px;
+  color: var(--muted);
+  letter-spacing: 0.04em;
+}
+
+/* Topbar version pill — now a link to /chronicle (v3.28.2). */
+.version-pill {
+  text-decoration: none;
+}
+.version-pill:hover {
+  background: var(--panel-2);
+  color: var(--text);
 }
