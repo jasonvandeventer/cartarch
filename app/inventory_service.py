@@ -774,7 +774,17 @@ def list_inventory_rows(
     direction: str = "desc",
     page: int = 1,
     per_page: int = 50,
+    owned_counts: dict[str, int] | None = None,
 ) -> tuple[list[InventoryRow], int]:
+    """List inventory rows with optional search / filter / sort.
+
+    v3.27.19 — gained an optional ``owned_counts`` parameter for the
+    ``sort=="count"`` path. When provided, the count sort uses the
+    pre-computed dict instead of re-running the GROUP BY query. The
+    caller (``collection_page``) computes the dict once and passes it
+    in so the same aggregation also feeds the template's group
+    headers; this avoids running the same query twice.
+    """
     page = max(page, 1)
     per_page = max(1, min(per_page, 100))
     reverse = direction == "desc"
@@ -856,6 +866,35 @@ def list_inventory_rows(
     elif sort == "value":
         rows = base_query.all()
         rows.sort(key=lambda r: effective_price(r.card, r.finish) or 0.0, reverse=reverse)
+        rows = rows[(page - 1) * per_page : (page - 1) * per_page + per_page]
+    elif sort == "count":
+        # v3.27.19 — count-sorted collection view (consumer of the shared
+        # name-level owned-count aggregation). The caller passes the
+        # pre-computed name→total dict via ``owned_counts`` so the same
+        # single GROUP BY query also feeds the template's group headers
+        # (no double query). If a caller forgets the dict we degrade to
+        # an empty mapping — sort still terminates, just with everything
+        # tying at count=0, which is harmless rather than crashing.
+        owned = owned_counts or {}
+        rows = base_query.all()
+        # Two-pass stable sort: first the secondary key (name → printing
+        # → location → id), then the primary key (total owned count).
+        # Python's sort is stable, so applying the count sort last means
+        # ties break in the secondary order. Three-level grouping is a
+        # presentational outcome of this ordering.
+        rows.sort(
+            key=lambda r: (
+                (r.card.name or "").lower(),
+                (r.card.set_code or ""),
+                (r.card.collector_number or ""),
+                (r.storage_location.name if r.storage_location else "Unassigned"),
+                r.id,
+            )
+        )
+        rows.sort(
+            key=lambda r: owned.get((r.card.name or "").lower(), 0),
+            reverse=reverse,
+        )
         rows = rows[(page - 1) * per_page : (page - 1) * per_page + per_page]
     else:
         query = base_query.order_by(InventoryRow.id.desc() if reverse else InventoryRow.id.asc())

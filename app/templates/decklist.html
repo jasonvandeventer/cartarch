@@ -1,0 +1,204 @@
+{% extends "base.html" %}
+{% block content %}
+  {# v3.27.19 — Decklist collection check.
+     Paste a decklist; see what you own, where it lives, and what's
+     missing. Reuses the import flow's paste parser (so a list that
+     imports cleanly matches cleanly here) and the v3.26.2 location
+     mode system to surface tradeable-first ordering of matched
+     copies. NEVER touches Scryfall — local matching only. #}
+  <section class="panel pagehead">
+    <div class="pagehead-eyebrow">Decklist</div>
+    <h1 class="pagehead-title">Decklist Collection Check</h1>
+    <p class="pagehead-tagline">
+      Paste a decklist (Moxfield / MTGA / MTGO format). See which cards you already own, where each printing lives, and what's missing.
+    </p>
+  </section>
+
+  <section class="panel">
+    <form method="post" action="/decklist" class="decklist-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <label for="decklist-paste" class="decklist-label">Paste your decklist below</label>
+      <textarea id="decklist-paste"
+                name="decklist"
+                class="decklist-textarea"
+                rows="14"
+                placeholder="1 Sol Ring (CMR) 333&#10;1 Arcane Signet (CMR) 297&#10;1 Counterspell&#10;...&#10;"
+                spellcheck="false"
+                autocomplete="off">{{ raw_decklist or '' }}</textarea>
+      <div class="decklist-form-actions">
+        <button type="submit" class="btn-primary">Check collection</button>
+        {% if submitted %}<a href="/decklist" class="btn-like btn-like-muted">Reset</a>{% endif %}
+      </div>
+    </form>
+  </section>
+
+  {% if submitted %}
+    <section class="panel decklist-summary">
+      <div class="decklist-summary-stats">
+        <span><strong>{{ total_unique }}</strong> distinct cards in the list</span>
+        <span><strong>{{ total_wanted }}</strong> total copies wanted</span>
+      </div>
+      <div class="decklist-summary-buckets">
+        <span class="decklist-bucket-chip decklist-bucket-have">{{ have | length }} have</span>
+        <span class="decklist-bucket-chip decklist-bucket-partial">{{ partial | length }} partial</span>
+        <span class="decklist-bucket-chip decklist-bucket-missing">{{ missing | length }} missing</span>
+        {% if basics %}<span class="decklist-bucket-chip decklist-bucket-basics">{{ basics | length }} basics</span>{% endif %}
+      </div>
+    </section>
+
+    {% macro _printing_row(p) -%}
+      <li class="decklist-printing
+                 decklist-printing-{{ 'tradeable' if p.is_tradeable else 'locked' }}">
+        {# v3.27.19 enhancement — small card-image thumbnail.
+           The card's Scryfall image_url is typically the "normal" size;
+           the regex swap to "small" at render time matches the same
+           pattern v3.26.1 uses for commander art_crop swaps. Click
+           target goes to the card-detail page so a user can act on the
+           printing (move, sell, etc.). #}
+        <a class="decklist-printing-thumb-wrap" href="/cards/{{ p.card_id }}">
+          {% if p.image_url %}
+            <img class="decklist-printing-thumb"
+                 src="{{ p.image_url | replace('/normal/', '/small/') }}"
+                 alt="{{ p.name }} ({{ p.set_code | upper }} #{{ p.collector_number }})"
+                 loading="lazy">
+          {% else %}
+            <span class="decklist-printing-thumb decklist-printing-thumb-empty" aria-hidden="true"></span>
+          {% endif %}
+        </a>
+        <span class="decklist-printing-set">{{ p.set_code | upper }}</span>
+        <span class="decklist-printing-num">#{{ p.collector_number }}</span>
+        <span class="decklist-printing-qty">×{{ p.quantity }}</span>
+        {% if p.finish != 'normal' %}<span class="finish-badge">{{ p.finish }}</span>{% endif %}
+        {% if p.is_proxy %}<span class="finish-badge">proxy</span>{% endif %}
+        <span class="decklist-printing-loc">→ {{ p.storage_location_full_label }}</span>
+        {% if not p.is_tradeable %}
+          <span class="decklist-printing-locked-mark"
+                title="In a {{ p.storage_location_mode }}-mode location — moving this means breaking something">🔒</span>
+        {% endif %}
+      </li>
+    {%- endmacro %}
+
+    {% if have %}
+      <section class="panel decklist-section decklist-section-have">
+        <h3 class="panel-title">
+          <span class="decklist-section-dot decklist-section-dot-have"></span>
+          Have it ({{ have | length }})
+        </h3>
+        <ul class="decklist-card-list">
+          {% for entry in have %}
+            <li class="decklist-card">
+              <div class="decklist-card-header">
+                <span class="decklist-card-name">{{ entry.name }}</span>
+                <span class="decklist-card-counts">{{ entry.owned }} owned · {{ entry.wanted }} wanted</span>
+              </div>
+              <details class="decklist-card-details">
+                <summary>Printings + locations ({{ entry.printings | length }})</summary>
+                <ul class="decklist-printings">
+                  {% for p in entry.printings %}{{ _printing_row(p) }}{% endfor %}
+                </ul>
+              </details>
+            </li>
+          {% endfor %}
+        </ul>
+      </section>
+    {% endif %}
+
+    {% if partial %}
+      <section class="panel decklist-section decklist-section-partial">
+        <h3 class="panel-title">
+          <span class="decklist-section-dot decklist-section-dot-partial"></span>
+          Partial ({{ partial | length }})
+        </h3>
+        <p class="muted">
+          You own some copies but not the quantity the list asks for. The Need column shows the shortfall.
+        </p>
+        <ul class="decklist-card-list">
+          {% for entry in partial %}
+            <li class="decklist-card">
+              <div class="decklist-card-header">
+                <span class="decklist-card-name">{{ entry.name }}</span>
+                <span class="decklist-card-counts">
+                  {{ entry.owned }} owned · {{ entry.wanted }} wanted ·
+                  <strong>need {{ entry.wanted - entry.owned }}</strong>
+                </span>
+              </div>
+              <details class="decklist-card-details" open>
+                <summary>Printings + locations ({{ entry.printings | length }})</summary>
+                <ul class="decklist-printings">
+                  {% for p in entry.printings %}{{ _printing_row(p) }}{% endfor %}
+                </ul>
+              </details>
+            </li>
+          {% endfor %}
+        </ul>
+      </section>
+    {% endif %}
+
+    {% if missing %}
+      <section class="panel decklist-section decklist-section-missing">
+        <h3 class="panel-title">
+          <span class="decklist-section-dot decklist-section-dot-missing"></span>
+          Missing ({{ missing | length }})
+        </h3>
+        <ul class="decklist-card-list decklist-card-list-missing">
+          {% for entry in missing %}
+            <li class="decklist-card decklist-card-missing">
+              <span class="decklist-card-name">{{ entry.name }}</span>
+              <span class="decklist-card-counts">need {{ entry.wanted }}</span>
+            </li>
+          {% endfor %}
+        </ul>
+      </section>
+    {% endif %}
+
+    {% if basics %}
+      <section class="panel decklist-section decklist-section-basics">
+        <h3 class="panel-title">
+          <span class="decklist-section-dot decklist-section-dot-basics"></span>
+          Basic lands ({{ basics | length }})
+        </h3>
+        <p class="muted">
+          Set aside because basic-land counts aren't a meaningful trade question. Owned-vs-wanted shown for reference.
+        </p>
+        <ul class="decklist-card-list decklist-card-list-basics">
+          {% for entry in basics %}
+            <li class="decklist-card">
+              <span class="decklist-card-name">{{ entry.name }}</span>
+              <span class="decklist-card-counts">{{ entry.owned }} owned · {{ entry.wanted }} wanted</span>
+            </li>
+          {% endfor %}
+        </ul>
+      </section>
+    {% endif %}
+
+    {% if unresolved_short %}
+      <section class="panel decklist-section decklist-section-unresolved">
+        <h3 class="panel-title">
+          <span class="decklist-section-dot decklist-section-dot-missing"></span>
+          Couldn't match these short-form lines ({{ unresolved_short | length }})
+        </h3>
+        <p class="muted">
+          These lines used the bare <code>SET COLLECTOR</code> shorthand but couldn't be resolved against your local card data. Add a card name, or use the import flow at <a href="/import">/import</a> to bring the card into your collection first.
+        </p>
+        <ul class="decklist-card-list decklist-card-list-missing">
+          {% for e in unresolved_short %}
+            <li class="decklist-card decklist-card-missing">
+              <span class="decklist-card-name">
+                {{ e.set_code | upper }} #{{ e.collector_number }}
+              </span>
+              <span class="decklist-card-counts">need {{ e.quantity }} · line {{ e.line_number }}</span>
+            </li>
+          {% endfor %}
+        </ul>
+      </section>
+    {% endif %}
+
+    {% if not have and not partial and not missing and not basics and not unresolved_short %}
+      <section class="panel">
+        <p class="muted">
+          No card lines parsed from the paste. Each line should look like <code>1 Sol Ring (CMR) 333</code> or just <code>Sol Ring</code> — section headers (Deck, Sideboard, Commander) are skipped silently.
+        </p>
+      </section>
+    {% endif %}
+  {% endif %}
+{% endblock %}

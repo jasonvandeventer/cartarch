@@ -2,7 +2,7 @@
 
 Self-hosted web application for managing a physical Magic: The Gathering collection. (Identifies as **Cartarch** in user-facing UI as of v3.27.6; the in-repo project identifier is still `mana-archive` pending the full infrastructure rename near actual public launch.)
 
-**Current version: v3.27.18** · [Platform repo](https://github.com/jasonvandeventer/mana-archive-platform)
+**Current version: v3.27.19** · [Platform repo](https://github.com/jasonvandeventer/mana-archive-platform)
 
 ---
 
@@ -63,7 +63,16 @@ See [docs/screenshots/](docs/screenshots/) for capture guidelines and additional
 - Browse and search your full inventory with Scryfall-style boolean syntax
 - Keywords: `t:creature`, `c:WU`, `cmc:>3`, `o:"draw a card"`, `id:gb`, `price:>=5`, `is:foil`, `qty:>1`, and more
 - Full boolean logic: `OR`, `AND`, `-negation`, `(grouping)`, quoted multi-word values
-- Sort by name, type, mana cost, color, or price
+- Sort by name, type, mana cost, color, price, or **owned count** (count-sorted view groups all printings of a high-count name together — three-level grouping name → printing → location)
+
+### Decklist Check
+
+- Paste a decklist at `/decklist` (Moxfield / MTGA / MTGO format); see what's already in your collection, what's missing, and where each owned copy lives
+- Four buckets: **Have it** (owned ≥ wanted), **Partial** (own some but fewer than wanted; shows shortfall), **Missing** (own none), **Basic lands** (set aside separately — basic-land counts aren't a meaningful trade question)
+- Each Have / Partial result shows the per-printing locations, sorted **tradeable-first**: copies in `managed`/`sink` locations (loose, sortable) surface ahead of copies in `manual` locations (decks, display cases, sentimental boxes) so you see actionable inventory before "would-have-to-break-something" inventory
+- Reuses the import flow's paste parser — a list that imports cleanly via `/import` matches cleanly here
+- Local-only matching — pasted card names that don't match your inventory become Missing results; never falls back to a Scryfall lookup
+- Stateless (no saved wantlists in v1)
 
 ### Imports
 

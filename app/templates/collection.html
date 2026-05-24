@@ -117,6 +117,12 @@
         <option value="cmc" {% if sort == 'cmc' %}selected{% endif %}>Mana Cost</option>
         <option value="value" {% if sort == 'value' %}selected{% endif %}>Price (Each)</option>
         <option value="placement" {% if sort == 'placement' %}selected{% endif %}>Placement</option>
+        {# v3.27.19 — owned-count sort. Groups all printings of a
+           high-count name together (e.g. a dozen Sol Ring printings),
+           ordered by total copies owned across all printings + all
+           locations. Three-level grouping (name → printing → location)
+           rendered via group headers in the card grid below. #}
+        <option value="count" {% if sort == 'count' %}selected{% endif %}>Owned Count</option>
       </select>
       <select name="direction">
         <option value="asc" {% if direction == 'asc' %}selected{% endif %}>Ascending</option>
@@ -132,17 +138,56 @@
     </form>
   </section>
   {% if items %}
-    <section class="card-grid-section">
-      <div class="inventory-grid">
+    {# v3.27.19 — when count-sorted, render three-level group headers
+       (name → printing → location) between rows. Other sorts render the
+       flat grid as before; the count-sort branch is the only consumer
+       of the new "owned_total" item field. Tracking previous values
+       via Jinja namespace() — Jinja loop scope doesn't survive the
+       iteration boundary without it. #}
+    {% if sort == 'count' %}
+      <section class="card-grid-section">
+        {% set ns = namespace(prev_name='', prev_printing='') %}
         {% for item in items %}
-          {{ inventory_card(item, csrf_token,
-                    show_collection_actions=true,
-                    show_location_label=true,
-                    decks=decks,
-                    locations=locations) }}
+          {% set name_key = (item.card.name or '') | lower %}
+          {% set printing_key = (item.card.set_code or '') ~ '#' ~ (item.card.collector_number or '') %}
+          {% if name_key != ns.prev_name %}
+            <h3 class="collection-group-name">
+              {{ item.card.name }}
+              {% if item.owned_total %}
+                <span class="collection-group-name-count">×{{ item.owned_total }} owned</span>
+              {% endif %}
+            </h3>
+          {% endif %}
+          {% if printing_key != ns.prev_printing or name_key != ns.prev_name %}
+            <div class="collection-group-printing">
+              {{ (item.card.set_code or '?') | upper }}
+              #{{ item.card.collector_number or '?' }}
+            </div>
+          {% endif %}
+          <div class="inventory-grid collection-group-rows">
+            {{ inventory_card(item, csrf_token,
+                      show_collection_actions=true,
+                      show_location_label=true,
+                      decks=decks,
+                      locations=locations) }}
+          </div>
+          {% set ns.prev_name = name_key %}
+          {% set ns.prev_printing = printing_key %}
         {% endfor %}
-      </div>
-    </section>
+      </section>
+    {% else %}
+      <section class="card-grid-section">
+        <div class="inventory-grid">
+          {% for item in items %}
+            {{ inventory_card(item, csrf_token,
+                      show_collection_actions=true,
+                      show_location_label=true,
+                      decks=decks,
+                      locations=locations) }}
+          {% endfor %}
+        </div>
+      </section>
+    {% endif %}
     <section class="panel controls-panel" style="margin-top: 1rem;">
       <div class="hero-row"
            style="align-items: center;

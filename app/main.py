@@ -70,6 +70,13 @@ from app.deck_service import (
     switch_deck_row_printing,
     update_deck,
 )
+from app.decklist_service import (
+    bucket_decklist_results,
+    name_owned_counts,
+    owned_inventory_for_names,
+    parse_decklist_text,
+    resolve_short_form_lines,
+)
 from app.dependencies import (
     DRAWER_SORTER_USERNAMES,
     CsrfRequired,
@@ -1852,6 +1859,16 @@ def collection_page(
     if selected_location and selected_location.type == "drawer":
         drawer = selected_location.name.replace("Drawer", "").strip()
 
+    # v3.27.19 — when count-sorting, run the name-level owned-count
+    # aggregation ONCE up front. Pass the dict into list_inventory_rows
+    # for the sort key AND into the template for three-level group
+    # header rendering (name → printing → location). Single GROUP BY
+    # query per page load — the spec's N+1 failure mode is the
+    # per-InventoryRow count, not a single pre-computed pass.
+    owned_counts: dict[str, int] | None = None
+    if sort == "count":
+        owned_counts = name_owned_counts(session, current_user.id)
+
     inventory_rows, total_count = list_inventory_rows(
         session,
         user_id=current_user.id,
@@ -1863,6 +1880,7 @@ def collection_page(
         direction=direction,
         page=page,
         per_page=per_page,
+        owned_counts=owned_counts,
     )
 
     stats = get_inventory_row_stats(
@@ -1921,6 +1939,15 @@ def collection_page(
                 "drawer_label": get_location_label(row),
                 "location_label": location_label,
                 "storage_location_id": row.storage_location_id,
+                # v3.27.19 — total owned across all printings of this
+                # card name. None when sort != "count" so the template
+                # can branch on its presence to decide whether to
+                # render the three-level group headers.
+                "owned_total": (
+                    (owned_counts or {}).get((row.card.name or "").lower())
+                    if owned_counts is not None
+                    else None
+                ),
             }
         )
 
@@ -4852,6 +4879,96 @@ def watchlist_page(
             "title": "Watchlist",
             "items": items,
             "current_user": current_user,
+        },
+    )
+
+
+# ---------------------------------------------------------------------------
+# Decklist collection check (v3.27.19)
+# ---------------------------------------------------------------------------
+
+
+@app.get("/decklist")
+def decklist_page(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+):
+    """Empty paste form. v3.27.19 — stateless; the pasted list isn't
+    persisted (no saved wantlists in v1; that's a possible follow-up)."""
+    return render(
+        request,
+        "decklist.html",
+        {
+            "title": "Decklist Check",
+            "current_user": current_user,
+            "submitted": False,
+        },
+    )
+
+
+@app.post("/decklist")
+def decklist_check(
+    request: Request,
+    decklist: str = Form(""),
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+    _: None = CsrfRequired,
+):
+    """Parse the pasted decklist, match against the user's owned
+    inventory locally (NEVER touches Scryfall — request-path network
+    invariant), and render the buckets.
+
+    Re-uses the import flow's ``_parse_list_line`` so a list that
+    imports cleanly via ``/import`` matches cleanly here (matching
+    parity per spec). The owned-count aggregation is one indexed
+    GROUP BY query; per-printing detail is one batched fetch.
+    """
+    name_entries, short_entries = parse_decklist_text(decklist)
+    # Resolve any short-form (SET COLLECTOR [qty]) lines via local Card
+    # lookup so they slot into the normal name-aggregated pipeline
+    # alongside paste lines that carried names. NEVER calls Scryfall.
+    resolved, unresolved_short = resolve_short_form_lines(session, short_entries)
+    # Merge resolved-by-short-form into name_entries, summing quantities
+    # when the same name appears in both (e.g. user pasted "4x Sol Ring"
+    # and "CMR 333" with quantity 1 — total wanted = 5).
+    merged: dict[str, dict] = {}
+    for e in name_entries + resolved:
+        key = e["name"].lower()
+        if key in merged:
+            merged[key]["quantity"] += e["quantity"]
+            merged[key]["line_numbers"].extend(e.get("line_numbers", []))
+        else:
+            merged[key] = dict(e)
+    all_entries = list(merged.values())
+
+    # Single GROUP BY aggregation against the user's full inventory,
+    # narrowed to the decklist's names. Returns a name→total-owned dict
+    # for O(1) application-side lookup. Stress-tested at 20–50k rows
+    # (see release-history entry for measurement details).
+    owned_names = [e["name"] for e in all_entries]
+    owned_counts = name_owned_counts(session, current_user.id, names=owned_names)
+    # Per-row detail fetch for the matched names (single batched query
+    # with LEFT JOIN to StorageLocation; sorted tradeable-first inside
+    # the service helper).
+    owned_detail = owned_inventory_for_names(session, current_user.id, owned_names)
+
+    buckets = bucket_decklist_results(all_entries, owned_counts, owned_detail)
+
+    return render(
+        request,
+        "decklist.html",
+        {
+            "title": "Decklist Check",
+            "current_user": current_user,
+            "submitted": True,
+            "raw_decklist": decklist,
+            "have": buckets["have"],
+            "partial": buckets["partial"],
+            "missing": buckets["missing"],
+            "basics": buckets["basics"],
+            "unresolved_short": unresolved_short,
+            "total_unique": len(all_entries),
+            "total_wanted": sum(e["quantity"] for e in all_entries),
         },
     )
 

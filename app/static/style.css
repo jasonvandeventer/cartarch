@@ -6417,3 +6417,350 @@ body.game-mode {
     text-align: center;
   }
 }
+
+/* ============================================================================
+   v3.27.19 — Decklist Collection Check
+   ----------------------------------------------------------------------------
+   The decklist-check page renders inside the standard .app-shell, so its
+   surface inherits the navy palette + topbar + sidebar from base.html. The
+   rules below are page-specific composition only; every value resolves via
+   the v3.27.7 / v3.27.15 token layer. Zero new tokens.
+
+   Sections rendered in order on the page:
+   * .pagehead — title + tagline (existing component, no per-page styling)
+   * .decklist-form — paste textarea + submit + reset
+   * .decklist-summary — counts strip across the top of results
+   * .decklist-section-* — Have / Partial / Missing / Basics / Unresolved
+     each carrying their own border-left accent in the bucket color.
+   ============================================================================ */
+
+.decklist-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.decklist-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-dim);
+}
+.decklist-textarea {
+  /* Token-reuse styling — same palette as the existing inputs across the
+     app; explicit min-height so the textarea is comfortable for a 60-100
+     line decklist without the user needing to drag the resize handle. */
+  width: 100%;
+  min-height: 240px;
+  padding: var(--space-3);
+  background: var(--panel-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-family:
+    ui-monospace,
+    "SF Mono",
+    Menlo,
+    Consolas,
+    monospace;
+  font-size: 0.86rem;
+  line-height: 1.55;
+  resize: vertical;
+}
+.decklist-textarea:focus {
+  outline: 2px solid var(--brand-gold-soft);
+  outline-offset: -1px;
+  border-color: var(--brand-gold);
+}
+.decklist-form-actions {
+  display: flex;
+  gap: var(--space-3);
+  align-items: center;
+}
+/* Primary submit button — gold pill that matches the v3.27.17 landing
+   CTA visual language. Reuses --brand-gold + --brand-near-black for the
+   on-gold text contrast. */
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.55rem 1.1rem;
+  background: var(--brand-gold);
+  color: var(--brand-near-black);
+  border: 0;
+  border-radius: var(--radius-sm);
+  font-weight: 700;
+  font-size: 0.92rem;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: filter 0.15s ease;
+}
+.btn-primary:hover {
+  filter: brightness(1.08);
+}
+
+.decklist-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+.decklist-summary-stats {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  color: var(--text-dim);
+  font-size: 0.9rem;
+}
+.decklist-summary-stats strong {
+  color: var(--text);
+  font-weight: 700;
+}
+.decklist-summary-buckets {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.decklist-bucket-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.3rem 0.75rem;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--text);
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+.decklist-bucket-have {
+  border-color: rgba(46, 125, 70, 0.6);
+  color: var(--brand-green);
+}
+.decklist-bucket-partial {
+  border-color: rgba(200, 161, 90, 0.6);
+  color: var(--brand-gold);
+}
+.decklist-bucket-missing {
+  border-color: rgba(199, 61, 61, 0.55);
+  color: var(--brand-red);
+}
+.decklist-bucket-basics {
+  border-color: var(--border);
+  color: var(--text-dim);
+}
+
+/* Section header dot — small colored circle that ties each section's
+   panel-title to the corresponding chip color in the summary strip. */
+.decklist-section-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-right: 0.5rem;
+  vertical-align: middle;
+}
+.decklist-section-dot-have {
+  background: var(--brand-green);
+}
+.decklist-section-dot-partial {
+  background: var(--brand-gold);
+}
+.decklist-section-dot-missing {
+  background: var(--brand-red);
+}
+.decklist-section-dot-basics {
+  background: var(--muted);
+}
+
+.decklist-section {
+  border-left: 3px solid transparent;
+}
+.decklist-section-have {
+  border-left-color: rgba(46, 125, 70, 0.5);
+}
+.decklist-section-partial {
+  border-left-color: rgba(200, 161, 90, 0.5);
+}
+.decklist-section-missing {
+  border-left-color: rgba(199, 61, 61, 0.4);
+}
+.decklist-section-basics {
+  border-left-color: var(--border);
+}
+.decklist-section-unresolved {
+  border-left-color: rgba(199, 61, 61, 0.4);
+}
+
+.decklist-card-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.decklist-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+.decklist-card-header {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+.decklist-card-name {
+  font-weight: 600;
+  color: var(--text);
+}
+.decklist-card-counts {
+  font-size: 0.86rem;
+  color: var(--text-dim);
+}
+.decklist-card-counts strong {
+  color: var(--brand-gold);
+}
+
+/* Missing + Basics bucket cards are single-row (no expand) — use a
+   flat two-column row layout instead of the multi-row Have/Partial
+   layout above. */
+.decklist-card-list-missing .decklist-card,
+.decklist-card-list-basics .decklist-card {
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.decklist-card-details summary {
+  cursor: pointer;
+  font-size: 0.82rem;
+  color: var(--text-dim);
+  padding: 0.15rem 0;
+}
+.decklist-card-details summary:hover {
+  color: var(--text);
+}
+.decklist-printings {
+  list-style: none;
+  margin: 0.4rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+.decklist-printing {
+  /* Each printing-and-location row — set / collector / qty / finish-or-
+     proxy badge / location name. The .decklist-printing-locked variant
+     (deck or manual-mode location) is dimmer so the eye lands on
+     tradeable copies first. */
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0.6rem;
+  background: var(--panel);
+  border-radius: var(--radius-sm);
+  font-size: 0.82rem;
+  color: var(--text);
+}
+.decklist-printing-locked {
+  opacity: 0.72;
+}
+.decklist-printing-set {
+  font-weight: 700;
+  color: var(--brand-gold);
+  letter-spacing: 0.04em;
+}
+.decklist-printing-num {
+  color: var(--text-dim);
+}
+.decklist-printing-qty {
+  color: var(--text);
+  font-weight: 600;
+}
+.decklist-printing-loc {
+  margin-left: auto;
+  color: var(--text-dim);
+}
+.decklist-printing-locked-mark {
+  font-size: 0.95rem;
+}
+
+/* v3.27.19 — count-sorted collection view group headers.
+   Three-level grouping per the v3.27.18 spec settlement (name →
+   printing → location): the name header is the top tier with the
+   total owned count appended; the printing header is the middle tier
+   showing the set + collector for the run of rows sharing that
+   printing; each row's location is shown by the existing
+   inventory_card macro (the bottom tier). No new tokens. */
+.collection-group-name {
+  margin: 1.25rem 0 0.35rem;
+  padding-bottom: 0.35rem;
+  border-bottom: 1px solid var(--border);
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: 0.01em;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+.collection-group-name-count {
+  color: var(--brand-gold);
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+.collection-group-printing {
+  margin: 0.6rem 0 0.35rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+.collection-group-printing::before {
+  content: "▾ ";
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+/* Stack each row group as a single-column grid so the printing header
+   sits ABOVE its rows rather than next to them; subsequent rows in the
+   same printing flow naturally onto the next line. */
+.collection-group-rows {
+  margin-bottom: 0.5rem;
+}
+
+/* v3.27.19 enhancement — per-printing thumbnail in the decklist
+   checker. Tiny so 8+ printings fit cleanly inside an open <details>.
+   The MTG card aspect ratio is ~63:88, so 28px wide × 39px tall keeps
+   the image legible without crowding the row. Anchor wraps the
+   image to make the click target the card-detail page. */
+.decklist-printing-thumb-wrap {
+  flex-shrink: 0;
+  line-height: 0;
+  text-decoration: none;
+}
+.decklist-printing-thumb {
+  width: 28px;
+  height: 39px;
+  border-radius: 3px;
+  display: block;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  /* MTG card art clips at the very edge; tiny visible border helps
+     the image read as a card rather than a generic thumbnail. */
+}
+.decklist-printing-thumb-empty {
+  /* Same footprint as the loaded image so rows without an image_url
+     don't reflow shorter than rows with one. */
+  border-style: dashed;
+}
