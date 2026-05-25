@@ -6,7 +6,7 @@ from collections.abc import Iterable
 from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import Float as SAFloat
-from sqlalchemy import and_, cast, func, not_, or_, select, text, tuple_
+from sqlalchemy import and_, case, cast, func, not_, or_, select, text, tuple_
 from sqlalchemy.orm import Session, joinedload
 
 from app.audit_service import log_transaction
@@ -640,7 +640,13 @@ def _term_to_clause(key: str | None, value: str):
         if parsed is None:
             return None
         op, val = parsed
-        price_col = cast(Card.price_usd, SAFloat)
+        # v3.28.8 fix — finish-aware via _effective_price_expr (foil →
+        # price_usd_foil with price_usd fallback; etched → price_usd_etched
+        # with foil/normal fallback; else price_usd). Pre-v3.28.8 cast
+        # Card.price_usd directly, which silently let foil rows with cheap
+        # foil prices pass a `price:>=N` filter when their normal was ≥N
+        # but their displayed price was the cheap foil.
+        price_col = _effective_price_expr()
         if op == "=":
             return price_col == val
         if op == ">":
@@ -742,6 +748,32 @@ def _parse_atom(tokens: list[tuple], pos: int) -> tuple:
 
     # OR/AND/RPAREN in unexpected position — skip
     return None, pos + 1
+
+
+# v3.28.8 post-ship fix — finish-aware effective price expression. The
+# pre-v3.28.8 `price:` search keyword cast Card.price_usd directly, which
+# is the NORMAL price — a foil row with a cheap foil price but an
+# expensive normal would pass `price:>=5` even though its display price
+# was the cheap foil. Same shape as the v3.27.10 dashboard's
+# _placed_value_expr — mirrors app.pricing.effective_price's
+# finish-fallback order so SQL filtering matches what the user actually
+# sees on the row. Used by the new v3.28.8 facet price range AND
+# retroactively fixes the `price:` boolean-search keyword.
+def _effective_price_expr():
+    return cast(
+        case(
+            (
+                InventoryRow.finish == "foil",
+                func.coalesce(Card.price_usd_foil, Card.price_usd),
+            ),
+            (
+                InventoryRow.finish == "etched",
+                func.coalesce(Card.price_usd_etched, Card.price_usd_foil, Card.price_usd),
+            ),
+            else_=Card.price_usd,
+        ),
+        SAFloat,
+    )
 
 
 def apply_collection_search_filters(query, search: str):
@@ -853,11 +885,18 @@ def apply_collection_facet_filters(
         if finishes:
             query = query.filter(InventoryRow.finish.in_(finishes))
 
-    price_col = cast(Card.price_usd, SAFloat)
-    if facet_price_min is not None:
-        query = query.filter(price_col >= facet_price_min)
-    if facet_price_max is not None:
-        query = query.filter(price_col <= facet_price_max)
+    # v3.28.8 fix — finish-aware effective price (mirrors
+    # app.pricing.effective_price's fallback order). The original v3.28.8
+    # cut cast Card.price_usd directly, which produced a visible bug: foil
+    # rows with cheap foil prices passed `price_min=N` filters even when
+    # their displayed price was the cheap foil. Same expression now used
+    # by the `price:` boolean-search keyword.
+    if facet_price_min is not None or facet_price_max is not None:
+        price_col = _effective_price_expr()
+        if facet_price_min is not None:
+            query = query.filter(price_col >= facet_price_min)
+        if facet_price_max is not None:
+            query = query.filter(price_col <= facet_price_max)
 
     return query
 

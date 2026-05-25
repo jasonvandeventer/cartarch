@@ -1,5 +1,16 @@
 [
   {
+    "version": "3.28.9",
+    "date": "2026-05-25",
+    "added": [],
+    "refined": [],
+    "resolved": [
+      "The Collection page's new price filter (added in v3.28.8) was checking the card's NORMAL price rather than the price actually shown on the row. Foil cards with cheap foil prices and expensive normal prices were passing through a 'price ≥ $1' filter when their displayed foil price was under $1. The filter now matches what the row displays — same finish-aware fallback the Collection page already uses for the price column itself, and the same expression the dashboard's Collection Value tile uses for SUM. Foil $0.50 displays correctly excluded by price ≥ 1; included by price ≤ 1.",
+      "The boolean-search `price:` / `usd:` keyword has had the same finish-blind issue since v3.8 — a `price:>=5` query was checking only the normal price. Closed in passing because both call sites now go through the same finish-aware expression."
+    ],
+    "archivist_note": "A small post-ship corrective on top of v3.28.8 — same shape as the v3.27.16 and v3.27.18 corrective patches in the prior cluster. The fix is one helper function and two call sites pointing at it; the user's experience changes in one place (foil-priced rows now filter the way they look). The cluster grows from 12 to 13 sub-releases to make room; Imports / Watchlist / Mobile slide down a slot."
+  },
+  {
     "version": "3.28.8",
     "date": "2026-05-25",
     "added": [
