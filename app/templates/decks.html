@@ -1,11 +1,19 @@
 {% extends "base.html" %}
 {% from "_macros.html" import mana_pips, editorial_eyebrow %}
 {% block content %}
+  {# v3.28.7 — editorial-row Decks page. The pre-v3.28.7 table is replaced by
+     a featured-deck panel + compact editorial rows. Per the cluster's
+     page-fork decision (#2), this is the bundle's one real layout change.
+     Data path: deck attributes from list_decks() + per-deck game stats
+     (games / wins / win_rate / last_played) batched via
+     compute_deck_game_stats() — single GROUP BY query, no N+1, same v3.28.5
+     dashboard pattern. The new Deck.blurb column renders as a sub-line on
+     both featured and compact rows when set; hidden when NULL. #}
   <section class="panel page-hero">
     <div>
       {{ editorial_eyebrow("Play · Decks") }}
       <h2 class="panel-title">Deck Management</h2>
-      <p class="pagehead-tagline">Track cards pulled into decks and return them cleanly to your collection.</p>
+      <p class="pagehead-tagline">Build, log, and study your decks — track win-rates from real games and keep flavour notes alongside.</p>
     </div>
     {% if decks %}
       <div class="stat-grid">
@@ -16,6 +24,10 @@
         <div class="stat-card">
           <div class="stat-value">{{ decks | sum(attribute='card_count') }}</div>
           <div class="stat-label">Total Cards in Decks</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">{{ decks | sum(attribute='games') }}</div>
+          <div class="stat-label">Games Logged</div>
         </div>
       </div>
     {% endif %}
@@ -38,75 +50,187 @@
     </form>
   </section>
   {% if decks %}
-    <section class="panel">
-      <div class="table-wrap">
-        <table class="stacking-table">
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th class="col-priority-mid">Format</th>
-              <th>Total Cards</th>
-              <th class="col-priority-low">Health</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for deck in decks %}
-              <tr>
-                <td>
-                  <a href="/decks/{{ deck.id }}">{{ deck.name }}</a>
-                  <span class="mana-pip-row">{{ mana_pips(deck.color_identity) }}</span>
-                </td>
-                <td class="col-priority-mid" data-label="Format">{{ deck.format or '—' }}</td>
-                <td data-label="Total Cards">{{ deck.card_count or 0 }}</td>
-                {# v3.27.9: Bracket column removed pending analytics rebuild (see roadmap.md Deferred / latent items "Deck Analytics Rebuild"). #}
-                <td class="col-priority-low" data-label="Health">
+    {% set has_games = decks | selectattr('games') | list | length > 0 %}
+
+    {# Featured deck — the most active by game count, falling back to first
+       by name when no deck has logged games. The featured slot collapses to
+       just the compact-row treatment when there's nothing to feature. #}
+    {% if featured and featured.games > 0 %}
+      <section class="decks-featured">
+        <div class="decks-featured-tag">Featured · Most active</div>
+        <div class="decks-featured-grid">
+          <div class="decks-featured-art">
+            {% if featured.color_identity %}
+              <div class="decks-featured-art-pip">{{ mana_pips(featured.color_identity) }}</div>
+            {% endif %}
+          </div>
+          <div class="decks-featured-copy">
+            <h2 class="decks-featured-name">
+              <a href="/decks/{{ featured.id }}">{{ featured.name }}</a>
+            </h2>
+            <div class="decks-featured-meta">
+              {% if featured.color_identity %}
+                <span class="decks-featured-pips">{{ mana_pips(featured.color_identity) }}</span>
+              {% endif %}
+              <span class="decks-featured-fmt">{{ featured.format or 'Commander' }}</span>
+              <span class="decks-featured-cards">{{ featured.card_count or 0 }} cards</span>
+            </div>
+            {% if featured.blurb %}
+              <p class="decks-featured-blurb">{{ featured.blurb }}</p>
+            {% endif %}
+            {% if featured.consistency %}
+              <div class="decks-featured-tags">
+                <span class="decks-featured-tag-chip cs-{{ featured.consistency.tier }}">
+                  {{ featured.consistency.label }} · {{ featured.consistency.score }}
+                </span>
+              </div>
+            {% endif %}
+          </div>
+          <div class="decks-featured-record">
+            <div class="decks-featured-record-label">Record</div>
+            <div class="decks-featured-record-v">
+              {{ featured.wins }}<span class="decks-featured-record-sep">–</span>{{ featured.losses }}
+            </div>
+            <div class="decks-featured-record-pct {% if featured.win_rate >= 0.5 %}up{% else %}dn{% endif %}">
+              {{ (featured.win_rate * 100) | round | int }}% over {{ featured.games }}g
+            </div>
+            {% if featured.last_played %}
+              <div class="decks-featured-record-last">
+                Last played {{ featured.last_played | editorial_date }}
+              </div>
+            {% endif %}
+            <a href="/decks/{{ featured.id }}" class="decks-featured-open">Open deck →</a>
+          </div>
+        </div>
+      </section>
+    {% endif %}
+
+    {# Compact editorial rows for everything else (or all decks if no
+       feature). Order: by last_played DESC when games exist; otherwise
+       by name. The featured deck is filtered out of this list. #}
+    {% set others = decks | rejectattr('id', 'equalto', (featured.id if featured and featured.games > 0 else 0)) | list %}
+    {% if others %}
+      <section class="decks-rows">
+        {% for deck in others %}
+          <article class="decks-row {% if deck.consistency and deck.consistency.tier == 'low' %}decks-row-attn{% endif %}">
+            <div class="decks-row-copy">
+              <h3 class="decks-row-name">
+                <a href="/decks/{{ deck.id }}">{{ deck.name }}</a>
+              </h3>
+              <div class="decks-row-meta">
+                {% if deck.color_identity %}
+                  <span class="decks-row-pips">{{ mana_pips(deck.color_identity) }}</span>
+                {% endif %}
+                <span class="decks-row-fmt">{{ deck.format or 'Commander' }}</span>
+                <span class="decks-row-cards">· {{ deck.card_count or 0 }} cards</span>
+              </div>
+              {% if deck.blurb %}
+                <p class="decks-row-blurb">{{ deck.blurb }}</p>
+              {% endif %}
+            </div>
+            <div class="decks-row-stats">
+              <div class="decks-row-stat">
+                <div class="decks-row-stat-l">Games</div>
+                <div class="decks-row-stat-v">{{ deck.games }}</div>
+              </div>
+              <div class="decks-row-stat">
+                <div class="decks-row-stat-l">Health</div>
+                <div class="decks-row-stat-v">
                   {% if deck.consistency %}
-                    <span class="consistency-badge cs-{{ deck.consistency.tier }}"
-                          title="{{ deck.consistency.label }}">{{ deck.consistency.score }}</span>
+                    <span class="consistency-badge cs-{{ deck.consistency.tier }}" title="{{ deck.consistency.label }}">{{ deck.consistency.score }}</span>
                   {% else %}
-                    —
+                    <span class="decks-row-stat-empty">—</span>
                   {% endif %}
-                </td>
-                <td style="text-align: right; white-space: nowrap;">
-                  <details class="inline-details"
-                           style="display: inline-block;
-                                  margin-right: 0.4rem">
-                    <summary class="btn-like">Edit</summary>
-                    <div class="edit-popout mobile-popover">
-                      <form action="/decks/{{ deck.id }}/edit" method="post" class="stack-form">
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                        <label>Name</label>
-                        <input type="text" name="name" value="{{ deck.name }}" required>
-                        <label>Format</label>
-                        <select name="format_name">
-                          {% for fmt in ['Commander', 'Standard', 'Pioneer', 'Modern', 'Legacy', 'Vintage', 'Cube'] %}
-                            <option value="{{ fmt }}" {% if deck.format == fmt %}selected{% endif %}>{{ fmt }}</option>
-                          {% endfor %}
-                        </select>
-                        <label>Notes</label>
-                        <textarea name="notes" rows="3">{{ deck.notes or '' }}</textarea>
-                        <button type="submit" style="margin-top: 0.25rem">Save</button>
-                      </form>
-                    </div>
-                  </details>
-                  <form action="/decks/{{ deck.id }}/delete"
-                        method="post"
-                        style="display: inline">
+                </div>
+              </div>
+            </div>
+            <div class="decks-row-record">
+              {% if deck.games > 0 %}
+                <div class="decks-row-record-v">
+                  {{ deck.wins }}<span class="decks-row-record-sep">–</span>{{ deck.losses }}
+                </div>
+                <div class="decks-row-record-pct {% if deck.win_rate >= 0.5 %}up{% else %}dn{% endif %}">
+                  {{ (deck.win_rate * 100) | round | int }}%
+                </div>
+                {% if deck.last_played %}
+                  <div class="decks-row-record-last">{{ deck.last_played | editorial_date }}</div>
+                {% endif %}
+              {% else %}
+                <div class="decks-row-record-empty">No games yet</div>
+              {% endif %}
+            </div>
+            <div class="decks-row-actions">
+              <a href="/decks/{{ deck.id }}" class="decks-row-open">Open</a>
+              <details class="inline-details">
+                <summary class="btn-like">Edit</summary>
+                <div class="edit-popout mobile-popover">
+                  <form action="/decks/{{ deck.id }}/edit" method="post" class="stack-form">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                    <button type="submit"
-                            class="btn-danger-small"
-                            onclick="return confirm('Delete {{ deck.name }}? Cards in this deck will be removed.');">
-                      Delete
-                    </button>
+                    <label>Name</label>
+                    <input type="text" name="name" value="{{ deck.name }}" required>
+                    <label>Format</label>
+                    <select name="format_name">
+                      {% for fmt in ['Commander', 'Standard', 'Pioneer', 'Modern', 'Legacy', 'Vintage', 'Cube'] %}
+                        <option value="{{ fmt }}" {% if deck.format == fmt %}selected{% endif %}>{{ fmt }}</option>
+                      {% endfor %}
+                    </select>
+                    <label>Flavour blurb <span class="decks-edit-hint">— a short sub-line under the deck name</span></label>
+                    <input type="text" name="blurb" value="{{ deck.blurb or '' }}" maxlength="255" placeholder="e.g. Superfriends · counters · proliferate">
+                    <label>Notes</label>
+                    <textarea name="notes" rows="3">{{ deck.notes or '' }}</textarea>
+                    <button type="submit" style="margin-top: 0.25rem">Save</button>
                   </form>
-                </td>
-              </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-    </section>
+                </div>
+              </details>
+              <form action="/decks/{{ deck.id }}/delete" method="post" style="display: inline">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <button type="submit" class="btn-danger-small"
+                        onclick="return confirm('Delete {{ deck.name }}? Cards in this deck will be removed.');">
+                  Delete
+                </button>
+              </form>
+            </div>
+          </article>
+        {% endfor %}
+      </section>
+    {% endif %}
+
+    {# Featured-deck edit popout — separate from the row popouts so the
+       featured deck's blurb is editable too. Surfaced as a small chip in
+       the bottom-right of the featured panel via JavaScript-free CSS
+       absolute positioning. #}
+    {% if featured and featured.games > 0 %}
+      <section class="panel decks-featured-controls">
+        <details class="inline-details">
+          <summary class="btn-like">Edit {{ featured.name }}</summary>
+          <div class="edit-popout mobile-popover">
+            <form action="/decks/{{ featured.id }}/edit" method="post" class="stack-form">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+              <label>Name</label>
+              <input type="text" name="name" value="{{ featured.name }}" required>
+              <label>Format</label>
+              <select name="format_name">
+                {% for fmt in ['Commander', 'Standard', 'Pioneer', 'Modern', 'Legacy', 'Vintage', 'Cube'] %}
+                  <option value="{{ fmt }}" {% if featured.format == fmt %}selected{% endif %}>{{ fmt }}</option>
+                {% endfor %}
+              </select>
+              <label>Flavour blurb <span class="decks-edit-hint">— a short sub-line under the deck name</span></label>
+              <input type="text" name="blurb" value="{{ featured.blurb or '' }}" maxlength="255" placeholder="e.g. Superfriends · counters · proliferate">
+              <label>Notes</label>
+              <textarea name="notes" rows="3">{{ featured.notes or '' }}</textarea>
+              <button type="submit" style="margin-top: 0.25rem">Save</button>
+            </form>
+          </div>
+        </details>
+        <form action="/decks/{{ featured.id }}/delete" method="post" style="display: inline">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <button type="submit" class="btn-danger-small"
+                  onclick="return confirm('Delete {{ featured.name }}? Cards in this deck will be removed.');">
+            Delete
+          </button>
+        </form>
+      </section>
+    {% endif %}
   {% else %}
     <section class="panel">
       <p class="muted">No decks yet. Create one above to start organizing your cards.</p>

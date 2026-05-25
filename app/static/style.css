@@ -8446,3 +8446,972 @@ body.game-mode {
     flex: 1 1 100%;
   }
 }
+
+/* ===================================================================
+   v3.28.7 — Folio smaller-page polish (Decks + Pending + Card Detail +
+   Deck Detail). Token-driven; consumes the v3.28.1 Folio palette. Zero
+   parallel tokens. Built responsive for the v3.28.10 verify pass.
+   =================================================================== */
+
+/* ---------- Decks editorial rows (full table → editorial-row rewrite) ---------- */
+
+/* Featured deck — gold gradient frame, larger typography. */
+.decks-featured {
+  background: linear-gradient(180deg, var(--brand-gold-soft), var(--panel));
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 1.5rem 1.75rem;
+  position: relative;
+  margin-top: 1.25rem;
+}
+.decks-featured-tag {
+  position: absolute;
+  top: -0.6rem;
+  left: 1.5rem;
+  background: var(--bg);
+  color: var(--brand-gold);
+  padding: 0.15rem 0.7rem;
+  font-size: 9px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  font-weight: 700;
+}
+.decks-featured-grid {
+  display: grid;
+  grid-template-columns: auto 1.2fr 1fr;
+  gap: 1.5rem;
+  align-items: stretch;
+}
+.decks-featured-art {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 90px;
+  padding: 0.5rem;
+}
+.decks-featured-art-pip img.mana-pip {
+  width: 36px;
+  height: 36px;
+  margin-left: 0;
+}
+.decks-featured-copy {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.decks-featured-name {
+  margin: 0;
+  font-family: "Newsreader", serif;
+  font-style: italic;
+  font-weight: 500;
+  font-size: 1.5rem;
+  line-height: 1.15;
+  color: var(--text);
+  letter-spacing: -0.005em;
+}
+.decks-featured-name a {
+  color: inherit;
+  text-decoration: none;
+}
+.decks-featured-name a:hover {
+  color: var(--brand-gold);
+}
+.decks-featured-meta {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  font-family: ui-monospace, "JetBrains Mono", monospace;
+  font-size: 11px;
+  color: var(--text-dim);
+  margin: 0.4rem 0 0.6rem;
+}
+.decks-featured-pips {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.decks-featured-pips img.mana-pip {
+  width: 16px;
+  height: 16px;
+  margin-left: 0;
+}
+.decks-featured-fmt {
+  font-family: "Newsreader", serif;
+  font-style: italic;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.decks-featured-cards {
+  color: var(--muted);
+}
+.decks-featured-blurb {
+  font-family: "Newsreader", serif;
+  font-style: italic;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--text-dim);
+  border-left: 2px solid var(--brand-gold);
+  padding-left: 0.75rem;
+  margin: 0 0 0.6rem;
+  max-width: 48ch;
+}
+.decks-featured-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: auto;
+}
+.decks-featured-tag-chip {
+  font-family: "Montserrat", sans-serif;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  font-weight: 600;
+  padding: 0.2rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.2);
+}
+.decks-featured-record {
+  display: flex;
+  flex-direction: column;
+  padding-left: 1.25rem;
+  border-left: 1px solid var(--border);
+  align-items: stretch;
+  min-width: 130px;
+}
+.decks-featured-record-label {
+  font-size: 9px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 700;
+}
+.decks-featured-record-v {
+  font-family: "Newsreader", serif;
+  font-style: italic;
+  font-size: 2rem;
+  color: var(--text);
+  font-weight: 500;
+  line-height: 1;
+  margin-top: 0.25rem;
+}
+.decks-featured-record-sep {
+  color: var(--brand-gold);
+  font-size: 1.2rem;
+  margin: 0 0.1rem;
+}
+.decks-featured-record-pct {
+  font-family: ui-monospace, "JetBrains Mono", monospace;
+  font-size: 12px;
+  font-weight: 600;
+  margin-top: 0.25rem;
+}
+.decks-featured-record-pct.up {
+  color: var(--brand-green);
+}
+.decks-featured-record-pct.dn {
+  color: var(--danger);
+}
+.decks-featured-record-last {
+  font-family: "Newsreader", serif;
+  font-style: italic;
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 0.5rem;
+}
+.decks-featured-open {
+  margin-top: 0.75rem;
+  padding: 0.5rem 0.9rem;
+  background: var(--brand-gold);
+  color: var(--bg);
+  border: 1px solid var(--brand-gold);
+  border-radius: 4px;
+  font-family: "Montserrat", sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  text-decoration: none;
+  text-align: center;
+  display: inline-block;
+}
+.decks-featured-open:hover {
+  filter: brightness(1.1);
+}
+.decks-featured-controls {
+  margin-top: 0.6rem;
+}
+
+/* Compact editorial rows for non-featured decks. */
+.decks-rows {
+  margin-top: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+.decks-row {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 1rem 1.25rem;
+  display: grid;
+  grid-template-columns: 1.5fr 1fr 0.8fr auto;
+  gap: 1.25rem;
+  align-items: center;
+}
+.decks-row-attn {
+  border-color: rgba(138, 46, 34, 0.35);
+}
+.decks-row-copy {
+  min-width: 0;
+}
+.decks-row-name {
+  margin: 0;
+  font-family: "Newsreader", serif;
+  font-style: italic;
+  font-size: 1.05rem;
+  font-weight: 500;
+  color: var(--text);
+  letter-spacing: -0.005em;
+}
+.decks-row-name a {
+  color: inherit;
+  text-decoration: none;
+}
+.decks-row-name a:hover {
+  color: var(--brand-gold);
+}
+.decks-row-meta {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  font-family: ui-monospace, "JetBrains Mono", monospace;
+  font-size: 10.5px;
+  color: var(--text-dim);
+  margin-top: 0.2rem;
+}
+.decks-row-pips {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.decks-row-pips img.mana-pip {
+  width: 14px;
+  height: 14px;
+  margin-left: 0;
+}
+.decks-row-fmt {
+  font-family: "Newsreader", serif;
+  font-style: italic;
+  font-size: 11.5px;
+  color: var(--text-dim);
+}
+.decks-row-cards {
+  color: var(--muted);
+}
+.decks-row-blurb {
+  font-family: "Newsreader", serif;
+  font-style: italic;
+  font-size: 12px;
+  color: var(--muted);
+  margin: 0.35rem 0 0;
+  line-height: 1.4;
+  max-width: 50ch;
+}
+.decks-row-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+.decks-row-stat-l {
+  font-size: 9px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 700;
+}
+.decks-row-stat-v {
+  font-family: "Newsreader", serif;
+  font-style: italic;
+  font-size: 13.5px;
+  color: var(--text);
+  margin-top: 0.15rem;
+  font-weight: 500;
+}
+.decks-row-stat-empty {
+  color: var(--muted);
+}
+.decks-row-record {
+  text-align: right;
+  min-width: 90px;
+}
+.decks-row-record-v {
+  font-family: "Newsreader", serif;
+  font-style: italic;
+  font-size: 1.25rem;
+  color: var(--text);
+  font-weight: 500;
+}
+.decks-row-record-sep {
+  color: var(--brand-gold);
+  font-size: 0.9rem;
+  margin: 0 0.1rem;
+}
+.decks-row-record-pct {
+  font-family: ui-monospace, "JetBrains Mono", monospace;
+  font-size: 11px;
+  font-weight: 600;
+  margin-top: 0.15rem;
+}
+.decks-row-record-pct.up {
+  color: var(--brand-green);
+}
+.decks-row-record-pct.dn {
+  color: var(--danger);
+}
+.decks-row-record-last {
+  font-family: "Newsreader", serif;
+  font-style: italic;
+  font-size: 10.5px;
+  color: var(--muted);
+  margin-top: 0.1rem;
+}
+.decks-row-record-empty {
+  font-family: "Newsreader", serif;
+  font-style: italic;
+  font-size: 11.5px;
+  color: var(--muted);
+}
+.decks-row-actions {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.decks-row-open {
+  padding: 0.4rem 0.75rem;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 4px;
+  font-family: "Montserrat", sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  text-decoration: none;
+}
+.decks-row-open:hover {
+  background: var(--panel-2);
+}
+.decks-edit-hint {
+  font-family: "Newsreader", serif;
+  font-style: italic;
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 400;
+  margin-left: 0.25rem;
+}
+
+/* ---------- Pending: progress strip + editorial batch headers ---------- */
+
+.pending-progress-strip {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 1rem;
+  align-items: center;
+  padding: 0.85rem 1.25rem;
+}
+.pending-progress-label {
+  display: flex;
+  flex-direction: column;
+}
+.pending-progress-l {
+  font-size: 9.5px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 700;
+}
+.pending-progress-v {
+  font-family: ui-monospace, "JetBrains Mono", monospace;
+  font-size: 12.5px;
+  color: var(--text);
+  font-weight: 600;
+  margin-top: 0.15rem;
+}
+.pending-progress-bar {
+  height: 6px;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.pending-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--brand-gold), #d4a85f);
+}
+.pending-progress-aux {
+  font-family: "Newsreader", serif;
+  font-style: italic;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* Editorial batch headers (non-drawer-sorter users). */
+.pending-batch-summary {
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
+  gap: 1rem;
+  align-items: center;
+  padding: 0.65rem 0;
+  cursor: pointer;
+  list-style: none;
+}
+.pending-batch-summary::-webkit-details-marker {
+  display: none;
+}
+.pending-batch-ix {
+  font-family: "Newsreader", serif;
+  font-style: italic;
+  font-size: 1.3rem;
+  color: var(--brand-gold);
+  font-weight: 500;
+  line-height: 1;
+  min-width: 1.6rem;
+}
+.pending-batch-h {
+  min-width: 0;
+}
+.pending-batch-source {
+  font-family: "Newsreader", serif;
+  font-style: italic;
+  font-size: 1.05rem;
+  color: var(--text);
+  font-weight: 500;
+  letter-spacing: -0.005em;
+}
+.pending-batch-note {
+  font-family: "Newsreader", serif;
+  font-style: italic;
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 0.1rem;
+}
+.pending-batch-count {
+  font-family: ui-monospace, "JetBrains Mono", monospace;
+  font-size: 11px;
+  color: var(--text-dim);
+  padding: 0.25rem 0.65rem;
+  background: var(--brand-gold-soft);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-weight: 600;
+}
+.pending-batch-date {
+  font-family: ui-monospace, "JetBrains Mono", monospace;
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+/* ---------- Card Detail Folio polish ---------- */
+
+.card-detail-hero {
+  margin-top: 1rem;
+}
+.card-detail-hero-grid {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  gap: 1.5rem;
+  align-items: flex-start;
+}
+.card-detail-art {
+  flex: 0 0 auto;
+}
+.card-detail-art-img {
+  width: 100%;
+  max-width: 240px;
+  height: auto;
+  display: block;
+  border-radius: 12px;
+  filter: drop-shadow(0 16px 28px rgba(0, 0, 0, 0.5));
+}
+.card-detail-art-placeholder {
+  width: 240px;
+  height: 335px;
+  background: var(--panel-2);
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+}
+.card-detail-hero-copy {
+  min-width: 0;
+}
+.card-detail-name {
+  margin: 0.25rem 0 0.4rem;
+  font-family: "Newsreader", serif;
+  font-style: italic;
+  font-weight: 500;
+  font-size: 2rem;
+  line-height: 1.05;
+  color: var(--text);
+  letter-spacing: -0.012em;
+}
+.card-detail-type {
+  font-family: "Newsreader", serif;
+  font-size: 14px;
+  color: var(--text-dim);
+  margin-bottom: 0.5rem;
+}
+.card-detail-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem;
+  font-family: ui-monospace, "JetBrains Mono", monospace;
+  font-size: 11.5px;
+  color: var(--text-dim);
+  margin-bottom: 0.5rem;
+}
+.card-detail-mana {
+  color: var(--brand-gold);
+  font-weight: 600;
+}
+.card-detail-cmc {
+  color: var(--muted);
+}
+.card-detail-meta-sep {
+  color: var(--muted);
+}
+.card-detail-rarity {
+  font-family: "Montserrat", sans-serif;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-weight: 700;
+}
+.card-detail-rarity-common {
+  color: var(--text-dim);
+}
+.card-detail-rarity-uncommon {
+  color: #c0c5cc;
+}
+.card-detail-rarity-rare {
+  color: var(--brand-gold);
+}
+.card-detail-rarity-mythic {
+  color: #e08a3c;
+}
+.card-detail-identity {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.6rem;
+}
+.card-detail-identity-lbl {
+  font-size: 9px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 700;
+}
+.card-detail-identity-pips img.mana-pip {
+  width: 18px;
+  height: 18px;
+  margin-left: 0;
+}
+.card-detail-stats {
+  margin: 0.5rem 0;
+}
+.card-detail-scryfall-link {
+  margin: 0.5rem 0 0;
+  font-size: 12px;
+}
+
+.card-detail-oracle {
+  margin-top: 1rem;
+}
+.card-detail-oracle-body {
+  font-family: "Newsreader", serif;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text);
+  white-space: pre-line;
+  margin-top: 0.5rem;
+  max-width: 70ch;
+}
+
+/* § panels — Printings / In Decks / Prices / Legality / History */
+.card-detail-panel {
+  margin-top: 1rem;
+}
+.card-detail-panel-h {
+  margin: 0 0 0.85rem;
+  font-family: "Montserrat", sans-serif;
+  font-size: 10px;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--brand-gold);
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+.card-detail-panel-h::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+.card-detail-panel-aux {
+  text-transform: none;
+  letter-spacing: 0.02em;
+  font-family: "Newsreader", serif;
+  font-style: italic;
+  font-size: 11px;
+  color: var(--muted);
+  font-weight: 400;
+}
+
+/* § I — Printings */
+.card-detail-printings {
+  display: flex;
+  flex-direction: column;
+}
+.card-detail-printings-row {
+  display: grid;
+  grid-template-columns: 1.2rem 4rem 1fr 5.5rem 4rem 4rem;
+  gap: 0.75rem;
+  align-items: center;
+  padding: 0.4rem 0;
+  border-bottom: 1px dotted var(--border);
+}
+.card-detail-printings-row:last-child {
+  border-bottom: 0;
+}
+.card-detail-printings-head {
+  font-size: 9px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 700;
+}
+.card-detail-printings-current {
+  background: var(--brand-gold-soft);
+  padding-left: 0.4rem;
+  padding-right: 0.4rem;
+  border-radius: 4px;
+}
+.card-detail-printings-ix {
+  font-family: "Newsreader", serif;
+  font-style: italic;
+  font-size: 10px;
+  color: var(--muted);
+}
+.card-detail-printings-set {
+  font-family: ui-monospace, "JetBrains Mono", monospace;
+  font-size: 11px;
+  color: var(--brand-gold);
+  letter-spacing: 0.08em;
+  font-weight: 600;
+}
+.card-detail-printings-collector a {
+  font-family: "Newsreader", serif;
+  font-size: 13px;
+  color: var(--text);
+  text-decoration: none;
+}
+.card-detail-printings-collector a:hover {
+  color: var(--brand-gold);
+}
+.card-detail-printings-watch {
+  color: var(--brand-gold);
+  margin-left: 0.3rem;
+}
+.card-detail-printings-r {
+  text-align: right;
+}
+.card-detail-printings-px {
+  font-family: ui-monospace, "JetBrains Mono", monospace;
+  font-size: 11.5px;
+  color: var(--brand-gold);
+  font-weight: 600;
+}
+.card-detail-printings-ow {
+  font-family: ui-monospace, "JetBrains Mono", monospace;
+  font-size: 11.5px;
+  color: var(--text);
+}
+.card-detail-printings-ow-zero {
+  color: var(--muted);
+}
+.card-detail-printings-act {
+  font-family: "Montserrat", sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  text-align: right;
+}
+.card-detail-printings-act a {
+  color: var(--brand-gold);
+  text-decoration: none;
+}
+.card-detail-printings-cur {
+  color: var(--muted);
+  font-style: italic;
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 500;
+}
+
+/* § II — In Decks */
+.card-detail-in-decks {
+  display: flex;
+  flex-direction: column;
+}
+.card-detail-in-decks-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.5rem;
+  align-items: baseline;
+  padding: 0.4rem 0;
+  border-bottom: 1px dotted var(--border);
+}
+.card-detail-in-decks-row:last-child {
+  border-bottom: 0;
+}
+.card-detail-in-decks-nm a {
+  font-family: "Newsreader", serif;
+  font-style: italic;
+  font-size: 13.5px;
+  color: var(--text);
+  text-decoration: none;
+}
+.card-detail-in-decks-nm a:hover {
+  color: var(--brand-gold);
+}
+.card-detail-in-decks-role {
+  font-family: "Newsreader", serif;
+  font-style: italic;
+  font-size: 11px;
+  color: var(--brand-gold);
+  margin-top: 0.1rem;
+}
+.card-detail-in-decks-qty {
+  font-family: ui-monospace, "JetBrains Mono", monospace;
+  font-size: 11.5px;
+  color: var(--text);
+  font-weight: 600;
+}
+
+/* § III — Prices */
+.card-detail-prices {
+  display: flex;
+  flex-direction: column;
+}
+.card-detail-prices-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.5rem;
+  align-items: baseline;
+  padding: 0.4rem 0;
+  border-bottom: 1px dotted var(--border);
+}
+.card-detail-prices-row:last-child {
+  border-bottom: 0;
+}
+.card-detail-prices-l {
+  font-family: "Newsreader", serif;
+  font-size: 13px;
+  color: var(--text-dim);
+}
+.card-detail-prices-v {
+  font-family: ui-monospace, "JetBrains Mono", monospace;
+  font-size: 13.5px;
+  color: var(--text);
+  font-weight: 600;
+}
+.card-detail-prices-deferred {
+  font-family: "Newsreader", serif;
+  font-style: italic;
+  font-size: 11.5px;
+  color: var(--muted);
+  margin-top: 0.6rem;
+  padding-top: 0.5rem;
+  border-top: 1px dotted var(--border);
+}
+
+/* § IV — Legality */
+.card-detail-legality {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.4rem 1rem;
+}
+.card-detail-legality-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.3rem 0;
+  font-family: "Newsreader", serif;
+  font-size: 12.5px;
+  color: var(--text-dim);
+}
+.card-detail-legality-fmt {
+  color: var(--text);
+}
+.card-detail-legality-status {
+  font-family: "Montserrat", sans-serif;
+  font-size: 9.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-weight: 700;
+}
+.card-detail-legality-legal .card-detail-legality-status {
+  color: var(--brand-green);
+}
+.card-detail-legality-not_legal .card-detail-legality-status {
+  color: var(--muted);
+}
+.card-detail-legality-banned .card-detail-legality-status {
+  color: var(--danger);
+}
+.card-detail-legality-restricted .card-detail-legality-status {
+  color: #e08a3c;
+}
+
+/* § V — History */
+.card-detail-history {
+  display: flex;
+  flex-direction: column;
+}
+.card-detail-history-row {
+  display: grid;
+  grid-template-columns: 6rem 1fr auto;
+  gap: 0.6rem;
+  align-items: baseline;
+  padding: 0.35rem 0;
+  border-bottom: 1px dotted var(--border);
+}
+.card-detail-history-row:last-child {
+  border-bottom: 0;
+}
+.card-detail-history-t {
+  font-family: "Montserrat", sans-serif;
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--brand-gold);
+  font-weight: 700;
+}
+.card-detail-history-n {
+  font-family: "Newsreader", serif;
+  font-size: 12.5px;
+  color: var(--text);
+}
+.card-detail-history-qty {
+  color: var(--muted);
+  margin-left: 0.25rem;
+  font-family: ui-monospace, "JetBrains Mono", monospace;
+  font-size: 10.5px;
+}
+.card-detail-history-d {
+  font-family: ui-monospace, "JetBrains Mono", monospace;
+  font-size: 10.5px;
+  color: var(--muted);
+}
+
+/* ---------- Deck Detail § section mark (polish-only) ---------- */
+.deck-detail-section-mark {
+  color: var(--brand-gold);
+  font-style: italic;
+  font-family: "Newsreader", serif;
+  font-weight: 500;
+  margin-right: 0.25rem;
+}
+
+/* ---------- Responsive — every v3.28.7 surface collapses cleanly ---------- */
+@media (max-width: 980px) {
+  .decks-featured-grid {
+    grid-template-columns: auto 1fr;
+  }
+  .decks-featured-record {
+    grid-column: 1 / -1;
+    border-left: 0;
+    border-top: 1px solid var(--border);
+    padding-left: 0;
+    padding-top: 1rem;
+    flex-direction: row;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    min-width: 0;
+  }
+  .decks-featured-open {
+    margin-top: 0;
+    margin-left: auto;
+  }
+  .decks-row {
+    grid-template-columns: 1fr auto;
+  }
+  .decks-row-stats {
+    grid-column: 1 / -1;
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .decks-row-record {
+    grid-column: 1 / -1;
+    text-align: left;
+  }
+  .decks-row-actions {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+  }
+  .card-detail-hero-grid {
+    grid-template-columns: 1fr;
+  }
+  .card-detail-art-img {
+    max-width: 180px;
+  }
+  .card-detail-printings-row {
+    grid-template-columns: 1fr 4rem 4rem;
+    row-gap: 0.2rem;
+  }
+  .card-detail-printings-ix,
+  .card-detail-printings-set,
+  .card-detail-printings-act {
+    display: none;
+  }
+}
+
+@media (max-width: 768px) {
+  .decks-featured {
+    padding: 1rem;
+  }
+  .decks-featured-grid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+  .decks-featured-art {
+    justify-content: flex-start;
+  }
+  .pending-progress-strip {
+    grid-template-columns: 1fr;
+    gap: 0.5rem;
+  }
+  .pending-batch-summary {
+    grid-template-columns: auto 1fr;
+    row-gap: 0.25rem;
+  }
+  .pending-batch-count,
+  .pending-batch-date {
+    grid-column: 2;
+  }
+  .card-detail-legality {
+    grid-template-columns: 1fr;
+  }
+}

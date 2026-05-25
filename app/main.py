@@ -30,6 +30,7 @@ from fastapi.responses import (
     Response,
 )
 from fastapi.staticfiles import StaticFiles
+from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
 from starlette.middleware.sessions import SessionMiddleware
@@ -47,6 +48,7 @@ from app.deck_service import (
     compute_consistency,
     compute_dead_cards,
     compute_deck_analytics,
+    compute_deck_game_stats,
     compute_deck_health,
     compute_deck_synergy,
     compute_deck_tokens,
@@ -134,7 +136,7 @@ from app.location_service import (
     list_locations,
     update_location,
 )
-from app.models import Card, Deck, ImportBatch, InventoryRow, User
+from app.models import Card, Deck, ImportBatch, InventoryRow, TransactionLog, User
 from app.password_reset_service import (
     check_rate_limits,
     consume_token,
@@ -142,7 +144,7 @@ from app.password_reset_service import (
     find_valid_token,
     queue_reset_email,
 )
-from app.presentation_service import build_pending_view_model
+from app.presentation_service import build_pending_batch_groups, build_pending_view_model
 from app.pricing import effective_price
 from app.routes import account, admin, auth, drawers
 from app.scryfall import (
@@ -2250,12 +2252,25 @@ def pending_page(
     locations = [] if use_drawer_sorter else list_locations(session, current_user.id)
     view_model = build_pending_view_model(rows)
 
+    # v3.28.7 — batch grouping for non-drawer-sorter users. Drawer-sorter users
+    # keep their drawer-grouping (`grouped_drawers`) because that mirrors their
+    # physical filing workflow; non-sorter users see batches by source/date
+    # (Helvault / Moxfield / Manual) instead — matches the design package's
+    # narrative batch headers. Both paths share the same per-item dict so the
+    # confirm/remove form contracts are identical.
+    grouped_batches = []
+    if not use_drawer_sorter:
+        grouped_batches = build_pending_batch_groups(
+            session, user_id=current_user.id, items=view_model["items"]
+        )
+
     return render(
         request,
         "pending.html",
         {
             "title": "Pending Placement",
             **view_model,
+            "grouped_batches": grouped_batches,
             "latest_batch_id": latest_batch.id if latest_batch else None,
             "current_user": current_user,
             "use_drawer_sorter": use_drawer_sorter,
@@ -2860,12 +2875,37 @@ def decks_page(
     decks = list_decks(session, user_id=current_user.id)
     show_onboarding = len(decks) == 0
 
+    # v3.28.7 — editorial-row Decks page. Attach per-deck game stats
+    # (games / wins / win_rate / last_played) via the v3.28.5 batched
+    # aggregate pattern. Single GROUP BY across all decks, dict lookup
+    # per template iteration — no N+1.
+    game_stats = compute_deck_game_stats(
+        session, user_id=current_user.id, deck_ids=[d.id for d in decks]
+    )
+    for deck in decks:
+        stats = game_stats.get(deck.id, {})
+        deck.games = stats.get("games", 0)
+        deck.wins = stats.get("wins", 0)
+        deck.losses = stats.get("losses", 0)
+        deck.win_rate = stats.get("win_rate", 0.0)
+        deck.last_played = stats.get("last_played")
+
+    # Featured deck = most active by game count (ties broken by name).
+    # Editorial-row layout: featured renders with full panel; rest as
+    # compact rows. None when zero decks have games (featured slot
+    # collapses to the first deck by name).
+    featured = None
+    if decks:
+        with_games = [d for d in decks if d.games > 0]
+        featured = max(with_games, key=lambda d: d.games) if with_games else decks[0]
+
     return render(
         request,
         "decks.html",
         {
             "title": "Decks",
             "decks": decks,
+            "featured": featured,
             "current_user": current_user,
             "show_onboarding": show_onboarding,
         },
@@ -3565,6 +3605,7 @@ def decks_edit(
     name: str = Form(...),
     format_name: str = Form(""),
     notes: str = Form(""),
+    blurb: str = Form(""),
     session: Session = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
     _: None = CsrfRequired,
@@ -3577,6 +3618,8 @@ def decks_edit(
             name=name,
             format_name=format_name,
             notes=notes,
+            blurb=blurb,
+            update_blurb=True,
         )
     except ValueError:
         pass
@@ -4247,6 +4290,131 @@ def card_detail_page(
 
     watch_ids = get_watch_ids_for_card(session, current_user.id, target_card.id, target_card.name)
 
+    # v3.28.7 — Folio Card Detail § panel data. Five panels, all backed by
+    # existing schema (no migrations). P/T + flavor text scoped out per
+    # the v3.28.7 owner decision (Card model has no power/toughness/flavor
+    # columns; Card schema additions deferred to a follow-up patch).
+    #
+    # § I Printings — all printings of this card NAME, with per-printing
+    #   owned counts (across the user's InventoryRows) + watch markers.
+    # § II In Decks — which of the user's decks contain this card
+    #   (InventoryRow.storage_location_id JOIN Deck.storage_location_id).
+    # § III Prices — static USD per finish. 1d/7d/30d deltas DEFERRED.
+    # § IV Legality — parsed from Card.legalities JSON.
+    # § V History — TransactionLog filtered by user + card_id, top 10.
+
+    # § I — all printings of this name. Cheap: name index covers it.
+    printings_query = (
+        session.query(Card)
+        .filter(Card.name == target_card.name)
+        .order_by(Card.set_code.asc(), Card.collector_number.asc())
+        .all()
+    )
+    # Per-printing owned counts (single GROUP BY across the user's rows).
+    owned_by_card_id: dict[int, int] = (
+        dict(
+            session.query(
+                InventoryRow.card_id,
+                func.sum(InventoryRow.quantity),
+            )
+            .filter(
+                InventoryRow.user_id == current_user.id,
+                InventoryRow.card_id.in_([p.id for p in printings_query]),
+            )
+            .group_by(InventoryRow.card_id)
+            .all()
+        )
+        if printings_query
+        else {}
+    )
+    # Per-printing watchlist membership (one batch query against WatchlistItem).
+    from app.models import WatchlistItem
+
+    watched_card_ids: set[int] = set()
+    if printings_query:
+        for (cid,) in (
+            session.query(WatchlistItem.card_id)
+            .filter(
+                WatchlistItem.user_id == current_user.id,
+                WatchlistItem.card_id.in_([p.id for p in printings_query]),
+            )
+            .all()
+        ):
+            if cid is not None:
+                watched_card_ids.add(cid)
+    printings = [
+        {
+            "card": p,
+            "owned": int(owned_by_card_id.get(p.id, 0) or 0),
+            "is_watched": p.id in watched_card_ids,
+            "is_current": p.id == target_card.id,
+        }
+        for p in printings_query
+    ]
+
+    # § II — In Decks. JOIN InventoryRow → Deck via storage_location_id; one
+    # query, GROUP BY deck so each deck shows once with the total quantity.
+    in_decks_rows = (
+        session.query(
+            Deck.id.label("deck_id"),
+            Deck.name.label("deck_name"),
+            func.sum(InventoryRow.quantity).label("quantity"),
+            func.max(InventoryRow.role).label("role"),
+        )
+        .join(InventoryRow, InventoryRow.storage_location_id == Deck.storage_location_id)
+        .filter(
+            Deck.user_id == current_user.id,
+            InventoryRow.user_id == current_user.id,
+            InventoryRow.card_id == target_card.id,
+        )
+        .group_by(Deck.id, Deck.name)
+        .order_by(Deck.name.asc())
+        .all()
+    )
+    in_decks = [
+        {
+            "deck_id": r.deck_id,
+            "deck_name": r.deck_name,
+            "quantity": int(r.quantity or 0),
+            "role": r.role,
+        }
+        for r in in_decks_rows
+    ]
+
+    # § III — Prices (static; 1d/7d/30d deltas DEFERRED).
+    prices = {
+        "regular": target_card.price_usd,
+        "foil": target_card.price_usd_foil,
+        "etched": target_card.price_usd_etched,
+    }
+
+    # § IV — Legality. Card.legalities is a JSON-encoded dict from Scryfall;
+    # parse-fail returns an empty dict so the template renders cleanly.
+    import json as _json
+
+    legality_map: dict[str, str] = {}
+    if target_card.legalities:
+        try:
+            parsed = _json.loads(target_card.legalities) or {}
+            # Restrict to formats the player cares about — full list is
+            # noisy.
+            shown = ["standard", "modern", "pioneer", "commander", "legacy", "vintage", "pauper"]
+            legality_map = {fmt.capitalize(): parsed.get(fmt, "not_legal") for fmt in shown}
+        except (ValueError, TypeError):
+            legality_map = {}
+
+    # § V — History. TransactionLog filtered by this card; top 10 most recent.
+    history_rows = (
+        session.query(TransactionLog)
+        .filter(
+            TransactionLog.user_id == current_user.id,
+            TransactionLog.card_id == target_card.id,
+        )
+        .order_by(TransactionLog.created_at.desc())
+        .limit(10)
+        .all()
+    )
+
     return render(
         request,
         "card_detail.html",
@@ -4259,6 +4427,12 @@ def card_detail_page(
             "current_user": current_user,
             "watch_printing_id": watch_ids["printing_id"],
             "watch_name_id": watch_ids["name_id"],
+            # v3.28.7 — § panel data
+            "printings": printings,
+            "in_decks": in_decks,
+            "prices": prices,
+            "legality_map": legality_map,
+            "history_rows": history_rows,
         },
     )
 

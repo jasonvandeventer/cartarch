@@ -260,7 +260,7 @@
     <section class="panel analytics-panel">
       <div class="analytics-grid {% if not analytics.pips %}no-pips{% endif %}">
         <div class="analytics-section">
-          <div class="analytics-section-label">Mana Curve</div>
+          <div class="analytics-section-label"><span class="deck-detail-section-mark">§</span> Mana Curve</div>
           <div class="analytics-avg-cmc">
             {{ analytics.avg_cmc }}<span class="analytics-avg-cmc-unit">avg CMC</span>
           </div>
@@ -301,7 +301,7 @@
         </div>
         {% if analytics.types %}
           <div class="analytics-section">
-            <div class="analytics-section-label">Card Types</div>
+            <div class="analytics-section-label"><span class="deck-detail-section-mark">§</span> Card Types</div>
             {% for type, count in analytics.types.items() %}
               <div class="analytics-row">
                 <span class="arow-label">{{ type }}</span>
@@ -316,7 +316,7 @@
         {% endif %}
         {% if analytics.pips %}
           <div class="analytics-section">
-            <div class="analytics-section-label">Color Pips</div>
+            <div class="analytics-section-label"><span class="deck-detail-section-mark">§</span> Color Pips</div>
             {% for color, count in analytics.pips.items() %}
               <div class="analytics-row">
                 <span class="arow-label arow-label-pip">
@@ -336,7 +336,7 @@
   {% endif %}
   {% if health %}
     <section class="panel health-panel">
-      <h3 class="panel-title">Deck Health</h3>
+      <h3 class="panel-title"><span class="deck-detail-section-mark">§</span> Deck Health</h3>
       {% if consistency %}
         <div class="consistency-row">
           <div class="consistency-badge cs-{{ consistency.tier }}">{{ consistency.score }}</div>
@@ -595,7 +595,7 @@
     </section>
     {% if deck %}
       <section class="panel token-needs-panel">
-        <h3 class="panel-title">Tokens Needed</h3>
+        <h3 class="panel-title"><span class="deck-detail-section-mark">§</span> Tokens Needed</h3>
         {% if token_requirements %}
           <div class="table-wrap">
             <table>

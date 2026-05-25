@@ -162,6 +162,7 @@ class Deck(Base):
     intent_combo: Mapped[str | None] = mapped_column(String(16), nullable=True)
     intent_winning: Mapped[str | None] = mapped_column(String(16), nullable=True)
     intent_played: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    blurb: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     storage_location: Mapped[StorageLocation | None] = relationship()

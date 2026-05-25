@@ -1,5 +1,20 @@
 [
   {
+    "version": "3.28.7",
+    "date": "2026-05-25",
+    "added": [
+      "Decks is reshaped from a table into editorial rows. The most-played deck is featured in a gold-bordered panel at the top — record, win-rate, last played, the consistency tier as a small chip. Every other deck reads as a compact editorial row underneath, carrying the same fields scaled down. Each deck can now carry a short flavour blurb (\"Superfriends · counters · proliferate\") that renders as an italic sub-line beneath the name — settable from the deck's Edit popout.",
+      "Card Detail gains five new sections beneath the hero: Printings (every printing of this card name with how many of each you own and which ones you're watching), In your decks (which decks hold this card, with the role tag if any), Prices (regular / foil / etched USD), Legality (the seven formats that matter — Standard / Modern / Pioneer / Commander / Legacy / Vintage / Pauper), and History (the most recent 10 events on your copies — placed, moved, removed, refreshed). The card's mana cost, CMC, rarity, type line, and color identity now read in the hero alongside the name.",
+      "Pending gains a progress strip at the top showing how many cards are in this filing session, plus narrative batch headers — \"Helvault export · 14 cards · imported 24 May\" reads as a story rather than a generic group header. The drawer-sorter users still see their drawer groups; the new batch headers apply to everyone else."
+    ],
+    "refined": [
+      "Deck Detail picks up the Folio § mark on its main analytical panels — Mana Curve, Card Types, Color Pips, Deck Health, Tokens Needed — without restructuring. Every panel that worked before still works: the inventory card grid, the role-tag editor, the v3.21 switch-printing modal, the consistency scoring, the synergy classification, the dead-cards panel — all preserved verbatim. Polish only; no redesign.",
+      "Decks the page picks up a third stat tile, \"Games Logged,\" alongside the existing Decks + Total Cards counts."
+    ],
+    "resolved": [],
+    "archivist_note": "Three of the four pages in this bundle are additive — Decks is the one that genuinely changes shape. The shift from a table to editorial rows trades information density for personality; the Decks page has always been a desk-style management view and the table did that job well, but the cluster's design language is editorial, and a small number of decks with rich game history reads better as a featured-plus-rows narrative than as a flat grid. Power-user functions all still live in the Edit popouts and the per-row buttons. Card Detail was the most surprising piece of the bundle in implementation — the design's inline P/T and flavor text needed Card-table columns the project doesn't have yet, so those scope out cleanly to a follow-up patch and the five backed sections ship now."
+  },
+  {
     "version": "3.28.6",
     "date": "2026-05-25",
     "added": [

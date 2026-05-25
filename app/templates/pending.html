@@ -35,6 +35,29 @@
       </div>
     </div>
   </section>
+  {# v3.28.7 — progress strip. Shows placement-session progress at a glance:
+     0 placed of total pending. Visible whenever the queue has rows. The
+     ticks-per-batch indicator from the design package is omitted here
+     because grouped_batches may be empty (drawer-sorter path) or have a
+     different number of groups than the design's mock data. #}
+  {% if pending_count > 0 %}
+    <section class="panel pending-progress-strip">
+      <div class="pending-progress-label">
+        <div class="pending-progress-l">Filing session</div>
+        <div class="pending-progress-v">0 of {{ pending_count }}</div>
+      </div>
+      <div class="pending-progress-bar">
+        <div class="pending-progress-fill" style="width: 0%"></div>
+      </div>
+      <div class="pending-progress-aux">
+        {% if use_drawer_sorter %}
+          across {{ drawer_count }} drawer{{ '' if drawer_count == 1 else 's' }}
+        {% else %}
+          across {{ grouped_batches | length }} batch{{ '' if (grouped_batches | length) == 1 else 'es' }}
+        {% endif %}
+      </div>
+    </section>
+  {% endif %}
   <section class="panel controls-panel">
     <div class="pending-actions" style="border: none; padding: 0;">
       {% if use_drawer_sorter %}
@@ -52,7 +75,89 @@
       {% endif %}
     </div>
   </section>
+  {# v3.28.7 — non-drawer-sorter users see editorial batch grouping
+     (source / date / note headers per import batch). Drawer-sorter users
+     keep the existing drawer-grouping (their physical filing workflow).
+     Both paths reuse the same .pending-item article shape so the HTMX
+     confirm/remove contracts are identical. #}
   <div id="pending-groups-wrap">
+    {% if not use_drawer_sorter and grouped_batches %}
+      {% for batch in grouped_batches %}
+        <section class="panel pending-group pending-batch-group"
+                 id="pending-group-batch-{{ batch.batch_id or 'manual' }}"
+                 data-pending-group="batch-{{ batch.batch_id or 'manual' }}">
+          <details open>
+            <summary class="pending-batch-summary">
+              <span class="pending-batch-ix">{{ ['i.', 'ii.', 'iii.', 'iv.', 'v.', 'vi.', 'vii.', 'viii.', 'ix.', 'x.'][loop.index0] if loop.index0 < 10 else loop.index ~ '.' }}</span>
+              <div class="pending-batch-h">
+                <div class="pending-batch-source">{{ batch.source }}</div>
+                {% if batch.note and batch.note != batch.source %}
+                  <div class="pending-batch-note">{{ batch.note }}</div>
+                {% endif %}
+              </div>
+              <span class="pending-batch-count">{{ batch.count }} card{{ '' if batch.count == 1 else 's' }}</span>
+              {% if batch.date %}
+                <span class="pending-batch-date">{{ batch.date | editorial_date }}</span>
+              {% endif %}
+            </summary>
+            <div class="pending-list">
+              {% for item in batch.entries %}
+                <article class="pending-item unified-card-row cross-drawer"
+                         id="pending-row-{{ item.id }}"
+                         data-pending-group="batch-{{ batch.batch_id or 'manual' }}">
+                  <div class="pending-thumb-wrap">
+                    {% if item.card.image_url %}
+                      <img class="pending-thumb" src="{{ item.card.image_url }}" alt="{{ item.card.name }}" loading="lazy">
+                    {% else %}
+                      <div class="pending-thumb placeholder"></div>
+                    {% endif %}
+                  </div>
+                  <div>
+                    <div class="pending-name">{{ item.card.name }}</div>
+                    <div class="pending-meta">
+                      {{ item.card.set_name }} ({{ item.card.set_code|upper }}) · {{ item.finish|capitalize }}
+                      {% if item.language and item.language != 'en' %}
+                        · <span class="language-badge">{{ item.language|upper }}</span>
+                      {% endif %}
+                      · Qty: {{ item.quantity }} · ${{ '%.2f'|format(item.price) }}
+                    </div>
+                  </div>
+                  <div class="pending-action">
+                    <form action="/pending/confirm" method="post"
+                          class="inline-form"
+                          style="flex-wrap: wrap; gap: 0.4rem"
+                          hx-post="/pending/confirm"
+                          hx-target="#pending-row-{{ item.id }}"
+                          hx-swap="delete">
+                      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                      <input type="hidden" name="row_id" value="{{ item.id }}">
+                      <select name="location_id" required {% if not locations %}disabled{% endif %}>
+                        <option value="">— pick location —</option>
+                        {% for loc in locations %}
+                          {% if loc.type != "root" and loc.type != "deck" %}
+                            <option value="{{ loc.id }}">{{ loc.name }} ({{ loc.type }})</option>
+                          {% endif %}
+                        {% endfor %}
+                      </select>
+                      <button type="submit" class="danger-button" {% if not locations %}disabled{% endif %}>Confirm</button>
+                    </form>
+                    <form action="/pending/{{ item.id }}/remove" method="post"
+                          class="inline-form"
+                          hx-post="/pending/{{ item.id }}/remove"
+                          hx-target="#pending-row-{{ item.id }}"
+                          hx-swap="delete">
+                      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                      <button type="submit" class="ghost-button"
+                              onclick="return confirm('Remove this pending card from your collection?');">Remove</button>
+                    </form>
+                  </div>
+                </article>
+              {% endfor %}
+            </div>
+          </details>
+        </section>
+      {% endfor %}
+    {% else %}
     {% for group in grouped_drawers %}
       <section class="panel pending-group"
                id="pending-group-{{ group.drawer|replace('-', 'none') }}"
@@ -153,6 +258,7 @@
         </details>
       </section>
     {% endfor %}
+    {% endif %}
   </div>
   <section class="panel pending-empty"
            id="pending-empty-state"

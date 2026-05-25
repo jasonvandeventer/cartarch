@@ -8,7 +8,7 @@ from sqlalchemy import func, tuple_
 from sqlalchemy.orm import Session, joinedload
 
 from app.audit_service import log_transaction
-from app.models import Card, Deck, InventoryRow, StorageLocation
+from app.models import Card, Deck, Game, GameSeat, InventoryRow, StorageLocation
 from app.scryfall import fetch_deck_tokens
 
 # Library search for lands. Anchored to "your library" so opponent-search effects
@@ -1863,7 +1863,17 @@ def update_deck(
     name: str,
     format_name: str = "",
     notes: str = "",
+    blurb: str | None = None,
+    update_blurb: bool = False,
 ) -> Deck:
+    """Update a deck's editable attributes.
+
+    v3.28.7 — ``blurb`` and ``update_blurb`` parameters added for the
+    editorial-row Decks page's flavour-blurb sub-line. ``update_blurb``
+    distinguishes "not in this form submission" (preserve stored value)
+    from "explicitly cleared" (empty string clears to NULL) — same
+    pattern v3.28.6 used for ``StorageLocation.note`` / ``capacity``.
+    """
     deck = get_deck(session, deck_id=deck_id, user_id=user_id)
     if not deck:
         raise ValueError("Deck not found.")
@@ -1883,6 +1893,8 @@ def update_deck(
     deck.name = name
     deck.format = format_name.strip() or None
     deck.notes = notes.strip() or None
+    if update_blurb:
+        deck.blurb = (blurb.strip() if blurb else None) or None
 
     if deck.storage_location_id:
         location = (
@@ -1979,6 +1991,63 @@ def list_decks(session: Session, user_id: int) -> list[Deck]:
         deck.consistency = compute_consistency(all_rows) if all_rows else None
 
     return decks
+
+
+def compute_deck_game_stats(session: Session, user_id: int, deck_ids: list[int]) -> dict[int, dict]:
+    """Batched per-deck game stats for the v3.28.7 editorial-row Decks page.
+
+    Returns a dict keyed by deck_id with ``games`` / ``wins`` / ``win_rate``
+    / ``last_played``. Single GROUP BY query — no N+1 — matching the
+    v3.28.5 ``dashboard_service.get_dashboard_data`` deck_performance
+    pattern. Decks with zero games are simply absent from the returned
+    dict; callers default to 0/0/0.0/None on miss.
+
+    Filter contract: only finalized games (`Game.status == 'finalized'`)
+    with placement set (`GameSeat.placement IS NOT NULL`) count toward
+    games and wins. ``placement == 1`` is a win. Mirrors the dashboard
+    deck-performance contract for cross-page reconciliation.
+    """
+    if not deck_ids:
+        return {}
+
+    from sqlalchemy import case, desc, func
+
+    rows = (
+        session.query(
+            GameSeat.deck_id.label("deck_id"),
+            func.count(GameSeat.id).label("games"),
+            func.sum(case((GameSeat.placement == 1, 1), else_=0)).label("wins"),
+            func.max(Game.played_at).label("last_played"),
+        )
+        .join(Game, GameSeat.game_id == Game.id)
+        .filter(
+            GameSeat.deck_id.in_(deck_ids),
+            Game.user_id == user_id,
+            Game.status == "finalized",
+            GameSeat.placement.is_not(None),
+        )
+        .group_by(GameSeat.deck_id)
+        .all()
+    )
+
+    # Silence the unused-import warning (desc is imported for symmetry with
+    # the dashboard pattern but not actually used in this query).
+    _ = desc
+
+    out: dict[int, dict] = {}
+    for r in rows:
+        if r.deck_id is None:
+            continue
+        games = int(r.games or 0)
+        wins = int(r.wins or 0)
+        out[int(r.deck_id)] = {
+            "games": games,
+            "wins": wins,
+            "losses": games - wins,
+            "win_rate": (wins / games) if games > 0 else 0.0,
+            "last_played": r.last_played,
+        }
+    return out
 
 
 def get_deck(session: Session, deck_id: int, user_id: int) -> Deck | None:

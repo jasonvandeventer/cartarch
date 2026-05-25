@@ -74,6 +74,9 @@ from scripts.migrate_v3_27_14_password_reset_tokens import (
 from scripts.migrate_v3_28_6_storage_location_note_and_capacity import (
     main as migrate_v3_28_6_storage_location_note_and_capacity,
 )
+from scripts.migrate_v3_28_7_deck_blurb import (
+    main as migrate_v3_28_7_deck_blurb,
+)
 
 
 def _is_applied(name: str) -> bool:
@@ -384,6 +387,13 @@ def run():
         _mark_applied("v3_28_6_storage_location_note_and_capacity")
     else:
         print("v3.28.6 storage_location_note_and_capacity already applied, skipping")
+
+    if not _is_applied("v3_28_7_deck_blurb"):
+        print("Running v3.28.7 decks.blurb migration...")
+        migrate_v3_28_7_deck_blurb()
+        _mark_applied("v3_28_7_deck_blurb")
+    else:
+        print("v3.28.7 deck_blurb already applied, skipping")
 
     print("Migration runner complete")
 

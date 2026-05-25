@@ -1,149 +1,320 @@
-{% from "_macros.html" import editorial_eyebrow %}
+{% from "_macros.html" import editorial_eyebrow, mana_pips %}
 {% extends "base.html" %}
 {% block content %}
-  <section class="panel hero-panel compact-hero">
-    <div class="hero-row">
-      <div>
+  {# v3.28.7 — Folio Card Detail. The pre-v3.28.7 page kept its v3.28.3
+     editorial eyebrow but had no inline type-line / mana-cost / cmc, no
+     § section pattern, no Printings panel, no In-Decks panel, no
+     Legality panel, no History panel. Per opening-task triage, all five
+     panels are backed by existing schema (no migrations). P/T + flavor
+     text scoped out per owner decision (Card model has no power /
+     toughness / flavor_text columns — Card schema additions deferred).
+
+     Layout: hero with art on the left + name/type/meta on the right,
+     followed by Oracle Text, then 4 § panels (Printings, In Decks, Legality,
+     History) stacked. Inventory keeps its existing table for the per-row
+     action affordances (Remove / Sell / Trade / Delete) the inventory_card
+     macro provides on Collection — Card Detail's inventory section is
+     the only place users can act on specific rows of THIS card without
+     navigating away. Watch toggles (v3.27.12) preserved verbatim. #}
+  <section class="panel page-hero card-detail-hero">
+    <div class="card-detail-hero-grid">
+      <div class="card-detail-art">
+        {% if card.image_url %}
+          <img src="{{ card.image_url }}" alt="{{ card.name }}" loading="lazy" class="card-detail-art-img">
+        {% else %}
+          <div class="card-detail-art-placeholder"></div>
+        {% endif %}
+      </div>
+      <div class="card-detail-hero-copy">
         {{ editorial_eyebrow("Collection · Card Detail") }}
-        <h2 class="panel-title">{{ card.name }}</h2>
-        <p class="muted">
-          {{ card.set_name }} · {{ card.set_code|upper }} #{{ card.collector_number }}
-          &nbsp;·&nbsp;
+        <h2 class="card-detail-name">{{ card.name }}</h2>
+        {% if card.type_line %}
+          <div class="card-detail-type">{{ card.type_line }}</div>
+        {% endif %}
+        <div class="card-detail-meta">
+          {% if card.mana_cost %}
+            <span class="card-detail-mana">{{ card.mana_cost }}</span>
+            {% if card.cmc is not none %}<span class="card-detail-cmc">· CMC {{ card.cmc | round | int }}</span>{% endif %}
+          {% endif %}
+          <span class="card-detail-meta-sep">·</span>
+          <span>{{ card.set_name }} ({{ card.set_code|upper }}) #{{ card.collector_number }}</span>
+          {% if card.rarity %}
+            <span class="card-detail-meta-sep">·</span>
+            <span class="card-detail-rarity card-detail-rarity-{{ card.rarity|lower }}">{{ card.rarity|capitalize }}</span>
+          {% endif %}
+        </div>
+        {% if card.color_identity %}
+          <div class="card-detail-identity">
+            <span class="card-detail-identity-lbl">Identity</span>
+            <span class="card-detail-identity-pips">{{ mana_pips(card.color_identity) }}</span>
+          </div>
+        {% endif %}
+        <div class="stat-grid card-detail-stats" style="gap: 0.6rem;">
+          <div class="stat-card compact">
+            <div class="stat-label">Copies</div>
+            <div class="stat-value">{{ total_copies }}</div>
+          </div>
+          <div class="stat-card compact">
+            <div class="stat-label">Value</div>
+            <div class="stat-value">${{ "%.2f"|format(total_value) }}</div>
+          </div>
+        </div>
+        <p class="card-detail-scryfall-link muted">
           <a href="https://scryfall.com/card/{{ card.set_code }}/{{ card.collector_number }}"
-             target="_blank"
-             rel="noreferrer">Scryfall ↗</a>
+             target="_blank" rel="noreferrer">View on Scryfall ↗</a>
         </p>
-      </div>
-      <div class="stat-grid" style="gap: 0.6rem;">
-        <div class="stat-card compact">
-          <div class="stat-label">Copies</div>
-          <div class="stat-value">{{ total_copies }}</div>
+        {# v3.27.12 — watch toggles. Two identity modes per the v3.27.12 spec:
+           printing-specific (card_id) and printing-agnostic (name). Both can
+           be active independently; the buttons reflect whichever are
+           currently watched. Markup unchanged from pre-v3.28.7 — preserved
+           verbatim per the spec. #}
+        <div class="card-watch-row">
+          {% if watch_printing_id %}
+            <form method="post" action="/watchlist/{{ watch_printing_id }}/delete" style="display: inline">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+              <button type="submit" class="btn-like watch-btn watch-btn-on">★ Watching this printing — stop</button>
+            </form>
+          {% else %}
+            <form method="post" action="/watchlist/add" style="display: inline">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+              <input type="hidden" name="card_id" value="{{ card.id }}">
+              <button type="submit" class="btn-like watch-btn">☆ Watch this printing</button>
+            </form>
+          {% endif %}
+          {% if watch_name_id %}
+            <form method="post" action="/watchlist/{{ watch_name_id }}/delete" style="display: inline">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+              <button type="submit" class="btn-like watch-btn watch-btn-on">★ Watching any printing — stop</button>
+            </form>
+          {% else %}
+            <form method="post" action="/watchlist/add" style="display: inline">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+              <input type="hidden" name="card_name" value="{{ card.name }}">
+              <button type="submit" class="btn-like watch-btn">☆ Watch any printing</button>
+            </form>
+          {% endif %}
         </div>
-        <div class="stat-card compact">
-          <div class="stat-label">Value</div>
-          <div class="stat-value">${{ "%.2f"|format(total_value) }}</div>
-        </div>
       </div>
-    </div>
-    {# v3.27.12 — watch toggles. Two identity modes per the v3.27.12 spec:
-       printing-specific (card_id) and printing-agnostic (name). Both can
-       be active independently; the buttons reflect whichever are
-       currently watched. #}
-    <div class="card-watch-row">
-      {% if watch_printing_id %}
-        <form method="post"
-              action="/watchlist/{{ watch_printing_id }}/delete"
-              style="display: inline">
-          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-          <button type="submit" class="btn-like watch-btn watch-btn-on">★ Watching this printing — stop</button>
-        </form>
-      {% else %}
-        <form method="post" action="/watchlist/add" style="display: inline">
-          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-          <input type="hidden" name="card_id" value="{{ card.id }}">
-          <button type="submit" class="btn-like watch-btn">☆ Watch this printing</button>
-        </form>
-      {% endif %}
-      {% if watch_name_id %}
-        <form method="post"
-              action="/watchlist/{{ watch_name_id }}/delete"
-              style="display: inline">
-          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-          <button type="submit" class="btn-like watch-btn watch-btn-on">★ Watching any printing — stop</button>
-        </form>
-      {% else %}
-        <form method="post" action="/watchlist/add" style="display: inline">
-          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-          <input type="hidden" name="card_name" value="{{ card.name }}">
-          <button type="submit" class="btn-like watch-btn">☆ Watch any printing</button>
-        </form>
-      {% endif %}
     </div>
   </section>
-  <section>
-    <div>
-      {% if card.image_url %}<img src="{{ card.image_url }}" alt="{{ card.name }}" loading="lazy">{% endif %}
-    </div>
-    <div>
-      {% if card.oracle_text %}
-        <section class="panel">
-          <h3 class="panel-title">Oracle Text</h3>
-          <p style="white-space: pre-line; margin-top: 0.5rem;">{{ card.oracle_text }}</p>
-        </section>
-      {% endif %}
-      <section class="panel">
-        <h3 class="panel-title">Inventory</h3>
-        {% if rows %}
-          <div class="table-wrap">
-            <table class="stacking-table">
-              <thead>
-                <tr>
-                  <th>Finish</th>
-                  <th>Qty</th>
-                  <th>Location</th>
-                  <th>Pending</th>
-                  <th>Price</th>
-                  <th>Total</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {% for row in rows %}
-                  <tr>
-                    <td>
-                      <span class="finish-badge">{{ row.finish|capitalize }}</span>
-                    </td>
-                    <td data-label="Qty">{{ row.quantity }}</td>
-                    <td data-label="Location">{{ row.drawer_label }}</td>
-                    <td data-label="Pending">{{ "Yes" if row.is_pending else "No" }}</td>
-                    <td data-label="Price">${{ "%.2f"|format(row.effective_price) }}</td>
-                    <td data-label="Total">${{ "%.2f"|format(row.total_value) }}</td>
-                    <td>
-                      <div>
-                        <form action="/inventory/rows/{{ row.id }}/remove"
-                              method="post"
-                              class="inline-form">
-                          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                          <input type="number"
-                                 name="quantity"
-                                 min="1"
-                                 max="{{ row.quantity }}"
-                                 value="1">
-                          <button type="submit">Remove</button>
-                        </form>
-                        <form action="/inventory/rows/{{ row.id }}/sell"
-                              method="post"
-                              class="inline-form">
-                          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                          <input type="hidden" name="quantity" value="1">
-                          <button type="submit">Sell 1</button>
-                        </form>
-                        <form action="/inventory/rows/{{ row.id }}/trade"
-                              method="post"
-                              class="inline-form">
-                          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                          <input type="hidden" name="quantity" value="1">
-                          <button type="submit">Trade 1</button>
-                        </form>
-                        <form action="/inventory/rows/{{ row.id }}/delete"
-                              method="post"
-                              class="inline-form">
-                          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                          <button type="submit"
-                                  class="danger-button"
-                                  onclick="return confirm('Delete this row?');">Delete Row</button>
-                        </form>
-                      </div>
-                    </td>
-                  </tr>
-                {% endfor %}
-              </tbody>
-            </table>
+
+  {% if card.oracle_text %}
+    <section class="panel card-detail-oracle">
+      <h3 class="panel-title">Oracle Text</h3>
+      <p class="card-detail-oracle-body">{{ card.oracle_text }}</p>
+    </section>
+  {% endif %}
+
+  {# § I · Printings — all printings of this card NAME. Backed by Card.name
+     index + a single GROUP BY against InventoryRow for owned counts + a
+     single WatchlistItem batch. #}
+  {% if printings and (printings | length) > 1 %}
+    <section class="panel card-detail-panel">
+      <h3 class="card-detail-panel-h">
+        <span>§ I · Printings</span>
+        <span class="card-detail-panel-aux">{{ printings | length }} printings · {{ printings | selectattr('owned') | list | length }} owned</span>
+      </h3>
+      <div class="card-detail-printings">
+        <div class="card-detail-printings-row card-detail-printings-head">
+          <span></span>
+          <span>Set</span>
+          <span>Collector</span>
+          <span class="card-detail-printings-r">Price</span>
+          <span class="card-detail-printings-r">Owned</span>
+          <span></span>
+        </div>
+        {% for p in printings %}
+          <div class="card-detail-printings-row {% if p.is_current %}card-detail-printings-current{% endif %}">
+            <span class="card-detail-printings-ix">{{ ['i.', 'ii.', 'iii.', 'iv.', 'v.', 'vi.', 'vii.', 'viii.', 'ix.', 'x.'][loop.index0] if loop.index0 < 10 else loop.index ~ '.' }}</span>
+            <span class="card-detail-printings-set">{{ p.card.set_code|upper }}</span>
+            <span class="card-detail-printings-collector">
+              <a href="/cards/{{ p.card.id }}">#{{ p.card.collector_number }}</a>
+              {% if p.is_watched %}<span class="card-detail-printings-watch" title="Watching this printing">★</span>{% endif %}
+            </span>
+            <span class="card-detail-printings-r card-detail-printings-px">
+              {% if p.card.price_usd %}${{ p.card.price_usd }}{% else %}—{% endif %}
+            </span>
+            <span class="card-detail-printings-r card-detail-printings-ow {% if not p.owned %}card-detail-printings-ow-zero{% endif %}">
+              {% if p.owned %}×{{ p.owned }}{% else %}—{% endif %}
+            </span>
+            <span class="card-detail-printings-act">
+              {% if p.is_current %}<span class="card-detail-printings-cur">current</span>{% else %}<a href="/cards/{{ p.card.id }}">View</a>{% endif %}
+            </span>
           </div>
-        {% else %}
-          <p class="muted">No inventory rows found.</p>
+        {% endfor %}
+      </div>
+    </section>
+  {% endif %}
+
+  {# § II · In Decks — joined via InventoryRow.storage_location_id matching
+     Deck.storage_location_id (the v3.5 deck-as-StorageLocation pattern). #}
+  {% if in_decks %}
+    <section class="panel card-detail-panel">
+      <h3 class="card-detail-panel-h">
+        <span>§ II · In your decks</span>
+        <span class="card-detail-panel-aux">{{ in_decks | length }} deck{{ '' if (in_decks | length) == 1 else 's' }}</span>
+      </h3>
+      <div class="card-detail-in-decks">
+        {% for d in in_decks %}
+          <div class="card-detail-in-decks-row">
+            <div>
+              <div class="card-detail-in-decks-nm">
+                <a href="/decks/{{ d.deck_id }}">{{ d.deck_name }}</a>
+              </div>
+              {% if d.role == 'commander' %}
+                <div class="card-detail-in-decks-role">Commander</div>
+              {% endif %}
+            </div>
+            <span class="card-detail-in-decks-qty">×{{ d.quantity }}</span>
+          </div>
+        {% endfor %}
+      </div>
+    </section>
+  {% endif %}
+
+  {# § III · Prices — static USD by finish. 1d/7d/30d deltas DEFERRED per
+     the v3.28.7 opening-task triage (needs price-history schema; same
+     posture as v3.28.5 Holdings chart and v3.28.9 Watchlist delta). #}
+  {% if prices.regular or prices.foil or prices.etched %}
+    <section class="panel card-detail-panel">
+      <h3 class="card-detail-panel-h">
+        <span>§ III · Prices</span>
+        <span class="card-detail-panel-aux">USD · Scryfall</span>
+      </h3>
+      <div class="card-detail-prices">
+        {% if prices.regular %}
+          <div class="card-detail-prices-row">
+            <span class="card-detail-prices-l">Regular</span>
+            <span class="card-detail-prices-v">${{ prices.regular }}</span>
+          </div>
         {% endif %}
-      </section>
-    </div>
+        {% if prices.foil %}
+          <div class="card-detail-prices-row">
+            <span class="card-detail-prices-l">Foil</span>
+            <span class="card-detail-prices-v">${{ prices.foil }}</span>
+          </div>
+        {% endif %}
+        {% if prices.etched %}
+          <div class="card-detail-prices-row">
+            <span class="card-detail-prices-l">Etched</span>
+            <span class="card-detail-prices-v">${{ prices.etched }}</span>
+          </div>
+        {% endif %}
+      </div>
+      <p class="card-detail-prices-deferred">
+        Price-over-time deltas will appear here once daily price tracking lands. That's a separate future release.
+      </p>
+    </section>
+  {% endif %}
+
+  {# § IV · Legality — parsed from Card.legalities JSON. Shown for the
+     formats the player cares about. #}
+  {% if legality_map %}
+    <section class="panel card-detail-panel">
+      <h3 class="card-detail-panel-h">
+        <span>§ IV · Legality</span>
+      </h3>
+      <div class="card-detail-legality">
+        {% for fmt, status in legality_map.items() %}
+          <div class="card-detail-legality-row card-detail-legality-{{ status }}">
+            <span class="card-detail-legality-fmt">{{ fmt }}</span>
+            <span class="card-detail-legality-status">
+              {% if status == 'legal' %}legal
+              {% elif status == 'banned' %}banned
+              {% elif status == 'restricted' %}restricted
+              {% else %}not legal{% endif %}
+            </span>
+          </div>
+        {% endfor %}
+      </div>
+    </section>
+  {% endif %}
+
+  {# § V · History — your copy's events. TransactionLog filtered by user +
+     card_id; top 10 most recent. Empty if the card has no history yet. #}
+  {% if history_rows %}
+    <section class="panel card-detail-panel">
+      <h3 class="card-detail-panel-h">
+        <span>§ V · History</span>
+        <span class="card-detail-panel-aux">your copy{{ '' if (history_rows | length) == 1 else "'s recent events" }}</span>
+      </h3>
+      <div class="card-detail-history">
+        {% for h in history_rows %}
+          <div class="card-detail-history-row">
+            <span class="card-detail-history-t">{{ h.event_type | replace('_', ' ') | capitalize }}</span>
+            <span class="card-detail-history-n">
+              {% if h.destination_location %}{{ h.destination_location }}{% elif h.source_location %}from {{ h.source_location }}{% elif h.note %}{{ h.note }}{% else %}—{% endif %}
+              {% if h.quantity_delta %}<span class="card-detail-history-qty">×{{ h.quantity_delta }}</span>{% endif %}
+            </span>
+            <span class="card-detail-history-d">{{ h.created_at | editorial_date }}</span>
+          </div>
+        {% endfor %}
+      </div>
+    </section>
+  {% endif %}
+
+  {# Inventory table — preserved from pre-v3.28.7 verbatim. The per-row
+     actions (Remove / Sell / Trade / Delete) are real workflows that
+     don't exist anywhere else for a specific row of THIS card; keeping
+     the table form is the right shape. #}
+  <section class="panel">
+    <h3 class="panel-title">Inventory</h3>
+    {% if rows %}
+      <div class="table-wrap">
+        <table class="stacking-table">
+          <thead>
+            <tr>
+              <th>Finish</th>
+              <th>Qty</th>
+              <th>Location</th>
+              <th>Pending</th>
+              <th>Price</th>
+              <th>Total</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in rows %}
+              <tr>
+                <td>
+                  <span class="finish-badge">{{ row.finish|capitalize }}</span>
+                </td>
+                <td data-label="Qty">{{ row.quantity }}</td>
+                <td data-label="Location">{{ row.drawer_label }}</td>
+                <td data-label="Pending">{{ "Yes" if row.is_pending else "No" }}</td>
+                <td data-label="Price">${{ "%.2f"|format(row.effective_price) }}</td>
+                <td data-label="Total">${{ "%.2f"|format(row.total_value) }}</td>
+                <td>
+                  <div>
+                    <form action="/inventory/rows/{{ row.id }}/remove" method="post" class="inline-form">
+                      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                      <input type="number" name="quantity" min="1" max="{{ row.quantity }}" value="1">
+                      <button type="submit">Remove</button>
+                    </form>
+                    <form action="/inventory/rows/{{ row.id }}/sell" method="post" class="inline-form">
+                      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                      <input type="hidden" name="quantity" value="1">
+                      <button type="submit">Sell 1</button>
+                    </form>
+                    <form action="/inventory/rows/{{ row.id }}/trade" method="post" class="inline-form">
+                      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                      <input type="hidden" name="quantity" value="1">
+                      <button type="submit">Trade 1</button>
+                    </form>
+                    <form action="/inventory/rows/{{ row.id }}/delete" method="post" class="inline-form">
+                      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                      <button type="submit" class="danger-button"
+                              onclick="return confirm('Delete this row?');">Delete Row</button>
+                    </form>
+                  </div>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p class="muted">No inventory rows found.</p>
+    {% endif %}
   </section>
 {% endblock %}
