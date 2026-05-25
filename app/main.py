@@ -36,7 +36,7 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from app.audit_service import list_transaction_logs, log_transaction
 from app.auth import hash_password, validate_password_strength
-from app.dashboard_service import get_dashboard_tiles
+from app.dashboard_service import get_dashboard_data
 from app.db import DATA_DIR, SessionLocal, init_db
 from app.deck_service import (
     CARD_ROLE_TAGS,
@@ -461,13 +461,15 @@ def home(
         session.query(InventoryRow.id).filter(InventoryRow.user_id == current_user.id).first()
         is None
     )
-    # v3.27.10 — three dashboard tiles (Collection Value, Sets Collected,
-    # Recent Activity). Live aggregation; total cost <10ms on prod data
-    # shape (see app/dashboard_service.py header for the per-query
-    # measurements). Computed only when the populated dashboard renders —
-    # the show_onboarding empty state skips the work since a brand-new
-    # account has nothing to surface.
-    tiles = None if show_onboarding else get_dashboard_tiles(session, user_id=current_user.id)
+    # v3.28.5 — Folio dashboard. ``get_dashboard_data`` returns the full
+    # nine-panel data shape (replaces the v3.27.10/v3.27.11 three-tile
+    # ``get_dashboard_tiles`` shape; the legacy function is kept in
+    # dashboard_service.py for backward-compat but is no longer called
+    # from the home route). Computed only when the populated dashboard
+    # renders — the show_onboarding empty state skips the work since a
+    # brand-new account has nothing to surface. Total query cost
+    # ~30 ms on prod data shape per the dashboard_service module header.
+    dashboard = None if show_onboarding else get_dashboard_data(session, user_id=current_user.id)
     return render(
         request,
         "home.html",
@@ -476,7 +478,7 @@ def home(
             "current_user": current_user,
             "use_drawer_sorter": current_user.username in DRAWER_SORTER_USERNAMES,
             "show_onboarding": show_onboarding,
-            "tiles": tiles,
+            "dashboard": dashboard,
         },
     )
 

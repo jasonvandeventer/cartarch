@@ -7502,3 +7502,781 @@ body.game-mode {
     font-size: 1.625rem;
   }
 }
+
+/* ============================================================================
+   === Folio dashboard (v3.28.5) ===
+   ----------------------------------------------------------------------------
+   The Folio masthead + search hero + nine `§`-numbered editorial panels.
+   Replaces the v3.27.8 "Quick Actions launcher" + v3.27.10/v3.27.11 three-tile
+   shape with the design package's full dashboard. Translated from
+   page_dashboard.jsx's dashCss block; token-mapped per the cluster pattern
+   (--cream → --text, --cream-2 → --text-dim, --cream-3 → --muted,
+   --brass-2 → --accent-2, --brass-soft → --brand-gold-soft, --sage →
+   --brand-green, --oxblood → --danger). The Holdings 30-day chart + delta
+   are deferred — they need a price-history schema; v3.28.5 renders a clean
+   "available once price history lands" placeholder instead.
+
+   Layout: masthead (2-col: text+stat-block) → search hero (1-row) →
+   main grid (2-col: 1.5fr left / 1fr right) → lower row (4 equal cols).
+   Responsive collapse at ≤980px (main grid → 1 col) and ≤768px (lower
+   row → 1 col, masthead text+stat-block stack).
+   ============================================================================ */
+
+/* === MASTHEAD ===
+   v3.28.5 cleanup pass: pumped masthead and stat-block typography scale.
+   Originally the masthead H1 was clamp(1.5rem, 3vw, 2rem) ≈ the .pagehead-title
+   size, but the dashboard is the editorial centerpiece — needs to read as
+   a magazine cover, not a generic page heading. */
+.dashboard-masthead {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: end;
+  gap: 1.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--border);
+}
+.dashboard-masthead-title {
+  /* Newsreader italic display, large. Matches the design's .dsh-masthead h1
+     font-size 26px at desktop, scales up at wider viewports. */
+  font-family: "Newsreader", Georgia, serif;
+  font-style: italic;
+  font-weight: 400;
+  font-size: clamp(2rem, 4vw, 2.8rem);
+  line-height: 1.05;
+  letter-spacing: -0.012em;
+  color: var(--text);
+  margin: 0.4rem 0 0;
+}
+.dashboard-masthead-title b {
+  font-style: normal;
+  font-weight: 500;
+}
+.dashboard-masthead-insight {
+  margin-top: 0.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  font-family: "Newsreader", Georgia, serif;
+  font-style: italic;
+  font-size: 1.05rem;
+  color: var(--text-dim);
+  line-height: 1.45;
+}
+.dashboard-masthead-insight::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--accent-2);
+  flex: 0 0 auto;
+}
+.dashboard-masthead-insight b {
+  color: var(--text);
+  font-style: italic;
+  font-weight: 500;
+}
+.dashboard-masthead-insight i {
+  color: var(--accent-2);
+  font-style: italic;
+}
+.dashboard-masthead-right {
+  display: flex;
+  gap: 1.75rem;
+}
+.dashboard-masthead-stat {
+  text-align: right;
+}
+.dashboard-masthead-stat .lbl {
+  font-size: 0.62rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 700;
+}
+.dashboard-masthead-stat .v {
+  font-family: "Newsreader", Georgia, serif;
+  font-style: italic;
+  font-size: 1.5rem;
+  color: var(--text);
+  font-weight: 500;
+  margin-top: 0.25rem;
+  line-height: 1;
+}
+.dashboard-masthead-stat .v.brass {
+  color: var(--accent-2);
+}
+
+/* === SEARCH HERO === */
+.dashboard-search-hero {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.75rem;
+  align-items: center;
+  margin: 1rem 0 1.25rem;
+}
+.dashboard-search-input {
+  padding: 0.8rem 1.1rem;
+  border-radius: var(--radius-sm);
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: "Newsreader", Georgia, serif;
+  font-style: italic;
+  font-size: 1rem;
+  width: 100%;
+}
+.dashboard-search-input::placeholder {
+  color: var(--muted);
+  font-style: italic;
+}
+.dashboard-search-chips {
+  display: flex;
+  gap: 0.375rem;
+  flex-wrap: wrap;
+}
+.dashboard-search-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.45rem 0.75rem;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  color: var(--text-dim);
+  font-family: "Montserrat", sans-serif;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-decoration: none;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.dashboard-search-chip:hover {
+  background: var(--panel-2);
+  color: var(--text);
+}
+
+/* === MAIN GRID ===
+   v3.28.5 cleanup: bigger gaps + bigger panel padding to match the design's
+   breathing-room aesthetic. The page felt cramped at the previous values. */
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: 1.55fr 1fr;
+  gap: 1.4rem;
+  align-items: start;
+  margin-bottom: 1.4rem;
+}
+.dashboard-col {
+  display: grid;
+  gap: 1.125rem;
+  align-content: start;
+}
+
+/* === PANEL — editorial header ("§ N · Title") + content + optional aux ===
+   v3.28.5 cleanup: § header pumped from 0.6rem → 0.72rem (uppercase
+   letter-spaced — still small, but now readable). Panel padding bumped for
+   breathing room. Aux uses .82rem Newsreader italic so it carries actual
+   visual weight beside the § header. */
+.dashboard-panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.25rem 1.4rem;
+  display: flex;
+  flex-direction: column;
+}
+.dashboard-panel-h {
+  font-family: "Montserrat", sans-serif;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  color: var(--accent-2);
+  margin: 0 0 0.875rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+.dashboard-panel-h::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--border-soft);
+}
+.dashboard-panel-h .aux {
+  flex: 0 0 auto;
+  text-transform: none;
+  letter-spacing: 0.02em;
+  font-family: "Newsreader", Georgia, serif;
+  font-style: italic;
+  font-size: 0.82rem;
+  color: var(--muted);
+  font-weight: 400;
+}
+.dashboard-panel-urgent {
+  background: linear-gradient(180deg, rgba(138, 46, 34, 0.10), var(--panel));
+  border-color: rgba(138, 46, 34, 0.45);
+}
+/* v3.28.5 cleanup: empty states get a "deliberate pause" treatment rather
+   than reading as placeholder text. Italic Newsreader at body size, a faint
+   sage-tone dot marker that signals "intentional / nothing wrong here". */
+.dashboard-empty {
+  font-family: "Newsreader", Georgia, serif;
+  font-style: italic;
+  font-size: 0.95rem;
+  color: var(--muted);
+  margin: 0;
+  padding: 0.5rem 0;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+.dashboard-empty::before {
+  content: "·";
+  font-size: 1.25rem;
+  color: var(--brand-green);
+  line-height: 1;
+  flex: 0 0 auto;
+}
+
+/* === § I TODAY'S BRIEF ===
+   v3.28.5 cleanup: typography pumped one step (0.875rem → 0.95rem); first
+   item gets a .major modifier with larger italic-display treatment per the
+   design's `.dsh-brief-item.major .lede { font-size: 15px; font-style: italic; }`. */
+.dashboard-brief {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.dashboard-brief-item {
+  display: grid;
+  grid-template-columns: 1.75rem 1fr;
+  gap: 0.625rem;
+  padding: 0.55rem 0;
+  border-bottom: 1px dotted var(--border-soft);
+}
+.dashboard-brief-item:last-child {
+  border-bottom: 0;
+}
+.dashboard-brief-item .num {
+  font-family: "Newsreader", Georgia, serif;
+  font-style: italic;
+  font-size: 0.95rem;
+  color: var(--accent-2);
+}
+.dashboard-brief-item .lede {
+  font-family: "Newsreader", Georgia, serif;
+  font-size: 0.95rem;
+  color: var(--text-dim);
+  line-height: 1.45;
+}
+.dashboard-brief-item.major .lede {
+  font-style: italic;
+  font-size: 1.1rem;
+  color: var(--text);
+}
+.dashboard-brief-item .lede b {
+  color: var(--text);
+  font-weight: 500;
+}
+.dashboard-brief-item.major .lede b {
+  font-style: italic;
+}
+.dashboard-brief-item .lede i {
+  color: var(--accent-2);
+  font-style: italic;
+}
+.dashboard-brief-item .detail {
+  grid-column: 2;
+  font-family: "Newsreader", Georgia, serif;
+  font-style: italic;
+  font-size: 0.85rem;
+  color: var(--muted);
+  margin-top: 0.3rem;
+  line-height: 1.45;
+}
+
+/* === § II HOLDINGS ===
+   v3.28.5 cleanup: typography pumped one step; deferred-chart placeholder
+   gets more breathing room. */
+.dashboard-holdings {
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
+}
+.dashboard-holdings-lede {
+  font-family: "Newsreader", Georgia, serif;
+  font-style: italic;
+  font-size: 1rem;
+  color: var(--text-dim);
+  line-height: 1.5;
+}
+.dashboard-holdings-lede b {
+  color: var(--text);
+  font-weight: 500;
+}
+.dashboard-holdings-deferred {
+  padding: 0.875rem 1rem;
+  background: rgba(0, 0, 0, 0.18);
+  border-left: 2px solid var(--border-soft);
+  border-radius: 0 4px 4px 0;
+}
+.dashboard-holdings-deferred-note {
+  font-family: "Newsreader", Georgia, serif;
+  font-style: italic;
+  font-size: 0.85rem;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+/* === § III CHRONICLE === */
+.dashboard-chron {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.dashboard-chron-row {
+  display: grid;
+  grid-template-columns: 1.75rem 5rem 1fr auto;
+  gap: 0.5rem;
+  align-items: baseline;
+  padding: 0.45rem 0;
+  border-bottom: 1px dotted var(--border-soft);
+  font-family: "Newsreader", Georgia, serif;
+  font-size: 0.875rem;
+}
+.dashboard-chron-row:last-child {
+  border-bottom: 0;
+}
+.dashboard-chron-row .ix {
+  font-style: italic;
+  color: var(--accent-2);
+}
+.dashboard-chron-row .verb {
+  font-style: italic;
+  color: var(--text-dim);
+}
+.dashboard-chron-row .verb.plc {
+  color: var(--brand-green);
+}
+.dashboard-chron-row .verb.del {
+  color: var(--danger);
+}
+.dashboard-chron-row .nm {
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dashboard-chron-row .set {
+  font-family: ui-monospace, "JetBrains Mono", monospace;
+  font-size: 0.66rem;
+  color: var(--muted);
+  letter-spacing: 0.08em;
+}
+
+/* === § IV PRIORITY QUEUE ===
+   v3.28.5 cleanup: number pumped 2.25rem → 3.5rem so the queue size is
+   the panel's visual anchor (matches the design's "28" prominence).
+   CTA button gets more padding for action-affordance weight. */
+.dashboard-pq {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+.dashboard-pq-headline {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+.dashboard-pq-headline .num {
+  font-family: "Newsreader", Georgia, serif;
+  font-style: italic;
+  font-size: 3.5rem;
+  font-weight: 500;
+  color: var(--text);
+  line-height: 1;
+}
+.dashboard-pq-headline .meta {
+  font-family: "Newsreader", Georgia, serif;
+  font-style: italic;
+  font-size: 0.95rem;
+  color: var(--muted);
+}
+.dashboard-pq-cta {
+  align-self: flex-start;
+  padding: 0.75rem 1.25rem;
+  background: var(--accent-2);
+  color: var(--bg);
+  border: 1px solid var(--accent-2);
+  border-radius: var(--radius-sm);
+  font-family: "Montserrat", sans-serif;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  text-decoration: none;
+}
+.dashboard-pq-cta:hover {
+  filter: brightness(1.05);
+}
+/* v3.28.5 cleanup: celebratory "queue clear" empty state. Sage-toned
+   check mark + italic Newsreader copy reads as "all good" rather than
+   "no data" — addresses the empty-space concern on the Priority Queue
+   panel without growing scope. */
+.dashboard-pq-clear {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.5rem 0 0.25rem;
+}
+.dashboard-pq-clear-mark {
+  font-size: 2rem;
+  color: var(--brand-green);
+  font-weight: 500;
+  line-height: 1;
+  flex: 0 0 auto;
+}
+.dashboard-pq-clear-text {
+  font-family: "Newsreader", Georgia, serif;
+  font-style: italic;
+  font-size: 1.15rem;
+  color: var(--text);
+  margin: 0;
+  line-height: 1.25;
+}
+.dashboard-pq-clear-sub {
+  font-family: "Newsreader", Georgia, serif;
+  font-style: italic;
+  font-size: 0.85rem;
+  color: var(--muted);
+  margin: 0.15rem 0 0;
+}
+
+/* === § V SPOTLIGHT ===
+   v3.28.5 cleanup: card art bumped 86 → 110px (closer to the design's
+   visual prominence); name bigger; stats row tightened. */
+.dashboard-spot {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 1rem;
+  align-items: start;
+  text-decoration: none;
+  color: inherit;
+}
+.dashboard-spot-art {
+  filter: drop-shadow(0 8px 18px rgba(0, 0, 0, 0.5));
+  border-radius: 5px;
+  overflow: hidden;
+}
+.dashboard-spot-art img {
+  width: 110px;
+  height: auto;
+  display: block;
+  border-radius: 5px;
+}
+.dashboard-spot-art-placeholder {
+  width: 110px;
+  height: 153px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+}
+.dashboard-spot-copy {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.dashboard-spot-name {
+  font-family: "Newsreader", Georgia, serif;
+  font-style: italic;
+  font-weight: 500;
+  font-size: 1.25rem;
+  color: var(--text);
+  margin: 0 0 0.3rem;
+  line-height: 1.15;
+}
+.dashboard-spot-set {
+  font-family: ui-monospace, "JetBrains Mono", monospace;
+  font-size: 0.72rem;
+  color: var(--muted);
+  letter-spacing: 0.08em;
+}
+.dashboard-spot-stats {
+  display: flex;
+  gap: 1rem;
+  margin-top: 0.625rem;
+  padding-top: 0.625rem;
+  border-top: 1px dotted var(--border-soft);
+}
+.dashboard-spot-stats .l {
+  display: block;
+  font-size: 0.58rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 700;
+}
+.dashboard-spot-stats .v {
+  display: block;
+  font-family: "Newsreader", Georgia, serif;
+  font-style: italic;
+  font-size: 0.95rem;
+  color: var(--text);
+  margin-top: 0.2rem;
+}
+/* v3.28.5 cleanup: Spotlight Identity uses the canonical .mana-pip SVG
+   (Scryfall card-symbols) via the mana_pips() macro. Sized down from the
+   default 24px to 18px so it fits the Spotlight stats row's compact scale.
+   Same approach as Deck Performance below — override .mana-pip dimensions
+   in each dashboard panel's scope rather than introducing yet another
+   custom-pip variant. */
+.dashboard-spot-pips {
+  display: inline-flex;
+  gap: 2px;
+  align-items: center;
+  margin-top: 0.15rem;
+}
+.dashboard-spot-pips .mana-pip {
+  width: 18px;
+  height: 18px;
+  margin-left: 0;
+}
+
+/* === LOWER ROW (4 columns) ===
+   v3.28.5 cleanup: `align-items: stretch` so all four panels match the
+   tallest panel's height. Visual rhythm — empty space at the bottom of
+   short panels reads as deliberate breathing room rather than truncation. */
+.dashboard-lower {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1.4rem;
+  align-items: stretch;
+}
+
+/* === § VI DECK PERFORMANCE ===
+   v3.28.5 cleanup: typography pumped; per-row mana-identity pips column
+   added (matches the design's pips-before-name pattern). */
+.dashboard-decks {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.dashboard-decks-row {
+  border-bottom: 1px dotted var(--border-soft);
+}
+.dashboard-decks-row:last-child {
+  border-bottom: 0;
+}
+.dashboard-decks-row a {
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
+  gap: 0.5rem;
+  align-items: center;
+  padding: 0.5rem 0;
+  text-decoration: none;
+}
+.dashboard-decks-row .pips {
+  display: inline-flex;
+  gap: 1px;
+  flex: 0 0 auto;
+  align-items: center;
+}
+/* v3.28.5 cleanup: Deck Performance pips use the canonical .mana-pip SVG
+   (Scryfall card-symbols) via the mana_pips() macro. Sized down from the
+   default 24px to 16px to fit the compact deck-row scale. */
+.dashboard-decks-row .mana-pip {
+  width: 16px;
+  height: 16px;
+  margin-left: 0;
+}
+.dashboard-decks-row .nm {
+  font-family: "Newsreader", Georgia, serif;
+  font-size: 0.92rem;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dashboard-decks-row .n {
+  font-family: ui-monospace, "JetBrains Mono", monospace;
+  font-size: 0.7rem;
+  color: var(--muted);
+}
+.dashboard-decks-row .w {
+  font-family: "Newsreader", Georgia, serif;
+  font-style: italic;
+  font-size: 0.92rem;
+  font-weight: 500;
+}
+.dashboard-decks-row .w.up {
+  color: var(--brand-green);
+}
+.dashboard-decks-row .w.dn {
+  color: var(--muted);
+}
+
+/* === § VII COLOR IDENTITY ===
+   v3.28.5 cleanup: bar height pumped 5px → 8px; pip slightly larger;
+   row padding bumped for breathing room. */
+.dashboard-colid {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.dashboard-colid-row {
+  display: grid;
+  grid-template-columns: 1.5rem 1fr auto;
+  gap: 0.625rem;
+  align-items: center;
+  padding: 0.4rem 0;
+}
+.dashboard-colid-row .pip {
+  width: 1.35rem;
+  height: 1.35rem;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: ui-monospace, "JetBrains Mono", monospace;
+  font-weight: 700;
+  font-size: 0.72rem;
+}
+.dashboard-colid-w .pip { background: #F1E6C5; color: #3a2f1c; }
+.dashboard-colid-u .pip { background: #3C6BB0; color: #E6EEF8; }
+.dashboard-colid-b .pip { background: #23201E; color: #D8D2C6; }
+.dashboard-colid-r .pip { background: #B23A2C; color: #fff; }
+.dashboard-colid-g .pip { background: #2F6E4A; color: #fff; }
+.dashboard-colid-c .pip { background: #8C8579; color: #fff; }
+.dashboard-colid-m .pip {
+  background: linear-gradient(135deg, #C9A55E, #8B6914);
+  color: #1a1a1a;
+}
+.dashboard-colid-row .bar {
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.3);
+  overflow: hidden;
+}
+.dashboard-colid-row .bar .fill {
+  height: 100%;
+  background: var(--accent-2);
+}
+.dashboard-colid-w .bar .fill { background: #F1E6C5; }
+.dashboard-colid-u .bar .fill { background: #3C6BB0; }
+.dashboard-colid-b .bar .fill { background: #6a6058; }
+.dashboard-colid-r .bar .fill { background: #B23A2C; }
+.dashboard-colid-g .bar .fill { background: #2F6E4A; }
+.dashboard-colid-c .bar .fill { background: #8C8579; }
+.dashboard-colid-m .bar .fill { background: #C9A55E; }
+.dashboard-colid-row .val {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  font-family: ui-monospace, "JetBrains Mono", monospace;
+  font-size: 0.78rem;
+  color: var(--text);
+}
+.dashboard-colid-row .val small {
+  font-size: 0.62rem;
+  color: var(--muted);
+  letter-spacing: 0.04em;
+}
+
+/* === § VIII COLLECTION STATISTICS ===
+   v3.28.5 cleanup: typography pumped one step; rows breathe. */
+.dashboard-stats {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.dashboard-stats li {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 0.45rem 0;
+  border-bottom: 1px dotted var(--border-soft);
+  font-size: 0.9rem;
+}
+.dashboard-stats li:last-child {
+  border-bottom: 0;
+}
+.dashboard-stats .l {
+  color: var(--muted);
+  font-family: "Newsreader", Georgia, serif;
+  font-style: italic;
+}
+.dashboard-stats .v {
+  color: var(--text);
+  font-family: ui-monospace, "JetBrains Mono", monospace;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+/* === § IX QUICK ACTIONS ===
+   v3.28.5 cleanup: per-action card padding and text both pumped; hint
+   reads as italic Newsreader body rather than caption. */
+.dashboard-actions {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.dashboard-actions a {
+  display: flex;
+  flex-direction: column;
+  padding: 0.7rem 0.875rem;
+  background: rgba(0, 0, 0, 0.15);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  text-decoration: none;
+  transition: background 0.12s ease, border-color 0.12s ease;
+  gap: 0.15rem;
+}
+.dashboard-actions a:hover {
+  background: var(--brand-gold-soft);
+  border-color: var(--accent-2);
+}
+.dashboard-actions .nm {
+  font-family: "Newsreader", Georgia, serif;
+  font-size: 0.98rem;
+  font-weight: 500;
+  color: var(--text);
+}
+.dashboard-actions .hint {
+  font-family: "Newsreader", Georgia, serif;
+  font-style: italic;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+/* === Responsive collapse === */
+@media (max-width: 980px) {
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+  .dashboard-lower {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+@media (max-width: 768px) {
+  .dashboard-masthead {
+    grid-template-columns: 1fr;
+    align-items: start;
+  }
+  .dashboard-masthead-right {
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
+  .dashboard-masthead-stat {
+    text-align: left;
+  }
+  .dashboard-search-hero {
+    grid-template-columns: 1fr;
+  }
+  .dashboard-lower {
+    grid-template-columns: 1fr;
+  }
+}

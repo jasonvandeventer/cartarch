@@ -1,16 +1,21 @@
-{% from "_macros.html" import editorial_eyebrow %}
+{% from "_macros.html" import editorial_eyebrow, mana_pips %}
 {% extends "base.html" %}
 {% block content %}
-  {# v3.27.8 layout restructure. Two states driven by show_onboarding:
-     - populated: pagehead + quick-actions grid (existing action cards
-       restructured into a tighter hierarchy). Stat row + lower panels
-       (recent-activity / storage-snapshot) are deliberately NOT rendered
-       in v3.27.8 — those slots are owned by v3.27.9 dashboard-data-tiles
-       which has its own data-aggregation prereqs. The layout makes room
-       for them; the data wiring is v3.27.9's job.
-     - empty (show_onboarding): welcome panel + first-step CTA + numbered
-       what-comes-next steps. Replaces the wall-of-zeros that the
-       populated dashboard would show a brand-new account. #}
+  {# v3.28.5 — Folio dashboard. Replaces the v3.27.8 "Quick Actions launcher"
+     + v3.27.10/v3.27.11 three-tile shape with the design package's
+     masthead + search hero + nine `§`-numbered editorial panel grid.
+
+     Two states gated by show_onboarding:
+
+       populated (show_onboarding=False, signed-in user with inventory):
+         the Folio masthead + nine-panel grid (`{{ dashboard }}` context
+         comes from app.dashboard_service.get_dashboard_data — full
+         per-panel data shape).
+
+       empty (show_onboarding=True, brand-new account, no inventory rows):
+         the v3.27.8 welcome + first-step + numbered next-steps screen
+         (preserved — a new user doesn't benefit from the Folio
+         dashboard's nine empty panels). #}
   {% if show_onboarding %}
     <section class="welcome-panel">
       <div class="welcome-eyebrow">Getting started</div>
@@ -48,111 +53,304 @@
       </div>
     </section>
   {% else %}
-    <section class="pagehead">
-      {{ editorial_eyebrow("Dashboard") }}
-      <h1 class="pagehead-title">Welcome back, {{ current_user.display_name or current_user.username }}</h1>
-      <p class="pagehead-tagline">Everything important is one click away — import, place, build, and track.</p>
-    </section>
-    <div class="section-label">Quick actions</div>
-    <section class="action-grid">
-      <a href="/pending" class="action-card action-card-highlight">
-        <span class="action-tag">Place</span>
-        <h3>Pending Placement</h3>
-        <p>See imported cards waiting to be filed into your drawers, and confirm each once it's physically placed.</p>
-        <span class="action-cta">Review now</span>
-      </a>
-      <a href="/import" class="action-card">
-        <span class="action-tag">Import</span>
-        <h3>Import Cards</h3>
-        <p>Import from Helvault, Moxfield, or paste a card list. Preview and confirm before committing.</p>
-        <span class="action-cta">Import cards</span>
-      </a>
-      <a href="/collection" class="action-card">
-        <span class="action-tag">Browse</span>
-        <h3>Collection View</h3>
-        <p>Browse the full collection with pricing, exact printings, and storage-location assignments.</p>
-        <span class="action-cta">View collection</span>
-      </a>
-      {% if use_drawer_sorter %}
-        <a href="/drawers" class="action-card">
-          <span class="action-tag">Organize</span>
-          <h3>Drawer Layout</h3>
-          <p>See the physical organization of the collection grouped by drawer and slot.</p>
-          <span class="action-cta">Open drawers</span>
-        </a>
-      {% else %}
-        <a href="/locations" class="action-card">
-          <span class="action-tag">Organize</span>
-          <h3>Storage Locations</h3>
-          <p>Manage your binders, boxes, and other storage locations and see what's in each.</p>
-          <span class="action-cta">Open locations</span>
-        </a>
-      {% endif %}
-      <a href="/decks" class="action-card">
-        <span class="action-tag">Build</span>
-        <h3>Deck Management</h3>
-        <p>Track cards pulled into decks and return them cleanly to your collection.</p>
-        <span class="action-cta">Open decks</span>
-      </a>
-      <a href="/games" class="action-card">
-        <span class="action-tag">Play</span>
-        <h3>Game History</h3>
-        <p>Log Commander games, track win/loss records, and review deck performance.</p>
-        <span class="action-cta">View games</span>
-      </a>
-    </section>
-    {# v3.27.10 — three dashboard tiles wiring the slots v3.27.8 left
-       empty: Collection Value, Sets Collected, Recent Activity. Tiles
-       render only on the populated dashboard; the show_onboarding empty
-       state stays unchanged so a brand-new account never sees a wall of
-       zero-value tiles. Token reuse only — no aesthetic restyling (that
-       work is v3.27.13). #}
-    {% if tiles %}
-      <div class="section-label">At a glance</div>
-      <section class="dashboard-tiles">
-        <a href="/collection" class="dash-tile dash-tile-stat">
-          <div class="dash-tile-eyebrow">Collection Value</div>
-          <div class="dash-tile-number">${{ '%.2f'|format(tiles.collection.placed_value) }}</div>
-          <div class="dash-tile-sublabel">{{ tiles.collection.placed_cards }} cards placed</div>
-          {% if tiles.collection.pending_cards > 0 %}
-            <div class="dash-tile-pending">
-              {{ tiles.collection.pending_cards }} card{{ '' if tiles.collection.pending_cards == 1 else 's' }} / ${{ '%.2f'|format(tiles.collection.pending_value) }} pending placement
-            </div>
-          {% endif %}
-        </a>
-        {# v3.27.11 — replaced the Sets Collected tile. The Sets data was
-           cross-user-shared via the `cards` table denominator, so the
-           percentage moved on other users' imports — signal the current
-           user didn't generate. Sets remains its own page at /sets. #}
-        <a href="/decks" class="dash-tile dash-tile-stat">
-          <div class="dash-tile-eyebrow">Decks Owned</div>
-          <div class="dash-tile-number">{{ tiles.decks.total }}</div>
-          <div class="dash-tile-sublabel">
-            {% if tiles.decks.total == 0 %}
-              No decks yet
-            {% else %}
-              Commander: {{ tiles.decks.commander_format }}
-            {% endif %}
-          </div>
-        </a>
-        <a href="{% if use_drawer_sorter %}/audit{% else %}/collection{% endif %}"
-           class="dash-tile dash-tile-activity">
-          <div class="dash-tile-eyebrow">Recent Activity</div>
-          {% if tiles.activity %}
-            <ul class="dash-tile-activity-list">
-              {% for event in tiles.activity[:5] %}
-                <li>
-                  <span class="dash-tile-activity-type">{{ event.event_type | replace('_', ' ') }}</span>
-                  {% if event.card_name %}<span class="dash-tile-activity-card">{{ event.card_name }}</span>{% endif %}
-                  <span class="dash-tile-activity-when">{{ event.created_at | format_local_datetime("%Y-%m-%d") }}</span>
+    {# === MASTHEAD === #}
+    <header class="dashboard-masthead">
+      <div class="dashboard-masthead-left">
+        {{ editorial_eyebrow("Dashboard") }}
+        <h1 class="dashboard-masthead-title">{{ dashboard.masthead.greeting }}, <b>{{ current_user.display_name or current_user.username }}.</b></h1>
+        <div class="dashboard-masthead-insight">
+          <span>{{ dashboard.masthead.insight_html | safe }}</span>
+        </div>
+      </div>
+      <div class="dashboard-masthead-right">
+        <div class="dashboard-masthead-stat">
+          <div class="lbl">Pending</div>
+          <div class="v {% if dashboard.masthead.pending_count > 0 %}brass{% endif %}">{{ dashboard.masthead.pending_count }}</div>
+        </div>
+        <div class="dashboard-masthead-stat">
+          <div class="lbl">Placed</div>
+          <div class="v">{{ '{:,}'.format(dashboard.masthead.placed_cards) }}</div>
+        </div>
+      </div>
+    </header>
+
+    {# === SEARCH HERO === #}
+    <form class="dashboard-search-hero" action="/collection" method="get">
+      <input type="search"
+             name="search"
+             class="dashboard-search-input"
+             placeholder="Search cards, decks, locations, sets…"
+             autocomplete="off">
+      <div class="dashboard-search-chips">
+        <a class="dashboard-search-chip" href="/collection">Collection</a>
+        <a class="dashboard-search-chip" href="/decks">Decks</a>
+        <a class="dashboard-search-chip" href="/locations">Locations</a>
+        <a class="dashboard-search-chip" href="/sets">Sets</a>
+      </div>
+    </form>
+
+    {# === MAIN GRID — 2 columns (1.5fr / 1fr); left has Brief + Holdings + Priority Queue; right has Spotlight + Chronicle.
+       v3.28.5 pre-push rebalance — measured-and-redistributed partition. Heights were taken via headless Chromium
+       (Playwright) at 1440px viewport against representative seed data: Brief 188, Holdings 182, PQ 183, Spotlight 223,
+       Chronicle 282; column rowGap 18. Of every 2-col partition satisfying the constraint "Brief and Chronicle in
+       different columns," this split minimizes |Δheight| at 66px (LEFT 589 vs RIGHT 523). The mirror split
+       ({Chronicle,Spotlight} left, {Brief,Holdings,PQ} right) achieves the same Δ=66 but displaces Brief from the §I
+       slot — Today's Brief is the page's lede per design intent, so it stays §I in the top-left.
+       Column-major reading order preserved: §I,§II,§III down left; §IV,§V down right; §VI..§IX across lower row.
+       Mobile single-column collapse follows DOM order (left col → right col → lower row), producing the same
+       monotonic §I..§IX stack. #}
+    <div class="dashboard-grid">
+
+      {# ── LEFT COLUMN ── #}
+      <div class="dashboard-col">
+
+        {# § I · Today's Brief #}
+        <section class="panel dashboard-panel">
+          <div class="dashboard-panel-h">§ I · Today's Brief{% if dashboard.today_brief %}<span class="aux">{{ dashboard.today_brief | length }} notable {{ "item" if dashboard.today_brief | length == 1 else "items" }}</span>{% endif %}</div>
+          {% if dashboard.today_brief %}
+            <ol class="dashboard-brief">
+              {% for item in dashboard.today_brief %}
+                {# v3.28.5 — the first Brief item gets a `.major` modifier
+                   (Newsreader italic larger display text); subsequent items
+                   render as smaller single-liners. Mirrors the design
+                   package's .dsh-brief-item.major treatment in
+                   page_dashboard.jsx. #}
+                <li class="dashboard-brief-item{% if loop.first %} major{% endif %}">
+                  <span class="num">{{ ['i.', 'ii.', 'iii.', 'iv.'][loop.index0] if loop.index0 < 4 else loop.index ~ '.' }}</span>
+                  <div class="lede">{{ item.lede_html | safe }}</div>
+                  {% if item.detail %}<div class="detail">{{ item.detail }}</div>{% endif %}
                 </li>
               {% endfor %}
-            </ul>
+            </ol>
           {% else %}
-            <div class="dash-tile-empty">No recent activity yet.</div>
+            <p class="dashboard-empty">Nothing notable to surface right now.</p>
           {% endif %}
-        </a>
+        </section>
+
+        {# § II · Holdings (current value + deferred chart placeholder) #}
+        <section class="panel dashboard-panel">
+          <div class="dashboard-panel-h">§ II · Holdings<span class="aux">${{ '{:,.2f}'.format(dashboard.holdings.placed_value) }}</span></div>
+          <div class="dashboard-holdings">
+            <div class="dashboard-holdings-lede">
+              The collection sits at <b>${{ '{:,.2f}'.format(dashboard.holdings.placed_value) }}</b> across <b>{{ '{:,}'.format(dashboard.holdings.placed_cards) }}</b> placed cards.
+            </div>
+            {% if dashboard.holdings.history_deferred %}
+              {# v3.28.5 spec bucket (d) — DEFERRED. Daily price-history is a
+                 separate future effort; the 30-day chart and delta ship as a
+                 clean known-deferred element rather than faked or broken. #}
+              <div class="dashboard-holdings-deferred">
+                <span class="dashboard-holdings-deferred-note">
+                  Value over time will appear here once daily price tracking lands. That's a separate future release — the headline above is the current total.
+                </span>
+              </div>
+            {% endif %}
+          </div>
+        </section>
+
+        {# § III · Priority Queue (moved here from right column in the v3.28.5
+           measured rebalance — see comment on .dashboard-grid above. PQ is the
+           short panel needed to bring the left column up to height parity with
+           the right). #}
+        <section class="panel dashboard-panel {% if dashboard.priority_queue.pending_cards > 0 %}dashboard-panel-urgent{% endif %}">
+          <div class="dashboard-panel-h">§ III · Priority Queue{% if dashboard.priority_queue.oldest_pending_label %}<span class="aux">oldest {{ dashboard.priority_queue.oldest_pending_label }}</span>{% endif %}</div>
+          <div class="dashboard-pq">
+            {% if dashboard.priority_queue.pending_cards > 0 %}
+              <div class="dashboard-pq-headline">
+                <span class="num">{{ dashboard.priority_queue.pending_cards }}</span>
+                <span class="meta">
+                  card{{ 's' if dashboard.priority_queue.pending_cards != 1 else '' }}
+                  {% if dashboard.priority_queue.location_count > 0 %} · {{ dashboard.priority_queue.location_count }} location{{ 's' if dashboard.priority_queue.location_count != 1 else '' }}{% endif %}
+                </span>
+              </div>
+              <a href="/pending" class="dashboard-pq-cta">Review now →</a>
+            {% else %}
+              {# v3.28.5 cleanup: empty-queue celebratory treatment, not a
+                 dead-air placeholder. Mirrors the design package's intent
+                 — "all clear" reads as a positive signal, not absence. #}
+              <div class="dashboard-pq-clear">
+                <div class="dashboard-pq-clear-mark">✓</div>
+                <div>
+                  <p class="dashboard-pq-clear-text">Your placement queue is clear.</p>
+                  <p class="dashboard-pq-clear-sub">Nothing to file right now.</p>
+                </div>
+              </div>
+            {% endif %}
+          </div>
+        </section>
+
+      </div>
+
+      {# ── RIGHT COLUMN ── #}
+      <div class="dashboard-col">
+
+        {# § IV · Spotlight — most-recently-placed card. Image_url comes from the
+           v3.25.0 scryfall_cards bulk cache → request-path-safe (no live
+           Scryfall on the dashboard request path). Renumbered from §V to §IV
+           in the v3.28.5 pre-push rebalance. #}
+        <section class="panel dashboard-panel">
+          <div class="dashboard-panel-h">§ IV · Spotlight<span class="aux">newly placed</span></div>
+          {% if dashboard.spotlight %}
+            <a href="/cards/{{ dashboard.spotlight.card_id }}" class="dashboard-spot">
+              <div class="dashboard-spot-art">
+                {% if dashboard.spotlight.image_url %}
+                  <img src="{{ dashboard.spotlight.image_url | replace('/normal/', '/small/') }}"
+                       alt="{{ dashboard.spotlight.name }}"
+                       loading="lazy">
+                {% else %}
+                  <div class="dashboard-spot-art-placeholder"></div>
+                {% endif %}
+              </div>
+              <div class="dashboard-spot-copy">
+                <h3 class="dashboard-spot-name">{{ dashboard.spotlight.name }}</h3>
+                <div class="dashboard-spot-set">{{ dashboard.spotlight.set_code | upper }} · {{ dashboard.spotlight.collector_number }}{% if dashboard.spotlight.finish != 'nonfoil' %} · {{ dashboard.spotlight.finish }}{% endif %}</div>
+                {% if dashboard.spotlight.price_usd or dashboard.spotlight.color_identity %}
+                  <div class="dashboard-spot-stats">
+                    {% if dashboard.spotlight.price_usd %}
+                      <span><span class="l">Price</span><span class="v">${{ dashboard.spotlight.price_usd }}</span></span>
+                    {% endif %}
+                    {% if dashboard.spotlight.color_identity %}
+                      {# v3.28.5 cleanup: Identity uses the canonical mana_pips
+                         macro (Scryfall card-symbol SVGs from /static/mana/),
+                         consistent with Decks / Deck Detail / mana-curve usage
+                         app-wide. color_identity is a space-separated WUBRG
+                         string from Card.color_identity — macro expects exactly
+                         that shape. #}
+                      <span>
+                        <span class="l">Identity</span>
+                        <span class="v dashboard-spot-pips">{{ mana_pips(dashboard.spotlight.color_identity) }}</span>
+                      </span>
+                    {% endif %}
+                  </div>
+                {% endif %}
+              </div>
+            </a>
+          {% else %}
+            <p class="dashboard-empty">Place a card to feature it here.</p>
+          {% endif %}
+        </section>
+
+        {# § V · Chronicle (recent activity). Moved here from the left column in the
+           v3.28.5 pre-push rebalance so the right column carries enough vertical
+           weight to match the left. Renumbered from §III to §V to keep the
+           column-major reading order monotonic. #}
+        <section class="panel dashboard-panel">
+          <div class="dashboard-panel-h">§ V · Chronicle<span class="aux">last activity</span></div>
+          {% if dashboard.chronicle %}
+            <ol class="dashboard-chron">
+              {% for r in dashboard.chronicle %}
+                {% set roman = ['i.', 'ii.', 'iii.', 'iv.', 'v.', 'vi.', 'vii.'][loop.index0] %}
+                {% set is_placed = r.event_type == 'placement_confirmed' or r.event_type == 'placed' %}
+                {% set is_deleted = r.event_type == 'row_deleted' or r.event_type == 'deleted' %}
+                {% set verb = 'Filed' if is_placed else 'Removed' if is_deleted else r.event_type | replace('_', ' ') | capitalize %}
+                <li class="dashboard-chron-row">
+                  <span class="ix">{{ roman }}</span>
+                  <span class="verb {% if is_placed %}plc{% elif is_deleted %}del{% endif %}">{{ verb }}</span>
+                  <span class="nm">{{ r.card_name or '—' }}</span>
+                  {% if r.set_code %}<span class="set">{{ r.set_code | upper }}</span>{% endif %}
+                </li>
+              {% endfor %}
+            </ol>
+          {% else %}
+            <p class="dashboard-empty">No recent activity.</p>
+          {% endif %}
+        </section>
+      </div>
+    </div>
+
+    {# === LOWER ROW — 4 columns (Deck Performance / Color Identity / Stats / Quick Actions) === #}
+    <div class="dashboard-lower">
+
+      {# § VI · Deck Performance #}
+      <section class="panel dashboard-panel">
+        <div class="dashboard-panel-h">§ VI · Deck Performance{% if dashboard.deck_performance %}<span class="aux">top {{ dashboard.deck_performance | length }}</span>{% endif %}</div>
+        {% if dashboard.deck_performance %}
+          <ul class="dashboard-decks">
+            {% for d in dashboard.deck_performance %}
+              <li class="dashboard-decks-row">
+                <a href="/decks/{{ d.deck_id }}">
+                  {# v3.28.5 cleanup: pip column uses the canonical mana_pips
+                     macro (Scryfall card-symbol SVGs from /static/mana/) —
+                     matches Decks / Deck Detail rendering across the app.
+                     color_identity is a space-separated WUBRG string from
+                     dashboard_service.get_dashboard_data (matches Card's
+                     color_identity convention). Conditional wrap so decks
+                     without a tagged commander don't render a misleading
+                     colorless C pip — the macro's else-branch falls back to
+                     C for empty input which would be wrong for "no
+                     commander tagged" vs "actually colorless." #}
+                  <span class="pips">{% if d.color_identity %}{{ mana_pips(d.color_identity) }}{% endif %}</span>
+                  <span class="nm">{{ d.name }}</span>
+                  <span class="n">n={{ d.games }}</span>
+                  <span class="w {% if d.win_rate >= 0.5 %}up{% else %}dn{% endif %}">{{ (d.win_rate * 100) | round | int }}%</span>
+                </a>
+              </li>
+            {% endfor %}
+          </ul>
+        {% else %}
+          <p class="dashboard-empty">Log a Commander game to see deck performance.</p>
+        {% endif %}
       </section>
-    {% endif %}
+
+      {# § VII · Color Identity #}
+      <section class="panel dashboard-panel">
+        <div class="dashboard-panel-h">§ VII · Color Identity{% if dashboard.collection_stats.total_cards > 0 %}<span class="aux">{{ '{:,}'.format(dashboard.collection_stats.total_cards) }}</span>{% endif %}</div>
+        {% if dashboard.collection_stats.total_cards > 0 %}
+          <ul class="dashboard-colid">
+            {% for c in dashboard.color_identity %}
+              {% if c.count > 0 %}
+                <li class="dashboard-colid-row dashboard-colid-{{ c.id | lower }}">
+                  <span class="pip">{{ c.id }}</span>
+                  {# v3.28.5 — bar fill ×1.6 boost for visual emphasis, mirroring the
+                     design package's `width: (c.count/total*100*1.6)` in
+                     page_dashboard.jsx. The numeric label still shows the true
+                     percentage; only the bar's visual width is amplified. Capped
+                     at 100% so the fill never overflows the track. #}
+                  <div class="bar"><div class="fill" style="width: {{ [c.pct * 1.6, 100] | min }}%"></div></div>
+                  <span class="val"><small>{{ c.pct | round | int }}%</small><span>{{ '{:,}'.format(c.count) }}</span></span>
+                </li>
+              {% endif %}
+            {% endfor %}
+          </ul>
+        {% else %}
+          <p class="dashboard-empty">No cards yet.</p>
+        {% endif %}
+      </section>
+
+      {# § VIII · Collection Statistics #}
+      <section class="panel dashboard-panel">
+        <div class="dashboard-panel-h">§ VIII · Collection Statistics</div>
+        <ul class="dashboard-stats">
+          <li><span class="l">Total cards</span><span class="v">{{ '{:,}'.format(dashboard.collection_stats.total_cards) }}</span></li>
+          <li><span class="l">Unique printings</span><span class="v">{{ '{:,}'.format(dashboard.collection_stats.unique_printings) }}</span></li>
+          <li><span class="l">Sets represented</span><span class="v">{{ '{:,}'.format(dashboard.collection_stats.sets_represented) }}</span></li>
+          {% if dashboard.collection_stats.largest_set %}
+            <li><span class="l">Largest set</span><span class="v">{{ dashboard.collection_stats.largest_set.set_code | upper }} · {{ dashboard.collection_stats.largest_set.count }}</span></li>
+          {% endif %}
+          <li><span class="l">Avg card value</span><span class="v">${{ '{:.2f}'.format(dashboard.collection_stats.avg_value) }}</span></li>
+          <li><span class="l">Watchlist</span><span class="v">{{ dashboard.collection_stats.watchlist_count }} tracked</span></li>
+        </ul>
+      </section>
+
+      {# § IX · Quick Actions. Generalised labels per v3.28.5 spec item 4 —
+         "Drawer Layout" / "Open drawers" → "Storage Map" / "View storage".
+         The broader nav-rename to "Storage" (generalising the sidebar's
+         "Drawers" item) is v3.28.6; v3.28.5 only fixes the dashboard's
+         own card labels here. #}
+      <section class="panel dashboard-panel">
+        <div class="dashboard-panel-h">§ IX · Quick Actions</div>
+        <ul class="dashboard-actions">
+          <li><a href="/pending"><span class="nm">Pending Placement</span><span class="hint">Review &amp; confirm</span></a></li>
+          <li><a href="/import"><span class="nm">Import Cards</span><span class="hint">Helvault, Moxfield, paste</span></a></li>
+          <li><a href="/collection"><span class="nm">Collection</span><span class="hint">Browse with pricing</span></a></li>
+          {% if use_drawer_sorter %}
+            <li><a href="/drawers"><span class="nm">Storage Map</span><span class="hint">Grouped by drawer</span></a></li>
+          {% else %}
+            <li><a href="/locations"><span class="nm">Storage Map</span><span class="hint">Locations &amp; capacity</span></a></li>
+          {% endif %}
+          <li><a href="/decks"><span class="nm">Decks</span><span class="hint">Build &amp; manage</span></a></li>
+          <li><a href="/games"><span class="nm">Games</span><span class="hint">Log Commander games</span></a></li>
+        </ul>
+      </section>
+    </div>
   {% endif %}
 {% endblock %}

@@ -1,5 +1,20 @@
 [
   {
+    "version": "3.28.5",
+    "date": "2026-05-24",
+    "added": [
+      "The dashboard is fully redesigned. The Quick Actions launcher is replaced by an editorial layout: a masthead with a time-aware greeting and your current numbers; a search bar; and nine numbered panels — Today's Brief, Holdings, Chronicle (recent activity), Priority Queue (pending placement), Spotlight (your most recently placed card), Deck Performance, Color Identity, Collection Statistics, and Quick Actions.",
+      "Spotlight shows the most recently placed card with its art when we have it (and a clean placeholder when we don't).",
+      "Color Identity surfaces the WUBRG breakdown of your placed cards across mono, multi, and colorless buckets — the same data deck analytics use, finally aggregated for the whole collection."
+    ],
+    "refined": [
+      "Today's Brief shows actual templated items from your data — pending count, largest set, most-recent import, top win-rate deck — rather than a wall of empty 'demo' lines. Items appear only when there's real signal.",
+      "Quick Actions on the dashboard now read as 'Storage Map' instead of the installation-specific 'Drawer Layout' / 'Open drawers' labels. The broader rename across the sidebar nav is the next release."
+    ],
+    "resolved": [],
+    "archivist_note": "The biggest single layout change of the Folio cluster. The Holdings panel deliberately ships without its 30-day value chart — the chart needs daily price snapshots Cartarch isn't yet keeping, and we'd rather show a clean 'available once price history lands' note than fake numbers. Same call we'll make on the Watchlist 7-day price delta in a later release; both wait for the same future price-history work. The architecture is now ready for that — the dashboard slot is built and waiting."
+  },
+  {
     "version": "3.28.4",
     "date": "2026-05-24",
     "added": [
