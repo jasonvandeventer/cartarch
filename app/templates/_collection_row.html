@@ -1,0 +1,132 @@
+{# v3.28.8 — Collection Rows-mode row. One compact row per InventoryRow.
+   Per spec scope item 4, per-card actions in Rows mode live in a kebab
+   (⋮) menu — the same seven inline actions inventory_card surfaces in
+   Grid mode, just collapsed behind a kebab so the row stays compact.
+
+   Forms inside the kebab are IDENTICAL to the inventory_card macro's
+   forms (same action URLs, same field names, same CSRF) — the rows-
+   mode presentation is a different SHELL, not a different ACTION SET.
+   Preserve-verbatim contract per opening-task 2.
+
+   Required `item` keys (match the inventory_card macro): id, card,
+   finish, language, is_proxy, quantity, is_pending, effective_price,
+   total_value, drawer_label, location_label, storage_location_id,
+   has_price, price_status, owned_total. #}
+<article class="collection-row" data-row-id="{{ item.id }}">
+  <a href="/cards/{{ item.card.id }}" class="collection-row-thumb">
+    {% if item.card.image_url %}
+      <img src="{{ item.card.image_url | replace('/normal/', '/small/') }}"
+           alt="{{ item.card.name }}"
+           loading="lazy"
+           class="collection-row-thumb-img">
+    {% else %}
+      <div class="collection-row-thumb-placeholder"></div>
+    {% endif %}
+  </a>
+  <div class="collection-row-copy">
+    <div class="collection-row-name">
+      <a href="/cards/{{ item.card.id }}">{{ item.card.name }}</a>
+      {% if item.is_pending %}<span class="collection-row-pending-mark" title="Pending placement">⏳</span>{% endif %}
+    </div>
+    <div class="collection-row-meta">
+      <span class="collection-row-set">{{ (item.card.set_code or '?') | upper }}</span>
+      <span class="collection-row-meta-sep">·</span>
+      <span class="collection-row-collector">#{{ item.card.collector_number or '?' }}</span>
+      <span class="collection-row-meta-sep">·</span>
+      <span class="collection-row-finish finish-badge">{{ item.finish | capitalize }}</span>
+      {% if item.language and item.language != 'en' %}
+        <span class="collection-row-meta-sep">·</span>
+        <span class="collection-row-lang language-badge">{{ item.language | upper }}</span>
+      {% endif %}
+      {% if item.is_proxy %}
+        <span class="collection-row-meta-sep">·</span>
+        <span class="collection-row-proxy">proxy</span>
+      {% endif %}
+      {% if item.card.color_identity %}
+        <span class="collection-row-meta-sep">·</span>
+        <span class="collection-row-pips">{{ mana_pips(item.card.color_identity) }}</span>
+      {% endif %}
+    </div>
+  </div>
+  <div class="collection-row-loc">{{ item.location_label }}</div>
+  <div class="collection-row-qty">×{{ item.quantity }}</div>
+  <div class="collection-row-price">
+    {% if item.has_price %}
+      {% if item.price_status == 'stale' %}
+        <span class="warning-text">${{ '%.2f'|format(item.effective_price) }}</span>
+      {% else %}
+        ${{ '%.2f'|format(item.effective_price) }}
+      {% endif %}
+    {% else %}
+      <span class="muted">—</span>
+    {% endif %}
+  </div>
+  <div class="collection-row-total">${{ '%.2f'|format(item.total_value) }}</div>
+  <details class="collection-row-kebab">
+    <summary class="collection-row-kebab-summary" aria-label="Row actions">⋮</summary>
+    <div class="collection-row-kebab-body">
+      {# THE SEVEN INLINE ACTIONS — same forms as inventory_card,
+         preserved verbatim per opening-task 2. Identical routes, fields,
+         CSRF tokens. #}
+      <form action="/inventory/rows/{{ item.id }}/remove" method="post" class="inline-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <input type="number" name="quantity" min="1" max="{{ item.quantity }}" value="1" style="width: 64px">
+        <button type="submit">Remove</button>
+      </form>
+      {% if decks %}
+        <form action="/decks/pull" method="post" class="inline-form" style="flex-wrap: wrap">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <input type="hidden" name="inventory_row_id" value="{{ item.id }}">
+          <select name="deck_id" required>
+            {% for d in decks %}<option value="{{ d.id }}">{{ d.name }}</option>{% endfor %}
+          </select>
+          <input type="number" name="quantity" value="1" min="1" max="{{ item.quantity }}" style="width: 64px">
+          <button type="submit">Add to Deck</button>
+        </form>
+      {% endif %}
+      {% if locations %}
+        {% set movable = locations | selectattr("type", "ne", "root") | selectattr("type", "ne", "deck") | list %}
+        {% if movable %}
+          <form action="/inventory/rows/{{ item.id }}/move" method="post" class="inline-form" style="flex-wrap: wrap">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <select name="location_id" required>
+              {% for loc in movable %}
+                <option value="{{ loc.id }}" {% if item.storage_location_id == loc.id %}selected{% endif %}>
+                  {{ loc.name }} ({{ loc.type }})
+                </option>
+              {% endfor %}
+            </select>
+            <button type="submit">Move</button>
+          </form>
+        {% endif %}
+      {% endif %}
+      <div class="collection-row-kebab-actions">
+        <form action="/inventory/rows/{{ item.id }}/sell" method="post" class="inline-form">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <input type="hidden" name="quantity" value="1">
+          <button type="submit">Sell 1</button>
+        </form>
+        <form action="/inventory/rows/{{ item.id }}/trade" method="post" class="inline-form">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <input type="hidden" name="quantity" value="1">
+          <button type="submit">Trade 1</button>
+        </form>
+        <form action="/inventory/rows/{{ item.id }}/delete" method="post" class="inline-form">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <button type="submit" onclick="return confirm('Delete this row?')">Delete Row</button>
+        </form>
+        <form action="/cards/refresh" method="post" class="inline-form">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <input type="hidden" name="card_id" value="{{ item.card.id }}">
+          <button type="submit">Refresh Price</button>
+        </form>
+        <form action="/inventory/rows/{{ item.id }}/toggle-proxy" method="post" class="inline-form">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <button type="submit">
+            {% if item.is_proxy %}Unmark Proxy{% else %}Mark Proxy{% endif %}
+          </button>
+        </form>
+      </div>
+    </div>
+  </details>
+</article>

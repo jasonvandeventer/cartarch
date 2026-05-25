@@ -115,6 +115,7 @@ from app.inventory_service import (
     confirm_pending_row,
     delete_inventory_row,
     find_inventory_matches_for_collection_import,
+    get_collection_facet_counts,
     get_inventory_row_stats,
     get_location_label,
     is_price_stale,
@@ -1984,6 +1985,16 @@ def collection_page(
     sort: str = "newest",
     direction: str = "desc",
     page: int = 1,
+    # v3.28.8 — facet-sidebar params. Each is an independent URL param,
+    # AND-composed with `search` at query time (Option A interaction
+    # model). All optional; empty string = facet not active.
+    colors: str = "",
+    types: str = "",
+    status: str = "",
+    finishes: str = "",
+    price_min: str = "",
+    price_max: str = "",
+    view: str = "grid",
     session: Session = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
 ):
@@ -2012,6 +2023,22 @@ def collection_page(
     if sort == "count":
         owned_counts = name_owned_counts(session, current_user.id)
 
+    # v3.28.8 — parse facet params. Price floats are tolerant: empty / non-
+    # numeric → None (skip facet). View is whitelisted.
+    facet_price_min: float | None = None
+    facet_price_max: float | None = None
+    if price_min and price_min.strip():
+        try:
+            facet_price_min = float(price_min.strip())
+        except ValueError:
+            facet_price_min = None
+    if price_max and price_max.strip():
+        try:
+            facet_price_max = float(price_max.strip())
+        except ValueError:
+            facet_price_max = None
+    view_mode = "rows" if view == "rows" else "grid"
+
     inventory_rows, total_count = list_inventory_rows(
         session,
         user_id=current_user.id,
@@ -2024,7 +2051,19 @@ def collection_page(
         page=page,
         per_page=per_page,
         owned_counts=owned_counts,
+        facet_colors=colors,
+        facet_types=types,
+        facet_status=status,
+        facet_finishes=finishes,
+        facet_price_min=facet_price_min,
+        facet_price_max=facet_price_max,
     )
+
+    # v3.28.8 — facet counts for the sidebar. Single aggregate query;
+    # reflects the active search (boolean parser) but ignores active
+    # facet state for v1 simplicity. See get_collection_facet_counts
+    # docstring for the rationale.
+    facet_counts = get_collection_facet_counts(session, user_id=current_user.id, search=search)
 
     stats = get_inventory_row_stats(
         session,
@@ -2126,6 +2165,18 @@ def collection_page(
             "current_user": current_user,
             "show_onboarding": show_onboarding,
             "use_drawer_sorter": current_user.username in DRAWER_SORTER_USERNAMES,
+            # v3.28.8 — facet state + counts + view mode for the
+            # faceted-sidebar Collection redesign. Each facet's set is
+            # parsed from a CSV URL param; the template renders the
+            # sidebar with the corresponding options pre-checked.
+            "facet_colors_set": {c for c in (colors or "").upper() if c in "WUBRGC"},
+            "facet_types_set": {t.strip() for t in (types or "").split(",") if t.strip()},
+            "facet_status_set": {s.strip() for s in (status or "").split(",") if s.strip()},
+            "facet_finishes_set": {f.strip() for f in (finishes or "").split(",") if f.strip()},
+            "facet_price_min_raw": price_min or "",
+            "facet_price_max_raw": price_max or "",
+            "facet_counts": facet_counts,
+            "view_mode": view_mode,
         },
     )
 

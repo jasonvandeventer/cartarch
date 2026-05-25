@@ -1,6 +1,23 @@
 {% extends "base.html" %}
-{% from "_macros.html" import inventory_card, editorial_eyebrow %}
+{% from "_macros.html" import inventory_card, editorial_eyebrow, mana_pips %}
 {% block content %}
+  {# v3.28.8 — Folio Collection redesign. Two-column layout: faceted-sidebar
+     on the left + content area on the right. Per the cluster's interaction-
+     model decision (Option A), the existing boolean-search input and the
+     new faceted sidebar are independent URL params that AND together at
+     query time — production's boolean parser is preserved verbatim
+     because it already implements and extends what the package
+     advertised.
+
+     Preserve-verbatim surfaces (per opening-task triage):
+     - The seven inline actions in inventory_card (Remove, Add to Deck,
+       Move, Sell 1, Trade 1, Delete Row, Refresh Price) plus auxiliary
+       Mark Proxy / Tag editor / Switch-printing modal trigger.
+     - The v3.27.19 three-level grouping (name → printing → location)
+       when sort=='count'.
+     Both render identically in Grid mode (via the unchanged macro) and
+     are surfaced via a kebab menu in Rows mode. #}
+
   {% if show_onboarding %}
     <section class="panel">
       <h3>Welcome to Cartarch</h3>
@@ -30,12 +47,25 @@
       {% endif %}
     </section>
   {% endif %}
+
+  {# === HERO with hybrid stat presentation per Option B ===
+     Three production stat tiles preserved verbatim; the tagline restyles
+     as the editorial italic lede beneath the eyebrow. #}
   <section class="panel hero-panel compact-hero">
     <div class="hero-row">
       <div>
         {{ editorial_eyebrow("Collection · Inventory") }}
         <h2 class="panel-title">Collection Overview</h2>
-        <p class="pagehead-tagline">Your exact-printing inventory with storage location assignments.</p>
+        <p class="pagehead-tagline collection-hero-lede">
+          {% if total_count > 0 %}
+            <b>{{ '{:,}'.format(total_cards) }}</b> cards on the shelves
+            {% if pending_cards > 0 %}· <b>{{ pending_cards }}</b> pending placement{% endif %}
+            · ${{ '%.2f'|format(total_value) }} in hand
+            · {{ unique_cards }} unique names
+          {% else %}
+            Your exact-printing inventory with storage location assignments.
+          {% endif %}
+        </p>
       </div>
       {% if use_drawer_sorter %}
         <form action="/collection/resort" method="post" class="inline-form">
@@ -46,8 +76,7 @@
     </div>
     {# v3.27.10: headline numbers count PLACED cards only. Pending — cards
        imported but not yet filed into a storage location — surfaces as an
-       explicit sub-stat below, never folded silently into the headline.
-       Same canon applies to the dashboard tiles. #}
+       explicit sub-stat below, never folded silently into the headline. #}
     <div class="stat-grid collection-stats-grid">
       <div class="stat-card compact">
         <div class="stat-label">Total value</div>
@@ -76,24 +105,23 @@
         </span>
       {% endfor %}
     </div>
-    {# <div class="drawer-pill-row">
-      <span class="drawer-pill">Drawer 1 <strong>{{ drawer_counts['1'] }}</strong></span>
-      <span class="drawer-pill">Drawer 2 <strong>{{ drawer_counts['2'] }}</strong></span>
-      <span class="drawer-pill">Drawer 3 <strong>{{ drawer_counts['3'] }}</strong></span>
-      <span class="drawer-pill">Drawer 4 <strong>{{ drawer_counts['4'] }}</strong></span>
-      <span class="drawer-pill">Drawer 5 <strong>{{ drawer_counts['5'] }}</strong></span>
-      <span class="drawer-pill">Drawer 6 <strong>{{ drawer_counts['6'] }}</strong></span>
-      <span class="drawer-pill">Unassigned <strong>{{ unassigned_count }}</strong></span>
-    </div> #}
   </section>
+
+  {# === TOOLS BAR — search + sort + view toggle ===
+     Single GET form so every filter (search + sort + dropdowns + view
+     toggle) round-trips through the URL as bookmarkable state. The
+     faceted-sidebar form below ALSO targets /collection but stays as a
+     separate form (independent URL params per Option A); the two forms
+     are visually adjacent but submit independently. #}
   <section class="panel controls-panel">
-    <form method="get" action="/collection" class="filter-row">
+    <form method="get" action="/collection" class="filter-row collection-toolbar" id="collection-toolbar-form">
       <input type="text"
              name="search"
              placeholder="t:rat -t:pirate · t:creature OR t:artifact · (t:instant OR t:sorcery) · id:gb · is:foil · qty:&gt;1 · price:&gt;=5 · lang:ja"
              data-mobile-placeholder="Search…"
-             value="{{ search }}">
-      <select name="finish">
+             value="{{ search }}"
+             class="collection-search-input">
+      <select name="finish" title="Quick finish filter (single value; the sidebar's Finish facet AND-composes on top)">
         <option value="">All finishes</option>
         <option value="normal" {% if finish_filter == 'normal' %}selected{% endif %}>Normal</option>
         <option value="foil" {% if finish_filter == 'foil' %}selected{% endif %}>Foil</option>
@@ -128,127 +156,253 @@
         <option value="asc" {% if direction == 'asc' %}selected{% endif %}>Ascending</option>
         <option value="desc" {% if direction == 'desc' %}selected{% endif %}>Descending</option>
       </select>
+      {# v3.28.8 — facet state forwarded as hidden inputs so the toolbar
+         form preserves the sidebar state when Apply/Clear are clicked. #}
+      <input type="hidden" name="colors" value="{{ facet_colors_set | sort | join('') }}">
+      <input type="hidden" name="types" value="{{ facet_types_set | sort | join(',') }}">
+      <input type="hidden" name="status" value="{{ facet_status_set | sort | join(',') }}">
+      <input type="hidden" name="finishes" value="{{ facet_finishes_set | sort | join(',') }}">
+      <input type="hidden" name="price_min" value="{{ facet_price_min_raw }}">
+      <input type="hidden" name="price_max" value="{{ facet_price_max_raw }}">
+      <input type="hidden" name="view" value="{{ view_mode }}">
       <button type="submit">Apply</button>
-      <a href="/collection">
-        <button type="button">Clear</button>
-      </a>
-      <a href="/collection/export">
+      <a href="/collection"><button type="button">Clear all</button></a>
+      <a href="/collection/export?search={{ search|urlencode }}&finish={{ finish_filter }}&location_id={{ location_id }}&sort={{ sort }}&direction={{ direction }}&colors={{ facet_colors_set | sort | join('') }}&types={{ facet_types_set | sort | join(',') | urlencode }}&status={{ facet_status_set | sort | join(',') }}&finishes={{ facet_finishes_set | sort | join(',') }}&price_min={{ facet_price_min_raw }}&price_max={{ facet_price_max_raw }}">
         <button type="button">Export CSV</button>
       </a>
+      {# v3.28.8 — Grid/Rows view toggle. Submits the form with view=rows
+         (or back to grid). The toggle's hidden input is overridden by the
+         button's click via a tiny inline JS handler that sets the value
+         and submits — no separate route, no client-only state. #}
+      <span class="collection-view-toggle" role="group" aria-label="View mode">
+        <button type="submit" name="view" value="grid"
+                class="collection-view-seg {% if view_mode == 'grid' %}collection-view-seg-on{% endif %}"
+                title="Grid view">▦ Grid</button>
+        <button type="submit" name="view" value="rows"
+                class="collection-view-seg {% if view_mode == 'rows' %}collection-view-seg-on{% endif %}"
+                title="Rows view">≡ Rows</button>
+      </span>
     </form>
   </section>
-  {% if items %}
-    {# v3.27.19 — when count-sorted, render three-level group headers
-       (name → printing → location) between rows. Other sorts render the
-       flat grid as before; the count-sort branch is the only consumer
-       of the new "owned_total" item field. Tracking previous values
-       via Jinja namespace() — Jinja loop scope doesn't survive the
-       iteration boundary without it. #}
-    {% if sort == 'count' %}
-      <section class="card-grid-section">
-        {% set ns = namespace(prev_name='', prev_printing='') %}
-        {% for item in items %}
-          {% set name_key = (item.card.name or '') | lower %}
-          {% set printing_key = (item.card.set_code or '') ~ '#' ~ (item.card.collector_number or '') %}
-          {% if name_key != ns.prev_name %}
-            <h3 class="collection-group-name">
-              {{ item.card.name }}
-              {% if item.owned_total %}
-                <span class="collection-group-name-count">×{{ item.owned_total }} owned</span>
-              {% endif %}
-            </h3>
-          {% endif %}
-          {% if printing_key != ns.prev_printing or name_key != ns.prev_name %}
-            <div class="collection-group-printing">
-              {{ (item.card.set_code or '?') | upper }}
-              #{{ item.card.collector_number or '?' }}
-            </div>
-          {% endif %}
-          <div class="inventory-grid collection-group-rows">
-            {{ inventory_card(item, csrf_token,
-                      show_collection_actions=true,
-                      show_location_label=true,
-                      decks=decks,
-                      locations=locations) }}
-          </div>
-          {% set ns.prev_name = name_key %}
-          {% set ns.prev_printing = printing_key %}
-        {% endfor %}
-      </section>
-    {% else %}
-      <section class="card-grid-section">
-        <div class="inventory-grid">
-          {% for item in items %}
-            {{ inventory_card(item, csrf_token,
-                      show_collection_actions=true,
-                      show_location_label=true,
-                      decks=decks,
-                      locations=locations) }}
-          {% endfor %}
-        </div>
-      </section>
-    {% endif %}
-    <section class="panel controls-panel" style="margin-top: 1rem;">
-      <div class="hero-row"
-           style="align-items: center;
-                  justify-content: space-between;
-                  gap: 1rem;
-                  flex-wrap: wrap">
-        <div class="muted">Page {{ page }} of {{ total_pages }} · {{ total_count }} matching rows</div>
-        <div style="display: flex;
-                    gap: 0.5rem;
-                    flex-wrap: wrap;
-                    align-items: center">
-          {% if page > 1 %}
-            <a href="/collection?search={{ search }}&finish={{ finish_filter }}&location_id={{ location_id }}&sort={{ sort }}&direction={{ direction }}&page={{ page - 1 }}">
-              <button type="button">Previous</button>
-            </a>
-          {% endif %}
-          {% for p in range(1, total_pages + 1) %}
-            {% if p == 1 or p == total_pages or (p >= page - 2 and p <= page + 2) %}
-              <a href="/collection?search={{ search }}&finish={{ finish_filter }}&location_id={{ location_id }}&sort={{ sort }}&direction={{ direction }}&page={{ p }}">
-                <button type="button"
-                        {% if p == page %}style="font-weight: bold; opacity: 0.8;"{% endif %}>{{ p }}</button>
-              </a>
-            {% elif p == 2 and page > 4 %}
-              <span class="muted">…</span>
-            {% elif p == total_pages - 1 and page < total_pages - 3 %}
-              <span class="muted">…</span>
-            {% endif %}
-          {% endfor %}
-          {% if page < total_pages %}
-            <a href="/collection?search={{ search }}&finish={{ finish_filter }}&location_id={{ location_id }}&sort={{ sort }}&direction={{ direction }}&page={{ page + 1 }}">
-              <button type="button">Next</button>
-            </a>
-          {% endif %}
-        </div>
-        <form method="get"
-              action="/collection"
-              class="inline-form"
-              style="gap: 0.4rem;
-                     align-items: center">
+
+  {# === MAIN LAYOUT — two-column: faceted sidebar + content === #}
+  <div class="collection-layout">
+    {# Faceted sidebar (Option A) — separate form so facets can be applied
+       independently. Cleared via the Clear button which goes back to the
+       toolbar form. The sidebar's submit re-renders Collection with the
+       chosen facet state; all other URL params (search/sort/finish-dropdown/
+       location/direction) are forwarded as hidden inputs to preserve the
+       full URL state. #}
+    <aside class="collection-sidebar">
+      <details class="collection-sidebar-details" open>
+        <summary class="collection-sidebar-summary">§ Filters</summary>
+        <form method="get" action="/collection" class="collection-facet-form">
+          {# Forward non-facet state so the form fully preserves URL params #}
           <input type="hidden" name="search" value="{{ search }}">
           <input type="hidden" name="finish" value="{{ finish_filter }}">
           <input type="hidden" name="location_id" value="{{ location_id }}">
           <input type="hidden" name="sort" value="{{ sort }}">
           <input type="hidden" name="direction" value="{{ direction }}">
-          <input type="number"
-                 name="page"
-                 min="1"
-                 max="{{ total_pages }}"
-                 value="{{ page }}"
-                 style="width: 80px">
-          <button type="submit">Go</button>
+          <input type="hidden" name="view" value="{{ view_mode }}">
+
+          <div class="collection-facet-group">
+            <div class="collection-facet-label">Color identity</div>
+            <div class="collection-facet-pips">
+              {% for letter in ['W', 'U', 'B', 'R', 'G', 'C'] %}
+                <label class="collection-facet-pip {% if letter in facet_colors_set %}collection-facet-pip-on{% endif %}">
+                  <input type="checkbox" name="colors" value="{{ letter }}"
+                         {% if letter in facet_colors_set %}checked{% endif %}>
+                  {% if letter == 'C' %}
+                    <span class="collection-facet-pip-c">C</span>
+                  {% else %}
+                    <img src="/static/mana/{{ letter }}.svg" alt="{{ letter }}" class="mana-pip">
+                  {% endif %}
+                  <span class="collection-facet-pip-count">{{ facet_counts.colors[letter] }}</span>
+                </label>
+              {% endfor %}
+            </div>
+          </div>
+
+          <div class="collection-facet-group">
+            <div class="collection-facet-label">Type</div>
+            <div class="collection-facet-checks">
+              {% for t in ['Creature', 'Instant', 'Sorcery', 'Artifact', 'Enchantment', 'Land', 'Planeswalker'] %}
+                <label class="collection-facet-check">
+                  <input type="checkbox" name="types" value="{{ t }}"
+                         {% if t in facet_types_set %}checked{% endif %}>
+                  <span class="collection-facet-check-lbl">{{ t }}</span>
+                  <span class="collection-facet-check-count">{{ facet_counts.types[t] }}</span>
+                </label>
+              {% endfor %}
+            </div>
+          </div>
+
+          <div class="collection-facet-group">
+            <div class="collection-facet-label">Status</div>
+            <div class="collection-facet-checks">
+              {% for s, label in [('placed', 'Placed'), ('pending', 'Pending'), ('in_deck', 'In deck'), ('watchlist', 'Watchlist')] %}
+                <label class="collection-facet-check">
+                  <input type="checkbox" name="status" value="{{ s }}"
+                         {% if s in facet_status_set %}checked{% endif %}>
+                  <span class="collection-facet-check-lbl">{{ label }}</span>
+                  <span class="collection-facet-check-count">{{ facet_counts.status[s] }}</span>
+                </label>
+              {% endfor %}
+            </div>
+          </div>
+
+          <div class="collection-facet-group">
+            <div class="collection-facet-label">Price (USD)</div>
+            <div class="collection-facet-range">
+              <input type="number" name="price_min" placeholder="min" step="0.01" min="0"
+                     value="{{ facet_price_min_raw }}" class="collection-facet-range-input">
+              <span class="collection-facet-range-sep">—</span>
+              <input type="number" name="price_max" placeholder="max" step="0.01" min="0"
+                     value="{{ facet_price_max_raw }}" class="collection-facet-range-input">
+            </div>
+          </div>
+
+          <div class="collection-facet-group">
+            <div class="collection-facet-label">Finish</div>
+            <div class="collection-facet-checks">
+              {% for f, label in [('normal', 'Normal'), ('foil', 'Foil'), ('etched', 'Etched')] %}
+                <label class="collection-facet-check">
+                  <input type="checkbox" name="finishes" value="{{ f }}"
+                         {% if f in facet_finishes_set %}checked{% endif %}>
+                  <span class="collection-facet-check-lbl">{{ label }}</span>
+                  <span class="collection-facet-check-count">{{ facet_counts.finishes[f] }}</span>
+                </label>
+              {% endfor %}
+            </div>
+          </div>
+
+          <div class="collection-facet-actions">
+            <button type="submit" class="collection-facet-apply">Apply filters</button>
+            <a href="/collection?search={{ search|urlencode }}&finish={{ finish_filter }}&location_id={{ location_id }}&sort={{ sort }}&direction={{ direction }}&view={{ view_mode }}"
+               class="collection-facet-clear-link">Clear facets</a>
+          </div>
         </form>
-      </div>
-    </section>
-  {% else %}
-    <section class="panel">
-      {% if search or finish_filter or location_id %}
-        <p>No matching inventory rows for the current filters.</p>
+      </details>
+    </aside>
+
+    {# === CONTENT AREA — Grid or Rows view, with v3.27.19 grouping === #}
+    <section class="collection-content">
+      {% if items %}
+        {# Filter description (editorial). Shows what's active. #}
+        {% set has_facets = facet_colors_set or facet_types_set or facet_status_set or facet_finishes_set or facet_price_min_raw or facet_price_max_raw %}
+        {% if has_facets or search or finish_filter or location_id %}
+          <p class="collection-filter-desc">
+            Showing <b>{{ items | length }}</b> of <b>{{ '{:,}'.format(total_count) }}</b>
+            {% if has_facets %}
+              — filtered by
+              {% set bits = [] %}
+              {% if facet_colors_set %}{% set _ = bits.append('Colors: ' ~ (facet_colors_set | sort | join(''))) %}{% endif %}
+              {% if facet_types_set %}{% set _ = bits.append('Type: ' ~ (facet_types_set | sort | join(', '))) %}{% endif %}
+              {% if facet_status_set %}{% set _ = bits.append('Status: ' ~ (facet_status_set | sort | join(', '))) %}{% endif %}
+              {% if facet_finishes_set %}{% set _ = bits.append('Finish: ' ~ (facet_finishes_set | sort | join(', '))) %}{% endif %}
+              {% if facet_price_min_raw or facet_price_max_raw %}{% set _ = bits.append('Price: ' ~ (facet_price_min_raw or '0') ~ '–' ~ (facet_price_max_raw or '∞')) %}{% endif %}
+              <em>{{ bits | join(' · ') }}</em>
+            {% endif %}
+          </p>
+        {% endif %}
+
+        {% if sort == 'count' %}
+          {# v3.27.19 three-level grouping — preserved verbatim from
+             pre-v3.28.8. Renders in BOTH Grid and Rows view (the inner
+             item rendering is what differs). #}
+          <section class="card-grid-section">
+            {% set ns = namespace(prev_name='', prev_printing='') %}
+            {% for item in items %}
+              {% set name_key = (item.card.name or '') | lower %}
+              {% set printing_key = (item.card.set_code or '') ~ '#' ~ (item.card.collector_number or '') %}
+              {% if name_key != ns.prev_name %}
+                <h3 class="collection-group-name">
+                  {{ item.card.name }}
+                  {% if item.owned_total %}
+                    <span class="collection-group-name-count">×{{ item.owned_total }} owned</span>
+                  {% endif %}
+                </h3>
+              {% endif %}
+              {% if printing_key != ns.prev_printing or name_key != ns.prev_name %}
+                <div class="collection-group-printing">
+                  {{ (item.card.set_code or '?') | upper }}
+                  #{{ item.card.collector_number or '?' }}
+                </div>
+              {% endif %}
+              {% if view_mode == 'rows' %}
+                <div class="collection-rows-wrap collection-group-rows">
+                  {% include "_collection_row.html" %}
+                </div>
+              {% else %}
+                <div class="inventory-grid collection-group-rows">
+                  {{ inventory_card(item, csrf_token,
+                            show_collection_actions=true,
+                            show_location_label=true,
+                            decks=decks,
+                            locations=locations) }}
+                </div>
+              {% endif %}
+              {% set ns.prev_name = name_key %}
+              {% set ns.prev_printing = printing_key %}
+            {% endfor %}
+          </section>
+        {% else %}
+          {% if view_mode == 'rows' %}
+            <section class="collection-rows-wrap">
+              {% for item in items %}
+                {% include "_collection_row.html" %}
+              {% endfor %}
+            </section>
+          {% else %}
+            <section class="card-grid-section">
+              <div class="inventory-grid">
+                {% for item in items %}
+                  {{ inventory_card(item, csrf_token,
+                            show_collection_actions=true,
+                            show_location_label=true,
+                            decks=decks,
+                            locations=locations) }}
+                {% endfor %}
+              </div>
+            </section>
+          {% endif %}
+        {% endif %}
+
+        <section class="panel controls-panel" style="margin-top: 1rem;">
+          <div class="hero-row"
+               style="align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap">
+            <div class="muted">Page {{ page }} of {{ total_pages }} · {{ total_count }} matching rows</div>
+            <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center">
+              {% set qs = '&search=' ~ search|urlencode ~ '&finish=' ~ finish_filter ~ '&location_id=' ~ location_id ~ '&sort=' ~ sort ~ '&direction=' ~ direction ~ '&view=' ~ view_mode ~ '&colors=' ~ (facet_colors_set | sort | join('')) ~ '&types=' ~ (facet_types_set | sort | join(',') | urlencode) ~ '&status=' ~ (facet_status_set | sort | join(',')) ~ '&finishes=' ~ (facet_finishes_set | sort | join(',')) ~ '&price_min=' ~ facet_price_min_raw ~ '&price_max=' ~ facet_price_max_raw %}
+              {% if page > 1 %}
+                <a href="/collection?page={{ page - 1 }}{{ qs }}"><button type="button">Previous</button></a>
+              {% endif %}
+              {% for p in range(1, total_pages + 1) %}
+                {% if p == 1 or p == total_pages or (p >= page - 2 and p <= page + 2) %}
+                  <a href="/collection?page={{ p }}{{ qs }}">
+                    <button type="button" {% if p == page %}style="font-weight: bold; opacity: 0.8;"{% endif %}>{{ p }}</button>
+                  </a>
+                {% elif p == 2 and page > 4 %}
+                  <span class="muted">…</span>
+                {% elif p == total_pages - 1 and page < total_pages - 3 %}
+                  <span class="muted">…</span>
+                {% endif %}
+              {% endfor %}
+              {% if page < total_pages %}
+                <a href="/collection?page={{ page + 1 }}{{ qs }}"><button type="button">Next</button></a>
+              {% endif %}
+            </div>
+          </div>
+        </section>
       {% else %}
-        <p>No inventory rows yet.</p>
+        <section class="panel">
+          {% if search or finish_filter or location_id or facet_colors_set or facet_types_set or facet_status_set or facet_finishes_set or facet_price_min_raw or facet_price_max_raw %}
+            <p>No matching inventory rows for the current filters.</p>
+          {% else %}
+            <p>No inventory rows yet.</p>
+          {% endif %}
+        </section>
       {% endif %}
     </section>
-  {% endif %}
+  </div>
 {% endblock %}

@@ -1,5 +1,20 @@
 [
   {
+    "version": "3.28.8",
+    "date": "2026-05-25",
+    "added": [
+      "Collection gains a faceted filter sidebar — Color identity as pip toggles (W/U/B/R/G/C), Type (Creature / Instant / Sorcery / Artifact / Enchantment / Land / Planeswalker), Status (Placed / Pending / In deck / Watchlist), Price range, Finish — each with live counts that reflect your current search. Apply a filter by checking its box; the URL captures the full filter state so a filtered view is bookmarkable and shareable.",
+      "Collection gains a Grid/Rows view toggle. Grid is the existing card view; Rows is a new dense one-line-per-card view — thumb + name + meta + location + quantity + price + total — for browsing at higher density. In Rows mode each card's per-card actions (Remove, Add to Deck, Move, Sell, Trade, Delete, Refresh Price, Mark Proxy) live behind a ⋮ kebab menu rather than expanding inline. Both views support the existing Owned Count three-level grouping (name → printing → location).",
+      "The boolean search you've always had stays exactly as it was. The new facets compose alongside it — search and facets are independent dimensions that AND together at query time. Power users keep their syntax; casual users get a discoverable sidebar; both surfaces produce shareable URLs."
+    ],
+    "refined": [
+      "The Collection hero gains an editorial italic lede beneath the eyebrow that surfaces the headline numbers in narrative form (\"X cards on the shelves · Y pending placement · $Z in hand · N unique names\"). The three stat tiles (Total Value / Total Cards / Unique Cardnames) stay exactly where they were.",
+      "Every per-card action you had in Grid mode is preserved in Rows mode through the kebab — Remove with quantity input, Add to Deck with deck selector, Move with location selector, Sell 1, Trade 1, Delete Row, Refresh Price, Mark/Unmark Proxy. Same forms, same routes, same CSRF — just a different presentation shell."
+    ],
+    "resolved": [],
+    "archivist_note": "The Collection page was under-sized in the broad recon — it's the app's main browsing surface and warranted a dedicated release. A focused gap check after v3.28.7 shipped corrected the sizing to L and inserted this release at v3.28.8, cascading Imports / Watchlist / Mobile down by one slot. The interaction-model decision came down to four forks, all settled before code started: the faceted sidebar lives ALONGSIDE the existing boolean search rather than replacing it (production's parser is more powerful than the package's placeholder advertised — it would have been a regression to subordinate it), the stat presentation is hybrid (tiles plus an italic lede beneath, both reading from the same numbers), Rows view is included rather than deferred, and per-card actions in Rows mode get a kebab menu so the row stays compact without losing function. The hard constraint throughout was: don't quietly drop function. Every action that was inline in Grid mode is still reachable in Rows mode."
+  },
+  {
     "version": "3.28.7",
     "date": "2026-05-25",
     "added": [

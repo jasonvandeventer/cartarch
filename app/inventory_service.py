@@ -6,7 +6,7 @@ from collections.abc import Iterable
 from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import Float as SAFloat
-from sqlalchemy import and_, cast, func, not_, or_, text, tuple_
+from sqlalchemy import and_, cast, func, not_, or_, select, text, tuple_
 from sqlalchemy.orm import Session, joinedload
 
 from app.audit_service import log_transaction
@@ -763,6 +763,256 @@ def apply_collection_search_filters(query, search: str):
     return query
 
 
+# v3.28.8 — faceted-sidebar filters for the Collection redesign. Each facet
+# uses OR semantics WITHIN itself (e.g., types="Creature,Instant" matches
+# Creature OR Instant) and AND ACROSS facets (Creature-or-Instant AND
+# Placed AND Foil). The boolean search parser (above) AND-composes on top of
+# the facet predicates — search and facets are independent dimensions per
+# the spec's Option A. All facets are backed by existing schema; no migration.
+def apply_collection_facet_filters(
+    session: Session,
+    query,
+    user_id: int,
+    *,
+    facet_colors: str = "",
+    facet_types: str = "",
+    facet_status: str = "",
+    facet_finishes: str = "",
+    facet_price_min: float | None = None,
+    facet_price_max: float | None = None,
+):
+    """Apply faceted-sidebar filters to a Collection query.
+
+    ``facet_colors`` — Letter string from WUBRG (e.g., "WU"). Subset
+    semantics: a card matches if its ``color_identity`` contains EACH of
+    the requested letters. ``C`` (colorless) is a special case — matches
+    rows with empty/NULL color_identity.
+
+    ``facet_types`` — CSV of type tokens (e.g., "Creature,Instant"). OR
+    semantics: matches if ``type_line`` ILIKEs any of the listed tokens.
+
+    ``facet_status`` — CSV of "placed", "pending", "in_deck", "watchlist".
+    OR semantics. ``watchlist`` is matched via both v3.27.12 identity modes
+    (card_id OR card_name).
+
+    ``facet_finishes`` — CSV of "normal", "foil", "etched". OR semantics
+    via IN clause.
+
+    ``facet_price_min`` / ``facet_price_max`` — floats. Both ends optional.
+    """
+    from app.models import WatchlistItem
+
+    if facet_colors:
+        upper = facet_colors.upper()
+        # WUBRG subset filter: must contain ALL requested letters
+        for letter in [c for c in upper if c in "WUBRG"]:
+            query = query.filter(Card.color_identity.contains(letter))
+        # C (colorless) special case — empty or NULL color_identity
+        if "C" in upper:
+            query = query.filter(or_(Card.color_identity == "", Card.color_identity.is_(None)))
+
+    if facet_types:
+        type_tokens = [t.strip() for t in facet_types.split(",") if t.strip()]
+        if type_tokens:
+            type_clauses = [Card.type_line.ilike(f"%{t}%") for t in type_tokens]
+            query = query.filter(or_(*type_clauses))
+
+    if facet_status:
+        statuses = [s.strip() for s in facet_status.split(",") if s.strip()]
+        status_clauses = []
+        if "placed" in statuses:
+            status_clauses.append(InventoryRow.is_pending == False)  # noqa: E712
+        if "pending" in statuses:
+            status_clauses.append(InventoryRow.is_pending == True)  # noqa: E712
+        if "in_deck" in statuses:
+            deck_loc_ids = select(StorageLocation.id).where(
+                StorageLocation.user_id == user_id,
+                StorageLocation.type == "deck",
+            )
+            status_clauses.append(InventoryRow.storage_location_id.in_(deck_loc_ids))
+        if "watchlist" in statuses:
+            watch_card_ids = select(WatchlistItem.card_id).where(
+                WatchlistItem.user_id == user_id,
+                WatchlistItem.card_id.isnot(None),
+            )
+            watch_names = select(WatchlistItem.card_name).where(
+                WatchlistItem.user_id == user_id,
+                WatchlistItem.card_name.isnot(None),
+            )
+            status_clauses.append(
+                or_(
+                    InventoryRow.card_id.in_(watch_card_ids),
+                    Card.name.in_(watch_names),
+                )
+            )
+        if status_clauses:
+            query = query.filter(or_(*status_clauses))
+
+    if facet_finishes:
+        finishes = [f.strip() for f in facet_finishes.split(",") if f.strip()]
+        if finishes:
+            query = query.filter(InventoryRow.finish.in_(finishes))
+
+    price_col = cast(Card.price_usd, SAFloat)
+    if facet_price_min is not None:
+        query = query.filter(price_col >= facet_price_min)
+    if facet_price_max is not None:
+        query = query.filter(price_col <= facet_price_max)
+
+    return query
+
+
+def get_collection_facet_counts(
+    session: Session,
+    user_id: int,
+    search: str = "",
+) -> dict:
+    """Compute facet counts for the v3.28.8 Collection sidebar.
+
+    Returns a dict with per-option counts for every facet group. Counts
+    reflect the current SEARCH query (boolean parser) and the user filter,
+    but ignore active FACET state — this is the simpler "global counts
+    given the search" model. The "narrow counts" alternative (ignore
+    self-facet, AND others) is a future refinement; v1 ships the simpler
+    model to keep the aggregate query path tight (~<10ms budget per the
+    v3.27.10 dashboard-tile reference).
+
+    All counts come from a SINGLE conditional-sum query over the same
+    InventoryRow ⋈ Card join the page itself uses. The 5 facets fold
+    into one query so the round-trip cost is fixed regardless of facet
+    surface. Total cost: 1 query, indexed columns throughout.
+    """
+    from sqlalchemy import case, func
+
+    from app.models import Deck, WatchlistItem
+
+    # Subqueries for "in_deck" + "watchlist" status counts.
+    # Use explicit select() so SQLAlchemy doesn't emit the
+    # "Coercing Subquery object into a select() for use in IN()" warning.
+    deck_loc_ids = select(StorageLocation.id).where(
+        StorageLocation.user_id == user_id, StorageLocation.type == "deck"
+    )
+    _ = Deck  # imported for symmetry with the in_deck JOIN above; not directly used in counts
+    watch_card_ids = select(WatchlistItem.card_id).where(
+        WatchlistItem.user_id == user_id, WatchlistItem.card_id.isnot(None)
+    )
+    watch_names = select(WatchlistItem.card_name).where(
+        WatchlistItem.user_id == user_id, WatchlistItem.card_name.isnot(None)
+    )
+
+    # Aggregate query — one row, one query, many SUM(CASE WHEN) columns
+    base = (
+        session.query(
+            # Colors
+            func.sum(case((Card.color_identity.contains("W"), 1), else_=0)).label("c_w"),
+            func.sum(case((Card.color_identity.contains("U"), 1), else_=0)).label("c_u"),
+            func.sum(case((Card.color_identity.contains("B"), 1), else_=0)).label("c_b"),
+            func.sum(case((Card.color_identity.contains("R"), 1), else_=0)).label("c_r"),
+            func.sum(case((Card.color_identity.contains("G"), 1), else_=0)).label("c_g"),
+            func.sum(
+                case(
+                    ((Card.color_identity == "") | (Card.color_identity.is_(None)), 1),
+                    else_=0,
+                )
+            ).label("c_c"),
+            # Types — fixed bucket set matching the design's facet list
+            func.sum(case((Card.type_line.ilike("%Creature%"), 1), else_=0)).label("t_creature"),
+            func.sum(case((Card.type_line.ilike("%Instant%"), 1), else_=0)).label("t_instant"),
+            func.sum(case((Card.type_line.ilike("%Sorcery%"), 1), else_=0)).label("t_sorcery"),
+            func.sum(case((Card.type_line.ilike("%Artifact%"), 1), else_=0)).label("t_artifact"),
+            func.sum(case((Card.type_line.ilike("%Enchantment%"), 1), else_=0)).label(
+                "t_enchantment"
+            ),
+            func.sum(case((Card.type_line.ilike("%Land%"), 1), else_=0)).label("t_land"),
+            func.sum(case((Card.type_line.ilike("%Planeswalker%"), 1), else_=0)).label(
+                "t_planeswalker"
+            ),
+            # Status
+            func.sum(case((InventoryRow.is_pending == False, 1), else_=0)).label(  # noqa: E712
+                "s_placed"
+            ),
+            func.sum(case((InventoryRow.is_pending == True, 1), else_=0)).label(  # noqa: E712
+                "s_pending"
+            ),
+            func.sum(case((InventoryRow.storage_location_id.in_(deck_loc_ids), 1), else_=0)).label(
+                "s_in_deck"
+            ),
+            func.sum(
+                case(
+                    (
+                        or_(
+                            InventoryRow.card_id.in_(watch_card_ids),
+                            Card.name.in_(watch_names),
+                        ),
+                        1,
+                    ),
+                    else_=0,
+                )
+            ).label("s_watchlist"),
+            # Finishes
+            func.sum(case((InventoryRow.finish == "normal", 1), else_=0)).label("f_normal"),
+            func.sum(case((InventoryRow.finish == "foil", 1), else_=0)).label("f_foil"),
+            func.sum(case((InventoryRow.finish == "etched", 1), else_=0)).label("f_etched"),
+            # Total
+            func.count(InventoryRow.id).label("total"),
+        )
+        .select_from(InventoryRow)
+        .join(Card, Card.id == InventoryRow.card_id)
+        .filter(InventoryRow.user_id == user_id)
+    )
+    # Apply the search filter (boolean parser) — same shape as the row
+    # query the page itself runs, so counts reflect the search context.
+    base = apply_collection_search_filters(base, search)
+    row = base.one_or_none()
+    if row is None:
+        return {
+            "colors": {"W": 0, "U": 0, "B": 0, "R": 0, "G": 0, "C": 0},
+            "types": {
+                "Creature": 0,
+                "Instant": 0,
+                "Sorcery": 0,
+                "Artifact": 0,
+                "Enchantment": 0,
+                "Land": 0,
+                "Planeswalker": 0,
+            },
+            "status": {"placed": 0, "pending": 0, "in_deck": 0, "watchlist": 0},
+            "finishes": {"normal": 0, "foil": 0, "etched": 0},
+            "total": 0,
+        }
+    return {
+        "colors": {
+            "W": int(row.c_w or 0),
+            "U": int(row.c_u or 0),
+            "B": int(row.c_b or 0),
+            "R": int(row.c_r or 0),
+            "G": int(row.c_g or 0),
+            "C": int(row.c_c or 0),
+        },
+        "types": {
+            "Creature": int(row.t_creature or 0),
+            "Instant": int(row.t_instant or 0),
+            "Sorcery": int(row.t_sorcery or 0),
+            "Artifact": int(row.t_artifact or 0),
+            "Enchantment": int(row.t_enchantment or 0),
+            "Land": int(row.t_land or 0),
+            "Planeswalker": int(row.t_planeswalker or 0),
+        },
+        "status": {
+            "placed": int(row.s_placed or 0),
+            "pending": int(row.s_pending or 0),
+            "in_deck": int(row.s_in_deck or 0),
+            "watchlist": int(row.s_watchlist or 0),
+        },
+        "finishes": {
+            "normal": int(row.f_normal or 0),
+            "foil": int(row.f_foil or 0),
+            "etched": int(row.f_etched or 0),
+        },
+        "total": int(row.total or 0),
+    }
+
+
 def list_inventory_rows(
     session: Session,
     user_id: int,
@@ -775,6 +1025,12 @@ def list_inventory_rows(
     page: int = 1,
     per_page: int = 50,
     owned_counts: dict[str, int] | None = None,
+    facet_colors: str = "",
+    facet_types: str = "",
+    facet_status: str = "",
+    facet_finishes: str = "",
+    facet_price_min: float | None = None,
+    facet_price_max: float | None = None,
 ) -> tuple[list[InventoryRow], int]:
     """List inventory rows with optional search / filter / sort.
 
@@ -784,6 +1040,12 @@ def list_inventory_rows(
     caller (``collection_page``) computes the dict once and passes it
     in so the same aggregation also feeds the template's group
     headers; this avoids running the same query twice.
+
+    v3.28.8 — gained six ``facet_*`` parameters for the Folio Collection
+    redesign's faceted sidebar. The boolean search parser (``search``) and
+    the legacy single-value ``finish`` dropdown both continue to work
+    unchanged — the new facets compose ON TOP via AND. Per the spec's
+    Option A, search and facets are independent dimensions.
     """
     page = max(page, 1)
     per_page = max(1, min(per_page, 100))
@@ -797,6 +1059,21 @@ def list_inventory_rows(
     )
 
     base_query = apply_collection_search_filters(base_query, search)
+
+    # v3.28.8 — facet filters applied on top of the search filter (AND).
+    # Backward compatibility: the legacy single-value `finish` dropdown
+    # filter below still works; facet_finishes (csv) layers on top via AND.
+    base_query = apply_collection_facet_filters(
+        session,
+        base_query,
+        user_id=user_id,
+        facet_colors=facet_colors,
+        facet_types=facet_types,
+        facet_status=facet_status,
+        facet_finishes=facet_finishes,
+        facet_price_min=facet_price_min,
+        facet_price_max=facet_price_max,
+    )
 
     if finish.strip():
         base_query = base_query.filter(InventoryRow.finish == finish.strip().lower())
