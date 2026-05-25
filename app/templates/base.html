@@ -337,17 +337,28 @@
           <span class="bottom-nav-icon" aria-hidden="true">▦</span>
           <span class="bottom-nav-label">Collection</span>
         </a>
+        {# v3.28.12 — bottom-nav IA cluster-closer fix. Primary tabs are
+           Home / Collection / Pending / Decks / More per the cluster's
+           intended mobile IA (the `mobile.jsx` reference). Pre-v3.28.12
+           had Games in the primary slot; Pending was buried in More.
+           Pending is the higher-frequency placement-workflow surface, so
+           it earns the primary tab; Games moves into More alongside the
+           newly-added Watchlist + Chronicle. #}
+        <a href="/pending"
+           class="bottom-nav-tab{% if path.startswith('/pending') %} active{% endif %}">
+          <span class="bottom-nav-icon" aria-hidden="true">⏳</span>
+          <span class="bottom-nav-label">Pending</span>
+        </a>
         <a href="/decks"
            class="bottom-nav-tab{% if path.startswith('/decks') %} active{% endif %}">
           <span class="bottom-nav-icon" aria-hidden="true">▤</span>
           <span class="bottom-nav-label">Decks</span>
         </a>
-        <a href="/games"
-           class="bottom-nav-tab{% if path.startswith('/games') %} active{% endif %}">
-          <span class="bottom-nav-icon" aria-hidden="true">◉</span>
-          <span class="bottom-nav-label">Games</span>
-        </a>
-        {% set on_more = path.startswith('/import') or path.startswith('/pending') or path.startswith('/locations') or path.startswith('/tokens') or path.startswith('/sets') or path.startswith('/drawers') or path.startswith('/audit') or path.startswith('/admin') or path.startswith('/account') %}
+        {# v3.28.12 — `on_more` excludes `/pending` (now a primary tab) and
+           includes `/games`, `/watchlist`, `/chronicle`, `/decklist` (those
+           are reached only via More now). Keeps the highlight state in
+           sync with where each destination actually lives. #}
+        {% set on_more = path.startswith('/import') or path.startswith('/locations') or path.startswith('/tokens') or path.startswith('/sets') or path.startswith('/decklist') or path.startswith('/drawers') or path.startswith('/audit') or path.startswith('/admin') or path.startswith('/account') or path.startswith('/games') or path.startswith('/watchlist') or path.startswith('/chronicle') %}
         <button type="button"
                 class="bottom-nav-tab{% if on_more %} active{% endif %}"
                 onclick="toggleMoreMenu()"
@@ -384,19 +395,30 @@
                     onclick="toggleMoreMenu()"
                     aria-label="Close menu">×</button>
           </div>
+          {# v3.28.12 — More menu now reaches every destination the desktop
+             sidebar carries. Pre-v3.28.12 was missing Watchlist (v3.27.12),
+             Chronicle (v3.28.2), and Games (which moved here when Pending
+             took its primary-tab slot). Pending dropped out of this list —
+             it's now in the primary bottom-nav. Ordering follows the
+             desktop sidebar's nav-group order so users can build a single
+             mental map across the two surfaces. #}
           <nav class="more-menu-list" aria-label="Secondary navigation">
             <a href="/import">Import</a>
-            <a href="/pending">Pending</a>
-            <a href="/locations">Locations</a>
-            <a href="/tokens">Tokens</a>
+            <a href="/watchlist">Watchlist</a>
             <a href="/sets">Sets</a>
+            <a href="/tokens">Tokens</a>
             <a href="/decklist">Decklist Check</a>
+            <a href="/locations">Locations</a>
             {% if current_user.username in drawer_sorter_usernames %}
               <a href="/drawers">Drawers</a>
+            {% endif %}
+            <a href="/games">Games</a>
+            {% if current_user.username in drawer_sorter_usernames %}
               <a href="/audit">Audit</a>
             {% endif %}
             {% if current_user.is_admin %}<a href="/admin">Admin</a>{% endif %}
             <a href="/account">Account</a>
+            <a href="/chronicle">Chronicle</a>
           </nav>
           <form method="post" action="/logout" class="more-menu-logout">
             <input type="hidden" name="csrf_token" value="{{ csrf_token }}">

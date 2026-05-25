@@ -1,5 +1,17 @@
 [
   {
+    "version": "3.28.12",
+    "date": "2026-05-25",
+    "added": [],
+    "refined": [
+      "Mobile bottom-nav now reads Home / Collection / Pending / Decks / More. Pending — the placement-workflow surface — earns the primary tab; Games moves into the More menu alongside Watchlist and Chronicle. The More menu now reaches every destination the desktop sidebar carries (Watchlist and Chronicle had been missing); ordering follows the desktop sidebar's nav groups so the mental map carries between the two surfaces."
+    ],
+    "resolved": [
+      "Verification sweep of every Folio-redesigned page (Dashboard, Collection, Decks, Pending, Locations, Import, Watchlist, Games, Sets, Tokens, Decklist, Chronicle, Account) at three viewport widths (980px / 768px / 375px) — every page passes at every width: no horizontal overflow, the sidebar correctly hides at ≤768px, the bottom-nav correctly appears at ≤768px, and the topbar holds at 72px consistently. The cluster's 'built responsive on purpose' intent — every release from v3.28.3 onward carries its own ≤980px and ≤768px breakpoints by design — is borne out by evidence. This release is a verify-and-polish pass, not a rebuild."
+    ],
+    "archivist_note": "The cluster closer. Folio shipped over thirteen releases — foundation, palette, Chronicle surface, editorial sweep, Auth, Dashboard, Locations, smaller-page polish, Collection, the corrective patch, Imports polish, Watchlist target prices — and ends here, with the mobile pass that the rest of the cluster was building toward. The discipline of v3.28.12 was the opposite of every release before it: don't invent work. Every Folio release was built responsive on purpose; the sweep had to confirm that intent and reach for fixes only when defects existed. The only defect found was the bottom-nav IA — Pending should have been a primary tab, Watchlist and Chronicle and Games should have been reachable in More. Fixed. The cluster is complete. Next: v3.29.0 opens with Playgroups, then sharing-flavored work."
+  },
+  {
     "version": "3.28.11",
     "date": "2026-05-25",
     "added": [
