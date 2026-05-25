@@ -1,10 +1,11 @@
+{% from "_macros.html" import editorial_eyebrow %}
 {% extends "base.html" %}
 {% block content %}
   <section class="panel page-hero">
     <div>
-      <div class="eyebrow">Organize</div>
+      {{ editorial_eyebrow("Storage · Drawers") }}
       <h2 class="panel-title">Drawer Layout</h2>
-      <p class="muted">Physical collection view grouped by drawer.</p>
+      <p class="pagehead-tagline">Physical collection view grouped by drawer.</p>
     </div>
     {% if drawer_summaries %}
       <div class="stat-grid" style="margin-top: 1rem;">

@@ -1,9 +1,9 @@
 {% extends "base.html" %}
-{% from "_macros.html" import inventory_card %}
+{% from "_macros.html" import inventory_card, editorial_eyebrow %}
 {% block content %}
   <section class="panel page-hero">
     <div>
-      <div class="eyebrow">Confirm</div>
+      {{ editorial_eyebrow("Confirm Bulk Delete") }}
       <h2 class="panel-title">
         Delete {{ items|length }} card{{ '' if items|length == 1 else 's' }} from {{ source_name }}?
       </h2>

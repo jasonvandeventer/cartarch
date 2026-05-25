@@ -1,3 +1,4 @@
+{% from "_macros.html" import editorial_eyebrow %}
 {% extends "base.html" %}
 
 {#  v3.28.2 — Chronicle surface. Translated from the Folio design package's
@@ -17,7 +18,7 @@
 {% block content %}
 <div class="page-shell">
   <header class="pagehead">
-    <div class="eyebrow">§ System · Chronicle</div>
+    {{ editorial_eyebrow("System · Chronicle") }}
     <h1 class="pagehead-title">The <b>Cartarch Chronicle</b>.</h1>
     <p class="pagehead-tagline">
       A journal of releases — what we shipped, what we refined, what we resolved,
@@ -41,7 +42,7 @@
         <div class="chronicle-raw">
           <span>v<b>{{ entry.version }}</b></span>
           <span>·</span>
-          <span>{{ entry.date }}</span>
+          <span>{{ entry.date | editorial_date }}</span>
           <span>·</span>
           <span class="chronicle-status">published</span>
         </div>
@@ -116,7 +117,7 @@
                href="/chronicle/v{{ e.version }}">
               <span class="ent">Entry {{ to_roman(e.patch) }}</span>
               <span class="nm">{{ e.summary }}</span>
-              <span class="dt">{{ e.date }}</span>
+              <span class="dt">{{ e.date | editorial_date }}</span>
             </a>
             {% endfor %}
           </div>

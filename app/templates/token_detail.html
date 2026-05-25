@@ -1,9 +1,10 @@
+{% from "_macros.html" import editorial_eyebrow %}
 {% extends "base.html" %}
 {% block content %}
   <section class="panel hero-panel compact-hero">
-    <div class="panel-topline">Token</div>
     <div class="hero-row">
       <div>
+        {{ editorial_eyebrow("Collection · Tokens · " ~ token.name) }}
         <h2 class="panel-title">{{ token.name }}</h2>
         <p class="muted">
           {{ token.set_name }} · {{ token.set_code|upper }} #{{ token.collector_number }}

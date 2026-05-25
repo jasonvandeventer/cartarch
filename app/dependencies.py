@@ -95,6 +95,35 @@ def format_local_datetime(dt: datetime | None, fmt: str = "%Y-%m-%d") -> str:
 templates.env.filters["format_local_datetime"] = format_local_datetime
 
 
+# v3.28.3 — editorial date format. Renders a datetime or an ISO date
+# string (``YYYY-MM-DD``) in the Folio editorial form ("21 May 2026").
+# Used on user-facing date surfaces — primarily Chronicle entries
+# (which carry their dates as ISO strings in chronicle.json) and
+# anywhere else a date renders for readers rather than for ops.
+#
+# Accepts either a ``datetime`` (any tz-state — naive UTC is the
+# project convention) or an ISO date string. Returns ``''`` for None /
+# unparseable input; never crashes — same NULL-safe shape as
+# ``format_local_datetime`` above.
+def format_editorial_date(value) -> str:
+    if value is None or value == "":
+        return ""
+    # datetime → use its date component directly. Naive UTC is the
+    # project convention, but the date component is tz-independent
+    # enough that timezone math isn't required for an editorial render.
+    if isinstance(value, datetime):
+        d = value.date()
+    else:
+        try:
+            d = datetime.strptime(str(value), "%Y-%m-%d").date()
+        except (ValueError, TypeError):
+            return str(value)
+    return d.strftime("%-d %B %Y")  # "21 May 2026"
+
+
+templates.env.filters["editorial_date"] = format_editorial_date
+
+
 # v3.28.2 — Folio versioning helper. Renders the semantic version
 # (``X.Y.Z`` or ``vX.Y.Z``) as ``Folio X · Issue Y · Entry Z`` with Roman
 # numerals. The production equivalent of the design package's

@@ -1,9 +1,8 @@
+{% from "_macros.html" import editorial_eyebrow %}
 {% extends "base.html" %}
 {% block content %}
   <section class="panel hero-panel compact-hero">
-    <div class="panel-topline">
-      <div class="eyebrow">Import</div>
-    </div>
+        {{ editorial_eyebrow("Overview · Import · Preview") }}
     <h2 class="panel-title">Preview: {{ filename }}</h2>
     <p class="muted">
       Format: <strong>{{ format_name }}</strong> &nbsp;·&nbsp;

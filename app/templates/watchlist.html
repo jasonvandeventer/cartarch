@@ -1,7 +1,8 @@
+{% from "_macros.html" import editorial_eyebrow %}
 {% extends "base.html" %}
 {% block content %}
   <section class="panel pagehead">
-    <div class="pagehead-eyebrow">Overview</div>
+    {{ editorial_eyebrow("Overview · Watchlist") }}
     <h1 class="pagehead-title">Watchlist</h1>
     <p class="pagehead-tagline">
       Cards you're tracking — to acquire later, compare prices on, or just remember. Add a card to your watchlist from any card detail page.

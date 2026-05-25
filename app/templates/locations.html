@@ -1,10 +1,11 @@
+{% from "_macros.html" import editorial_eyebrow %}
 {% extends "base.html" %}
 {% block content %}
   <section class="panel page-hero">
     <div>
-      <div class="eyebrow">Organize</div>
+      {{ editorial_eyebrow("Storage · Locations") }}
       <h2 class="panel-title">Storage Locations</h2>
-      <p class="muted">Manage where cards are physically stored — binders, boxes, and other containers.</p>
+      <p class="pagehead-tagline">Manage where cards are physically stored — binders, boxes, and other containers.</p>
     </div>
   </section>
   <section class="panel controls-panel">

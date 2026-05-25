@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import inventory_card %}
+{% from "_macros.html" import inventory_card, editorial_eyebrow %}
 {% block content %}
   {% if show_onboarding %}
     <section class="panel">
@@ -31,11 +31,11 @@
     </section>
   {% endif %}
   <section class="panel hero-panel compact-hero">
-    <div class="panel-topline">Collection</div>
     <div class="hero-row">
       <div>
+        {{ editorial_eyebrow("Collection · Inventory") }}
         <h2 class="panel-title">Collection Overview</h2>
-        <p class="muted">Your exact-printing inventory with storage location assignments.</p>
+        <p class="pagehead-tagline">Your exact-printing inventory with storage location assignments.</p>
       </div>
       {% if use_drawer_sorter %}
         <form action="/collection/resort" method="post" class="inline-form">

@@ -1,8 +1,9 @@
+{% from "_macros.html" import editorial_eyebrow %}
 {% extends "base.html" %}
 {% block content %}
   <section class="panel page-hero">
     <div>
-      <div class="eyebrow">Account</div>
+      {{ editorial_eyebrow("System · Account") }}
       <h2 class="panel-title">{{ current_user.display_name or current_user.username }}</h2>
       {% if current_user.display_name %}<p class="muted">{{ current_user.username }}</p>{% endif %}
       <p class="muted">

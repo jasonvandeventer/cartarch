@@ -1,7 +1,8 @@
+{% from "_macros.html" import editorial_eyebrow %}
 {% extends "base.html" %}
 {% block content %}
   <section class="panel hero-panel compact-hero">
-    <div class="eyebrow">Import</div>
+    {{ editorial_eyebrow("Overview · Import · Manual") }}
     <h2 class="panel-title">Manual Import Preview</h2>
     {% if card %}
       <p>

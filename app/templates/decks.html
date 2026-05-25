@@ -1,11 +1,11 @@
 {% extends "base.html" %}
-{% from "_macros.html" import mana_pips %}
+{% from "_macros.html" import mana_pips, editorial_eyebrow %}
 {% block content %}
   <section class="panel page-hero">
     <div>
-      <div class="eyebrow">Build</div>
+      {{ editorial_eyebrow("Play · Decks") }}
       <h2 class="panel-title">Deck Management</h2>
-      <p class="muted">Track cards pulled into decks and return them cleanly to your collection.</p>
+      <p class="pagehead-tagline">Track cards pulled into decks and return them cleanly to your collection.</p>
     </div>
     {% if decks %}
       <div class="stat-grid">

@@ -1,11 +1,12 @@
+{% from "_macros.html" import editorial_eyebrow %}
 {% extends "base.html" %}
 {% block content %}
   <section class="panel page-hero">
     <div>
-      <div class="eyebrow">Place</div>
+      {{ editorial_eyebrow("Overview · Pending Placement") }}
       <h2 class="panel-title">Pending Placement</h2>
       {% if use_drawer_sorter %}
-        <p class="muted">Cards imported but not yet physically filed in their drawer. Confirm each once placed.</p>
+        <p class="pagehead-tagline">Cards imported but not yet physically filed in their drawer. Confirm each once placed.</p>
       {% else %}
         <p class="muted">
           Cards imported but not yet assigned to a storage location. Select a location and confirm once placed.

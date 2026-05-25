@@ -1,9 +1,10 @@
+{% from "_macros.html" import editorial_eyebrow %}
 {% extends "base.html" %}
 {% block content %}
   <section class="panel hero-panel compact-hero">
     <div class="hero-row">
       <div>
-        <div class="panel-topline">Tokens</div>
+        {{ editorial_eyebrow("Collection · Tokens") }}
         <h2 class="panel-title">Token Inventory</h2>
         <p class="muted">Lightweight tracking for the physical tokens you actually use at the table.</p>
       </div>

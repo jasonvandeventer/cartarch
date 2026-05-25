@@ -1,3 +1,22 @@
+{# v3.28.3 — editorial-pattern sweep. The page-level eyebrow renders the
+   editorial crumb pattern (`<group> · <page>`) with a 24×1px brass-2
+   hairline preceding the text. Translates the design package's
+   layout.jsx PageHead .crumb component (`<span class="ln"></span><span>{crumb}</span>`)
+   into a single shared production macro so every page picks the
+   editorial register up centrally — the v3.27.15 / v3.28.1
+   whole-app-sweep mechanism.
+
+   Usage:
+     {% from "_macros.html" import editorial_eyebrow %}
+     {{ editorial_eyebrow("Overview · Pending Placement") }}
+
+   Auth pages keep the existing `.eyebrow.brand-name` "Cartarch" treatment
+   from v3.27.15 and stay untouched here — v3.28.4 will redo auth pages
+   with the two-column brand pane. The macro is for app-shell pages. #}
+{% macro editorial_eyebrow(crumb) -%}
+<div class="eyebrow"><span class="ln" aria-hidden="true"></span><span>{{ crumb }}</span></div>
+{%- endmacro %}
+
 {% macro mana_pips(colors) %}
   {% if colors %}
     {% for letter in ['W', 'U', 'B', 'R', 'G'] %}

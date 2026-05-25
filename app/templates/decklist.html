@@ -1,3 +1,4 @@
+{% from "_macros.html" import editorial_eyebrow %}
 {% extends "base.html" %}
 {% block content %}
   {# v3.27.19 — Decklist collection check.
@@ -7,7 +8,7 @@
      mode system to surface tradeable-first ordering of matched
      copies. NEVER touches Scryfall — local matching only. #}
   <section class="panel pagehead">
-    <div class="pagehead-eyebrow">Decklist</div>
+    {{ editorial_eyebrow("Collection · Decklist Check") }}
     <h1 class="pagehead-title">Decklist Collection Check</h1>
     <p class="pagehead-tagline">
       Paste a decklist (Moxfield / MTGA / MTGO format). See which cards you already own, where each printing lives, and what's missing.

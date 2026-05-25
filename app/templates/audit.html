@@ -1,10 +1,11 @@
+{% from "_macros.html" import editorial_eyebrow %}
 {% extends "base.html" %}
 {% block content %}
   <section class="panel page-hero">
     <div>
-      <div class="eyebrow">Review</div>
+      {{ editorial_eyebrow("System · Audit") }}
       <h2 class="panel-title">Audit &amp; Undo</h2>
-      <p class="muted">Review import batches and transaction history. Undo the last mistake fast.</p>
+      <p class="pagehead-tagline">Review import batches and transaction history. Undo the last mistake fast.</p>
     </div>
   </section>
   <section class="panel controls-panel">

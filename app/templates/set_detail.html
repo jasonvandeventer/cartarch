@@ -1,9 +1,8 @@
+{% from "_macros.html" import editorial_eyebrow %}
 {% extends "base.html" %}
 {% block content %}
   <section class="panel hero-panel compact-hero">
-    <div class="panel-topline">
-      <div class="eyebrow">{{ data.set_code.upper() }}</div>
-    </div>
+        {{ editorial_eyebrow("Collection · Sets · " ~ data.set_code.upper()) }}
     <h2 class="panel-title">{{ title }}</h2>
     <p class="muted">{{ data.owned_cards }} / {{ data.total_cards }} cards owned ({{ data.completion_pct }}%)</p>
     <div class="progress-bar" style="margin-top: 0.75rem;">

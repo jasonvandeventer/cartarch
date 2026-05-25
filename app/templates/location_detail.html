@@ -1,10 +1,10 @@
 {% extends "base.html" %}
-{% from "_macros.html" import inventory_card %}
+{% from "_macros.html" import inventory_card, editorial_eyebrow %}
 {% block content %}
   <section class="panel hero-panel compact-hero">
-    <div class="panel-topline">Storage Location</div>
     <div class="hero-row">
       <div>
+        {{ editorial_eyebrow("Storage · Locations · " ~ location.name) }}
         <h2 class="panel-title">{{ location.name }}</h2>
         <p class="muted">
           {{ location.type|capitalize }}

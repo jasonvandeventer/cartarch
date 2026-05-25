@@ -1,5 +1,21 @@
 [
   {
+    "version": "3.28.3",
+    "date": "2026-05-24",
+    "added": [
+      "Editorial eyebrow on every page — the small label above the page title now reads as `<group> · <page>` (e.g. 'Storage · Locations', 'Play · Decks') with a small antique-gold hairline before the text. Pages that didn't have an eyebrow before — Collection, Watchlist, Decklist Check, Card Detail, Deck Detail, Drawer Detail, Location Detail, the four Token surfaces, Import Confirmed, Manual Search — now have one.",
+      "Italic Newsreader treatment applied to page descriptions (the lede paragraph under each page heading) on Audit, Collection, Decks, Drawer Detail, Drawers, Games, Import, Locations, and Pending. The editorial register the visual reskin set up now lands consistently.",
+      "Dates on the Chronicle page now render in editorial form ('24 May 2026' rather than '2026-05-24'). Other date surfaces left as ISO for this release."
+    ],
+    "refined": [
+      "Chronicle's page-header eyebrow now uses the same shared mechanism as every other page (was a one-off bespoke version from the Chronicle release)."
+    ],
+    "resolved": [
+      "The editorial eyebrow pattern that the warm-charcoal visual reskin assumed but never landed across the app — finished now in a single sweep, three releases later."
+    ],
+    "archivist_note": "A quiet release with disproportionate visual payoff. We added a shared Jinja macro for the editorial eyebrow and routed every page through it, instead of hand-editing 30 templates. The reward is that the next time we want to tweak the eyebrow — adjust the hairline, change the separator, add a tooltip — the change lives in one place. This is the same pattern we used for the warm-charcoal palette and Newsreader: build the foundation right, and every page picks the change up automatically."
+  },
+  {
     "version": "3.28.2",
     "date": "2026-05-24",
     "added": [

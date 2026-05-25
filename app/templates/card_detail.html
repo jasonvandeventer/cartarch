@@ -1,9 +1,10 @@
+{% from "_macros.html" import editorial_eyebrow %}
 {% extends "base.html" %}
 {% block content %}
   <section class="panel hero-panel compact-hero">
-    <div class="panel-topline">Card Detail</div>
     <div class="hero-row">
       <div>
+        {{ editorial_eyebrow("Collection · Card Detail") }}
         <h2 class="panel-title">{{ card.name }}</h2>
         <p class="muted">
           {{ card.set_name }} · {{ card.set_code|upper }} #{{ card.collector_number }}

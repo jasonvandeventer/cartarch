@@ -1,7 +1,8 @@
+{% from "_macros.html" import editorial_eyebrow %}
 {% extends "base.html" %}
 {% block content %}
   <section class="panel hero-panel compact-hero">
-    <div class="panel-topline">Import</div>
+    {{ editorial_eyebrow("Overview · Import · Confirmed") }}
     <h2 class="panel-title">Import Complete</h2>
     {% set _moved = moved_count if moved_count is defined else 0 %}
     {% set _merged = merged_count if merged_count is defined else 0 %}

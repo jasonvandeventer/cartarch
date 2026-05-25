@@ -1,3 +1,4 @@
+{% from "_macros.html" import editorial_eyebrow %}
 {% extends "base.html" %}
 {% block content %}
   {% if not use_drawer_sorter and not locations %}
@@ -10,9 +11,9 @@
   {% endif %}
   <section class="panel page-hero">
     <div>
-      <div class="eyebrow">Import</div>
+      {{ editorial_eyebrow("Overview · Import") }}
       <h2 class="panel-title">Add Cards</h2>
-      <p class="muted">Import from a CSV export, paste a card list, search by name, or enter a Scryfall ID directly.</p>
+      <p class="pagehead-tagline">Import from a CSV export, paste a card list, search by name, or enter a Scryfall ID directly.</p>
     </div>
   </section>
   <section class="panel">

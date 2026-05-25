@@ -1,8 +1,9 @@
+{% from "_macros.html" import editorial_eyebrow %}
 {% extends "base.html" %}
 {% block content %}
   <section class="panel hero-panel compact-hero">
     <div>
-      <div class="panel-topline">Tokens</div>
+      {{ editorial_eyebrow("Collection · Tokens · New") }}
       <h2 class="panel-title">New Token</h2>
       <p class="muted">Just the name and a quantity gets you started. Everything else is optional.</p>
     </div>

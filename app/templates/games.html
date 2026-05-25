@@ -1,10 +1,11 @@
+{% from "_macros.html" import editorial_eyebrow %}
 {% extends "base.html" %}
 {% block content %}
   <section class="panel page-hero">
     <div>
-      <div class="eyebrow">Play</div>
+      {{ editorial_eyebrow("Play · Games") }}
       <h2 class="panel-title">Game History</h2>
-      <p class="muted">Track your Commander games and deck win/loss records.</p>
+      <p class="pagehead-tagline">Track your Commander games and deck win/loss records.</p>
     </div>
     <div class="stat-grid">
       <div class="stat-card">

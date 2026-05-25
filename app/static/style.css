@@ -1249,13 +1249,31 @@ body::after {
      match the dashboard/eyebrow aesthetic that's the v3.27.15 visual
      reference. Used on multiple pages (login/register/forgot-password/
      reset-password panel-topline, card-detail hero, set-detail) as the
-     small "PAGE SECTION LABEL" affordance. */
+     small "PAGE SECTION LABEL" affordance.
+     v3.28.3 — switched to inline-flex so the editorial_eyebrow() macro's
+     24×1px hairline (`<span class="ln">`) sits inline with the text.
+     Eyebrows without a `.ln` child (legacy callers, modals, etc.) still
+     render correctly — flex with one child is layout-equivalent to a
+     plain block. */
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
   text-transform: uppercase;
   letter-spacing: 0.16em;
   font-weight: 700;
   font-size: 0.88rem;
   color: var(--brand-gold);
   margin-bottom: 0.2rem;
+}
+/* v3.28.3 — the editorial 24×1px brass hairline that precedes the eyebrow
+   text on the editorial_eyebrow() macro. Translates the design package's
+   `.ds-pagehead .crumb .ln { width: 24px; height: 1px; background: var(--brass-2); }`
+   from layout.jsx. Brass-2 (production --brand-gold) for the hairline tone. */
+.eyebrow .ln {
+  width: 24px;
+  height: 1px;
+  background: var(--brand-gold);
+  flex: 0 0 auto;
 }
 /* v3.27.15 — auth-page brand-name surface picks up Montserrat Alternates.
    The "Cartarch" text inside .eyebrow on login/register/forgot/reset uses

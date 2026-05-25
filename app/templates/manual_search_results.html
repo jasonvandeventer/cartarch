@@ -1,7 +1,8 @@
+{% from "_macros.html" import editorial_eyebrow %}
 {% extends "base.html" %}
 {% block content %}
   <section class="panel hero-panel compact-hero">
-    <div class="panel-topline">Import</div>
+    {{ editorial_eyebrow("Overview · Import · Search") }}
     <h2 class="panel-title">Choose a Printing</h2>
     <p class="muted">
       Results for: <strong>{{ query }}</strong>

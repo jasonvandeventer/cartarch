@@ -1,8 +1,9 @@
+{% from "_macros.html" import editorial_eyebrow %}
 {% extends "base.html" %}
 {% block content %}
   <section class="panel hero-panel compact-hero">
     <div>
-      <div class="panel-topline">Tokens</div>
+      {{ editorial_eyebrow("Collection · Tokens · Bulk Add") }}
       <h2 class="panel-title">Bulk Add Tokens</h2>
       <p class="muted">
         Paste a list of tokens. Each line can be single-sided or double-faced; the parser

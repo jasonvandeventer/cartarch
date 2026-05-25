@@ -1,11 +1,12 @@
+{% from "_macros.html" import editorial_eyebrow %}
 {% extends "base.html" %}
 {% block content %}
   <section class="panel hero-panel compact-hero">
     <div class="hero-row">
       <div>
-        <div class="panel-topline">Drawer</div>
+        {{ editorial_eyebrow("Storage · Drawers · " ~ drawer_label) }}
         <h2 class="panel-title">{{ drawer_label }}</h2>
-        <p class="muted">Cards physically assigned to this drawer.</p>
+        <p class="pagehead-tagline">Cards physically assigned to this drawer.</p>
       </div>
       <div class="hero-stats-inline">
         <span>{{ entry_count }} entries</span>

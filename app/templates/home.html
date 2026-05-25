@@ -1,3 +1,4 @@
+{% from "_macros.html" import editorial_eyebrow %}
 {% extends "base.html" %}
 {% block content %}
   {# v3.27.8 layout restructure. Two states driven by show_onboarding:
@@ -48,7 +49,7 @@
     </section>
   {% else %}
     <section class="pagehead">
-      <div class="pagehead-eyebrow">Dashboard</div>
+      {{ editorial_eyebrow("Dashboard") }}
       <h1 class="pagehead-title">Welcome back, {{ current_user.display_name or current_user.username }}</h1>
       <p class="pagehead-tagline">Everything important is one click away — import, place, build, and track.</p>
     </section>

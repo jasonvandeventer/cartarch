@@ -1,8 +1,9 @@
+{% from "_macros.html" import editorial_eyebrow %}
 {% extends "base.html" %}
 {% block content %}
   <section class="panel page-hero">
     <div>
-      <div class="eyebrow">Admin</div>
+      {{ editorial_eyebrow("System · Admin") }}
       <h2 class="panel-title">User Management</h2>
       <p class="muted">{{ user_rows|length }} registered user{{ 's' if user_rows|length != 1 else '' }}</p>
     </div>

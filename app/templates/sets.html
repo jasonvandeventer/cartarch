@@ -1,8 +1,9 @@
+{% from "_macros.html" import editorial_eyebrow %}
 {% extends "base.html" %}
 {% block content %}
   <section class="panel page-hero">
     <div>
-      <div class="eyebrow">Track</div>
+      {{ editorial_eyebrow("Collection · Sets") }}
       <h2 class="panel-title">Set Collection Status</h2>
       <p class="muted">
         Track set completion, owned cards, and progress by expansion. Open a set to calculate full Scryfall completion.

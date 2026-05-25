@@ -1,11 +1,11 @@
 {% extends "base.html" %}
-{% from "_macros.html" import inventory_card, mana_pips %}
+{% from "_macros.html" import inventory_card, mana_pips, editorial_eyebrow %}
 {% block content %}
   <section class="panel hero-panel compact-hero">
     {% if deck %}
       <div class="hero-row">
         <div>
-          <div class="panel-topline">Deck</div>
+          {{ editorial_eyebrow("Play · Decks · " ~ deck.name) }}
           <h2 class="panel-title">
             {{ deck.name }}
             <span class="mana-pip-row">{{ mana_pips(color_identity) }}</span>
