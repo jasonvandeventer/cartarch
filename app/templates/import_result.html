@@ -1,9 +1,16 @@
 {% from "_macros.html" import editorial_eyebrow %}
 {% extends "base.html" %}
 {% block content %}
-  <section class="panel hero-panel compact-hero">
+  {# v3.28.10 — Folio editorial polish on the Result step. Existing
+     narrative copy in the "Added X cards to Y" paragraph stays; new
+     pagehead-tagline italic lede above the stat grid; § on Failed Rows
+     header (when present). Outcome paragraph + stat grid logic unchanged. #}
+  <section class="panel hero-panel compact-hero imports-result-hero">
     {{ editorial_eyebrow("Overview · Import · Confirmed") }}
     <h2 class="panel-title">Import Complete</h2>
+    <p class="pagehead-tagline imports-result-lede">
+      <em>The batch is in.</em> Below: what was imported new, what moved from your existing collection, what merged into rows you already had, and what was skipped.
+    </p>
     {% set _moved = moved_count if moved_count is defined else 0 %}
     {% set _merged = merged_count if merged_count is defined else 0 %}
     {% set _skipped = skipped_count if skipped_count is defined else 0 %}
@@ -106,8 +113,8 @@
     </div>
   </section>
   {% if failed_rows %}
-    <section class="panel">
-      <h3>Failed Rows</h3>
+    <section class="panel imports-rows-panel imports-rows-invalid">
+      <h3 class="panel-title imports-step-title"><span class="deck-detail-section-mark">§</span> Failed Rows</h3>
       <div class="table-wrap">
         <table>
           <thead>

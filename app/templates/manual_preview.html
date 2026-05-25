@@ -1,14 +1,20 @@
 {% from "_macros.html" import editorial_eyebrow %}
 {% extends "base.html" %}
 {% block content %}
-  <section class="panel hero-panel compact-hero">
+  {# v3.28.10 — Folio editorial polish on the Manual flow's Preview step.
+     HTMX contract preserved verbatim — hx-post="/import/manual/reconcile-preview",
+     hx-include="closest form", hx-target="#reconciliation-panel",
+     hx-swap="innerHTML", hx-trigger="load, change". Single-card variant of
+     import_preview.html. #}
+  <section class="panel hero-panel compact-hero imports-preview-hero">
     {{ editorial_eyebrow("Overview · Import · Manual") }}
-    <h2 class="panel-title">Manual Import Preview</h2>
+    <h2 class="panel-title imports-preview-title">Manual Import Preview</h2>
     {% if card %}
-      <p>
-        <strong>{{ card.name }}</strong> — {{ card.set_code|upper }} {{ card.collector_number }}
+      <p class="pagehead-tagline imports-preview-lede">
+        Reviewing <b>{{ card.name }}</b> — {{ card.set_code|upper }} #{{ card.collector_number }}.
+        Pick a destination below; the <em>reconciliation panel</em> shows what will move from your collection or be added new before you commit.
       </p>
-      <p class="muted">
+      <p class="muted imports-manual-meta">
         Finish: {{ finish|capitalize }} &nbsp;·&nbsp; Quantity: {{ quantity }}
         {% if language and language != 'en' %}
           &nbsp;·&nbsp; Language: <span class="language-badge">{{ language|upper }}</span>
@@ -20,7 +26,7 @@
       {% set placeable = locations | selectattr("type", "ne", "root") | selectattr("type", "ne", "deck") | list %}
       <form action="/import/manual/commit"
             method="post"
-            class="filter-row"
+            class="filter-row imports-commit-form"
             style="margin-top: 1rem;
                    display: block">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
@@ -30,8 +36,8 @@
         <input type="hidden" name="finish" value="{{ finish }}">
         <input type="hidden" name="quantity" value="{{ quantity }}">
         <input type="hidden" name="language" value="{{ language or 'en' }}">
-        <div class="filter-row" style="margin: 0">
-          <label style="font-weight: 600;">Destination</label>
+        <div class="filter-row imports-destination-row" style="margin: 0">
+          <label class="imports-destination-label">Destination</label>
           <select name="target_location_id"
                   id="import-destination-select"
                   hx-post="/import/manual/reconcile-preview"
@@ -54,6 +60,7 @@
           </select>
           <button type="submit"
                   id="import-submit-btn"
+                  class="imports-commit-btn"
                   {% if not use_drawer_sorter and not placeable and not decks %}disabled{% endif %}>
             Commit Import
           </button>

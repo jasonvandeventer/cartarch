@@ -1,5 +1,16 @@
 [
   {
+    "version": "3.28.10",
+    "date": "2026-05-25",
+    "added": [],
+    "refined": [
+      "The Import flow picks up the Folio editorial register across all three steps — Entry, Preview/Reconcile, Result. The four input methods on the Entry page (CSV upload, paste card list, name search, manual entry) each gain a § panel mark and an italic Newsreader explainer alongside the existing forms. The Preview page leads with a narrative italic lede ('Format X. N rows ready to commit, M rows cannot be parsed. Pick a destination below; the reconciliation panel shows what will move from your collection, what will merge, and what will be added new — confirm when you're ready.'); the filename renders as a brass-gold mono pill; Valid Rows and Invalid Rows get § I and § II marks. The Result page leads with a small italic 'The batch is in.' line above the existing stat tiles.",
+      "The reconciliation panel — the live HTMX swap that updates whenever the destination changes — picks up the § mark on its header. The matching logic, the action select (move-existing / merge / import-new for decks; skip-already-owned / import-delta / import-new for storage), and the per-row breakdowns are unchanged."
+    ],
+    "resolved": [],
+    "archivist_note": "Imports is a consequential-write flow — the sequence (enter → preview → confirm) is load-bearing. The design package proposed a tabbed single-page UX; we deliberately did not adopt that. Tabs that lose state on switch would be a UX regression for an import. So v3.28.10 is a polish pass on the existing funnel: each step gets the Folio register on top, every form action and every HTMX contract stays exactly as it was. A real import you ran the day before would feel the same in the hands; it just reads as a more deliberate document on the page."
+  },
+  {
     "version": "3.28.9",
     "date": "2026-05-25",
     "added": [],

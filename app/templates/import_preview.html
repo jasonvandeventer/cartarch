@@ -1,23 +1,27 @@
 {% from "_macros.html" import editorial_eyebrow %}
 {% extends "base.html" %}
 {% block content %}
-  <section class="panel hero-panel compact-hero">
-        {{ editorial_eyebrow("Overview · Import · Preview") }}
-    <h2 class="panel-title">Preview: {{ filename }}</h2>
-    <p class="muted">
-      Format: <strong>{{ format_name }}</strong> &nbsp;·&nbsp;
-      <strong>{{ valid_rows|length }}</strong> valid
-      {% if invalid_rows|length > 0 %}
-        &nbsp;·&nbsp; <span style="color: #b45309;"><strong>{{ invalid_rows|length }}</strong> invalid</span>
-      {% else %}
-        &nbsp;·&nbsp; 0 invalid
-      {% endif %}
+  {# v3.28.10 — Folio editorial polish on the Preview step of the Imports
+     funnel. Narrative italic lede; § marks on Valid Rows / Invalid Rows.
+     The destination select's HTMX contract is PRESERVED VERBATIM
+     (hx-post="/import/reconcile-preview", hx-include="closest form",
+     hx-target="#reconciliation-panel", hx-swap="innerHTML",
+     hx-trigger="load, change"); the parent form structure, hidden inputs
+     per parsed row, and the #reconciliation-panel target div all stay
+     unchanged. This is a styling pass on a consequential-write flow. #}
+  <section class="panel hero-panel compact-hero imports-preview-hero">
+    {{ editorial_eyebrow("Overview · Import · Preview") }}
+    <h2 class="panel-title imports-preview-title">Preview: <span class="imports-preview-filename">{{ filename }}</span></h2>
+    <p class="pagehead-tagline imports-preview-lede">
+      Format <b>{{ format_name }}</b>.
+      <b>{{ valid_rows|length }}</b> {{ "row" if valid_rows|length == 1 else "rows" }} ready to commit{% if invalid_rows|length > 0 %}, <span class="warning-text"><b>{{ invalid_rows|length }}</b> {{ "row" if invalid_rows|length == 1 else "rows" }} cannot be parsed</span>{% endif %}.
+      Pick a destination below; the <em>reconciliation panel</em> shows what will move from your collection, what will merge, and what will be added new — confirm when you're ready.
     </p>
     {% if valid_rows %}
       {% set placeable = locations | selectattr("type", "ne", "root") | selectattr("type", "ne", "deck") | list %}
       <form action="/import/commit"
             method="post"
-            class="filter-row"
+            class="filter-row imports-commit-form"
             style="margin-top: 1rem;
                    display: block">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
@@ -35,8 +39,8 @@
           <input type="hidden" name="location" value="{{ row.location }}">
           <input type="hidden" name="language" value="{{ row.language or 'en' }}">
         {% endfor %}
-        <div class="filter-row" style="margin: 0">
-          <label style="font-weight: 600;">Destination</label>
+        <div class="filter-row imports-destination-row" style="margin: 0">
+          <label class="imports-destination-label">Destination</label>
           <select name="target_location_id"
                   id="import-destination-select"
                   hx-post="/import/reconcile-preview"
@@ -59,6 +63,7 @@
           </select>
           <button type="submit"
                   id="import-submit-btn"
+                  class="imports-commit-btn"
                   {% if not use_drawer_sorter and not placeable and not decks %}disabled{% endif %}>
             Import Valid Rows
           </button>
@@ -67,14 +72,14 @@
            the inner content of this wrapper. The wrapper lives INSIDE the form
            so the reconcile_action / reconcile_move_qty / reconcile_new_qty
            hidden fields submit along with the existing parsed-row fields when
-           the user clicks Import. #}
+           the user clicks Import. PRESERVED VERBATIM in v3.28.10. #}
         <div id="reconciliation-panel"></div>
       </form>
       {% include "_inline_create_destination.html" %}
     {% endif %}
   </section>
-  <section class="panel">
-    <h3 class="panel-title">Valid Rows</h3>
+  <section class="panel imports-rows-panel">
+    <h3 class="panel-title imports-step-title"><span class="deck-detail-section-mark">§ I</span> Valid Rows</h3>
     {% if valid_rows %}
       <div class="table-wrap">
         <table>
@@ -125,8 +130,9 @@
     {% endif %}
   </section>
   {% if invalid_rows %}
-    <section class="panel">
-      <h3 class="panel-title">Invalid Rows</h3>
+    <section class="panel imports-rows-panel imports-rows-invalid">
+      <h3 class="panel-title imports-step-title"><span class="deck-detail-section-mark">§ II</span> Invalid Rows</h3>
+      <p class="imports-step-lede">These rows couldn't be parsed — typically a missing set/collector match or an ambiguous name. Fix and re-import.</p>
       <div class="table-wrap">
         <table>
           <thead>
@@ -149,7 +155,7 @@
                 <td>{{ row.collector_number or '-' }}</td>
                 <td>{{ row.finish }}</td>
                 <td>{{ row.quantity }}</td>
-                <td style="color: #b45309;">{{ row.reason or 'Invalid row' }}</td>
+                <td class="warning-text">{{ row.reason or 'Invalid row' }}</td>
               </tr>
             {% endfor %}
           </tbody>

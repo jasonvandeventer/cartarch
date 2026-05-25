@@ -1,15 +1,18 @@
 {% from "_macros.html" import editorial_eyebrow %}
 {% extends "base.html" %}
 {% block content %}
-  <section class="panel hero-panel compact-hero">
+  {# v3.28.10 — Folio editorial polish. Form actions + result-grid forms
+     all preserved verbatim. Each result card's "Choose" form still posts
+     to /import/manual/preview unchanged. #}
+  <section class="panel hero-panel compact-hero imports-search-hero">
     {{ editorial_eyebrow("Overview · Import · Search") }}
     <h2 class="panel-title">Choose a Printing</h2>
-    <p class="muted">
-      Results for: <strong>{{ query }}</strong>
+    <p class="pagehead-tagline imports-preview-lede">
+      Results for <b>{{ query }}</b>. Pick the printing you have in hand — quantity and finish are configurable on each result.
     </p>
     <form action="/import/manual/search"
           method="post"
-          class="filter-row"
+          class="filter-row imports-form"
           style="margin-top: 0.75rem">
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
       <input type="text" name="name" value="{{ query }}" placeholder="Card name">

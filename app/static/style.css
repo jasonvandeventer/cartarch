@@ -9944,3 +9944,169 @@ body.game-mode {
   }
 }
 
+/* ===================================================================
+   v3.28.10 — Folio Imports editorial polish
+   ===================================================================
+   Editorial-styling pass on the existing sequential funnel (entry →
+   preview/reconcile → result) per the cluster's page-fork decision #2.
+   No structural change; templates retain their form actions, hidden
+   inputs, HTMX contracts, and consequential-write semantics. CSS only
+   adjusts copy register, spacing, and section-header treatment.
+
+   Token-driven entirely; consumes the v3.28.1 Folio palette + v3.27.7
+   spacing/radius scales. Zero parallel tokens. Reuses
+   `.deck-detail-section-mark` (v3.28.7) for the § panel marks.
+   =================================================== */
+
+/* Warning panel (no storage location yet) — restyle from raw inline
+   border-left to a token-driven editorial warning panel. */
+.imports-warning-panel {
+  border-left: 4px solid var(--brand-gold);
+}
+.imports-warning-strong {
+  font-weight: 600;
+  margin: 0;
+  color: var(--text);
+}
+.imports-warning-detail {
+  margin: 0.25rem 0 0;
+}
+
+/* Imports entry hero — narrative italic lede beneath the eyebrow */
+.imports-hero {
+  margin-top: 1rem;
+}
+.imports-lede {
+  max-width: 60ch;
+}
+.imports-lede b {
+  color: var(--text);
+  font-weight: 500;
+}
+
+/* Per-step panels (Upload CSV / Paste Card List / Search / Manual) */
+.imports-step {
+  margin-top: 1rem;
+}
+.imports-step-title {
+  font-family: "Newsreader", serif;
+  font-style: italic;
+  font-weight: 500;
+  color: var(--text);
+  letter-spacing: -0.005em;
+}
+.imports-step-lede {
+  font-family: "Newsreader", serif;
+  font-style: italic;
+  font-size: 13px;
+  color: var(--text-dim);
+  margin: 0.4rem 0 0.75rem;
+  max-width: 64ch;
+  line-height: 1.55;
+}
+.imports-step-lede code {
+  font-family: ui-monospace, "JetBrains Mono", monospace;
+  font-style: normal;
+  font-size: 11.5px;
+  color: var(--text);
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--border);
+  padding: 0.05rem 0.4rem;
+  border-radius: 3px;
+}
+.imports-step-lede strong {
+  color: var(--text);
+  font-weight: 600;
+}
+.imports-form {
+  gap: 0.6rem;
+}
+
+/* Preview hero — narrative lede with filename emphasized */
+.imports-preview-hero {
+  margin-top: 1rem;
+}
+.imports-preview-title {
+  font-family: "Newsreader", serif;
+  font-style: italic;
+  font-weight: 500;
+  letter-spacing: -0.005em;
+}
+.imports-preview-filename {
+  color: var(--brand-gold);
+  font-style: normal;
+  font-family: ui-monospace, "JetBrains Mono", monospace;
+  font-size: 0.85em;
+  margin-left: 0.4rem;
+  background: var(--brand-gold-soft);
+  padding: 0.1rem 0.5rem;
+  border-radius: 3px;
+}
+.imports-preview-lede {
+  max-width: 70ch;
+}
+.imports-preview-lede b {
+  color: var(--text);
+  font-weight: 500;
+}
+.imports-preview-lede em {
+  color: var(--text);
+  font-style: italic;
+}
+.imports-manual-meta {
+  font-size: 12.5px;
+  margin-top: 0.5rem;
+}
+
+/* Destination form — editorial label + chip-style submit button */
+.imports-destination-row {
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0.85rem 0 0;
+}
+.imports-destination-label {
+  font-family: "Montserrat", sans-serif;
+  font-size: 10px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 700;
+}
+.imports-commit-form {
+  gap: 0.5rem;
+}
+.imports-commit-btn {
+  font-weight: 600;
+}
+
+/* Valid Rows / Invalid Rows / Failed Rows panels — Folio editorial
+   register; tables inside still render via the existing global table
+   chrome, so per-row data presentation stays familiar. */
+.imports-rows-panel {
+  margin-top: 1rem;
+}
+.imports-rows-invalid {
+  border-left: 3px solid rgba(138, 46, 34, 0.4);
+}
+
+/* Search-results hero (Choose a Printing) */
+.imports-search-hero {
+  margin-top: 1rem;
+}
+
+/* Result hero — italic emphasis on the outcome line */
+.imports-result-hero {
+  margin-top: 1rem;
+}
+.imports-result-lede {
+  max-width: 70ch;
+}
+.imports-result-lede em {
+  color: var(--brand-gold);
+  font-style: italic;
+  font-weight: 500;
+}
+
+/* Responsive — all three steps already collapse naturally via the
+   existing .filter-row + .stack-form rules + the v3.27.8 .page-shell
+   wrapper. No additional breakpoints needed here. */
