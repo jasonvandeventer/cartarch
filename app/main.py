@@ -2387,12 +2387,26 @@ def create_location_route(
     parent_id: int | None = Form(None),
     sort_order: int = Form(0),
     mode: str = Form("managed"),
+    note: str = Form(""),
+    capacity: str = Form(""),
     session: Session = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
     _: None = CsrfRequired,
 ):
     if parent_id == 0:
         parent_id = None
+
+    # v3.28.6 — note + capacity additive fields. Capacity arrives as a string
+    # because the form input is optional; empty / non-integer → None.
+    note_value = note.strip() or None
+    capacity_value: int | None = None
+    if capacity and capacity.strip():
+        try:
+            parsed = int(capacity.strip())
+            if parsed > 0:
+                capacity_value = parsed
+        except ValueError:
+            capacity_value = None
 
     create_location(
         session,
@@ -2402,6 +2416,8 @@ def create_location_route(
         parent_id=parent_id,
         sort_order=sort_order,
         mode=mode,
+        note=note_value,
+        capacity=capacity_value,
     )
     return RedirectResponse("/locations", status_code=303)
 
@@ -2496,12 +2512,30 @@ def edit_location_route(
     parent_id: int | None = Form(None),
     sort_order: int = Form(0),
     mode: str | None = Form(None),
+    note: str = Form(""),
+    capacity: str = Form(""),
     session: Session = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
     _: None = CsrfRequired,
 ):
     if parent_id == 0:
         parent_id = None
+
+    # v3.28.6 — capacity parses from string for the same reason as the create
+    # route (form value is optional). The edit popout always includes both
+    # `note` and `capacity` fields, so update_note=True / update_capacity=True
+    # are passed unconditionally — the service layer treats empty string /
+    # zero / non-integer as "clear the stored value."
+    note_value = note
+    capacity_value: int | None = None
+    if capacity and capacity.strip():
+        try:
+            parsed = int(capacity.strip())
+            if parsed > 0:
+                capacity_value = parsed
+        except ValueError:
+            capacity_value = None
+
     try:
         update_location(
             session,
@@ -2512,6 +2546,10 @@ def edit_location_route(
             parent_id=parent_id,
             sort_order=sort_order,
             mode=mode,
+            note=note_value,
+            capacity=capacity_value,
+            update_note=True,
+            update_capacity=True,
         )
     except ValueError:
         pass

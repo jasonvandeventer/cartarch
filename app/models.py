@@ -103,6 +103,8 @@ class StorageLocation(Base):
     )
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
     mode: Mapped[str] = mapped_column(String(16), default="managed", nullable=False, index=True)
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    capacity: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     user: Mapped[User] = relationship(back_populates="storage_locations")

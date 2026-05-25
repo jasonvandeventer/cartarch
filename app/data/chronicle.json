@@ -1,5 +1,22 @@
 [
   {
+    "version": "3.28.6",
+    "date": "2026-05-25",
+    "added": [
+      "Storage Locations now carries a per-location note — a short description (\"Commander staples · A-tier\", \"Trade fodder\", whatever you'd write on a label) that shows beneath each location's name in the table. Settable via both the Add Location form and the per-row Edit popout.",
+      "Locations can declare a capacity — the maximum number of cards the container is meant to hold. When set, the table renders a small brass-to-amber capacity meter inline with each row, showing how full it is. Locations at 95% or above get a warning treatment (oxblood bar, faintly tinted row) so you can see at a glance what needs thinning. Capacity is optional — leave it blank on any location and the meter simply doesn't render for that row.",
+      "A 'Last touched' column shows the most recent date anything happened at each location — placement, move, quantity change. Derived from the data already there; no new tracking added. Editorial date format matches the Chronicle."
+    ],
+    "refined": [
+      "The Locations table picks up the Folio editorial register — column headers tightened, capacity inline rather than tucked into a separate detail page, the note sub-line giving each row a small piece of writing of its own. Everything that worked before still works: the Mode column (managed/manual/sink/ignored), the Parent expression, Edit popouts, Delete-with-redirect when a location has cards in it. The Folio polish is on top of every existing feature, not in place of any.",
+      "The Add Location form gains a second row so capacity and note fit alongside the existing name, type, mode, and parent fields without forcing horizontal scroll on laptop widths."
+    ],
+    "resolved": [
+      "Several user-facing strings still mentioned 'drawer' as a generic example container — in the welcome flow, in the collection prompt for new users, in the import setup hint, in the reconciliation panel — even when shown to users who don't use the drawer auto-sorter. Those generic examples are reworded to neutral storage vocabulary (binder, box, shelf). The Drawer auto-sorter itself, and every surface only drawer-sorter users see, is unchanged."
+    ],
+    "archivist_note": "The Locations page is the second of the cluster's three page-fork decisions — keep the structure that already works, lift only the editorial finish on top. Tables are right for hierarchical numerous data; a flat card grid would have lost the cabinet › drawer › slot relationship and made twenty locations longer to scan than five. The capacity meter is an opt-in promise: declare what a container is meant to hold and the page tells you how full it is, every time."
+  },
+  {
     "version": "3.28.5",
     "date": "2026-05-24",
     "added": [

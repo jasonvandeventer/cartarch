@@ -71,6 +71,9 @@ from scripts.migrate_v3_27_12_watchlist import main as migrate_v3_27_12_watchlis
 from scripts.migrate_v3_27_14_password_reset_tokens import (
     main as migrate_v3_27_14_password_reset_tokens,
 )
+from scripts.migrate_v3_28_6_storage_location_note_and_capacity import (
+    main as migrate_v3_28_6_storage_location_note_and_capacity,
+)
 
 
 def _is_applied(name: str) -> bool:
@@ -374,6 +377,13 @@ def run():
         _mark_applied("v3_27_14_password_reset_tokens")
     else:
         print("v3.27.14 password_reset_tokens already applied, skipping")
+
+    if not _is_applied("v3_28_6_storage_location_note_and_capacity"):
+        print("Running v3.28.6 storage_locations note + capacity migration...")
+        migrate_v3_28_6_storage_location_note_and_capacity()
+        _mark_applied("v3_28_6_storage_location_note_and_capacity")
+    else:
+        print("v3.28.6 storage_location_note_and_capacity already applied, skipping")
 
     print("Migration runner complete")
 

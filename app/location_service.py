@@ -1,3 +1,4 @@
+from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
 from app.models import Deck, InventoryRow, StorageLocation
@@ -80,6 +81,8 @@ def create_location(
     parent_id: int | None = None,
     sort_order: int = 0,
     mode: str = "managed",
+    note: str | None = None,
+    capacity: int | None = None,
 ) -> StorageLocation:
     name = name.strip()
     type = type.strip().lower() or "other"
@@ -93,6 +96,12 @@ def create_location(
 
     if mode not in VALID_LOCATION_MODES:
         raise ValueError(f"Invalid location mode: {mode}")
+
+    if note is not None:
+        note = note.strip() or None
+
+    if capacity is not None and capacity <= 0:
+        capacity = None
 
     existing = (
         session.query(StorageLocation)
@@ -117,6 +126,8 @@ def create_location(
         parent_id=parent_id,
         sort_order=sort_order,
         mode=mode,
+        note=note,
+        capacity=capacity,
     )
     session.add(location)
     session.commit()
@@ -126,6 +137,26 @@ def create_location(
 
 def get_location_summary(session: Session, user_id: int) -> list[dict]:
     locations = list_locations(session, user_id=user_id)
+
+    # v3.28.6 — batched last-touched aggregate. Single GROUP BY across all of
+    # the user's InventoryRows, keyed by storage_location_id. Looked up O(1)
+    # per location, no per-location query. Faithful "last activity at this
+    # location" because every inventory mutation (placement, move, quantity
+    # adjustment) writes InventoryRow.updated_at via 15+ explicit
+    # `updated_at = datetime.utcnow()` sites in inventory_service.py /
+    # import_service.py / main.py — verified pre-implementation.
+    last_touched_map: dict[int, object] = dict(
+        session.query(
+            InventoryRow.storage_location_id,
+            func.max(InventoryRow.updated_at),
+        )
+        .filter(
+            InventoryRow.user_id == user_id,
+            InventoryRow.storage_location_id.isnot(None),
+        )
+        .group_by(InventoryRow.storage_location_id)
+        .all()
+    )
 
     summaries = []
     for location in locations:
@@ -168,6 +199,17 @@ def get_location_summary(session: Session, user_id: int) -> list[dict]:
             len(rows) > 0 and location.type not in ("root", "deck") and not has_children
         )
 
+        # v3.28.6 — capacity meter derivations. capacity_pct is the
+        # fill-percentage (0-100, clamped) when capacity is set; None when
+        # NULL so the template branches on the value rather than a special
+        # zero. is_over_capacity flags ≥95% — the design package's `attn`
+        # threshold, used to apply the oxblood meter color.
+        capacity_pct: float | None = None
+        is_over_capacity = False
+        if location.capacity and location.capacity > 0:
+            capacity_pct = min(100.0, (quantity / location.capacity) * 100.0)
+            is_over_capacity = (quantity / location.capacity) >= 0.95
+
         summaries.append(
             {
                 "location": location,
@@ -176,6 +218,9 @@ def get_location_summary(session: Session, user_id: int) -> list[dict]:
                 "total_value": total_value,
                 "is_deletable": is_deletable,
                 "is_redirectable": is_redirectable,
+                "last_touched_at": last_touched_map.get(location.id),
+                "capacity_pct": capacity_pct,
+                "is_over_capacity": is_over_capacity,
             }
         )
 
@@ -191,7 +236,19 @@ def update_location(
     parent_id: int | None = None,
     sort_order: int = 0,
     mode: str | None = None,
+    note: str | None = None,
+    capacity: int | None = None,
+    update_note: bool = False,
+    update_capacity: bool = False,
 ) -> StorageLocation:
+    """Update an editable location. ``note`` and ``capacity`` are only
+    applied when their corresponding ``update_note`` / ``update_capacity``
+    flags are True — distinguishes "not in this form submission" from
+    "explicitly cleared." The route handler passes the flags True when the
+    form carries those fields (the v3.28.6 Locations edit popout always
+    includes both); future routes that don't carry them can leave the
+    flags False to preserve the stored value.
+    """
     location = get_location(session, location_id, user_id)
     if location is None:
         raise ValueError("Location not found.")
@@ -240,6 +297,12 @@ def update_location(
     location.sort_order = sort_order
     if mode is not None:
         location.mode = mode
+    if update_note:
+        # Empty string clears the note; whitespace-only also clears.
+        location.note = (note.strip() if note else None) or None
+    if update_capacity:
+        # Falsy / non-positive clears the capacity.
+        location.capacity = capacity if (capacity is not None and capacity > 0) else None
     session.commit()
     return location
 

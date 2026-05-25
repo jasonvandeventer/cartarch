@@ -5,31 +5,54 @@
     <div>
       {{ editorial_eyebrow("Storage · Locations") }}
       <h2 class="panel-title">Storage Locations</h2>
-      <p class="pagehead-tagline">Manage where cards are physically stored — binders, boxes, and other containers.</p>
+      <p class="pagehead-tagline">Where the collection lives — binders, boxes, shelves, and other physical containers.</p>
     </div>
   </section>
   <section class="panel controls-panel">
     <h3 class="panel-title">Add Location</h3>
-    <form method="post"
-          action="/locations"
-          class="filter-row"
-          style="margin-top: 0.5rem">
+    <form method="post" action="/locations" class="stack-form locations-create-form">
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-      <input type="text" name="name" placeholder="Location name" required>
-      <select name="type">
-        {% for t in location_types %}<option value="{{ t }}">{{ t.capitalize() }}</option>{% endfor %}
-      </select>
-      <select name="mode" title="Sorter mode">
-        <option value="managed" selected>Managed — sorter places &amp; rebalances</option>
-        <option value="manual">Manual — sorter never touches</option>
-        <option value="sink">Sink — sorter pulls from only</option>
-        <option value="ignored">Ignored — invisible to sorter</option>
-      </select>
-      <select name="parent_id">
-        <option value="0">No parent</option>
-        {% for loc in parent_locations %}<option value="{{ loc.id }}">{{ loc.name }} ({{ loc.type }})</option>{% endfor %}
-      </select>
-      <button type="submit">Create</button>
+      <div class="locations-create-row">
+        <div class="locations-create-field locations-create-field-name">
+          <label>Name</label>
+          <input type="text" name="name" placeholder="e.g. Mardu Binder" required>
+        </div>
+        <div class="locations-create-field">
+          <label>Type</label>
+          <select name="type">
+            {% for t in location_types %}<option value="{{ t }}">{{ t.capitalize() }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="locations-create-field">
+          <label>Sorter mode</label>
+          <select name="mode">
+            <option value="managed" selected>Managed</option>
+            <option value="manual">Manual</option>
+            <option value="sink">Sink</option>
+            <option value="ignored">Ignored</option>
+          </select>
+        </div>
+        <div class="locations-create-field">
+          <label>Parent</label>
+          <select name="parent_id">
+            <option value="0">No parent</option>
+            {% for loc in parent_locations %}<option value="{{ loc.id }}">{{ loc.name }} ({{ loc.type }})</option>{% endfor %}
+          </select>
+        </div>
+        <div class="locations-create-field locations-create-field-capacity">
+          <label>Capacity</label>
+          <input type="number" name="capacity" min="1" placeholder="optional">
+        </div>
+      </div>
+      <div class="locations-create-row">
+        <div class="locations-create-field locations-create-field-note">
+          <label>Note <span class="locations-create-hint">— a short description, shown beneath the name</span></label>
+          <input type="text" name="note" placeholder="optional — e.g. Commander staples · A-tier" maxlength="255">
+        </div>
+        <div class="locations-create-submit">
+          <button type="submit">Create</button>
+        </div>
+      </div>
     </form>
   </section>
   <section class="panel controls-panel">
@@ -56,34 +79,48 @@
     <h3 class="panel-title">Your Locations</h3>
     {% if locations %}
       <div class="table-wrap">
-        <table class="stacking-table">
+        <table class="stacking-table locations-table">
           <thead>
             <tr>
-              <th>Name</th>
+              <th>Location</th>
               <th>Type</th>
               <th class="col-priority-low">Mode</th>
               <th class="col-priority-low">Parent</th>
-              <th class="col-priority-mid">Rows</th>
-              <th>Qty</th>
-              <th>Value</th>
+              <th>Capacity</th>
+              <th class="col-priority-mid">Value</th>
+              <th class="col-priority-low">Last touched</th>
               <th></th>
             </tr>
           </thead>
           <tbody>
             {% for summary in location_summaries %}
               {% set loc = summary.location %}
-              <tr>
+              <tr {% if summary.is_over_capacity %}class="locations-row-attn"{% endif %}>
                 <td>
-                  <a href="/locations/{{ loc.id }}">{{ loc.name }}</a>
+                  <a href="/locations/{{ loc.id }}" class="locations-name-link">{{ loc.name }}</a>
+                  {% if loc.note %}<div class="locations-note">{{ loc.note }}</div>{% endif %}
                 </td>
-                <td data-label="Type">{{ loc.type }}</td>
+                <td data-label="Type">{{ loc.type.capitalize() }}</td>
                 <td class="col-priority-low" data-label="Mode">
                   <span class="location-mode-badge location-mode-{{ loc.mode }}">{{ loc.mode }}</span>
                 </td>
                 <td class="col-priority-low" data-label="Parent">{{ loc.parent.name if loc.parent else '—' }}</td>
-                <td class="col-priority-mid" data-label="Rows">{{ summary.row_count }}</td>
-                <td data-label="Qty">{{ summary.quantity }}</td>
-                <td data-label="Value">${{ '%.2f'|format(summary.total_value) }}</td>
+                <td data-label="Capacity">
+                  {% if loc.capacity %}
+                    <div class="locations-meter">
+                      <div class="locations-meter-bar{% if summary.is_over_capacity %} locations-meter-bar-attn{% endif %}">
+                        <div class="locations-meter-fill" style="width: {{ summary.capacity_pct }}%"></div>
+                      </div>
+                      <span class="locations-meter-pc">{{ summary.quantity }} <span class="locations-meter-sep">·</span> {{ summary.capacity_pct | round | int }}%</span>
+                    </div>
+                  {% else %}
+                    <span class="locations-count-plain">{{ summary.quantity }}</span>
+                  {% endif %}
+                </td>
+                <td class="col-priority-mid" data-label="Value">${{ '%.2f'|format(summary.total_value) }}</td>
+                <td class="col-priority-low locations-last-touched" data-label="Last touched">
+                  {% if summary.last_touched_at %}{{ summary.last_touched_at | editorial_date }}{% else %}<span class="locations-last-touched-empty">—</span>{% endif %}
+                </td>
                 <td style="text-align: right; white-space: nowrap;">
                   <a href="/locations/{{ loc.id }}">
                     <button type="button">Open</button>
@@ -129,6 +166,19 @@
                             <option value="sink" {% if loc.mode == "sink" %}selected{% endif %}>Sink — sorter pulls from only</option>
                             <option value="ignored" {% if loc.mode == "ignored" %}selected{% endif %}>Ignored — invisible to sorter</option>
                           </select>
+                          <label>Capacity <span class="locations-edit-hint">— optional</span></label>
+                          <input type="number"
+                                 name="capacity"
+                                 min="1"
+                                 value="{{ loc.capacity or '' }}"
+                                 placeholder="optional"
+                                 style="width: 120px">
+                          <label>Note <span class="locations-edit-hint">— optional, shown beneath the name</span></label>
+                          <input type="text"
+                                 name="note"
+                                 value="{{ loc.note or '' }}"
+                                 placeholder="e.g. Commander staples · A-tier"
+                                 maxlength="255">
                           <button type="submit" style="margin-top: 0.25rem">Save</button>
                         </form>
                       </div>
