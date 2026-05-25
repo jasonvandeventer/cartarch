@@ -1,5 +1,25 @@
 [
   {
+    "version": "3.28.13",
+    "date": "2026-05-25",
+    "added": [
+      "Multiple counters per seat in the live game tracker. Track Poison and Experience and a Rad counter simultaneously — each on its own pill, each with its own ± buttons, each removable. The single-typed-counter widget that had been there since v3.26.5 lifts to an array; the curated types (Rad, Poison, Experience, Energy, Storm) and a Custom slot with a freeform label remain. Add a counter via the small '+ ctr' button on each seat panel.",
+      "A Pause button in the masthead. Pauses the displayed game-elapsed and the active turn's elapsed; resume continues from where you left off. Per-seat clock-on-clock stays unpaused because that's a per-player timing record, not a wall-clock affordance.",
+      "Elimination now stamps the turn it happened on — the pill reads 'Eliminated · T10'. Manual eliminate, manual revive, and the auto-elim from 0 life / 10 poison / 21 commander damage all set the stamp; revive clears it.",
+      "A § Chronicle strip across the bottom of the tracker — recent actions with their clock times, and a 'Last action' readout on the far right. Replaces the cramped history bar that used to float at the bottom edge.",
+      "A Damage Matrix modal. The new always-visible commander-damage strip on each seat panel shows what they've taken from each opponent; click any strip cell to open the full N×N matrix scoped to that receiver. Add or subtract damage in the matrix; the strip updates live."
+    ],
+    "refined": [
+      "The live game tracker is now in the Folio editorial palette. Warm-charcoal background, italic Newsreader life numerals, the brass-stamp § eyebrow on the bottom Chronicle, the gold End-turn button. The seat panels carry the commander art behind them (unchanged from v3.26.1) and the per-seat current-turn cue moved from the old center indicator's border to a thickened active-panel border in the player's color.",
+      "The floating turn indicator at the center of the table is gone. Turn number and the current player's name moved up into the masthead ('Turn 11 · Marina to act'); the game-elapsed and current-turn timers moved into the masthead's right stat cluster; the End Turn button moved into the bottom bar. The center cell is back to being playmat space.",
+      "The per-seat commander damage strip is always visible now (it used to be tucked behind a 'Commander Damage ▸' details summary). One cell per opponent, color escalates to amber at 16 and red at 21. The strip is read-only as a glance — open the new Damage Matrix modal to actually edit values."
+    ],
+    "resolved": [
+      "The tracker had been left on the pre-Folio navy app while every other surface moved to warm-charcoal Folio in the v3.28.x cluster — the initial recon sized it 'polish only' by measuring features (the tracker is functionally ahead of the design package it was checked against), and the v3.28.3 editorial sweep deliberately skipped it because it has no standard page header. This release closes that gap. The Folio cluster, marked complete at v3.28.12, is re-opened for v3.28.13 and re-closed."
+    ],
+    "archivist_note": "We thought the cluster was finished. A second look at the tracker showed it wasn't — not the features, which lead the design canvas, but the layout: the masthead, the bottom Chronicle, the editorial life numerals, the warm-charcoal palette. So the cluster reopens for one more release and re-closes. The tracker is now the cluster's largest single redesign — three new bands replace the floating-overlay model that had quietly accumulated since v3.26 — and carries the cluster's most consequential state-shape change too: counters can be concurrent now. Add a Poison pill to a seat that already has an Experience pill; both live independently, both follow their own escalation rules, neither displaces the other. The Pause button finally exists. The Damage Matrix modal finally exists. The cluster, again, is complete."
+  },
+  {
     "version": "3.28.12",
     "date": "2026-05-25",
     "added": [],

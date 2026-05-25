@@ -1,71 +1,122 @@
 {% from "_macros.html" import editorial_eyebrow %}
 {% extends "base.html" %}
 {% block content %}
-  {# v3.27.3 — is_ended now reads game.status directly. Replaces the
-     brittle "any seat has placement → ended" derivation that conflated
-     finalized games with abandoned ones (both had no placements when
-     viewed from the seat-placement angle). Templates downstream of this
-     line are unchanged — the variable name is_ended is preserved as the
-     read seam for the 21 consumer sites below. #}
+  {# v3.28.13 — Folio redesign (cluster re-opener). Masthead-+-bottom-bar
+     layout replaces the v3.26-era floating .game-topbar + .card-slot-center
+     overlay + .game-histbar. Per-seat composition is a panel-local CSS grid;
+     rotation is preserved verbatim via POSITION_ROTATE + data-rotate (the
+     panel internals are panel-coordinate so rotation handles player
+     perspective correctly). gameFingerprint() is NOT bumped — 35th-or-more
+     successive release respecting the v3.25.1 invariant. See release-history
+     entry for v3.28.13 + folio-game-tracker-gap-2026-05-25.md in the vault. #}
   {% set is_ended = game.status == 'finalized' %}
   {% set winner = game.seats | selectattr('placement', 'eq', 1) | first | default(none) %}
   <div class="game-app"
        id="game-app"
        {% if is_ended %}data-ended="1"{% endif %}>
-    {# ── Floating top bar ──────────────────────────────────────── #}
-    <div class="game-topbar" id="game-topbar">
-      <a href="/games" class="game-topbar-link">← Games</a>
-      <button type="button"
-              class="fs-btn"
-              id="fs-btn"
-              onclick="toggleFullscreen()"
-              title="Toggle fullscreen">⛶</button>
-      <span class="game-topbar-sep">|</span>
-      {% if not is_ended %}
-        <button type="button"
-                class="undo-btn"
-                id="undo-btn"
-                onclick="undoLast()"
-                disabled>↩ Undo</button>
-        <button type="button" class="game-topbar-end-btn" onclick="toggleEndGame()">End Game</button>
-        <span class="portrait-turn-row" onclick="nextTurn()" title="Next turn">
-          <span class="game-topbar-sep">|</span>
-          <span class="turn-label">T<span id="portrait-turn-counter">1</span></span>
-          <span id="portrait-turn-name" class="portrait-turn-name">—</span>
-          <span class="game-topbar-sep">·</span>
-          <span class="portrait-timer" id="portrait-timer">0:00</span>
-          <button type="button" class="portrait-next-btn">→</button>
+    {# ── Editorial masthead (top band) ─────────────────────────── #}
+    <div class="game-masthead" id="game-masthead">
+      <div class="mast-left">
+        <a href="/games" class="mast-back" title="Back to games">←</a>
+        <span class="mast-eyebrow">
+          <span class="mast-hairline" aria-hidden="true"></span>
+          <em>{% if is_ended %}Game record{% else %}Live game{% endif %}</em>
+          <span class="mast-sep">·</span>
+          <span class="mast-format">{{ game.format or 'Commander' }} pod</span>
         </span>
-      {% else %}
-        <span>{{ game.played_at.strftime("%Y-%m-%d") }}</span>
-        {% if game.format %}<span class="game-topbar-sep">·</span><span>{{ game.format }}</span>{% endif %}
-        {% if game.turn_count %}<span class="game-topbar-sep">·</span><span>{{ game.turn_count }} turns</span>{% endif %}
-        {% if winner %}<span class="game-topbar-sep">·</span><span>🏆 {{ winner.player_name }}</span>{% endif %}
-      {% endif %}
-      <form method="post"
-            action="/games/{{ game.id }}/delete"
-            style="display:inline;
-                   margin-left:0.25rem">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-        <button type="submit"
-                class="btn-danger-small"
-                onclick="return confirm('Delete this game record?')">Delete</button>
-      </form>
+      </div>
+      <div class="mast-center">
+        {% if not is_ended %}
+          <span class="mast-turn-line">
+            <span class="mast-turn-label">Turn</span>
+            <span class="mast-turn-num" id="mast-turn-counter">1</span>
+            <span class="mast-turn-sep">·</span>
+            <em class="mast-turn-name" id="mast-turn-name">—</em>
+            <span class="mast-turn-sep">·</span>
+            <span class="mast-turn-actor">to act</span>
+          </span>
+        {% else %}
+          <span class="mast-turn-line">
+            <em>{{ game.played_at.strftime("%-d %B %Y") }}</em>
+            {% if game.turn_count %}<span class="mast-turn-sep">·</span><span>{{ game.turn_count }} turns</span>{% endif %}
+            {% if winner %}<span class="mast-turn-sep">·</span><span>🏆 {{ winner.player_name }}</span>{% endif %}
+          </span>
+        {% endif %}
+      </div>
+      <div class="mast-right">
+        {% if not is_ended %}
+          <div class="mast-stats">
+            <span class="mast-stat">
+              <span class="mast-stat-label">Elapsed</span>
+              <span class="mast-stat-val" id="mast-elapsed">0:00</span>
+            </span>
+            <span class="mast-stat">
+              <span class="mast-stat-label">Alive</span>
+              <span class="mast-stat-val">
+                <span id="mast-alive-count">{{ game.seats | length }}</span>
+                <span class="mast-stat-of">of {{ game.seats | length }}</span>
+              </span>
+            </span>
+            <span class="mast-stat">
+              <span class="mast-stat-label">Starting life</span>
+              <span class="mast-stat-val">{{ game.seats[0].starting_life if game.seats else 40 }}</span>
+            </span>
+          </div>
+          <div class="mast-controls">
+            <button type="button"
+                    class="mast-btn"
+                    id="undo-btn"
+                    onclick="undoLast()"
+                    disabled>↩ Undo</button>
+            <button type="button"
+                    class="mast-btn"
+                    id="pause-btn"
+                    onclick="togglePause()">⏸ Pause</button>
+            <button type="button"
+                    class="mast-btn mast-btn-end"
+                    onclick="toggleEndGame()">End game</button>
+            <button type="button"
+                    class="mast-btn mast-btn-fs"
+                    id="fs-btn"
+                    onclick="toggleFullscreen()"
+                    title="Toggle fullscreen">⛶</button>
+          </div>
+        {% else %}
+          <div class="mast-controls">
+            <button type="button"
+                    class="mast-btn mast-btn-fs"
+                    id="fs-btn"
+                    onclick="toggleFullscreen()"
+                    title="Toggle fullscreen">⛶</button>
+            <form method="post"
+                  action="/games/{{ game.id }}/delete"
+                  style="display:inline">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+              <button type="submit"
+                      class="mast-btn mast-btn-end"
+                      onclick="return confirm('Delete this game record?')">Delete</button>
+            </form>
+          </div>
+        {% endif %}
+      </div>
     </div>
     {# ── Launch overlay (active games) ────────────────────────── #}
     {% if not is_ended %}
       <div class="game-launch-overlay" id="game-launch-overlay">
         <div class="game-launch-inner">
           <div class="game-launch-format">{{ game.format or 'Commander' }} · {{ game.seats | length }} players</div>
-          <button type="button" class="game-launch-btn" onclick="dismissLaunch(true)">⛶ Go Fullscreen</button>
+          <button type="button" class="game-launch-btn" onclick="dismissLaunch(true)">⛶ Go fullscreen</button>
           <button type="button" class="game-launch-skip" onclick="dismissLaunch(false)">Continue without fullscreen</button>
         </div>
       </div>
     {% endif %}
-    {# ── Player grid — fixed 8-seat topology ───────────────────── #}
+    {# ── Player grid — fixed 8-seat topology (preserved verbatim) ── #}
     {# Positions: p1=top-left p2=top-ctr p3=top-right             #}
-    {#            p8=left-end    tc=ctr     p4=right-end           #}
+    {#            p8=left-end             p4=right-end             #}
     {#            p7=bot-left p6=bot-ctr p5=bot-right              #}
+    {# The center slot (.card-slot-center) is intentionally OMITTED here
+       — v3.28.13 migrates turn-indicator content to the masthead per Fork F.
+       buildDynamicGrid() defensively hides any cached old center slot. #}
     <div class="tracker-grid" id="tracker-grid">
       {% for seat in game.seats %}
         <div class="card-slot" id="slot-{{ seat.id }}">
@@ -74,7 +125,24 @@
                data-seat-id="{{ seat.id }}"
                data-rotate="0">
             <div class="tc-seat-badge" id="badge-{{ seat.id }}">—</div>
-            <div class="tc-header">
+            {# Two top corners — TL identity, TR counters / status / controls #}
+            <div class="tc-corner tc-corner-tl">
+              <div class="tc-identity">
+                <span class="tc-player-name">{{ seat.player_name }}</span>
+                {% set deck_display = seat.deck_name_at_game or (seat.deck.name if seat.deck else None) %}
+                {% set commander_display = seat.commander_name_at_game or '' %}
+                {% if commander_display or deck_display %}
+                  <span class="tc-identity-sep">·</span>
+                  <em class="tc-commander-name">{{ commander_display or deck_display }}</em>
+                {% endif %}
+              </div>
+              {% if not is_ended %}
+                <div class="tc-on-clock" title="Total time on clock this game">
+                  ⏱ <span id="timer-on-clock-{{ seat.id }}">0:00</span>
+                </div>
+              {% endif %}
+            </div>
+            <div class="tc-corner tc-corner-tr">
               {% if is_ended %}
                 {% if seat.placement %}
                   <span class="tc-placement placement-{{ seat.placement }}">
@@ -90,144 +158,153 @@
                   </span>
                 {% endif %}
               {% else %}
-                <button type="button"
-                        class="tc-elim-btn"
-                        onclick="toggleEliminate({{ seat.id }})"
-                        title="Eliminate / revive">☠</button>
-                {% if seat_commander_images.get(seat.id) %}
-                  <form action="/games/{{ game.id }}/seats/{{ seat.id }}/art-toggle"
-                        method="post"
-                        class="tc-art-toggle-form">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                    <button type="submit"
-                            class="tc-art-toggle-btn{% if seat.art_background_hidden %} tc-art-toggle-off{% endif %}"
-                            title="{% if seat.art_background_hidden %}Show commander art{% else %}Hide commander art{% endif %}">
-                      🖼
-                    </button>
-                  </form>
-                {% endif %}
-              {% endif %}
-            </div>
-            <div class="tc-life-section">
-              {% if not is_ended %}
-                <div class="tc-life-btn-col">
-                  <button type="button"
-                          class="tc-life-btn tc-life-plus"
-                          onclick="adjustLife({{ seat.id }}, 10)">+10</button>
-                  <button type="button"
-                          class="tc-life-btn tc-life-plus"
-                          onclick="adjustLife({{ seat.id }}, 5)">+5</button>
-                  <button type="button"
-                          class="tc-life-btn tc-life-plus"
-                          onclick="adjustLife({{ seat.id }}, 1)">+1</button>
+                <div class="tc-status-pills">
+                  <span class="tc-active-pill" id="active-pill-{{ seat.id }}">● Active</span>
+                  <span class="tc-elim-pill" id="elim-pill-{{ seat.id }}"></span>
                 </div>
-              {% endif %}
-              <div class="tc-life-center">
-                <div class="tc-names">
-                  <div class="tc-player">{{ seat.player_name }}</div>
-                  {# v3.27.0b-1 — snapshot-first deck name with live-deck fallback for legacy seats. #}
-                  {% set deck_display = seat.deck_name_at_game or (seat.deck.name if seat.deck else None) %}
-                  {% if deck_display %}<div class="tc-deck">{{ deck_display }}</div>{% endif %}
-                  {% if not is_ended %}
-                    <div class="tc-on-clock" title="Total time on clock this game">
-                      ⏱ <span id="timer-on-clock-{{ seat.id }}">0:00</span>
-                    </div>
+                <div class="tc-counter-pills" id="counter-pills-{{ seat.id }}"></div>
+                <div class="tc-corner-controls">
+                  <button type="button"
+                          class="tc-elim-btn"
+                          onclick="toggleEliminate({{ seat.id }})"
+                          title="Eliminate / revive">☠</button>
+                  {% if seat_commander_images.get(seat.id) %}
+                    <form action="/games/{{ game.id }}/seats/{{ seat.id }}/art-toggle"
+                          method="post"
+                          class="tc-art-toggle-form">
+                      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                      <button type="submit"
+                              class="tc-art-toggle-btn{% if seat.art_background_hidden %} tc-art-toggle-off{% endif %}"
+                              title="{% if seat.art_background_hidden %}Show commander art{% else %}Hide commander art{% endif %}">
+                        🖼
+                      </button>
+                    </form>
                   {% endif %}
-                </div>
-                <div class="tc-life" id="life-{{ seat.id }}">
-                  {{ seat.final_life if seat.final_life is not none else seat.starting_life }}
-                </div>
-                {% if is_ended %}
-                  {% if seat.final_life is not none %}<div class="tc-final-note">Final life: {{ seat.final_life }}</div>{% endif %}
-                {% else %}
-                  <div class="tc-cpill-row">
-                    <div class="tc-cpill tc-cpill-x">
-                      <select class="tc-extra-type"
-                              id="extra-type-{{ seat.id }}"
-                              onchange="setExtraCounterType({{ seat.id }}, this.value)">
-                        <option value="rad">☢ Rad</option>
-                        <option value="poison">☠ Poison</option>
-                        <option value="experience">✦ Experience</option>
-                        <option value="energy">⚡ Energy</option>
-                        <option value="storm">⛈ Storm</option>
-                        <option value="custom">● Custom…</option>
-                      </select>
-                      <button type="button"
-                              class="tc-cpill-btn"
-                              onclick="adjustExtraCounter({{ seat.id }}, -1)">−</button>
-                      <span class="tc-cpill-val" id="extra-{{ seat.id }}">0</span>
-                      <button type="button"
-                              class="tc-cpill-btn"
-                              onclick="adjustExtraCounter({{ seat.id }}, 1)">+</button>
-                    </div>
-                  </div>
-                {% endif %}
-              </div>
-              {% if not is_ended %}
-                <div class="tc-life-btn-col">
                   <button type="button"
-                          class="tc-life-btn tc-life-minus"
-                          onclick="adjustLife({{ seat.id }}, -1)">−1</button>
-                  <button type="button"
-                          class="tc-life-btn tc-life-minus"
-                          onclick="adjustLife({{ seat.id }}, -5)">−5</button>
-                  <button type="button"
-                          class="tc-life-btn tc-life-minus"
-                          onclick="adjustLife({{ seat.id }}, -10)">−10</button>
+                          class="tc-add-counter-btn"
+                          onclick="openAddCounterMenu({{ seat.id }})"
+                          title="Add counter">+ ctr</button>
                 </div>
               {% endif %}
             </div>
+            {# Mid zone — always-visible CMDR damage strip (Fork C/G).
+               Strip cells are read-only at-a-glance; click opens the global
+               DAMAGE MATRIX modal scoped to that receiver. #}
             {% if not is_ended and game.seats | length > 1 %}
-              <details class="tc-cmd-details">
-                <summary class="tc-cmd-summary">Commander Damage ▸</summary>
-                <div class="tc-cmd-grid">
+              <div class="tc-cmd-strip" id="cmd-strip-{{ seat.id }}">
+                <span class="tc-cmd-strip-label">Cmdr damage taken</span>
+                <span class="tc-cmd-strip-cells">
                   {% for other in game.seats if other.id != seat.id %}
-                    <div class="tc-cmd-row">
-                      <span class="tc-cmd-from">from {{ other.player_name }}</span>
-                      <button type="button"
-                              class="tc-ctr-btn"
-                              onclick="adjustCmd({{ seat.id }}, {{ other.id }}, -1)">−</button>
-                      <span class="tc-counter-val" id="cmd-{{ seat.id }}-{{ other.id }}">0</span>
-                      <button type="button"
-                              class="tc-ctr-btn"
-                              onclick="adjustCmd({{ seat.id }}, {{ other.id }}, 1)">+</button>
-                    </div>
+                    <button type="button"
+                            class="tc-cmd-cell"
+                            onclick="openDamageMatrix({{ seat.id }})"
+                            title="Damage from {{ other.player_name }} — opens matrix">
+                      <span class="tc-cmd-cell-from">{{ other.player_name[:3] }}</span>
+                      <span class="tc-cmd-cell-val" id="cmd-{{ seat.id }}-{{ other.id }}">0</span>
+                    </button>
                   {% endfor %}
+                </span>
+              </div>
+            {% endif %}
+            {# Two bottom corners — BL life numeral, BR button grid #}
+            <div class="tc-corner tc-corner-bl">
+              <div class="tc-life-block">
+                <span class="tc-life-label">Life</span>
+                <span class="tc-life" id="life-{{ seat.id }}">{{ seat.final_life if seat.final_life is not none else seat.starting_life }}</span>
+              </div>
+              {% if is_ended and seat.final_life is not none %}
+                <div class="tc-final-note">Final {{ seat.final_life }}</div>
+              {% endif %}
+            </div>
+            {% if not is_ended %}
+              <div class="tc-corner tc-corner-br">
+                {# 2 cols × 3 rows: + column on left, − column on right;
+                   rows paired by magnitude top-to-bottom: 1, 5, 10. #}
+                <div class="tc-life-pad">
+                  <button type="button"
+                          class="tc-life-btn tc-life-plus"
+                          onclick="adjustLife({{ seat.id }}, 1)"
+                          title="Add 1 life">+1</button>
+                  <button type="button"
+                          class="tc-life-btn tc-life-minus"
+                          onclick="adjustLife({{ seat.id }}, -1)"
+                          title="Subtract 1 life">−1</button>
+                  <button type="button"
+                          class="tc-life-btn tc-life-plus"
+                          onclick="adjustLife({{ seat.id }}, 5)"
+                          title="Add 5 life">+5</button>
+                  <button type="button"
+                          class="tc-life-btn tc-life-minus"
+                          onclick="adjustLife({{ seat.id }}, -5)"
+                          title="Subtract 5 life">−5</button>
+                  <button type="button"
+                          class="tc-life-btn tc-life-plus"
+                          onclick="adjustLife({{ seat.id }}, 10)"
+                          title="Add 10 life">+10</button>
+                  <button type="button"
+                          class="tc-life-btn tc-life-minus"
+                          onclick="adjustLife({{ seat.id }}, -10)"
+                          title="Subtract 10 life">−10</button>
                 </div>
-              </details>
+              </div>
             {% endif %}
           </div>
         </div>
       {% endfor %}
-      {# ── Center cell — turn indicator ──────────────────────── #}
-      <div class="card-slot card-slot-center" id="slot-center">
-        {% if not is_ended %}
-          <div class="turn-center" onclick="nextTurn()" title="Next turn">
-            <div class="turn-center-round">
-              TURN <span id="turn-counter">1</span>
-            </div>
-            <div class="turn-center-name" id="turn-center-name">—</div>
-            <div class="turn-center-timer">
-              <span class="turn-timer-label">⏱</span>
-              <span id="timer-current-turn">0:00</span>
-              <span class="turn-timer-sep">·</span>
-              <span class="turn-timer-game-label">Game</span>
-              <span id="timer-game-elapsed">0:00</span>
-            </div>
-            <button type="button" class="turn-next-btn">→ Next</button>
-          </div>
-        {% endif %}
-      </div>
     </div>
-    {# ── History bar ───────────────────────────────────────────── #}
+    {# ── Editorial bottom bar — § Chronicle (active games only) ── #}
     {% if not is_ended %}
-      <div class="game-histbar" id="game-histbar">
-        <span id="history-list" class="history-entries"></span>
+      <div class="game-bottombar" id="game-bottombar">
+        <div class="bottombar-chron">
+          <span class="bottombar-eyebrow">
+            <span class="mast-hairline" aria-hidden="true"></span>
+            <em>§ Chronicle</em>
+          </span>
+          <span class="bottombar-entries" id="chron-entries"></span>
+        </div>
+        <div class="bottombar-actions">
+          <button type="button"
+                  class="bottombar-btn"
+                  onclick="openDamageMatrix(null)">⚔ Damage matrix</button>
+          <button type="button"
+                  class="bottombar-btn bottombar-btn-primary"
+                  onclick="nextTurn()">End turn →</button>
+        </div>
+        <div class="bottombar-lastaction">
+          <span class="bottombar-lastaction-label">Last action</span>
+          <em class="bottombar-lastaction-text" id="bottombar-lastaction">—</em>
+        </div>
       </div>
-      {# ── End game modal ──────────────────────────────────────── #}
+      {# ── Floating add-counter menu ─────────────────────────────── #}
+      <div id="add-counter-menu" class="add-counter-menu" style="display:none">
+        <div class="add-counter-menu-title">Add counter</div>
+        <button type="button" class="add-counter-opt" data-type="rad">☢ Rad</button>
+        <button type="button" class="add-counter-opt" data-type="poison">☠ Poison</button>
+        <button type="button" class="add-counter-opt" data-type="experience">✦ Experience</button>
+        <button type="button" class="add-counter-opt" data-type="energy">⚡ Energy</button>
+        <button type="button" class="add-counter-opt" data-type="storm">⛈ Storm</button>
+        <button type="button" class="add-counter-opt" data-type="custom">● Custom…</button>
+      </div>
+      {# ── Damage matrix modal (Fork G) ──────────────────────────── #}
+      <div id="damage-matrix-modal" class="damage-matrix-modal" style="display:none">
+        <div class="damage-matrix-inner">
+          <div class="damage-matrix-head">
+            <span class="bottombar-eyebrow">
+              <span class="mast-hairline" aria-hidden="true"></span>
+              <em>§ Commander damage matrix</em>
+            </span>
+            <button type="button" class="damage-matrix-close" onclick="closeDamageMatrix()">×</button>
+          </div>
+          <div class="damage-matrix-grid" id="damage-matrix-grid"></div>
+          <div class="damage-matrix-foot">
+            <em>Rows = damage taken by · columns = dealt by</em>
+          </div>
+        </div>
+      </div>
+      {# ── End-game modal (preserved verbatim) ───────────────────── #}
       <div id="end-game-modal" class="end-game-modal" style="display:none">
         <div class="end-game-inner">
-          <h3 style="margin:0 0 1rem">Record Result</h3>
+          <h3 style="margin:0 0 1rem">Record result</h3>
           <form method="post" action="/games/{{ game.id }}/end">
             <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
             <div class="stack-form">
@@ -257,7 +334,7 @@
                          style="width:100px">
                 </div>
               {% endfor %}
-              <label>Turns Played</label>
+              <label>Turns played</label>
               <input type="number"
                      name="turn_count"
                      id="submit-turns"
@@ -272,23 +349,35 @@
                         placeholder="How did it go?"></textarea>
             </div>
             <div style="margin-top:1rem;display:flex;gap:0.5rem">
-              <button type="submit">Save Result</button>
+              <button type="submit">Save result</button>
               <button type="button" onclick="toggleEndGame()">Cancel</button>
             </div>
           </form>
         </div>
       </div>
+      {# Delete control — discreet floating button bottom-right #}
+      <form method="post"
+            action="/games/{{ game.id }}/delete"
+            id="game-delete-form"
+            style="position:fixed;
+                   bottom:0.5rem;
+                   right:0.5rem;
+                   z-index:601">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <button type="submit"
+                class="mast-btn mast-btn-delete-discrete"
+                onclick="return confirm('Delete this game record?')">Delete game</button>
+      </form>
     {% endif %}
   </div>
 {% endblock %}
 {% block extra_scripts %}
   <script>
-// ── Fixed 8-seat topology ─────────────────────────────────────
+// ── Fixed 8-seat topology (preserved verbatim) ────────────────
 // Grid:  p1  p2  p3
-//        p8  tc  p4
+//        p8  __  p4
 //        p7  p6  p5
-// Clockwise order: p1→p2→p3→p4→p5→p6→p7→p8→p1
-// Seat-to-position mapping per player count (design spec):
+// Clockwise: p1→p2→p3→p4→p5→p6→p7→p8→p1
 const SEAT_POSITIONS = {
   2: ['p2', 'p6'],
   3: ['p2', 'p4', 'p6'],
@@ -305,7 +394,6 @@ const POSITION_ROTATE = {
   p7: 0, p6: 0, p5: 0,
 };
 const CLOCKWISE = ['p1', 'p2', 'p3', 'p4', 'p5', 'p6', 'p7', 'p8'];
-const ALL_POSITIONS = ['p1', 'p2', 'p3', 'p8', 'p4', 'p7', 'p6', 'p5'];
 
 const SEAT_COLORS = ['#3b82f6','#ef4444','#22c55e','#f59e0b','#8b5cf6','#ec4899','#06b6d4','#f97316'];
 const gameId = {{ game.id }};
@@ -319,24 +407,13 @@ const seatDefs = [
     otherIds: [{% for o in game.seats if o.id != seat.id %}{{ o.id }}{% if not loop.last %},{% endif %}{% endfor %}] },
   {% endfor %}
 ];
-// v3.27.0 — collision-proof localStorage key. SQLite reuses ``games.id``
-// rowids after a game is deleted, so the bare ``mana-game-${gameId}`` key
-// can collide with a recycled id and resurface a deleted game's saved
-// state (the bug fix). The ``clientToken`` is a per-game URL-safe random
-// string the server generates once at game creation and never regenerates;
-// pairing it with the rowid makes the composite key unique across the
-// table's lifetime even with rowid reuse. NULL clientToken means a legacy
-// game predating this fix — fall back to the OLD bare key so existing
-// in-progress trackers keep their saved state and are NOT wiped. New games
-// always have a token (see ``game_create`` in main.py). Mirrors the NULL-
-// fallback approach v3.25.1 used for ``first_seat_number``.
+// v3.27.0 — collision-proof localStorage key (preserved).
 const clientToken = {{ game.client_token | tojson }};
 const storageKey = clientToken
   ? `mana-game-${gameId}-${clientToken}`
   : `mana-game-${gameId}`;
 
 // ── Assign physical positions ──────────────────────────────────
-// Use stored positions if all seats have them; otherwise auto-map by count.
 const allStored = seatDefs.every(s => s.storedPosition);
 const positions = allStored
   ? seatDefs.map(s => s.storedPosition)
@@ -346,12 +423,9 @@ seatDefs.forEach((s, i) => {
   s.rotate = POSITION_ROTATE[positions[i]] ?? 0;
   s.turnOrder = CLOCKWISE.indexOf(positions[i]);
 });
-// Seats sorted in clockwise order (for turn sequencing and badges)
 const clockwiseSeats = seatDefs.slice().sort((a, b) => a.turnOrder - b.turnOrder);
 
-// v3.25.1 — explicit first player (GameSeat.seat_number). Falls back to the
-// pre-v3.25.1 default (lowest clockwise seat) when unset or unmatched, so
-// existing games and any game without a pick behave exactly as before.
+// v3.25.1 — explicit first player (preserved).
 const firstSeatNumber = {{ game.first_seat_number | tojson }};
 const firstSeatId =
   (firstSeatNumber != null
@@ -359,7 +433,6 @@ const firstSeatId =
     : null)
   ?? clockwiseSeats[0]?.id ?? seatDefs[0]?.id;
 
-// Logical row and column rank for each position in the 3×3 topology
 const ROW_OF = { p1: 0, p2: 0, p3: 0, p8: 1, p4: 1, p7: 2, p6: 2, p5: 2 };
 const COL_RANK = { p1: 0, p2: 1, p3: 2, p8: 0, p4: 2, p7: 0, p6: 1, p5: 2 };
 
@@ -375,38 +448,29 @@ const portraitMQ = window.matchMedia('(orientation: portrait)');
 function isPortrait() { return portraitMQ.matches; }
 
 function buildDynamicGrid() {
-  // Group seats by logical row, sorted by column rank within each row
   const rowSeats = [[], [], []];
   seatDefs.forEach(s => rowSeats[ROW_OF[s.position]].push(s));
   rowSeats.forEach(row => row.sort((a, b) => COL_RANK[a.position] - COL_RANK[b.position]));
 
   const p4Seat = rowSeats[1].find(s => s.position === 'p4');
   const p8Seat = rowSeats[1].find(s => s.position === 'p8');
-  // Side players are ALWAYS tall narrow strips spanning the full grid height
-  // (top to bottom of viewport) when present — top/bottom row players coexist
-  // with them in the inner column range.
   const tallP4 = !!p4Seat;
   const tallP8 = !!p8Seat;
 
-  // TC is a floating overlay; middle row is never used for cells now that
-  // sides are always tall.
   const activeRows = [];
   if (rowSeats[0].length) activeRows.push(0);
   if (rowSeats[2].length) activeRows.push(2);
-  if (!activeRows.length) activeRows.push(0);  // safety: always at least one row
+  if (!activeRows.length) activeRows.push(0);
   const rowToGrid = {};
   activeRows.forEach((r, i) => { rowToGrid[r] = i + 1; });
 
   const gridEl = document.getElementById('tracker-grid');
   gridEl.style.gridTemplateAreas = 'none';
   gridEl.style.gridTemplateRows = activeRows.map(() => '1fr').join(' ');
-  // 36-col grid: sides take 9 cols (25%) so the side player visually "covers"
-  // the right/left of the table; inner 27 cols still divides 3-ways cleanly.
   gridEl.style.gridTemplateColumns = 'repeat(36, 1fr)';
   gridEl.style.gridAutoRows = '';
   gridEl.style.gridAutoFlow = '';
 
-  // Tall sides take 9 of 36 cols (25%) — substantial vertical strips
   const leftBound = tallP8 ? 10 : 1;
   const rightBound = tallP4 ? 28 : 37;
   const innerCols = rightBound - leftBound;
@@ -422,7 +486,6 @@ function buildDynamicGrid() {
     if (card) card.dataset.rotate = String(seat.rotate);
   };
 
-  // Top (row 0) and bottom (row 2): distribute across innerCols
   [0, 2].forEach(logRow => {
     const seats = rowSeats[logRow];
     if (!seats.length) return;
@@ -433,25 +496,15 @@ function buildDynamicGrid() {
     });
   });
 
-  // Side players span all active rows as narrow vertical strips
   const totalRows = activeRows.length;
   if (tallP4) writeSlot(p4Seat, `1 / ${totalRows + 1}`, rightBound, 37);
   if (tallP8) writeSlot(p8Seat, `1 / ${totalRows + 1}`, 1, leftBound);
 
-  // TC is no longer a grid cell — it's a floating center overlay (see CSS).
-  // Clear any leftover inline grid placement / display from earlier states.
+  // v3.28.13 — defensive: legacy center slot if a stale cached template
+  // still renders one. The redesigned template intentionally omits it.
   const tcSlot = document.getElementById('slot-center');
-  if (tcSlot) {
-    tcSlot.style.display = '';
-    tcSlot.style.gridArea = '';
-    tcSlot.style.gridRow = '';
-    tcSlot.style.gridColumn = '';
-  }
+  if (tcSlot) tcSlot.style.display = 'none';
 
-  // Force a synchronous reflow before sizing rotated cards so slot dimensions
-  // are stable. Reading offsetHeight on the grid forces layout flush. Then run
-  // sizeRotatedCards twice — once now (layout is fresh) and once on next RAF
-  // (catches any post-paint adjustments like fullscreen transitions).
   void gridEl.offsetHeight;
   sizeRotatedCards();
   requestAnimationFrame(sizeRotatedCards);
@@ -476,9 +529,6 @@ function applyLayout() {
       slotEl.style.order = String(clockwiseSeats.findIndex(cs => cs.id === s.id));
       card.dataset.rotate = '0';
     });
-
-    const tcSlot = document.getElementById('slot-center');
-    if (tcSlot) tcSlot.style.display = 'none';
 
     requestAnimationFrame(sizeRotatedCards);
   } else {
@@ -535,50 +585,51 @@ portraitMQ.addEventListener('change', () => { applyLayout(); });
 
 {% if not is_ended %}
 // ── State ─────────────────────────────────────────────────────
-// v3.26.5 — extraCounter replaces the v3.x fixed poison/exp slots.
-// Per-seat shape: { type: 'rad'|'poison'|'experience'|'energy'|'storm'|
-//   'custom', value: number, customLabel?: string }.
-// Lossy type-switch by design (the spec calls for a single typed counter,
-// not per-type retention).
-// Blood / Monarch / Ticket deliberately excluded — Blood is a token, not a
-// counter; Monarch is a game-state toggle better tracked elsewhere; Ticket
-// is too format-specific. Add via Custom… if needed.
+// v3.28.13 — multi-counter shape. state.extraCounters[seatId] is an array of
+// { type, value, customLabel? }. A seat may hold multiple simultaneous typed
+// counters (e.g. Poison + Experience). Empty array = no counters.
+// Per-counter shape is byte-identical to v3.26.5's singular extraCounter.
+//
+// Two-step load-time hoist preserves both prior shapes losslessly:
+//   1. v3.26.5 singular state.extraCounter → wrap in array (or empty if 0).
+//   2. pre-v3.26.5 state.poison + state.exp → multi-counter array (both can land).
+//
+// gameFingerprint() is NOT bumped — v3.25.1/26.5/26.7/27.0 additive-field
+// pattern. 35th-or-more successive release respecting the invariant.
 const EXTRA_TYPES = ['rad','poison','experience','energy','storm','custom'];
 const EXTRA_SYMBOLS = {
   rad:'☢', poison:'☠', experience:'✦', energy:'⚡', storm:'⛈', custom:'●'
 };
+const EXTRA_LABELS = {
+  rad:'Rad', poison:'Poison', experience:'Exp',
+  energy:'Energy', storm:'Storm', custom:'Custom'
+};
 
 function freshState() {
-  const lives = {}, eliminated = {}, cmd = {}, extraCounter = {};
+  const lives = {}, eliminated = {}, eliminatedAtTurn = {}, cmd = {}, extraCounters = {};
   seatDefs.forEach(s => {
     lives[s.id] = s.startingLife;
     eliminated[s.id] = false;
+    eliminatedAtTurn[s.id] = null;
     cmd[s.id] = {};
     s.otherIds.forEach(oid => { cmd[s.id][oid] = 0; });
-    extraCounter[s.id] = { type: 'poison', value: 0 };
+    extraCounters[s.id] = [];
   });
-  // poison/exp kept as empty objects (not iterated) so a stale browser tab
-  // running pre-v3.26.5 code that reads state.poison[seatId] sees undefined
-  // (falls back to 0 via `|| 0`) instead of crashing on undefined.poison.
-  // v3.26.7 — turnEvents seeded with the first-seat anchor so game-length and
-  // current-turn-elapsed are defined from the moment the page renders. Each
-  // event marks the START of that seat's turn; subsequent events come from
-  // nextTurn(). Per-turn durations are derived at render time, never stored.
-  return { _fp: gameFingerprint(), lives, poison: {}, exp: {}, eliminated, cmd,
-           extraCounter, history: [],
+  // poison/exp/extraCounter kept as empty objects so a stale tab running
+  // pre-v3.28.13 code reading state.extraCounter[seatId] sees undefined
+  // (→ no crash). Same cross-version-safety idiom v3.26.5 established.
+  return { _fp: gameFingerprint(), lives, poison: {}, exp: {}, extraCounter: {},
+           eliminated, eliminatedAtTurn, cmd, extraCounters,
+           paused: false, pauseStartedTs: null, cumulativePausedMs: 0,
+           history: [],
            turnEvents: [{ ts: Date.now(), seatId: firstSeatId }],
            turn: 1, currentTurnId: firstSeatId };
 }
 
-// v3.25.1 deliberately did not bump this fingerprint, and v3.26.5 doesn't
-// either. extraCounter is an additive optional field; on load we hoist
-// any legacy state.poison/state.exp values into it (see the try block
-// below), so old saved games adopt the new shape without a wipe.
-// Bumping for a feature add would be the exact mistake v3.25.1 warned
-// against. v3.27.0 also deliberately does not bump: the clientToken is
-// a localStorage KEY namespace (lookup-only), NOT part of the saved-state
-// blob — state shape and semantics are unchanged, so bumping would mid-
-// game-wipe live trackers for zero benefit.
+// gameFingerprint() — DO NOT BUMP. v3.28.13 widening adds optional state
+// fields with load-time hoisting; the saved-state SHAPE expanded but is
+// fully backward-compatible. Bumping would mid-game-wipe every live tracker
+// — the exact mistake v3.25.1 warned against.
 function gameFingerprint() {
   return seatDefs.map(s => `${s.id}:${s.startingLife}:${s.name}`).join('|');
 }
@@ -589,34 +640,61 @@ try {
   const loaded = raw ? JSON.parse(raw) : null;
   state = (loaded && loaded._fp === gameFingerprint()) ? loaded : freshState();
   if (state.currentTurnId === undefined) state.currentTurnId = firstSeatId;
-  // Hoist legacy state.poison / state.exp into the new extraCounter shape.
-  // First non-zero wins; if both zero, default to {type:'poison', value:0}.
-  if (state.extraCounter === undefined) {
-    state.extraCounter = {};
+  // v3.28.13 — two-step counter hoist.
+  if (state.extraCounters === undefined) {
+    state.extraCounters = {};
     seatDefs.forEach(s => {
-      const p = (state.poison && state.poison[s.id]) || 0;
-      const e = (state.exp && state.exp[s.id]) || 0;
-      if (p > 0) state.extraCounter[s.id] = { type: 'poison', value: p };
-      else if (e > 0) state.extraCounter[s.id] = { type: 'energy', value: e };
-      else state.extraCounter[s.id] = { type: 'poison', value: 0 };
-    });
-  } else {
-    // Defensive: a saved state may carry a type that's no longer in
-    // EXTRA_TYPES (e.g. v3.26.5 dev iterations briefly included monarch /
-    // ticket / blood). Coerce unknown types back to 'poison' with the
-    // value preserved — better than rendering a blank dropdown.
-    seatDefs.forEach(s => {
-      const ec = state.extraCounter[s.id];
-      if (!ec || !EXTRA_TYPES.includes(ec.type)) {
-        state.extraCounter[s.id] = { type: 'poison', value: (ec && ec.value) || 0 };
+      // Branch 1 — v3.26.5 singular extraCounter present.
+      if (state.extraCounter && state.extraCounter[s.id]) {
+        const ec = state.extraCounter[s.id];
+        const validType = EXTRA_TYPES.includes(ec.type) ? ec.type : 'poison';
+        if ((ec.value || 0) > 0) {
+          const entry = { type: validType, value: ec.value };
+          if (ec.customLabel) entry.customLabel = ec.customLabel;
+          state.extraCounters[s.id] = [entry];
+        } else {
+          state.extraCounters[s.id] = [];
+        }
+      } else {
+        // Branch 2 — pre-v3.26.5 fixed poison/exp slots. Both may be
+        // non-zero — that's the concurrent-counter case v3.26.5 collapsed.
+        const arr = [];
+        const p = (state.poison && state.poison[s.id]) || 0;
+        const e = (state.exp && state.exp[s.id]) || 0;
+        if (p > 0) arr.push({ type: 'poison', value: p });
+        if (e > 0) arr.push({ type: 'energy', value: e });
+        state.extraCounters[s.id] = arr;
       }
     });
+  } else {
+    // Defensive: validate types on the loaded array, coercing unknowns
+    // back to 'poison' with value preserved.
+    seatDefs.forEach(s => {
+      const arr = state.extraCounters[s.id];
+      if (!Array.isArray(arr)) { state.extraCounters[s.id] = []; return; }
+      state.extraCounters[s.id] = arr.map(ec => {
+        if (!ec || typeof ec !== 'object') return null;
+        const t = EXTRA_TYPES.includes(ec.type) ? ec.type : 'poison';
+        const v = Math.max(0, Number(ec.value) || 0);
+        const out = { type: t, value: v };
+        if (ec.customLabel) out.customLabel = ec.customLabel;
+        return out;
+      }).filter(Boolean);
+    });
   }
-  // v3.26.7 — turnEvents is an additive optional field; pre-v3.26.7 saved
-  // state has no events. Synthesize a single "current turn starts now"
-  // anchor so the timer is well-defined from this render forward. The
-  // game-length tally restarts from this point — the real prior duration
-  // is lost (it was never tracked), and back-dating would be a fabrication.
+  // v3.28.13 — elimination turn-stamp; default missing entries to null so
+  // legacy eliminated seats render the pill (without the turn suffix).
+  if (state.eliminatedAtTurn === undefined) state.eliminatedAtTurn = {};
+  seatDefs.forEach(s => {
+    if (state.eliminatedAtTurn[s.id] === undefined) {
+      state.eliminatedAtTurn[s.id] = null;
+    }
+  });
+  // v3.28.13 — pause defaults.
+  if (state.paused === undefined) state.paused = false;
+  if (state.pauseStartedTs === undefined) state.pauseStartedTs = null;
+  if (state.cumulativePausedMs === undefined) state.cumulativePausedMs = 0;
+  // v3.26.7 — turnEvents anchor (preserved).
   if (state.turnEvents === undefined) {
     state.turnEvents = [{ ts: Date.now(), seatId: state.currentTurnId }];
   }
@@ -624,29 +702,35 @@ try {
 
 function save() { localStorage.setItem(storageKey, JSON.stringify(state)); }
 function pushHistory(entry) {
+  if (entry.ts === undefined) entry.ts = Date.now();
   state.history.push(entry);
   if (state.history.length > 60) state.history.shift();
 }
 
+// ── Counter helpers (v3.28.13) ─────────────────────────────────
+function getCounters(seatId) {
+  return state.extraCounters[seatId] || (state.extraCounters[seatId] = []);
+}
+
 // ── Actions ───────────────────────────────────────────────────
-// MTG loss conditions: 0 life, 10 poison counters, or 21 cmd damage from a
-// single commander. Once any threshold is crossed the seat is auto-eliminated;
-// it stays eliminated even if the value moves back below the threshold (per
-// MTG rules — dead is dead). Manual toggleEliminate still works for revive.
+// MTG loss conditions: 0 life, 10 poison counters, or 21 cmd damage from
+// any single commander. Once any threshold is crossed the seat is
+// auto-eliminated; it stays eliminated even if values recover (per MTG
+// rules). Manual toggleEliminate still works for revive.
+// v3.28.13 — scans the multi-counter array for a poison ≥10 (was: inspected
+// the singular extraCounter's value when type === 'poison').
 function checkElimination(seatId) {
   if (state.eliminated[seatId]) return;
   const life = state.lives[seatId];
-  // Auto-elim on 10 poison counters fires only when Poison is the actively
-  // tracked counter for that seat. Switching to a different counter type
-  // resets the value to 0 — same lossy-switch tradeoff documented at
-  // setExtraCounterType.
-  const ec = state.extraCounter[seatId] || { type: 'poison', value: 0 };
-  const poison = (ec.type === 'poison') ? (ec.value || 0) : 0;
+  const counters = getCounters(seatId);
+  const poisonCounter = counters.find(c => c.type === 'poison');
+  const poison = poisonCounter ? (poisonCounter.value || 0) : 0;
   const cmdMap = state.cmd[seatId] || {};
   const cmdValues = Object.values(cmdMap);
   const maxCmd = cmdValues.length ? Math.max(...cmdValues) : 0;
   if ((life !== undefined && life <= 0) || poison >= 10 || maxCmd >= 21) {
     state.eliminated[seatId] = true;
+    state.eliminatedAtTurn[seatId] = state.turn || 1;
   }
 }
 
@@ -656,44 +740,49 @@ function adjustLife(seatId, delta) {
   checkElimination(seatId);
   save(); render();
 }
-function adjustExtraCounter(seatId, delta) {
-  const ec = state.extraCounter[seatId] || { type: 'poison', value: 0 };
+
+function addCounter(seatId, type, customLabel) {
+  if (!EXTRA_TYPES.includes(type)) return;
+  const counters = getCounters(seatId);
+  // De-dup non-custom: bump existing if same type already there. Custom
+  // counters can stack (different labels = different concerns).
+  if (type !== 'custom') {
+    const existing = counters.find(c => c.type === type);
+    if (existing) {
+      adjustCounter(seatId, counters.indexOf(existing), 1);
+      return;
+    }
+  }
+  const entry = { type, value: 0 };
+  if (type === 'custom' && customLabel) entry.customLabel = customLabel;
+  counters.push(entry);
+  pushHistory({ type: 'addCounter', seatId, counterType: type,
+                ...(customLabel ? { customLabel } : {}) });
+  save(); render();
+}
+
+function adjustCounter(seatId, counterIdx, delta) {
+  const counters = getCounters(seatId);
+  const ec = counters[counterIdx];
+  if (!ec) return;
   const newValue = Math.max(0, (ec.value || 0) + delta);
-  // Preserve the actual delta after the Math.max clamp — undo replays it
-  // verbatim, so clamping at + here means the negative undo of an already-
-  // clamped-at-zero increment becomes a no-op rather than going negative.
   const actualDelta = newValue - (ec.value || 0);
-  state.extraCounter[seatId] = { ...ec, value: newValue };
-  pushHistory({ type: 'extra', seatId, delta: actualDelta, counterType: ec.type });
+  ec.value = newValue;
+  pushHistory({ type: 'extra', seatId, counterIdx,
+                counterType: ec.type, delta: actualDelta });
   checkElimination(seatId);
   save(); render();
 }
 
-// Lossy type-switch by design (the v3.26.5 spec calls for a single typed
-// counter, not per-type retention). Switching from Poison-at-8 to Energy
-// drops the 8; the prior value is recoverable only via the history-undo
-// stack (the 'extraType' entry stores the full prev state).
-function setExtraCounterType(seatId, newType) {
-  const prev = state.extraCounter[seatId] || { type: 'poison', value: 0 };
-  if (newType === 'custom') {
-    const raw = prompt('Counter name:', prev.type === 'custom' ? (prev.customLabel || '') : '');
-    if (raw === null) {
-      // User cancelled — restore the select's displayed value to the prior type
-      // so the UI doesn't lie about what's tracked.
-      const sel = document.getElementById(`extra-type-${seatId}`);
-      if (sel) sel.value = prev.type;
-      return;
-    }
-    const label = raw.trim() || 'Custom';
-    state.extraCounter[seatId] = { type: 'custom', value: 0, customLabel: label };
-  } else if (EXTRA_TYPES.includes(newType)) {
-    state.extraCounter[seatId] = { type: newType, value: 0 };
-  } else {
-    return;
-  }
-  pushHistory({ type: 'extraType', seatId, prev, next: state.extraCounter[seatId] });
+function removeCounter(seatId, counterIdx) {
+  const counters = getCounters(seatId);
+  const prev = counters[counterIdx];
+  if (!prev) return;
+  counters.splice(counterIdx, 1);
+  pushHistory({ type: 'removeCounter', seatId, counterIdx, prev });
   save(); render();
 }
+
 function adjustCmd(receiverId, senderId, delta) {
   if (!state.cmd[receiverId]) state.cmd[receiverId] = {};
   const prev = state.cmd[receiverId][senderId] || 0;
@@ -704,10 +793,14 @@ function adjustCmd(receiverId, senderId, delta) {
   checkElimination(receiverId);
   save(); render();
 }
+
 function toggleEliminate(seatId) {
-  state.eliminated[seatId] = !state.eliminated[seatId];
+  const becoming = !state.eliminated[seatId];
+  state.eliminated[seatId] = becoming;
+  state.eliminatedAtTurn[seatId] = becoming ? (state.turn || 1) : null;
   save(); render();
 }
+
 function nextTurn() {
   const alive = clockwiseSeats.filter(s => !state.eliminated[s.id]);
   if (!alive.length) return;
@@ -717,42 +810,73 @@ function nextTurn() {
   if (nextIdx === 0) state.turn = (state.turn || 1) + 1;
   state.currentTurnId = alive[nextIdx].id;
   pushHistory({ type: 'nextTurn', seatId: state.currentTurnId, prevTurnId, delta: 0 });
-  // v3.26.7 — record turn-transition event AFTER currentTurnId is updated, so
-  // the event's seatId is the seat whose turn is starting. Undo pops this
-  // entry (see undoLast).
   (state.turnEvents = state.turnEvents || []).push({
     ts: Date.now(), seatId: state.currentTurnId,
   });
   save(); render();
 }
+
+// v3.28.13 — client-only pause (Fork D). cumulativePausedMs is subtracted
+// from displayed elapsed via turnDurations(). Server is never told a
+// tracker is paused — pause is a within-session affordance, not a
+// game-record fact.
+function togglePause() {
+  const now = Date.now();
+  if (state.paused) {
+    const startedTs = state.pauseStartedTs || now;
+    state.cumulativePausedMs = (state.cumulativePausedMs || 0) + (now - startedTs);
+    state.paused = false;
+    state.pauseStartedTs = null;
+  } else {
+    state.paused = true;
+    state.pauseStartedTs = now;
+  }
+  save(); render();
+}
+
 function undoLast() {
   if (!state.history.length) return;
   const last = state.history.pop();
   if (last.type === 'life') {
     state.lives[last.seatId] -= last.delta;
   } else if (last.type === 'extra') {
-    const ec = state.extraCounter[last.seatId] || { type: 'poison', value: 0 };
-    state.extraCounter[last.seatId] = {
-      ...ec,
-      value: Math.max(0, (ec.value || 0) - last.delta),
-    };
+    // v3.28.13 — prefer counterIdx; fall back to first-matching counterType
+    // for legacy entries written before the multi-counter widening.
+    const counters = getCounters(last.seatId);
+    let idx = last.counterIdx;
+    if (idx === undefined && last.counterType !== undefined) {
+      idx = counters.findIndex(c => c.type === last.counterType);
+    }
+    const ec = counters[idx];
+    if (ec) {
+      ec.value = Math.max(0, (ec.value || 0) - last.delta);
+    }
+  } else if (last.type === 'addCounter') {
+    // Pop the most recent counter of that type (de-dup makes this safe;
+    // custom counters stack so popping the last is correct ordering).
+    const counters = getCounters(last.seatId);
+    for (let i = counters.length - 1; i >= 0; i--) {
+      if (counters[i].type === last.counterType) {
+        counters.splice(i, 1);
+        break;
+      }
+    }
+  } else if (last.type === 'removeCounter') {
+    // Restore the spliced counter at its original index (bounded).
+    const counters = getCounters(last.seatId);
+    const idx = Math.min(last.counterIdx || 0, counters.length);
+    counters.splice(idx, 0, last.prev);
   } else if (last.type === 'extraType') {
-    // Whole-state restore — handles the lossy-switch case correctly because
-    // the prev entry captured the full counter object (type, value, label).
-    state.extraCounter[last.seatId] = last.prev;
-  } else if (last.type === 'poison') {
-    // Legacy history entries from pre-v3.26.5 saved state. Replay the inverse
-    // into extraCounter when Poison is the active counter; otherwise no-op
-    // (the old counter is no longer surfaced anywhere). Same for 'exp'.
-    const ec = state.extraCounter[last.seatId];
-    if (ec && ec.type === 'poison') {
-      state.extraCounter[last.seatId] = { ...ec, value: Math.max(0, (ec.value || 0) - last.delta) };
-    }
-  } else if (last.type === 'exp') {
-    const ec = state.extraCounter[last.seatId];
-    if (ec && ec.type === 'energy') {
-      state.extraCounter[last.seatId] = { ...ec, value: Math.max(0, (ec.value || 0) - last.delta) };
-    }
+    // Legacy v3.26.5 type-switch entry. The multi-counter model has no
+    // type-switch operation — replay is a no-op (the prior counter state
+    // was already restored if this entry preceded an 'extra' undo).
+  } else if (last.type === 'poison' || last.type === 'exp') {
+    // Legacy pre-v3.26.5 entries. Replay inverse into the matching-type
+    // counter if one exists in the new array; otherwise no-op.
+    const targetType = last.type === 'poison' ? 'poison' : 'energy';
+    const counters = getCounters(last.seatId);
+    const ec = counters.find(c => c.type === targetType);
+    if (ec) ec.value = Math.max(0, (ec.value || 0) - last.delta);
   } else if (last.type === 'cmd') {
     state.cmd[last.seatId][last.senderId] = Math.max(0,
       (state.cmd[last.seatId][last.senderId] || 0) - last.delta);
@@ -761,11 +885,6 @@ function undoLast() {
     const nextIdx = clockwiseSeats.findIndex(s => s.id === last.seatId);
     if (nextIdx === 0) state.turn = Math.max(1, (state.turn || 1) - 1);
     state.currentTurnId = last.prevTurnId;
-    // v3.26.7 — drop the turnEvents entry pushed by nextTurn(). Guarded against
-    // empty/missing array because pre-v3.26.7 history entries from a session
-    // that loaded before turnEvents existed could in theory still be in the
-    // history buffer; in that case there's nothing to pop and we leave the
-    // (synthetic-anchored) events alone.
     if (state.turnEvents && state.turnEvents.length > 1) {
       state.turnEvents.pop();
     }
@@ -788,7 +907,7 @@ function toggleEndGame() {
   }
 }
 
-// ── Auto-win ──────────────────────────────────────────────────
+// ── Auto-win (preserved) ───────────────────────────────────────
 let autoWinTriggered = false;
 function checkWinCondition() {
   if (autoWinTriggered || seatDefs.length < 2) return;
@@ -805,11 +924,14 @@ function checkWinCondition() {
   toggleEndGame();
 }
 
-// ── Turn timing (v3.26.7) ─────────────────────────────────────
-// Durations are a derived view of state.turnEvents — never stored. Same data
-// yields game length, current-turn elapsed, and per-player time-on-clock.
-// This shape ports forward to the v4 event-sourced tracker for near-zero
-// migration cost.
+// ── Turn timing (v3.26.7, extended for v3.28.13 pause) ─────────
+function pausedOffsetMs() {
+  let off = state.cumulativePausedMs || 0;
+  if (state.paused && state.pauseStartedTs) {
+    off += Date.now() - state.pauseStartedTs;
+  }
+  return off;
+}
 function turnDurations() {
   const events = state.turnEvents || [];
   const now = Date.now();
@@ -822,9 +944,12 @@ function turnDurations() {
     const endTs = i < events.length - 1 ? events[i + 1].ts : now;
     perSeat[events[i].seatId] = (perSeat[events[i].seatId] || 0) + (endTs - startTs);
   }
+  // Subtract paused time from displayed elapsed values. Per-seat clock
+  // remains additive — pause is a tracker affordance, not a turn-timing fact.
+  const off = pausedOffsetMs();
   return {
-    gameElapsed: now - events[0].ts,
-    currentTurnElapsed: now - events[events.length - 1].ts,
+    gameElapsed: Math.max(0, (now - events[0].ts) - off),
+    currentTurnElapsed: Math.max(0, (now - events[events.length - 1].ts) - off),
     perSeat,
   };
 }
@@ -837,6 +962,167 @@ function fmtDuration(ms) {
     ? `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
     : `${m}:${s.toString().padStart(2, '0')}`;
 }
+function fmtClock(ts) {
+  const d = new Date(ts);
+  const h = d.getHours().toString().padStart(2, '0');
+  const m = d.getMinutes().toString().padStart(2, '0');
+  const s = d.getSeconds().toString().padStart(2, '0');
+  return `${h}:${m}:${s}`;
+}
+
+// ── History entry → human prose (Chronicle + LAST ACTION) ──────
+function describeHistory(h) {
+  const name = seatDefs.find(s => s.id === h.seatId)?.name ?? '?';
+  if (h.type === 'nextTurn') return `${name} begins turn`;
+  const sign = h.delta > 0 ? '+' : '';
+  if (h.type === 'cmd') {
+    const from = seatDefs.find(s => s.id === h.senderId)?.name ?? '?';
+    return `${name} CMD(${from}) ${sign}${h.delta}`;
+  }
+  if (h.type === 'extra') {
+    const sym = EXTRA_SYMBOLS[h.counterType] || '●';
+    return `${name} ${sym}${sign}${h.delta}`;
+  }
+  if (h.type === 'addCounter') {
+    const sym = EXTRA_SYMBOLS[h.counterType] || '●';
+    return `${name} +${sym}`;
+  }
+  if (h.type === 'removeCounter') {
+    const sym = EXTRA_SYMBOLS[h.prev?.type] || '●';
+    return `${name} −${sym}`;
+  }
+  if (h.type === 'extraType') {
+    const sym = EXTRA_SYMBOLS[h.next?.type] || '●';
+    return `${name} →${sym}`;
+  }
+  if (h.type === 'life') {
+    const lifeAfter = state.lives[h.seatId];
+    return lifeAfter !== undefined
+      ? `${name} ${sign}${h.delta} life · ${lifeAfter}`
+      : `${name} ${sign}${h.delta} life`;
+  }
+  const label = h.type === 'poison' ? '☠' : h.type === 'exp' ? '⚡' : '♥';
+  return `${name} ${label}${sign}${h.delta}`;
+}
+
+// ── Counter pills render ──────────────────────────────────────
+function renderCounterPills(seatId) {
+  const host = document.getElementById(`counter-pills-${seatId}`);
+  if (!host) return;
+  const counters = getCounters(seatId);
+  host.innerHTML = counters.map((c, idx) => {
+    const sym = EXTRA_SYMBOLS[c.type] || '●';
+    const labelBase = c.type === 'custom'
+      ? (c.customLabel || 'Custom')
+      : EXTRA_LABELS[c.type];
+    const showAsPoison = c.type === 'poison';
+    const dangerCls = showAsPoison && c.value >= 10 ? ' tc-counter-danger'
+                    : showAsPoison && c.value >= 7 ? ' tc-counter-warn'
+                    : '';
+    const valDisp = showAsPoison ? `${c.value}/10` : `${c.value}`;
+    return `
+      <div class="tc-cpill tc-cpill-${c.type}" data-counter-idx="${idx}">
+        <span class="tc-cpill-icon">${sym}</span>
+        <span class="tc-cpill-label">${labelBase}</span>
+        <button type="button" class="tc-cpill-btn" onclick="adjustCounter(${seatId}, ${idx}, -1)" title="−1">−</button>
+        <span class="tc-cpill-val${dangerCls}">${valDisp}</span>
+        <button type="button" class="tc-cpill-btn" onclick="adjustCounter(${seatId}, ${idx}, 1)" title="+1">+</button>
+        <button type="button" class="tc-cpill-rm" onclick="removeCounter(${seatId}, ${idx})" title="Remove">×</button>
+      </div>`;
+  }).join('');
+}
+
+// ── Add-counter floating menu ─────────────────────────────────
+let _addCounterSeatId = null;
+function openAddCounterMenu(seatId) {
+  _addCounterSeatId = seatId;
+  const menu = document.getElementById('add-counter-menu');
+  if (!menu) return;
+  const card = document.getElementById(`card-${seatId}`);
+  const rect = card ? card.getBoundingClientRect() : null;
+  if (rect) {
+    const menuWidth = 180;
+    let left = rect.right - menuWidth - 12;
+    let top = rect.top + 12;
+    if (left < 8) left = 8;
+    if (left + menuWidth > window.innerWidth - 8) left = window.innerWidth - menuWidth - 8;
+    menu.style.left = `${left}px`;
+    menu.style.top = `${top}px`;
+  }
+  menu.style.display = 'flex';
+}
+function closeAddCounterMenu() {
+  const menu = document.getElementById('add-counter-menu');
+  if (menu) menu.style.display = 'none';
+  _addCounterSeatId = null;
+}
+document.addEventListener('click', (ev) => {
+  const menu = document.getElementById('add-counter-menu');
+  if (!menu || menu.style.display === 'none') return;
+  if (ev.target.closest('.tc-add-counter-btn')) return; // opening click
+  if (!ev.target.closest('#add-counter-menu')) closeAddCounterMenu();
+});
+document.querySelectorAll('.add-counter-opt').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const type = btn.dataset.type;
+    const seatId = _addCounterSeatId;
+    closeAddCounterMenu();
+    if (!seatId) return;
+    if (type === 'custom') {
+      const raw = prompt('Counter name:', '');
+      if (raw === null) return;
+      const label = raw.trim() || 'Custom';
+      addCounter(seatId, 'custom', label);
+    } else {
+      addCounter(seatId, type);
+    }
+  });
+});
+
+// ── Damage matrix modal (Fork G) ──────────────────────────────
+let _damageMatrixFocusReceiver = null;
+function openDamageMatrix(receiverId) {
+  _damageMatrixFocusReceiver = receiverId;
+  renderDamageMatrix();
+  const modal = document.getElementById('damage-matrix-modal');
+  if (modal) modal.style.display = 'flex';
+}
+function closeDamageMatrix() {
+  const modal = document.getElementById('damage-matrix-modal');
+  if (modal) modal.style.display = 'none';
+  _damageMatrixFocusReceiver = null;
+}
+function renderDamageMatrix() {
+  const host = document.getElementById('damage-matrix-grid');
+  if (!host) return;
+  const seats = seatDefs;
+  let html = '<table class="dmtx"><thead><tr><th></th>';
+  seats.forEach(sender => {
+    html += `<th><span class="dmtx-name">${sender.name}</span></th>`;
+  });
+  html += '</tr></thead><tbody>';
+  seats.forEach(receiver => {
+    const focusCls = (_damageMatrixFocusReceiver === receiver.id) ? ' dmtx-row-focus' : '';
+    html += `<tr class="dmtx-row${focusCls}"><th class="dmtx-rowhead"><span class="dmtx-name">${receiver.name}</span></th>`;
+    seats.forEach(sender => {
+      if (sender.id === receiver.id) {
+        html += '<td class="dmtx-cell dmtx-cell-self">—</td>';
+      } else {
+        const val = (state.cmd[receiver.id] || {})[sender.id] || 0;
+        const dangerCls = val >= 21 ? ' tc-counter-danger' : val >= 16 ? ' tc-counter-warn' : '';
+        html += `
+          <td class="dmtx-cell">
+            <button type="button" class="dmtx-btn" onclick="adjustCmd(${receiver.id}, ${sender.id}, -1)">−</button>
+            <span class="dmtx-val${dangerCls}">${val}</span>
+            <button type="button" class="dmtx-btn" onclick="adjustCmd(${receiver.id}, ${sender.id}, 1)">+</button>
+          </td>`;
+      }
+    });
+    html += '</tr>';
+  });
+  html += '</tbody></table>';
+  host.innerHTML = html;
+}
 
 // ── Render ────────────────────────────────────────────────────
 function render() {
@@ -845,16 +1131,10 @@ function render() {
     if (!card) return;
     card.style.setProperty('--player-color', SEAT_COLORS[i % SEAT_COLORS.length]);
     card.classList.toggle('tc-active-turn', s.id === state.currentTurnId);
+    card.classList.toggle('tc-eliminated', !!state.eliminated[s.id]);
 
-    // v3.26.1: commander art panel background. Scryfall URL pattern is
-    // stable — swap /normal/ → /art_crop/ for the art-only endpoint.
-    // Empty list → both classes removed, falls back to the color gradient.
-    // 1 URL → .has-commander-art (full-card cover). 2 URLs → also
-    // .has-partner-art (top/bottom vertical halves for Partner /
-    // Choose-a-Background / Friends Forever decks).
-    // v3.26.6 — per-seat art_background_hidden is opt-OUT (default FALSE
-    // preserves v3.26.1 behavior). When TRUE the seat falls back to the
-    // legacy color gradient regardless of whether commander art is cached.
+    // v3.26.1 — commander art panel background (preserved verbatim).
+    // v3.26.6 — respect art_background_hidden.
     const cmdUrls = s.artBackgroundHidden
       ? []
       : (s.commanderImageUrls || []).map(u => u.replace('/normal/', '/art_crop/'));
@@ -875,116 +1155,99 @@ function render() {
 
     const lifeEl = document.getElementById(`life-${s.id}`);
     if (lifeEl) {
-      lifeEl.textContent = state.lives[s.id] ?? s.startingLife;
-      lifeEl.className = 'tc-life' + ((state.lives[s.id] ?? s.startingLife) <= 0 ? ' tc-life-dead' : '');
+      const life = state.lives[s.id] ?? s.startingLife;
+      lifeEl.textContent = life;
+      lifeEl.className = 'tc-life' + (life <= 0 ? ' tc-life-dead' : '');
     }
 
-    const ec = state.extraCounter[s.id] || { type: 'poison', value: 0 };
-    const extraEl = document.getElementById(`extra-${s.id}`);
-    if (extraEl) {
-      extraEl.textContent = ec.value || 0;
-      // Counter-danger / counter-warn styling applies only when Poison is
-      // the active counter (matches the loss-condition threshold semantics
-      // in checkElimination — non-poison counters have no inherent threshold).
-      const dangerCls = ec.type === 'poison' && ec.value >= 10 ? ' tc-counter-danger'
-                      : ec.type === 'poison' && ec.value >= 7 ? ' tc-counter-warn' : '';
-      extraEl.className = 'tc-cpill-val' + dangerCls;
-    }
-    const typeSel = document.getElementById(`extra-type-${s.id}`);
-    if (typeSel) {
-      // Rewrite the custom option's label so the dropdown reads
-      // "● Custom: <label>" when the user named the counter, while keeping
-      // the option's value="custom" stable so onchange still fires correctly.
-      const customOpt = typeSel.querySelector('option[value="custom"]');
-      if (customOpt) {
-        customOpt.textContent = (ec.type === 'custom' && ec.customLabel)
-          ? `● Custom: ${ec.customLabel}` : '● Custom…';
-      }
-      typeSel.value = ec.type;
-    }
+    renderCounterPills(s.id);
 
+    // CMDR damage strip per-cell values.
     s.otherIds.forEach(oid => {
       const el = document.getElementById(`cmd-${s.id}-${oid}`);
       if (!el) return;
       const val = (state.cmd[s.id] || {})[oid] || 0;
       el.textContent = val;
-      el.className = 'tc-counter-val' +
+      el.className = 'tc-cmd-cell-val' +
         (val >= 21 ? ' tc-counter-danger' : val >= 16 ? ' tc-counter-warn' : '');
     });
 
-    card.classList.toggle('tc-eliminated', !!state.eliminated[s.id]);
+    const elimPill = document.getElementById(`elim-pill-${s.id}`);
+    const activePill = document.getElementById(`active-pill-${s.id}`);
+    if (elimPill) {
+      if (state.eliminated[s.id]) {
+        const t = state.eliminatedAtTurn[s.id];
+        elimPill.textContent = (t != null) ? `Eliminated · T${t}` : 'Eliminated';
+        elimPill.style.display = '';
+      } else {
+        elimPill.style.display = 'none';
+      }
+    }
+    if (activePill) {
+      activePill.style.display = (s.id === state.currentTurnId && !state.eliminated[s.id]) ? '' : 'none';
+    }
   });
 
   const active = seatDefs.find(s => s.id === state.currentTurnId);
   const turnVal = state.turn ?? 1;
   const activeName = active?.name ?? '—';
 
-  const turnEl = document.getElementById('turn-counter');
-  if (turnEl) turnEl.textContent = turnVal;
-  const portraitTurnEl = document.getElementById('portrait-turn-counter');
-  if (portraitTurnEl) portraitTurnEl.textContent = turnVal;
+  const mastTurnEl = document.getElementById('mast-turn-counter');
+  if (mastTurnEl) mastTurnEl.textContent = turnVal;
+  const mastNameEl = document.getElementById('mast-turn-name');
+  if (mastNameEl) {
+    mastNameEl.textContent = activeName;
+    const idx = seatDefs.findIndex(s => s.id === state.currentTurnId);
+    if (idx >= 0) {
+      mastNameEl.style.color = SEAT_COLORS[idx % SEAT_COLORS.length];
+    }
+  }
 
-  const turnNameEl = document.getElementById('turn-center-name');
-  if (turnNameEl) turnNameEl.textContent = activeName;
-  const portraitNameEl = document.getElementById('portrait-turn-name');
-  if (portraitNameEl) portraitNameEl.textContent = activeName;
+  const aliveCountEl = document.getElementById('mast-alive-count');
+  if (aliveCountEl) {
+    aliveCountEl.textContent = seatDefs.filter(s => !state.eliminated[s.id]).length;
+  }
 
-  // v3.26.7 — turn-timing DOM updates. Live-tick comes from the setInterval
-  // below, which just calls render() once per second.
   const dur = turnDurations();
-  const ttEl = document.getElementById('timer-current-turn');
-  if (ttEl) ttEl.textContent = fmtDuration(dur.currentTurnElapsed);
-  const ptEl = document.getElementById('portrait-timer');
-  if (ptEl) ptEl.textContent = fmtDuration(dur.currentTurnElapsed);
-  const geEl = document.getElementById('timer-game-elapsed');
-  if (geEl) geEl.textContent = fmtDuration(dur.gameElapsed);
+  const elapsedEl = document.getElementById('mast-elapsed');
+  if (elapsedEl) elapsedEl.textContent = fmtDuration(dur.gameElapsed);
   seatDefs.forEach(s => {
     const el = document.getElementById(`timer-on-clock-${s.id}`);
     if (el) el.textContent = fmtDuration(dur.perSeat[s.id] || 0);
   });
 
-  const histEl = document.getElementById('history-list');
-  if (histEl) {
-    histEl.innerHTML = state.history.slice(-12).reverse().map(h => {
-      const name = seatDefs.find(s => s.id === h.seatId)?.name ?? '?';
-      if (h.type === 'nextTurn') return `<span class="history-entry">${name}'s turn</span>`;
-      const sign = h.delta > 0 ? '+' : '';
-      if (h.type === 'cmd') {
-        const from = seatDefs.find(s => s.id === h.senderId)?.name ?? '?';
-        return `<span class="history-entry">${name} CMD(${from}) ${sign}${h.delta}</span>`;
-      }
-      if (h.type === 'extra') {
-        const sym = EXTRA_SYMBOLS[h.counterType] || '●';
-        return `<span class="history-entry">${name} ${sym}${sign}${h.delta}</span>`;
-      }
-      if (h.type === 'extraType') {
-        const newType = h.next?.type || 'poison';
-        const sym = EXTRA_SYMBOLS[newType] || '●';
-        return `<span class="history-entry">${name} →${sym}</span>`;
-      }
-      // Legacy entries from pre-v3.26.5 saved state. Poison legacy entries
-      // render with the new ☠ symbol (semantically still Poison; the visual
-      // is what v3.26.5 unified on).
-      const label = h.type === 'poison' ? '☠' : h.type === 'exp' ? '⚡' : '♥';
-      return `<span class="history-entry">${name} ${label}${sign}${h.delta}</span>`;
+  const pauseBtn = document.getElementById('pause-btn');
+  if (pauseBtn) {
+    pauseBtn.textContent = state.paused ? '▶ Resume' : '⏸ Pause';
+    pauseBtn.classList.toggle('mast-btn-paused', !!state.paused);
+  }
+  document.getElementById('game-app')?.classList.toggle('game-paused', !!state.paused);
+
+  // § Chronicle entries (last 3) + LAST ACTION.
+  const chronEl = document.getElementById('chron-entries');
+  if (chronEl) {
+    const recent = state.history.slice(-3).reverse();
+    chronEl.innerHTML = recent.map(h => {
+      const ts = h.ts ? fmtClock(h.ts) : '';
+      return `<span class="chron-entry">${ts ? `<span class="chron-ts">${ts}</span>` : ''}<span class="chron-text">${describeHistory(h)}</span></span>`;
     }).join('');
+  }
+  const lastActionEl = document.getElementById('bottombar-lastaction');
+  if (lastActionEl) {
+    if (state.history.length) {
+      lastActionEl.textContent = describeHistory(state.history[state.history.length - 1]);
+    } else {
+      lastActionEl.textContent = '—';
+    }
   }
 
   const undoBtn = document.getElementById('undo-btn');
   if (undoBtn) undoBtn.disabled = !state.history.length;
 
-  // v3.26.1 (iteration): center turn indicator border tracks the current-turn
-  // player's seat color via --current-player-color CSS var on .card-slot-center.
-  // The 0.3s border-color transition (in CSS) animates the flip on turn advance.
-  const centerEl = document.getElementById('slot-center');
-  if (centerEl) {
-    const currentSeatIdx = seatDefs.findIndex(s => s.id === state.currentTurnId);
-    if (currentSeatIdx >= 0) {
-      centerEl.style.setProperty(
-        '--current-player-color',
-        SEAT_COLORS[currentSeatIdx % SEAT_COLORS.length]
-      );
-    }
+  // Re-render the damage matrix modal if it's open.
+  const dmtxModal = document.getElementById('damage-matrix-modal');
+  if (dmtxModal && dmtxModal.style.display === 'flex') {
+    renderDamageMatrix();
   }
 
   checkWinCondition();
@@ -992,21 +1255,13 @@ function render() {
 
 render();
 
-// v3.26.7 — 1Hz tick re-runs render() so the active-turn timer + per-seat
-// time-on-clock + total game elapsed values advance live. render() is
-// idempotent against state (just writes textContent / className) so doing
-// it on a 1s cadence has no side effects. Skipped on finalized games (the
-// whole block is gated by the Jinja not-is-ended branch).
+// v3.26.7 — 1Hz tick re-runs render() for live timers (preserved).
 const _turnTimerTick = setInterval(render, 1000);
 {% else %}
 seatDefs.forEach((s, i) => {
   const card = document.getElementById(`card-${s.id}`);
   if (!card) return;
   card.style.setProperty('--player-color', SEAT_COLORS[i % SEAT_COLORS.length]);
-  // v3.26.1: commander art panel background for finalized games — same
-  // /normal/ → /art_crop/ Scryfall URL swap as the active-game render() path,
-  // and same single/partner branching for 1 vs 2 tagged commanders.
-  // v3.26.6 — respect art_background_hidden on the finalized-game path too.
   const cmdUrls = s.artBackgroundHidden
     ? []
     : (s.commanderImageUrls || []).map(u => u.replace('/normal/', '/art_crop/'));

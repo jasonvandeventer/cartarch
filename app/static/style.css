@@ -4345,6 +4345,989 @@ body.game-mode {
   flex-shrink: 0;
 }
 
+/* ─────────────────────────────────────────────────────────────────
+   v3.28.13 — Folio game-tracker redesign (cluster re-opener).
+   These rules OVERRIDE selected pre-v3.28.13 tracker rules above
+   (.game-app palette, .tracker-grid offsets, .tracker-card layout,
+   .tc-life typography, .tc-life-section layout). The rest of the
+   pre-v3.28.13 tracker block — rotation (.tracker-card[data-rotate]),
+   commander art panel background, .tc-seat-badge, .tc-elim-btn,
+   .tc-art-toggle-btn, .tc-counter-warn/.tc-counter-danger,
+   .end-game-modal — is PRESERVED VERBATIM and inherited.
+   See folio-game-tracker-gap-2026-05-25.md (vault) for the gap
+   analysis + 73-item preserve-verbatim inventory.
+   gameFingerprint() NOT touched (35th+ successive release).
+   ───────────────────────────────────────────────────────────────── */
+
+/* Folio palette swap on the full-screen app container. The old
+   #0b0f06/#131a0c "dark felt" gradient is replaced by Folio warm-charcoal
+   tokens. The subtle SVG noise overlay is preserved for texture. */
+body.game-mode .game-app {
+  background-color: var(--bg);
+  background-image:
+    radial-gradient(ellipse at 50% 50%, var(--panel) 0%, var(--bg) 100%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='4' height='4'%3E%3Ccircle cx='1' cy='1' r='0.6' fill='rgba(245,241,212,0.022)'/%3E%3C/svg%3E");
+}
+
+/* New full-width masthead (top band). Replaces the .game-topbar
+   floating bar — content + Undo / Pause / End game live here now. */
+.game-masthead {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 600;
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) auto minmax(220px, 1fr);
+  align-items: center;
+  gap: 1rem;
+  height: 64px;
+  padding: 0 1.25rem;
+  background: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--panel) 92%, transparent),
+    color-mix(in srgb, var(--panel) 78%, transparent)
+  );
+  border-bottom: 1px solid var(--border);
+  backdrop-filter: blur(10px);
+  color: var(--text);
+  font-size: 0.86rem;
+}
+.mast-left {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  min-width: 0;
+}
+.mast-back {
+  color: var(--muted);
+  text-decoration: none;
+  font-size: 1.05rem;
+  line-height: 1;
+  padding: 0.2rem 0.4rem;
+  border-radius: 4px;
+  transition: color 0.12s, background 0.12s;
+}
+.mast-back:hover {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.04);
+}
+.mast-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-family: Newsreader, Georgia, serif;
+  font-style: italic;
+  font-size: 0.95rem;
+  color: var(--text);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mast-eyebrow em {
+  font-style: italic;
+  color: var(--text);
+}
+.mast-hairline {
+  display: inline-block;
+  width: 24px;
+  height: 1px;
+  background: var(--brand-gold);
+  flex: 0 0 auto;
+}
+.mast-sep {
+  color: var(--border);
+  font-style: normal;
+  user-select: none;
+}
+.mast-format {
+  color: var(--text-dim);
+  font-style: normal;
+}
+.mast-center {
+  text-align: center;
+  min-width: 0;
+  overflow: hidden;
+}
+.mast-turn-line {
+  font-family: Newsreader, Georgia, serif;
+  font-size: 1.05rem;
+  color: var(--text);
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.45rem;
+  white-space: nowrap;
+}
+.mast-turn-label {
+  color: var(--muted);
+  font-style: normal;
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.mast-turn-num {
+  font-style: italic;
+  font-weight: 500;
+  font-size: 1.2rem;
+  color: var(--brand-gold);
+}
+.mast-turn-name {
+  font-style: italic;
+  font-weight: 500;
+  color: var(--text);
+  max-width: 280px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: color 0.3s ease;
+}
+.mast-turn-actor {
+  color: var(--muted);
+  font-style: normal;
+  font-size: 0.82rem;
+}
+.mast-turn-sep {
+  color: var(--border);
+  font-style: normal;
+}
+.mast-right {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 1.25rem;
+  min-width: 0;
+}
+.mast-stats {
+  display: inline-flex;
+  align-items: center;
+  gap: 1.25rem;
+}
+.mast-stat {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.1rem;
+  line-height: 1;
+}
+.mast-stat-label {
+  font-size: 0.66rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.mast-stat-val {
+  font-family: Newsreader, Georgia, serif;
+  font-style: italic;
+  font-size: 1rem;
+  color: var(--text);
+}
+.mast-stat-of {
+  color: var(--muted);
+  font-style: normal;
+  font-size: 0.78rem;
+  margin-left: 0.1rem;
+}
+.mast-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+.mast-btn {
+  padding: 0.35rem 0.7rem;
+  background: rgba(245, 241, 212, 0.04);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  color: var(--text-dim);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: color 0.12s, background 0.12s, border-color 0.12s;
+}
+.mast-btn:hover:not(:disabled) {
+  color: var(--text);
+  background: rgba(245, 241, 212, 0.08);
+  border-color: var(--brand-gold);
+}
+.mast-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.mast-btn-end {
+  background: rgba(138, 46, 34, 0.18);
+  border-color: rgba(138, 46, 34, 0.5);
+  color: var(--danger);
+}
+.mast-btn-end:hover {
+  background: rgba(138, 46, 34, 0.32);
+  border-color: var(--danger);
+  color: var(--danger);
+}
+.mast-btn-fs {
+  padding: 0.3rem 0.55rem;
+  font-size: 0.95rem;
+  line-height: 1;
+}
+.mast-btn-paused {
+  background: var(--brand-gold-soft);
+  border-color: var(--brand-gold);
+  color: var(--brand-gold);
+}
+.mast-btn-delete-discrete {
+  background: rgba(138, 46, 34, 0.12);
+  border-color: rgba(138, 46, 34, 0.32);
+  color: rgba(138, 46, 34, 0.7);
+  font-size: 0.7rem;
+  padding: 0.2rem 0.5rem;
+  opacity: 0.6;
+}
+.mast-btn-delete-discrete:hover {
+  opacity: 1;
+}
+
+/* Grid clearance for new masthead height + bottom bar height. The
+   pre-v3.28.13 .tracker-grid top/bottom offsets were 42px/38px against
+   the floating .game-topbar / .game-histbar; v3.28.13's bands are
+   full-width and slightly taller. */
+body.game-mode .tracker-grid {
+  top: 64px;
+  bottom: 52px;
+}
+body.game-mode .game-app[data-ended] .tracker-grid {
+  bottom: 0;
+}
+
+/* Paused dim — subtle visual cue across the whole tracker.
+   The masthead Pause button gets its own .mast-btn-paused active style. */
+.game-app.game-paused .tracker-grid::after {
+  content: 'PAUSED';
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 599;
+  font-family: Newsreader, Georgia, serif;
+  font-style: italic;
+  font-size: clamp(2rem, 6vh, 4rem);
+  color: var(--brand-gold);
+  background: rgba(15, 26, 46, 0.78);
+  padding: 0.5rem 2rem;
+  border: 1px solid var(--brand-gold);
+  border-radius: 10px;
+  letter-spacing: 0.2em;
+  pointer-events: none;
+}
+
+/* Override the pre-v3.28.13 .tracker-card layout. The card was a flex
+   column; v3.28.13 makes it a panel-local CSS grid with explicit
+   corner zones (TL identity, TR counters+status+controls, mid cmd-strip,
+   BL life numeral, BR button pad). Rotation transforms continue to wrap
+   the card; the grid is panel-coordinate. Padding tightened so the
+   commander art reads through more of the panel. */
+body.game-mode .tracker-card {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: auto 1fr auto;
+  grid-template-areas:
+    "tl tr"
+    "mid mid"
+    "bl br";
+  gap: 0.4rem 0.5rem;
+  padding: 0.9rem 1rem;
+  overflow: hidden;
+}
+.tc-corner {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  z-index: 1;
+}
+.tc-corner-tl {
+  grid-area: tl;
+  align-items: flex-start;
+  gap: 0.2rem;
+}
+.tc-corner-tr {
+  grid-area: tr;
+  align-items: flex-end;
+  gap: 0.35rem;
+}
+.tc-corner-bl {
+  grid-area: bl;
+  justify-content: flex-end;
+  align-items: flex-start;
+}
+.tc-corner-br {
+  grid-area: br;
+  justify-content: flex-end;
+  align-items: flex-end;
+}
+.tc-identity {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  font-size: 0.92rem;
+  color: var(--text);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
+  flex-wrap: wrap;
+}
+.tc-player-name {
+  font-family: Newsreader, Georgia, serif;
+  font-style: italic;
+  font-weight: 500;
+  color: var(--text);
+  font-size: 1.05rem;
+}
+.tc-commander-name {
+  color: var(--text-dim);
+  font-style: italic;
+  font-size: 0.82rem;
+}
+.tc-identity-sep {
+  color: var(--border);
+}
+/* On-clock timer below the identity line (already existed but tightened
+   for the new corner placement). */
+body.game-mode .tc-on-clock {
+  font-size: 0.7rem;
+  color: var(--text-dim);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+/* TR corner — status pills + counter pills + small controls. */
+.tc-status-pills {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.25rem;
+}
+.tc-active-pill {
+  display: none;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  background: var(--brand-gold-soft);
+  color: var(--brand-gold);
+  border: 1px solid var(--brand-gold);
+}
+.tc-elim-pill {
+  display: none;
+  align-items: center;
+  font-family: Newsreader, Georgia, serif;
+  font-style: italic;
+  font-size: 0.75rem;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  background: rgba(138, 46, 34, 0.22);
+  color: var(--danger);
+  border: 1px solid rgba(138, 46, 34, 0.6);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.tc-counter-pills {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  align-items: flex-end;
+  max-width: 100%;
+}
+body.game-mode .tc-cpill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.2rem 0.45rem;
+  background: rgba(15, 26, 46, 0.75);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 0.78rem;
+  color: var(--text);
+  font-weight: 600;
+}
+body.game-mode .tc-cpill-poison {
+  background: rgba(60, 24, 60, 0.78);
+  border-color: rgba(167, 139, 250, 0.42);
+  color: #d4b8ff;
+}
+body.game-mode .tc-cpill-experience {
+  background: rgba(24, 60, 38, 0.78);
+  border-color: rgba(134, 239, 172, 0.42);
+  color: #b0f0c3;
+}
+body.game-mode .tc-cpill-energy {
+  background: rgba(60, 48, 18, 0.78);
+  border-color: rgba(245, 158, 11, 0.4);
+  color: #fbd38d;
+}
+body.game-mode .tc-cpill-rad {
+  background: rgba(60, 24, 18, 0.78);
+  border-color: rgba(239, 68, 68, 0.42);
+  color: #fda4a4;
+}
+body.game-mode .tc-cpill-storm {
+  background: rgba(24, 36, 60, 0.78);
+  border-color: rgba(59, 130, 246, 0.42);
+  color: #a8c7ff;
+}
+body.game-mode .tc-cpill-custom {
+  background: rgba(40, 40, 50, 0.78);
+  border-color: rgba(245, 241, 212, 0.25);
+  color: var(--text-dim);
+}
+.tc-cpill-icon {
+  font-size: 0.92rem;
+  line-height: 1;
+}
+.tc-cpill-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: inherit;
+  opacity: 0.85;
+}
+body.game-mode .tc-cpill-btn {
+  width: 20px;
+  height: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(0, 0, 0, 0.4);
+  color: inherit;
+  border-radius: 4px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+  font-size: 0.85rem;
+}
+body.game-mode .tc-cpill-val {
+  min-width: 2ch;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+.tc-cpill-rm {
+  width: 18px;
+  height: 18px;
+  border: none;
+  background: transparent;
+  color: inherit;
+  opacity: 0.5;
+  cursor: pointer;
+  font-size: 0.9rem;
+  line-height: 1;
+  padding: 0;
+}
+.tc-cpill-rm:hover {
+  opacity: 1;
+  color: var(--danger);
+}
+.tc-corner-controls {
+  display: inline-flex;
+  gap: 0.3rem;
+}
+body.game-mode .tc-elim-btn,
+body.game-mode .tc-art-toggle-btn {
+  min-width: 28px;
+  min-height: 28px;
+  padding: 0.15rem 0.4rem;
+  font-size: 0.85rem;
+}
+.tc-add-counter-btn {
+  background: rgba(245, 241, 212, 0.05);
+  border: 1px dashed var(--border);
+  border-radius: 5px;
+  color: var(--text-dim);
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0.2rem 0.5rem;
+  cursor: pointer;
+  min-height: 28px;
+}
+.tc-add-counter-btn:hover {
+  color: var(--brand-gold);
+  border-color: var(--brand-gold);
+  background: var(--brand-gold-soft);
+}
+
+/* Always-visible CMDR damage strip (mid zone). Read-only strip; cells
+   are click-targets that open the global damage matrix scoped to the
+   receiver (Fork G). */
+.tc-cmd-strip {
+  grid-area: mid;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  z-index: 1;
+}
+.tc-cmd-strip-label {
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+.tc-cmd-strip-cells {
+  display: inline-flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.tc-cmd-cell {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.1rem;
+  padding: 0.25rem 0.5rem;
+  background: rgba(15, 26, 46, 0.7);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  cursor: pointer;
+  font-size: 0.75rem;
+  font-weight: 600;
+  min-width: 40px;
+  transition: background 0.12s, border-color 0.12s;
+}
+.tc-cmd-cell:hover {
+  background: rgba(15, 26, 46, 0.92);
+  border-color: var(--brand-gold);
+}
+.tc-cmd-cell-from {
+  font-size: 0.6rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.tc-cmd-cell-val {
+  font-size: 0.95rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
+/* BL — life numeral (italic Newsreader). Replaces the old centered
+   tc-life-section + tc-life clamp(2.5rem, 8vh, 7rem) sans-serif. */
+.tc-life-block {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  line-height: 1;
+}
+.tc-life-label {
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--muted);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+body.game-mode .tc-life {
+  font-family: Newsreader, Georgia, serif;
+  font-style: italic;
+  font-weight: 500;
+  font-size: clamp(3rem, 9vh, 7.5rem);
+  line-height: 1;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.65);
+  transition: color 0.2s;
+  padding: 0;
+  margin: 0;
+}
+body.game-mode .tc-life.tc-life-dead {
+  color: var(--danger);
+}
+
+/* BR — life-adjust button pad. 2 columns × 3 rows: + column on the left,
+   − column on the right; rows paired by magnitude (5, 1, 10). Reading down
+   either column gives "all + actions" or "all − actions"; reading across a
+   row gives the matched pair. Replaces a 3-col × 2-row layout that filled
+   row-major and scrambled the +/− pairing. */
+.tc-life-pad {
+  display: grid;
+  grid-template-columns: auto auto;
+  grid-template-rows: repeat(3, auto);
+  gap: 0.35rem;
+}
+body.game-mode .tc-life-btn {
+  min-width: 48px;
+  min-height: 38px;
+  padding: 0.3rem 0.5rem;
+  background: rgba(15, 26, 46, 0.8);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  font-variant-numeric: tabular-nums;
+  touch-action: manipulation;
+  transition: transform 0.08s, background 0.1s, border-color 0.1s;
+}
+body.game-mode .tc-life-plus {
+  color: #b8e8c4;
+  border-color: rgba(106, 130, 83, 0.45);
+}
+body.game-mode .tc-life-plus:hover {
+  background: rgba(106, 130, 83, 0.22);
+  border-color: var(--brand-green);
+}
+body.game-mode .tc-life-plus:active {
+  background: rgba(106, 130, 83, 0.4);
+  transform: scale(0.94);
+}
+body.game-mode .tc-life-minus {
+  color: #f0a8a0;
+  border-color: rgba(138, 46, 34, 0.5);
+}
+body.game-mode .tc-life-minus:hover {
+  background: rgba(138, 46, 34, 0.22);
+  border-color: var(--danger);
+}
+body.game-mode .tc-life-minus:active {
+  background: rgba(138, 46, 34, 0.4);
+  transform: scale(0.94);
+}
+
+/* The pre-v3.28.13 .tc-life-section flex layout is no longer used by
+   the redesigned template (the corner-grid replaces it). Nullify it
+   so any inherited rule doesn't leak. */
+body.game-mode .tc-life-section {
+  all: unset;
+}
+
+/* Active panel — Fork F. The center-cell color-tracking cue (removed
+   with the floating turn indicator) is replaced by a thicker active
+   border in the player color. */
+body.game-mode .tracker-card.tc-active-turn {
+  border-top-width: 8px;
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--player-color) 38%, transparent);
+}
+
+/* Bottom bar — § Chronicle + actions + LAST ACTION. Replaces the
+   pre-v3.28.13 .game-histbar fixed-overlay strip. */
+.game-bottombar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 600;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 1rem;
+  height: 52px;
+  padding: 0 1.25rem;
+  background: linear-gradient(
+    to top,
+    color-mix(in srgb, var(--panel) 92%, transparent),
+    color-mix(in srgb, var(--panel) 78%, transparent)
+  );
+  border-top: 1px solid var(--border);
+  backdrop-filter: blur(10px);
+  color: var(--text);
+  font-size: 0.82rem;
+}
+.bottombar-chron {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.7rem;
+  min-width: 0;
+  overflow: hidden;
+}
+.bottombar-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-family: Newsreader, Georgia, serif;
+  font-style: italic;
+  font-size: 0.88rem;
+  color: var(--brand-gold);
+  flex-shrink: 0;
+}
+.bottombar-eyebrow em {
+  font-style: italic;
+  color: var(--brand-gold);
+}
+.bottombar-entries {
+  display: inline-flex;
+  gap: 0.7rem;
+  align-items: center;
+  flex-wrap: nowrap;
+  overflow: hidden;
+  min-width: 0;
+}
+.chron-entry {
+  display: inline-flex;
+  gap: 0.3rem;
+  align-items: baseline;
+  font-size: 0.76rem;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+.chron-ts {
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+.chron-text {
+  color: var(--text-dim);
+}
+.bottombar-actions {
+  display: inline-flex;
+  gap: 0.45rem;
+  justify-content: center;
+}
+.bottombar-btn {
+  padding: 0.4rem 0.85rem;
+  background: rgba(245, 241, 212, 0.05);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  color: var(--text);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+.bottombar-btn:hover {
+  background: rgba(245, 241, 212, 0.1);
+  border-color: var(--brand-gold);
+}
+.bottombar-btn-primary {
+  background: var(--brand-gold-soft);
+  border-color: var(--brand-gold);
+  color: var(--brand-gold);
+  font-weight: 700;
+}
+.bottombar-btn-primary:hover {
+  background: var(--brand-gold);
+  color: var(--brand-near-black);
+  border-color: var(--brand-gold);
+}
+.bottombar-lastaction {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  justify-content: flex-end;
+  min-width: 0;
+  overflow: hidden;
+}
+.bottombar-lastaction-label {
+  font-size: 0.66rem;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--muted);
+  flex-shrink: 0;
+}
+.bottombar-lastaction-text {
+  font-family: Newsreader, Georgia, serif;
+  font-style: italic;
+  font-size: 0.9rem;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Floating add-counter menu. */
+.add-counter-menu {
+  position: fixed;
+  z-index: 750;
+  width: 180px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.45rem;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+}
+.add-counter-menu-title {
+  font-size: 0.66rem;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--muted);
+  padding: 0.2rem 0.4rem 0.3rem;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 0.2rem;
+}
+.add-counter-opt {
+  text-align: left;
+  background: transparent;
+  border: none;
+  padding: 0.4rem 0.55rem;
+  border-radius: 4px;
+  color: var(--text);
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+.add-counter-opt:hover {
+  background: var(--brand-gold-soft);
+  color: var(--brand-gold);
+}
+
+/* Damage matrix modal (Fork G). */
+.damage-matrix-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 720;
+  background: rgba(0, 0, 0, 0.78);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+.damage-matrix-inner {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1.25rem 1.5rem;
+  max-width: 920px;
+  width: 100%;
+  max-height: 85vh;
+  overflow: auto;
+  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.7);
+}
+.damage-matrix-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+.damage-matrix-close {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  border-radius: 6px;
+  width: 32px;
+  height: 32px;
+  font-size: 1.2rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.damage-matrix-close:hover {
+  color: var(--text);
+  border-color: var(--brand-gold);
+}
+.damage-matrix-grid {
+  overflow: auto;
+}
+table.dmtx {
+  border-collapse: collapse;
+  width: 100%;
+  color: var(--text);
+}
+table.dmtx th,
+table.dmtx td {
+  border: 1px solid var(--border);
+  padding: 0.4rem 0.6rem;
+  font-size: 0.85rem;
+  text-align: center;
+}
+table.dmtx thead th {
+  background: var(--panel-2);
+  font-family: Newsreader, Georgia, serif;
+  font-style: italic;
+  font-weight: 500;
+  color: var(--text-dim);
+}
+table.dmtx .dmtx-rowhead {
+  background: var(--panel-2);
+  font-family: Newsreader, Georgia, serif;
+  font-style: italic;
+  font-weight: 500;
+  color: var(--text-dim);
+  text-align: left;
+}
+.dmtx-row-focus .dmtx-rowhead,
+.dmtx-row-focus .dmtx-cell {
+  background: var(--brand-gold-soft);
+}
+.dmtx-name {
+  display: inline-block;
+  max-width: 110px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+.dmtx-cell {
+  min-width: 96px;
+}
+.dmtx-cell-self {
+  color: var(--muted);
+}
+.dmtx-btn {
+  width: 22px;
+  height: 22px;
+  border: 1px solid var(--border);
+  background: rgba(0, 0, 0, 0.35);
+  color: var(--text);
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 700;
+  line-height: 1;
+  padding: 0;
+}
+.dmtx-btn:hover {
+  background: rgba(245, 241, 212, 0.08);
+  border-color: var(--brand-gold);
+}
+.dmtx-val {
+  display: inline-block;
+  min-width: 2ch;
+  margin: 0 0.4rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  color: var(--text);
+}
+.damage-matrix-foot {
+  margin-top: 0.85rem;
+  font-family: Newsreader, Georgia, serif;
+  font-style: italic;
+  font-size: 0.8rem;
+  color: var(--muted);
+  text-align: right;
+}
+
+/* Mobile / narrow-width treatment. The masthead's stats cluster wraps;
+   the bottombar collapses to a tighter layout; the per-seat button pad
+   reduces to a single row of L+/S+/+10/L−/S−/−10 if needed. */
+@media (max-width: 980px) {
+  .game-masthead {
+    height: auto;
+    min-height: 64px;
+    padding: 0.5rem 0.85rem;
+    grid-template-columns: auto 1fr;
+    grid-template-rows: auto auto;
+    gap: 0.5rem 0.85rem;
+  }
+  .mast-left { grid-column: 1; grid-row: 1; }
+  .mast-center { grid-column: 2; grid-row: 1; text-align: right; }
+  .mast-right { grid-column: 1 / -1; grid-row: 2; gap: 0.8rem; }
+  .mast-stats { gap: 0.85rem; }
+  body.game-mode .tracker-grid {
+    top: 108px;
+  }
+}
+@media (max-width: 640px) {
+  .bottombar-lastaction { display: none; }
+  .game-bottombar {
+    grid-template-columns: 1fr auto;
+    gap: 0.5rem;
+  }
+  .mast-stat-label { font-size: 0.6rem; }
+}
+
 /* First-player picker modal (v3.25.2 — new-game flow). Overlay/sizing
    mirror .end-game-modal; uses the defined theme tokens (--panel,
    --muted) rather than the undefined --bg-card/--text-muted the legacy
