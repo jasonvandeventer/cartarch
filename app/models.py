@@ -390,6 +390,15 @@ class WatchlistItem(Base):
     card_name: Mapped[str | None] = mapped_column(Text, nullable=True)
     added_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # v3.28.11 — optional buy-target. When the watched card's current
+    # price drops to or below target_price, the watchlist row gets a
+    # "target met" highlight on /watchlist. Independent of the
+    # card_id / card_name XOR — allowed on either identity mode; the
+    # comparison basis differs (printing-specific finish min vs name's
+    # lowest-across-printings). Stored as REAL (SQLite float) because
+    # this is user-entered numeric input, not a Scryfall wire-format
+    # round-trip the way Card.price_usd is.
+    target_price: Mapped[float | None] = mapped_column(Float, nullable=True)
 
     user: Mapped[User] = relationship(back_populates="watchlist_items")
     card: Mapped[Card | None] = relationship()

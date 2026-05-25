@@ -1,5 +1,18 @@
 [
   {
+    "version": "3.28.11",
+    "date": "2026-05-25",
+    "added": [
+      "Set a target price on any watchlist row. Type the dollar amount in the new Target column's inline editor — same shape as the existing Note editor — and Cartarch marks the row the moment the current price meets it (✓ before the price, soft gold-bordered row highlight). Clear the target by saving an empty value.",
+      "Two new columns on the watchlist table: Current (the lowest current price for the card — cheapest finish for a printing-specific watch, lowest across all printings for a name watch) and Target (your buy-target with the inline edit). The existing Watch type / Owned / Added / Note columns are unchanged."
+    ],
+    "refined": [
+      "A small italic Newsreader lede on the Watchlist hero — the only editorial-polish touch in this release. The page already shipped on the Folio palette in v3.27.12; this release is mostly feature, lightly bundled."
+    ],
+    "resolved": [],
+    "archivist_note": "The smallest substantive release in the cluster — and the one that finally rewards the watching. A target price says 'I'd buy this card if it ever dropped to here'; the watchlist row tells you the moment it does. The check is on the page only — no dashboard signal, no notification. That's intentional: a watchlist is a record of intent, not an alarm system. The price comparison is finish-aware too — for a printing-specific watch it's the cheapest of the three finishes for that printing; for a name watch it's the cheapest across every printing of that name. Both treat target as 'the lowest I could currently buy the card for' so the alert reads honestly."
+  },
+  {
     "version": "3.28.10",
     "date": "2026-05-25",
     "added": [],

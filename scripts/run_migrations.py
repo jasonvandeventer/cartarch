@@ -77,6 +77,9 @@ from scripts.migrate_v3_28_6_storage_location_note_and_capacity import (
 from scripts.migrate_v3_28_7_deck_blurb import (
     main as migrate_v3_28_7_deck_blurb,
 )
+from scripts.migrate_v3_28_11_watchlist_target_price import (
+    main as migrate_v3_28_11_watchlist_target_price,
+)
 
 
 def _is_applied(name: str) -> bool:
@@ -394,6 +397,13 @@ def run():
         _mark_applied("v3_28_7_deck_blurb")
     else:
         print("v3.28.7 deck_blurb already applied, skipping")
+
+    if not _is_applied("v3_28_11_watchlist_target_price"):
+        print("Running v3.28.11 watchlist.target_price migration...")
+        migrate_v3_28_11_watchlist_target_price()
+        _mark_applied("v3_28_11_watchlist_target_price")
+    else:
+        print("v3.28.11 watchlist_target_price already applied, skipping")
 
     print("Migration runner complete")
 

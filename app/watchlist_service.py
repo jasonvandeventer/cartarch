@@ -37,6 +37,36 @@ from sqlalchemy.orm import Session, joinedload
 from app.models import Card, InventoryRow, WatchlistItem
 
 
+def _min_finish_price(card: Card | None) -> float | None:
+    """Return the lowest non-NULL price across (normal, foil, etched).
+
+    v3.28.11 — used to compare a watchlist row's ``target_price`` against
+    the cheapest current price for the watched card. For a printing-
+    specific watch this answers "what's the lowest I can buy THIS
+    printing at, across the three finishes?". For a name watch each
+    printing is reduced to its min via this helper, then the overall
+    min is taken across all printings.
+
+    Scryfall stores prices as TEXT (the v3.25.0 bulk cache preserves
+    byte-identical wire format). Parse-failures and NULLs are silently
+    skipped. Returns None when every finish-price is NULL/missing.
+    """
+    if card is None:
+        return None
+    prices: list[float] = []
+    for raw in (card.price_usd, card.price_usd_foil, card.price_usd_etched):
+        if raw is None:
+            continue
+        s = str(raw).strip()
+        if not s:
+            continue
+        try:
+            prices.append(float(s))
+        except (ValueError, TypeError):
+            continue
+    return min(prices) if prices else None
+
+
 def _normalize_card_name(name: str | None) -> str | None:
     """Trim + collapse whitespace. Returns None for empty input.
 
@@ -95,7 +125,8 @@ def list_watchlist(session: Session, user_id: int) -> list[dict]:
     """Return all watchlist items for one user, with ownership counts.
 
     Each dict carries: ``id, identity_mode, card, card_name,
-    display_name, added_at, note, placed_count, pending_count``.
+    display_name, added_at, note, placed_count, pending_count,
+    target_price, current_min_price, target_met``.
 
     - ``identity_mode``: ``"card"`` (printing-specific) or ``"name"``
       (printing-agnostic). Lets templates branch without re-checking
@@ -104,6 +135,15 @@ def list_watchlist(session: Session, user_id: int) -> list[dict]:
       ``None`` for name watches.
     - ``display_name``: the canonical name to render (``card.name``
       for card watches; the stored ``card_name`` for name watches).
+
+    v3.28.11 — adds ``target_price`` / ``current_min_price`` /
+    ``target_met``. The current-price computation is finish-aware: for
+    a printing-specific watch it's the lowest non-NULL of (normal,
+    foil, etched) on the joined Card; for a name watch it's the lowest
+    of those across ALL printings sharing that name. The latter is
+    fetched via ONE batched query (no per-row N+1). ``target_met`` is
+    True iff both prices are present and ``current_min_price <=
+    target_price``.
     """
     items = (
         session.query(WatchlistItem)
@@ -112,10 +152,35 @@ def list_watchlist(session: Session, user_id: int) -> list[dict]:
         .order_by(WatchlistItem.added_at.desc())
         .all()
     )
+
+    # v3.28.11 — pre-compute current-price floor per name-watch via a
+    # SINGLE batched query. Card.name has an index (models.py:65) so the
+    # IN-filter is cheap; we then fold to per-name min in Python.
+    name_watch_names = sorted({item.card_name for item in items if item.card_name})
+    name_lowest: dict[str, float | None] = {}
+    if name_watch_names:
+        printings = session.query(Card).filter(Card.name.in_(name_watch_names)).all()
+        for card in printings:
+            per_card_min = _min_finish_price(card)
+            if per_card_min is None:
+                continue
+            cur = name_lowest.get(card.name)
+            if cur is None or per_card_min < cur:
+                name_lowest[card.name] = per_card_min
+
     out: list[dict] = []
     for item in items:
+        target_price = item.target_price
         if item.card_id is not None and item.card is not None:
             placed, pending = _ownership_for_card_id(session, user_id, item.card_id)
+            # v3.28.11 — printing-specific: min across the three finishes
+            # on the joined Card. Zero extra queries (card is joinedload-ed).
+            current_min_price = _min_finish_price(item.card)
+            target_met = (
+                target_price is not None
+                and current_min_price is not None
+                and current_min_price <= target_price
+            )
             out.append(
                 {
                     "id": item.id,
@@ -127,10 +192,20 @@ def list_watchlist(session: Session, user_id: int) -> list[dict]:
                     "note": item.note,
                     "placed_count": placed,
                     "pending_count": pending,
+                    "target_price": target_price,
+                    "current_min_price": current_min_price,
+                    "target_met": target_met,
                 }
             )
         elif item.card_name is not None:
             placed, pending = _ownership_for_card_name(session, user_id, item.card_name)
+            # v3.28.11 — printing-agnostic: lowest across all printings.
+            current_min_price = name_lowest.get(item.card_name)
+            target_met = (
+                target_price is not None
+                and current_min_price is not None
+                and current_min_price <= target_price
+            )
             out.append(
                 {
                     "id": item.id,
@@ -142,6 +217,9 @@ def list_watchlist(session: Session, user_id: int) -> list[dict]:
                     "note": item.note,
                     "placed_count": placed,
                     "pending_count": pending,
+                    "target_price": target_price,
+                    "current_min_price": current_min_price,
+                    "target_met": target_met,
                 }
             )
         # Defensive: a row with neither column populated would be invalid
@@ -224,6 +302,45 @@ def update_note(session: Session, user_id: int, watchlist_id: int, note: str | N
         return False
     cleaned = note.strip() if note else None
     item.note = cleaned or None
+    return True
+
+
+def update_target_price(
+    session: Session,
+    user_id: int,
+    watchlist_id: int,
+    target_price: str | None,
+) -> bool:
+    """v3.28.11 — Update the target_price on one watchlist row.
+
+    Mirrors ``update_note`` exactly in shape: per-user scoping via the
+    user_id filter; empty / whitespace-only / non-numeric input clears
+    the target (stored as NULL); caller is responsible for commit.
+
+    Accepts string input (the route layer passes the form value
+    directly). Parse-failures clear the target rather than raising —
+    the user's intent on an unparseable value is ambiguous; clearing is
+    the safe default. Returns True if a row matched, False otherwise.
+    """
+    item = (
+        session.query(WatchlistItem)
+        .filter(WatchlistItem.id == watchlist_id, WatchlistItem.user_id == user_id)
+        .first()
+    )
+    if item is None:
+        return False
+
+    cleaned: float | None = None
+    if target_price is not None:
+        s = str(target_price).strip()
+        if s:
+            try:
+                parsed = float(s)
+                if parsed > 0:
+                    cleaned = parsed
+            except ValueError:
+                cleaned = None
+    item.target_price = cleaned
     return True
 
 

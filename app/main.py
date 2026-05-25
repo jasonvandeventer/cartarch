@@ -179,6 +179,7 @@ from app.watchlist_service import (
     list_watchlist,
     remove_from_watchlist,
     update_note,
+    update_target_price,
 )
 from scripts.run_migrations import run as run_migrations
 
@@ -5444,6 +5445,29 @@ def watchlist_update_note(
     _: None = CsrfRequired,
 ):
     update_note(session, current_user.id, watchlist_id, note)
+    session.commit()
+    redirect_target = safe_redirect_url(request, default="/watchlist")
+    return RedirectResponse(url=redirect_target, status_code=303)
+
+
+@app.post("/watchlist/{watchlist_id}/target")
+def watchlist_update_target_price(
+    request: Request,
+    watchlist_id: int,
+    target_price: str = Form(""),
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+    _: None = CsrfRequired,
+):
+    """v3.28.11 — Update the target_price on one watchlist row.
+
+    Shape-mirrors ``/watchlist/{id}/note`` exactly: CSRF-protected POST,
+    per-user scoped via the service layer, empty / non-numeric input
+    clears the target. The form value arrives as a string because the
+    user types it; ``update_target_price`` parses + stores as REAL.
+    Redirect uses the same ``safe_redirect_url`` pattern.
+    """
+    update_target_price(session, current_user.id, watchlist_id, target_price)
     session.commit()
     redirect_target = safe_redirect_url(request, default="/watchlist")
     return RedirectResponse(url=redirect_target, status_code=303)

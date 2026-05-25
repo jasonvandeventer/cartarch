@@ -1,22 +1,29 @@
 {% from "_macros.html" import editorial_eyebrow %}
 {% extends "base.html" %}
 {% block content %}
-  <section class="panel pagehead">
+  {# v3.28.11 — Folio Watchlist refresh.
+     - Thin editorial polish (page-hero italic lede; existing eyebrow stays).
+     - NEW feature: per-row target_price with inline edit + row highlight
+       when current price ≤ target. Inline edit mirrors the note-field
+       pattern exactly (same <details>/edit-popout shape, same CSRF). #}
+  <section class="panel pagehead watchlist-hero">
     {{ editorial_eyebrow("Overview · Watchlist") }}
     <h1 class="pagehead-title">Watchlist</h1>
-    <p class="pagehead-tagline">
-      Cards you're tracking — to acquire later, compare prices on, or just remember. Add a card to your watchlist from any card detail page.
+    <p class="pagehead-tagline watchlist-lede">
+      Cards you're tracking — to acquire later, compare prices on, or just remember. <em>Set a target price</em> on any row and Cartarch will mark it the moment the current price meets it.
     </p>
   </section>
   {% if items %}
     <section class="panel">
       <div class="table-wrap">
-        <table class="stacking-table">
+        <table class="stacking-table watchlist-table">
           <thead>
             <tr>
               <th>Card</th>
               <th class="col-priority-low">Watch type</th>
               <th>Owned</th>
+              <th>Current</th>
+              <th>Target</th>
               <th class="col-priority-mid">Added</th>
               <th class="col-priority-low">Note</th>
               <th></th>
@@ -24,11 +31,11 @@
           </thead>
           <tbody>
             {% for item in items %}
-              <tr>
+              <tr {% if item.target_met %}class="watchlist-row-target-met"{% endif %}>
                 <td>
                   {% if item.identity_mode == 'card' %}
                     <a href="/cards/{{ item.card.id }}">{{ item.display_name }}</a>
-                    <div class="muted" style="font-size: 0.78rem">
+                    <div class="muted watchlist-card-meta">
                       {{ item.card.set_name }} · {{ item.card.set_code|upper }} #{{ item.card.collector_number }}
                     </div>
                   {% else %}
@@ -49,8 +56,48 @@
                     <span class="muted">none placed</span>
                   {% endif %}
                   {% if item.pending_count > 0 %}
-                    <div class="muted" style="font-size: 0.78rem">+{{ item.pending_count }} pending</div>
+                    <div class="muted watchlist-owned-sub">+{{ item.pending_count }} pending</div>
                   {% endif %}
+                </td>
+                <td data-label="Current" class="watchlist-current-cell">
+                  {% if item.current_min_price is not none %}
+                    <span class="watchlist-current-price">${{ '%.2f'|format(item.current_min_price) }}</span>
+                    {% if item.identity_mode == 'name' %}
+                      <div class="muted watchlist-current-sub">lowest across printings</div>
+                    {% else %}
+                      <div class="muted watchlist-current-sub">cheapest finish</div>
+                    {% endif %}
+                  {% else %}
+                    <span class="muted">—</span>
+                  {% endif %}
+                </td>
+                <td data-label="Target" class="watchlist-target-cell">
+                  <details class="inline-details">
+                    <summary class="btn-like">
+                      {% if item.target_price is not none %}
+                        <span class="watchlist-target-display {% if item.target_met %}watchlist-target-met-mark{% endif %}">
+                          {% if item.target_met %}✓ {% endif %}${{ '%.2f'|format(item.target_price) }}
+                        </span>
+                      {% else %}
+                        <span class="muted">+ target</span>
+                      {% endif %}
+                    </summary>
+                    <div class="edit-popout mobile-popover">
+                      <form action="/watchlist/{{ item.id }}/target"
+                            method="post"
+                            class="stack-form">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                        <label>Target price (USD) <span class="watchlist-target-hint">— clear with empty to remove</span></label>
+                        <input type="number"
+                               name="target_price"
+                               step="0.01"
+                               min="0"
+                               placeholder="e.g. 25.00"
+                               value="{{ '%.2f'|format(item.target_price) if item.target_price is not none else '' }}">
+                        <button type="submit" style="margin-top: 0.25rem">Save target</button>
+                      </form>
+                    </div>
+                  </details>
                 </td>
                 <td class="col-priority-mid" data-label="Added">{{ item.added_at | format_local_datetime("%Y-%m-%d") }}</td>
                 <td class="col-priority-low" data-label="Note">
@@ -75,7 +122,7 @@
                     </div>
                   </details>
                 </td>
-                <td style="text-align: right; white-space: nowrap;">
+                <td class="watchlist-actions-cell">
                   <form action="/watchlist/{{ item.id }}/delete"
                         method="post"
                         style="display: inline">

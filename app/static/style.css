@@ -10110,3 +10110,92 @@ body.game-mode {
 /* Responsive — all three steps already collapse naturally via the
    existing .filter-row + .stack-form rules + the v3.27.8 .page-shell
    wrapper. No additional breakpoints needed here. */
+
+/* ===================================================================
+   v3.28.11 — Folio Watchlist refresh (target price + light polish)
+   ===================================================================
+   The Watchlist page (v3.27.12) is already on the Folio palette. v3.28.11
+   adds a per-row target_price column with an inline-edit popover that
+   mirrors the existing note-field pattern, plus a row highlight when
+   current price ≤ target. Plus a thin editorial italic lede on the
+   hero. No structural change.
+   =================================================== */
+
+/* Page hero — italic Newsreader lede with emphasis on "Set a target price" */
+.watchlist-hero {
+  margin-top: 1rem;
+}
+.watchlist-lede em {
+  color: var(--text);
+  font-style: italic;
+  font-weight: 500;
+}
+
+/* Table micro-typography */
+.watchlist-table {
+  /* Existing .stacking-table chrome carries; just add a few inline-text
+     sizes the page hadn't pinned. */
+}
+.watchlist-card-meta {
+  font-size: 0.78rem;
+  margin-top: 0.15rem;
+}
+.watchlist-owned-sub,
+.watchlist-current-sub {
+  font-size: 0.72rem;
+  font-style: italic;
+  margin-top: 0.1rem;
+}
+
+/* Current Price column */
+.watchlist-current-cell {
+  min-width: 5.5rem;
+}
+.watchlist-current-price {
+  font-family: ui-monospace, "JetBrains Mono", monospace;
+  font-size: 12.5px;
+  color: var(--text);
+  font-weight: 600;
+}
+
+/* Target Price column */
+.watchlist-target-cell {
+  min-width: 5.5rem;
+}
+.watchlist-target-display {
+  font-family: ui-monospace, "JetBrains Mono", monospace;
+  font-size: 12.5px;
+  color: var(--text);
+  font-weight: 600;
+}
+.watchlist-target-met-mark {
+  color: var(--brand-gold);
+}
+.watchlist-target-hint {
+  font-family: "Newsreader", serif;
+  font-style: italic;
+  font-size: 11px;
+  color: var(--muted);
+  font-weight: 400;
+  margin-left: 0.25rem;
+}
+
+/* Row highlight when current ≤ target — soft brass-gold tint + left
+   border, matching the v3.28.7 Decks-row consistency-tier chip register
+   so the alert reads in the same visual language. */
+.watchlist-row-target-met {
+  background: var(--brand-gold-soft);
+  position: relative;
+}
+.watchlist-row-target-met > td:first-child {
+  border-left: 3px solid var(--brand-gold);
+}
+.watchlist-row-target-met .watchlist-current-price {
+  color: var(--brand-gold);
+}
+
+/* Actions cell alignment */
+.watchlist-actions-cell {
+  text-align: right;
+  white-space: nowrap;
+}
