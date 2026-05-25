@@ -1,31 +1,30 @@
-{% extends "base.html" %}
-{% block content %}
-  <div style="max-width: 400px; margin: 3rem auto;">
-    <section class="panel">
-      <div class="eyebrow brand-name" style="margin-bottom: 0.5rem;">Cartarch</div>
-      <h2 class="panel-title" style="margin-bottom: 1.25rem;">Sign In</h2>
-      {% if error %}<p style="color: #b45309; font-weight: 600; margin: 0 0 1rem;">{{ error }}</p>{% endif %}
-      <form method="post" action="/login" class="stack-form">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-        <label>Email or username</label>
-        <input name="username"
-               type="text"
-               required
-               autofocus
-               autocomplete="username">
-        <label>Password</label>
-        <input name="password"
-               type="password"
-               required
-               autocomplete="current-password">
-        <button type="submit" style="margin-top: 0.5rem;">Sign In</button>
-      </form>
-      <p class="muted" style="margin-top: 1rem;">
-        <a href="/forgot-password">Forgot password?</a>
-      </p>
-      <p class="muted" style="margin-top: 0.25rem;">
-        Don't have an account? <a href="/register">Create one</a>
-      </p>
-    </section>
+{% extends "_auth_layout.html" %}
+
+{% block title %}Sign in — Cartarch{% endblock %}
+
+{% block crumb %}§ Sign in{% endblock %}
+{% block heading %}Welcome back, <b>collector</b>.{% endblock %}
+{% block subheading %}New here? <a href="/register">Create an account</a>{% endblock %}
+
+{% block form_pane %}
+  {% if error %}<p class="auth-error">{{ error }}</p>{% endif %}
+  <form method="post" action="/login" class="stack-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <label>Email or username</label>
+    <input name="username"
+           type="text"
+           required
+           autofocus
+           autocomplete="username">
+    <label>Password</label>
+    <input name="password"
+           type="password"
+           required
+           autocomplete="current-password">
+    <button type="submit">Sign in</button>
+  </form>
+  <div class="auth-foot-links">
+    <a href="/forgot-password">Forgot password?</a>
+    <span>Don't have an account? <a href="/register">Create one</a></span>
   </div>
 {% endblock %}

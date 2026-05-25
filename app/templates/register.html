@@ -1,32 +1,37 @@
-{% extends "base.html" %}
-{% block content %}
-  <div style="max-width: 400px; margin: 3rem auto;">
-    <section class="panel">
-      <div class="eyebrow brand-name" style="margin-bottom: 0.5rem;">Cartarch</div>
-      <h2 class="panel-title" style="margin-bottom: 1.25rem;">Create Account</h2>
-      {% if error %}<p style="color: #b45309; font-weight: 600; margin: 0 0 1rem;">{{ error }}</p>{% endif %}
-      <form action="/register" method="post" class="stack-form">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-        <label>Display Name</label>
-        <input type="text"
-               name="display_name"
-               placeholder="Your name"
-               required
-               autofocus
-               autocomplete="name">
-        <label>Email</label>
-        <input type="email" name="username" required autocomplete="email">
-        <label>Password</label>
-        <input type="password"
-               name="password"
-               required
-               autocomplete="new-password"
-               minlength="8">
-        <button type="submit" style="margin-top: 0.5rem;">Create Account</button>
-      </form>
-      <p class="muted" style="margin-top: 1rem;">
-        Already have an account? <a href="/login">Sign in</a>
-      </p>
-    </section>
+{% extends "_auth_layout.html" %}
+
+{% block title %}Create account — Cartarch{% endblock %}
+
+{% block crumb %}§ Register{% endblock %}
+{% block heading %}Open the <b>catalogue</b>.{% endblock %}
+{% block subheading %}Already have one? <a href="/login">Sign in instead</a>{% endblock %}
+
+{% block form_pane %}
+  {% if error %}<p class="auth-error">{{ error }}</p>{% endif %}
+  <form action="/register" method="post" class="stack-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <label>Display name</label>
+    <input type="text"
+           name="display_name"
+           placeholder="Your name"
+           required
+           autofocus
+           autocomplete="name">
+    <label>Email</label>
+    <input type="email"
+           name="username"
+           required
+           autocomplete="email">
+    <label>Password</label>
+    <input type="password"
+           name="password"
+           required
+           autocomplete="new-password"
+           minlength="8"
+           placeholder="8 characters minimum">
+    <button type="submit">Create account</button>
+  </form>
+  <div class="auth-foot-links">
+    <span>Already have an account? <a href="/login">Sign in</a></span>
   </div>
 {% endblock %}

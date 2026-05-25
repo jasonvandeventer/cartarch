@@ -7220,3 +7220,285 @@ body.game-mode {
   background: var(--panel-2);
   color: var(--text);
 }
+
+/* ============================================================================
+   === Auth two-column shell (v3.28.4) ===
+   ----------------------------------------------------------------------------
+   Standalone layout for /login, /register, /forgot-password, /reset-password.
+   The four templates extend ``_auth_layout.html`` (not ``base.html``) — auth
+   pages have no app shell (sidebar, topbar) because the user is logged out.
+   Two-column at desktop: editorial brand pane on the left, form pane on the
+   right. Collapses to single column at ≤768px (form first, brand pane
+   above; brand-pane hero hidden at narrow widths so the form stays primary).
+   Translated from the Folio design package's page_auth.jsx ``.au-*`` classes;
+   token-mapped --cream → --text, --cream-2 → --text-dim, --cream-3 → --muted,
+   --brass-2 → --accent-2, --brass-soft → --brand-gold-soft. Form input
+   styling deliberately NOT adopted from the design (the design uses italic
+   Newsreader inputs; production keeps sans inputs for autofill / password /
+   mono-space-paste affordances — same utility-vs-editorial split v3.28.3
+   used for the eyebrow scope).
+   ============================================================================ */
+
+/* Outer shell — fixed-aspect on desktop via min-height: 100vh + grid. */
+.auth-shell {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  background: var(--bg);
+  color: var(--text);
+  position: relative;
+  overflow: hidden;
+}
+/* Mirrors the body::before fractal-noise texture from v3.28.1 / v3.27.15.
+   The auth shell doesn't render base.html so it has to opt in to the
+   ambient texture itself. */
+.auth-shell::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.5;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.025'/%3E%3C/svg%3E");
+}
+
+/* === Left brand pane — crest + wordmark + hero + footer === */
+.auth-brand {
+  position: relative;
+  z-index: 1;
+  background: linear-gradient(160deg, var(--panel) 0%, var(--bg) 100%);
+  border-right: 1px solid var(--border);
+  padding: 4.5rem 5rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 2rem;
+}
+.auth-brand-top {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.875rem;
+  text-align: center;
+}
+.auth-brand-crest {
+  width: 140px;
+  height: 140px;
+  filter: drop-shadow(0 16px 36px rgba(0, 0, 0, 0.55));
+}
+.auth-brand-wordmark {
+  height: 22px;
+  width: auto;
+  display: block;
+  margin: 0 auto;
+}
+.auth-brand-tagline {
+  font-size: 9px;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  color: var(--accent-2);
+  font-weight: 500;
+  font-style: italic;
+  margin-top: 0.375rem;
+}
+
+/* Editorial hero — stamp + Newsreader italic H1 + Newsreader body. */
+.auth-brand-hero {
+  margin-top: 5rem;
+}
+.auth-brand-stamp {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 9.5px;
+  letter-spacing: 0.34em;
+  text-transform: uppercase;
+  color: var(--accent-2);
+  font-weight: 700;
+}
+.auth-brand-stamp .ln {
+  width: 32px;
+  height: 1px;
+  background: var(--accent-2);
+  flex: 0 0 auto;
+}
+.auth-brand-hero h1 {
+  margin: 1rem 0 0;
+  font-family: "Newsreader", Georgia, serif;
+  font-weight: 400;
+  font-style: italic;
+  font-size: clamp(2rem, 3.6vw, 3.125rem);
+  line-height: 1.02;
+  letter-spacing: -0.015em;
+  color: var(--text);
+}
+.auth-brand-hero h1 b {
+  font-style: normal;
+  font-weight: 500;
+}
+.auth-brand-hero p {
+  margin: 1.125rem 0 0;
+  font-family: "Newsreader", Georgia, serif;
+  font-size: 0.94rem;
+  line-height: 1.6;
+  color: var(--text-dim);
+  max-width: 29rem;
+}
+.auth-brand-hero p b {
+  font-weight: 500;
+  color: var(--text);
+}
+
+/* Footer — version (rendered via | folio filter) + tagline + posture. */
+.auth-brand-footer {
+  display: flex;
+  gap: 1.25rem;
+  align-items: baseline;
+  font-family: "Newsreader", Georgia, serif;
+  font-style: italic;
+  font-size: 0.75rem;
+  color: var(--muted);
+  flex-wrap: wrap;
+}
+.auth-brand-footer .v {
+  font-family: ui-monospace, "JetBrains Mono", monospace;
+  font-style: normal;
+  color: var(--text-dim);
+}
+
+/* === Right form pane === */
+.auth-form-wrap {
+  position: relative;
+  z-index: 1;
+  padding: 4.5rem 5rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+.auth-form {
+  max-width: 28rem;
+  width: 100%;
+  margin: 0 auto;
+}
+.auth-form-head {
+  margin-bottom: 1.75rem;
+}
+/* Form-pane H1 — Newsreader italic large display, matches package's .au-form .head h2.
+   Per v3.28.3 .pagehead-title's pattern but slightly larger for the auth surface. */
+.auth-form-head h1 {
+  margin: 0.625rem 0 0.25rem;
+  font-family: "Newsreader", Georgia, serif;
+  font-weight: 400;
+  font-style: italic;
+  font-size: 2rem;
+  line-height: 1.05;
+  letter-spacing: -0.012em;
+  color: var(--text);
+}
+.auth-form-head h1 b {
+  font-style: normal;
+  font-weight: 500;
+}
+.auth-form-head .auth-form-sub {
+  font-family: "Newsreader", Georgia, serif;
+  font-style: italic;
+  font-size: 0.875rem;
+  color: var(--muted);
+  margin-top: 0.5rem;
+}
+.auth-form-head .auth-form-sub a {
+  color: var(--accent-2);
+}
+
+/* Existing .stack-form / form inputs / .panel styling is reused inside
+   .auth-form. The form pane is intentionally NOT wrapped in a .panel —
+   the brand pane provides the visual containment, and the form floats
+   directly on the warm-charcoal ground. */
+.auth-form .stack-form button[type="submit"] {
+  margin-top: 0.5rem;
+}
+
+/* Error / state messages inside the form pane carry the editorial register
+   but stay color-coded. */
+.auth-form .auth-error {
+  color: var(--accent-2);
+  font-family: "Newsreader", Georgia, serif;
+  font-style: italic;
+  font-size: 0.95rem;
+  margin: 0 0 1rem;
+}
+.auth-form .auth-success {
+  color: var(--brand-green);
+  font-family: "Newsreader", Georgia, serif;
+  font-weight: 500;
+  font-style: italic;
+  font-size: 0.95rem;
+  margin: 0 0 1rem;
+}
+.auth-form .auth-notice {
+  color: var(--muted);
+  font-family: "Newsreader", Georgia, serif;
+  font-style: italic;
+  font-size: 0.95rem;
+  line-height: 1.55;
+  margin: 0 0 1rem;
+}
+.auth-form .auth-foot-links {
+  margin-top: 1.5rem;
+  font-family: "Newsreader", Georgia, serif;
+  font-style: italic;
+  font-size: 0.875rem;
+  color: var(--muted);
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+.auth-form .auth-foot-links a {
+  color: var(--accent-2);
+}
+
+/* === Responsive collapse at ≤768px ===
+   Two-column → single-column; brand pane condenses to crest + wordmark
+   only (the editorial hero hides — the form must be the focus on phones).
+   Form pane gets reduced padding so the input width remains usable. */
+@media (max-width: 768px) {
+  .auth-shell {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr;
+    min-height: 100vh;
+  }
+  .auth-brand {
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+    padding: 2rem 1.5rem 1.5rem;
+    gap: 1rem;
+  }
+  .auth-brand-top {
+    flex-direction: row;
+    gap: 0.875rem;
+    text-align: left;
+    justify-content: center;
+  }
+  .auth-brand-crest {
+    width: 56px;
+    height: 56px;
+  }
+  .auth-brand-wordmark {
+    margin: 0;
+  }
+  .auth-brand-tagline {
+    text-align: left;
+    margin-top: 0.25rem;
+  }
+  /* Hide the editorial hero + footer at phone widths — form first. */
+  .auth-brand-hero,
+  .auth-brand-footer {
+    display: none;
+  }
+  .auth-form-wrap {
+    padding: 2rem 1.5rem 3rem;
+  }
+  .auth-form-head h1 {
+    font-size: 1.625rem;
+  }
+}

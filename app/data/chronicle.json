@@ -1,5 +1,18 @@
 [
   {
+    "version": "3.28.4",
+    "date": "2026-05-24",
+    "added": [
+      "The sign-in, register, forgot-password, and reset-password pages have an editorial brand pane on the left — Cartarch crest, wordmark, tagline, and a short note on what Cartarch is for — alongside the form on the right. The previous auth pages were a small centred form on an empty page; now arriving at one of those screens feels like opening a magazine cover.",
+      "On phones the brand pane condenses to just the crest and wordmark at the top and the form takes the whole screen — built responsive from day one so we won't have to redo it for the mobile pass."
+    ],
+    "refined": [
+      "All four auth pages now share a single layout so any future change to the brand pane lands in one place. The form behaviour — validation, password strength, the forgot/reset link contract, CSRF — is identical to before; only the surrounding layout changed."
+    ],
+    "resolved": [],
+    "archivist_note": "First page of the cluster's real redesign work. We picked Auth as the entry point because it's the bounded one: four small pages, one shared layout, no schema in sight. The Dashboard is the bigger build — it's next, with nine editorial panels to translate. Auth is the practice run for that mechanism."
+  },
+  {
     "version": "3.28.3",
     "date": "2026-05-24",
     "added": [

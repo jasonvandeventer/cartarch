@@ -1,0 +1,95 @@
+{# v3.28.4 — Shared two-column auth layout (login / register / forgot_password
+   / reset_password). Standalone shell — does NOT extend base.html because
+   auth pages have no app sidebar/topbar (user is logged out). Translates
+   the Folio design package's page_auth.jsx AuthShell into production.
+
+   Brand pane on the left (crest + wordmark + tagline + editorial hero + footer)
+   is shared across all four templates; the form pane on the right is filled
+   per-page via the {% block form_pane %} hook.
+
+   Per-page blocks the four auth templates supply:
+     - {% block title %}     — <title> for the document head
+     - {% block crumb %}     — the form-pane eyebrow text (e.g. "§ Sign in")
+     - {% block heading %}   — the form-pane H1 (Newsreader italic)
+     - {% block subheading %} — italic subhead line under the heading (links to sibling page)
+     - {% block form_pane %} — the form content itself
+
+   The hero (left brand pane) is intentionally generic for all four templates —
+   pre-login pages can't surface user-specific data, and the form-pane eyebrow
+   signals which auth surface you're on. Final marketing copy for the hero is
+   a follow-up; this v3.28.4 version is the working content. #}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Cartarch{% endblock %}</title>
+  <link rel="icon" type="image/svg+xml" href="/static/brand/icon/favicon.svg">
+  <link rel="icon" type="image/x-icon" href="/static/brand/icon/favicon.ico">
+  <link rel="apple-touch-icon" href="/static/brand/icon/apple-touch-icon.png">
+  <link rel="manifest" href="/static/manifest.json">
+  <meta name="theme-color" content="#1A130C">
+  <link rel="stylesheet" href="/static/style.css?v={{ static_v('style.css') }}">
+</head>
+<body class="auth-body">
+<div class="auth-shell">
+
+  {# === LEFT BRAND PANE — shared across all four auth pages === #}
+  <section class="auth-brand">
+    <div class="auth-brand-top">
+      <img class="auth-brand-crest"
+           src="/static/brand/logo/cartarch-icon.svg"
+           alt="Cartarch">
+      <div>
+        <img class="auth-brand-wordmark"
+             src="/static/brand/logo/cartarch-wordmark.svg"
+             alt="Cartarch">
+        <div class="auth-brand-tagline">The ruler of your collection</div>
+      </div>
+    </div>
+
+    <div class="auth-brand-hero">
+      <div class="auth-brand-stamp">
+        <span class="ln" aria-hidden="true"></span>
+        <span>By collectors · For collectors</span>
+      </div>
+      <h1>Cartarch. <b>Built for the long collection.</b></h1>
+      <p>
+        A premium platform for the physical workflow of serious Magic
+        collectors. Track every printing, organise every storage location,
+        bring your decks and your games into one <b>record</b>.
+      </p>
+    </div>
+
+    <div class="auth-brand-footer">
+      <span>{{ app_version | folio }}</span>
+      <span>·</span>
+      <span>Built since <span class="v">1999</span></span>
+      <span>·</span>
+      <span>Independent</span>
+    </div>
+  </section>
+
+  {# === RIGHT FORM PANE === #}
+  <section class="auth-form-wrap">
+    <div class="auth-form">
+      <div class="auth-form-head">
+        {# v3.28.3 editorial_eyebrow — pages pass the crumb string they want
+           (e.g. "§ Sign in" for the auth-specific single-token § shape). #}
+        <div class="eyebrow">
+          <span class="ln" aria-hidden="true"></span>
+          <span>{% block crumb %}{% endblock %}</span>
+        </div>
+        <h1>{% block heading %}{% endblock %}</h1>
+        {% if self.subheading()|trim %}
+          <div class="auth-form-sub">{% block subheading %}{% endblock %}</div>
+        {% endif %}
+      </div>
+
+      {% block form_pane %}{% endblock %}
+    </div>
+  </section>
+
+</div>
+</body>
+</html>
