@@ -89,6 +89,16 @@
       {% if current_user %}
         <aside class="app-sidebar" aria-label="Primary navigation">
           <nav class="sidebar-nav">
+            {# v3.29.5 — .sidebar-nav-scroll wraps the five nav groups as
+               the internally-scrolling middle region of the sidebar's
+               flex column. The Donate link sits below as a non-scrolling
+               footer (flex: 0 0 auto). The wrapper carries
+               `min-height: 0` so the flex child can shrink below content
+               height on short viewports — without it the internal scroll
+               never engages. Mobile (≤768px) hides the sidebar entirely
+               via the .app-sidebar { display: none } rule, so this
+               structure has no effect there. #}
+            <div class="sidebar-nav-scroll">
             <div class="nav-group">
               <div class="nav-label">Overview</div>
               <a href="/" class="nav-item{% if path == '/' %} active{% endif %}">
@@ -229,6 +239,7 @@
                 <span>Chronicle</span>
               </a>
             </div>
+            </div>{# /.sidebar-nav-scroll — end of v3.29.5 scrolling middle region #}
             {# v3.29.3 — Donate. Pinned at the bottom of the sidebar,
                visually separated from the five nav groups: it is a
                support ask, not navigation. External Ko-fi link
@@ -236,7 +247,10 @@
                any active-state or on_more highlight logic — has no
                in-app route and therefore no "active" state. Donation-
                flavored CTA wording only ("Donate") — the project's
-               donation-only / no-paywall posture is deliberate. #}
+               donation-only / no-paywall posture is deliberate.
+               v3.29.5 — now lives in the non-scrolling flex: 0 0 auto
+               footer region of the sticky 100vh sidebar; visible on
+               all pages without scrolling the page body. #}
             <a href="https://ko-fi.com/coruscantsunrise"
                target="_blank"
                rel="noopener noreferrer"

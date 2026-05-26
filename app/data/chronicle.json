@@ -1,5 +1,19 @@
 [
   {
+    "version": "3.29.5",
+    "date": "2026-05-26",
+    "added": [
+      "Sticky sidebar — Donate is now visible on every page without scrolling. The desktop sidebar becomes its own fixed, viewport-height column with an internal scroll region for the five nav groups and a non-scrolling footer for the Donate link. On long pages (Collection, Sets) the sidebar stays put while the page body scrolls. On short laptop viewports where the nav groups don't all fit at once, the middle region scrolls internally and the wordmark up top + Donate at the bottom stay pinned in view."
+    ],
+    "refined": [
+      "The v3.29.3 in-flow bottom-pin (margin-top:auto on the Donate link inside .sidebar-nav) is retired. That mechanism placed Donate at the bottom of the sidebar's natural flow, which only surfaced it after scrolling the page body to the foot — exactly the opposite of what was wanted. The new structure puts Donate in a non-scrolling footer of a sticky 100vh column, so it is visible immediately on every page."
+    ],
+    "resolved": [
+      "Closes the actual cause of the v3.29.3 'Donate is far below the fold on long pages' issue — the sidebar now has its own viewport-height shell and doesn't scroll with the page body."
+    ],
+    "archivist_note": "A small structural correction with an outsized effect on whether the donation surface gets seen. The v3.29.3 release pinned Donate to the bottom of the sidebar's flow, which worked in isolation but lost the user's eye on any page tall enough to require scrolling. The fix was not to relocate the Donate link but to give the sidebar the independent viewport-height frame the design always implicitly assumed. The topbar also picks up sticky behaviour on desktop here so the geometry stays clean — the sidebar sits in the space immediately below the topbar, with no gap, on every scroll position. Mobile is deliberately untouched: at ≤768px the sidebar is hidden and the bottom-nav + More menu (which already carries Donate) handles navigation as before."
+  },
+  {
     "version": "3.29.4",
     "date": "2026-05-26",
     "added": [
