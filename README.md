@@ -2,7 +2,7 @@
 
 Self-hosted web application for managing a physical Magic: The Gathering collection. (Identifies as **Cartarch** in user-facing UI as of v3.27.6; the in-repo project identifier is still `mana-archive` pending the full infrastructure rename near actual public launch.)
 
-**Current version: v3.30.0** · [Platform repo](https://github.com/jasonvandeventer/mana-archive-platform)
+**Current version: v3.30.1** · [Platform repo](https://github.com/jasonvandeventer/mana-archive-platform)
 
 ---
 

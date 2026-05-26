@@ -1,5 +1,21 @@
 [
   {
+    "version": "3.30.1",
+    "date": "2026-05-26",
+    "added": [
+      "Fullscreen play surface \u2014 the Goldfish playtester now claims the whole viewport instead of sitting inside the standard app chrome. The sidebar and topbar disappear behind the play surface; a slim bar across the top carries a back arrow (returns to the deck), the deck name, the current Life and Turn totals, and a fullscreen toggle (browser fullscreen \u2014 goes truly edge-to-edge, useful on a second monitor or a tablet).",
+      "Type-based battlefield regions \u2014 the old two-row Lands / Permanents split becomes five distinct regions: **Creatures**, **Lands**, **Artifacts & Enchantments**, **Planeswalkers & Battles**, and **Other** as the catch-all. Cards still auto-arrange \u2014 the app sorts each card into a region \u2014 but now with card-type separation. Cards entering by click and cards entering by drag both end up in the right region by the same rule, so the two interaction models can't disagree."
+    ],
+    "refined": [
+      "Card-type priority is strict and stated: Creature beats Planeswalker / Battle beats Artifact / Enchantment beats Land beats Other. The first match wins. An artifact creature lands in Creatures (creature wins \u2014 the way a player thinks of an artifact creature in play). An enchantment creature does too. Mishra's Factory lands in Creatures during its creature phase too \u2014 well, it lands as a land, but you get the picture. Mana rocks stay in Artifacts & Enchantments. Regions are organized by card *type*, not by function \u2014 the room doesn't try to be clever about what each artifact does.",
+      "All v3.30.0 interactions carry forward unchanged: left-click on a battlefield card taps or untaps it; right-click and touch long-press open the context menu; drag-and-drop works between every zone; the mana pool still prompts when you tap an untapped land; library browse still sorts (not draw order) and reshuffles on close; Look-at-top-N stays separate; the hover preview pane is still there."
+    ],
+    "resolved": [
+      "Closes the playtester-feels-cramped feedback from the post-v3.30.0 dev session. The play surface now uses the whole viewport, the way Moxfield's does, and the cards have room to breathe. Card-type separation lands inline with the fullscreen pass since both improvements share a theme \u2014 the playtester gets a real play surface."
+    ],
+    "archivist_note": "The Goldfish room expands. It needed the space. The chrome that surrounds the rest of Cartarch is reasonable for a collection \u2014 visible nav, clear topbar, the rhythm of a catalogue \u2014 but it was the wrong frame for a play surface. The room now takes the table; the doorway out is the small arrow in the corner. The battlefield's five regions are the smallest concession to type-separation that still works the way a player thinks about cards in play. We didn't draw a coordinate grid; we just gave each card-type its own bucket. The room sorts; you play."
+  },
+  {
     "version": "3.30.0",
     "date": "2026-05-26",
     "added": [

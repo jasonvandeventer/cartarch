@@ -13139,3 +13139,313 @@ table.dmtx .dmtx-rowhead {
   }
   .gf-mp-pips { grid-template-columns: repeat(6, auto); }
 }
+
+/* ============================================================================
+   v3.30.1 — Goldfish playtester: fullscreen shell + type-based regions
+   Change A — .gf-app overlay (mirrors the v3.28.13 game tracker pattern)
+   Change B — five battlefield regions (Creatures / Lands / Artifacts &
+              Enchantments / Planeswalkers & Battles / Other)
+   All new rules namespaced .gf-*. Token reuse only.
+   ============================================================================ */
+
+/* Lock page scroll while the playtester is mounted. Parallel to the
+   v3.28.13 tracker's `body.game-mode`. The .gf-app overlay covers the
+   sidebar + topbar via position:fixed, so the rest of the app remains
+   reachable only by navigating away (the ← back-to-deck chip). */
+body.gf-mode { overflow: hidden; }
+
+/* Full-viewport overlay — covers .app-shell, .app-sidebar, .app-topbar
+   without modifying them. Same z-index tier as .game-app (500). */
+.gf-app {
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  background: var(--bg);
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='4' height='4'%3E%3Ccircle cx='1' cy='1' r='0.6' fill='rgba(181,138,71,0.04)'/%3E%3C/svg%3E");
+  background-size: 4px 4px;
+  display: flex;
+  flex-direction: column;
+  color: var(--text);
+}
+
+/* Masthead — slim bar with back chip + deck title + Life/Turn stats +
+   fullscreen toggle. Parallel to .game-masthead. */
+.gf-app-mast {
+  flex: 0 0 auto;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.5rem 1rem;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+  min-height: 52px;
+}
+.gf-mast-left {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 0;
+}
+.gf-mast-back {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  text-decoration: none;
+  font: 700 18px/1 "Montserrat", system-ui, sans-serif;
+  cursor: pointer;
+  flex: 0 0 auto;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+.gf-mast-back:hover {
+  background: var(--brand-gold);
+  border-color: var(--brand-gold);
+  color: var(--brand-near-black);
+}
+.gf-mast-title {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+.gf-mast-eyebrow {
+  font: 600 10px/1 "Montserrat", system-ui, sans-serif;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--brand-gold);
+}
+.gf-mast-deck {
+  font: italic 500 16px/1.2 "Newsreader", Georgia, serif;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.gf-mast-center {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  justify-content: center;
+}
+.gf-mast-stat {
+  font: 500 13px/1 "Montserrat", system-ui, sans-serif;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+.gf-mast-stat strong {
+  color: var(--text);
+  font-weight: 700;
+}
+.gf-mast-right {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 0.5rem;
+}
+.gf-mast-btn {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  border-radius: var(--radius-sm);
+  font: 700 16px/1 "Montserrat", system-ui, sans-serif;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+.gf-mast-btn:hover {
+  background: var(--brand-gold-soft);
+  border-color: var(--brand-gold);
+  color: var(--brand-gold);
+}
+
+/* Controls — slim under the masthead; v3.30.0 .gf-controls-panel rule
+   styles the row, but we override its container chrome (was a .panel
+   with v3.27.7 panel chrome). The fullscreen surface doesn't want a
+   panel here; controls float on the overlay background. */
+.gf-app .gf-controls-panel {
+  flex: 0 0 auto;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+  padding: 0.5rem 1rem;
+  border-radius: 0;
+}
+.gf-app .gf-controls-row {
+  gap: 0.4rem;
+}
+.gf-readout-inline {
+  margin-left: auto;
+  display: inline-flex;
+  gap: 1rem;
+  align-items: center;
+  background: transparent;
+  border: none;
+  padding: 0;
+}
+.gf-readout-inline .gf-readout {
+  font: italic 400 12px/1.2 "Newsreader", Georgia, serif;
+  color: var(--text-dim);
+}
+.gf-readout-inline .gf-readout strong {
+  font-style: normal;
+  font-family: "Montserrat", system-ui, sans-serif;
+  font-weight: 600;
+  color: var(--text);
+}
+
+/* Board panel inside .gf-app — flex-grow to fill remaining height; the
+   board itself uses CSS grid for the 3-column layout. v3.30.0's
+   .gf-board-panel was a side-by-side board+preview grid in a normal
+   panel; here we keep the same 1fr/240px columns but flex into the
+   fullscreen frame. */
+.gf-app .gf-board-panel {
+  flex: 1 1 auto;
+  background: transparent;
+  padding: 0.75rem;
+  border: none;
+  border-radius: 0;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 1fr 240px;
+  gap: 0.75rem;
+  overflow: hidden;
+}
+.gf-app .gf-board {
+  display: grid;
+  grid-template-columns: 160px 1fr 160px;
+  gap: 0.75rem;
+  min-height: 0;
+  height: 100%;
+}
+.gf-app .gf-board-main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  min-height: 0;
+}
+
+/* Battlefield — five type-based regions on a CSS grid that gives
+   Creatures the dominant area, Lands a wide secondary row, and the
+   three smaller regions a 3-column bottom row. Override the v3.30.0
+   .gf-battlefield flex-column rule with grid layout. */
+.gf-app .gf-battlefield {
+  flex: 1 1 auto;
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 1fr;
+  grid-template-rows: 1.5fr 1fr;
+  grid-template-areas:
+    "creatures creatures pwbattle"
+    "lands     artenc    other";
+  gap: 0.5rem;
+  min-height: 0;
+  padding: 0.5rem;
+}
+
+.gf-bf-region {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  align-items: flex-start;
+  align-content: flex-start;
+  padding: 1.6rem 0.5rem 0.5rem;
+  background: var(--panel-2);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-sm);
+  min-height: 140px;
+  overflow-y: auto;
+  transition: border-color 0.15s, background 0.15s;
+}
+.gf-bf-creatures { grid-area: creatures; }
+.gf-bf-lands { grid-area: lands; background: rgba(181, 138, 71, 0.03); }
+.gf-bf-artenc { grid-area: artenc; }
+.gf-bf-pwbattle { grid-area: pwbattle; }
+.gf-bf-other { grid-area: other; }
+
+.gf-bf-region-label {
+  position: absolute;
+  top: 0.3rem;
+  left: 0.5rem;
+  font: italic 500 12px/1 "Newsreader", Georgia, serif;
+  color: var(--muted);
+  letter-spacing: 0.02em;
+  user-select: none;
+  pointer-events: none;
+}
+.gf-bf-region-empty .gf-bf-region-label {
+  color: var(--text-dim);
+}
+
+/* Hand — flex-grow inside the fullscreen frame, dedicated row below
+   battlefield. Style overrides keep v3.30.0 chrome but adjust height. */
+.gf-app .gf-hand {
+  flex: 0 0 auto;
+  min-height: 170px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.5rem;
+}
+
+/* Rails take the full vertical track in the fullscreen frame. */
+.gf-app .gf-rail {
+  height: 100%;
+  min-height: 0;
+}
+.gf-app .gf-zone {
+  flex: 1 1 0;
+  min-height: 0;
+}
+
+/* Responsive — at ≤980px the right preview rail drops below the board,
+   and the battlefield grid collapses to a single column with regions
+   stacked. The .gf-app keeps its overlay nature; only its interior
+   reflows. */
+@media (max-width: 980px) {
+  .gf-app .gf-board-panel {
+    grid-template-columns: 1fr;
+  }
+  .gf-app .gf-board {
+    grid-template-columns: 1fr;
+  }
+  .gf-app .gf-rail {
+    flex-direction: row;
+    flex-wrap: wrap;
+    height: auto;
+  }
+  .gf-app .gf-zone {
+    flex: 1 1 220px;
+  }
+  .gf-app .gf-battlefield {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto;
+    grid-template-areas:
+      "creatures"
+      "lands"
+      "artenc"
+      "pwbattle"
+      "other";
+  }
+  .gf-mast-center { display: none; }
+  .gf-readout-inline { margin-left: 0; }
+}
+
+@media (max-width: 640px) {
+  .gf-mast-deck { font-size: 14px; }
+  .gf-app .gf-controls-row { flex-wrap: wrap; }
+}
+
+/* The legacy v3.30.0 .gf-hero panel + .gf-board-panel as a top-level
+   panel are no longer rendered (the template now wraps everything in
+   .gf-app and replaces .gf-hero with .gf-app-mast). The old class
+   rules in style.css are preserved per the project's retired-class-
+   family precedent — they sit dormant under the .gf-app overlay layer
+   and have no DOM consumer. */

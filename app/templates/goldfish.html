@@ -1,121 +1,165 @@
 {% extends "base.html" %}
-{% from "_macros.html" import editorial_eyebrow %}
 {% block content %}
-  <section class="panel hero-panel compact-hero gf-hero">
-    <div class="hero-row">
-      <div>
-        {{ editorial_eyebrow("Play · Decks · " ~ deck.name ~ " · Goldfish") }}
-        <h2 class="panel-title">Goldfish · {{ deck.name }}</h2>
-        <p class="muted gf-hero-lede">
-          A loose single-player draws-and-curve test. No opponent, no rules
-          enforcement. Nothing persists — reload starts a fresh game.
-        </p>
+  {# v3.30.1 — fullscreen play surface. Mirrors the v3.28.13 game tracker
+     pattern: extend base.html unchanged (sidebar + topbar render in DOM,
+     but the .gf-app overlay at position:fixed inset:0 z-index:500 sits
+     above them and a `document.body.classList.add('gf-mode')` line in
+     goldfish.js applies body.gf-mode { overflow: hidden } so the page
+     scroll is locked. Cleared on pagehide.) Exit via the masthead's
+     ← Back-to-deck chip, parallel to the tracker's ← link. #}
+  <div class="gf-app" id="gf-app" data-deck-id="{{ deck.id }}">
+    <div class="gf-app-mast" id="gf-app-mast">
+      <div class="gf-mast-left">
+        <a class="gf-mast-back" href="/decks/{{ deck.id }}" title="Back to deck">←</a>
+        <div class="gf-mast-title">
+          <span class="gf-mast-eyebrow">Goldfish</span>
+          <span class="gf-mast-deck">{{ deck.name }}</span>
+        </div>
       </div>
-      <div class="hero-stats-inline">
-        <span><strong id="gf-stat-life">40</strong> Life</span>
-        <span>Turn <strong id="gf-stat-turn">1</strong></span>
-        <a class="btn-like" href="/decks/{{ deck.id }}">← Back to deck</a>
+      <div class="gf-mast-center" id="gf-mast-center">
+        <span class="gf-mast-stat"><strong id="gf-stat-life">40</strong> Life</span>
+        <span class="gf-mast-stat">Turn <strong id="gf-stat-turn">1</strong></span>
+      </div>
+      <div class="gf-mast-right">
+        <button type="button"
+                class="gf-mast-btn gf-mast-fs"
+                id="gf-btn-fullscreen"
+                title="Toggle fullscreen">⛶</button>
       </div>
     </div>
-  </section>
 
-  <section class="panel gf-controls-panel">
-    <div class="gf-controls-row">
-      <button type="button" id="gf-btn-new-game" class="gf-btn gf-btn-primary">New game</button>
-      <button type="button" id="gf-btn-new-turn" class="gf-btn">New turn</button>
-      <button type="button" id="gf-btn-draw" class="gf-btn">Draw</button>
-      <button type="button" id="gf-btn-untap-all" class="gf-btn">Untap all</button>
-      <button type="button" id="gf-btn-mulligan" class="gf-btn">Mulligan</button>
-      <button type="button" id="gf-btn-shuffle" class="gf-btn">Shuffle library</button>
-      <span class="gf-control-group">
-        <label class="gf-control-label" for="gf-input-mill">Mill</label>
-        <input type="number" id="gf-input-mill" class="gf-input-num" min="1" max="100" value="1">
-        <button type="button" id="gf-btn-mill" class="gf-btn">Mill N</button>
-      </span>
-      <span class="gf-control-group">
-        <label class="gf-control-label" for="gf-input-look">Look</label>
-        <input type="number" id="gf-input-look" class="gf-input-num" min="1" max="20" value="3">
-        <button type="button" id="gf-btn-look" class="gf-btn">Look at top N</button>
-      </span>
-      <span class="gf-control-group">
-        <label class="gf-control-label" for="gf-input-life">Life</label>
-        <button type="button" class="gf-btn gf-btn-small" data-life-delta="-1">−1</button>
-        <button type="button" class="gf-btn gf-btn-small" data-life-delta="1">+1</button>
-        <button type="button" class="gf-btn gf-btn-small" data-life-delta="-5">−5</button>
-        <button type="button" class="gf-btn gf-btn-small" data-life-delta="5">+5</button>
-      </span>
+    <div class="gf-controls-panel">
+      <div class="gf-controls-row">
+        <button type="button" id="gf-btn-new-game" class="gf-btn gf-btn-primary">New game</button>
+        <button type="button" id="gf-btn-new-turn" class="gf-btn">New turn</button>
+        <button type="button" id="gf-btn-draw" class="gf-btn">Draw</button>
+        <button type="button" id="gf-btn-untap-all" class="gf-btn">Untap all</button>
+        <button type="button" id="gf-btn-mulligan" class="gf-btn">Mulligan</button>
+        <button type="button" id="gf-btn-shuffle" class="gf-btn">Shuffle library</button>
+        <span class="gf-control-group">
+          <label class="gf-control-label" for="gf-input-mill">Mill</label>
+          <input type="number" id="gf-input-mill" class="gf-input-num" min="1" max="100" value="1">
+          <button type="button" id="gf-btn-mill" class="gf-btn">Mill N</button>
+        </span>
+        <span class="gf-control-group">
+          <label class="gf-control-label" for="gf-input-look">Look</label>
+          <input type="number" id="gf-input-look" class="gf-input-num" min="1" max="20" value="3">
+          <button type="button" id="gf-btn-look" class="gf-btn">Look at top N</button>
+        </span>
+        <span class="gf-control-group">
+          <label class="gf-control-label">Life</label>
+          <button type="button" class="gf-btn gf-btn-small" data-life-delta="-1">−1</button>
+          <button type="button" class="gf-btn gf-btn-small" data-life-delta="1">+1</button>
+          <button type="button" class="gf-btn gf-btn-small" data-life-delta="-5">−5</button>
+          <button type="button" class="gf-btn gf-btn-small" data-life-delta="5">+5</button>
+        </span>
+        <span class="gf-control-group gf-readout-inline">
+          <span class="gf-readout">Hand: <strong id="gf-readout-hand">—</strong></span>
+          <span class="gf-readout">Lands: <strong id="gf-readout-lands">—</strong></span>
+          <span class="gf-readout">Avg MV: <strong id="gf-readout-avgmv">—</strong></span>
+        </span>
+      </div>
     </div>
-    <div class="gf-readout-row">
-      <span class="gf-readout">Opening hand: <strong id="gf-readout-hand">—</strong></span>
-      <span class="gf-readout">Lands: <strong id="gf-readout-lands">—</strong></span>
-      <span class="gf-readout">Avg spell MV: <strong id="gf-readout-avgmv">—</strong></span>
-    </div>
-  </section>
 
-  <section class="panel gf-board-panel">
-    <div class="gf-board">
-      <aside class="gf-rail gf-rail-left">
-        <div class="gf-zone gf-zone-pile" data-zone="library">
-          <div class="gf-zone-head"><span class="gf-zone-name">Library</span><span class="gf-zone-count" id="gf-count-library">0</span></div>
-          <div class="gf-pile gf-pile-library" id="gf-pile-library">
-            <div class="gf-card-back" id="gf-card-back-library" tabindex="0" role="button" aria-label="Library">
-              <span class="gf-card-back-glyph">§</span>
+    <div class="gf-board-panel">
+      <div class="gf-board">
+        <aside class="gf-rail gf-rail-left">
+          <div class="gf-zone gf-zone-pile" data-zone="library">
+            <div class="gf-zone-head"><span class="gf-zone-name">Library</span><span class="gf-zone-count" id="gf-count-library">0</span></div>
+            <div class="gf-pile gf-pile-library" id="gf-pile-library">
+              <div class="gf-card-back" id="gf-card-back-library" tabindex="0" role="button" aria-label="Library">
+                <span class="gf-card-back-glyph">§</span>
+              </div>
             </div>
           </div>
-        </div>
-        <div class="gf-zone gf-zone-pile" data-zone="exile">
-          <div class="gf-zone-head"><span class="gf-zone-name">Exile</span><span class="gf-zone-count" id="gf-count-exile">0</span></div>
-          <div class="gf-pile" id="gf-pile-exile" data-zone-drop="exile"></div>
-        </div>
-      </aside>
+          <div class="gf-zone gf-zone-pile" data-zone="exile">
+            <div class="gf-zone-head"><span class="gf-zone-name">Exile</span><span class="gf-zone-count" id="gf-count-exile">0</span></div>
+            <div class="gf-pile" id="gf-pile-exile" data-zone-drop="exile"></div>
+          </div>
+        </aside>
 
-      <div class="gf-board-main">
-        <div class="gf-battlefield" data-zone-drop="battlefield-permanents">
-          <div class="gf-battlefield-row gf-row-permanents" id="gf-row-permanents" data-row="permanents">
-            <div class="gf-row-label">Permanents</div>
+        <div class="gf-board-main">
+          {# v3.30.1 — five type-based battlefield regions. Auto-arranged via
+             classifyRegion(card.type_line) using the priority Creature →
+             Planeswalker/Battle → Artifact/Enchantment → Land → Other.
+             An artifact creature lands in Creatures (creature wins). A
+             mana rock stays in Artifacts & Enchantments — region is by
+             card *type*, not by function. Supersedes v3.30.0's 2-row
+             Lands/Permanents split. #}
+          <div class="gf-battlefield" id="gf-battlefield" data-zone-drop="battlefield">
+            <div class="gf-bf-region gf-bf-creatures"
+                 id="gf-region-creatures"
+                 data-region="creatures"
+                 data-zone-drop="battlefield">
+              <div class="gf-bf-region-label">Creatures</div>
+            </div>
+            <div class="gf-bf-region gf-bf-lands"
+                 id="gf-region-lands"
+                 data-region="lands"
+                 data-zone-drop="battlefield">
+              <div class="gf-bf-region-label">Lands</div>
+            </div>
+            <div class="gf-bf-region gf-bf-artenc"
+                 id="gf-region-artenc"
+                 data-region="artenc"
+                 data-zone-drop="battlefield">
+              <div class="gf-bf-region-label">Artifacts &amp; Enchantments</div>
+            </div>
+            <div class="gf-bf-region gf-bf-pwbattle"
+                 id="gf-region-pwbattle"
+                 data-region="pwbattle"
+                 data-zone-drop="battlefield">
+              <div class="gf-bf-region-label">Planeswalkers &amp; Battles</div>
+            </div>
+            <div class="gf-bf-region gf-bf-other"
+                 id="gf-region-other"
+                 data-region="other"
+                 data-zone-drop="battlefield">
+              <div class="gf-bf-region-label">Other</div>
+            </div>
           </div>
-          <div class="gf-battlefield-row gf-row-lands" id="gf-row-lands" data-row="lands" data-zone-drop="battlefield-lands">
-            <div class="gf-row-label">Lands</div>
+
+          <div class="gf-hand" id="gf-hand" data-zone-drop="hand">
+            <div class="gf-zone-head gf-hand-head">
+              <span class="gf-zone-name">Hand</span>
+              <span class="gf-zone-count" id="gf-count-hand">0</span>
+            </div>
+            <div class="gf-hand-strip" id="gf-hand-strip"></div>
           </div>
         </div>
 
-        <div class="gf-hand" id="gf-hand" data-zone-drop="hand">
-          <div class="gf-zone-head gf-hand-head">
-            <span class="gf-zone-name">Hand</span>
-            <span class="gf-zone-count" id="gf-count-hand">0</span>
+        <aside class="gf-rail gf-rail-right">
+          <div class="gf-zone gf-zone-pile" data-zone="command">
+            <div class="gf-zone-head"><span class="gf-zone-name">Command</span><span class="gf-zone-count" id="gf-count-command">0</span></div>
+            <div class="gf-pile" id="gf-pile-command" data-zone-drop="command"></div>
           </div>
-          <div class="gf-hand-strip" id="gf-hand-strip"></div>
-        </div>
+          <div class="gf-zone gf-zone-pile" data-zone="graveyard">
+            <div class="gf-zone-head"><span class="gf-zone-name">Graveyard</span><span class="gf-zone-count" id="gf-count-graveyard">0</span></div>
+            <div class="gf-pile" id="gf-pile-graveyard" data-zone-drop="graveyard"></div>
+          </div>
+        </aside>
       </div>
 
-      <aside class="gf-rail gf-rail-right">
-        <div class="gf-zone gf-zone-pile" data-zone="command">
-          <div class="gf-zone-head"><span class="gf-zone-name">Command</span><span class="gf-zone-count" id="gf-count-command">0</span></div>
-          <div class="gf-pile" id="gf-pile-command" data-zone-drop="command"></div>
-        </div>
-        <div class="gf-zone gf-zone-pile" data-zone="graveyard">
-          <div class="gf-zone-head"><span class="gf-zone-name">Graveyard</span><span class="gf-zone-count" id="gf-count-graveyard">0</span></div>
-          <div class="gf-pile" id="gf-pile-graveyard" data-zone-drop="graveyard"></div>
+      <aside class="gf-preview" id="gf-preview" aria-live="polite">
+        <div class="gf-preview-frame" id="gf-preview-frame">
+          <div class="gf-preview-empty">Hover or click any card to inspect it here.</div>
         </div>
       </aside>
     </div>
 
-    <aside class="gf-preview" id="gf-preview" aria-live="polite">
-      <div class="gf-preview-frame" id="gf-preview-frame">
-        <div class="gf-preview-empty">Hover or click any card to inspect it here.</div>
-      </div>
-    </aside>
-  </section>
+    {# Legacy static element retained per v3.30.0 Fix 2 — left in DOM with the
+       defensive .gf-context-menu[hidden] { display: none } rule. Dynamic
+       .gf-ctx menus are built and removed by goldfish.js. #}
+    <div class="gf-context-menu" id="gf-context-menu" role="menu" hidden></div>
 
-  <div class="gf-context-menu" id="gf-context-menu" role="menu" hidden></div>
-
-  <div class="gf-modal" id="gf-modal" hidden role="dialog" aria-modal="true" aria-labelledby="gf-modal-title">
-    <div class="gf-modal-card">
-      <div class="gf-modal-head">
-        <h3 id="gf-modal-title" class="panel-title">Pile</h3>
-        <button type="button" class="gf-btn" id="gf-modal-close">Close</button>
+    <div class="gf-modal" id="gf-modal" hidden role="dialog" aria-modal="true" aria-labelledby="gf-modal-title">
+      <div class="gf-modal-card">
+        <div class="gf-modal-head">
+          <h3 id="gf-modal-title" class="panel-title">Pile</h3>
+          <button type="button" class="gf-btn" id="gf-modal-close">Close</button>
+        </div>
+        <div class="gf-modal-body" id="gf-modal-body"></div>
       </div>
-      <div class="gf-modal-body" id="gf-modal-body"></div>
     </div>
   </div>
 

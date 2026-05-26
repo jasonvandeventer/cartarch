@@ -1,3 +1,31 @@
+/* Goldfish playtester — v3.30.1 fullscreen surface + type-based regions.
+ *
+ * v3.30.1 changes (this release):
+ *   Change A — Fullscreen play surface. The page now wraps its content in
+ *              a `.gf-app` overlay (`position: fixed; inset: 0; z-index:
+ *              500`) that covers the standard chrome — exact pattern the
+ *              v3.28.13 game tracker uses. `document.body.classList.add(
+ *              "gf-mode")` on boot triggers `body.gf-mode { overflow:
+ *              hidden }` to lock page scrolling; cleared on `pagehide`
+ *              (which fires on browser-tab close, history navigation,
+ *              and reload). The masthead carries a ← Back-to-deck chip
+ *              and a ⛶ fullscreen toggle (browser Fullscreen API).
+ *   Change B — Type-based battlefield regions. The v3.30.0 two-row Lands
+ *              / Permanents split is replaced by FIVE regions driven by
+ *              `classifyRegion(card.type_line)` with strict priority
+ *              Creature → Planeswalker/Battle → Artifact/Enchantment →
+ *              Land → Other. An artifact-creature lands in Creatures
+ *              (creature wins — how a player thinks of it in play). A
+ *              mana rock stays in Artifacts & Enchantments — region is
+ *              by card *type*, not by function; the app has no
+ *              produced-mana data (`Card.produced_mana` is the deferred
+ *              v3.30.0 follow-up). `placeOnBattlefield(id)` and every
+ *              battlefield drop converge through `classifyRegion` —
+ *              same single-source-of-truth discipline as v3.30.0 Fix 1,
+ *              just more buckets.
+ *
+ * Carried forward from v3.30.0 (unchanged in v3.30.1):
+ */
 /* Goldfish playtester — v3.30.0 (post-dev-feedback revision pass).
  *
  * Six feedback items folded into v3.30.0 itself (no -N suffix; v3.30.0 has
@@ -67,13 +95,21 @@
   "use strict";
 
   // ── State ──────────────────────────────────────────────────────
+  // v3.30.1 — battlefield is now five type-based regions (Change B).
+  // The legacy aliases `battlefield-lands` and `battlefield-permanents`
+  // from v3.30.0 still resolve through `classifyRegion()` if a drop
+  // handler reports them; new drops use `data-zone-drop="battlefield"`
+  // and classify by card type.
   const state = {
     deckId: null,
     deckName: "",
     library: [],
     hand: [],
-    battlefieldLands: [],
-    battlefieldPermanents: [],
+    bfCreatures: [],
+    bfLands: [],
+    bfArtEnc: [],
+    bfPwBattle: [],
+    bfOther: [],
     graveyard: [],
     exile: [],
     command: [],
@@ -81,10 +117,10 @@
     turn: 1,
     instanceSeq: 1,
     manaPool: { W: 0, U: 0, B: 0, R: 0, G: 0, C: 0 },
-    activeMenu: null, // currently-open .gf-ctx element (if any)
-    activeManaPicker: null, // currently-open .gf-mana-picker element
-    libraryBrowseOpen: false, // set by browseLibrary; closeModal reshuffles
-    modalContext: null, // { kind, zone } so refreshModal can re-render
+    activeMenu: null,
+    activeManaPicker: null,
+    libraryBrowseOpen: false,
+    modalContext: null,
     longPressTimer: null,
   };
 
@@ -100,8 +136,11 @@
     state.library = [];
     state.command = [];
     state.hand = [];
-    state.battlefieldLands = [];
-    state.battlefieldPermanents = [];
+    state.bfCreatures = [];
+    state.bfLands = [];
+    state.bfArtEnc = [];
+    state.bfPwBattle = [];
+    state.bfOther = [];
     state.graveyard = [];
     state.exile = [];
     state.instanceSeq = 1;
@@ -130,15 +169,48 @@
   }
 
   // ── Zone helpers ──────────────────────────────────────────────
+  // v3.30.1 — zone list registry. Battlefield expands to five regions.
+  // Legacy `battlefield-lands` / `battlefield-permanents` keys from v3.30.0
+  // are no longer first-class zones; they re-route through classifyRegion
+  // when they appear in drop targets or move-to actions.
   const ZONE_LISTS = {
     library: () => state.library,
     hand: () => state.hand,
-    "battlefield-lands": () => state.battlefieldLands,
-    "battlefield-permanents": () => state.battlefieldPermanents,
+    "bf-creatures": () => state.bfCreatures,
+    "bf-lands": () => state.bfLands,
+    "bf-artenc": () => state.bfArtEnc,
+    "bf-pwbattle": () => state.bfPwBattle,
+    "bf-other": () => state.bfOther,
     graveyard: () => state.graveyard,
     exile: () => state.exile,
     command: () => state.command,
   };
+
+  const BATTLEFIELD_REGION_KEYS = new Set([
+    "bf-creatures",
+    "bf-lands",
+    "bf-artenc",
+    "bf-pwbattle",
+    "bf-other",
+  ]);
+
+  /**
+   * Classify a card into a battlefield region by type_line, strict
+   * priority Creature → Planeswalker/Battle → Artifact/Enchantment →
+   * Land → Other. First match wins. An artifact-creature returns
+   * "bf-creatures" (creature wins — the player's mental model in play).
+   * A mana rock returns "bf-artenc" — regions are by card *type*, not
+   * by function; the function-aware path needs the deferred
+   * Card.produced_mana migration.
+   */
+  function classifyRegion(card) {
+    const tl = ((card && card.type_line) || "").toLowerCase();
+    if (tl.includes("creature")) return "bf-creatures";
+    if (tl.includes("planeswalker") || tl.includes("battle")) return "bf-pwbattle";
+    if (tl.includes("artifact") || tl.includes("enchantment")) return "bf-artenc";
+    if (tl.includes("land")) return "bf-lands";
+    return "bf-other";
+  }
 
   function findInstance(id) {
     for (const zone of Object.keys(ZONE_LISTS)) {
@@ -175,12 +247,31 @@
     refreshModalIfOpen();
   }
 
-  /** Single placement function — both click-move and drag-drop converge here. */
+  /**
+   * Single placement function — every battlefield-bound path (click-move
+   * via menu, drag-drop onto any battlefield surface, the `Move →
+   * Battlefield` menu action) converges here and routes the card to one
+   * of five regions via `classifyRegion`. v3.30.1 expansion of v3.30.0
+   * Fix 1's single-placement discipline.
+   */
   function placeOnBattlefield(id) {
     const found = findInstance(id);
     if (!found) return;
-    const target = isLand(found.inst) ? "battlefield-lands" : "battlefield-permanents";
-    moveTo(id, target);
+    moveTo(id, classifyRegion(found.inst.card));
+  }
+
+  function isBattlefieldZone(zone) {
+    return BATTLEFIELD_REGION_KEYS.has(zone);
+  }
+
+  function allBattlefieldInstances() {
+    return [
+      ...state.bfCreatures,
+      ...state.bfLands,
+      ...state.bfArtEnc,
+      ...state.bfPwBattle,
+      ...state.bfOther,
+    ];
   }
 
   function drawN(n) {
@@ -203,8 +294,7 @@
 
   function newTurn() {
     state.turn += 1;
-    for (const inst of state.battlefieldLands) inst.tapped = false;
-    for (const inst of state.battlefieldPermanents) inst.tapped = false;
+    for (const inst of allBattlefieldInstances()) inst.tapped = false;
     clearManaPool();
     drawN(1);
   }
@@ -228,8 +318,7 @@
   }
 
   function untapAll() {
-    for (const inst of state.battlefieldLands) inst.tapped = false;
-    for (const inst of state.battlefieldPermanents) inst.tapped = false;
+    for (const inst of allBattlefieldInstances()) inst.tapped = false;
     render();
   }
 
@@ -240,7 +329,7 @@
   function toggleTap(id, anchorEl) {
     const found = findInstance(id);
     if (!found) return;
-    if (found.zone !== "battlefield-lands" && found.zone !== "battlefield-permanents") return;
+    if (!isBattlefieldZone(found.zone)) return;
     const wasUntapped = !found.inst.tapped;
     found.inst.tapped = !found.inst.tapped;
     render();
@@ -451,8 +540,11 @@
     document.getElementById("gf-count-command").textContent = String(state.command.length);
 
     renderHand();
-    renderRow("permanents", state.battlefieldPermanents);
-    renderRow("lands", state.battlefieldLands);
+    renderBattlefieldRegion("creatures", "bf-creatures", state.bfCreatures);
+    renderBattlefieldRegion("lands", "bf-lands", state.bfLands);
+    renderBattlefieldRegion("artenc", "bf-artenc", state.bfArtEnc);
+    renderBattlefieldRegion("pwbattle", "bf-pwbattle", state.bfPwBattle);
+    renderBattlefieldRegion("other", "bf-other", state.bfOther);
     renderPile("graveyard", state.graveyard);
     renderPile("exile", state.exile);
     renderPile("command", state.command);
@@ -464,10 +556,12 @@
     for (const inst of state.hand) strip.appendChild(buildCardEl(inst, "hand"));
   }
 
-  function renderRow(rowKey, list) {
-    const row = document.getElementById("gf-row-" + rowKey);
+  function renderBattlefieldRegion(regionId, zoneKey, list) {
+    const row = document.getElementById("gf-region-" + regionId);
+    if (!row) return;
     Array.from(row.querySelectorAll(".gf-card")).forEach((n) => n.remove());
-    const zoneKey = rowKey === "lands" ? "battlefield-lands" : "battlefield-permanents";
+    if (list.length === 0) row.classList.add("gf-bf-region-empty");
+    else row.classList.remove("gf-bf-region-empty");
     for (const inst of list) row.appendChild(buildCardEl(inst, zoneKey));
   }
 
@@ -584,7 +678,7 @@
       e.preventDefault();
       e.stopPropagation();
       setPreview(inst);
-      if (zone === "battlefield-lands" || zone === "battlefield-permanents") {
+      if (isBattlefieldZone(zone)) {
         toggleTap(inst.id, el);
       } else {
         openContextMenu(e, inst, zone);
@@ -713,14 +807,15 @@
         action: () => playFromHand(inst.id),
       });
     }
-    if (zone === "battlefield-lands" || zone === "battlefield-permanents") {
+    if (isBattlefieldZone(zone)) {
       items.push({
         label: inst.tapped ? "Untap" : "Tap",
         action: () => toggleTap(inst.id),
       });
     }
-    // Single "Move → Battlefield" — placement routes via kindOf, so the
-    // user no longer has to choose Lands vs Permanents (Fix 1).
+    // Single "Move → Battlefield" — placement routes via classifyRegion,
+    // so the user never picks a battlefield region directly. v3.30.1
+    // expansion of v3.30.0 Fix 1's single-placement discipline.
     const moveTargets = [
       { z: "hand", label: "Move → Hand" },
       { z: "battlefield", label: "Move → Battlefield" },
@@ -730,11 +825,7 @@
       { z: "library", label: "Move → Library (top)" },
     ];
     for (const t of moveTargets) {
-      if (
-        t.z === "battlefield" &&
-        (zone === "battlefield-lands" || zone === "battlefield-permanents")
-      )
-        continue;
+      if (t.z === "battlefield" && isBattlefieldZone(zone)) continue;
       if (t.z === zone) continue;
       items.push({
         label: t.label,
@@ -786,10 +877,16 @@
         // Any battlefield drop — lands row, permanents row, or a
         // generic "battlefield" zone — routes via kindOf. Visual sub-
         // element does NOT override the card's type.
+        // v3.30.1 — any battlefield drop converges through placeOnBattlefield
+        // → classifyRegion. The "battlefield" key is the canonical drop-
+        // target for the whole battlefield container and every region row.
+        // Legacy "battlefield-lands" / "battlefield-permanents" keys from
+        // v3.30.0 markup re-route through the same classifier so stale
+        // tabs running against a fresh deploy degrade cleanly.
         if (
+          target === "battlefield" ||
           target === "battlefield-lands" ||
-          target === "battlefield-permanents" ||
-          target === "battlefield"
+          target === "battlefield-permanents"
         ) {
           placeOnBattlefield(id);
         } else {
@@ -922,6 +1019,39 @@
       else browseZone(z, capitalize(z));
     });
   });
+
+  // ── Fullscreen shell wiring (Change A) ────────────────────────
+  // Lock page scroll; the .gf-app overlay covers sidebar+topbar via
+  // position:fixed inset:0 z-index:500. Cleared on pagehide so a
+  // browser back-nav / tab-close / reload doesn't leave the body in
+  // gf-mode for any later in-tab navigation.
+  document.body.classList.add("gf-mode");
+  window.addEventListener("pagehide", () => {
+    document.body.classList.remove("gf-mode");
+  });
+
+  // Fullscreen toggle — Fullscreen API on the .gf-app element so the
+  // playtester goes truly edge-to-edge. Mirrors the v3.28.13 tracker
+  // ⛶ button shape.
+  const fsBtn = document.getElementById("gf-btn-fullscreen");
+  const appEl = document.getElementById("gf-app");
+  function isFullscreen() {
+    return !!(document.fullscreenElement || document.webkitFullscreenElement);
+  }
+  function refreshFsBtnGlyph() {
+    if (fsBtn) fsBtn.textContent = isFullscreen() ? "⊠" : "⛶";
+  }
+  if (fsBtn && appEl) {
+    fsBtn.addEventListener("click", () => {
+      if (isFullscreen()) {
+        (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+      } else {
+        (appEl.requestFullscreen || appEl.webkitRequestFullscreen).call(appEl);
+      }
+    });
+    document.addEventListener("fullscreenchange", refreshFsBtnGlyph);
+    document.addEventListener("webkitfullscreenchange", refreshFsBtnGlyph);
+  }
 
   // ── Boot ──────────────────────────────────────────────────────
   buildManaPoolWidget();
