@@ -12,9 +12,8 @@
     <link rel="icon" type="image/svg+xml" href="/static/brand/icon/favicon.svg">
     <link rel="apple-touch-icon" href="/static/brand/icon/apple-touch-icon.png">
     <link rel="manifest" href="/static/manifest.json">
-    <meta name="theme-color" content="#081321">
+    <meta name="theme-color" content="#1A130C">
 
-    {# DRAFT meta description — refine when final landing copy lands. #}
     <meta name="description"
           content="Cartarch — a premium platform for managing physical Magic: the Gathering collections. Track ownership, analyze decks, and run games at the table.">
 
@@ -40,8 +39,11 @@
   </head>
   <body class="landing-body">
     <header class="landing-header">
+      {# v3.29.4 — full-color brand mark (was -white monochrome). The same
+         asset the authed sidebar/topbar uses; keeps brand identity unified
+         between the public landing and the in-app experience. #}
       <a href="/" class="landing-brand" aria-label="Cartarch home">
-        <img src="/static/brand/logo/cartarch-horizontal-white.svg"
+        <img src="/static/brand/logo/cartarch-horizontal.svg"
              alt="Cartarch"
              class="landing-brand-logo">
       </a>
@@ -53,15 +55,18 @@
 
     <main class="landing-main">
       <section class="landing-hero">
-        <img src="/static/brand/logo/cartarch-stacked-white.svg"
+        {# v3.29.4 — full-color stacked mark (was -white monochrome). #}
+        <img src="/static/brand/logo/cartarch-stacked.svg"
              alt=""
              class="landing-hero-logo"
              aria-hidden="true">
-        <h1 class="landing-hero-tagline brand-name">The ruler of your collection</h1>
-        <!-- DRAFT COPY — finalize when content lands -->
-        <p class="landing-hero-sub">
-          Cartarch is a premium collectible-management platform built for the
-          physical workflows of serious Magic: the Gathering collectors —
+        {# v3.29.4 — "The ruler of your collection." in the editorial
+           display register. Terminal period is part of the typesetting;
+           it lives in the markup so screen readers read it naturally. #}
+        <h1 class="lp-hero-title">The ruler of your collection.</h1>
+        <p class="lp-hero-lede">
+          Cartarch is a premium collectible-management platform built for
+          the physical workflow of serious Magic: the Gathering collectors —
           track ownership across boxes, binders, and built decks; analyze
           deck shape and consistency; run games at the table.
         </p>
@@ -71,23 +76,33 @@
         </div>
       </section>
 
+      <div class="section-divider" aria-hidden="true">
+        <span class="section-divider-mark">§</span>
+      </div>
+
       <section id="features" class="landing-features">
-        <h2 class="landing-section-title">Built for the physical workflow</h2>
-        <!-- DRAFT COPY — feature descriptions drawn from the real app surface. -->
+        <p class="chapter-eyebrow">
+          <span class="chapter-mark">§</span>
+          <span class="chapter-roman">I</span>
+          <span>— The Volumes</span>
+        </p>
+        <h2 class="lp-section-title">Built for the physical workflow.</h2>
         <div class="landing-feature-grid">
-          <article class="landing-feature">
-            <h3 class="landing-feature-title">Collection tracking</h3>
-            <p class="landing-feature-body">
-              Import from a barcode scanner, Helvault, Moxfield, or a pasted
-              decklist — Cartarch normalizes the format and resolves every
-              card against a local Scryfall mirror. Search with full
+          <article class="lp-feature">
+            <p class="lp-feature-marker">i.</p>
+            <h3 class="lp-feature-title">Collection tracking</h3>
+            <p class="lp-feature-body">
+              Import from a barcode scanner, Helvault, Moxfield, or a
+              pasted decklist — Cartarch normalizes the format and resolves
+              every card against a local Scryfall mirror. Search with full
               Scryfall-style syntax (boolean operators, color identity,
               format legality, price filters) across your whole collection.
             </p>
           </article>
-          <article class="landing-feature">
-            <h3 class="landing-feature-title">The drawer sorter</h3>
-            <p class="landing-feature-body">
+          <article class="lp-feature">
+            <p class="lp-feature-marker">ii.</p>
+            <h3 class="lp-feature-title">The drawer sorter</h3>
+            <p class="lp-feature-body">
               An opt-in physical-layout system that assigns every card a
               drawer and slot deterministically, so a re-sort always lands
               at the same place. Tuned for a 6-drawer setup; configurable
@@ -95,62 +110,159 @@
               the auto-sort.
             </p>
           </article>
-          <article class="landing-feature">
-            <h3 class="landing-feature-title">Deck analytics</h3>
-            <p class="landing-feature-body">
+          <article class="lp-feature">
+            <p class="lp-feature-marker">iii.</p>
+            <h3 class="lp-feature-title">Deck analytics</h3>
+            <p class="lp-feature-body">
               Every deck gets a health panel: ramp, draw, removal, and
               wipe density against tunable thresholds; pip strain across
               demand vs. land sources; mana curve, card-type breakdown,
-              color pips, avg CMC. Filter by role tags (Ramp / Draw /
+              color pips, average CMC. Filter by role tags (Ramp / Draw /
               Removal / Combo piece / Payoff / Protection) for surgical
               tuning.
             </p>
           </article>
-          <article class="landing-feature">
-            <h3 class="landing-feature-title">The game tracker</h3>
-            <p class="landing-feature-body">
+          <article class="lp-feature">
+            <p class="lp-feature-marker">iv.</p>
+            <h3 class="lp-feature-title">The game tracker</h3>
+            <p class="lp-feature-body">
               A landscape tablet-first tracker for the at-table game.
               Commander art panel backgrounds (loaded from the local
               Scryfall mirror), per-seat life + counters, turn timing,
-              auto-elimination on lethal poison, history + undo. First-
-              player selection by dice roll or manual tap.
+              auto-elimination on lethal poison, history + undo.
+              First-player selection by dice roll or manual tap.
             </p>
           </article>
         </div>
       </section>
 
+      <div class="section-divider" aria-hidden="true">
+        <span class="section-divider-mark">§</span>
+      </div>
+
       <section class="landing-showcase">
-        <h2 class="landing-section-title">A look inside</h2>
-        <div class="landing-screenshot-grid">
-          <!-- TODO: screenshot — dashboard / At a Glance tiles -->
-          <div class="landing-screenshot-placeholder">
-            <span class="landing-screenshot-label">Dashboard</span>
-          </div>
-          <!-- TODO: screenshot — deck detail with analytics panel -->
-          <div class="landing-screenshot-placeholder">
-            <span class="landing-screenshot-label">Deck analytics</span>
-          </div>
-          <!-- TODO: screenshot — game tracker in landscape -->
-          <div class="landing-screenshot-placeholder">
-            <span class="landing-screenshot-label">Game tracker</span>
-          </div>
+        <p class="chapter-eyebrow">
+          <span class="chapter-mark">§</span>
+          <span class="chapter-roman">II</span>
+          <span>— Inside</span>
+        </p>
+        <h2 class="lp-section-title">A look at the tools.</h2>
+        <div class="lp-showcase-grid">
+          {#
+             v3.29.4 — Three "a look inside" preview panels. The screenshot
+             capture per §4 was attempted; headless-browser tooling
+             (Playwright) was not available in the v3.29.4 build environment,
+             so the three panels ship as DELIBERATELY STYLED PLACEHOLDERS per
+             the §4 explicit fallback. The owner can drop captured images
+             into /static/img/landing/dashboard.webp, deck-analytics.webp,
+             game-tracker.webp at any later point and swap the placeholder
+             markup for <img src="..."> — the .lp-showcase-frame composition
+             accommodates either path.
+
+             The placeholders are NOT empty boxes (the v3.27.17 stub shape
+             that this release explicitly improves on); they carry an
+             editorial frame, eyebrow + serif title identifying which
+             surface lives in that slot, and a one-line description of
+             what the user will see when the capture lands.
+          #}
+          <article class="lp-showcase-panel">
+            <header class="lp-showcase-head">
+              <p class="lp-showcase-eyebrow">Overview</p>
+              <p class="lp-showcase-title">The Dashboard.</p>
+            </header>
+            <div class="lp-showcase-frame">
+              {# v3.29.4 — real screenshot wired in. The .lp-showcase-frame
+                 img CSS rule positions the image absolutely over the
+                 placeholder div; if the asset fails to load, onerror
+                 removes the img and the placeholder underneath is
+                 revealed naturally — graceful fallback, no broken-image
+                 icon. #}
+              <img src="/static/img/landing/inside-dashboard.webp"
+                   alt="Cartarch dashboard — daily brief, collection value, and quick actions."
+                   class="lp-showcase-img"
+                   loading="lazy"
+                   onerror="this.remove();">
+              <div class="lp-showcase-placeholder">
+                <span class="lp-showcase-placeholder-glyph">§</span>
+                <p class="lp-showcase-placeholder-text">
+                  The day's brief, collection value at a glance, and quick
+                  actions for the placement queue.
+                </p>
+              </div>
+            </div>
+            <p class="lp-showcase-caption">
+              Today's brief, holdings, recent activity.
+            </p>
+          </article>
+
+          <article class="lp-showcase-panel">
+            <header class="lp-showcase-head">
+              <p class="lp-showcase-eyebrow">Play</p>
+              <p class="lp-showcase-title">Deck analytics.</p>
+            </header>
+            <div class="lp-showcase-frame">
+              <img src="/static/img/landing/inside-deck-analytics.webp"
+                   alt="Deck analytics — mana curve, type breakdown, pip strain, and deck-health read."
+                   class="lp-showcase-img"
+                   loading="lazy"
+                   onerror="this.remove();">
+              <div class="lp-showcase-placeholder">
+                <span class="lp-showcase-placeholder-glyph">§</span>
+                <p class="lp-showcase-placeholder-text">
+                  Mana curve, type breakdown, pip strain, and a deck-health
+                  read for every commander deck.
+                </p>
+              </div>
+            </div>
+            <p class="lp-showcase-caption">
+              Health, density, strain — every angle you tune.
+            </p>
+          </article>
+
+          <article class="lp-showcase-panel">
+            <header class="lp-showcase-head">
+              <p class="lp-showcase-eyebrow">At the table</p>
+              <p class="lp-showcase-title">The game tracker.</p>
+            </header>
+            <div class="lp-showcase-frame">
+              <img src="/static/img/landing/inside-game-tracker.webp"
+                   alt="Game tracker — per-seat life, counters, commander damage, and turn timing."
+                   class="lp-showcase-img"
+                   loading="lazy"
+                   onerror="this.remove();">
+              <div class="lp-showcase-placeholder">
+                <span class="lp-showcase-placeholder-glyph">§</span>
+                <p class="lp-showcase-placeholder-text">
+                  Per-seat life, counters, commander damage and turn
+                  timing — landscape, tablet-first, no rules engine.
+                </p>
+              </div>
+            </div>
+            <p class="lp-showcase-caption">
+              Landscape, tablet-first; no rules engine in the way.
+            </p>
+          </article>
         </div>
       </section>
 
+      <div class="section-divider" aria-hidden="true">
+        <span class="section-divider-mark">§</span>
+      </div>
+
       <section class="landing-secondary">
-        <article class="landing-secondary-card">
-          <h3 class="landing-secondary-title">Try the beta</h3>
-          <!-- DRAFT COPY -->
-          <p class="landing-secondary-body">
+        <article class="lp-secondary-card">
+          <p class="lp-secondary-eyebrow">Beta</p>
+          <h3 class="lp-secondary-title">Try the beta.</h3>
+          <p class="lp-secondary-body">
             Cartarch is in active development. Email
-            <a href="mailto:support@cartarch.com">support@cartarch.com</a>
+            <a href="mailto:support@cartarch.com" class="landing-secondary-link">support@cartarch.com</a>
             for an account — include a sentence about how you'd use it.
           </p>
         </article>
-        <article class="landing-secondary-card">
-          <h3 class="landing-secondary-title">Support the project</h3>
-          <!-- DRAFT COPY -->
-          <p class="landing-secondary-body">
+        <article class="lp-secondary-card">
+          <p class="lp-secondary-eyebrow">Support</p>
+          <h3 class="lp-secondary-title">Support the project.</h3>
+          <p class="lp-secondary-body">
             Cartarch is free to use. If it helps your collection,
             <a href="https://ko-fi.com/coruscantsunrise"
                target="_blank"
@@ -159,14 +271,13 @@
             to keep development going. Donation-only — no paid tiers.
           </p>
         </article>
-        <article class="landing-secondary-card">
-          <h3 class="landing-secondary-title">What's new</h3>
-          <!-- DRAFT COPY -->
-          <p class="landing-secondary-body">
-            Read the
-            <a href="/chronicle" class="landing-secondary-link">Chronicle</a>
-            &mdash; a journal of releases, refinements, and resolved problems
-            since the Cartarch rebrand.
+        <article class="lp-secondary-card">
+          <p class="lp-secondary-eyebrow">What's new</p>
+          <h3 class="lp-secondary-title">Read the Chronicle.</h3>
+          <p class="lp-secondary-body">
+            A journal of releases, refinements, and resolved problems since
+            the Cartarch rebrand &mdash;
+            <a href="/chronicle" class="landing-secondary-link">open the Chronicle</a>.
           </p>
         </article>
       </section>
@@ -175,7 +286,8 @@
     <footer class="landing-footer">
       <div class="landing-footer-inner">
         <div class="landing-footer-brand">
-          <img src="/static/brand/logo/cartarch-icon-white.svg"
+          {# v3.29.4 — full-color icon (was -white monochrome). #}
+          <img src="/static/brand/logo/cartarch-icon.svg"
                alt=""
                class="landing-footer-logo"
                aria-hidden="true">

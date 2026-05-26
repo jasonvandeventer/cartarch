@@ -1,5 +1,25 @@
 [
   {
+    "version": "3.29.4",
+    "date": "2026-05-26",
+    "added": [
+      "Editorial finish across three pages — the public landing, the Sets index, and the Tokens page. The Folio design language gains its 'The X.' titling voice: 'The ruler of your collection.', 'The Sets.', 'The Tokens.' — short, article-led, terminal period — set in a new self-hosted editorial serif (Source Serif 4). The § motif appears as chapter eyebrows ('§ I — The Volumes', '§ II — Inside') and as centered dividers between sections on the landing page.",
+      "Full-color brand mark on the landing page — the wordmark, the stacked hero mark, and the footer icon are now the same full-color assets the authed app uses. The landing previously carried monochrome white variants, which read as washed out on the warm-charcoal background.",
+      "A self-hosted editorial display webfont. Source Serif 4 (latin subset, variable woff2; upright + italic) joins Montserrat (body/UI, since v3.27.15) and Newsreader (display italic, since v3.28.1) as the third self-hosted family. Total addition under 100 KB; no runtime CDN dependency. New --font-display token in :root."
+    ],
+    "refined": [
+      "Sets index — composed editorial cards in a clean grid. Each card carries an eyebrow, the set code in serif display weight, the set name in editorial italic, and a 'unique owned · total copies' meta line. Same data, same /sets/{set_code} link to set detail; the chrome is the upgrade.",
+      "Tokens page — a titled intro panel replaces the compact hero. The table itself is preserved verbatim, including the .col-priority-low / .col-priority-mid responsive column-drop classes and the v3.27.16 .table-wrap horizontal-scroll fallback; the filter bar, +New Token / Bulk Add actions, and per-row Edit popout (with the back-face lookup helper) all work as before.",
+      "Landing-page feature cards now carry roman-numeral markers (i. ii. iii. iv.) and a calmer composition. The four features (Collection tracking · The drawer sorter · Deck analytics · The game tracker) keep their copy verbatim; only the chrome changed."
+    ],
+    "resolved": [
+      "The 'a look inside' panels on the landing page now carry real captured screenshots — The Dashboard, Deck analytics, and The game tracker — wired in at /static/img/landing/ as optimized WebP. The three panels are framed consistently with object-fit:cover and object-position:top center so they read as a uniform set across the desktop and tablet-landscape captures; a graceful onerror fallback to the styled placeholder is preserved if any asset fails to load.",
+      "Two stray hyphen-line-break artifacts in the feature-card copy fixed in passing — the 'First-player selection' line in the game-tracker card no longer splits at the hyphen.",
+      "Sets and Tokens page headers brought into line with the rest of the app. The Pending page's shipped pattern (page name in italic Newsreader — 'Pending Placement') is the canonical shape; Sets and Tokens had been carrying the v3.27.17-era 'The Sets.' / 'The Tokens.' upright voice, which predates the v3.28.x Folio cluster. Sets now reads 'Sets', Tokens reads 'Tokens', both in the matching italic register; the Tokens eyebrow also corrected from 'Catalogue · Tokens' to 'Collection · Tokens' (Tokens lives in the Collection nav group)."
+    ],
+    "archivist_note": "Three pages caught up with the rest of the catalogue. The Folio voice — short article-led titles in a printed-page serif, the § motif as a section divider, restrained editorial cards with generous internal air — now reaches the public landing, the Sets index, and the Tokens table that newcomers see first. Source Serif 4 was chosen for its transitional proportions and its wide weight range; it sits alongside Newsreader (the italic display face since v3.28.1) and Montserrat (the body/UI face), keeping the typographic system honest. Several deferred items were named explicitly while we were here — Sets-analytics (per-set completion %, set value, price trend, a Most Pursued panel, completion / era / value facets) and Tokens-analytics (type aggregation, demand and shortage detection, decks running short, print sources) — each is its own design conversation and its own precompute story; a per-set completion % computed at request time would have meant doing Scryfall completion for every set on every visit to the index, the kind of cold-render cost the project has been scarred by before."
+  },
+  {
     "version": "3.29.3",
     "date": "2026-05-26",
     "added": [

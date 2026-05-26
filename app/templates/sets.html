@@ -1,22 +1,45 @@
 {% from "_macros.html" import editorial_eyebrow %}
 {% extends "base.html" %}
 {% block content %}
+  {# v3.29.4 — Editorial restyle: composed editorial card grid.
+     Same data: each card still links to /sets/{set_code} and shows the
+     unique-owned + total-copies values the server returns. Per-set
+     completion %, set value, price trend, and the Most Pursued panel
+     are deliberately NOT here — those are the deferred Sets-analytics
+     feature recorded in roadmap.md (they need precompute to avoid the
+     per-request /sets cold-render cost shape the codebase has been
+     scarred by before).
+
+     v3.29.4 follow-up (Item 3): page header aligned to the shipped
+     Pending pattern — .panel.page-hero + h2.panel-title (italic
+     Newsreader per the h2.panel-title v3.28.1 rule) + pagehead-tagline
+     italic lede + editorial_eyebrow() crumb. Drops "The X." voice and
+     the H1/terminal-period treatment that came from the v3.27.17-era
+     mockups but didn't match what shipped on Pending. #}
   <section class="panel page-hero">
     <div>
       {{ editorial_eyebrow("Collection · Sets") }}
-      <h2 class="panel-title">Set Collection Status</h2>
-      <p class="muted">
-        Track set completion, owned cards, and progress by expansion. Open a set to calculate full Scryfall completion.
+      <h2 class="panel-title">Sets</h2>
+      <p class="pagehead-tagline">
+        Set completion, owned cards, and progress by expansion. Open a set to
+        see card-by-card detail and Scryfall completion.
       </p>
     </div>
   </section>
-  <div class="set-dashboard-grid">
+
+  <div class="sets-grid-editorial">
     {% for s in sets %}
-      <a href="/sets/{{ s.set_code }}" class="set-dashboard-card">
-        <div class="set-code">{{ s.set_code.upper() }}</div>
-        <div class="set-name">{{ s.set_name }}</div>
-        <div class="set-progress-meta">{{ s.unique_owned }} unique owned</div>
-        {% if s.total_copies is defined %}<div class="card-meta">{{ s.total_copies }} total copies</div>{% endif %}
+      <a href="/sets/{{ s.set_code }}"
+         class="editorial-card sets-card-editorial">
+        <p class="sets-card-eyebrow">Set</p>
+        <div class="sets-card-code">{{ s.set_code.upper() }}</div>
+        <div class="sets-card-name">{{ s.set_name }}</div>
+        <div class="sets-card-meta">
+          <span class="sets-card-meta-line"><strong>{{ s.unique_owned }}</strong>unique owned</span>
+          {% if s.total_copies is defined %}
+            <span class="sets-card-meta-line"><strong>{{ s.total_copies }}</strong>total copies</span>
+          {% endif %}
+        </div>
       </a>
     {% endfor %}
   </div>

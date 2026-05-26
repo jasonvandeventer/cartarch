@@ -129,6 +129,16 @@
   --space-5: 1.5rem;
   --space-6: 2rem;
 
+  /* --- Editorial display face (v3.29.4) ---
+     Self-hosted Source Serif 4 for the "The X." titling register added in
+     v3.29.4 (landing, sets, tokens). Distinct from --font-family-base
+     (Montserrat — body/UI) and the Newsreader stack used by pagehead-title
+     since v3.28.1. The transitional/old-style proportions give the editorial
+     register the "printed-page" voice the Folio design language asks for.
+     Consumed by .editorial-display + the v3.29.4 .the-x-title rules. */
+  --font-display:
+    "Source Serif 4", "Source Serif Pro", Georgia, "Times New Roman", serif;
+
   /* --- Breakpoints (v3.x, unchanged) ---
      Documentation only — CSS doesn't allow custom properties inside @media
      conditions. See the big top-of-file comment for the full @media usage
@@ -354,6 +364,33 @@ img {
   font-weight: 200 800;
   font-display: swap;
   src: url("/static/fonts/newsreader-italic-variable-latin.woff2") format("woff2");
+}
+
+/* --- Source Serif 4 (v3.29.4) — the editorial display face ----------------
+   Self-hosted variable woff2 (Latin subset) — 2 files cover regular + italic
+   weights 400..700. Source Serif 4 is used ONLY for the editorial display
+   register added in v3.29.4: page titles in the "The X." titling voice
+   ("The Sets.", "The Tokens.", "The ruler of your collection."), chapter
+   eyebrows, and the § motif. Newsreader stays the working editorial italic
+   face for pagehead-titles + body display copy (the v3.28.1 register).
+   Montserrat stays the body/UI face. SIL OFL — redistribution is fine.
+
+   Variable woff2 (weights 400..700) for upright + italic; same shape as the
+   v3.28.1 Newsreader blocks. Exposed via --font-display below; consumed by
+   `.editorial-display` and the v3.29.4 landing/sets/tokens editorial rules. */
+@font-face {
+  font-family: "Source Serif 4";
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url("/static/fonts/source-serif-4-variable-latin.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Source Serif 4";
+  font-style: italic;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url("/static/fonts/source-serif-4-italic-variable-latin.woff2") format("woff2");
 }
 
 body {
@@ -11811,3 +11848,530 @@ table.dmtx .dmtx-rowhead {
     grid-template-columns: 1fr;
   }
 }
+
+/* ============================================================================
+   v3.29.4 — Editorial Finish: Landing, Sets, Tokens
+   ----------------------------------------------------------------------------
+   Editorial design-language pass over three pages: the public landing, the
+   Sets index, and the Tokens page. Token reuse only — the v3.29.4 spec
+   permits exactly ONE new token (`--font-display`, the Source Serif 4 stack
+   declared in :root above) and the `@font-face` woff2 wiring also above.
+   No new color tokens. No per-template hardcoded colors.
+
+   What this block adds:
+     - `.editorial-display` — the Source Serif 4 display register, the
+       "The X." titling voice with terminal period. Page H1s.
+     - `.chapter-eyebrow` — letterspaced small-caps editorial eyebrow with
+       roman numerals ("§ I — THE VOLUMES"). Landing-only at v3.29.4 ship;
+       reusable elsewhere if a future page wants chapter framing.
+     - `.section-divider` — centered § divider between sections.
+     - `.intro-panel` — composed intro panel for catalogue pages (eyebrow +
+       serif title + one-line lede). Used by sets + tokens.
+     - `.editorial-card` — composed editorial card; restrained 1px borders,
+       generous padding. Used by sets index restyle.
+     - Landing-specific tweaks layered on top of the v3.27.17 .landing-*
+       ruleset above (NOT replacing; the v3.27.17 markup stays). The .lp-*
+       prefix is new — additive overrides that re-style title/lede/feature
+       cards/screenshot panels to the editorial register.
+     - Sets-specific restyle of the .set-dashboard-grid / .set-dashboard-card
+       chrome to editorial card composition (not a structural change —
+       same .a element, same href, same per-card content).
+     - Tokens-specific intro-panel + filter-bar polish. Table chrome
+       inherits global <table> rules; the .col-priority-* + .table-wrap
+       responsive fallback (v3.27.16) is preserved untouched.
+
+   Cluster precedent: v3.27.15 (navy aesthetic pass) and v3.28.1 (Folio
+   reskin) both did token-driven sweeps without touching individual page
+   markup beyond the minimum needed; v3.29.4 follows the same posture.
+   ============================================================================ */
+
+/* --- Editorial display register --------------------------------------------- */
+.editorial-display {
+  font-family: var(--font-display);
+  font-style: normal;
+  font-weight: 600;
+  letter-spacing: -0.012em;
+  line-height: 1.04;
+  color: var(--text);
+  margin: 0;
+}
+
+/* The "The X." page-title voice — short, article-led, terminal period.
+   The terminal period is part of the typesetting (it's in the markup; we
+   don't generate it via ::after to keep screen readers honest). Sizing
+   ramps fluidly from phone to ultrawide. */
+.the-x-title {
+  font-family: var(--font-display);
+  font-style: normal;
+  font-weight: 600;
+  font-size: clamp(2rem, 4.8vw, 3.4rem);
+  letter-spacing: -0.015em;
+  line-height: 1.02;
+  color: var(--text);
+  margin: 0;
+}
+
+/* --- Chapter eyebrow + § divider (editorial section motifs) ----------------- */
+.chapter-eyebrow {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  font-family: "Montserrat", system-ui, sans-serif;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--brand-gold);
+  margin: 0 0 1rem;
+}
+.chapter-eyebrow .chapter-mark {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 1.05rem;
+  letter-spacing: 0;
+  color: var(--brand-gold);
+}
+.chapter-eyebrow .chapter-roman {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 500;
+  font-size: 0.95rem;
+  letter-spacing: 0.06em;
+  text-transform: none;
+  color: var(--accent-2);
+}
+
+.section-divider {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  margin: 3rem 0 2.5rem;
+  color: var(--brand-gold);
+}
+.section-divider::before,
+.section-divider::after {
+  content: "";
+  flex: 0 0 60px;
+  height: 1px;
+  background: var(--border);
+}
+.section-divider .section-divider-mark {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 500;
+  font-size: 1.6rem;
+  color: var(--brand-gold);
+  line-height: 1;
+}
+
+/* --- Catalogue intro panel (sets + tokens; potentially reusable) ------------ */
+.intro-panel {
+  padding: var(--space-5) var(--space-5);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin: 0 0 var(--space-5);
+  box-shadow: var(--shadow-sm);
+}
+.intro-panel .intro-eyebrow {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--brand-gold);
+  margin: 0 0 0.5rem;
+}
+.intro-panel .intro-title {
+  /* The "The X." voice — uses the same .the-x-title sizing scale at a
+     hair smaller cap so the intro panel sits comfortably inside its
+     own box rather than dominating the page. */
+  font-family: var(--font-display);
+  font-style: normal;
+  font-weight: 600;
+  font-size: clamp(1.9rem, 4vw, 2.9rem);
+  letter-spacing: -0.015em;
+  line-height: 1.02;
+  color: var(--text);
+  margin: 0;
+}
+.intro-panel .intro-lede {
+  font-family: "Newsreader", Georgia, serif;
+  font-style: italic;
+  font-size: 1rem;
+  line-height: 1.5;
+  color: var(--text-dim);
+  margin: 0.55rem 0 0;
+  max-width: 56ch;
+}
+
+/* --- Editorial card (sets restyle uses this composition) -------------------- */
+.editorial-card {
+  position: relative;
+  display: block;
+  padding: 1.1rem 1.15rem 1.2rem;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  text-decoration: none;
+  color: var(--text);
+  box-shadow: var(--shadow-sm);
+  transition:
+    border-color 0.18s ease,
+    transform 0.18s ease,
+    background 0.18s ease;
+}
+.editorial-card:hover,
+.editorial-card:focus-visible {
+  border-color: var(--brand-gold-soft);
+  transform: translateY(-1px);
+  background: var(--panel-2);
+  outline: none;
+}
+
+/* ---------------------------------------------------------------------------- */
+/* Landing-page editorial overrides (v3.29.4)                                   */
+/* ---------------------------------------------------------------------------- */
+
+/* Brand assets — swap from white/mono to full-color. The v3.27.17 .landing-*
+   rules above set 32px header logo + 220px hero logo; we just inherit those
+   sizing rules — the file path swap happens in landing.html. No CSS change
+   needed for the asset swap; this comment documents the contract. */
+
+/* Hero — restyle the tagline to the "The X." voice. The v3.27.17
+   .landing-hero-tagline still wins on specificity because we layer the
+   editorial overrides as .lp-hero-* below; the markup gets the new class. */
+.lp-hero-title {
+  /* The "The ruler of your collection." title — Source Serif 4, terminal
+     period. Bigger than the v3.27.17 tagline; more confident composition. */
+  font-family: var(--font-display);
+  font-style: normal;
+  font-weight: 600;
+  font-size: clamp(2.4rem, 5.4vw, 4rem);
+  letter-spacing: -0.018em;
+  line-height: 1.02;
+  color: var(--text);
+  margin: 0 0 1.25rem;
+  /* Override the .brand-name letter-spacing if it lands on the same element */
+  text-transform: none;
+}
+
+.lp-hero-lede {
+  font-family: "Newsreader", Georgia, serif;
+  font-style: italic;
+  font-size: 1.1rem;
+  line-height: 1.55;
+  max-width: 620px;
+  margin: 0 auto 2rem;
+  color: var(--text-dim);
+}
+
+/* Landing section titles — small-caps editorial eyebrows; the markup
+   provides a chapter-eyebrow + the-x-title combination. */
+.lp-section-title {
+  font-family: var(--font-display);
+  font-style: normal;
+  font-weight: 600;
+  font-size: clamp(1.7rem, 3.4vw, 2.4rem);
+  letter-spacing: -0.012em;
+  line-height: 1.05;
+  text-align: left;
+  color: var(--text);
+  margin: 0 0 1.5rem;
+}
+
+/* Feature cards — composed editorial cards. Adds a roman-numeral marker
+   above the feature title. */
+.lp-feature {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.65rem 1.5rem 1.5rem;
+  position: relative;
+  box-shadow: var(--shadow-sm);
+  transition: border-color 0.18s ease;
+}
+.lp-feature:hover {
+  border-color: var(--brand-gold-soft);
+}
+.lp-feature-marker {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 500;
+  font-size: 0.95rem;
+  letter-spacing: 0.04em;
+  color: var(--brand-gold);
+  margin: 0 0 0.35rem;
+}
+.lp-feature-title {
+  font-family: var(--font-display);
+  font-style: normal;
+  font-weight: 600;
+  font-size: 1.25rem;
+  letter-spacing: -0.005em;
+  color: var(--text);
+  margin: 0 0 0.55rem;
+}
+.lp-feature-body {
+  font-family: "Newsreader", Georgia, serif;
+  font-style: normal;
+  font-weight: 400;
+  font-size: 0.98rem;
+  line-height: 1.6;
+  color: var(--text-dim);
+  margin: 0;
+  max-width: 56ch;
+}
+
+/* Screenshot showcase — captured screenshots if available, deliberately
+   styled placeholders if not (v3.29.4 §4 fallback contract). Each panel
+   sits as an editorial card with a header strip identifying what will or
+   does appear inside, and a 16:10 inner frame for the eventual image. */
+.lp-showcase-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-4);
+  margin-top: 1.25rem;
+}
+@media (max-width: 980px) {
+  .lp-showcase-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+@media (max-width: 600px) {
+  .lp-showcase-grid {
+    grid-template-columns: 1fr;
+  }
+}
+.lp-showcase-panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-shadow: var(--shadow-sm);
+  transition: border-color 0.18s ease;
+}
+.lp-showcase-panel:hover {
+  border-color: var(--brand-gold-soft);
+}
+.lp-showcase-head {
+  padding: 0.85rem 1rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel-2);
+}
+.lp-showcase-eyebrow {
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--brand-gold);
+  margin: 0 0 0.2rem;
+}
+.lp-showcase-title {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 500;
+  font-size: 1.05rem;
+  letter-spacing: -0.005em;
+  color: var(--text);
+  margin: 0;
+}
+.lp-showcase-frame {
+  position: relative;
+  aspect-ratio: 16 / 10;
+  background: var(--bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.lp-showcase-frame img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top center;
+  display: block;
+  z-index: 1;
+}
+.lp-showcase-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 1.5rem;
+  text-align: center;
+  color: var(--muted);
+}
+.lp-showcase-placeholder-glyph {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 500;
+  font-size: 2.2rem;
+  color: var(--brand-gold);
+  line-height: 1;
+  opacity: 0.55;
+}
+.lp-showcase-placeholder-text {
+  font-family: "Newsreader", Georgia, serif;
+  font-style: italic;
+  font-size: 0.92rem;
+  line-height: 1.45;
+  color: var(--text-dim);
+  max-width: 32ch;
+  margin: 0;
+}
+.lp-showcase-caption {
+  padding: 0.7rem 1rem 0.9rem;
+  font-family: "Newsreader", Georgia, serif;
+  font-style: italic;
+  font-size: 0.88rem;
+  line-height: 1.4;
+  color: var(--text-dim);
+  border-top: 1px solid var(--border-soft);
+}
+
+/* Secondary row — restyle the existing .landing-secondary cards to
+   match the editorial composition. */
+.lp-secondary-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.5rem 1.4rem 1.4rem;
+  box-shadow: var(--shadow-sm);
+}
+.lp-secondary-eyebrow {
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--brand-gold);
+  margin: 0 0 0.35rem;
+}
+.lp-secondary-title {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 500;
+  font-size: 1.2rem;
+  letter-spacing: -0.005em;
+  color: var(--text);
+  margin: 0 0 0.55rem;
+}
+.lp-secondary-body {
+  font-family: "Newsreader", Georgia, serif;
+  font-style: normal;
+  font-size: 0.95rem;
+  line-height: 1.55;
+  color: var(--text-dim);
+  margin: 0;
+}
+
+/* ---------------------------------------------------------------------------- */
+/* Sets index editorial restyle (v3.29.4)                                       */
+/* ---------------------------------------------------------------------------- */
+
+.sets-grid-editorial {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: var(--space-4);
+}
+.sets-card-editorial {
+  /* Inherits .editorial-card composition (markup applies both classes). */
+  padding: 1.15rem 1.2rem 1.25rem;
+}
+.sets-card-editorial .sets-card-eyebrow {
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 0 0 0.3rem;
+}
+.sets-card-editorial .sets-card-code {
+  font-family: var(--font-display);
+  font-style: normal;
+  font-weight: 600;
+  font-size: 1.55rem;
+  letter-spacing: 0.02em;
+  color: var(--brand-gold);
+  line-height: 1;
+  margin: 0 0 0.5rem;
+}
+.sets-card-editorial .sets-card-name {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 500;
+  font-size: 1.05rem;
+  letter-spacing: -0.005em;
+  color: var(--text);
+  margin: 0 0 0.85rem;
+  line-height: 1.25;
+}
+.sets-card-editorial .sets-card-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border-soft);
+}
+.sets-card-editorial .sets-card-meta-line {
+  font-family: "Newsreader", Georgia, serif;
+  font-style: italic;
+  font-size: 0.88rem;
+  line-height: 1.35;
+  color: var(--text-dim);
+}
+.sets-card-editorial .sets-card-meta-line strong {
+  font-family: var(--font-display);
+  font-style: normal;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  margin-right: 0.3rem;
+}
+
+/* ---------------------------------------------------------------------------- */
+/* Tokens page editorial polish (v3.29.4)                                       */
+/* ---------------------------------------------------------------------------- */
+
+/* The intro panel for /tokens uses the shared .intro-panel composition.
+   Filter bar + actions get small editorial polish; the table is the
+   global <table> chrome with the .table-wrap + .col-priority-* rules
+   from v3.27.15/v3.27.16 preserved verbatim. */
+
+.tokens-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  flex-wrap: wrap;
+}
+.tokens-stat-line {
+  font-family: "Newsreader", Georgia, serif;
+  font-style: italic;
+  font-size: 0.92rem;
+  color: var(--text-dim);
+  margin: 0;
+}
+.tokens-stat-line strong {
+  font-family: var(--font-display);
+  font-style: normal;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  margin-right: 0.2rem;
+}
+.tokens-controls {
+  margin-bottom: var(--space-4);
+}
+
+/* The §6 verification gate notes Tokens stays a TABLE (not a card grid).
+   No `.tokens-grid` / `.tokens-typecard` rules — those would be the
+   deferred Tokens-analytics feature recorded in roadmap.md. */
+
+/* ============================================================================
+   END v3.29.4 editorial finish block
+   ============================================================================ */

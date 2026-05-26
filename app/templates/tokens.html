@@ -1,22 +1,39 @@
 {% from "_macros.html" import editorial_eyebrow %}
 {% extends "base.html" %}
 {% block content %}
-  <section class="panel hero-panel compact-hero">
-    <div class="hero-row">
-      <div>
-        {{ editorial_eyebrow("Collection · Tokens") }}
-        <h2 class="panel-title">Token Inventory</h2>
-        <p class="muted">Lightweight tracking for the physical tokens you actually use at the table.</p>
-      </div>
-      <div class="hero-stats-inline">
-        <span>{{ tokens|length }} entries</span>
-        <span>{{ total_count }} total tokens</span>
+  {# v3.29.4 — Editorial restyle: polished controls + stat line.
+     Table chrome is preserved verbatim: the .table-wrap + .col-priority-low /
+     .col-priority-mid classes from v3.27.16 stay, the Edit popout + image
+     popout + double-sided badge + back-face lookup script all unchanged.
+     This page STAYS A TABLE — the mockup's typed-card grid is a type-
+     aggregated view backed by demand/shortage analytics (the deferred
+     Tokens-analytics feature in roadmap.md); the v3.29.4 restyle delivers a
+     composed editorial table, not a structural rebuild.
+
+     v3.29.4 follow-up (Item 3): page header aligned to the shipped
+     Pending pattern (see comment in sets.html). Also fixes the eyebrow
+     from the wrong "Catalogue · Tokens" to "Collection · Tokens" —
+     Tokens lives in the COLLECTION nav group, not a non-existent
+     Catalogue group. #}
+  <section class="panel page-hero">
+    <div>
+      {{ editorial_eyebrow("Collection · Tokens") }}
+      <h2 class="panel-title">Tokens</h2>
+      <p class="pagehead-tagline">
+        Lightweight tracking for the physical tokens you actually use at the
+        table — every Treasure, Pest, and double-sided helper, kept exactly
+        as found in the box.
+      </p>
+      <div class="tokens-actions" style="margin-top: 1rem">
+        <p class="tokens-stat-line"><strong>{{ tokens|length }}</strong>entries</p>
+        <p class="tokens-stat-line"><strong>{{ total_count }}</strong>total tokens</p>
         <a href="/tokens/new" class="btn-like">+ New Token</a>
         <a href="/tokens/bulk-add" class="btn-like btn-like-muted">Bulk Add</a>
       </div>
     </div>
   </section>
-  <section class="panel controls-panel">
+
+  <section class="panel controls-panel tokens-controls">
     <form method="get" action="/tokens" class="filter-row">
       <input type="text"
              name="name"
@@ -29,184 +46,185 @@
              list="subtype-list">
       <datalist id="subtype-list">
         {% for st in subtypes %}<option value="{{ st }}">{% endfor %}
-        </datalist>
-        <select name="location">
-          <option value="">— Any location —</option>
-          {% for loc in locations %}
-            <option value="{{ loc.id }}"
-                    {% if location == loc.id|string %}selected{% endif %}>{{ loc.name }}</option>
-          {% endfor %}
-        </select>
-        <label class="filter-checkbox">
-          <input type="checkbox"
-                 name="double_sided"
-                 value="1"
-                 {% if double_sided == '1' %}checked{% endif %}>
-          Double-sided only
-        </label>
-        <button type="submit">Filter</button>
-        <a href="/tokens" class="btn-like btn-like-muted">Reset</a>
-      </form>
-    </section>
-    {% if tokens %}
-      <section class="panel">
-        <div class="table-wrap">
-          <table>
-            <thead>
+      </datalist>
+      <select name="location">
+        <option value="">— Any location —</option>
+        {% for loc in locations %}
+          <option value="{{ loc.id }}"
+                  {% if location == loc.id|string %}selected{% endif %}>{{ loc.name }}</option>
+        {% endfor %}
+      </select>
+      <label class="filter-checkbox">
+        <input type="checkbox"
+               name="double_sided"
+               value="1"
+               {% if double_sided == '1' %}checked{% endif %}>
+        Double-sided only
+      </label>
+      <button type="submit">Filter</button>
+      <a href="/tokens" class="btn-like btn-like-muted">Reset</a>
+    </form>
+  </section>
+
+  {% if tokens %}
+    <section class="panel">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Token</th>
+              <th class="col-priority-low">Subtype</th>
+              <th>Qty</th>
+              <th class="col-priority-mid">Location</th>
+              <th class="col-priority-low">Notes</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for t in tokens %}
               <tr>
-                <th>Token</th>
-                <th class="col-priority-low">Subtype</th>
-                <th>Qty</th>
-                <th class="col-priority-mid">Location</th>
-                <th class="col-priority-low">Notes</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for t in tokens %}
-                <tr>
-                  <td>
-                    <strong>
-                      {{ t.name }}
-                      {% if t.is_double_sided and t.back_name %}<span class="muted">/</span> {{ t.back_name }}{% endif %}
-                    </strong>
-                    {% if t.is_double_sided %}<span class="finish-badge" title="Double-sided">↻</span>{% endif %}
-                    {% set front_id = (t.set_code|upper if t.set_code else '') ~ ('#' ~ t.collector_number if t.collector_number else '') %}
-                    {% set back_id = (t.back_set_code|upper if t.back_set_code else '') ~ ('#' ~ t.back_collector_number if t.back_collector_number else '') %}
-                    {% if front_id or (t.is_double_sided and back_id) %}
-                      <div class="muted">
-                        {{ front_id }}
-                        {% if t.is_double_sided and back_id %}/ {{ back_id }}{% endif %}
-                      </div>
-                    {% endif %}
-                    {% if t.image_url %}
-                      <details class="inline-details inline-details-side" style="display:inline">
-                        <summary class="btn-like btn-like-muted">image</summary>
-                        <div class="edit-popout mobile-popover">
-                          <img src="{{ t.image_url }}"
-                               alt="{{ t.name }}"
+                <td>
+                  <strong>
+                    {{ t.name }}
+                    {% if t.is_double_sided and t.back_name %}<span class="muted">/</span> {{ t.back_name }}{% endif %}
+                  </strong>
+                  {% if t.is_double_sided %}<span class="finish-badge" title="Double-sided">↻</span>{% endif %}
+                  {% set front_id = (t.set_code|upper if t.set_code else '') ~ ('#' ~ t.collector_number if t.collector_number else '') %}
+                  {% set back_id = (t.back_set_code|upper if t.back_set_code else '') ~ ('#' ~ t.back_collector_number if t.back_collector_number else '') %}
+                  {% if front_id or (t.is_double_sided and back_id) %}
+                    <div class="muted">
+                      {{ front_id }}
+                      {% if t.is_double_sided and back_id %}/ {{ back_id }}{% endif %}
+                    </div>
+                  {% endif %}
+                  {% if t.image_url %}
+                    <details class="inline-details inline-details-side" style="display:inline">
+                      <summary class="btn-like btn-like-muted">image</summary>
+                      <div class="edit-popout mobile-popover">
+                        <img src="{{ t.image_url }}"
+                             alt="{{ t.name }}"
+                             loading="lazy"
+                             style="max-width:200px;
+                                    border-radius:6px">
+                        {% if t.is_double_sided and t.back_image_url %}
+                          <img src="{{ t.back_image_url }}"
+                               alt="{{ t.back_name or 'back' }}"
                                loading="lazy"
                                style="max-width:200px;
-                                      border-radius:6px">
-                          {% if t.is_double_sided and t.back_image_url %}
-                            <img src="{{ t.back_image_url }}"
-                                 alt="{{ t.back_name or 'back' }}"
-                                 loading="lazy"
-                                 style="max-width:200px;
-                                        border-radius:6px;
-                                        margin-top:0.4rem">
-                          {% endif %}
-                        </div>
-                      </details>
-                    {% endif %}
-                  </td>
-                  <td class="col-priority-low">{{ t.subtype or '—' }}</td>
-                  <td>
-                    <strong>{{ t.quantity }}</strong>
-                  </td>
-                  <td class="col-priority-mid">{{ t.storage_location.name if t.storage_location else '—' }}</td>
-                  <td class="col-priority-low muted">{{ t.notes or '' }}</td>
-                  <td>
-                    <details class="inline-details">
-                      <summary class="btn-like btn-like-muted">Edit</summary>
-                      <div class="edit-popout mobile-popover">
-                        <form action="/tokens/{{ t.id }}/edit" method="post" class="stack-form">
-                          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                          <label>Name</label>
-                          <input type="text" name="name" value="{{ t.name }}" required>
-                          <label>Subtype</label>
-                          <input type="text" name="subtype" value="{{ t.subtype or '' }}">
-                          <label>Quantity</label>
-                          <input type="number" name="quantity" value="{{ t.quantity }}" min="0">
-                          <label>Storage location</label>
-                          <select name="storage_location_id">
-                            <option value="">— None —</option>
-                            {% for loc in locations %}
-                              <option value="{{ loc.id }}"
-                                      {% if t.storage_location_id == loc.id %}selected{% endif %}>
-                                {{ loc.name }}
-                              </option>
-                            {% endfor %}
-                          </select>
-                          <label>Image URL</label>
-                          <input type="url" name="image_url" value="{{ t.image_url or '' }}">
-                          <label class="filter-checkbox">
-                            <input type="checkbox"
-                                   name="is_double_sided"
-                                   value="1"
-                                   {% if t.is_double_sided %}checked{% endif %}>
-                            Double-sided
-                          </label>
-                          <fieldset class="token-edit-back"
-                                    style="border:1px solid rgba(255,255,255,0.08);
-                                           border-radius:6px;
-                                           padding:0.5rem">
-                            <legend class="muted">Back face</legend>
-                            <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.4rem">
-                              <label style="margin:0">
-                                Back set
-                                <input type="text"
-                                       name="back_set_code"
-                                       value="{{ t.back_set_code or '' }}"
-                                       class="token-back-set"
-                                       placeholder="e.g. tblc">
-                              </label>
-                              <label style="margin:0">
-                                Back #
-                                <input type="text"
-                                       name="back_collector_number"
-                                       value="{{ t.back_collector_number or '' }}"
-                                       class="token-back-collector"
-                                       placeholder="e.g. 14">
-                              </label>
-                            </div>
-                            <button type="button"
-                                    class="btn-like btn-like-muted token-edit-back-lookup"
-                                    data-token-id="{{ t.id }}"
-                                    style="margin-top:0.4rem">Look up back</button>
-                            <p class="muted token-edit-back-status" style="margin:0; min-height:1em"></p>
-                            <label>Back-face name</label>
-                            <input type="text"
-                                   name="back_name"
-                                   value="{{ t.back_name or '' }}"
-                                   class="token-back-name">
-                            <label>Back-face image URL</label>
-                            <input type="url"
-                                   name="back_image_url"
-                                   value="{{ t.back_image_url or '' }}"
-                                   class="token-back-image">
-                          </fieldset>
-                          <label>Notes</label>
-                          <textarea name="notes" rows="2">{{ t.notes or '' }}</textarea>
-                          <button type="submit">Save</button>
-                        </form>
-                        <form action="/tokens/{{ t.id }}/delete"
-                              method="post"
-                              style="margin-top:0.5rem">
-                          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                          <button type="submit"
-                                  class="btn-danger-small"
-                                  onclick="return confirm('Delete this token entry?')">Delete</button>
-                        </form>
+                                      border-radius:6px;
+                                      margin-top:0.4rem">
+                        {% endif %}
                       </div>
                     </details>
-                  </td>
-                </tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        </div>
-      </section>
-    {% else %}
-      <section class="panel">
-        <p class="muted">
-          No tokens yet. <a href="/tokens/new">Add your first token</a> — Pest x12, Treasure x30, whatever you actually have on hand.
-        </p>
-      </section>
-    {% endif %}
-  {% endblock %}
-  {% block extra_scripts %}
-    <script>
+                  {% endif %}
+                </td>
+                <td class="col-priority-low">{{ t.subtype or '—' }}</td>
+                <td>
+                  <strong>{{ t.quantity }}</strong>
+                </td>
+                <td class="col-priority-mid">{{ t.storage_location.name if t.storage_location else '—' }}</td>
+                <td class="col-priority-low muted">{{ t.notes or '' }}</td>
+                <td>
+                  <details class="inline-details">
+                    <summary class="btn-like btn-like-muted">Edit</summary>
+                    <div class="edit-popout mobile-popover">
+                      <form action="/tokens/{{ t.id }}/edit" method="post" class="stack-form">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                        <label>Name</label>
+                        <input type="text" name="name" value="{{ t.name }}" required>
+                        <label>Subtype</label>
+                        <input type="text" name="subtype" value="{{ t.subtype or '' }}">
+                        <label>Quantity</label>
+                        <input type="number" name="quantity" value="{{ t.quantity }}" min="0">
+                        <label>Storage location</label>
+                        <select name="storage_location_id">
+                          <option value="">— None —</option>
+                          {% for loc in locations %}
+                            <option value="{{ loc.id }}"
+                                    {% if t.storage_location_id == loc.id %}selected{% endif %}>
+                              {{ loc.name }}
+                            </option>
+                          {% endfor %}
+                        </select>
+                        <label>Image URL</label>
+                        <input type="url" name="image_url" value="{{ t.image_url or '' }}">
+                        <label class="filter-checkbox">
+                          <input type="checkbox"
+                                 name="is_double_sided"
+                                 value="1"
+                                 {% if t.is_double_sided %}checked{% endif %}>
+                          Double-sided
+                        </label>
+                        <fieldset class="token-edit-back"
+                                  style="border:1px solid rgba(255,255,255,0.08);
+                                         border-radius:6px;
+                                         padding:0.5rem">
+                          <legend class="muted">Back face</legend>
+                          <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.4rem">
+                            <label style="margin:0">
+                              Back set
+                              <input type="text"
+                                     name="back_set_code"
+                                     value="{{ t.back_set_code or '' }}"
+                                     class="token-back-set"
+                                     placeholder="e.g. tblc">
+                            </label>
+                            <label style="margin:0">
+                              Back #
+                              <input type="text"
+                                     name="back_collector_number"
+                                     value="{{ t.back_collector_number or '' }}"
+                                     class="token-back-collector"
+                                     placeholder="e.g. 14">
+                            </label>
+                          </div>
+                          <button type="button"
+                                  class="btn-like btn-like-muted token-edit-back-lookup"
+                                  data-token-id="{{ t.id }}"
+                                  style="margin-top:0.4rem">Look up back</button>
+                          <p class="muted token-edit-back-status" style="margin:0; min-height:1em"></p>
+                          <label>Back-face name</label>
+                          <input type="text"
+                                 name="back_name"
+                                 value="{{ t.back_name or '' }}"
+                                 class="token-back-name">
+                          <label>Back-face image URL</label>
+                          <input type="url"
+                                 name="back_image_url"
+                                 value="{{ t.back_image_url or '' }}"
+                                 class="token-back-image">
+                        </fieldset>
+                        <label>Notes</label>
+                        <textarea name="notes" rows="2">{{ t.notes or '' }}</textarea>
+                        <button type="submit">Save</button>
+                      </form>
+                      <form action="/tokens/{{ t.id }}/delete"
+                            method="post"
+                            style="margin-top:0.5rem">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                        <button type="submit"
+                                class="btn-danger-small"
+                                onclick="return confirm('Delete this token entry?')">Delete</button>
+                      </form>
+                    </div>
+                  </details>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  {% else %}
+    <section class="panel">
+      <p class="muted">
+        No tokens yet. <a href="/tokens/new">Add your first token</a> — Pest x12, Treasure x30, whatever you actually have on hand.
+      </p>
+    </section>
+  {% endif %}
+{% endblock %}
+{% block extra_scripts %}
+  <script>
 (() => {
   // Wire the per-row 'Look up back' button in the edit popout.
   document.querySelectorAll('.token-edit-back-lookup').forEach(btn => {
@@ -250,5 +268,5 @@
     });
   });
 })();
-    </script>
-  {% endblock %}
+  </script>
+{% endblock %}
