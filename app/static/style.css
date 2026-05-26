@@ -11335,3 +11335,167 @@ table.dmtx .dmtx-rowhead {
   flex-wrap: wrap;
 }
 
+/* ─────────────────────────────────────────────────────────────────
+   v3.29.1 — Collection sharing (Showcase + Share). Token reuse only —
+   inherits the Folio palette + the v3.10.6 inline-popout idiom + the
+   v3.29.0 .playgroup-* role-badge pattern. Zero parallel tokens.
+   Showcase ≠ Share (the two-name discipline matches the model
+   docstrings); the .showcase-* and .share-* rules sit side-by-side
+   so the visual register stays cohesive across the two pages.
+   ───────────────────────────────────────────────────────────────── */
+
+/* Heroes inherit .pagehead-tagline italic Newsreader from v3.28.x */
+.showcase-hero,
+.share-hero,
+.share-view-hero {
+  margin-bottom: 1rem;
+}
+
+/* Flash messages — same shape as .playgroups-flash */
+.showcase-flash,
+.share-flash {
+  padding: 0.7rem 1rem;
+  margin-bottom: 0.85rem;
+  border-radius: var(--radius);
+  font-size: 0.9rem;
+}
+.showcase-flash-error,
+.share-flash-error {
+  background: rgba(138, 46, 34, 0.18);
+  border: 1px solid rgba(138, 46, 34, 0.5);
+  color: var(--danger);
+}
+.showcase-flash-success,
+.share-flash-success {
+  background: var(--brand-gold-soft);
+  border: 1px solid var(--brand-gold);
+  color: var(--brand-gold);
+}
+
+/* Showcase items grid */
+.showcase-items-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 0.85rem;
+  margin-top: 0.85rem;
+}
+.showcase-item {
+  display: flex;
+  gap: 0.75rem;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.7rem;
+}
+.showcase-item-art img,
+.showcase-item-placeholder {
+  width: 64px;
+  height: 88px;
+  border-radius: var(--radius-sm);
+  object-fit: cover;
+  background: var(--panel);
+  border: 1px solid var(--border);
+}
+.showcase-item-body {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.showcase-item-title {
+  font-family: Newsreader, Georgia, serif;
+  font-style: italic;
+  font-weight: 500;
+  font-size: 1.02rem;
+  margin: 0 0 0.25rem;
+  color: var(--text);
+}
+.showcase-item-meta {
+  font-size: 0.78rem;
+  color: var(--text-dim);
+  margin-bottom: 0.35rem;
+}
+.showcase-item-qty {
+  font-size: 0.85rem;
+  color: var(--text);
+  margin-bottom: 0.4rem;
+}
+.showcase-item-actions {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.showcase-empty {
+  color: var(--text-dim);
+  font-style: italic;
+}
+
+/* Shares list (on /shares) */
+.share-table .share-pg-link {
+  font-family: Newsreader, Georgia, serif;
+  font-style: italic;
+  font-weight: 500;
+  color: var(--text);
+  text-decoration: none;
+}
+.share-table .share-pg-link:hover {
+  color: var(--brand-gold);
+}
+.share-actions-cell {
+  display: flex;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.share-create-form {
+  max-width: 420px;
+}
+.share-empty {
+  color: var(--text-dim);
+  font-style: italic;
+}
+
+/* Shares panel on /playgroups/{id} */
+.share-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  margin-top: 0.6rem;
+}
+.share-list-item {
+  display: flex;
+  gap: 0.85rem;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.55rem 0.85rem;
+}
+.share-list-meta {
+  min-width: 0;
+}
+.share-list-name {
+  font-family: Newsreader, Georgia, serif;
+  font-style: italic;
+  font-weight: 500;
+  font-size: 1.02rem;
+  color: var(--text);
+  text-decoration: none;
+}
+.share-list-name:hover {
+  color: var(--brand-gold);
+}
+
+/* Read-only share view */
+.share-view-description {
+  margin-top: 0.4rem;
+  color: var(--text-dim);
+  font-size: 0.92rem;
+}
+.share-view-meta {
+  margin-top: 0.4rem;
+  font-size: 0.82rem;
+}
+.share-view-grid {
+  margin-top: 0.6rem;
+}

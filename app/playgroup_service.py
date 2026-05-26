@@ -28,7 +28,7 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.models import Playgroup, PlaygroupMember, User
+from app.models import Playgroup, PlaygroupMember, Share, User
 
 # Service-layer canonical role enum (the v3.27.2 / v3.27.3 pattern, no
 # DB CHECK constraint). v3.29.0 ships two roles; the enum can widen
@@ -377,6 +377,15 @@ def leave_playgroup(session: Session, user_id: int, playgroup_id: int) -> tuple[
                 "delete the playgroup before leaving.",
             )
 
+    # v3.29.1 — cleanup the departing user's shares targeting this
+    # playgroup. The sharer is leaving the audience; hard-delete the
+    # Share row (decision B2 — no soft-revoke). Direct DELETE rather
+    # than importing ``share_service`` to avoid the circular import the
+    # spec called out (§9). The Showcase itself is untouched.
+    session.query(Share).filter(
+        Share.user_id == user_id,
+        Share.playgroup_id == playgroup_id,
+    ).delete(synchronize_session=False)
     session.delete(membership)
     session.flush()
     # If the playgroup is now empty, hard-delete it (D1 auto-delete).
@@ -387,6 +396,11 @@ def leave_playgroup(session: Session, user_id: int, playgroup_id: int) -> tuple[
         or 0
     )
     if remaining == 0:
+        # v3.29.1 — playgroup gone, drop every share targeting it
+        # (the case where leave_playgroup auto-deletes the playgroup).
+        session.query(Share).filter(Share.playgroup_id == playgroup_id).delete(
+            synchronize_session=False
+        )
         pg = session.query(Playgroup).filter(Playgroup.id == playgroup_id).first()
         if pg is not None:
             session.delete(pg)
@@ -413,6 +427,13 @@ def remove_member(
         return False, "That user is not a member."
     if target.role == "owner":
         return False, "Use Transfer Ownership or Leave to change the owner."
+    # v3.29.1 — cleanup the removed member's shares targeting this
+    # playgroup. They are no longer in the audience; hard-delete the
+    # Share rows (decision B2). Showcase itself untouched.
+    session.query(Share).filter(
+        Share.user_id == target_user_id,
+        Share.playgroup_id == playgroup_id,
+    ).delete(synchronize_session=False)
     session.delete(target)
     session.commit()
     return True, None
@@ -534,6 +555,13 @@ def delete_playgroup(
     pg = session.query(Playgroup).filter(Playgroup.id == playgroup_id).first()
     if pg is None:
         return False, "Playgroup not found."
+    # v3.29.1 — every Share targeting this playgroup goes too. The
+    # audience no longer exists; hard-delete (decision B2). Showcases
+    # the shares pointed at are untouched — those belong to other
+    # users (they may still be shared elsewhere via other Share rows).
+    session.query(Share).filter(Share.playgroup_id == playgroup_id).delete(
+        synchronize_session=False
+    )
     session.delete(pg)
     session.commit()
     return True, None
@@ -581,6 +609,13 @@ def handle_user_deletion(session: Session, user_id: int) -> None:
         if successor is None:
             # Sole member; hard-delete the playgroup. Cascade clears
             # the about-to-be-deleted owner's membership row.
+            # v3.29.1 — drop every Share targeting this playgroup
+            # before deletion (the audience is going away). Shares
+            # OWNED by the user being deleted are cleaned up
+            # separately in the admin cascade in routes/admin.py.
+            session.query(Share).filter(Share.playgroup_id == pg_id).delete(
+                synchronize_session=False
+            )
             pg = session.query(Playgroup).filter(Playgroup.id == pg_id).first()
             if pg is not None:
                 session.delete(pg)

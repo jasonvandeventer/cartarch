@@ -1,0 +1,59 @@
+{% from "_macros.html" import editorial_eyebrow, inventory_card %}
+{% extends "base.html" %}
+{% block content %}
+  {# v3.29.1 — read-only shared view of a Showcase.
+
+     SANITIZED PROJECTION: ``items`` is built by
+     ``share_service.build_share_display_items`` which whitelists only
+     the fields §8 of the v3.29.1 spec allows. The rendered HTML must
+     NEVER carry markers from these fields — privacy hard-flag asserted
+     in the verification gate:
+       - InventoryRow.notes, tags, role, is_pending,
+         storage_location_id, drawer, slot, from_drawer, from_slot,
+         created_at, updated_at, user_id
+       - ShowcaseItem.notes (sharer-private)
+     Each item carries a ``_ReadOnlyCardProjection`` instead of a raw
+     ``Card`` ORM object — accessing any non-whitelisted card column on
+     it raises AttributeError, so a future template change can't
+     accidentally surface a private field through ``item.card.X``.
+
+     ``inventory_card`` is reused with ALL ACTION FLAGS OFF — no
+     show_collection_actions, no show_deck_actions, no
+     show_location_label. That keeps every action-form branch out of
+     the rendered output AND skips the ``{% elif item.slot %}`` branch
+     because the projection deliberately doesn't populate ``slot``. #}
+  <section class="panel pagehead share-view-hero">
+    {{ editorial_eyebrow("Play · Shares · " + showcase.name) }}
+    <h1 class="pagehead-title">{{ showcase.name }}</h1>
+    <p class="pagehead-tagline">
+      Shared by <strong>{{ sharer.display_name or sharer.username }}</strong> with the <a href="/playgroups/{{ playgroup.id }}">{{ playgroup.name }}</a> playgroup.
+    </p>
+    {% if showcase.description %}
+      <p class="share-view-description"><em>{{ showcase.description }}</em></p>
+    {% endif %}
+    <p class="muted share-view-meta">
+      {{ items | length }} card{{ 's' if items | length != 1 else '' }} ·
+      shared {{ share.created_at | editorial_date }}
+    </p>
+  </section>
+
+  <section class="panel">
+    <h3 class="panel-title">Showcase</h3>
+    {% if items %}
+      <div class="inventory-grid share-view-grid">
+        {% for item in items %}
+          {{ inventory_card(item, csrf_token,
+                            show_collection_actions=false,
+                            show_location_label=false,
+                            show_deck_actions=false) }}
+        {% endfor %}
+      </div>
+    {% else %}
+      <p class="muted">This Showcase is empty.</p>
+    {% endif %}
+  </section>
+
+  <section class="panel">
+    <p class="muted"><em>You're viewing a read-only share.</em> No edit, audit, or action affordances are available — this is a glance-only window into another collector's curated list.</p>
+  </section>
+{% endblock %}

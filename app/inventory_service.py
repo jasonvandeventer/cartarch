@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session, joinedload
 from app.audit_service import log_transaction
 from app.import_service import coerce_language_code_strict
 from app.location_service import SORTABLE_SOURCE_MODES
-from app.models import Card, InventoryRow, StorageLocation, TransactionLog
+from app.models import Card, InventoryRow, ShowcaseItem, StorageLocation, TransactionLog
 from app.pricing import effective_price
 from app.scryfall import fetch_card_by_scryfall_id
 
@@ -1981,6 +1981,15 @@ def adjust_inventory_row_quantity(
     )
 
     if quantity == row.quantity:
+        # v3.29.1 — cleanup any ShowcaseItem rows referencing this
+        # InventoryRow before deletion (§9). With PRAGMA foreign_keys
+        # OFF the FK isn't enforced, so a dangling ShowcaseItem would
+        # survive otherwise. ``build_share_display_items`` skips
+        # dangling rows defensively, but the cleanup keeps the DB
+        # honest.
+        session.query(ShowcaseItem).filter(ShowcaseItem.inventory_row_id == row.id).delete(
+            synchronize_session=False
+        )
         session.delete(row)
         session.commit()
         return None
@@ -2034,6 +2043,18 @@ def bulk_delete_inventory_rows(session: Session, row_ids: list[int], user_id: in
         .filter(InventoryRow.id.in_(row_ids), InventoryRow.user_id == user_id)
         .all()
     )
+
+    # v3.29.1 — drop ShowcaseItems referencing any of these rows
+    # before the rows go (§9). Single batched DELETE keyed on the
+    # actually-resolvable row ids (rows the user owns); a tampered
+    # batch with someone else's row ids gets neither the InventoryRow
+    # nor the ShowcaseItem deleted (the filter on user_id above
+    # silently skips non-owned rows).
+    if rows:
+        owned_ids = [r.id for r in rows]
+        session.query(ShowcaseItem).filter(ShowcaseItem.inventory_row_id.in_(owned_ids)).delete(
+            synchronize_session=False
+        )
 
     for row in rows:
         source_location = (

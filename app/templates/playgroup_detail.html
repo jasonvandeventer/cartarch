@@ -124,6 +124,27 @@
     </div>
   </section>
 
+  {# ── Shares (v3.29.1) — Showcases members have shared with this playgroup ── #}
+  <section class="panel">
+    <h3 class="panel-title">Shared collections</h3>
+    {% if shares %}
+      <p class="muted">Members have shared {{ shares | length }} curated Showcase{{ 's' if shares | length != 1 else '' }} with this playgroup. Open one to glance through the cards, read-only.</p>
+      <div class="share-list">
+        {% for row in shares %}
+          <article class="share-list-item">
+            <div class="share-list-meta">
+              <a class="share-list-name" href="/shares/{{ row.share.id }}">{{ row.showcase.name }}</a>
+              <div class="muted">by {{ row.sharer.display_name or row.sharer.username }} · shared {{ row.share.created_at | editorial_date }}</div>
+            </div>
+            <a class="btn-like" href="/shares/{{ row.share.id }}">View →</a>
+          </article>
+        {% endfor %}
+      </div>
+    {% else %}
+      <p class="muted">No Showcases have been shared with this playgroup yet. Visit your <a href="/showcase">Showcase</a> page to curate cards, then <a href="/shares">share</a> it with a playgroup.</p>
+    {% endif %}
+  </section>
+
   {# ── Owner controls (rename/notes, transfer, delete) ── #}
   {% if is_owner %}
     <section class="panel">

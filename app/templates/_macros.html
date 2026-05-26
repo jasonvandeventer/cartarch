@@ -200,6 +200,19 @@
                   {% endif %}
                 </button>
               </form>
+              {# v3.29.1 — Add to Showcase. The single add-to-Showcase
+                 entry point in v3.29.1; the management page lists/edits
+                 but does not search for inventory rows. ``add_showcase_item``
+                 is idempotent on duplicate (inventory_row_id, showcase_id) —
+                 a second click is a no-op. #}
+              <form action="/showcase/items/add"
+                    method="post"
+                    class="inline-form">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <input type="hidden" name="inventory_row_id" value="{{ item.id }}">
+                <input type="hidden" name="quantity_offered" value="1">
+                <button type="submit">Add to Showcase</button>
+              </form>
             </div>
           </div>
         </details>

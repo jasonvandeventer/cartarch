@@ -1,5 +1,26 @@
 [
   {
+    "version": "3.29.1",
+    "date": "2026-05-25",
+    "added": [
+      "Showcase. A new page (Play → Showcase) where you curate a list of cards from your collection — the ones you'd want to show off, trade away, or simply highlight. Open any card's Actions menu on the Collection page and click ‘Add to Showcase'; the card lands in your Showcase with a default offered quantity of 1. Edit the offered quantity any time. Removing a card from your Showcase doesn't touch your inventory.",
+      "Shares. A second new page (Play → Shares) where you take your Showcase and expose it, read-only, to a playgroup of your choice. Pick the playgroup, click Share, and members of that playgroup see your Showcase listed on their playgroup's detail page. They can click through to view your curated cards, but they cannot edit, comment, or otherwise touch anything — it's glance-only.",
+      "Available quantity that follows the inventory automatically. If you offer 3 copies of a card and later sell 2, the share view drops to ‘Qty 1' on its own. No bookkeeping to do — the displayed available is the smaller of what you offered and what's currently in your collection, computed every time the share is viewed.",
+      "Revoke a share whenever you want, from your Shares page. The share row goes away (no soft-revoke; it really is gone). Your Showcase itself is untouched — revoking only takes back the act of exposing it to that playgroup."
+    ],
+    "refined": [
+      "Showcase ≠ Share — a deliberate two-name discipline. The Showcase is what you keep; the Share is one act of exposing it to one playgroup. You can share the same Showcase to multiple playgroups (each becomes its own Share row, each is independently revocable), and revoking any share never touches the Showcase or your inventory.",
+      "Privacy is built into the design, not bolted on. The shared view shows only card identity (name, set, collector number, image, mana cost, type, oracle text, rarity, prices, legalities), finish, language, proxy badge, and the computed available quantity. It NEVER shows your private InventoryRow notes, tags, deck role, pending status, or which drawer/slot/location the card lives in. The list of allowed fields is whitelisted at the source; everything else is excluded by construction.",
+      "Sharing scopes to playgroup membership. Viewers must be in the playgroup the share targets — non-members get a non-leaky redirect that doesn't distinguish ‘exists but you can't see it' from ‘doesn't exist'. This consumes the v3.29.0 Playgroups substrate directly — the share's audience is the chosen playgroup specifically, not your wider social graph.",
+      "Lifecycle is cleaned up everywhere it matters: when you leave a playgroup, your shares to it go away. When an owner removes a member, that member's shares to it go away. When a playgroup is deleted, every share targeting it goes away. When an InventoryRow is deleted, the related Showcase item is cleaned up first. When an account is deleted, the user's shares, Showcase, and all Showcase items go with it."
+    ],
+    "resolved": [
+      "Several smaller decisions land here that the original sharing roadmap had left as open questions. Quantity is computed, not stored — no drift when you sell. There's exactly one Showcase per user at v3.29.1 (one place to curate; a future multi-showcase release is a small change). Revoke is hard-delete, not soft. Only the binder/curated-list mode ships in v3.29.1; full-collection and saved-search sharing modes are deferred. Public unauthenticated links are deferred entirely — those require a separate privacy review, rate-limiting, and a different revocation model before they can responsibly ship.",
+      "Read-only at v3.29.1. The trade-proposal capability — recipient picks cards from the sharer's Showcase and offers cards back — is v3.29.2 Pairwise trading territory, the next release of the v3.29.x social-features minor."
+    ],
+    "archivist_note": "The middle of the v3.29.x arc. Playgroups gave us ‘the people you play with' as a real thing in the schema. Collection sharing gives one of those people something to show the others — and does so in a way that makes the privacy boundary the most important design property of the release. We deliberately wrap the live Card object in a whitelisting proxy before letting any template render it: a future template change can't accidentally reach a non-whitelisted field, because accessing one raises immediately. The Showcase-versus-Share split is the other discipline we wanted to be loud about. They sound similar; they are not. The Showcase is the curated list you tend. A Share is one act of exposing that list to one audience. You can share the same Showcase to two playgroups, revoke one without touching the other, and revoke both without touching the Showcase. v3.29.2 — Pairwise trading — comes next, and it builds on the same primitive: a curated list of haves, scoped to who you trade with."
+  },
+  {
     "version": "3.29.0",
     "date": "2026-05-25",
     "added": [

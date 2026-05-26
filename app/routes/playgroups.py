@@ -21,6 +21,7 @@ from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
 from app import playgroup_service as svc
+from app import share_service
 from app.dependencies import (
     CsrfRequired,
     get_current_user,
@@ -134,6 +135,12 @@ def playgroups_detail(
         return RedirectResponse(url="/playgroups?error=not_a_member", status_code=303)
     error = request.query_params.get("error")
     success = request.query_params.get("success")
+    # v3.29.1 — Shares targeting this playgroup, visible to the
+    # viewing member. Service-layer filter is direct-PlaygroupMember
+    # on Share.playgroup_id (decision E2). The viewer's membership is
+    # already established by ``get_playgroup_detail`` above; the
+    # ``list_shares_for_playgroup`` membership check is belt-and-suspenders.
+    shares = share_service.list_shares_for_playgroup(session, current_user.id, playgroup_id)
     return render(
         request,
         "playgroup_detail.html",
@@ -143,6 +150,7 @@ def playgroups_detail(
             "playgroup": detail["playgroup"],
             "viewer_role": detail["viewer_role"],
             "members": detail["members"],
+            "shares": shares,
             "error": error,
             "success": success,
         },

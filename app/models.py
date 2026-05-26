@@ -63,6 +63,14 @@ class User(Base):
     playgroup_memberships: Mapped[list[PlaygroupMember]] = relationship(
         foreign_keys="PlaygroupMember.user_id"
     )
+    # v3.29.1 — uselist=False because of the v3.29.1 UNIQUE(user_id)
+    # constraint (decision A5 — one Showcase per user, lazily created on
+    # first add-to-showcase action). No cascade from User; the admin
+    # user-deletion path explicitly DELETEs Share, Showcase, and (via
+    # cascade="all, delete-orphan" on Showcase.items) ShowcaseItem rows
+    # in ``app/routes/admin.py:delete_user`` to guarantee the outcome
+    # regardless of SQLite's PRAGMA foreign_keys posture.
+    showcase: Mapped[Showcase | None] = relationship(uselist=False)
 
 
 class Card(Base):
@@ -500,6 +508,134 @@ class Playgroup(Base):
         back_populates="playgroup", cascade="all, delete-orphan"
     )
     creator: Mapped[User] = relationship(foreign_keys=[created_by])
+
+
+class Showcase(Base):
+    """A user's curated subset of their own inventory, prepared for sharing.
+
+    v3.29.1. One per user (``UniqueConstraint(user_id)``); the model is
+    deliberately general so a future multi-showcase release drops the
+    constraint with no other change, and so v3.29.2 trading may reuse it
+    as a "haves" list. A Showcase is NOT a ``StorageLocation type="binder"``
+    (a physical container). It is a logical curated list — cards can be
+    in it without being physically moved.
+
+    **Showcase ≠ Share.** The Showcase is the prepared curation; a
+    :class:`Share` is one act of exposing this Showcase to one playgroup,
+    read-only. Revoking a Share hard-deletes the Share row; the Showcase
+    it pointed at is untouched. This separation is the whole point of the
+    two-table split.
+
+    Items live in :class:`ShowcaseItem`, cascade-deleted with the
+    Showcase.
+    """
+
+    __tablename__ = "showcases"
+    __table_args__ = (UniqueConstraint("user_id", name="uq_showcases_user"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    name: Mapped[str] = mapped_column(String(128), nullable=False, default="My Showcase")
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+
+    items: Mapped[list[ShowcaseItem]] = relationship(
+        back_populates="showcase", cascade="all, delete-orphan"
+    )
+    user: Mapped[User] = relationship()
+
+
+class ShowcaseItem(Base):
+    """One curated card in a :class:`Showcase`. References an InventoryRow.
+
+    v3.29.1. ``inventory_row_id`` is the identity key (decision A3 — the
+    Showcase NEVER forks or copies inventory; InventoryRow stays the
+    single source of truth). ``quantity_offered`` is the sharer's intent;
+    the displayed available quantity in the shared view is computed at
+    render time as ``min(quantity_offered, InventoryRow.quantity)`` — no
+    stored quantity to drift when the sharer sells from inventory.
+
+    ``notes`` is **sharer-private**: it is the one field on this table
+    that MUST NEVER appear in the sanitized share projection (§8 of the
+    v3.29.1 spec). The privacy hard-flag verification in the test suite
+    asserts that no rendered share-view HTML contains a marker derived
+    from this column.
+
+    ``UniqueConstraint(showcase_id, inventory_row_id)`` keeps the
+    curated set a true set; ``add_showcase_item`` in
+    ``app/share_service.py`` treats IntegrityError on this pair as a
+    no-op (the v3.29.0 ``join_by_code`` idempotency pattern).
+
+    ``inventory_row_id`` is a documentary FK only (project runs with
+    ``PRAGMA foreign_keys`` OFF). InventoryRow-delete cleanup runs
+    explicitly: ``inventory_service`` deletes the ShowcaseItem rows
+    referencing the row BEFORE the row is deleted (§9 of the spec). A
+    defensive read-skip in ``build_share_display_items`` handles the
+    theoretical case where the link is dangling at render time.
+    """
+
+    __tablename__ = "showcase_items"
+    __table_args__ = (
+        UniqueConstraint("showcase_id", "inventory_row_id", name="uq_showcase_items_showcase_inv"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    showcase_id: Mapped[int] = mapped_column(ForeignKey("showcases.id"), nullable=False, index=True)
+    inventory_row_id: Mapped[int] = mapped_column(
+        ForeignKey("inventory_rows.id"), nullable=False, index=True
+    )
+    quantity_offered: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    added_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+
+    showcase: Mapped[Showcase] = relationship(back_populates="items")
+    inventory_row: Mapped[InventoryRow | None] = relationship()
+
+
+class Share(Base):
+    """One act of exposing a :class:`Showcase` to one playgroup, read-only.
+
+    v3.29.1. Ephemeral: revoking hard-deletes this row (decision B2).
+    Public links are out of scope at v3.29.1 (decision B1 — playgroup-
+    scoped only; the public-link path is deferred entirely until its own
+    privacy review). One playgroup per Share (decision B3); a Showcase
+    shared to N playgroups is N Share rows.
+
+    Visibility is a direct ``PlaygroupMember`` filter on
+    ``Share.playgroup_id`` (decision E2 — NOT ``co_members_of``, which
+    would return everyone the sharer co-belongs with across other
+    playgroups too; the visibility scope of a Share is the chosen
+    playgroup specifically, not the sharer's social graph in general).
+
+    ``user_id`` is denormalized for the "my shares" query and the admin
+    user-deletion cascade. ``UniqueConstraint(showcase_id, playgroup_id)``
+    prevents double-sharing the same Showcase to the same playgroup;
+    ``create_share`` in ``app/share_service.py`` returns the existing
+    Share when the constraint trips.
+
+    Playgroup-lifecycle cleanup is wired in ``app/playgroup_service.py``
+    (§9 of the spec): ``delete_playgroup`` deletes all shares targeting
+    that playgroup; ``leave_playgroup`` and ``remove_member`` delete the
+    departing user's shares targeting that playgroup. The
+    ``Showcase`` itself is not touched by playgroup deletion.
+    """
+
+    __tablename__ = "shares"
+    __table_args__ = (
+        UniqueConstraint("showcase_id", "playgroup_id", name="uq_shares_showcase_playgroup"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    showcase_id: Mapped[int] = mapped_column(ForeignKey("showcases.id"), nullable=False, index=True)
+    playgroup_id: Mapped[int] = mapped_column(
+        ForeignKey("playgroups.id"), nullable=False, index=True
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+
+    user: Mapped[User] = relationship()
+    showcase: Mapped[Showcase] = relationship()
+    playgroup: Mapped[Playgroup] = relationship()
 
 
 class PlaygroupMember(Base):

@@ -1,0 +1,108 @@
+{% from "_macros.html" import editorial_eyebrow %}
+{% extends "base.html" %}
+{% block content %}
+  {# v3.29.1 — Showcase management. The user's curated subset of their
+     inventory, prepared for sharing. ONE Showcase per user (decision A5),
+     lazily created on first add-to-showcase. The Showcase is NOT a
+     Share — Shares (acts of exposing this Showcase to a playgroup) are
+     managed on /shares. Cards are added from the inventory_card
+     "Actions" drawer on /collection, NOT here at v3.29.1. #}
+  <section class="panel pagehead showcase-hero">
+    {{ editorial_eyebrow("Play · Showcase") }}
+    <h1 class="pagehead-title">Showcase</h1>
+    <p class="pagehead-tagline">
+      <em>A curated list.</em> Pick cards from your collection that you want to show off, trade, or simply highlight. Then share it, read-only, with a playgroup on the <a href="/shares">Shares</a> page.
+    </p>
+  </section>
+
+  {% if error %}
+    <section class="panel showcase-flash showcase-flash-error">
+      <strong>That didn't work.</strong>
+      {% if error == 'add_failed' %}That card isn't in your inventory.
+      {% else %}{{ error | replace('_', ' ') }}
+      {% endif %}
+    </section>
+  {% endif %}
+  {% if success %}
+    <section class="panel showcase-flash showcase-flash-success">
+      {% if success == 'added' %}Added to your Showcase.
+      {% elif success == 'removed' %}Removed.
+      {% elif success == 'updated' %}Saved.
+      {% elif success == 'quantity_updated' %}Quantity updated.
+      {% else %}{{ success | replace('_', ' ') }}
+      {% endif %}
+    </section>
+  {% endif %}
+
+  {# ── Showcase name + description (always editable) ── #}
+  <section class="panel">
+    <h3 class="panel-title">Showcase details</h3>
+    <form method="post" action="/showcase/edit" class="stack-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <label for="showcase-name">Name</label>
+      <input type="text" id="showcase-name" name="name" value="{{ showcase.name }}" maxlength="128">
+      <label for="showcase-description">Description (optional)</label>
+      <textarea id="showcase-description" name="description" rows="2" placeholder="A short intro for people viewing this Showcase.">{{ showcase.description or '' }}</textarea>
+      <button type="submit" class="btn-like">Save</button>
+    </form>
+  </section>
+
+  {# ── Items ── #}
+  <section class="panel">
+    <h3 class="panel-title">Items in your Showcase</h3>
+    {% if items %}
+      <p class="muted">{{ items | length }} card{{ 's' if items | length != 1 else '' }} curated. <em>Available</em> is the smaller of what you offered and what's currently in your inventory — it updates automatically when you sell or remove cards.</p>
+      <div class="showcase-items-grid">
+        {% for item in items %}
+          <article class="showcase-item">
+            <div class="showcase-item-art">
+              {% if item.card.image_url %}
+                <img src="{{ item.card.image_url }}" alt="{{ item.card.name }}" loading="lazy">
+              {% else %}
+                <div class="showcase-item-placeholder"></div>
+              {% endif %}
+            </div>
+            <div class="showcase-item-body">
+              <h4 class="showcase-item-title">{{ item.card.name }}</h4>
+              <div class="showcase-item-meta">
+                {{ item.card.set_name }} · {{ item.card.set_code|upper }} #{{ item.card.collector_number }}
+                <br>
+                <span class="finish-badge">{{ item.finish|capitalize }}</span>
+                {% if item.language and item.language != 'en' %}
+                  <span class="language-badge">{{ item.language|upper }}</span>
+                {% endif %}
+                {% if item.is_proxy %}<span class="proxy-badge">PROXY</span>{% endif %}
+              </div>
+              <div class="showcase-item-qty">
+                <strong>Available: {{ item.available }}</strong>
+                {% if item.available < item.quantity_offered %}
+                  <span class="muted">(you offered {{ item.quantity_offered }}; inventory only has {{ item.available }} now)</span>
+                {% endif %}
+              </div>
+              <div class="showcase-item-actions">
+                <form method="post" action="/showcase/items/{{ item.id }}/quantity" class="inline-form">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                  <label for="qty-{{ item.id }}" class="muted" style="font-size:0.78rem">Offered:</label>
+                  <input type="number" id="qty-{{ item.id }}" name="quantity_offered" value="{{ item.quantity_offered }}" min="1" style="width:64px">
+                  <button type="submit">Update</button>
+                </form>
+                <form method="post" action="/showcase/items/{{ item.id }}/remove" class="inline-form"
+                      onsubmit="return confirm('Remove this card from your Showcase?')">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                  <button type="submit" class="btn-danger-small">Remove</button>
+                </form>
+              </div>
+            </div>
+          </article>
+        {% endfor %}
+      </div>
+    {% else %}
+      <p class="showcase-empty">Your Showcase is empty. Open <a href="/collection">your Collection</a>, find a card, expand its <em>Actions</em> menu, and click <strong>Add to Showcase</strong>.</p>
+    {% endif %}
+  </section>
+
+  {# ── Quick link to the Shares page ── #}
+  <section class="panel">
+    <p class="muted">Ready to share? Head to the <a href="/shares">Shares</a> page to expose this Showcase to a playgroup, read-only.</p>
+  </section>
+{% endblock %}
