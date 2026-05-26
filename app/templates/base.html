@@ -229,6 +229,21 @@
                 <span>Chronicle</span>
               </a>
             </div>
+            {# v3.29.3 — Donate. Pinned at the bottom of the sidebar,
+               visually separated from the five nav groups: it is a
+               support ask, not navigation. External Ko-fi link
+               (target=_blank + rel=noopener noreferrer); NOT wired into
+               any active-state or on_more highlight logic — has no
+               in-app route and therefore no "active" state. Donation-
+               flavored CTA wording only ("Donate") — the project's
+               donation-only / no-paywall posture is deliberate. #}
+            <a href="https://ko-fi.com/coruscantsunrise"
+               target="_blank"
+               rel="noopener noreferrer"
+               class="nav-donate">
+              <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+              <span>Donate</span>
+            </a>
           </nav>
         </aside>
       {% endif %}
@@ -463,6 +478,17 @@
             {% if current_user.is_admin %}<a href="/admin">Admin</a>{% endif %}
             <a href="/account">Account</a>
             <a href="/chronicle">Chronicle</a>
+            {# v3.29.3 — Donate. External Ko-fi link; mirrors the
+               desktop sidebar's bottom-pinned Donate. Same external-
+               link attributes (target=_blank + rel=noopener noreferrer);
+               NOT in on_more (no in-app route). The .more-menu-donate
+               class gives it the same gold-accent treatment as the
+               sidebar version so it reads as distinct from the regular
+               nav entries. #}
+            <a href="https://ko-fi.com/coruscantsunrise"
+               target="_blank"
+               rel="noopener noreferrer"
+               class="more-menu-donate">Donate</a>
           </nav>
           <form method="post" action="/logout" class="more-menu-logout">
             <input type="hidden" name="csrf_token" value="{{ csrf_token }}">

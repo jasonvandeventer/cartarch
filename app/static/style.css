@@ -541,6 +541,49 @@ body::after {
   color: var(--brand-gold);
 }
 
+/* v3.29.3 — Donate link (sidebar bottom + mobile More mirror).
+   Tasteful gold-accented treatment using the existing --brand-gold /
+   --brand-gold-soft tokens — reads as distinct from the plain nav
+   items above without competing for navigation attention. NOT
+   wired into active-state logic (external link, no in-app route).
+   Pinned at the bottom of the sidebar via margin-top:auto on the
+   parent .sidebar-nav flex column. */
+.nav-donate {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  margin: 0.75rem 0 0;
+  padding: 0.55rem 0.7rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--brand-gold-soft);
+  background: transparent;
+  color: var(--brand-gold);
+  font-size: 0.86rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
+}
+.nav-donate:hover {
+  background: var(--brand-gold-soft);
+  border-color: var(--brand-gold);
+  color: var(--text);
+}
+.nav-donate .nav-icon {
+  color: var(--brand-gold);
+  opacity: 1;
+}
+.sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+}
+.sidebar-nav > .nav-donate {
+  margin-top: auto;
+}
+
 /* v3.27.17 correction — full-width brand topbar.
    - Spans both columns via grid-area: topbar (declared above on
      .app-shell > .app-topbar).
@@ -6095,6 +6138,20 @@ table.dmtx .dmtx-rowhead {
   }
   .more-menu-list a:active {
     background: rgba(58, 44, 29, 0.8);
+  }
+  /* v3.29.3 — Donate in the mobile More menu. Inherits the .more-menu-list a
+     base shell + structure (padding / radius / min-height), repointed to the
+     gold-accent palette so it reads as the matching mobile mirror of the
+     sidebar Donate. */
+  .more-menu-list a.more-menu-donate {
+    background: var(--brand-gold-soft);
+    border-color: var(--brand-gold);
+    color: var(--brand-gold);
+    font-weight: 700;
+  }
+  .more-menu-list a.more-menu-donate:active {
+    background: var(--brand-gold);
+    color: var(--brand-near-black);
   }
   .more-menu-logout {
     margin-top: 1.5rem;

@@ -1,5 +1,18 @@
 [
   {
+    "version": "3.29.3",
+    "date": "2026-05-26",
+    "added": [
+      "Donate link in the sidebar (pinned at the bottom, visually distinct from the five nav groups) and mirrored into the mobile More menu. Opens cartarch's Ko-fi page (https://ko-fi.com/coruscantsunrise) in a new tab. Donation-only — there is no paid tier and there will not be one for any Scryfall-derived feature (search, card data, images, set browsing, card-data analytics). Tipping is welcome; the app does not gate anything behind payment.",
+      "The landing page's 'Support the project' card now points at the live Ko-fi page (it had carried a TODO placeholder URL since v3.27.17 brand assets shipped). Wording stays donation-flavored ('consider a donation' rather than 'Buy' / 'Get' / 'Unlock') — the discipline is deliberate."
+    ],
+    "refined": [],
+    "resolved": [
+      "Closes the long-standing TODO on the landing page support card (placeholder href left from v3.27.17 brand assets + landing page)."
+    ],
+    "archivist_note": "External-link-only release. No Python, no route, no migration, no model change — three files (base.html, landing.html, style.css) plus the four memory artifacts and the version bump. The Donate link reads as a support ask rather than navigation because it is one; the gold-accent treatment uses the existing --brand-gold / --brand-gold-soft tokens so it sits inside the established Folio palette without inventing anything new. If the project ever does grow a paid tier, it cannot run through any Scryfall-derived surface — Scryfall's data-use guidelines explicitly forbid that and the roadmap's Commercial Optionality section records it. A donation link that gates nothing IS permitted, and is what shipped here."
+  },
+  {
     "version": "3.29.2",
     "date": "2026-05-25",
     "added": [
