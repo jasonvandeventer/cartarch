@@ -1,0 +1,196 @@
+{% from "_macros.html" import editorial_eyebrow %}
+{% extends "base.html" %}
+{% block content %}
+  {# v3.29.0 — Playgroup detail. Member list, join code, owner controls.
+     Visible to members only (non-members redirected at the route layer
+     — never expose detail). Owner controls follow the locations.html /
+     decks.html inline-popout idiom. #}
+  {% set is_owner = viewer_role == 'owner' %}
+  <section class="panel pagehead">
+    {{ editorial_eyebrow("Play · Playgroups · " + playgroup.name) }}
+    <h1 class="pagehead-title">{{ playgroup.name }}</h1>
+    {% if playgroup.notes %}
+      <p class="pagehead-tagline"><em>{{ playgroup.notes }}</em></p>
+    {% endif %}
+    <div class="playgroup-meta-row">
+      <span class="playgroup-role-badge playgroup-role-{{ viewer_role }}">{{ viewer_role }}</span>
+      <span class="muted">{{ members | length }} member{{ 's' if members | length != 1 else '' }}</span>
+      <span class="muted">created {{ playgroup.created_at | editorial_date }}</span>
+    </div>
+  </section>
+
+  {% if error %}
+    <section class="panel playgroups-flash playgroups-flash-error">
+      <strong>That didn't work.</strong>
+      {% if error == 'name_mismatch' %}The confirmation name didn't match. Type the playgroup name exactly to delete.
+      {% elif error == 'name_required' %}A name is required.
+      {% elif error.startswith('you_are_the_sole_owner') %}You're the sole owner — transfer ownership or delete the playgroup before leaving.
+      {% elif error.startswith('only_the_owner') %}Only the owner can do that.
+      {% elif error.startswith('target_must_be_a_member') %}That user is not a member of the playgroup.
+      {% elif error.startswith('use_transfer_ownership') %}Use Transfer Ownership or Leave to change the owner.
+      {% else %}{{ error | replace('_', ' ') }}
+      {% endif %}
+    </section>
+  {% endif %}
+  {% if success %}
+    <section class="panel playgroups-flash playgroups-flash-success">
+      {% if success == 'joined' %}You've joined this playgroup.
+      {% elif success == 'updated' %}Saved.
+      {% elif success == 'transferred' %}Ownership transferred.
+      {% elif success == 'removed' %}Member removed.
+      {% elif success == 'code_regenerated' %}A new join code was generated.
+      {% elif success == 'code_toggled' %}Join code updated.
+      {% else %}{{ success | replace('_', ' ') }}
+      {% endif %}
+    </section>
+  {% endif %}
+
+  {# ── Join code block (visible to all members; owner has controls) ── #}
+  <section class="panel playgroup-code-panel">
+    <h3 class="panel-title">Join code</h3>
+    {% if playgroup.join_code %}
+      <p class="playgroup-code-help">Share this with anyone you want to invite — they enter it on the Playgroups page to join.</p>
+      <div class="playgroup-code-display">
+        <code class="playgroup-code-value">{{ playgroup.join_code }}</code>
+      </div>
+    {% else %}
+      <p class="muted">The join code is disabled. {% if is_owner %}Enable it to let new members join with a code.{% endif %}</p>
+    {% endif %}
+    {% if is_owner %}
+      <div class="playgroup-code-actions">
+        {% if playgroup.join_code %}
+          <form method="post" action="/playgroups/{{ playgroup.id }}/regenerate-code" style="display:inline">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <button type="submit" class="btn-like"
+                    onclick="return confirm('Generate a new code? The current code stops working immediately.')">Regenerate</button>
+          </form>
+          <form method="post" action="/playgroups/{{ playgroup.id }}/code-toggle" style="display:inline">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <input type="hidden" name="enabled" value="0">
+            <button type="submit" class="btn-like">Disable</button>
+          </form>
+        {% else %}
+          <form method="post" action="/playgroups/{{ playgroup.id }}/code-toggle" style="display:inline">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <input type="hidden" name="enabled" value="1">
+            <button type="submit" class="btn-like">Enable</button>
+          </form>
+        {% endif %}
+      </div>
+    {% endif %}
+  </section>
+
+  {# ── Members list ── #}
+  <section class="panel">
+    <h3 class="panel-title">Members</h3>
+    <div class="table-wrap">
+      <table class="stacking-table playgroup-members-table">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Role</th>
+            <th>Joined</th>
+            {% if is_owner %}<th></th>{% endif %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in members %}
+            <tr>
+              <td data-label="Name">
+                {{ row.user.display_name or row.user.username }}
+                {% if row.user.id == current_user.id %}<span class="muted">(you)</span>{% endif %}
+              </td>
+              <td data-label="Role">
+                <span class="playgroup-role-badge playgroup-role-{{ row.member.role }}">{{ row.member.role }}</span>
+              </td>
+              <td data-label="Joined">{{ row.member.joined_at | editorial_date }}</td>
+              {% if is_owner %}
+                <td data-label="">
+                  {% if row.user.id != current_user.id and row.member.role != 'owner' %}
+                    <form method="post"
+                          action="/playgroups/{{ playgroup.id }}/members/{{ row.user.id }}/remove"
+                          style="display:inline">
+                      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                      <button type="submit" class="btn-danger-small"
+                              onclick="return confirm('Remove {{ row.user.display_name or row.user.username }} from this playgroup?')">Remove</button>
+                    </form>
+                  {% endif %}
+                </td>
+              {% endif %}
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  {# ── Owner controls (rename/notes, transfer, delete) ── #}
+  {% if is_owner %}
+    <section class="panel">
+      <h3 class="panel-title">Owner controls</h3>
+
+      {# Rename + notes inside an inline popout, matching locations.html / decks.html idiom #}
+      <details class="inline-details">
+        <summary class="btn-like">Edit name / notes</summary>
+        <div class="edit-popout mobile-popover">
+          <form method="post" action="/playgroups/{{ playgroup.id }}/edit" class="stack-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <label for="pg-edit-name">Name</label>
+            <input type="text" id="pg-edit-name" name="name" value="{{ playgroup.name }}" required maxlength="128">
+            <label for="pg-edit-notes">Notes</label>
+            <textarea id="pg-edit-notes" name="notes" rows="3">{{ playgroup.notes or '' }}</textarea>
+            <button type="submit" class="btn-like">Save</button>
+          </form>
+        </div>
+      </details>
+
+      {# Transfer ownership — a select of other members + confirm #}
+      {% set other_members = members | rejectattr('user.id', 'equalto', current_user.id) | list %}
+      {% if other_members %}
+        <details class="inline-details">
+          <summary class="btn-like">Transfer ownership</summary>
+          <div class="edit-popout mobile-popover">
+            <form method="post" action="/playgroups/{{ playgroup.id }}/transfer-ownership" class="stack-form"
+                  onsubmit="return confirm('Transfer ownership of this playgroup? You will become a member.')">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+              <label for="pg-transfer-target">New owner</label>
+              <select id="pg-transfer-target" name="new_owner_user_id" required>
+                <option value="">— choose a member —</option>
+                {% for row in other_members %}
+                  <option value="{{ row.user.id }}">{{ row.user.display_name or row.user.username }}</option>
+                {% endfor %}
+              </select>
+              <button type="submit" class="btn-like">Transfer ownership</button>
+            </form>
+          </div>
+        </details>
+      {% endif %}
+
+      {# Delete — type-the-name confirm (the destructive-action pattern from games / users) #}
+      <details class="inline-details">
+        <summary class="btn-danger-small">Delete playgroup…</summary>
+        <div class="edit-popout mobile-popover">
+          <form method="post" action="/playgroups/{{ playgroup.id }}/delete" class="stack-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <p class="warning-text">This deletes the playgroup and removes everyone's membership. The cards, decks, and game records of every member are unaffected.</p>
+            <label for="pg-delete-confirm">Type the playgroup name to confirm: <strong>{{ playgroup.name }}</strong></label>
+            <input type="text" id="pg-delete-confirm" name="confirm_name" required autocomplete="off">
+            <button type="submit" class="btn-danger-small">Delete playgroup</button>
+          </form>
+        </div>
+      </details>
+    </section>
+  {% endif %}
+
+  {# ── Leave button (every member; sole-owner block surfaces as ?error= back here) ── #}
+  <section class="panel">
+    <form method="post" action="/playgroups/{{ playgroup.id }}/leave"
+          onsubmit="return confirm('Leave this playgroup?')">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <button type="submit" class="btn-danger-small">Leave playgroup</button>
+      {% if is_owner and (members | length > 1) %}
+        <span class="muted">— you're the owner; transfer ownership first.</span>
+      {% endif %}
+    </form>
+  </section>
+{% endblock %}

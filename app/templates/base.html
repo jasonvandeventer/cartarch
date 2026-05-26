@@ -160,6 +160,14 @@
                 <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65"/><path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"/></svg>
                 <span>Decks</span>
               </a>
+              {# v3.29.0 — Playgroups in the Play group, between Decks and
+                 Games. The opener of the v3.29.x social-features minor;
+                 scopes the game-creation people-picker. #}
+              <a href="/playgroups"
+                 class="nav-item{% if path.startswith('/playgroups') %} active{% endif %}">
+                <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                <span>Playgroups</span>
+              </a>
               <a href="/games"
                  class="nav-item{% if path.startswith('/games') %} active{% endif %}">
                 <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="14.5 17.5 3 6 3 3 6 3 17.5 14.5"/><line x1="13" x2="19" y1="19" y2="13"/><line x1="16" x2="20" y1="16" y2="20"/><line x1="19" x2="21" y1="21" y2="19"/><polyline points="14.5 6.5 18 3 21 3 21 6 17.5 9.5"/><line x1="5" x2="9" y1="14" y2="18"/><line x1="7" x2="4" y1="17" y2="20"/><line x1="3" x2="5" y1="19" y2="21"/></svg>
@@ -358,7 +366,7 @@
            includes `/games`, `/watchlist`, `/chronicle`, `/decklist` (those
            are reached only via More now). Keeps the highlight state in
            sync with where each destination actually lives. #}
-        {% set on_more = path.startswith('/import') or path.startswith('/locations') or path.startswith('/tokens') or path.startswith('/sets') or path.startswith('/decklist') or path.startswith('/drawers') or path.startswith('/audit') or path.startswith('/admin') or path.startswith('/account') or path.startswith('/games') or path.startswith('/watchlist') or path.startswith('/chronicle') %}
+        {% set on_more = path.startswith('/import') or path.startswith('/locations') or path.startswith('/tokens') or path.startswith('/sets') or path.startswith('/decklist') or path.startswith('/drawers') or path.startswith('/audit') or path.startswith('/admin') or path.startswith('/account') or path.startswith('/games') or path.startswith('/watchlist') or path.startswith('/chronicle') or path.startswith('/playgroups') %}
         <button type="button"
                 class="bottom-nav-tab{% if on_more %} active{% endif %}"
                 onclick="toggleMoreMenu()"
@@ -412,6 +420,10 @@
             {% if current_user.username in drawer_sorter_usernames %}
               <a href="/drawers">Drawers</a>
             {% endif %}
+            {# v3.29.0 — Playgroups, in the Play group between Decks and Games
+               on the desktop sidebar; same position in More so the mental
+               map carries across surfaces. #}
+            <a href="/playgroups">Playgroups</a>
             <a href="/games">Games</a>
             {% if current_user.username in drawer_sorter_usernames %}
               <a href="/audit">Audit</a>

@@ -147,7 +147,7 @@ from app.password_reset_service import (
 )
 from app.presentation_service import build_pending_batch_groups, build_pending_view_model
 from app.pricing import effective_price
-from app.routes import account, admin, auth, drawers
+from app.routes import account, admin, auth, drawers, playgroups
 from app.scryfall import (
     _bulk_data_loop,
     autocomplete_cards_for_add,
@@ -196,6 +196,7 @@ app.include_router(auth.router)
 app.include_router(admin.router)
 app.include_router(account.router)
 app.include_router(drawers.router)
+app.include_router(playgroups.router)
 
 
 @app.exception_handler(ValueError)
@@ -5024,12 +5025,17 @@ def game_new_page(
     session: Session = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
 ):
-    all_users = (
-        session.query(User)
-        .filter(User.is_active.is_(True))
-        .order_by(User.display_name, User.username)
-        .all()
-    )
+    # v3.29.0 — picker scopes to the user's playgroup co-members via
+    # ``playgroup_service.get_pickable_users``. C2 transition fallback:
+    # when the user has no co-members (no playgroups yet, or alone in a
+    # solo playgroup), the wrapper returns the global active-user list
+    # — preserves pre-v3.29.0 behavior for users who haven't joined any
+    # playgroup. The shared primitive ``co_members_of`` (consumed by
+    # v3.29.1 sharing / v3.29.2 trading) does NOT carry this fallback —
+    # only the people-picker does.
+    from app import playgroup_service
+
+    all_users = playgroup_service.get_pickable_users(session, current_user.id)
     all_decks = session.query(Deck).order_by(Deck.name).all()
     # JSON-safe: users list and deck lookup by user_id for JS filtering
     users_json = [{"id": u.id, "name": u.display_name or u.username} for u in all_users]

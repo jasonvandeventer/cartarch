@@ -13,6 +13,7 @@ from app.models import (
     ImportBatch,
     InventoryRow,
     PasswordResetToken,
+    PlaygroupMember,
     StorageLocation,
     TransactionLog,
     User,
@@ -168,6 +169,19 @@ def delete_user(
     if not target:
         return RedirectResponse(url="/admin", status_code=303)
 
+    # v3.29.0 — playgroup pre-cleanup. For each playgroup the deleted
+    # user owns: transfer ownership to the longest-tenured remaining
+    # member (D3 auto-transfer), or hard-delete the playgroup if the
+    # user is the sole member. After this call returns, ``user_id``
+    # owns no playgroup, and the plain ``PlaygroupMember`` DELETE
+    # below is safe. Owner-transfer was chosen here (rather than the
+    # recon's original "block" recommendation) because in an admin
+    # deletion the owner is not present to transfer themselves —
+    # blocking would be unactionable.
+    from app import playgroup_service
+
+    playgroup_service.handle_user_deletion(session, user_id)
+
     # Cascade in FK-safe order
     session.query(TransactionLog).filter(TransactionLog.user_id == user_id).delete()
     session.query(InventoryRow).filter(InventoryRow.user_id == user_id).delete()
@@ -192,6 +206,13 @@ def delete_user(
     # to preserve, unlike GameSeat.user_name_at_game). Plain DELETE here,
     # same shape as InventoryRow / Deck / etc. above.
     session.query(WatchlistItem).filter(WatchlistItem.user_id == user_id).delete()
+    # v3.29.0 — playgroup membership rows. The pre-cleanup call above
+    # has already transferred or auto-deleted any playgroups the user
+    # owned; the remaining rows here are plain (demoted) memberships
+    # with no retention value (no "X was a member of Y when their
+    # account was deleted" snapshot to preserve, unlike GameSeat.
+    # user_name_at_game). Plain DELETE.
+    session.query(PlaygroupMember).filter(PlaygroupMember.user_id == user_id).delete()
     # v3.27.14 — password reset tokens. Same reasoning as watchlist:
     # no retention value (no "X reset Y's password" snapshot semantics).
     # Plain DELETE. Even already-used tokens (kept for the brief audit

@@ -1,0 +1,50 @@
+{% from "_macros.html" import editorial_eyebrow %}
+{% extends "base.html" %}
+{% block content %}
+  {# v3.29.0 — Join-by-code landing.
+     - With a resolvable ?code= in the URL: show the playgroup name +
+       Join/Cancel.
+     - Without (or with an unresolvable code): show a bare code-entry form.
+     Minimal info only — never the member list or other detail pre-join. #}
+  <section class="panel pagehead">
+    {{ editorial_eyebrow("Play · Playgroups · Join") }}
+    <h1 class="pagehead-title">Join a playgroup</h1>
+  </section>
+
+  {% if error %}
+    <section class="panel playgroups-flash playgroups-flash-error">
+      {% if error == 'invalid_code' %}That code doesn't match an active playgroup. It may be wrong, or the owner may have disabled or regenerated it.
+      {% else %}{{ error | replace('_', ' ') }}
+      {% endif %}
+    </section>
+  {% endif %}
+
+  {% if playgroup %}
+    {# Pre-resolved code: confirm-join view #}
+    <section class="panel playgroups-join-confirm">
+      <h3 class="panel-title">Join <em>{{ playgroup.name }}</em>?</h3>
+      <p>You'll join as a member and see other members in the game-creation people-picker.</p>
+      <form method="post" action="/playgroups/join" class="stack-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <input type="hidden" name="code" value="{{ code }}">
+        <div class="playgroups-join-actions">
+          <button type="submit" class="bottombar-btn-primary">Join playgroup</button>
+          <a class="btn-like" href="/playgroups">Cancel</a>
+        </div>
+      </form>
+    </section>
+  {% else %}
+    {# Bare entry form #}
+    <section class="panel playgroups-join-panel">
+      <h3 class="panel-title">Enter a join code</h3>
+      <p>Paste the code someone shared with you.</p>
+      <form method="post" action="/playgroups/join" class="stack-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <label for="pg-join-code">Join code</label>
+        <input type="text" id="pg-join-code" name="code" required maxlength="32"
+               value="{{ code }}" autocomplete="off" autofocus>
+        <button type="submit" class="bottombar-btn-primary">Join</button>
+      </form>
+    </section>
+  {% endif %}
+{% endblock %}

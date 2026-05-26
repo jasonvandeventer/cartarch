@@ -55,6 +55,14 @@ class User(Base):
     storage_locations: Mapped[list[StorageLocation]] = relationship(back_populates="user")
     watchlist_items: Mapped[list[WatchlistItem]] = relationship(back_populates="user")
     password_reset_tokens: Mapped[list[PasswordResetToken]] = relationship(back_populates="user")
+    # v3.29.0 — plain relationship; no cascade from User. The admin
+    # user-deletion path handles cleanup explicitly via
+    # ``playgroup_service.handle_user_deletion`` (transfers owned playgroups
+    # to the longest-tenured remaining member; auto-deletes sole-member
+    # playgroups) followed by a plain DELETE of the membership rows.
+    playgroup_memberships: Mapped[list[PlaygroupMember]] = relationship(
+        foreign_keys="PlaygroupMember.user_id"
+    )
 
 
 class Card(Base):
@@ -447,3 +455,87 @@ class PasswordResetToken(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
 
     user: Mapped[User] = relationship(back_populates="password_reset_tokens")
+
+
+class Playgroup(Base):
+    """A membership-based grouping of users — the substrate for the
+    v3.29.x social features (v3.29.1 sharing, v3.29.2 trading). Opens
+    the v3.29.x minor.
+
+    NOT the planned v4 multi-tenancy ``playgroup_id`` / ``org_id``
+    scope. A v3.29.0 ``Playgroup`` is a *social grouping* (who you
+    play / share / trade with); a user belongs to many, membership is
+    fluid, it owns no data. The v4 tenancy scope is a *data-isolation
+    boundary*. The names collide; the entities are distinct. Recorded
+    as a v4-schema-design input in ``roadmap.md`` — v4 design settles
+    whether to reuse the entity or introduce a separate ``Tenant``
+    above it. Do not pre-decide here.
+
+    **Authority rule.** ``Playgroup.created_by`` is immutable audit
+    (who originally made it) and **never** the live authority check.
+    Live authority is ``PlaygroupMember.role == "owner"``. After an
+    ownership transfer the two diverge. Every permission check reads
+    ``role``, never ``created_by``.
+
+    Join-code-only invite model (v3.29.0). The opaque ``join_code``
+    is generated server-side at creation via ``secrets.token_urlsafe``;
+    NULL = disabled (the owner toggled the code off). Any member can
+    view and share the code; only the owner may regenerate or
+    disable it. Email invites are deferred — when taken up, they
+    will carry the v3.27.14 / v3.27.17 enumeration-oracle defense as
+    a hard-flag requirement.
+    """
+
+    __tablename__ = "playgroups"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
+    # Immutable audit — "who made it". NOT the authority check; see role.
+    created_by: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    join_code: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+
+    members: Mapped[list[PlaygroupMember]] = relationship(
+        back_populates="playgroup", cascade="all, delete-orphan"
+    )
+    creator: Mapped[User] = relationship(foreign_keys=[created_by])
+
+
+class PlaygroupMember(Base):
+    """user ↔ playgroup membership. The codebase's first explicit M2M.
+
+    Surrogate primary key + ``UniqueConstraint(playgroup_id, user_id)``
+    rather than a composite PK — keeps SQLAlchemy ergonomics simple
+    and matches every other join-bearing table in the schema (no
+    model in this file uses a composite PK today; ``GameSeat``,
+    ``DeckTokenRequirement`` etc. all use surrogate + uniqueness on
+    the FK pair when needed).
+
+    ``role`` is a service-layer canonical enum
+    (``CANONICAL_PLAYGROUP_ROLES`` in ``app/playgroup_service.py``) —
+    the v3.27.2 / v3.27.3 pattern, no DB ``CHECK`` constraint (would
+    require table rebuild, reserved for v4 Postgres). v3.29.0 ships
+    two roles, ``owner`` and ``member``; the enum can widen
+    additively later (e.g. to add ``admin``) with no schema change.
+
+    No ``invited_by`` column at v3.29.0 — under join-code-only it
+    would be uniformly NULL. Returns if/when email invites ship and
+    a real invite-audit trail becomes meaningful.
+    """
+
+    __tablename__ = "playgroup_members"
+    __table_args__ = (
+        UniqueConstraint("playgroup_id", "user_id", name="uq_playgroup_members_pg_user"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    playgroup_id: Mapped[int] = mapped_column(
+        ForeignKey("playgroups.id"), nullable=False, index=True
+    )
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    role: Mapped[str] = mapped_column(String(16), default="member", nullable=False)
+    joined_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+
+    playgroup: Mapped[Playgroup] = relationship(back_populates="members")
+    user: Mapped[User] = relationship(foreign_keys=[user_id], overlaps="playgroup_memberships")

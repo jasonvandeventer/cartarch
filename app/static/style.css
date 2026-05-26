@@ -11182,3 +11182,156 @@ table.dmtx .dmtx-rowhead {
   text-align: right;
   white-space: nowrap;
 }
+
+/* ─────────────────────────────────────────────────────────────────
+   v3.29.0 — Playgroups. Membership-scoped social grouping (the
+   opener of the v3.29.x social-features minor). Token reuse only —
+   inherits the locations/decks inline-popout idiom from v3.10.6 and
+   the Folio palette + typography from v3.28.x. Zero parallel tokens.
+   ───────────────────────────────────────────────────────────────── */
+
+.playgroups-hero {
+  margin-bottom: 1rem;
+}
+
+/* Flash messages — error / success bands above the content */
+.playgroups-flash {
+  padding: 0.7rem 1rem;
+  margin-bottom: 0.85rem;
+  border-radius: var(--radius);
+  font-size: 0.9rem;
+}
+.playgroups-flash-error {
+  background: rgba(138, 46, 34, 0.18);
+  border: 1px solid rgba(138, 46, 34, 0.5);
+  color: var(--danger);
+}
+.playgroups-flash-success {
+  background: var(--brand-gold-soft);
+  border: 1px solid var(--brand-gold);
+  color: var(--brand-gold);
+}
+
+/* Index table */
+.playgroups-table .playgroups-name-link {
+  font-family: Newsreader, Georgia, serif;
+  font-style: italic;
+  font-weight: 500;
+  font-size: 1.05rem;
+  color: var(--text);
+  text-decoration: none;
+}
+.playgroups-table .playgroups-name-link:hover {
+  color: var(--brand-gold);
+}
+.playgroups-notes {
+  font-size: 0.78rem;
+  color: var(--text-dim);
+  font-style: italic;
+  margin-top: 0.2rem;
+  max-width: 56ch;
+}
+
+/* Role badge — owner is brass-gold; member is muted neutral */
+.playgroup-role-badge {
+  display: inline-block;
+  padding: 0.1rem 0.55rem;
+  border-radius: var(--radius-pill);
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  border: 1px solid;
+}
+.playgroup-role-owner {
+  background: var(--brand-gold-soft);
+  border-color: var(--brand-gold);
+  color: var(--brand-gold);
+}
+.playgroup-role-member {
+  background: var(--panel-2);
+  border-color: var(--border);
+  color: var(--text-dim);
+}
+
+/* Empty state */
+.playgroups-empty {
+  text-align: center;
+  padding: 2rem 1rem;
+}
+.playgroups-empty .panel-title {
+  font-family: Newsreader, Georgia, serif;
+  font-style: italic;
+  margin-bottom: 0.5rem;
+}
+
+/* Two-column actions grid (Create + Join side-by-side; collapses on narrow) */
+.playgroups-actions-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+@media (max-width: 768px) {
+  .playgroups-actions-grid {
+    grid-template-columns: 1fr;
+  }
+}
+.playgroups-create-btn {
+  margin-top: 0.4rem;
+}
+
+/* Detail page */
+.playgroup-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  margin-top: 0.6rem;
+  flex-wrap: wrap;
+}
+
+/* Join code block — code is a brass-bordered monospace pill */
+.playgroup-code-panel .playgroup-code-help {
+  color: var(--text-dim);
+  font-size: 0.85rem;
+}
+.playgroup-code-display {
+  margin: 0.6rem 0;
+}
+.playgroup-code-value {
+  display: inline-block;
+  font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+  font-size: 1.1rem;
+  font-weight: 600;
+  padding: 0.45rem 0.85rem;
+  background: var(--panel-2);
+  border: 1px solid var(--brand-gold);
+  border-radius: var(--radius-sm);
+  color: var(--brand-gold);
+  letter-spacing: 0.02em;
+  user-select: all;
+}
+.playgroup-code-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.6rem;
+  flex-wrap: wrap;
+}
+
+/* Members table — sits on the existing .stacking-table chrome */
+.playgroup-members-table td[data-label="Name"] {
+  font-weight: 500;
+}
+
+/* Join confirm view */
+.playgroups-join-confirm .panel-title em {
+  color: var(--brand-gold);
+}
+.playgroups-join-actions {
+  display: flex;
+  gap: 0.6rem;
+  align-items: center;
+  margin-top: 0.5rem;
+  flex-wrap: wrap;
+}
+

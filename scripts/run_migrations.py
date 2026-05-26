@@ -80,6 +80,7 @@ from scripts.migrate_v3_28_7_deck_blurb import (
 from scripts.migrate_v3_28_11_watchlist_target_price import (
     main as migrate_v3_28_11_watchlist_target_price,
 )
+from scripts.migrate_v3_29_0_playgroups import main as migrate_v3_29_0_playgroups
 
 
 def _is_applied(name: str) -> bool:
@@ -404,6 +405,13 @@ def run():
         _mark_applied("v3_28_11_watchlist_target_price")
     else:
         print("v3.28.11 watchlist_target_price already applied, skipping")
+
+    if not _is_applied("v3_29_0_playgroups"):
+        print("Running v3.29.0 playgroups migration...")
+        migrate_v3_29_0_playgroups()
+        _mark_applied("v3_29_0_playgroups")
+    else:
+        print("v3.29.0 playgroups already applied, skipping")
 
     print("Migration runner complete")
 

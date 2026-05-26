@@ -1,5 +1,23 @@
 [
   {
+    "version": "3.29.0",
+    "date": "2026-05-25",
+    "added": [
+      "Playgroups. Create a playgroup — a Friday-night pod, an LGS group, a remote regular — and share its join code with the people you play with. They enter the code on their Playgroups page and you'll find each other in the game-tracker's people-picker on the New Game screen.",
+      "Multiple memberships per user — you can belong to as many playgroups as you have. The game-tracker picker shows everyone you share a playgroup with, deduplicated.",
+      "Owner controls on a playgroup's detail page: rename, edit notes, transfer ownership to another member, remove members, regenerate or disable the join code, and delete the playgroup (a type-the-name confirmation gate keeps the destructive action deliberate). Any member can view and share the active join code; only the owner regenerates or disables it.",
+      "If you're the only owner of a playgroup, you can't leave — transfer ownership to another member first, or delete the playgroup. A playgroup that reaches zero members is auto-deleted."
+    ],
+    "refined": [
+      "The game-tracker people-picker now scopes to your playgroups instead of every account on the instance. If you're not in any playgroup yet — or if you're alone in one — the picker falls back to the global active-user list, so day-one the experience is unchanged for anyone who hasn't created or joined a playgroup. Once you have at least one co-member, the picker narrows to those people.",
+      "Free-text guest seats (the ‘— no user —’ option, for playing with friends who don't have a Cartarch account) are untouched. Playgroups scope the registered-user dropdown only; the guest path remains."
+    ],
+    "resolved": [
+      "The v3.27.5 game-tracker seat→user picker had been drawing from every active account on the instance — fine for a single-user install, awkward as the user base grows. Playgroups is the substrate that lets every social surface — sharing, trading — scope to ‘your people’ instead of ‘everyone’."
+    ],
+    "archivist_note": "The opener of v3.29.x — the social-features arc. Two more releases come after this one (v3.29.1 Collection sharing, v3.29.2 Pairwise trading), and both consume the same primitive Playgroups establishes: ‘the people you share a group with’. Build that membership scope once, first; sharing and trading then land on top without re-inventing the share-target picker each time. The v3.29.0 model is deliberately small — two tables, two roles (owner + member), one invite mechanism (a code you share). Email invites and richer roles are deferred. The bigger philosophical decision sits in the docstring on the Playgroup model: a v3.29.0 Playgroup is a *social grouping*, not a *tenancy boundary*. The v4 Postgres migration will revisit what that distinction means for data isolation, but v3.29.0 leaves it open."
+  },
+  {
     "version": "3.28.13",
     "date": "2026-05-25",
     "added": [
