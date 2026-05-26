@@ -1,5 +1,23 @@
 [
   {
+    "version": "3.30.2",
+    "date": "2026-05-26",
+    "added": [
+      "Collapsible sidebar \u2014 a small button at the top of the sidebar collapses it to a narrow icons-only rail. Click it again and the sidebar expands back to its full-width form. The choice persists across pages and sessions in your browser's local storage, so the next time you open Cartarch the sidebar is exactly the way you left it.",
+      "Hover-expand while collapsed \u2014 when the sidebar is in its narrow icons-only state, moving the pointer over it (or moving keyboard focus into it) temporarily expands the panel over the page so you can read the labels and click a nav item without having to un-collapse first. Moving the pointer away collapses it back. The expansion is an overlay \u2014 it floats over the page content rather than pushing it sideways, so the page never reflows under you.",
+      "Trade-pending badge survives collapse \u2014 if you have trades awaiting your action, the small gold badge on the Trades icon stays visible even in the collapsed rail, so the signal can't get hidden behind a UI choice."
+    ],
+    "refined": [
+      "Default state is expanded \u2014 existing users see no change after the deploy until they choose to collapse the rail. Collapse is opt-in.",
+      "Every nav icon in the collapsed rail has an accessible label (screen readers read the same name the visible label carries when expanded) and a hover tooltip (sighted users get the title pop-up on hover), so the collapsed nav stays usable without visible text.",
+      "Mobile is untouched \u2014 the bottom-tab nav and the More menu at phone widths are exactly as before. The new collapsible behavior is desktop-only."
+    ],
+    "resolved": [
+      "Gives users back screen real-estate on the desktop side surfaces. The sidebar takes 236px when expanded; collapsed it takes 60px. On the wider pages \u2014 Collection at full filter visibility, Decks at full row layout \u2014 that's a meaningful amount of horizontal space returned to the content. For a user who knows the nav by heart the collapsed rail is the natural choice; for a user who still uses the labels the expanded state remains the default."
+    ],
+    "archivist_note": "The sidebar gets a quieter form. The first time we built it \u2014 five nav groups, every label spelled out \u2014 it was the orientation tool every new user needed. After a while you stop reading the labels; you reach for the icon. So the labels go on a hinge: click the toggle and the panel folds in to a column of crests; hover the column and the labels return temporarily, like a museum guide stepping forward when you look at a case. Nothing is removed; nothing is hidden behind an extra click; the room just remembers which form you prefer."
+  },
+  {
     "version": "3.30.1",
     "date": "2026-05-26",
     "added": [

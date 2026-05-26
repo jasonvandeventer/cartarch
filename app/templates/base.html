@@ -33,6 +33,24 @@
        updates: tag a form/button with hx-get|hx-post + hx-target + hx-swap.
        Docs: https://htmx.org/docs/ #}
     <script src="/static/vendor/htmx-1.9.12.min.js?v={{ static_v('vendor/htmx-1.9.12.min.js') }}"></script>
+    {# v3.30.2 — Collapsible sidebar. FOUC-prevention: read the pinned
+       collapsed/expanded preference from localStorage BEFORE first paint
+       and apply `html.sidebar-collapsed` so the CSS resolves to the
+       correct width immediately. Without this, a user who pinned the
+       sidebar collapsed would see it render full-width for one paint
+       cycle before the page-load JS kicked in. Default is expanded
+       (current behavior); collapse is opt-in via the toggle button. #}
+    <script>
+      (function () {
+        try {
+          if (window.localStorage && localStorage.getItem("cartarch-sidebar-collapsed") === "true") {
+            document.documentElement.classList.add("sidebar-collapsed");
+          }
+        } catch (e) {
+          /* localStorage disabled (private mode) — fall back to default expanded */
+        }
+      })();
+    </script>
   </head>
   <body>
     {# v3.27.8 — left-sidebar + topbar app shell (replaces the horizontal
@@ -87,8 +105,29 @@
         </div>
       </header>
       {% if current_user %}
-        <aside class="app-sidebar" aria-label="Primary navigation">
-          <nav class="sidebar-nav">
+        <aside class="app-sidebar" aria-label="Primary navigation" aria-expanded="true">
+          {# v3.30.2 — Sidebar collapse toggle. Pins the persistent
+             collapsed/expanded preference (localStorage key
+             `cartarch-sidebar-collapsed`). When pinned-collapsed the
+             rail shrinks to an icons-only column and hover-expands
+             as an overlay (no layout push); when pinned-expanded the
+             sidebar stays full-width as it does today. The button's
+             visible label hides under the collapsed-rail rule that
+             hides every `.nav-item > span:not(.nav-badge)` — same
+             mechanism that hides nav-item text labels — so no extra
+             CSS is needed to hide the label itself. aria-label /
+             title rewritten by the toggle handler on each flip so
+             screen readers and tooltips read the action correctly. #}
+          <button type="button"
+                  id="sidebar-toggle"
+                  class="sidebar-toggle"
+                  aria-label="Collapse sidebar"
+                  aria-controls="sidebar-nav"
+                  title="Collapse sidebar">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
+            <span class="sidebar-toggle-label">Collapse</span>
+          </button>
+          <nav class="sidebar-nav" id="sidebar-nav">
             {# v3.29.5 — .sidebar-nav-scroll wraps the five nav groups as
                the internally-scrolling middle region of the sidebar's
                flex column. The Donate link sits below as a non-scrolling
@@ -557,6 +596,85 @@
         })();
       </script>
     {% endif %}
+    {# v3.30.2 — Sidebar collapse toggle + a11y decoration. Runs once on
+       DOMContentLoaded (after the FOUC-prevention inline script in <head>
+       already applied any persisted collapsed state). Two pieces:
+         1. Wire the toggle button — flip html.sidebar-collapsed, persist
+            to localStorage, update aria-expanded + aria-label + title.
+         2. Decorate every .nav-item with aria-label + title derived from
+            its inner text span. This means the collapsed-rail icons stay
+            screen-reader-accessible without any template edit per
+            nav-item (the existing markup already carries the visible
+            text inside a bare <span>; we use that as the source of
+            truth for the accessible name). Idempotent — skips items
+            that already have aria-label. #}
+    <script>
+      (function () {
+        function decorateNavItems() {
+          document.querySelectorAll(".nav-item").forEach(function (item) {
+            if (item.hasAttribute("aria-label")) return;
+            // Skip the nav-badge child — find the bare label span.
+            var label = null;
+            var children = item.children;
+            for (var i = 0; i < children.length; i++) {
+              var c = children[i];
+              if (c.tagName === "SPAN" && !c.classList.contains("nav-badge")) {
+                label = c;
+                break;
+              }
+            }
+            if (!label) return;
+            var name = (label.textContent || "").trim();
+            if (!name) return;
+            item.setAttribute("aria-label", name);
+            item.setAttribute("title", name);
+          });
+        }
+
+        function applyCollapsedState(collapsed) {
+          var html = document.documentElement;
+          var aside = document.querySelector(".app-sidebar");
+          var btn = document.getElementById("sidebar-toggle");
+          html.classList.toggle("sidebar-collapsed", collapsed);
+          if (aside) aside.setAttribute("aria-expanded", String(!collapsed));
+          if (btn) {
+            var labelEl = btn.querySelector(".sidebar-toggle-label");
+            var verb = collapsed ? "Expand" : "Collapse";
+            btn.setAttribute("aria-label", verb + " sidebar");
+            btn.setAttribute("title", verb + " sidebar");
+            if (labelEl) labelEl.textContent = verb;
+          }
+        }
+
+        function wireToggle() {
+          var btn = document.getElementById("sidebar-toggle");
+          if (!btn) return;
+          // Reflect any state the FOUC script already applied.
+          var initialCollapsed = document.documentElement.classList.contains("sidebar-collapsed");
+          applyCollapsedState(initialCollapsed);
+          btn.addEventListener("click", function () {
+            var nextCollapsed = !document.documentElement.classList.contains("sidebar-collapsed");
+            applyCollapsedState(nextCollapsed);
+            try {
+              window.localStorage &&
+                localStorage.setItem("cartarch-sidebar-collapsed", String(nextCollapsed));
+            } catch (e) {
+              /* localStorage disabled — toggle still works for the session */
+            }
+          });
+        }
+
+        if (document.readyState === "loading") {
+          document.addEventListener("DOMContentLoaded", function () {
+            decorateNavItems();
+            wireToggle();
+          });
+        } else {
+          decorateNavItems();
+          wireToggle();
+        }
+      })();
+    </script>
     {% block extra_scripts %}
     {% endblock %}
   </body>

@@ -13449,3 +13449,195 @@ body.gf-mode { overflow: hidden; }
    rules in style.css are preserved per the project's retired-class-
    family precedent — they sit dormant under the .gf-app overlay layer
    and have no DOM consumer. */
+
+/* ============================================================================
+   v3.30.2 — Collapsible sidebar with hover-expand overlay
+   Desktop only (>768px). Mobile (≤768px) hides the sidebar entirely via the
+   existing `.app-sidebar { display: none }` rule; this block scopes every
+   new behavior inside `@media (min-width: 769px)` so none of it leaks into
+   the mobile bottom-tab IA. Token reuse only — Folio palette + existing
+   radius/spacing tokens; zero parallel tokens introduced.
+   ============================================================================ */
+
+/* Toggle button — sits at the top of the sidebar, above the .sidebar-nav.
+   In the expanded state it reads "Collapse"; collapsed it shrinks to icon-
+   only via the same "hide every .nav-item > span:not(.nav-badge)" rule
+   below. Always discoverable: the user finds it at the top of the rail. */
+.sidebar-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  width: 100%;
+  padding: 0.45rem 0.7rem;
+  margin-bottom: 0.5rem;
+  border: 1px solid var(--border);
+  background: var(--panel-2);
+  color: var(--text-dim);
+  border-radius: var(--radius-sm);
+  font: 600 11px/1 "Montserrat", system-ui, sans-serif;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  text-align: left;
+  flex: 0 0 auto;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+.sidebar-toggle:hover {
+  border-color: var(--brand-gold);
+  color: var(--brand-gold);
+}
+.sidebar-toggle:focus-visible {
+  outline: 2px solid var(--brand-gold);
+  outline-offset: 2px;
+}
+.sidebar-toggle .nav-icon {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  transition: transform 0.18s ease;
+}
+.sidebar-toggle-label {
+  white-space: nowrap;
+}
+
+/* Collapsed state — applies via the FOUC-prevention inline <script> in
+   <head> setting `html.sidebar-collapsed` from localStorage before paint.
+   The CSS-state cascade follows: html.sidebar-collapsed → .app-shell
+   grid track shrinks to a narrow rail; the sidebar element width matches;
+   nav-item text + group labels hide; icons center; the trade-pending
+   badge stays visible as a small floating pip on its icon. Desktop only. */
+@media (min-width: 769px) {
+  html.sidebar-collapsed .app-shell {
+    grid-template-columns: 60px 1fr;
+  }
+  html.sidebar-collapsed .app-sidebar {
+    /* The grid track is 60px; the .app-sidebar element matches in the
+       resting collapsed state. On hover the element grows to 236px past
+       its grid track — see the hover-expand rule below — and the grid
+       track stays at 60px (no layout reflow). overflow: visible lets
+       the expanded panel paint past the rail's right edge; the elevation
+       comes from the box-shadow on hover. */
+    overflow: visible;
+    padding: 1.25rem 0.4rem 1.5rem;
+    transition: padding 0.18s ease;
+  }
+  /* Hide visible text labels (the SVG icon stays). The aria-label that
+     the v3.30.2 boot JS sets on every .nav-item keeps screen readers
+     correct without any visible-text DOM. */
+  html.sidebar-collapsed .nav-label,
+  html.sidebar-collapsed .nav-item > span:not(.nav-badge),
+  html.sidebar-collapsed .nav-donate > span,
+  html.sidebar-collapsed .nav-logout-button .nav-logout-suffix,
+  html.sidebar-collapsed .sidebar-toggle-label {
+    display: none;
+  }
+  /* Center the nav-item content around its icon when the label is hidden. */
+  html.sidebar-collapsed .nav-item,
+  html.sidebar-collapsed .nav-donate {
+    justify-content: center;
+    padding: 0.55rem 0.5rem;
+    position: relative; /* anchor for the floating .nav-badge pip below */
+  }
+  html.sidebar-collapsed .sidebar-toggle {
+    justify-content: center;
+    padding: 0.5rem;
+  }
+  /* Chevron flip — points right (≫) when collapsed, indicating the
+     expand affordance. */
+  html.sidebar-collapsed .sidebar-toggle .nav-icon {
+    transform: rotate(180deg);
+  }
+  /* Trade-pending badge: pull out of the flex flow and float as a small
+     pip in the icon's top-right corner. Stays visible — a pending-action
+     signal must survive collapse. */
+  html.sidebar-collapsed .nav-badge {
+    position: absolute;
+    top: 2px;
+    right: 4px;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    margin-left: 0;
+    font-size: 9px;
+    line-height: 16px;
+    border-radius: 8px;
+  }
+  /* Group spacing tightens in collapsed view (the .nav-label rows are
+     gone, so the visual 1rem gap between groups is too generous). */
+  html.sidebar-collapsed .sidebar-nav {
+    gap: 0.5rem;
+  }
+  html.sidebar-collapsed .nav-group {
+    gap: 2px;
+  }
+
+  /* Hover-expand — fires only while the rail is pinned-collapsed.
+     The sidebar element widens from 60px to 236px AS AN OVERLAY: the
+     .app-shell grid track stays at 60px, so the main content does NOT
+     reflow. The wider sidebar element overflows its grid track to the
+     right; z-index lifts it above the main column; the box-shadow
+     gives the elevation cue. Both :hover and :focus-within trigger
+     the expansion — keyboard parity. */
+  html.sidebar-collapsed .app-sidebar:hover,
+  html.sidebar-collapsed .app-sidebar:focus-within {
+    width: 236px;
+    padding: 1.25rem 0.75rem 1.5rem;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+    border-right-color: var(--brand-gold-soft);
+    z-index: 60; /* above the topbar's z-index: 50 inside the main column;
+                    sticky positioning keeps the sidebar BELOW the topbar
+                    vertically (top: 72px), so this z-index governs the
+                    horizontal overlay over .app-main only. */
+    transition: width 0.18s ease, padding 0.18s ease, box-shadow 0.18s ease;
+  }
+  /* Re-show labels when the rail is hover-expanded. */
+  html.sidebar-collapsed .app-sidebar:hover .nav-label,
+  html.sidebar-collapsed .app-sidebar:hover .nav-item > span:not(.nav-badge),
+  html.sidebar-collapsed .app-sidebar:hover .nav-donate > span,
+  html.sidebar-collapsed .app-sidebar:hover .sidebar-toggle-label,
+  html.sidebar-collapsed .app-sidebar:focus-within .nav-label,
+  html.sidebar-collapsed .app-sidebar:focus-within .nav-item > span:not(.nav-badge),
+  html.sidebar-collapsed .app-sidebar:focus-within .nav-donate > span,
+  html.sidebar-collapsed .app-sidebar:focus-within .sidebar-toggle-label {
+    display: inline;
+  }
+  /* Restore the nav-item flex-row layout on hover-expand. */
+  html.sidebar-collapsed .app-sidebar:hover .nav-item,
+  html.sidebar-collapsed .app-sidebar:hover .nav-donate,
+  html.sidebar-collapsed .app-sidebar:focus-within .nav-item,
+  html.sidebar-collapsed .app-sidebar:focus-within .nav-donate {
+    justify-content: flex-start;
+    padding: 0.5rem 0.7rem;
+  }
+  html.sidebar-collapsed .app-sidebar:hover .sidebar-toggle,
+  html.sidebar-collapsed .app-sidebar:focus-within .sidebar-toggle {
+    justify-content: flex-start;
+    padding: 0.45rem 0.7rem;
+  }
+  /* Restore the inline-pill nav-badge styling on hover-expand. */
+  html.sidebar-collapsed .app-sidebar:hover .nav-badge,
+  html.sidebar-collapsed .app-sidebar:focus-within .nav-badge {
+    position: static;
+    margin-left: auto;
+    min-width: 0;
+    height: auto;
+    line-height: 1;
+    /* Let the base .nav-badge rule's font-size, padding, border-radius
+       resume; clearing the collapsed overrides above is enough. */
+  }
+  /* Group spacing restores on hover-expand. */
+  html.sidebar-collapsed .app-sidebar:hover .sidebar-nav,
+  html.sidebar-collapsed .app-sidebar:focus-within .sidebar-nav {
+    gap: 1.1rem;
+  }
+  html.sidebar-collapsed .app-sidebar:hover .nav-group,
+  html.sidebar-collapsed .app-sidebar:focus-within .nav-group {
+    gap: 1px;
+  }
+}
+
+/* End v3.30.2 collapsible-sidebar block. Mobile (≤768px) intentionally
+   carries no rule here — the existing `.app-sidebar { display: none }`
+   inside the @media (max-width: 768px) block covers mobile entirely, so
+   any html.sidebar-collapsed state has no visible effect at narrow
+   widths. The bottom-tab IA + More menu is unchanged. */
