@@ -1,5 +1,27 @@
 [
   {
+    "version": "3.29.2",
+    "date": "2026-05-25",
+    "added": [
+      "Trades. A new page (Play → Trades) where you propose a card trade with a co-member of one of your playgroups. The other party accepts, declines, or you cancel. Two parties, one trade record, on the take-it-or-leave-it model.",
+      "Propose-from-share. When you're browsing a co-member's shared Showcase, every card now carries a small ‘Propose trade for this' link. Click it and Cartarch jumps you to the trade construction page with the recipient + playgroup pre-locked and that card already in your requested column. Pick what you'd offer back from your own inventory, write a short note if you'd like, send.",
+      "An inbox at /trades with three sections — what's awaiting your action (proposed trades where you are the recipient), your open proposals (proposed trades you've sent), and recent closed trades (accepted, declined, cancelled, or auto-abandoned). The sidebar nav carries a small badge with the count of trades awaiting you, so you don't have to remember to check.",
+      "Trade agreed. When the recipient accepts, both of you see a ‘Trade agreed' panel pointing at the existing Move / Adjust-quantity affordances. Cartarch records that you agreed; you and the other party handle the physical exchange on your own time, then each updates your own inventory manually.",
+      "v3.29.x social-features minor COMPLETE. Three releases in a single day closed the arc: v3.29.0 Playgroups (who), v3.29.1 Collection sharing (what's visible), v3.29.2 Pairwise trading (the transaction). The next release picks up the unrelated v3.30.0 Goldfish playtester thread."
+    ],
+    "refined": [
+      "Recording-only by design. A trade is a record of an agreement; Cartarch never moves inventory between accounts. This is the conservative line — the cross-account inventory write is a v4 design item, gated on Postgres-grade transactions — and it has a small dividend in the meantime: trades are inspectable, reversible without dataset hygiene, and the durable historical record never needs to know what physical reality did or didn't do.",
+      "Identity that survives time. Every accepted/declined/cancelled/abandoned trade captures a snapshot of who the parties were and what cards were on each side at the moment of closure. The live links to InventoryRow / Card / playgroup stay populated while they exist, so the detail page keeps its image art and current prices; but if a card is edited, an inventory row is deleted, or someone's account is closed entirely, the historical record reads exactly as it did the day the trade closed.",
+      "Requested items come from the recipient's shared Showcase, period. There's no free-text ‘ask for a card not in their Showcase' yet. If you want something from a co-member that isn't on their Showcase, ask them to add it first — or let the watchlist do its job and add it to your own watchlist. Want-driven trade matching is a separate future thread.",
+      "Re-negotiation by decline-and-re-propose. There is no counter-offer button at v3.29.2. If a trade isn't quite right, decline it and propose your own variant. The first counter-offer slot, if it ever ships, lives in a future v3.29.x.1 follow-up — the take-it-or-leave-it loop is the v1 scope."
+    ],
+    "resolved": [
+      "Lifecycle integration is comprehensive. Leaving a playgroup auto-abandons your in-flight trades scoped to that playgroup. Being removed by an owner does the same. Deleting a playgroup auto-abandons every pending trade for it AND nulls the playgroup link on terminal trades (the historical record stays readable). Deleting a card from your inventory auto-abandons any pending trade that referenced it. Removing a card from your Showcase nulls the navigation link on existing trades but never touches the trade itself — the trade runs against the underlying inventory row, not the Showcase entry. Admin-deleting a user account closes every pending trade involving them and nulls the FK references on terminal trades, preserving the snapshot identity.",
+      "Both parties see each other's items, but only what they need to. The detail page renders card identity, finish, and quantity — nothing about where the other person stores the card, what notes they put on it, or any of the dozens of other private InventoryRow attributes. Whitelist-by-construction; absence is the privacy guarantee. Verified at the rendered-HTML level."
+    ],
+    "archivist_note": "We started the day with three sub-releases planned and finished it with three sub-releases shipped. v3.29.0 set the membership floor; v3.29.1 made collections visible across that floor; v3.29.2 made transactions across that visibility. Recording-only was a real choice, not a compromise — the simpler the v1 contract, the easier the v4 inventory-execution work will be when it arrives. The arc closes. Tomorrow is goldfish."
+  },
+  {
     "version": "3.29.1",
     "date": "2026-05-25",
     "added": [

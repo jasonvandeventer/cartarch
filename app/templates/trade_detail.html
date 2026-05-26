@@ -1,0 +1,152 @@
+{% from "_macros.html" import editorial_eyebrow, inventory_card %}
+{% extends "base.html" %}
+{% block content %}
+  {# v3.29.2 — trade detail. The detail page renders both sides
+     side-by-side. Each item is shown via the inventory_card macro with
+     ALL ACTION FLAGS OFF (show_collection_actions=false,
+     show_deck_actions=false, show_location_label=false) — the only
+     surface is identity. The trade-item dicts come from
+     trade_service.get_trade_detail which builds the v3.29.1 sanitized
+     projection (see app/trade_service.py:_build_trade_item_projection).
+     Privacy hard-flag: no InventoryRow private field surfaces here —
+     the projection's card is a _ReadOnlyCardProjection /
+     _SnapshotCardProjection so a future template change cannot leak
+     a private attribute (any non-whitelisted access raises
+     AttributeError).
+
+     Recording-only model (decision B2): an `accepted` trade shows
+     a "Trade agreed" panel pointing at existing Move + Adjust-
+     quantity affordances. No "mark exchange completed" control. #}
+
+  {% set proposer_label = trade.proposer.display_name or trade.proposer.username if trade.proposer else (trade.proposer_name_at_trade or 'Unknown') %}
+  {% set recipient_label = trade.recipient.display_name or trade.recipient.username if trade.recipient else (trade.recipient_name_at_trade or 'Unknown') %}
+
+  <section class="panel pagehead trade-detail-hero">
+    {{ editorial_eyebrow("Play · Trades · Detail") }}
+    <h1 class="pagehead-title">Trade #{{ trade.id }}</h1>
+    <p class="pagehead-tagline">
+      <strong>{{ proposer_label }}</strong> &rarr; <strong>{{ recipient_label }}</strong>
+      {% if trade.playgroup %}in <em><a href="/playgroups/{{ trade.playgroup.id }}">{{ trade.playgroup.name }}</a></em>{% else %}<em>(playgroup gone)</em>{% endif %}
+      &middot;
+      <span class="trade-status-pill status-{{ trade.status }}">{{ trade.status | capitalize }}</span>
+    </p>
+    <p class="muted trade-detail-meta">
+      Proposed {{ trade.created_at | editorial_date }}
+      {% if trade.closed_at %}&middot; closed {{ trade.closed_at | editorial_date }}{% endif %}
+    </p>
+  </section>
+
+  {% if error %}
+    <section class="panel trades-flash trades-flash-error">
+      <strong>That didn't work.</strong>
+      {% if error == 'trade_is_already_accepted;_no_further_transitions_allowed' or error.startswith('trade_is_already_') %}This trade is already closed.
+      {% elif error.startswith('only_the_recipient') %}Only the recipient can accept or decline.
+      {% elif error.startswith('only_the_proposer') %}Only the proposer can cancel.
+      {% else %}{{ error | replace('_', ' ') }}
+      {% endif %}
+    </section>
+  {% endif %}
+  {% if success %}
+    <section class="panel trades-flash trades-flash-success">
+      {% if success == 'proposed' %}Proposal sent.
+      {% elif success == 'accepted' %}You accepted this trade.
+      {% elif success == 'declined' %}You declined this trade.
+      {% elif success == 'cancelled' %}You cancelled this trade.
+      {% else %}{{ success | replace('_', ' ') }}
+      {% endif %}
+    </section>
+  {% endif %}
+
+  {% if trade.status == 'accepted' %}
+    <section class="panel trade-agreed-panel">
+      <h3 class="panel-title">Trade agreed</h3>
+      <p>
+        <em>Both parties agreed to this trade.</em> Cartarch records the agreement &mdash; it does not move cards. Once you've exchanged the physical cards, update your inventory manually:
+      </p>
+      <ul class="trade-agreed-steps">
+        <li>The card you gave away &mdash; <a href="/collection">Collection</a>, find the row, use <strong>Remove</strong> or <strong>Trade away</strong> to decrement quantity.</li>
+        <li>The card you received &mdash; <a href="/import">Import</a> a single row, or use <strong>Move</strong> from a pending row to place it.</li>
+      </ul>
+      <p class="muted"><small>Inventory execution is deferred until v4 (post-Postgres). For now, the recording lives here as the agreement; the cards live wherever you put them.</small></p>
+    </section>
+  {% endif %}
+
+  <section class="panel">
+    <h3 class="panel-title">{{ proposer_label }} offers</h3>
+    {% if offered_items %}
+      <div class="inventory-grid trade-items-grid">
+        {% for item in offered_items %}
+          {{ inventory_card(item, csrf_token,
+                            show_collection_actions=false,
+                            show_location_label=false,
+                            show_deck_actions=false) }}
+        {% endfor %}
+      </div>
+    {% else %}
+      <p class="trades-empty">No offered items.</p>
+    {% endif %}
+  </section>
+
+  <section class="panel">
+    <h3 class="panel-title">{{ proposer_label }} requests from {{ recipient_label }}</h3>
+    {% if requested_items %}
+      <div class="inventory-grid trade-items-grid">
+        {% for item in requested_items %}
+          {{ inventory_card(item, csrf_token,
+                            show_collection_actions=false,
+                            show_location_label=false,
+                            show_deck_actions=false) }}
+        {% endfor %}
+      </div>
+    {% else %}
+      <p class="trades-empty">No requested items.</p>
+    {% endif %}
+  </section>
+
+  {% if trade.proposer_note %}
+    <section class="panel trade-note-panel">
+      <h3 class="panel-title">Note from {{ proposer_label }}</h3>
+      <p><em>{{ trade.proposer_note }}</em></p>
+    </section>
+  {% endif %}
+  {% if trade.recipient_note %}
+    <section class="panel trade-note-panel">
+      <h3 class="panel-title">Note from {{ recipient_label }}</h3>
+      <p><em>{{ trade.recipient_note }}</em></p>
+    </section>
+  {% endif %}
+
+  {% if trade.status == 'proposed' %}
+    {% if viewer_is_recipient %}
+      <section class="panel trade-actions-panel">
+        <h3 class="panel-title">Accept or decline</h3>
+        <p class="muted">A short note back is optional and goes to the proposer.</p>
+        <form method="post" action="/trades/{{ trade.id }}/accept" class="stack-form inline-form">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <label for="accept-note">Optional reply</label>
+          <textarea id="accept-note" name="recipient_note" rows="2" placeholder="(optional)"></textarea>
+          <button type="submit" class="btn-like">Accept this trade</button>
+        </form>
+        <form method="post" action="/trades/{{ trade.id }}/decline" class="stack-form inline-form trade-decline-form"
+              onsubmit="return confirm('Decline this trade?')">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <input type="hidden" name="recipient_note" value="">
+          <button type="submit" class="btn-danger-small">Decline</button>
+        </form>
+      </section>
+    {% elif viewer_is_proposer %}
+      <section class="panel trade-actions-panel">
+        <h3 class="panel-title">Cancel proposal</h3>
+        <form method="post" action="/trades/{{ trade.id }}/cancel" class="inline-form"
+              onsubmit="return confirm('Cancel this proposal? The other party will no longer see it as actionable.')">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <button type="submit" class="btn-danger-small">Cancel this proposal</button>
+        </form>
+      </section>
+    {% endif %}
+  {% endif %}
+
+  <section class="panel">
+    <a class="btn-like-secondary" href="/trades">&larr; Back to Trades</a>
+  </section>
+{% endblock %}

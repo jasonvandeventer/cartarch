@@ -227,15 +227,37 @@ def _pending_count_for(user_id: int | None) -> int:
         session.close()
 
 
+def _trade_pending_count_for(user_id: int | None) -> int:
+    """Count trades awaiting this user's action — i.e. proposed trades
+    where they are the recipient. Used by the Trades nav badge (v3.29.2).
+
+    Runs once per render; cheap count(*) covered by indexes on
+    ``recipient_user_id`` + ``status``. Lazy-imports the service to
+    avoid a module-load cycle (trade_service imports models; this
+    module is imported by route modules that include trade_service).
+    """
+    if not user_id:
+        return 0
+    session = SessionLocal()
+    try:
+        from app import trade_service
+
+        return trade_service.pending_action_count(session, user_id)
+    finally:
+        session.close()
+
+
 def render(
     request: Request,
     template: str,
     ctx: dict | None = None,
     status_code: int = 200,
 ):
+    user_id = request.session.get("user_id")
     context = {
         "csrf_token": get_csrf_token(request),
-        "pending_count": _pending_count_for(request.session.get("user_id")),
+        "pending_count": _pending_count_for(user_id),
+        "trade_pending_count": _trade_pending_count_for(user_id),
     }
     if ctx:
         context.update(ctx)

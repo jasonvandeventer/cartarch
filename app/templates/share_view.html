@@ -40,12 +40,26 @@
   <section class="panel">
     <h3 class="panel-title">Showcase</h3>
     {% if items %}
+      {# v3.29.2 — propose-from-share link. Each item gets a small
+         "Propose trade for this" link that hops to /trades/new with
+         the ShowcaseItem id, which the trade construction page
+         resolves to a locked (recipient, playgroup) context with the
+         item prefilled on the requested side. The link only appears
+         to viewers who are NOT the sharer (sharer can't trade with
+         themselves; trade_service.resolve_propose_from_showcase_item
+         filters this case out too). #}
       <div class="inventory-grid share-view-grid">
         {% for item in items %}
-          {{ inventory_card(item, csrf_token,
-                            show_collection_actions=false,
-                            show_location_label=false,
-                            show_deck_actions=false) }}
+          <div class="share-view-item-wrap">
+            {{ inventory_card(item, csrf_token,
+                              show_collection_actions=false,
+                              show_location_label=false,
+                              show_deck_actions=false) }}
+            {% if current_user.id != sharer.id %}
+              <a class="btn-like share-view-propose-link"
+                 href="/trades/new?from_showcase_item={{ item.id }}">Propose trade for this</a>
+            {% endif %}
+          </div>
         {% endfor %}
       </div>
     {% else %}

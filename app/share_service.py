@@ -250,7 +250,13 @@ def remove_showcase_item(
     user_id: int,
     showcase_item_id: int,
 ) -> bool:
-    """Remove a curated card from the user's Showcase. Per-user scoped."""
+    """Remove a curated card from the user's Showcase. Per-user scoped.
+
+    v3.29.2 — NULLs any ``TradeItem.showcase_item_id`` references to
+    the removed item BEFORE the delete (§10). The trade itself stays
+    live; the link is navigation metadata (decision C1) and the trade
+    runs against its ``inventory_row_id`` regardless.
+    """
     showcase = get_or_create_showcase(session, user_id)
     item = (
         session.query(ShowcaseItem)
@@ -262,6 +268,14 @@ def remove_showcase_item(
     )
     if item is None:
         return False
+    # v3.29.2 — NULL TradeItem.showcase_item_id for any trade-item
+    # referencing this ShowcaseItem. Function-level import keeps the
+    # module-load order honest (trade_service imports share_service's
+    # _ReadOnlyCardProjection at module level; we MUST NOT import
+    # trade_service at module level here).
+    from app import trade_service
+
+    trade_service.null_trade_item_showcase_links(session, [item.id])
     session.delete(item)
     session.commit()
     return True

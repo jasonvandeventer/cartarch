@@ -182,6 +182,17 @@
                 <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" x2="15.42" y1="13.51" y2="17.49"/><line x1="15.41" x2="8.59" y1="6.51" y2="10.49"/></svg>
                 <span>Shares</span>
               </a>
+              {# v3.29.2 — Trades closes the v3.29.x social-features minor.
+                 Sits in Play next to Shares; nav badge counts trades
+                 awaiting the user's action (proposed + recipient). #}
+              <a href="/trades"
+                 class="nav-item{% if path.startswith('/trades') %} active{% endif %}">
+                <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 3h5v5"/><path d="M4 20 21 3"/><path d="M21 16v5h-5"/><path d="m15 15 6 6"/><path d="M4 4l5 5"/></svg>
+                <span>Trades</span>
+                {% if trade_pending_count and trade_pending_count > 0 %}
+                  <span class="nav-badge" aria-label="{{ trade_pending_count }} trades awaiting your action">{% if trade_pending_count >= 100 %}99+{% else %}{{ trade_pending_count }}{% endif %}</span>
+                {% endif %}
+              </a>
               <a href="/games"
                  class="nav-item{% if path.startswith('/games') %} active{% endif %}">
                 <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="14.5 17.5 3 6 3 3 6 3 17.5 14.5"/><line x1="13" x2="19" y1="19" y2="13"/><line x1="16" x2="20" y1="16" y2="20"/><line x1="19" x2="21" y1="21" y2="19"/><polyline points="14.5 6.5 18 3 21 3 21 6 17.5 9.5"/><line x1="5" x2="9" y1="14" y2="18"/><line x1="7" x2="4" y1="17" y2="20"/><line x1="3" x2="5" y1="19" y2="21"/></svg>
@@ -380,7 +391,7 @@
            includes `/games`, `/watchlist`, `/chronicle`, `/decklist` (those
            are reached only via More now). Keeps the highlight state in
            sync with where each destination actually lives. #}
-        {% set on_more = path.startswith('/import') or path.startswith('/locations') or path.startswith('/tokens') or path.startswith('/sets') or path.startswith('/decklist') or path.startswith('/drawers') or path.startswith('/audit') or path.startswith('/admin') or path.startswith('/account') or path.startswith('/games') or path.startswith('/watchlist') or path.startswith('/chronicle') or path.startswith('/playgroups') or path.startswith('/showcase') or path.startswith('/shares') %}
+        {% set on_more = path.startswith('/import') or path.startswith('/locations') or path.startswith('/tokens') or path.startswith('/sets') or path.startswith('/decklist') or path.startswith('/drawers') or path.startswith('/audit') or path.startswith('/admin') or path.startswith('/account') or path.startswith('/games') or path.startswith('/watchlist') or path.startswith('/chronicle') or path.startswith('/playgroups') or path.startswith('/showcase') or path.startswith('/shares') or path.startswith('/trades') %}
         <button type="button"
                 class="bottom-nav-tab{% if on_more %} active{% endif %}"
                 onclick="toggleMoreMenu()"
@@ -442,6 +453,9 @@
                nav-group order on desktop. #}
             <a href="/showcase">Showcase</a>
             <a href="/shares">Shares</a>
+            {# v3.29.2 — Trades closes the social-features minor; same Play
+               position on mobile as on desktop sidebar. #}
+            <a href="/trades">Trades{% if trade_pending_count and trade_pending_count > 0 %} ({{ trade_pending_count }}){% endif %}</a>
             <a href="/games">Games</a>
             {% if current_user.username in drawer_sorter_usernames %}
               <a href="/audit">Audit</a>

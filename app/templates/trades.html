@@ -1,0 +1,133 @@
+{% from "_macros.html" import editorial_eyebrow %}
+{% extends "base.html" %}
+{% block content %}
+  {# v3.29.2 — pairwise trading inbox. Three sections:
+     - Incoming pending: trades where the current user is recipient + status='proposed'
+       — these are the trades the nav badge counts (pending_action_count).
+     - Sent pending: trades where the current user is proposer + status='proposed'.
+     - Recent terminal: latest 20 closed trades involving the user (any side).
+
+     Trade is RECORDING-ONLY (decision B1): an ``accepted`` trade records the
+     agreement; the app never moves InventoryRow. The detail page shows the
+     "Trade agreed" panel with guidance pointing at the existing Move /
+     Adjust-quantity affordances. #}
+  <section class="panel pagehead trades-hero">
+    {{ editorial_eyebrow("Play · Trades") }}
+    <h1 class="pagehead-title">Trades</h1>
+    <p class="pagehead-tagline">
+      <em>Pairwise card trades with your playgroups.</em> Propose what you'd offer for cards on a co-member's Showcase; the other party accepts, declines, or you cancel. A trade is the agreement &mdash; physical exchange happens off-app, on your own time.
+    </p>
+  </section>
+
+  {% if error %}
+    <section class="panel trades-flash trades-flash-error">
+      <strong>That didn't work.</strong>
+      {% if error == 'trade_unavailable' %}That trade isn't visible to you. It may not exist, or you may not be a party.
+      {% else %}{{ error | replace('_', ' ') }}
+      {% endif %}
+    </section>
+  {% endif %}
+  {% if success %}
+    <section class="panel trades-flash trades-flash-success">
+      {% if success == 'proposed' %}Trade proposed. The other party will see it on their Trades page.
+      {% elif success == 'accepted' %}Trade accepted.
+      {% elif success == 'declined' %}Trade declined.
+      {% elif success == 'cancelled' %}Trade cancelled.
+      {% else %}{{ success | replace('_', ' ') }}
+      {% endif %}
+    </section>
+  {% endif %}
+
+  <section class="panel">
+    <div class="trades-section-head">
+      <h3 class="panel-title">Awaiting your action</h3>
+      <a class="btn-like" href="/trades/new">Propose a trade</a>
+    </div>
+    {% if incoming %}
+      <ul class="trades-list">
+        {% for t in incoming %}
+          <li class="trades-row">
+            <a class="trades-row-link" href="/trades/{{ t.id }}">
+              <span class="trades-row-headline">
+                <strong>{{ t.proposer.display_name or t.proposer.username if t.proposer else (t.proposer_name_at_trade or 'Unknown') }}</strong>
+                proposes a trade
+              </span>
+              <span class="trades-row-meta">
+                in <em>{{ t.playgroup.name if t.playgroup else '(playgroup gone)' }}</em>
+                &middot;
+                {{ t.items | selectattr('side', 'equalto', 'offered') | list | length }} offered,
+                {{ t.items | selectattr('side', 'equalto', 'requested') | list | length }} requested
+                &middot;
+                {{ t.created_at | editorial_date }}
+              </span>
+            </a>
+            <span class="trades-row-status status-proposed">Proposed</span>
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p class="trades-empty">No trades awaiting your action.</p>
+    {% endif %}
+  </section>
+
+  <section class="panel">
+    <h3 class="panel-title">Your open proposals</h3>
+    {% if sent %}
+      <ul class="trades-list">
+        {% for t in sent %}
+          <li class="trades-row">
+            <a class="trades-row-link" href="/trades/{{ t.id }}">
+              <span class="trades-row-headline">
+                You proposed a trade to
+                <strong>{{ t.recipient.display_name or t.recipient.username if t.recipient else (t.recipient_name_at_trade or 'Unknown') }}</strong>
+              </span>
+              <span class="trades-row-meta">
+                in <em>{{ t.playgroup.name if t.playgroup else '(playgroup gone)' }}</em>
+                &middot;
+                {{ t.items | selectattr('side', 'equalto', 'offered') | list | length }} offered,
+                {{ t.items | selectattr('side', 'equalto', 'requested') | list | length }} requested
+                &middot;
+                {{ t.created_at | editorial_date }}
+              </span>
+            </a>
+            <span class="trades-row-status status-proposed">Awaiting reply</span>
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p class="trades-empty">No proposals out for response.</p>
+    {% endif %}
+  </section>
+
+  <section class="panel">
+    <h3 class="panel-title">Recent</h3>
+    {% if recent %}
+      <ul class="trades-list">
+        {% for t in recent %}
+          <li class="trades-row trades-row-closed">
+            <a class="trades-row-link" href="/trades/{{ t.id }}">
+              <span class="trades-row-headline">
+                {% if t.proposer_user_id == current_user.id %}
+                  You proposed a trade to <strong>{{ t.recipient_name_at_trade or (t.recipient.display_name or t.recipient.username if t.recipient else 'Unknown') }}</strong>
+                {% else %}
+                  <strong>{{ t.proposer_name_at_trade or (t.proposer.display_name or t.proposer.username if t.proposer else 'Unknown') }}</strong>
+                  proposed a trade to you
+                {% endif %}
+              </span>
+              <span class="trades-row-meta">
+                {% if t.playgroup %}in <em>{{ t.playgroup.name }}</em> &middot;{% endif %}
+                {{ t.items | selectattr('side', 'equalto', 'offered') | list | length }} offered,
+                {{ t.items | selectattr('side', 'equalto', 'requested') | list | length }} requested
+                &middot;
+                {{ (t.closed_at or t.updated_at) | editorial_date }}
+              </span>
+            </a>
+            <span class="trades-row-status status-{{ t.status }}">{{ t.status | capitalize }}</span>
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p class="trades-empty">No closed trades yet.</p>
+    {% endif %}
+  </section>
+{% endblock %}

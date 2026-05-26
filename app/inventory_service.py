@@ -1990,6 +1990,14 @@ def adjust_inventory_row_quantity(
         session.query(ShowcaseItem).filter(ShowcaseItem.inventory_row_id == row.id).delete(
             synchronize_session=False
         )
+        # v3.29.2 — abandon any pending Trade whose TradeItem references
+        # this row; NULL the inventory_row_id on remaining (terminal or
+        # now-abandoned) TradeItem references. Trade snapshots survive
+        # the inventory disappearing (decision A4 — the *_at_trade
+        # columns are the durable historical record).
+        from app import trade_service
+
+        trade_service.abandon_pending_trades_for_inventory_rows(session, [row.id])
         session.delete(row)
         session.commit()
         return None
@@ -2055,6 +2063,13 @@ def bulk_delete_inventory_rows(session: Session, row_ids: list[int], user_id: in
         session.query(ShowcaseItem).filter(ShowcaseItem.inventory_row_id.in_(owned_ids)).delete(
             synchronize_session=False
         )
+        # v3.29.2 — auto-abandon pending trades referencing any of
+        # these rows; NULL inventory_row_id on remaining TradeItem
+        # references. Same identity-snapshot rationale as the single-
+        # row deletion path above.
+        from app import trade_service
+
+        trade_service.abandon_pending_trades_for_inventory_rows(session, owned_ids)
 
     for row in rows:
         source_location = (

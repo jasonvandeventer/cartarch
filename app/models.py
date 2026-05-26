@@ -675,3 +675,159 @@ class PlaygroupMember(Base):
 
     playgroup: Mapped[Playgroup] = relationship(back_populates="members")
     user: Mapped[User] = relationship(foreign_keys=[user_id], overlaps="playgroup_memberships")
+
+
+class Trade(Base):
+    """A pairwise card trade between two playgroup co-members.
+
+    v3.29.2 — the third and final release of the v3.29.x social-features
+    minor. Recording-only: the Trade records the agreement; it never
+    moves InventoryRow. Inventory execution is deferred (v4-gated;
+    v4-schema-design input).
+
+    **Lifecycle.** One non-terminal status (``proposed``) and four
+    terminal statuses (``accepted``, ``declined``, ``cancelled``,
+    ``abandoned``). Transitions are gated by the actor: the recipient
+    accepts / declines; the proposer cancels; ``abandoned`` is system-
+    only (the §10 cleanup hooks). The state machine is enforced in
+    ``app.trade_service.transition_trade`` — there is no other code path
+    that mutates ``status`` from a user action.
+
+    **Hybrid identity reference.** ``TradeItem`` carries both live FKs
+    (``inventory_row_id``, ``card_id``) and snapshot fields
+    (``*_at_trade``). The live FKs let the construction / detail pages
+    navigate to current InventoryRow + Card data during negotiation.
+    The snapshots are written on every transition into a terminal
+    status (decision A4) so the historical record survives later card-
+    or inventory-row changes. The live FKs stay populated after
+    terminal — they are nulled only when the underlying row is deleted
+    (§10 cleanup).
+
+    **Identity FKs are nullable for the SET-NULL pattern.**
+    ``proposer_user_id`` / ``recipient_user_id`` / ``playgroup_id`` are
+    all nullable at the DB level so the admin-cascade and playgroup-
+    delete cleanup hooks can SET-NULL on terminal trades (preserving
+    the historical record via the snapshot columns) and ORM-delete
+    pending trades. At app level both user FKs are required at
+    proposal time; ``playgroup_id`` is required at proposal time
+    (decision D1).
+
+    **Status / side enums are service-layer canonical** (no DB CHECK,
+    matching the v3.27.2 / v3.27.3 / v3.29.0 pattern). The valid sets
+    live in ``CANONICAL_TRADE_STATUSES`` / ``CANONICAL_TRADE_ITEM_SIDES``
+    in ``app/trade_service.py``.
+    """
+
+    __tablename__ = "trades"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    # Nullable for SET-NULL on admin account deletion of terminal trades
+    # (preserves the historical record via the *_name_at_trade snapshots).
+    # Required at app layer at proposal time.
+    proposer_user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id"), nullable=True, index=True
+    )
+    recipient_user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id"), nullable=True, index=True
+    )
+    # Nullable for SET-NULL on playgroup deletion of terminal trades.
+    # Required at app layer at proposal time (decision D1).
+    playgroup_id: Mapped[int | None] = mapped_column(
+        ForeignKey("playgroups.id"), nullable=True, index=True
+    )
+    # Service-layer canonical enum (CANONICAL_TRADE_STATUSES). Python-side
+    # default lands ``proposed`` on every new row; no DB CHECK (the v3.27.2
+    # service-enum pattern, SQLite-until-v4 posture).
+    status: Mapped[str] = mapped_column(String(32), default="proposed", nullable=False, index=True)
+    proposer_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    recipient_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Identity snapshots. NULL on a still-proposed trade; populated by
+    # ``write_trade_terminal_snapshot`` on every terminal transition (and
+    # by the cleanup helpers' ``abandon_*`` paths). Survives account
+    # deletion of either party.
+    proposer_name_at_trade: Mapped[str | None] = mapped_column(Text, nullable=True)
+    recipient_name_at_trade: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    # NULL while the trade is still ``proposed``; written on every terminal
+    # transition. The single source of truth for "when did this close?".
+    closed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    items: Mapped[list[TradeItem]] = relationship(
+        back_populates="trade", cascade="all, delete-orphan"
+    )
+    proposer: Mapped[User | None] = relationship(foreign_keys=[proposer_user_id])
+    recipient: Mapped[User | None] = relationship(foreign_keys=[recipient_user_id])
+    playgroup: Mapped[Playgroup | None] = relationship()
+
+
+class TradeItem(Base):
+    """One line item on one side of a :class:`Trade`.
+
+    ``side`` is one of ``offered`` (proposer is giving) or ``requested``
+    (proposer is asking for from the recipient). Service-layer canonical
+    enum (``CANONICAL_TRADE_ITEM_SIDES`` in ``app/trade_service.py``).
+
+    ``inventory_row_id`` is the live FK to the source InventoryRow —
+    set on both sides at proposal time (offered: a row the proposer
+    owns; requested: a row the recipient owns surfaced via their
+    Showcase). It is nulled by the §10 inventory-row-delete cleanup
+    when the underlying InventoryRow is deleted. ``card_id`` is the
+    redundant live FK for the card itself (cheaper joins for
+    rendering — InventoryRow already has card_id, but this avoids a
+    second join hop on hot paths).
+
+    ``showcase_item_id`` (decision C1) is the OPTIONAL link to the
+    v3.29.1 ShowcaseItem this trade-item was selected from. v3.29.2
+    requires it for every ``side='requested'`` row at proposal time
+    (decision C2 — requested items must come from the recipient's
+    shared Showcase); ``side='offered'`` rows leave it NULL. It is
+    nulled if the underlying ShowcaseItem is removed (§10 — the
+    showcase-item-remove hook). The trade continues against its
+    ``inventory_row_id`` regardless; the showcase link is navigation
+    metadata, not the identity.
+
+    Five ``*_at_trade`` snapshot fields are the durable historical
+    record (decision A4). NULL while the trade is still ``proposed``;
+    populated on every terminal transition by
+    ``write_trade_terminal_snapshot``. After terminal, the rendered
+    detail pulls from snapshots so card edits / inventory deletes
+    don't rewrite history.
+    """
+
+    __tablename__ = "trade_items"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    trade_id: Mapped[int] = mapped_column(ForeignKey("trades.id"), nullable=False, index=True)
+    # Service-layer canonical enum (CANONICAL_TRADE_ITEM_SIDES). Indexed
+    # for the composite (trade_id, side) per-side render query.
+    side: Mapped[str] = mapped_column(String(16), nullable=False, index=True)
+    # Live FK — nulled by §10 inventory-row-delete cleanup.
+    inventory_row_id: Mapped[int | None] = mapped_column(
+        ForeignKey("inventory_rows.id"), nullable=True, index=True
+    )
+    # Live FK — redundant with InventoryRow.card_id but saves the join hop
+    # on hot render paths. Documentary only (PRAGMA foreign_keys OFF).
+    card_id: Mapped[int | None] = mapped_column(ForeignKey("cards.id"), nullable=True, index=True)
+    # Decision C1 — nullable FK to the ShowcaseItem the requested item was
+    # selected from. App-layer requires it for ``side='requested'`` at
+    # proposal time (C2); ``side='offered'`` rows leave it NULL. Nulled by
+    # §10 showcase-item-remove cleanup; trade continues against
+    # inventory_row_id (the showcase link is navigation only).
+    showcase_item_id: Mapped[int | None] = mapped_column(
+        ForeignKey("showcase_items.id"), nullable=True
+    )
+    finish: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    quantity: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    # Five ``*_at_trade`` snapshot fields (decision A4). NULL while trade
+    # is still ``proposed``; populated on terminal transition.
+    card_name_at_trade: Mapped[str | None] = mapped_column(Text, nullable=True)
+    card_set_code_at_trade: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    card_collector_number_at_trade: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    finish_at_trade: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    quantity_at_trade: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+    trade: Mapped[Trade] = relationship(back_populates="items")
+    inventory_row: Mapped[InventoryRow | None] = relationship()
+    card: Mapped[Card | None] = relationship()
+    showcase_item: Mapped[ShowcaseItem | None] = relationship()

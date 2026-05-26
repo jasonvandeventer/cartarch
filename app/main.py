@@ -147,7 +147,7 @@ from app.password_reset_service import (
 )
 from app.presentation_service import build_pending_batch_groups, build_pending_view_model
 from app.pricing import effective_price
-from app.routes import account, admin, auth, drawers, playgroups, sharing
+from app.routes import account, admin, auth, drawers, playgroups, sharing, trades
 from app.scryfall import (
     _bulk_data_loop,
     autocomplete_cards_for_add,
@@ -198,6 +198,7 @@ app.include_router(account.router)
 app.include_router(drawers.router)
 app.include_router(playgroups.router)
 app.include_router(sharing.router)
+app.include_router(trades.router)
 
 
 @app.exception_handler(ValueError)

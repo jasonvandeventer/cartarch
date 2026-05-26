@@ -17,6 +17,7 @@ from app.models import (
     Share,
     Showcase,
     StorageLocation,
+    Trade,
     TransactionLog,
     User,
     WatchlistItem,
@@ -180,9 +181,36 @@ def delete_user(
     # recon's original "block" recommendation) because in an admin
     # deletion the owner is not present to transfer themselves —
     # blocking would be unactionable.
-    from app import playgroup_service
+    from app import playgroup_service, trade_service
 
     playgroup_service.handle_user_deletion(session, user_id)
+
+    # v3.29.2 — pairwise-trading pre-cleanup. Done BEFORE the
+    # InventoryRow / Share / Showcase cleanup so trade-item snapshots
+    # can resolve against still-live data.
+    #
+    # (a) Collect every PROPOSED trade-id involving this user (both
+    #     directions). Abandon them via the service helper (writes
+    #     *_at_trade snapshots + status='abandoned' + closed_at).
+    #     ORM-delete that exact set; cascade="all, delete-orphan" on
+    #     Trade.items clears the TradeItem rows alongside each Trade.
+    # (b) The terminal-trade SET-NULL pass is the §10 hook AFTER the
+    #     GameSeat SET-NULL further below — keeps it adjacent to the
+    #     v3.27.5 precedent for the same forward-compat pattern.
+    pending_trade_ids_to_delete = [
+        tid
+        for (tid,) in session.query(Trade.id)
+        .filter(
+            Trade.status == "proposed",
+            (Trade.proposer_user_id == user_id) | (Trade.recipient_user_id == user_id),
+        )
+        .all()
+    ]
+    if pending_trade_ids_to_delete:
+        trade_service.abandon_pending_trades_involving_user(session, user_id)
+        for trade in session.query(Trade).filter(Trade.id.in_(pending_trade_ids_to_delete)).all():
+            session.delete(trade)
+        session.flush()
 
     # v3.29.1 — collection-sharing cleanup. Order:
     #   1. Drop Share rows OWNED by this user (Share.user_id). These
@@ -224,6 +252,22 @@ def delete_user(
     # via the snapshot.
     session.query(GameSeat).filter(GameSeat.user_id == user_id).update(
         {GameSeat.user_id: None}, synchronize_session=False
+    )
+    # v3.29.2 — same SET-NULL discipline for terminal trades involving
+    # this user. The pending trades involving this user were ORM-
+    # deleted above (cascade); what remains are TERMINAL trades
+    # (accepted / declined / cancelled / pre-existing abandoned)
+    # carrying the user_id on proposer_user_id or recipient_user_id.
+    # SET-NULL the FKs; the v3.29.2 ``*_name_at_trade`` snapshot
+    # columns preserve identity in the historical record. Same
+    # forward-compat shape as the v3.27.5 ``GameSeat.user_id`` pattern.
+    session.query(Trade).filter(Trade.proposer_user_id == user_id).update(
+        {Trade.proposer_user_id: None},
+        synchronize_session=False,
+    )
+    session.query(Trade).filter(Trade.recipient_user_id == user_id).update(
+        {Trade.recipient_user_id: None},
+        synchronize_session=False,
     )
     # v3.27.12 — watchlist rows are per-user with no historical retention
     # value (no "X was watching Y when their account was deleted" meaning

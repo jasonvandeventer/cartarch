@@ -28,7 +28,7 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.models import Playgroup, PlaygroupMember, Share, User
+from app.models import Playgroup, PlaygroupMember, Share, Trade, User
 
 # Service-layer canonical role enum (the v3.27.2 / v3.27.3 pattern, no
 # DB CHECK constraint). v3.29.0 ships two roles; the enum can widen
@@ -386,6 +386,14 @@ def leave_playgroup(session: Session, user_id: int, playgroup_id: int) -> tuple[
         Share.user_id == user_id,
         Share.playgroup_id == playgroup_id,
     ).delete(synchronize_session=False)
+    # v3.29.2 — auto-abandon pending trades involving the leaving user
+    # scoped to this playgroup (§10). The user is leaving the audience;
+    # any in-flight proposal where they are a party in this playgroup
+    # closes with ``status='abandoned'``. Terminal trades are
+    # untouched — they're the historical record.
+    from app import trade_service
+
+    trade_service.abandon_pending_trades_for_member_in_playgroup(session, user_id, playgroup_id)
     session.delete(membership)
     session.flush()
     # If the playgroup is now empty, hard-delete it (D1 auto-delete).
@@ -400,6 +408,14 @@ def leave_playgroup(session: Session, user_id: int, playgroup_id: int) -> tuple[
         # (the case where leave_playgroup auto-deletes the playgroup).
         session.query(Share).filter(Share.playgroup_id == playgroup_id).delete(
             synchronize_session=False
+        )
+        # v3.29.2 — auto-abandon pending trades scoped to this playgroup
+        # (any party — the playgroup itself is going away). Terminal
+        # trades keep their snapshots but lose the live playgroup_id.
+        trade_service.abandon_pending_trades_for_playgroup(session, playgroup_id)
+        session.query(Trade).filter(Trade.playgroup_id == playgroup_id).update(
+            {Trade.playgroup_id: None},
+            synchronize_session=False,
         )
         pg = session.query(Playgroup).filter(Playgroup.id == playgroup_id).first()
         if pg is not None:
@@ -434,6 +450,14 @@ def remove_member(
         Share.user_id == target_user_id,
         Share.playgroup_id == playgroup_id,
     ).delete(synchronize_session=False)
+    # v3.29.2 — auto-abandon pending trades involving the removed
+    # member scoped to this playgroup (§10). They've been kicked from
+    # the audience; their in-flight proposals close as abandoned.
+    from app import trade_service
+
+    trade_service.abandon_pending_trades_for_member_in_playgroup(
+        session, target_user_id, playgroup_id
+    )
     session.delete(target)
     session.commit()
     return True, None
@@ -562,6 +586,17 @@ def delete_playgroup(
     session.query(Share).filter(Share.playgroup_id == playgroup_id).delete(
         synchronize_session=False
     )
+    # v3.29.2 — auto-abandon pending trades scoped to this playgroup;
+    # SET-NULL ``playgroup_id`` on terminal trades to preserve the
+    # historical record (the *_name_at_trade snapshots survive). The
+    # Trade row stays even after the playgroup is gone.
+    from app import trade_service
+
+    trade_service.abandon_pending_trades_for_playgroup(session, playgroup_id)
+    session.query(Trade).filter(Trade.playgroup_id == playgroup_id).update(
+        {Trade.playgroup_id: None},
+        synchronize_session=False,
+    )
     session.delete(pg)
     session.commit()
     return True, None
@@ -615,6 +650,18 @@ def handle_user_deletion(session: Session, user_id: int) -> None:
             # separately in the admin cascade in routes/admin.py.
             session.query(Share).filter(Share.playgroup_id == pg_id).delete(
                 synchronize_session=False
+            )
+            # v3.29.2 — auto-abandon pending trades scoped to this
+            # playgroup; SET-NULL terminal trades' ``playgroup_id`` to
+            # preserve the historical record. Mirrors the
+            # ``delete_playgroup`` cleanup path so admin-cascade behaves
+            # identically to a user-initiated playgroup delete.
+            from app import trade_service
+
+            trade_service.abandon_pending_trades_for_playgroup(session, pg_id)
+            session.query(Trade).filter(Trade.playgroup_id == pg_id).update(
+                {Trade.playgroup_id: None},
+                synchronize_session=False,
             )
             pg = session.query(Playgroup).filter(Playgroup.id == pg_id).first()
             if pg is not None:

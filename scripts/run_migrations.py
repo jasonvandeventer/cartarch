@@ -84,6 +84,9 @@ from scripts.migrate_v3_29_0_playgroups import main as migrate_v3_29_0_playgroup
 from scripts.migrate_v3_29_1_collection_sharing import (
     main as migrate_v3_29_1_collection_sharing,
 )
+from scripts.migrate_v3_29_2_pairwise_trading import (
+    main as migrate_v3_29_2_pairwise_trading,
+)
 
 
 def _is_applied(name: str) -> bool:
@@ -422,6 +425,13 @@ def run():
         _mark_applied("v3_29_1_collection_sharing")
     else:
         print("v3.29.1 collection_sharing already applied, skipping")
+
+    if not _is_applied("v3_29_2_pairwise_trading"):
+        print("Running v3.29.2 pairwise trading migration...")
+        migrate_v3_29_2_pairwise_trading()
+        _mark_applied("v3_29_2_pairwise_trading")
+    else:
+        print("v3.29.2 pairwise_trading already applied, skipping")
 
     print("Migration runner complete")
 

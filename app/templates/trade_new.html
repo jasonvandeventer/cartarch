@@ -1,0 +1,253 @@
+{% from "_macros.html" import editorial_eyebrow %}
+{% extends "base.html" %}
+{% block content %}
+  {# v3.29.2 — trade construction page. Two initiation modes feed this:
+     - Standalone /trades/new: recipient+playgroup picker first, then
+       requested-side picker (from recipient's shared Showcase) +
+       offered-side picker (from current user's own inventory).
+     - Propose-from-share /trades/new?from_showcase_item=N: recipient
+       + playgroup pre-locked from the ShowcaseItem's context, item
+       pre-filled on the requested side.
+
+     Requested items are sourced ONLY from the recipient's shared
+     Showcase (decision C2 — every side='requested' TradeItem must
+     carry a showcase_item_id). Offered items are from the current
+     user's own inventory (placed only). #}
+  <section class="panel pagehead trade-new-hero">
+    {{ editorial_eyebrow("Play · Trades · New") }}
+    <h1 class="pagehead-title">Propose a trade</h1>
+    <p class="pagehead-tagline">
+      <em>Pick what you'd ask for from their Showcase, what you'd offer from your own inventory, and a short note if you'd like.</em> They'll see the proposal on their Trades page; nothing moves until they accept &mdash; and even then, the physical exchange is up to you.
+    </p>
+  </section>
+
+  {% if error %}
+    <section class="panel trades-flash trades-flash-error">
+      <strong>That didn't work.</strong>
+      {% if error == 'invalid_submission' %}The submission was malformed.
+      {% elif error == 'at_least_one_offered_item_is_required' %}You need at least one offered item.
+      {% elif error == 'at_least_one_requested_item_is_required' %}You need at least one requested item.
+      {% elif error == 'requested_items_must_be_selected_from_the_recipients_shared_showcase_(decision_c2)' or error.startswith('requested_item_is_not_in') %}Requested items must come from the recipient's shared Showcase.
+      {% else %}{{ error | replace('_', ' ') }}
+      {% endif %}
+    </section>
+  {% endif %}
+
+  {% if pre_locked %}
+    <section class="panel trade-new-context">
+      <p>
+        Proposing a trade to
+        <strong>{{ pre_recipient.display_name or pre_recipient.username }}</strong>
+        in <em>{{ pre_playgroup.name }}</em>.
+      </p>
+    </section>
+  {% elif options.recipients %}
+    <section class="panel">
+      <h3 class="panel-title">Pick the trade partner</h3>
+      <p class="muted">Every co-member who has shared a Showcase with you, by playgroup. Pick one to load their available cards.</p>
+      <form method="get" action="/trades/new" class="stack-form trade-new-recipient-form">
+        <label for="trade-recipient-pair">Trade partner</label>
+        <select id="trade-recipient-pair" name="pair" onchange="(function(s){var v=s.value.split('|');if(v.length===2){window.location='/trades/new?recipient_user_id='+v[0]+'&playgroup_id='+v[1];}})(this)">
+          <option value="">— choose a partner —</option>
+          {% for cand in options.recipients %}
+            <option value="{{ cand.user.id }}|{{ cand.playgroup.id }}"
+              {% if pre_recipient and pre_playgroup and pre_recipient.id == cand.user.id and pre_playgroup.id == cand.playgroup.id %}selected{% endif %}>
+              {{ cand.user.display_name or cand.user.username }} — {{ cand.playgroup.name }}
+            </option>
+          {% endfor %}
+        </select>
+      </form>
+    </section>
+  {% else %}
+    <section class="panel">
+      <p class="trades-empty">
+        No trade partners available yet. To trade, you need a co-member of one of your playgroups who has shared a Showcase with that playgroup.
+        Visit <a href="/playgroups">Playgroups</a> to join or create, or ask a co-member to share their <a href="/showcase">Showcase</a>.
+      </p>
+    </section>
+  {% endif %}
+
+  {% if pre_recipient and pre_playgroup %}
+    <form method="post" action="/trades" id="trade-new-form" class="stack-form trade-new-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <input type="hidden" name="recipient_user_id" value="{{ pre_recipient.id }}">
+      <input type="hidden" name="playgroup_id" value="{{ pre_playgroup.id }}">
+      <input type="hidden" name="offered_json" id="offered-json" value="[]">
+      <input type="hidden" name="requested_json" id="requested-json" value="[]">
+
+      <section class="panel">
+        <h3 class="panel-title">Their cards (requested)</h3>
+        <p class="muted">Pick items from <strong>{{ pre_recipient.display_name or pre_recipient.username }}</strong>'s Showcase that's shared with <em>{{ pre_playgroup.name }}</em>. Toggle to add &mdash; quantities default to available, click to override.</p>
+        <div class="trade-pick-grid" id="requested-grid">
+          {% set seen_pre = [] %}
+          {% for it in prefilled_requested %}
+            <div class="trade-pick-item trade-pick-prefilled"
+                 data-showcase-item-id="{{ it.showcase_item_id }}"
+                 data-available="{{ it.available }}">
+              <div class="trade-pick-card">
+                <div class="trade-pick-name">{{ it.card.name }}</div>
+                <div class="trade-pick-meta">
+                  {{ it.card.set_code | upper }} #{{ it.card.collector_number }} &middot;
+                  {{ it.finish | capitalize }} &middot;
+                  available {{ it.available }}
+                </div>
+              </div>
+              <div class="trade-pick-controls">
+                <label>
+                  Qty
+                  <input type="number" min="1" max="{{ it.available }}" value="1"
+                         class="trade-pick-qty" data-showcase-item-id="{{ it.showcase_item_id }}">
+                </label>
+                <button type="button" class="btn-danger-small trade-pick-remove"
+                        data-showcase-item-id="{{ it.showcase_item_id }}">Remove</button>
+              </div>
+            </div>
+            {% if seen_pre.append(it.showcase_item_id) %}{% endif %}
+          {% endfor %}
+          {% for share_item in options.recipient_share_items %}
+            {% if share_item.showcase_item_id not in seen_pre %}
+              <div class="trade-pick-item"
+                   data-showcase-item-id="{{ share_item.showcase_item_id }}"
+                   data-available="{{ share_item.available }}">
+                <div class="trade-pick-card">
+                  <div class="trade-pick-name">{{ share_item.card.name }}</div>
+                  <div class="trade-pick-meta">
+                    {{ share_item.card.set_code | upper }} #{{ share_item.card.collector_number }} &middot;
+                    {{ share_item.finish | capitalize }} &middot;
+                    available {{ share_item.available }}
+                  </div>
+                </div>
+                <button type="button" class="btn-like trade-pick-add"
+                        data-showcase-item-id="{{ share_item.showcase_item_id }}"
+                        data-available="{{ share_item.available }}">Add</button>
+              </div>
+            {% endif %}
+          {% endfor %}
+          {% if not prefilled_requested and not options.recipient_share_items %}
+            <p class="trades-empty">No items to choose from in their shared Showcase.</p>
+          {% endif %}
+        </div>
+      </section>
+
+      <section class="panel">
+        <h3 class="panel-title">Your cards (offered)</h3>
+        <p class="muted">Pick items from your own placed inventory to offer in exchange.</p>
+        {% if options.proposer_inventory %}
+          <div class="trade-pick-grid" id="offered-grid">
+            {% for inv in options.proposer_inventory %}
+              <div class="trade-pick-item"
+                   data-inventory-row-id="{{ inv.inventory_row_id }}"
+                   data-available="{{ inv.quantity }}">
+                <div class="trade-pick-card">
+                  <div class="trade-pick-name">{{ inv.card.name }}</div>
+                  <div class="trade-pick-meta">
+                    {{ inv.card.set_code | upper }} #{{ inv.card.collector_number }} &middot;
+                    {{ inv.finish | capitalize }} &middot;
+                    you own {{ inv.quantity }}
+                  </div>
+                </div>
+                <button type="button" class="btn-like trade-pick-add"
+                        data-inventory-row-id="{{ inv.inventory_row_id }}"
+                        data-available="{{ inv.quantity }}">Add</button>
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <p class="trades-empty">You don't have any placed inventory to offer.</p>
+        {% endif %}
+      </section>
+
+      <section class="panel">
+        <h3 class="panel-title">Note (optional)</h3>
+        <textarea name="proposer_note" rows="3" placeholder="A short note for the recipient — context, deadlines, dealer's choice on which finish, whatever."></textarea>
+      </section>
+
+      <section class="panel">
+        <div class="trade-new-submit">
+          <button type="submit" class="btn-like" id="trade-new-submit-btn">Send proposal</button>
+          <a class="btn-like-secondary" href="/trades">Cancel</a>
+        </div>
+      </section>
+    </form>
+  {% endif %}
+
+  <script>
+    (function () {
+      // Trade construction JS. Tracks selected items per side via Maps
+      // keyed on the identity id (showcase_item_id for requested,
+      // inventory_row_id for offered). Each entry stores the qty +
+      // available cap. On submit, serializes both Maps into the hidden
+      // JSON fields the route expects.
+      var form = document.getElementById('trade-new-form');
+      if (!form) return;
+      var offered = new Map(); // inventory_row_id -> {quantity}
+      var requested = new Map(); // showcase_item_id -> {quantity}
+
+      // Pre-fill requested from server-rendered prefilled rows.
+      document.querySelectorAll('#requested-grid .trade-pick-prefilled').forEach(function (el) {
+        var id = parseInt(el.getAttribute('data-showcase-item-id'), 10);
+        var available = parseInt(el.getAttribute('data-available'), 10) || 1;
+        if (id) requested.set(id, { quantity: Math.min(1, available) });
+      });
+
+      function serialize() {
+        document.getElementById('offered-json').value = JSON.stringify(
+          Array.from(offered.entries()).map(function (entry) {
+            return { inventory_row_id: entry[0], quantity: entry[1].quantity };
+          })
+        );
+        document.getElementById('requested-json').value = JSON.stringify(
+          Array.from(requested.entries()).map(function (entry) {
+            return { showcase_item_id: entry[0], quantity: entry[1].quantity };
+          })
+        );
+      }
+
+      // Click handlers: Add buttons on the requested + offered grids.
+      document.querySelectorAll('#requested-grid .trade-pick-add').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var id = parseInt(btn.getAttribute('data-showcase-item-id'), 10);
+          var available = parseInt(btn.getAttribute('data-available'), 10) || 1;
+          if (!id) return;
+          requested.set(id, { quantity: Math.min(1, available) });
+          btn.disabled = true;
+          btn.textContent = 'Added';
+        });
+      });
+      document.querySelectorAll('#offered-grid .trade-pick-add').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var id = parseInt(btn.getAttribute('data-inventory-row-id'), 10);
+          var available = parseInt(btn.getAttribute('data-available'), 10) || 1;
+          if (!id) return;
+          offered.set(id, { quantity: Math.min(1, available) });
+          btn.disabled = true;
+          btn.textContent = 'Added';
+        });
+      });
+      // Prefilled-item Remove + qty change handlers.
+      document.querySelectorAll('#requested-grid .trade-pick-remove').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var id = parseInt(btn.getAttribute('data-showcase-item-id'), 10);
+          requested.delete(id);
+          var row = btn.closest('.trade-pick-item');
+          if (row) row.style.display = 'none';
+        });
+      });
+      document.querySelectorAll('#requested-grid .trade-pick-qty').forEach(function (input) {
+        input.addEventListener('change', function () {
+          var id = parseInt(input.getAttribute('data-showcase-item-id'), 10);
+          var qty = parseInt(input.value, 10) || 1;
+          if (requested.has(id)) requested.set(id, { quantity: qty });
+        });
+      });
+
+      form.addEventListener('submit', function (e) {
+        serialize();
+        if (offered.size === 0 || requested.size === 0) {
+          e.preventDefault();
+          alert('You need at least one offered card and one requested card.');
+        }
+      });
+    })();
+  </script>
+{% endblock %}
