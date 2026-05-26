@@ -1,167 +1,187 @@
 [
   {
+    "version": "3.30.0",
+    "date": "2026-05-26",
+    "added": [
+      "Goldfish playtester \u2014 a single-player draws-and-curve test for any of your decks. Open it from each deck's detail page via the 'Goldfish this deck' button. Six zones on screen at once (Library, Hand, Battlefield split into Lands + Permanents, Graveyard, Exile, Command), card art from your collection, a hover/focus preview pane, life total, turn counter, and an opening-hand readout that surfaces card count, land count, and average spell mana value.",
+      "Controls: New game, New turn (untap-all + draw), Draw, Untap all, Mulligan (London), Shuffle library, Mill N, Look at top N, life \u00b11 / \u00b15 nudges. Click semantics by zone: left-click a battlefield card to tap or untap it directly; left-click a card anywhere else opens its context menu; the context menu also opens on right-click and on a touch long-press, and every card carries a small kebab in the corner so touch users can find the menu.",
+      "Drag-and-drop onto any zone \u2014 and the room is honest about card type. Drop a land anywhere on the battlefield and it joins the Lands row; drop a non-land anywhere on the battlefield and it joins Permanents. Click-to-play and drag-to-play follow the same rule; there is no way for the two to disagree.",
+      "Mana pool \u2014 a small floating widget at the bottom of the page with one pip per color (W, U, B, R, G, C) plus colorless, manual + / \u2212 steppers on each pip, and a Clear control. Tapping a land prompts for the color it taps for, and that color is added to the pool. Untapping never subtracts. The pool clears on New Turn and on New Game. (A fully-automated pool that knows what each land taps for is a separate later release; it needs new card data the app does not currently store.)",
+      "Browse \u2014 every pile zone (Library, Graveyard, Exile, Command) opens its full contents in a modal browser. Cards in the browser respond to both click (opens the menu, browser stays open) and drag (drag the card straight out onto the table \u2014 the browser closes so the drop targets underneath are reachable). Library browse is the tutor path: cards are shown sorted by mana value, not in draw order, so the browser cannot be used to read the deck top, and closing it reshuffles the library. Look-at-top-N stays a separate action and preserves draw order, scry/surveil-style."
+    ],
+    "refined": [
+      "InventoryRow stays the source of truth. The playtester is strictly read-only against your collection \u2014 nothing it does writes back. The page queries your deck through the existing decks-as-storage-locations chain (Deck \u2192 StorageLocation \u2192 InventoryRow), expands quantities into per-instance cards with stable ids, and runs the entire zone state in your browser. Reload starts fresh; that is the point.",
+      "Commanders land in the Command zone at New game time. Anything tagged with the commander role in your deck shows up in the Command zone; everything else shuffles into the library.",
+      "Card art comes from your local Cartarch cache \u2014 no live Scryfall calls on the playtester page. Cards with no cached art render as a clean text card face (name, mana cost, type line, truncated oracle text) rather than a broken image."
+    ],
+    "resolved": [
+      "Closes the long-running user-requested retention/migration blocker \u2014 the requesting user kept the majority of their decks on Moxfield specifically because of its playtester. Iteration 1 ships the prototype's full scope plus the mana pool. Out of scope and deferred for later: persistent sessions, multiplayer / shared goldfishing, rules enforcement, token / double-faced / split-card special handling, fully-automated mana pool (knows what each land taps for), +1/+1 counters on cards, and other Moxfield-parity items pending tester input on what the workflow actually needs."
+    ],
+    "archivist_note": "The Goldfish room finally opens. A quiet table for one \u2014 no opponent, no rules engine, no obligation to remember anything between visits. Open a deck, shuffle, draw seven, mulligan until the hand feels right, walk through a few turns, see how the deck draws. Tap a land, tell the room which color it makes; the pool keeps the count for you. The point is to feel how a deck plays, not to test whether it can win; the simulation is deliberately loose. Nothing is recorded; reload starts fresh."
+  },
+  {
     "version": "3.29.5",
     "date": "2026-05-26",
     "added": [
-      "Sticky sidebar — Donate is now visible on every page without scrolling. The desktop sidebar becomes its own fixed, viewport-height column with an internal scroll region for the five nav groups and a non-scrolling footer for the Donate link. On long pages (Collection, Sets) the sidebar stays put while the page body scrolls. On short laptop viewports where the nav groups don't all fit at once, the middle region scrolls internally and the wordmark up top + Donate at the bottom stay pinned in view."
+      "Sticky sidebar \u2014 Donate is now visible on every page without scrolling. The desktop sidebar becomes its own fixed, viewport-height column with an internal scroll region for the five nav groups and a non-scrolling footer for the Donate link. On long pages (Collection, Sets) the sidebar stays put while the page body scrolls. On short laptop viewports where the nav groups don't all fit at once, the middle region scrolls internally and the wordmark up top + Donate at the bottom stay pinned in view."
     ],
     "refined": [
-      "The v3.29.3 in-flow bottom-pin (margin-top:auto on the Donate link inside .sidebar-nav) is retired. That mechanism placed Donate at the bottom of the sidebar's natural flow, which only surfaced it after scrolling the page body to the foot — exactly the opposite of what was wanted. The new structure puts Donate in a non-scrolling footer of a sticky 100vh column, so it is visible immediately on every page."
+      "The v3.29.3 in-flow bottom-pin (margin-top:auto on the Donate link inside .sidebar-nav) is retired. That mechanism placed Donate at the bottom of the sidebar's natural flow, which only surfaced it after scrolling the page body to the foot \u2014 exactly the opposite of what was wanted. The new structure puts Donate in a non-scrolling footer of a sticky 100vh column, so it is visible immediately on every page."
     ],
     "resolved": [
-      "Closes the actual cause of the v3.29.3 'Donate is far below the fold on long pages' issue — the sidebar now has its own viewport-height shell and doesn't scroll with the page body."
+      "Closes the actual cause of the v3.29.3 'Donate is far below the fold on long pages' issue \u2014 the sidebar now has its own viewport-height shell and doesn't scroll with the page body."
     ],
-    "archivist_note": "A small structural correction with an outsized effect on whether the donation surface gets seen. The v3.29.3 release pinned Donate to the bottom of the sidebar's flow, which worked in isolation but lost the user's eye on any page tall enough to require scrolling. The fix was not to relocate the Donate link but to give the sidebar the independent viewport-height frame the design always implicitly assumed. The topbar also picks up sticky behaviour on desktop here so the geometry stays clean — the sidebar sits in the space immediately below the topbar, with no gap, on every scroll position. Mobile is deliberately untouched: at ≤768px the sidebar is hidden and the bottom-nav + More menu (which already carries Donate) handles navigation as before."
+    "archivist_note": "A small structural correction with an outsized effect on whether the donation surface gets seen. The v3.29.3 release pinned Donate to the bottom of the sidebar's flow, which worked in isolation but lost the user's eye on any page tall enough to require scrolling. The fix was not to relocate the Donate link but to give the sidebar the independent viewport-height frame the design always implicitly assumed. The topbar also picks up sticky behaviour on desktop here so the geometry stays clean \u2014 the sidebar sits in the space immediately below the topbar, with no gap, on every scroll position. Mobile is deliberately untouched: at \u2264768px the sidebar is hidden and the bottom-nav + More menu (which already carries Donate) handles navigation as before."
   },
   {
     "version": "3.29.4",
     "date": "2026-05-26",
     "added": [
-      "Editorial finish across three pages — the public landing, the Sets index, and the Tokens page. The Folio design language gains its 'The X.' titling voice: 'The ruler of your collection.', 'The Sets.', 'The Tokens.' — short, article-led, terminal period — set in a new self-hosted editorial serif (Source Serif 4). The § motif appears as chapter eyebrows ('§ I — The Volumes', '§ II — Inside') and as centered dividers between sections on the landing page.",
-      "Full-color brand mark on the landing page — the wordmark, the stacked hero mark, and the footer icon are now the same full-color assets the authed app uses. The landing previously carried monochrome white variants, which read as washed out on the warm-charcoal background.",
+      "Editorial finish across three pages \u2014 the public landing, the Sets index, and the Tokens page. The Folio design language gains its 'The X.' titling voice: 'The ruler of your collection.', 'The Sets.', 'The Tokens.' \u2014 short, article-led, terminal period \u2014 set in a new self-hosted editorial serif (Source Serif 4). The \u00a7 motif appears as chapter eyebrows ('\u00a7 I \u2014 The Volumes', '\u00a7 II \u2014 Inside') and as centered dividers between sections on the landing page.",
+      "Full-color brand mark on the landing page \u2014 the wordmark, the stacked hero mark, and the footer icon are now the same full-color assets the authed app uses. The landing previously carried monochrome white variants, which read as washed out on the warm-charcoal background.",
       "A self-hosted editorial display webfont. Source Serif 4 (latin subset, variable woff2; upright + italic) joins Montserrat (body/UI, since v3.27.15) and Newsreader (display italic, since v3.28.1) as the third self-hosted family. Total addition under 100 KB; no runtime CDN dependency. New --font-display token in :root."
     ],
     "refined": [
-      "Sets index — composed editorial cards in a clean grid. Each card carries an eyebrow, the set code in serif display weight, the set name in editorial italic, and a 'unique owned · total copies' meta line. Same data, same /sets/{set_code} link to set detail; the chrome is the upgrade.",
-      "Tokens page — a titled intro panel replaces the compact hero. The table itself is preserved verbatim, including the .col-priority-low / .col-priority-mid responsive column-drop classes and the v3.27.16 .table-wrap horizontal-scroll fallback; the filter bar, +New Token / Bulk Add actions, and per-row Edit popout (with the back-face lookup helper) all work as before.",
-      "Landing-page feature cards now carry roman-numeral markers (i. ii. iii. iv.) and a calmer composition. The four features (Collection tracking · The drawer sorter · Deck analytics · The game tracker) keep their copy verbatim; only the chrome changed."
+      "Sets index \u2014 composed editorial cards in a clean grid. Each card carries an eyebrow, the set code in serif display weight, the set name in editorial italic, and a 'unique owned \u00b7 total copies' meta line. Same data, same /sets/{set_code} link to set detail; the chrome is the upgrade.",
+      "Tokens page \u2014 a titled intro panel replaces the compact hero. The table itself is preserved verbatim, including the .col-priority-low / .col-priority-mid responsive column-drop classes and the v3.27.16 .table-wrap horizontal-scroll fallback; the filter bar, +New Token / Bulk Add actions, and per-row Edit popout (with the back-face lookup helper) all work as before.",
+      "Landing-page feature cards now carry roman-numeral markers (i. ii. iii. iv.) and a calmer composition. The four features (Collection tracking \u00b7 The drawer sorter \u00b7 Deck analytics \u00b7 The game tracker) keep their copy verbatim; only the chrome changed."
     ],
     "resolved": [
-      "The 'a look inside' panels on the landing page now carry real captured screenshots — The Dashboard, Deck analytics, and The game tracker — wired in at /static/img/landing/ as optimized WebP. The three panels are framed consistently with object-fit:cover and object-position:top center so they read as a uniform set across the desktop and tablet-landscape captures; a graceful onerror fallback to the styled placeholder is preserved if any asset fails to load.",
-      "Two stray hyphen-line-break artifacts in the feature-card copy fixed in passing — the 'First-player selection' line in the game-tracker card no longer splits at the hyphen.",
-      "Sets and Tokens page headers brought into line with the rest of the app. The Pending page's shipped pattern (page name in italic Newsreader — 'Pending Placement') is the canonical shape; Sets and Tokens had been carrying the v3.27.17-era 'The Sets.' / 'The Tokens.' upright voice, which predates the v3.28.x Folio cluster. Sets now reads 'Sets', Tokens reads 'Tokens', both in the matching italic register; the Tokens eyebrow also corrected from 'Catalogue · Tokens' to 'Collection · Tokens' (Tokens lives in the Collection nav group)."
+      "The 'a look inside' panels on the landing page now carry real captured screenshots \u2014 The Dashboard, Deck analytics, and The game tracker \u2014 wired in at /static/img/landing/ as optimized WebP. The three panels are framed consistently with object-fit:cover and object-position:top center so they read as a uniform set across the desktop and tablet-landscape captures; a graceful onerror fallback to the styled placeholder is preserved if any asset fails to load.",
+      "Two stray hyphen-line-break artifacts in the feature-card copy fixed in passing \u2014 the 'First-player selection' line in the game-tracker card no longer splits at the hyphen.",
+      "Sets and Tokens page headers brought into line with the rest of the app. The Pending page's shipped pattern (page name in italic Newsreader \u2014 'Pending Placement') is the canonical shape; Sets and Tokens had been carrying the v3.27.17-era 'The Sets.' / 'The Tokens.' upright voice, which predates the v3.28.x Folio cluster. Sets now reads 'Sets', Tokens reads 'Tokens', both in the matching italic register; the Tokens eyebrow also corrected from 'Catalogue \u00b7 Tokens' to 'Collection \u00b7 Tokens' (Tokens lives in the Collection nav group)."
     ],
-    "archivist_note": "Three pages caught up with the rest of the catalogue. The Folio voice — short article-led titles in a printed-page serif, the § motif as a section divider, restrained editorial cards with generous internal air — now reaches the public landing, the Sets index, and the Tokens table that newcomers see first. Source Serif 4 was chosen for its transitional proportions and its wide weight range; it sits alongside Newsreader (the italic display face since v3.28.1) and Montserrat (the body/UI face), keeping the typographic system honest. Several deferred items were named explicitly while we were here — Sets-analytics (per-set completion %, set value, price trend, a Most Pursued panel, completion / era / value facets) and Tokens-analytics (type aggregation, demand and shortage detection, decks running short, print sources) — each is its own design conversation and its own precompute story; a per-set completion % computed at request time would have meant doing Scryfall completion for every set on every visit to the index, the kind of cold-render cost the project has been scarred by before."
+    "archivist_note": "Three pages caught up with the rest of the catalogue. The Folio voice \u2014 short article-led titles in a printed-page serif, the \u00a7 motif as a section divider, restrained editorial cards with generous internal air \u2014 now reaches the public landing, the Sets index, and the Tokens table that newcomers see first. Source Serif 4 was chosen for its transitional proportions and its wide weight range; it sits alongside Newsreader (the italic display face since v3.28.1) and Montserrat (the body/UI face), keeping the typographic system honest. Several deferred items were named explicitly while we were here \u2014 Sets-analytics (per-set completion %, set value, price trend, a Most Pursued panel, completion / era / value facets) and Tokens-analytics (type aggregation, demand and shortage detection, decks running short, print sources) \u2014 each is its own design conversation and its own precompute story; a per-set completion % computed at request time would have meant doing Scryfall completion for every set on every visit to the index, the kind of cold-render cost the project has been scarred by before."
   },
   {
     "version": "3.29.3",
     "date": "2026-05-26",
     "added": [
-      "Donate link in the sidebar (pinned at the bottom, visually distinct from the five nav groups) and mirrored into the mobile More menu. Opens cartarch's Ko-fi page (https://ko-fi.com/coruscantsunrise) in a new tab. Donation-only — there is no paid tier and there will not be one for any Scryfall-derived feature (search, card data, images, set browsing, card-data analytics). Tipping is welcome; the app does not gate anything behind payment.",
-      "The landing page's 'Support the project' card now points at the live Ko-fi page (it had carried a TODO placeholder URL since v3.27.17 brand assets shipped). Wording stays donation-flavored ('consider a donation' rather than 'Buy' / 'Get' / 'Unlock') — the discipline is deliberate."
+      "Donate link in the sidebar (pinned at the bottom, visually distinct from the five nav groups) and mirrored into the mobile More menu. Opens cartarch's Ko-fi page (https://ko-fi.com/coruscantsunrise) in a new tab. Donation-only \u2014 there is no paid tier and there will not be one for any Scryfall-derived feature (search, card data, images, set browsing, card-data analytics). Tipping is welcome; the app does not gate anything behind payment.",
+      "The landing page's 'Support the project' card now points at the live Ko-fi page (it had carried a TODO placeholder URL since v3.27.17 brand assets shipped). Wording stays donation-flavored ('consider a donation' rather than 'Buy' / 'Get' / 'Unlock') \u2014 the discipline is deliberate."
     ],
     "refined": [],
     "resolved": [
       "Closes the long-standing TODO on the landing page support card (placeholder href left from v3.27.17 brand assets + landing page)."
     ],
-    "archivist_note": "External-link-only release. No Python, no route, no migration, no model change — three files (base.html, landing.html, style.css) plus the four memory artifacts and the version bump. The Donate link reads as a support ask rather than navigation because it is one; the gold-accent treatment uses the existing --brand-gold / --brand-gold-soft tokens so it sits inside the established Folio palette without inventing anything new. If the project ever does grow a paid tier, it cannot run through any Scryfall-derived surface — Scryfall's data-use guidelines explicitly forbid that and the roadmap's Commercial Optionality section records it. A donation link that gates nothing IS permitted, and is what shipped here."
+    "archivist_note": "External-link-only release. No Python, no route, no migration, no model change \u2014 three files (base.html, landing.html, style.css) plus the four memory artifacts and the version bump. The Donate link reads as a support ask rather than navigation because it is one; the gold-accent treatment uses the existing --brand-gold / --brand-gold-soft tokens so it sits inside the established Folio palette without inventing anything new. If the project ever does grow a paid tier, it cannot run through any Scryfall-derived surface \u2014 Scryfall's data-use guidelines explicitly forbid that and the roadmap's Commercial Optionality section records it. A donation link that gates nothing IS permitted, and is what shipped here."
   },
   {
     "version": "3.29.2",
     "date": "2026-05-25",
     "added": [
-      "Trades. A new page (Play → Trades) where you propose a card trade with a co-member of one of your playgroups. The other party accepts, declines, or you cancel. Two parties, one trade record, on the take-it-or-leave-it model.",
-      "Propose-from-share. When you're browsing a co-member's shared Showcase, every card now carries a small ‘Propose trade for this' link. Click it and Cartarch jumps you to the trade construction page with the recipient + playgroup pre-locked and that card already in your requested column. Pick what you'd offer back from your own inventory, write a short note if you'd like, send.",
-      "An inbox at /trades with three sections — what's awaiting your action (proposed trades where you are the recipient), your open proposals (proposed trades you've sent), and recent closed trades (accepted, declined, cancelled, or auto-abandoned). The sidebar nav carries a small badge with the count of trades awaiting you, so you don't have to remember to check.",
-      "Trade agreed. When the recipient accepts, both of you see a ‘Trade agreed' panel pointing at the existing Move / Adjust-quantity affordances. Cartarch records that you agreed; you and the other party handle the physical exchange on your own time, then each updates your own inventory manually.",
+      "Trades. A new page (Play \u2192 Trades) where you propose a card trade with a co-member of one of your playgroups. The other party accepts, declines, or you cancel. Two parties, one trade record, on the take-it-or-leave-it model.",
+      "Propose-from-share. When you're browsing a co-member's shared Showcase, every card now carries a small \u2018Propose trade for this' link. Click it and Cartarch jumps you to the trade construction page with the recipient + playgroup pre-locked and that card already in your requested column. Pick what you'd offer back from your own inventory, write a short note if you'd like, send.",
+      "An inbox at /trades with three sections \u2014 what's awaiting your action (proposed trades where you are the recipient), your open proposals (proposed trades you've sent), and recent closed trades (accepted, declined, cancelled, or auto-abandoned). The sidebar nav carries a small badge with the count of trades awaiting you, so you don't have to remember to check.",
+      "Trade agreed. When the recipient accepts, both of you see a \u2018Trade agreed' panel pointing at the existing Move / Adjust-quantity affordances. Cartarch records that you agreed; you and the other party handle the physical exchange on your own time, then each updates your own inventory manually.",
       "v3.29.x social-features minor COMPLETE. Three releases in a single day closed the arc: v3.29.0 Playgroups (who), v3.29.1 Collection sharing (what's visible), v3.29.2 Pairwise trading (the transaction). The next release picks up the unrelated v3.30.0 Goldfish playtester thread."
     ],
     "refined": [
-      "Recording-only by design. A trade is a record of an agreement; Cartarch never moves inventory between accounts. This is the conservative line — the cross-account inventory write is a v4 design item, gated on Postgres-grade transactions — and it has a small dividend in the meantime: trades are inspectable, reversible without dataset hygiene, and the durable historical record never needs to know what physical reality did or didn't do.",
+      "Recording-only by design. A trade is a record of an agreement; Cartarch never moves inventory between accounts. This is the conservative line \u2014 the cross-account inventory write is a v4 design item, gated on Postgres-grade transactions \u2014 and it has a small dividend in the meantime: trades are inspectable, reversible without dataset hygiene, and the durable historical record never needs to know what physical reality did or didn't do.",
       "Identity that survives time. Every accepted/declined/cancelled/abandoned trade captures a snapshot of who the parties were and what cards were on each side at the moment of closure. The live links to InventoryRow / Card / playgroup stay populated while they exist, so the detail page keeps its image art and current prices; but if a card is edited, an inventory row is deleted, or someone's account is closed entirely, the historical record reads exactly as it did the day the trade closed.",
-      "Requested items come from the recipient's shared Showcase, period. There's no free-text ‘ask for a card not in their Showcase' yet. If you want something from a co-member that isn't on their Showcase, ask them to add it first — or let the watchlist do its job and add it to your own watchlist. Want-driven trade matching is a separate future thread.",
-      "Re-negotiation by decline-and-re-propose. There is no counter-offer button at v3.29.2. If a trade isn't quite right, decline it and propose your own variant. The first counter-offer slot, if it ever ships, lives in a future v3.29.x.1 follow-up — the take-it-or-leave-it loop is the v1 scope."
+      "Requested items come from the recipient's shared Showcase, period. There's no free-text \u2018ask for a card not in their Showcase' yet. If you want something from a co-member that isn't on their Showcase, ask them to add it first \u2014 or let the watchlist do its job and add it to your own watchlist. Want-driven trade matching is a separate future thread.",
+      "Re-negotiation by decline-and-re-propose. There is no counter-offer button at v3.29.2. If a trade isn't quite right, decline it and propose your own variant. The first counter-offer slot, if it ever ships, lives in a future v3.29.x.1 follow-up \u2014 the take-it-or-leave-it loop is the v1 scope."
     ],
     "resolved": [
-      "Lifecycle integration is comprehensive. Leaving a playgroup auto-abandons your in-flight trades scoped to that playgroup. Being removed by an owner does the same. Deleting a playgroup auto-abandons every pending trade for it AND nulls the playgroup link on terminal trades (the historical record stays readable). Deleting a card from your inventory auto-abandons any pending trade that referenced it. Removing a card from your Showcase nulls the navigation link on existing trades but never touches the trade itself — the trade runs against the underlying inventory row, not the Showcase entry. Admin-deleting a user account closes every pending trade involving them and nulls the FK references on terminal trades, preserving the snapshot identity.",
-      "Both parties see each other's items, but only what they need to. The detail page renders card identity, finish, and quantity — nothing about where the other person stores the card, what notes they put on it, or any of the dozens of other private InventoryRow attributes. Whitelist-by-construction; absence is the privacy guarantee. Verified at the rendered-HTML level."
+      "Lifecycle integration is comprehensive. Leaving a playgroup auto-abandons your in-flight trades scoped to that playgroup. Being removed by an owner does the same. Deleting a playgroup auto-abandons every pending trade for it AND nulls the playgroup link on terminal trades (the historical record stays readable). Deleting a card from your inventory auto-abandons any pending trade that referenced it. Removing a card from your Showcase nulls the navigation link on existing trades but never touches the trade itself \u2014 the trade runs against the underlying inventory row, not the Showcase entry. Admin-deleting a user account closes every pending trade involving them and nulls the FK references on terminal trades, preserving the snapshot identity.",
+      "Both parties see each other's items, but only what they need to. The detail page renders card identity, finish, and quantity \u2014 nothing about where the other person stores the card, what notes they put on it, or any of the dozens of other private InventoryRow attributes. Whitelist-by-construction; absence is the privacy guarantee. Verified at the rendered-HTML level."
     ],
-    "archivist_note": "We started the day with three sub-releases planned and finished it with three sub-releases shipped. v3.29.0 set the membership floor; v3.29.1 made collections visible across that floor; v3.29.2 made transactions across that visibility. Recording-only was a real choice, not a compromise — the simpler the v1 contract, the easier the v4 inventory-execution work will be when it arrives. The arc closes. Tomorrow is goldfish."
+    "archivist_note": "We started the day with three sub-releases planned and finished it with three sub-releases shipped. v3.29.0 set the membership floor; v3.29.1 made collections visible across that floor; v3.29.2 made transactions across that visibility. Recording-only was a real choice, not a compromise \u2014 the simpler the v1 contract, the easier the v4 inventory-execution work will be when it arrives. The arc closes. Tomorrow is goldfish."
   },
   {
     "version": "3.29.1",
     "date": "2026-05-25",
     "added": [
-      "Showcase. A new page (Play → Showcase) where you curate a list of cards from your collection — the ones you'd want to show off, trade away, or simply highlight. Open any card's Actions menu on the Collection page and click ‘Add to Showcase'; the card lands in your Showcase with a default offered quantity of 1. Edit the offered quantity any time. Removing a card from your Showcase doesn't touch your inventory.",
-      "Shares. A second new page (Play → Shares) where you take your Showcase and expose it, read-only, to a playgroup of your choice. Pick the playgroup, click Share, and members of that playgroup see your Showcase listed on their playgroup's detail page. They can click through to view your curated cards, but they cannot edit, comment, or otherwise touch anything — it's glance-only.",
-      "Available quantity that follows the inventory automatically. If you offer 3 copies of a card and later sell 2, the share view drops to ‘Qty 1' on its own. No bookkeeping to do — the displayed available is the smaller of what you offered and what's currently in your collection, computed every time the share is viewed.",
-      "Revoke a share whenever you want, from your Shares page. The share row goes away (no soft-revoke; it really is gone). Your Showcase itself is untouched — revoking only takes back the act of exposing it to that playgroup."
+      "Showcase. A new page (Play \u2192 Showcase) where you curate a list of cards from your collection \u2014 the ones you'd want to show off, trade away, or simply highlight. Open any card's Actions menu on the Collection page and click \u2018Add to Showcase'; the card lands in your Showcase with a default offered quantity of 1. Edit the offered quantity any time. Removing a card from your Showcase doesn't touch your inventory.",
+      "Shares. A second new page (Play \u2192 Shares) where you take your Showcase and expose it, read-only, to a playgroup of your choice. Pick the playgroup, click Share, and members of that playgroup see your Showcase listed on their playgroup's detail page. They can click through to view your curated cards, but they cannot edit, comment, or otherwise touch anything \u2014 it's glance-only.",
+      "Available quantity that follows the inventory automatically. If you offer 3 copies of a card and later sell 2, the share view drops to \u2018Qty 1' on its own. No bookkeeping to do \u2014 the displayed available is the smaller of what you offered and what's currently in your collection, computed every time the share is viewed.",
+      "Revoke a share whenever you want, from your Shares page. The share row goes away (no soft-revoke; it really is gone). Your Showcase itself is untouched \u2014 revoking only takes back the act of exposing it to that playgroup."
     ],
     "refined": [
-      "Showcase ≠ Share — a deliberate two-name discipline. The Showcase is what you keep; the Share is one act of exposing it to one playgroup. You can share the same Showcase to multiple playgroups (each becomes its own Share row, each is independently revocable), and revoking any share never touches the Showcase or your inventory.",
+      "Showcase \u2260 Share \u2014 a deliberate two-name discipline. The Showcase is what you keep; the Share is one act of exposing it to one playgroup. You can share the same Showcase to multiple playgroups (each becomes its own Share row, each is independently revocable), and revoking any share never touches the Showcase or your inventory.",
       "Privacy is built into the design, not bolted on. The shared view shows only card identity (name, set, collector number, image, mana cost, type, oracle text, rarity, prices, legalities), finish, language, proxy badge, and the computed available quantity. It NEVER shows your private InventoryRow notes, tags, deck role, pending status, or which drawer/slot/location the card lives in. The list of allowed fields is whitelisted at the source; everything else is excluded by construction.",
-      "Sharing scopes to playgroup membership. Viewers must be in the playgroup the share targets — non-members get a non-leaky redirect that doesn't distinguish ‘exists but you can't see it' from ‘doesn't exist'. This consumes the v3.29.0 Playgroups substrate directly — the share's audience is the chosen playgroup specifically, not your wider social graph.",
+      "Sharing scopes to playgroup membership. Viewers must be in the playgroup the share targets \u2014 non-members get a non-leaky redirect that doesn't distinguish \u2018exists but you can't see it' from \u2018doesn't exist'. This consumes the v3.29.0 Playgroups substrate directly \u2014 the share's audience is the chosen playgroup specifically, not your wider social graph.",
       "Lifecycle is cleaned up everywhere it matters: when you leave a playgroup, your shares to it go away. When an owner removes a member, that member's shares to it go away. When a playgroup is deleted, every share targeting it goes away. When an InventoryRow is deleted, the related Showcase item is cleaned up first. When an account is deleted, the user's shares, Showcase, and all Showcase items go with it."
     ],
     "resolved": [
-      "Several smaller decisions land here that the original sharing roadmap had left as open questions. Quantity is computed, not stored — no drift when you sell. There's exactly one Showcase per user at v3.29.1 (one place to curate; a future multi-showcase release is a small change). Revoke is hard-delete, not soft. Only the binder/curated-list mode ships in v3.29.1; full-collection and saved-search sharing modes are deferred. Public unauthenticated links are deferred entirely — those require a separate privacy review, rate-limiting, and a different revocation model before they can responsibly ship.",
-      "Read-only at v3.29.1. The trade-proposal capability — recipient picks cards from the sharer's Showcase and offers cards back — is v3.29.2 Pairwise trading territory, the next release of the v3.29.x social-features minor."
+      "Several smaller decisions land here that the original sharing roadmap had left as open questions. Quantity is computed, not stored \u2014 no drift when you sell. There's exactly one Showcase per user at v3.29.1 (one place to curate; a future multi-showcase release is a small change). Revoke is hard-delete, not soft. Only the binder/curated-list mode ships in v3.29.1; full-collection and saved-search sharing modes are deferred. Public unauthenticated links are deferred entirely \u2014 those require a separate privacy review, rate-limiting, and a different revocation model before they can responsibly ship.",
+      "Read-only at v3.29.1. The trade-proposal capability \u2014 recipient picks cards from the sharer's Showcase and offers cards back \u2014 is v3.29.2 Pairwise trading territory, the next release of the v3.29.x social-features minor."
     ],
-    "archivist_note": "The middle of the v3.29.x arc. Playgroups gave us ‘the people you play with' as a real thing in the schema. Collection sharing gives one of those people something to show the others — and does so in a way that makes the privacy boundary the most important design property of the release. We deliberately wrap the live Card object in a whitelisting proxy before letting any template render it: a future template change can't accidentally reach a non-whitelisted field, because accessing one raises immediately. The Showcase-versus-Share split is the other discipline we wanted to be loud about. They sound similar; they are not. The Showcase is the curated list you tend. A Share is one act of exposing that list to one audience. You can share the same Showcase to two playgroups, revoke one without touching the other, and revoke both without touching the Showcase. v3.29.2 — Pairwise trading — comes next, and it builds on the same primitive: a curated list of haves, scoped to who you trade with."
+    "archivist_note": "The middle of the v3.29.x arc. Playgroups gave us \u2018the people you play with' as a real thing in the schema. Collection sharing gives one of those people something to show the others \u2014 and does so in a way that makes the privacy boundary the most important design property of the release. We deliberately wrap the live Card object in a whitelisting proxy before letting any template render it: a future template change can't accidentally reach a non-whitelisted field, because accessing one raises immediately. The Showcase-versus-Share split is the other discipline we wanted to be loud about. They sound similar; they are not. The Showcase is the curated list you tend. A Share is one act of exposing that list to one audience. You can share the same Showcase to two playgroups, revoke one without touching the other, and revoke both without touching the Showcase. v3.29.2 \u2014 Pairwise trading \u2014 comes next, and it builds on the same primitive: a curated list of haves, scoped to who you trade with."
   },
   {
     "version": "3.29.0",
     "date": "2026-05-25",
     "added": [
-      "Playgroups. Create a playgroup — a Friday-night pod, an LGS group, a remote regular — and share its join code with the people you play with. They enter the code on their Playgroups page and you'll find each other in the game-tracker's people-picker on the New Game screen.",
-      "Multiple memberships per user — you can belong to as many playgroups as you have. The game-tracker picker shows everyone you share a playgroup with, deduplicated.",
+      "Playgroups. Create a playgroup \u2014 a Friday-night pod, an LGS group, a remote regular \u2014 and share its join code with the people you play with. They enter the code on their Playgroups page and you'll find each other in the game-tracker's people-picker on the New Game screen.",
+      "Multiple memberships per user \u2014 you can belong to as many playgroups as you have. The game-tracker picker shows everyone you share a playgroup with, deduplicated.",
       "Owner controls on a playgroup's detail page: rename, edit notes, transfer ownership to another member, remove members, regenerate or disable the join code, and delete the playgroup (a type-the-name confirmation gate keeps the destructive action deliberate). Any member can view and share the active join code; only the owner regenerates or disables it.",
-      "If you're the only owner of a playgroup, you can't leave — transfer ownership to another member first, or delete the playgroup. A playgroup that reaches zero members is auto-deleted."
+      "If you're the only owner of a playgroup, you can't leave \u2014 transfer ownership to another member first, or delete the playgroup. A playgroup that reaches zero members is auto-deleted."
     ],
     "refined": [
-      "The game-tracker people-picker now scopes to your playgroups instead of every account on the instance. If you're not in any playgroup yet — or if you're alone in one — the picker falls back to the global active-user list, so day-one the experience is unchanged for anyone who hasn't created or joined a playgroup. Once you have at least one co-member, the picker narrows to those people.",
-      "Free-text guest seats (the ‘— no user —’ option, for playing with friends who don't have a Cartarch account) are untouched. Playgroups scope the registered-user dropdown only; the guest path remains."
+      "The game-tracker people-picker now scopes to your playgroups instead of every account on the instance. If you're not in any playgroup yet \u2014 or if you're alone in one \u2014 the picker falls back to the global active-user list, so day-one the experience is unchanged for anyone who hasn't created or joined a playgroup. Once you have at least one co-member, the picker narrows to those people.",
+      "Free-text guest seats (the \u2018\u2014 no user \u2014\u2019 option, for playing with friends who don't have a Cartarch account) are untouched. Playgroups scope the registered-user dropdown only; the guest path remains."
     ],
     "resolved": [
-      "The v3.27.5 game-tracker seat→user picker had been drawing from every active account on the instance — fine for a single-user install, awkward as the user base grows. Playgroups is the substrate that lets every social surface — sharing, trading — scope to ‘your people’ instead of ‘everyone’."
+      "The v3.27.5 game-tracker seat\u2192user picker had been drawing from every active account on the instance \u2014 fine for a single-user install, awkward as the user base grows. Playgroups is the substrate that lets every social surface \u2014 sharing, trading \u2014 scope to \u2018your people\u2019 instead of \u2018everyone\u2019."
     ],
-    "archivist_note": "The opener of v3.29.x — the social-features arc. Two more releases come after this one (v3.29.1 Collection sharing, v3.29.2 Pairwise trading), and both consume the same primitive Playgroups establishes: ‘the people you share a group with’. Build that membership scope once, first; sharing and trading then land on top without re-inventing the share-target picker each time. The v3.29.0 model is deliberately small — two tables, two roles (owner + member), one invite mechanism (a code you share). Email invites and richer roles are deferred. The bigger philosophical decision sits in the docstring on the Playgroup model: a v3.29.0 Playgroup is a *social grouping*, not a *tenancy boundary*. The v4 Postgres migration will revisit what that distinction means for data isolation, but v3.29.0 leaves it open."
+    "archivist_note": "The opener of v3.29.x \u2014 the social-features arc. Two more releases come after this one (v3.29.1 Collection sharing, v3.29.2 Pairwise trading), and both consume the same primitive Playgroups establishes: \u2018the people you share a group with\u2019. Build that membership scope once, first; sharing and trading then land on top without re-inventing the share-target picker each time. The v3.29.0 model is deliberately small \u2014 two tables, two roles (owner + member), one invite mechanism (a code you share). Email invites and richer roles are deferred. The bigger philosophical decision sits in the docstring on the Playgroup model: a v3.29.0 Playgroup is a *social grouping*, not a *tenancy boundary*. The v4 Postgres migration will revisit what that distinction means for data isolation, but v3.29.0 leaves it open."
   },
   {
     "version": "3.28.13",
     "date": "2026-05-25",
     "added": [
-      "Multiple counters per seat in the live game tracker. Track Poison and Experience and a Rad counter simultaneously — each on its own pill, each with its own ± buttons, each removable. The single-typed-counter widget that had been there since v3.26.5 lifts to an array; the curated types (Rad, Poison, Experience, Energy, Storm) and a Custom slot with a freeform label remain. Add a counter via the small '+ ctr' button on each seat panel.",
+      "Multiple counters per seat in the live game tracker. Track Poison and Experience and a Rad counter simultaneously \u2014 each on its own pill, each with its own \u00b1 buttons, each removable. The single-typed-counter widget that had been there since v3.26.5 lifts to an array; the curated types (Rad, Poison, Experience, Energy, Storm) and a Custom slot with a freeform label remain. Add a counter via the small '+ ctr' button on each seat panel.",
       "A Pause button in the masthead. Pauses the displayed game-elapsed and the active turn's elapsed; resume continues from where you left off. Per-seat clock-on-clock stays unpaused because that's a per-player timing record, not a wall-clock affordance.",
-      "Elimination now stamps the turn it happened on — the pill reads 'Eliminated · T10'. Manual eliminate, manual revive, and the auto-elim from 0 life / 10 poison / 21 commander damage all set the stamp; revive clears it.",
-      "A § Chronicle strip across the bottom of the tracker — recent actions with their clock times, and a 'Last action' readout on the far right. Replaces the cramped history bar that used to float at the bottom edge.",
-      "A Damage Matrix modal. The new always-visible commander-damage strip on each seat panel shows what they've taken from each opponent; click any strip cell to open the full N×N matrix scoped to that receiver. Add or subtract damage in the matrix; the strip updates live."
+      "Elimination now stamps the turn it happened on \u2014 the pill reads 'Eliminated \u00b7 T10'. Manual eliminate, manual revive, and the auto-elim from 0 life / 10 poison / 21 commander damage all set the stamp; revive clears it.",
+      "A \u00a7 Chronicle strip across the bottom of the tracker \u2014 recent actions with their clock times, and a 'Last action' readout on the far right. Replaces the cramped history bar that used to float at the bottom edge.",
+      "A Damage Matrix modal. The new always-visible commander-damage strip on each seat panel shows what they've taken from each opponent; click any strip cell to open the full N\u00d7N matrix scoped to that receiver. Add or subtract damage in the matrix; the strip updates live."
     ],
     "refined": [
-      "The live game tracker is now in the Folio editorial palette. Warm-charcoal background, italic Newsreader life numerals, the brass-stamp § eyebrow on the bottom Chronicle, the gold End-turn button. The seat panels carry the commander art behind them (unchanged from v3.26.1) and the per-seat current-turn cue moved from the old center indicator's border to a thickened active-panel border in the player's color.",
-      "The floating turn indicator at the center of the table is gone. Turn number and the current player's name moved up into the masthead ('Turn 11 · Marina to act'); the game-elapsed and current-turn timers moved into the masthead's right stat cluster; the End Turn button moved into the bottom bar. The center cell is back to being playmat space.",
-      "The per-seat commander damage strip is always visible now (it used to be tucked behind a 'Commander Damage ▸' details summary). One cell per opponent, color escalates to amber at 16 and red at 21. The strip is read-only as a glance — open the new Damage Matrix modal to actually edit values."
+      "The live game tracker is now in the Folio editorial palette. Warm-charcoal background, italic Newsreader life numerals, the brass-stamp \u00a7 eyebrow on the bottom Chronicle, the gold End-turn button. The seat panels carry the commander art behind them (unchanged from v3.26.1) and the per-seat current-turn cue moved from the old center indicator's border to a thickened active-panel border in the player's color.",
+      "The floating turn indicator at the center of the table is gone. Turn number and the current player's name moved up into the masthead ('Turn 11 \u00b7 Marina to act'); the game-elapsed and current-turn timers moved into the masthead's right stat cluster; the End Turn button moved into the bottom bar. The center cell is back to being playmat space.",
+      "The per-seat commander damage strip is always visible now (it used to be tucked behind a 'Commander Damage \u25b8' details summary). One cell per opponent, color escalates to amber at 16 and red at 21. The strip is read-only as a glance \u2014 open the new Damage Matrix modal to actually edit values."
     ],
     "resolved": [
-      "The tracker had been left on the pre-Folio navy app while every other surface moved to warm-charcoal Folio in the v3.28.x cluster — the initial recon sized it 'polish only' by measuring features (the tracker is functionally ahead of the design package it was checked against), and the v3.28.3 editorial sweep deliberately skipped it because it has no standard page header. This release closes that gap. The Folio cluster, marked complete at v3.28.12, is re-opened for v3.28.13 and re-closed."
+      "The tracker had been left on the pre-Folio navy app while every other surface moved to warm-charcoal Folio in the v3.28.x cluster \u2014 the initial recon sized it 'polish only' by measuring features (the tracker is functionally ahead of the design package it was checked against), and the v3.28.3 editorial sweep deliberately skipped it because it has no standard page header. This release closes that gap. The Folio cluster, marked complete at v3.28.12, is re-opened for v3.28.13 and re-closed."
     ],
-    "archivist_note": "We thought the cluster was finished. A second look at the tracker showed it wasn't — not the features, which lead the design canvas, but the layout: the masthead, the bottom Chronicle, the editorial life numerals, the warm-charcoal palette. So the cluster reopens for one more release and re-closes. The tracker is now the cluster's largest single redesign — three new bands replace the floating-overlay model that had quietly accumulated since v3.26 — and carries the cluster's most consequential state-shape change too: counters can be concurrent now. Add a Poison pill to a seat that already has an Experience pill; both live independently, both follow their own escalation rules, neither displaces the other. The Pause button finally exists. The Damage Matrix modal finally exists. The cluster, again, is complete."
+    "archivist_note": "We thought the cluster was finished. A second look at the tracker showed it wasn't \u2014 not the features, which lead the design canvas, but the layout: the masthead, the bottom Chronicle, the editorial life numerals, the warm-charcoal palette. So the cluster reopens for one more release and re-closes. The tracker is now the cluster's largest single redesign \u2014 three new bands replace the floating-overlay model that had quietly accumulated since v3.26 \u2014 and carries the cluster's most consequential state-shape change too: counters can be concurrent now. Add a Poison pill to a seat that already has an Experience pill; both live independently, both follow their own escalation rules, neither displaces the other. The Pause button finally exists. The Damage Matrix modal finally exists. The cluster, again, is complete."
   },
   {
     "version": "3.28.12",
     "date": "2026-05-25",
     "added": [],
     "refined": [
-      "Mobile bottom-nav now reads Home / Collection / Pending / Decks / More. Pending — the placement-workflow surface — earns the primary tab; Games moves into the More menu alongside Watchlist and Chronicle. The More menu now reaches every destination the desktop sidebar carries (Watchlist and Chronicle had been missing); ordering follows the desktop sidebar's nav groups so the mental map carries between the two surfaces."
+      "Mobile bottom-nav now reads Home / Collection / Pending / Decks / More. Pending \u2014 the placement-workflow surface \u2014 earns the primary tab; Games moves into the More menu alongside Watchlist and Chronicle. The More menu now reaches every destination the desktop sidebar carries (Watchlist and Chronicle had been missing); ordering follows the desktop sidebar's nav groups so the mental map carries between the two surfaces."
     ],
     "resolved": [
-      "Verification sweep of every Folio-redesigned page (Dashboard, Collection, Decks, Pending, Locations, Import, Watchlist, Games, Sets, Tokens, Decklist, Chronicle, Account) at three viewport widths (980px / 768px / 375px) — every page passes at every width: no horizontal overflow, the sidebar correctly hides at ≤768px, the bottom-nav correctly appears at ≤768px, and the topbar holds at 72px consistently. The cluster's 'built responsive on purpose' intent — every release from v3.28.3 onward carries its own ≤980px and ≤768px breakpoints by design — is borne out by evidence. This release is a verify-and-polish pass, not a rebuild."
+      "Verification sweep of every Folio-redesigned page (Dashboard, Collection, Decks, Pending, Locations, Import, Watchlist, Games, Sets, Tokens, Decklist, Chronicle, Account) at three viewport widths (980px / 768px / 375px) \u2014 every page passes at every width: no horizontal overflow, the sidebar correctly hides at \u2264768px, the bottom-nav correctly appears at \u2264768px, and the topbar holds at 72px consistently. The cluster's 'built responsive on purpose' intent \u2014 every release from v3.28.3 onward carries its own \u2264980px and \u2264768px breakpoints by design \u2014 is borne out by evidence. This release is a verify-and-polish pass, not a rebuild."
     ],
-    "archivist_note": "The cluster closer. Folio shipped over thirteen releases — foundation, palette, Chronicle surface, editorial sweep, Auth, Dashboard, Locations, smaller-page polish, Collection, the corrective patch, Imports polish, Watchlist target prices — and ends here, with the mobile pass that the rest of the cluster was building toward. The discipline of v3.28.12 was the opposite of every release before it: don't invent work. Every Folio release was built responsive on purpose; the sweep had to confirm that intent and reach for fixes only when defects existed. The only defect found was the bottom-nav IA — Pending should have been a primary tab, Watchlist and Chronicle and Games should have been reachable in More. Fixed. The cluster is complete. Next: v3.29.0 opens with Playgroups, then sharing-flavored work."
+    "archivist_note": "The cluster closer. Folio shipped over thirteen releases \u2014 foundation, palette, Chronicle surface, editorial sweep, Auth, Dashboard, Locations, smaller-page polish, Collection, the corrective patch, Imports polish, Watchlist target prices \u2014 and ends here, with the mobile pass that the rest of the cluster was building toward. The discipline of v3.28.12 was the opposite of every release before it: don't invent work. Every Folio release was built responsive on purpose; the sweep had to confirm that intent and reach for fixes only when defects existed. The only defect found was the bottom-nav IA \u2014 Pending should have been a primary tab, Watchlist and Chronicle and Games should have been reachable in More. Fixed. The cluster is complete. Next: v3.29.0 opens with Playgroups, then sharing-flavored work."
   },
   {
     "version": "3.28.11",
     "date": "2026-05-25",
     "added": [
-      "Set a target price on any watchlist row. Type the dollar amount in the new Target column's inline editor — same shape as the existing Note editor — and Cartarch marks the row the moment the current price meets it (✓ before the price, soft gold-bordered row highlight). Clear the target by saving an empty value.",
-      "Two new columns on the watchlist table: Current (the lowest current price for the card — cheapest finish for a printing-specific watch, lowest across all printings for a name watch) and Target (your buy-target with the inline edit). The existing Watch type / Owned / Added / Note columns are unchanged."
+      "Set a target price on any watchlist row. Type the dollar amount in the new Target column's inline editor \u2014 same shape as the existing Note editor \u2014 and Cartarch marks the row the moment the current price meets it (\u2713 before the price, soft gold-bordered row highlight). Clear the target by saving an empty value.",
+      "Two new columns on the watchlist table: Current (the lowest current price for the card \u2014 cheapest finish for a printing-specific watch, lowest across all printings for a name watch) and Target (your buy-target with the inline edit). The existing Watch type / Owned / Added / Note columns are unchanged."
     ],
     "refined": [
-      "A small italic Newsreader lede on the Watchlist hero — the only editorial-polish touch in this release. The page already shipped on the Folio palette in v3.27.12; this release is mostly feature, lightly bundled."
+      "A small italic Newsreader lede on the Watchlist hero \u2014 the only editorial-polish touch in this release. The page already shipped on the Folio palette in v3.27.12; this release is mostly feature, lightly bundled."
     ],
     "resolved": [],
-    "archivist_note": "The smallest substantive release in the cluster — and the one that finally rewards the watching. A target price says 'I'd buy this card if it ever dropped to here'; the watchlist row tells you the moment it does. The check is on the page only — no dashboard signal, no notification. That's intentional: a watchlist is a record of intent, not an alarm system. The price comparison is finish-aware too — for a printing-specific watch it's the cheapest of the three finishes for that printing; for a name watch it's the cheapest across every printing of that name. Both treat target as 'the lowest I could currently buy the card for' so the alert reads honestly."
+    "archivist_note": "The smallest substantive release in the cluster \u2014 and the one that finally rewards the watching. A target price says 'I'd buy this card if it ever dropped to here'; the watchlist row tells you the moment it does. The check is on the page only \u2014 no dashboard signal, no notification. That's intentional: a watchlist is a record of intent, not an alarm system. The price comparison is finish-aware too \u2014 for a printing-specific watch it's the cheapest of the three finishes for that printing; for a name watch it's the cheapest across every printing of that name. Both treat target as 'the lowest I could currently buy the card for' so the alert reads honestly."
   },
   {
     "version": "3.28.10",
     "date": "2026-05-25",
     "added": [],
     "refined": [
-      "The Import flow picks up the Folio editorial register across all three steps — Entry, Preview/Reconcile, Result. The four input methods on the Entry page (CSV upload, paste card list, name search, manual entry) each gain a § panel mark and an italic Newsreader explainer alongside the existing forms. The Preview page leads with a narrative italic lede ('Format X. N rows ready to commit, M rows cannot be parsed. Pick a destination below; the reconciliation panel shows what will move from your collection, what will merge, and what will be added new — confirm when you're ready.'); the filename renders as a brass-gold mono pill; Valid Rows and Invalid Rows get § I and § II marks. The Result page leads with a small italic 'The batch is in.' line above the existing stat tiles.",
-      "The reconciliation panel — the live HTMX swap that updates whenever the destination changes — picks up the § mark on its header. The matching logic, the action select (move-existing / merge / import-new for decks; skip-already-owned / import-delta / import-new for storage), and the per-row breakdowns are unchanged."
+      "The Import flow picks up the Folio editorial register across all three steps \u2014 Entry, Preview/Reconcile, Result. The four input methods on the Entry page (CSV upload, paste card list, name search, manual entry) each gain a \u00a7 panel mark and an italic Newsreader explainer alongside the existing forms. The Preview page leads with a narrative italic lede ('Format X. N rows ready to commit, M rows cannot be parsed. Pick a destination below; the reconciliation panel shows what will move from your collection, what will merge, and what will be added new \u2014 confirm when you're ready.'); the filename renders as a brass-gold mono pill; Valid Rows and Invalid Rows get \u00a7 I and \u00a7 II marks. The Result page leads with a small italic 'The batch is in.' line above the existing stat tiles.",
+      "The reconciliation panel \u2014 the live HTMX swap that updates whenever the destination changes \u2014 picks up the \u00a7 mark on its header. The matching logic, the action select (move-existing / merge / import-new for decks; skip-already-owned / import-delta / import-new for storage), and the per-row breakdowns are unchanged."
     ],
     "resolved": [],
-    "archivist_note": "Imports is a consequential-write flow — the sequence (enter → preview → confirm) is load-bearing. The design package proposed a tabbed single-page UX; we deliberately did not adopt that. Tabs that lose state on switch would be a UX regression for an import. So v3.28.10 is a polish pass on the existing funnel: each step gets the Folio register on top, every form action and every HTMX contract stays exactly as it was. A real import you ran the day before would feel the same in the hands; it just reads as a more deliberate document on the page."
+    "archivist_note": "Imports is a consequential-write flow \u2014 the sequence (enter \u2192 preview \u2192 confirm) is load-bearing. The design package proposed a tabbed single-page UX; we deliberately did not adopt that. Tabs that lose state on switch would be a UX regression for an import. So v3.28.10 is a polish pass on the existing funnel: each step gets the Folio register on top, every form action and every HTMX contract stays exactly as it was. A real import you ran the day before would feel the same in the hands; it just reads as a more deliberate document on the page."
   },
   {
     "version": "3.28.9",
@@ -169,91 +189,91 @@
     "added": [],
     "refined": [],
     "resolved": [
-      "The Collection page's new price filter (added in v3.28.8) was checking the card's NORMAL price rather than the price actually shown on the row. Foil cards with cheap foil prices and expensive normal prices were passing through a 'price ≥ $1' filter when their displayed foil price was under $1. The filter now matches what the row displays — same finish-aware fallback the Collection page already uses for the price column itself, and the same expression the dashboard's Collection Value tile uses for SUM. Foil $0.50 displays correctly excluded by price ≥ 1; included by price ≤ 1.",
-      "The boolean-search `price:` / `usd:` keyword has had the same finish-blind issue since v3.8 — a `price:>=5` query was checking only the normal price. Closed in passing because both call sites now go through the same finish-aware expression."
+      "The Collection page's new price filter (added in v3.28.8) was checking the card's NORMAL price rather than the price actually shown on the row. Foil cards with cheap foil prices and expensive normal prices were passing through a 'price \u2265 $1' filter when their displayed foil price was under $1. The filter now matches what the row displays \u2014 same finish-aware fallback the Collection page already uses for the price column itself, and the same expression the dashboard's Collection Value tile uses for SUM. Foil $0.50 displays correctly excluded by price \u2265 1; included by price \u2264 1.",
+      "The boolean-search `price:` / `usd:` keyword has had the same finish-blind issue since v3.8 \u2014 a `price:>=5` query was checking only the normal price. Closed in passing because both call sites now go through the same finish-aware expression."
     ],
-    "archivist_note": "A small post-ship corrective on top of v3.28.8 — same shape as the v3.27.16 and v3.27.18 corrective patches in the prior cluster. The fix is one helper function and two call sites pointing at it; the user's experience changes in one place (foil-priced rows now filter the way they look). The cluster grows from 12 to 13 sub-releases to make room; Imports / Watchlist / Mobile slide down a slot."
+    "archivist_note": "A small post-ship corrective on top of v3.28.8 \u2014 same shape as the v3.27.16 and v3.27.18 corrective patches in the prior cluster. The fix is one helper function and two call sites pointing at it; the user's experience changes in one place (foil-priced rows now filter the way they look). The cluster grows from 12 to 13 sub-releases to make room; Imports / Watchlist / Mobile slide down a slot."
   },
   {
     "version": "3.28.8",
     "date": "2026-05-25",
     "added": [
-      "Collection gains a faceted filter sidebar — Color identity as pip toggles (W/U/B/R/G/C), Type (Creature / Instant / Sorcery / Artifact / Enchantment / Land / Planeswalker), Status (Placed / Pending / In deck / Watchlist), Price range, Finish — each with live counts that reflect your current search. Apply a filter by checking its box; the URL captures the full filter state so a filtered view is bookmarkable and shareable.",
-      "Collection gains a Grid/Rows view toggle. Grid is the existing card view; Rows is a new dense one-line-per-card view — thumb + name + meta + location + quantity + price + total — for browsing at higher density. In Rows mode each card's per-card actions (Remove, Add to Deck, Move, Sell, Trade, Delete, Refresh Price, Mark Proxy) live behind a ⋮ kebab menu rather than expanding inline. Both views support the existing Owned Count three-level grouping (name → printing → location).",
-      "The boolean search you've always had stays exactly as it was. The new facets compose alongside it — search and facets are independent dimensions that AND together at query time. Power users keep their syntax; casual users get a discoverable sidebar; both surfaces produce shareable URLs."
+      "Collection gains a faceted filter sidebar \u2014 Color identity as pip toggles (W/U/B/R/G/C), Type (Creature / Instant / Sorcery / Artifact / Enchantment / Land / Planeswalker), Status (Placed / Pending / In deck / Watchlist), Price range, Finish \u2014 each with live counts that reflect your current search. Apply a filter by checking its box; the URL captures the full filter state so a filtered view is bookmarkable and shareable.",
+      "Collection gains a Grid/Rows view toggle. Grid is the existing card view; Rows is a new dense one-line-per-card view \u2014 thumb + name + meta + location + quantity + price + total \u2014 for browsing at higher density. In Rows mode each card's per-card actions (Remove, Add to Deck, Move, Sell, Trade, Delete, Refresh Price, Mark Proxy) live behind a \u22ee kebab menu rather than expanding inline. Both views support the existing Owned Count three-level grouping (name \u2192 printing \u2192 location).",
+      "The boolean search you've always had stays exactly as it was. The new facets compose alongside it \u2014 search and facets are independent dimensions that AND together at query time. Power users keep their syntax; casual users get a discoverable sidebar; both surfaces produce shareable URLs."
     ],
     "refined": [
-      "The Collection hero gains an editorial italic lede beneath the eyebrow that surfaces the headline numbers in narrative form (\"X cards on the shelves · Y pending placement · $Z in hand · N unique names\"). The three stat tiles (Total Value / Total Cards / Unique Cardnames) stay exactly where they were.",
-      "Every per-card action you had in Grid mode is preserved in Rows mode through the kebab — Remove with quantity input, Add to Deck with deck selector, Move with location selector, Sell 1, Trade 1, Delete Row, Refresh Price, Mark/Unmark Proxy. Same forms, same routes, same CSRF — just a different presentation shell."
+      "The Collection hero gains an editorial italic lede beneath the eyebrow that surfaces the headline numbers in narrative form (\"X cards on the shelves \u00b7 Y pending placement \u00b7 $Z in hand \u00b7 N unique names\"). The three stat tiles (Total Value / Total Cards / Unique Cardnames) stay exactly where they were.",
+      "Every per-card action you had in Grid mode is preserved in Rows mode through the kebab \u2014 Remove with quantity input, Add to Deck with deck selector, Move with location selector, Sell 1, Trade 1, Delete Row, Refresh Price, Mark/Unmark Proxy. Same forms, same routes, same CSRF \u2014 just a different presentation shell."
     ],
     "resolved": [],
-    "archivist_note": "The Collection page was under-sized in the broad recon — it's the app's main browsing surface and warranted a dedicated release. A focused gap check after v3.28.7 shipped corrected the sizing to L and inserted this release at v3.28.8, cascading Imports / Watchlist / Mobile down by one slot. The interaction-model decision came down to four forks, all settled before code started: the faceted sidebar lives ALONGSIDE the existing boolean search rather than replacing it (production's parser is more powerful than the package's placeholder advertised — it would have been a regression to subordinate it), the stat presentation is hybrid (tiles plus an italic lede beneath, both reading from the same numbers), Rows view is included rather than deferred, and per-card actions in Rows mode get a kebab menu so the row stays compact without losing function. The hard constraint throughout was: don't quietly drop function. Every action that was inline in Grid mode is still reachable in Rows mode."
+    "archivist_note": "The Collection page was under-sized in the broad recon \u2014 it's the app's main browsing surface and warranted a dedicated release. A focused gap check after v3.28.7 shipped corrected the sizing to L and inserted this release at v3.28.8, cascading Imports / Watchlist / Mobile down by one slot. The interaction-model decision came down to four forks, all settled before code started: the faceted sidebar lives ALONGSIDE the existing boolean search rather than replacing it (production's parser is more powerful than the package's placeholder advertised \u2014 it would have been a regression to subordinate it), the stat presentation is hybrid (tiles plus an italic lede beneath, both reading from the same numbers), Rows view is included rather than deferred, and per-card actions in Rows mode get a kebab menu so the row stays compact without losing function. The hard constraint throughout was: don't quietly drop function. Every action that was inline in Grid mode is still reachable in Rows mode."
   },
   {
     "version": "3.28.7",
     "date": "2026-05-25",
     "added": [
-      "Decks is reshaped from a table into editorial rows. The most-played deck is featured in a gold-bordered panel at the top — record, win-rate, last played, the consistency tier as a small chip. Every other deck reads as a compact editorial row underneath, carrying the same fields scaled down. Each deck can now carry a short flavour blurb (\"Superfriends · counters · proliferate\") that renders as an italic sub-line beneath the name — settable from the deck's Edit popout.",
-      "Card Detail gains five new sections beneath the hero: Printings (every printing of this card name with how many of each you own and which ones you're watching), In your decks (which decks hold this card, with the role tag if any), Prices (regular / foil / etched USD), Legality (the seven formats that matter — Standard / Modern / Pioneer / Commander / Legacy / Vintage / Pauper), and History (the most recent 10 events on your copies — placed, moved, removed, refreshed). The card's mana cost, CMC, rarity, type line, and color identity now read in the hero alongside the name.",
-      "Pending gains a progress strip at the top showing how many cards are in this filing session, plus narrative batch headers — \"Helvault export · 14 cards · imported 24 May\" reads as a story rather than a generic group header. The drawer-sorter users still see their drawer groups; the new batch headers apply to everyone else."
+      "Decks is reshaped from a table into editorial rows. The most-played deck is featured in a gold-bordered panel at the top \u2014 record, win-rate, last played, the consistency tier as a small chip. Every other deck reads as a compact editorial row underneath, carrying the same fields scaled down. Each deck can now carry a short flavour blurb (\"Superfriends \u00b7 counters \u00b7 proliferate\") that renders as an italic sub-line beneath the name \u2014 settable from the deck's Edit popout.",
+      "Card Detail gains five new sections beneath the hero: Printings (every printing of this card name with how many of each you own and which ones you're watching), In your decks (which decks hold this card, with the role tag if any), Prices (regular / foil / etched USD), Legality (the seven formats that matter \u2014 Standard / Modern / Pioneer / Commander / Legacy / Vintage / Pauper), and History (the most recent 10 events on your copies \u2014 placed, moved, removed, refreshed). The card's mana cost, CMC, rarity, type line, and color identity now read in the hero alongside the name.",
+      "Pending gains a progress strip at the top showing how many cards are in this filing session, plus narrative batch headers \u2014 \"Helvault export \u00b7 14 cards \u00b7 imported 24 May\" reads as a story rather than a generic group header. The drawer-sorter users still see their drawer groups; the new batch headers apply to everyone else."
     ],
     "refined": [
-      "Deck Detail picks up the Folio § mark on its main analytical panels — Mana Curve, Card Types, Color Pips, Deck Health, Tokens Needed — without restructuring. Every panel that worked before still works: the inventory card grid, the role-tag editor, the v3.21 switch-printing modal, the consistency scoring, the synergy classification, the dead-cards panel — all preserved verbatim. Polish only; no redesign.",
+      "Deck Detail picks up the Folio \u00a7 mark on its main analytical panels \u2014 Mana Curve, Card Types, Color Pips, Deck Health, Tokens Needed \u2014 without restructuring. Every panel that worked before still works: the inventory card grid, the role-tag editor, the v3.21 switch-printing modal, the consistency scoring, the synergy classification, the dead-cards panel \u2014 all preserved verbatim. Polish only; no redesign.",
       "Decks the page picks up a third stat tile, \"Games Logged,\" alongside the existing Decks + Total Cards counts."
     ],
     "resolved": [],
-    "archivist_note": "Three of the four pages in this bundle are additive — Decks is the one that genuinely changes shape. The shift from a table to editorial rows trades information density for personality; the Decks page has always been a desk-style management view and the table did that job well, but the cluster's design language is editorial, and a small number of decks with rich game history reads better as a featured-plus-rows narrative than as a flat grid. Power-user functions all still live in the Edit popouts and the per-row buttons. Card Detail was the most surprising piece of the bundle in implementation — the design's inline P/T and flavor text needed Card-table columns the project doesn't have yet, so those scope out cleanly to a follow-up patch and the five backed sections ship now."
+    "archivist_note": "Three of the four pages in this bundle are additive \u2014 Decks is the one that genuinely changes shape. The shift from a table to editorial rows trades information density for personality; the Decks page has always been a desk-style management view and the table did that job well, but the cluster's design language is editorial, and a small number of decks with rich game history reads better as a featured-plus-rows narrative than as a flat grid. Power-user functions all still live in the Edit popouts and the per-row buttons. Card Detail was the most surprising piece of the bundle in implementation \u2014 the design's inline P/T and flavor text needed Card-table columns the project doesn't have yet, so those scope out cleanly to a follow-up patch and the five backed sections ship now."
   },
   {
     "version": "3.28.6",
     "date": "2026-05-25",
     "added": [
-      "Storage Locations now carries a per-location note — a short description (\"Commander staples · A-tier\", \"Trade fodder\", whatever you'd write on a label) that shows beneath each location's name in the table. Settable via both the Add Location form and the per-row Edit popout.",
-      "Locations can declare a capacity — the maximum number of cards the container is meant to hold. When set, the table renders a small brass-to-amber capacity meter inline with each row, showing how full it is. Locations at 95% or above get a warning treatment (oxblood bar, faintly tinted row) so you can see at a glance what needs thinning. Capacity is optional — leave it blank on any location and the meter simply doesn't render for that row.",
-      "A 'Last touched' column shows the most recent date anything happened at each location — placement, move, quantity change. Derived from the data already there; no new tracking added. Editorial date format matches the Chronicle."
+      "Storage Locations now carries a per-location note \u2014 a short description (\"Commander staples \u00b7 A-tier\", \"Trade fodder\", whatever you'd write on a label) that shows beneath each location's name in the table. Settable via both the Add Location form and the per-row Edit popout.",
+      "Locations can declare a capacity \u2014 the maximum number of cards the container is meant to hold. When set, the table renders a small brass-to-amber capacity meter inline with each row, showing how full it is. Locations at 95% or above get a warning treatment (oxblood bar, faintly tinted row) so you can see at a glance what needs thinning. Capacity is optional \u2014 leave it blank on any location and the meter simply doesn't render for that row.",
+      "A 'Last touched' column shows the most recent date anything happened at each location \u2014 placement, move, quantity change. Derived from the data already there; no new tracking added. Editorial date format matches the Chronicle."
     ],
     "refined": [
-      "The Locations table picks up the Folio editorial register — column headers tightened, capacity inline rather than tucked into a separate detail page, the note sub-line giving each row a small piece of writing of its own. Everything that worked before still works: the Mode column (managed/manual/sink/ignored), the Parent expression, Edit popouts, Delete-with-redirect when a location has cards in it. The Folio polish is on top of every existing feature, not in place of any.",
+      "The Locations table picks up the Folio editorial register \u2014 column headers tightened, capacity inline rather than tucked into a separate detail page, the note sub-line giving each row a small piece of writing of its own. Everything that worked before still works: the Mode column (managed/manual/sink/ignored), the Parent expression, Edit popouts, Delete-with-redirect when a location has cards in it. The Folio polish is on top of every existing feature, not in place of any.",
       "The Add Location form gains a second row so capacity and note fit alongside the existing name, type, mode, and parent fields without forcing horizontal scroll on laptop widths."
     ],
     "resolved": [
-      "Several user-facing strings still mentioned 'drawer' as a generic example container — in the welcome flow, in the collection prompt for new users, in the import setup hint, in the reconciliation panel — even when shown to users who don't use the drawer auto-sorter. Those generic examples are reworded to neutral storage vocabulary (binder, box, shelf). The Drawer auto-sorter itself, and every surface only drawer-sorter users see, is unchanged."
+      "Several user-facing strings still mentioned 'drawer' as a generic example container \u2014 in the welcome flow, in the collection prompt for new users, in the import setup hint, in the reconciliation panel \u2014 even when shown to users who don't use the drawer auto-sorter. Those generic examples are reworded to neutral storage vocabulary (binder, box, shelf). The Drawer auto-sorter itself, and every surface only drawer-sorter users see, is unchanged."
     ],
-    "archivist_note": "The Locations page is the second of the cluster's three page-fork decisions — keep the structure that already works, lift only the editorial finish on top. Tables are right for hierarchical numerous data; a flat card grid would have lost the cabinet › drawer › slot relationship and made twenty locations longer to scan than five. The capacity meter is an opt-in promise: declare what a container is meant to hold and the page tells you how full it is, every time."
+    "archivist_note": "The Locations page is the second of the cluster's three page-fork decisions \u2014 keep the structure that already works, lift only the editorial finish on top. Tables are right for hierarchical numerous data; a flat card grid would have lost the cabinet \u203a drawer \u203a slot relationship and made twenty locations longer to scan than five. The capacity meter is an opt-in promise: declare what a container is meant to hold and the page tells you how full it is, every time."
   },
   {
     "version": "3.28.5",
     "date": "2026-05-24",
     "added": [
-      "The dashboard is fully redesigned. The Quick Actions launcher is replaced by an editorial layout: a masthead with a time-aware greeting and your current numbers; a search bar; and nine numbered panels — Today's Brief, Holdings, Chronicle (recent activity), Priority Queue (pending placement), Spotlight (your most recently placed card), Deck Performance, Color Identity, Collection Statistics, and Quick Actions.",
+      "The dashboard is fully redesigned. The Quick Actions launcher is replaced by an editorial layout: a masthead with a time-aware greeting and your current numbers; a search bar; and nine numbered panels \u2014 Today's Brief, Holdings, Chronicle (recent activity), Priority Queue (pending placement), Spotlight (your most recently placed card), Deck Performance, Color Identity, Collection Statistics, and Quick Actions.",
       "Spotlight shows the most recently placed card with its art when we have it (and a clean placeholder when we don't).",
-      "Color Identity surfaces the WUBRG breakdown of your placed cards across mono, multi, and colorless buckets — the same data deck analytics use, finally aggregated for the whole collection."
+      "Color Identity surfaces the WUBRG breakdown of your placed cards across mono, multi, and colorless buckets \u2014 the same data deck analytics use, finally aggregated for the whole collection."
     ],
     "refined": [
-      "Today's Brief shows actual templated items from your data — pending count, largest set, most-recent import, top win-rate deck — rather than a wall of empty 'demo' lines. Items appear only when there's real signal.",
+      "Today's Brief shows actual templated items from your data \u2014 pending count, largest set, most-recent import, top win-rate deck \u2014 rather than a wall of empty 'demo' lines. Items appear only when there's real signal.",
       "Quick Actions on the dashboard now read as 'Storage Map' instead of the installation-specific 'Drawer Layout' / 'Open drawers' labels. The broader rename across the sidebar nav is the next release."
     ],
     "resolved": [],
-    "archivist_note": "The biggest single layout change of the Folio cluster. The Holdings panel deliberately ships without its 30-day value chart — the chart needs daily price snapshots Cartarch isn't yet keeping, and we'd rather show a clean 'available once price history lands' note than fake numbers. Same call we'll make on the Watchlist 7-day price delta in a later release; both wait for the same future price-history work. The architecture is now ready for that — the dashboard slot is built and waiting."
+    "archivist_note": "The biggest single layout change of the Folio cluster. The Holdings panel deliberately ships without its 30-day value chart \u2014 the chart needs daily price snapshots Cartarch isn't yet keeping, and we'd rather show a clean 'available once price history lands' note than fake numbers. Same call we'll make on the Watchlist 7-day price delta in a later release; both wait for the same future price-history work. The architecture is now ready for that \u2014 the dashboard slot is built and waiting."
   },
   {
     "version": "3.28.4",
     "date": "2026-05-24",
     "added": [
-      "The sign-in, register, forgot-password, and reset-password pages have an editorial brand pane on the left — Cartarch crest, wordmark, tagline, and a short note on what Cartarch is for — alongside the form on the right. The previous auth pages were a small centred form on an empty page; now arriving at one of those screens feels like opening a magazine cover.",
-      "On phones the brand pane condenses to just the crest and wordmark at the top and the form takes the whole screen — built responsive from day one so we won't have to redo it for the mobile pass."
+      "The sign-in, register, forgot-password, and reset-password pages have an editorial brand pane on the left \u2014 Cartarch crest, wordmark, tagline, and a short note on what Cartarch is for \u2014 alongside the form on the right. The previous auth pages were a small centred form on an empty page; now arriving at one of those screens feels like opening a magazine cover.",
+      "On phones the brand pane condenses to just the crest and wordmark at the top and the form takes the whole screen \u2014 built responsive from day one so we won't have to redo it for the mobile pass."
     ],
     "refined": [
-      "All four auth pages now share a single layout so any future change to the brand pane lands in one place. The form behaviour — validation, password strength, the forgot/reset link contract, CSRF — is identical to before; only the surrounding layout changed."
+      "All four auth pages now share a single layout so any future change to the brand pane lands in one place. The form behaviour \u2014 validation, password strength, the forgot/reset link contract, CSRF \u2014 is identical to before; only the surrounding layout changed."
     ],
     "resolved": [],
-    "archivist_note": "First page of the cluster's real redesign work. We picked Auth as the entry point because it's the bounded one: four small pages, one shared layout, no schema in sight. The Dashboard is the bigger build — it's next, with nine editorial panels to translate. Auth is the practice run for that mechanism."
+    "archivist_note": "First page of the cluster's real redesign work. We picked Auth as the entry point because it's the bounded one: four small pages, one shared layout, no schema in sight. The Dashboard is the bigger build \u2014 it's next, with nine editorial panels to translate. Auth is the practice run for that mechanism."
   },
   {
     "version": "3.28.3",
     "date": "2026-05-24",
     "added": [
-      "Editorial eyebrow on every page — the small label above the page title now reads as `<group> · <page>` (e.g. 'Storage · Locations', 'Play · Decks') with a small antique-gold hairline before the text. Pages that didn't have an eyebrow before — Collection, Watchlist, Decklist Check, Card Detail, Deck Detail, Drawer Detail, Location Detail, the four Token surfaces, Import Confirmed, Manual Search — now have one.",
+      "Editorial eyebrow on every page \u2014 the small label above the page title now reads as `<group> \u00b7 <page>` (e.g. 'Storage \u00b7 Locations', 'Play \u00b7 Decks') with a small antique-gold hairline before the text. Pages that didn't have an eyebrow before \u2014 Collection, Watchlist, Decklist Check, Card Detail, Deck Detail, Drawer Detail, Location Detail, the four Token surfaces, Import Confirmed, Manual Search \u2014 now have one.",
       "Italic Newsreader treatment applied to page descriptions (the lede paragraph under each page heading) on Audit, Collection, Decks, Drawer Detail, Drawers, Games, Import, Locations, and Pending. The editorial register the visual reskin set up now lands consistently.",
       "Dates on the Chronicle page now render in editorial form ('24 May 2026' rather than '2026-05-24'). Other date surfaces left as ISO for this release."
     ],
@@ -261,36 +281,36 @@
       "Chronicle's page-header eyebrow now uses the same shared mechanism as every other page (was a one-off bespoke version from the Chronicle release)."
     ],
     "resolved": [
-      "The editorial eyebrow pattern that the warm-charcoal visual reskin assumed but never landed across the app — finished now in a single sweep, three releases later."
+      "The editorial eyebrow pattern that the warm-charcoal visual reskin assumed but never landed across the app \u2014 finished now in a single sweep, three releases later."
     ],
-    "archivist_note": "A quiet release with disproportionate visual payoff. We added a shared Jinja macro for the editorial eyebrow and routed every page through it, instead of hand-editing 30 templates. The reward is that the next time we want to tweak the eyebrow — adjust the hairline, change the separator, add a tooltip — the change lives in one place. This is the same pattern we used for the warm-charcoal palette and Newsreader: build the foundation right, and every page picks the change up automatically."
+    "archivist_note": "A quiet release with disproportionate visual payoff. We added a shared Jinja macro for the editorial eyebrow and routed every page through it, instead of hand-editing 30 templates. The reward is that the next time we want to tweak the eyebrow \u2014 adjust the hairline, change the separator, add a tooltip \u2014 the change lives in one place. This is the same pattern we used for the warm-charcoal palette and Newsreader: build the foundation right, and every page picks the change up automatically."
   },
   {
     "version": "3.28.2",
     "date": "2026-05-24",
     "added": [
-      "Chronicle — a journal of releases at /chronicle. Each entry: what landed, what changed, what's fixed, and a short note from the Archivist.",
-      "The version pill in the topbar now reads as Folio · Issue · Entry — Roman numerals over the semantic versioning, presentation only. The pill links to the latest Chronicle entry."
+      "Chronicle \u2014 a journal of releases at /chronicle. Each entry: what landed, what changed, what's fixed, and a short note from the Archivist.",
+      "The version pill in the topbar now reads as Folio \u00b7 Issue \u00b7 Entry \u2014 Roman numerals over the semantic versioning, presentation only. The pill links to the latest Chronicle entry."
     ],
     "refined": [
-      "Vocabulary sweep across user-facing copy — Release Notes / Patch Notes / Changelog → Chronicle.",
+      "Vocabulary sweep across user-facing copy \u2014 Release Notes / Patch Notes / Changelog \u2192 Chronicle.",
       "The landing-page Chronicle card now links to the page itself instead of a TODO placeholder."
     ],
     "resolved": [],
-    "archivist_note": "The Cartarch Chronicle starts here, covering the cosmetic rebrand forward. The releases before that lived under the Mana Archive name; their record stays in the project's engineering history but doesn't belong in a Cartarch-branded Chronicle. We expect the Chronicle to compound — each future release adds an entry, the Archive sidebar grows, and the project's arc reads as one continuous story rather than a pile of patches."
+    "archivist_note": "The Cartarch Chronicle starts here, covering the cosmetic rebrand forward. The releases before that lived under the Mana Archive name; their record stays in the project's engineering history but doesn't belong in a Cartarch-branded Chronicle. We expect the Chronicle to compound \u2014 each future release adds an entry, the Archive sidebar grows, and the project's arc reads as one continuous story rather than a pile of patches."
   },
   {
     "version": "3.28.1",
     "date": "2026-05-24",
     "added": [
-      "Newsreader serif as the editorial display face — page headings, taglines, and dashboard stat figures pick up the italic register that signals 'you have arrived at this view'."
+      "Newsreader serif as the editorial display face \u2014 page headings, taglines, and dashboard stat figures pick up the italic register that signals 'you have arrived at this view'."
     ],
     "refined": [
       "A whole-app visual reskin to the warm-charcoal Folio aesthetic. The navy palette is gone; the app now reads in warm browns, cream off-white, and antique-gold accents. Montserrat stays as the body and UI face.",
       "The PWA chrome and splash screen match the new palette."
     ],
     "resolved": [],
-    "archivist_note": "The visual rebrand the v3.28.x cluster was aiming for. Token names stayed constant; only values changed — the same whole-app sweep mechanism the navy reskin used a few releases ago. Mobile widths inherit the new palette automatically; the responsive layout pass that follows tunes the structure to match."
+    "archivist_note": "The visual rebrand the v3.28.x cluster was aiming for. Token names stayed constant; only values changed \u2014 the same whole-app sweep mechanism the navy reskin used a few releases ago. Mobile widths inherit the new palette automatically; the responsive layout pass that follows tunes the structure to match."
   },
   {
     "version": "3.28.0",
@@ -298,13 +318,13 @@
     "added": [],
     "refined": [],
     "resolved": [],
-    "archivist_note": "A design-package release with no production change. We cleaned up the JSX design package that the Folio cluster translates from — split a monolithic components file into semantic modules, retired six back-compat aliases, removed an unused live-API path, consolidated five duplicate version literals. The production app already satisfied the foundation invariants (one token source, one application-version source, no per-card external lookups), so this release ships zero production diff and the visual reskin that follows gets a clean source-of-truth to translate from."
+    "archivist_note": "A design-package release with no production change. We cleaned up the JSX design package that the Folio cluster translates from \u2014 split a monolithic components file into semantic modules, retired six back-compat aliases, removed an unused live-API path, consolidated five duplicate version literals. The production app already satisfied the foundation invariants (one token source, one application-version source, no per-card external lookups), so this release ships zero production diff and the visual reskin that follows gets a clean source-of-truth to translate from."
   },
   {
     "version": "3.27.19",
     "date": "2026-05-23",
     "added": [
-      "Decklist Collection Check at /decklist. Paste a decklist in any standard format — Moxfield, MTGA, MTGO — and see what you own, what's missing, and where each owned copy lives. Cards bucket into Have / Partial / Missing / Basics.",
+      "Decklist Collection Check at /decklist. Paste a decklist in any standard format \u2014 Moxfield, MTGA, MTGO \u2014 and see what you own, what's missing, and where each owned copy lives. Cards bucket into Have / Partial / Missing / Basics.",
       "An 'Owned Count' sort on the Collection page groups cards by how many you own across all printings."
     ],
     "refined": [],
@@ -317,7 +337,7 @@
     "added": [],
     "refined": [],
     "resolved": [
-      "Two phone-width regressions from the brand-assets release: the full-width brand topbar collided with the logout button at very narrow widths (~360–400px), and the dashboard heading clipped at the right edge for accounts with long single-word display names."
+      "Two phone-width regressions from the brand-assets release: the full-width brand topbar collided with the logout button at very narrow widths (~360\u2013400px), and the dashboard heading clipped at the right edge for accounts with long single-word display names."
     ],
     "archivist_note": "Another post-ship corrective. Phone-width testing is genuinely hard to substitute for; some regressions only surface when a real user on a real phone hits a real edge case. Catching them within a day of ship is the discipline we hold to."
   },
@@ -325,16 +345,16 @@
     "version": "3.27.17",
     "date": "2026-05-23",
     "added": [
-      "The Cartarch brand assets land — new logo, favicons, and icon set across the app.",
+      "The Cartarch brand assets land \u2014 new logo, favicons, and icon set across the app.",
       "Public landing page at the root URL for anonymous visitors.",
       "Privacy and Terms stub pages so the footer links go somewhere real."
     ],
     "refined": [
       "The topbar is now a full-width brand band spanning the app above both the sidebar and the main content area.",
-      "PWA manifest landed — install Cartarch to your home screen with the right name and theme color."
+      "PWA manifest landed \u2014 install Cartarch to your home screen with the right name and theme color."
     ],
     "resolved": [
-      "A small but important registration-flow leak: attempting to register with an email that's already in use no longer reveals — through different error text — whether that email is registered."
+      "A small but important registration-flow leak: attempting to register with an email that's already in use no longer reveals \u2014 through different error text \u2014 whether that email is registered."
     ],
     "archivist_note": "The asset-gated half of the cosmetic rebrand. The text-only half shipped earlier so the rest of the redesign cluster could move without waiting on visual assets. Cartarch is now visually complete; the cluster's remaining work is the warm-charcoal reskin that follows."
   },
@@ -363,7 +383,7 @@
       "Wide tables on Decks, Games, Locations, Watchlist, and Admin gracefully drop lower-priority columns at narrow widths instead of overflowing."
     ],
     "resolved": [],
-    "archivist_note": "The token foundation laid down two releases earlier was the prep work for this one. Token names stay constant; only values change. The aesthetic ride on top of the foundation — a pattern we'd repeat months later in the Folio cluster when swapping to warm charcoal."
+    "archivist_note": "The token foundation laid down two releases earlier was the prep work for this one. Token names stay constant; only values change. The aesthetic ride on top of the foundation \u2014 a pattern we'd repeat months later in the Folio cluster when swapping to warm charcoal."
   },
   {
     "version": "3.27.14",
@@ -377,14 +397,14 @@
     "resolved": [
       "Registration previously had no minimum password length; a 1-character password would have been accepted."
     ],
-    "archivist_note": "The first transactional-email capability for the project. Future features that depend on outbound email — collection sharing, beta announcements, account verification — build on this foundation. The DNS work to legitimately send from cartarch.com (SPF, DKIM, DMARC) is part of this release too."
+    "archivist_note": "The first transactional-email capability for the project. Future features that depend on outbound email \u2014 collection sharing, beta announcements, account verification \u2014 build on this foundation. The DNS work to legitimately send from cartarch.com (SPF, DKIM, DMARC) is part of this release too."
   },
   {
     "version": "3.27.13",
     "date": "2026-05-22",
     "added": [],
     "refined": [
-      "The set detail page loads roughly 100× faster — from 18 to 27 seconds per visit down to under 100 milliseconds."
+      "The set detail page loads roughly 100\u00d7 faster \u2014 from 18 to 27 seconds per visit down to under 100 milliseconds."
     ],
     "resolved": [
       "A long-standing performance problem on /sets/{set_code}: the previous version was paginating Scryfall live three times per visit. The new version reads from a local cache kept current by a background daemon."
@@ -395,24 +415,24 @@
     "version": "3.27.12",
     "date": "2026-05-22",
     "added": [
-      "Watchlist — a per-user list of cards to track for later acquisition, price comparison, or memory. Two identity modes per row: a specific printing (a particular set + collector number) or any printing of a card name.",
+      "Watchlist \u2014 a per-user list of cards to track for later acquisition, price comparison, or memory. Two identity modes per row: a specific printing (a particular set + collector number) or any printing of a card name.",
       "Add cards from the card-detail page; manage them from a new /watchlist surface. Owned counts appear inline (placed + pending separately)."
     ],
     "refined": [],
     "resolved": [],
-    "archivist_note": "The first genuine new feature in a long string of UX and performance corrections. Watchlist also stands as foundation for future trade-adjacent surfaces — knowing what someone wants is the first signal that makes sharing collections useful."
+    "archivist_note": "The first genuine new feature in a long string of UX and performance corrections. Watchlist also stands as foundation for future trade-adjacent surfaces \u2014 knowing what someone wants is the first signal that makes sharing collections useful."
   },
   {
     "version": "3.27.11",
     "date": "2026-05-22",
     "added": [
-      "Decks Owned tile on the dashboard — total deck count plus a Commander-format breakdown sub-line."
+      "Decks Owned tile on the dashboard \u2014 total deck count plus a Commander-format breakdown sub-line."
     ],
     "refined": [],
     "resolved": [
       "The Sets Collected tile (introduced the previous release) had its completion percentage moving based on other users' card imports. Replaced with a personal stat. The Sets page at /sets remains the authoritative completion view."
     ],
-    "archivist_note": "A quiet correction. The Sets tile was both inaccurate — cross-user signal pollution — and unhelpful, with no actionable next step. The Decks tile answers a question users actually ask."
+    "archivist_note": "A quiet correction. The Sets tile was both inaccurate \u2014 cross-user signal pollution \u2014 and unhelpful, with no actionable next step. The Decks tile answers a question users actually ask."
   },
   {
     "version": "3.27.10",
@@ -421,35 +441,35 @@
       "Three dashboard tiles: Collection Value (total dollar worth of placed cards, finish-aware pricing), Sets Collected (later replaced by Decks Owned), and Recent Activity (latest eight collection events, linking to the audit log)."
     ],
     "refined": [
-      "Cross-page card counts now agree. The Drawers page switches from row-count to card-count — a drawer holding three rows of a 4-of now reads 12, not 3.",
-      "The Collection page headline shows placed cards only; pending cards surface as a separate sub-stat ('X cards / $Y pending placement →')."
+      "Cross-page card counts now agree. The Drawers page switches from row-count to card-count \u2014 a drawer holding three rows of a 4-of now reads 12, not 3.",
+      "The Collection page headline shows placed cards only; pending cards surface as a separate sub-stat ('X cards / $Y pending placement \u2192')."
     ],
     "resolved": [
       "Three different 'how many cards do I have?' answers across the Collection, Drawers, and dashboard surfaces previously disagreed. They now answer the same question the same way."
     ],
-    "archivist_note": "A small change in the Drawers headline ('Total Cards' where it once said 'Total Rows') ripples across the whole understanding of 'how big is my collection?' — three places finally agree."
+    "archivist_note": "A small change in the Drawers headline ('Total Cards' where it once said 'Total Rows') ripples across the whole understanding of 'how big is my collection?' \u2014 three places finally agree."
   },
   {
     "version": "3.27.9",
     "date": "2026-05-22",
     "added": [],
     "refined": [
-      "The Decks page loads roughly 100× faster on a cold cache — from about 14 seconds to under 200 milliseconds. The combo and bracket panels are temporarily removed from deck surfaces while the analytics rebuild for both is in flight; trusted analytics (Health, mana curve, types, color pips, synergy, dead cards, tokens) all remain."
+      "The Decks page loads roughly 100\u00d7 faster on a cold cache \u2014 from about 14 seconds to under 200 milliseconds. The combo and bracket panels are temporarily removed from deck surfaces while the analytics rebuild for both is in flight; trusted analytics (Health, mana curve, types, color pips, synergy, dead cards, tokens) all remain."
     ],
     "resolved": [
       "A long-standing performance problem on the Decks page (cold-cache visits making one external API call per deck on the request path) is closed."
     ],
-    "archivist_note": "An urgent fix slotted ahead of the planned next release. The combos and bracket subsystems aren't gone — they're dormant code waiting for the analytics rebuild that will reintroduce them with a faster path."
+    "archivist_note": "An urgent fix slotted ahead of the planned next release. The combos and bracket subsystems aren't gone \u2014 they're dormant code waiting for the analytics rebuild that will reintroduce them with a faster path."
   },
   {
     "version": "3.27.8",
     "date": "2026-05-22",
     "added": [
-      "Left-sidebar layout replaces the previous horizontal navigation. Five grouped nav sections — Overview, Collection, Storage, Play, System — make destinations easier to scan.",
+      "Left-sidebar layout replaces the previous horizontal navigation. Five grouped nav sections \u2014 Overview, Collection, Storage, Play, System \u2014 make destinations easier to scan.",
       "Empty-state homepage for brand-new accounts: a clear first step and a numbered 'what comes next' path."
     ],
     "refined": [
-      "Dashboard restructured around six Quick Action cards — the daily-workflow entry points surface as the page's primary content."
+      "Dashboard restructured around six Quick Action cards \u2014 the daily-workflow entry points surface as the page's primary content."
     ],
     "resolved": [
       "The Decks page's Edit/Delete column was being clipped at the right edge on standard desktop widths because the inherited page-wrapper width was sized for a no-sidebar layout. The anon-state topbar (login, register) was misaligned because the page-wrapper expected a sidebar that wasn't there."
@@ -462,19 +482,19 @@
     "added": [],
     "refined": [],
     "resolved": [
-      "The End Game modal on the game tracker now renders with a solid background — the modal had been transparent over the dark overlay since the v3.10 era (an undefined CSS token reference, traced and fixed here).",
+      "The End Game modal on the game tracker now renders with a solid background \u2014 the modal had been transparent over the dark overlay since the v3.10 era (an undefined CSS token reference, traced and fixed here).",
       "The Drawers page total card count corrected (previously over-counted by ~500 cards because deck-type rows were leaking into the drawer count)."
     ],
-    "archivist_note": "A quiet pass to set up the visual foundation that the navy aesthetic — and later the warm-charcoal Folio aesthetic — would build on. The one user-visible fix here (the End Game modal background) had been broken for longer than we realized."
+    "archivist_note": "A quiet pass to set up the visual foundation that the navy aesthetic \u2014 and later the warm-charcoal Folio aesthetic \u2014 would build on. The one user-visible fix here (the End Game modal background) had been broken for longer than we realized."
   },
   {
     "version": "3.27.6",
     "date": "2026-05-21",
     "added": [],
     "refined": [
-      "First step of the rebrand to Cartarch — the app now identifies as Cartarch in page titles, login and register copy, the welcome banner, and elsewhere across user-facing UI text."
+      "First step of the rebrand to Cartarch \u2014 the app now identifies as Cartarch in page titles, login and register copy, the welcome banner, and elsewhere across user-facing UI text."
     ],
     "resolved": [],
-    "archivist_note": "This is the first half of the Cartarch rebrand: the text-only sweep. The wordmark, favicons, and icon set still showed 'Mana Archive' at this point — those would arrive a few releases later when the designer delivered. Splitting the rebrand across two releases let the design-token foundation and the navy reskin proceed in parallel without waiting on visual assets."
+    "archivist_note": "This is the first half of the Cartarch rebrand: the text-only sweep. The wordmark, favicons, and icon set still showed 'Mana Archive' at this point \u2014 those would arrive a few releases later when the designer delivered. Splitting the rebrand across two releases let the design-token foundation and the navy reskin proceed in parallel without waiting on visual assets."
   }
 ]

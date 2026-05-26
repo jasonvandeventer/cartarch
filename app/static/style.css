@@ -12456,3 +12456,686 @@ table.dmtx .dmtx-rowhead {
 /* ============================================================================
    END v3.29.4 editorial finish block
    ============================================================================ */
+
+/* ============================================================================
+   v3.30.0 — Goldfish playtester
+   Session-only zone state UI. All rules namespaced .gf-*. Token reuse only.
+   ============================================================================ */
+
+.gf-hero .gf-hero-lede { max-width: 64ch; }
+
+.gf-controls-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.gf-controls-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.gf-control-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.25rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--panel-2);
+}
+
+.gf-control-label {
+  font: 600 11px/1 "Montserrat", system-ui, sans-serif;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.gf-input-num {
+  width: 4.5rem;
+  padding: 0.25rem 0.4rem;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: var(--radius-sm);
+  font: 500 13px/1.2 "Montserrat", system-ui, sans-serif;
+}
+
+.gf-btn {
+  padding: 0.4rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--panel-2);
+  color: var(--text);
+  font: 500 13px/1 "Montserrat", system-ui, sans-serif;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+.gf-btn:hover {
+  border-color: var(--brand-gold);
+  color: var(--brand-gold);
+}
+.gf-btn-primary {
+  background: var(--brand-gold-soft);
+  border-color: var(--brand-gold);
+  color: var(--text);
+}
+.gf-btn-primary:hover {
+  background: var(--brand-gold);
+  color: var(--brand-near-black);
+}
+.gf-btn-small { padding: 0.25rem 0.5rem; font-size: 12px; }
+
+.gf-readout-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.25rem;
+  padding-top: 0.25rem;
+  border-top: 1px solid var(--border-soft, rgba(181,138,71,0.10));
+}
+.gf-readout {
+  font: italic 400 13px/1.4 "Newsreader", Georgia, serif;
+  color: var(--text-dim);
+}
+.gf-readout strong {
+  font-style: normal;
+  font-family: "Montserrat", system-ui, sans-serif;
+  color: var(--text);
+}
+
+.gf-board-panel {
+  display: grid;
+  grid-template-columns: 1fr 240px;
+  gap: 1rem;
+  align-items: stretch;
+}
+
+.gf-board {
+  display: grid;
+  grid-template-columns: 160px 1fr 160px;
+  gap: 0.75rem;
+  min-height: 60vh;
+}
+
+.gf-rail {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.gf-zone {
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.gf-zone-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  padding-bottom: 0.25rem;
+  border-bottom: 1px solid var(--border-soft, rgba(181,138,71,0.10));
+}
+.gf-zone-name {
+  font: italic 500 14px/1 "Newsreader", Georgia, serif;
+  color: var(--text);
+}
+.gf-zone-count {
+  font: 600 12px/1 "Montserrat", system-ui, sans-serif;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  background: var(--panel);
+  padding: 0.2rem 0.5rem;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border);
+}
+
+.gf-pile {
+  position: relative;
+  min-height: 180px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+.gf-pile-empty {
+  font: italic 400 12px/1.4 "Newsreader", Georgia, serif;
+  color: var(--muted);
+}
+.gf-pile-browse { margin-top: 0.25rem; }
+
+.gf-card-back {
+  width: 100px;
+  height: 140px;
+  border-radius: var(--radius-sm);
+  background: linear-gradient(135deg, var(--panel) 0%, var(--brand-near-black) 70%);
+  border: 1px solid var(--brand-gold-soft);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: border-color 0.12s, transform 0.12s;
+}
+.gf-card-back:hover {
+  border-color: var(--brand-gold);
+  transform: translateY(-2px);
+}
+.gf-card-back-glyph {
+  font: italic 600 48px/1 "Newsreader", Georgia, serif;
+  color: var(--brand-gold);
+}
+
+.gf-board-main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.gf-battlefield {
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-height: 360px;
+}
+
+.gf-battlefield-row {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  align-items: flex-start;
+  padding: 0.4rem 0.4rem 0.4rem 5.5rem;
+  min-height: 150px;
+  border: 1px dashed transparent;
+  border-radius: var(--radius-sm);
+  transition: border-color 0.15s, background 0.15s;
+}
+.gf-row-lands { background: rgba(181,138,71,0.03); }
+.gf-row-label {
+  position: absolute;
+  left: 0.4rem;
+  top: 0.4rem;
+  font: italic 500 13px/1 "Newsreader", Georgia, serif;
+  color: var(--muted);
+  letter-spacing: 0.02em;
+}
+
+.gf-drop-hover {
+  border-color: var(--brand-gold) !important;
+  background: var(--brand-gold-soft) !important;
+}
+
+.gf-hand {
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  min-height: 200px;
+}
+.gf-hand-head { border-bottom: 1px solid var(--border-soft, rgba(181,138,71,0.10)); }
+.gf-hand-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  align-items: flex-start;
+  padding: 0.25rem;
+}
+
+.gf-card {
+  position: relative;
+  width: 100px;
+  height: 140px;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: transform 0.12s, border-color 0.12s, box-shadow 0.12s;
+  user-select: none;
+}
+.gf-card:hover {
+  transform: translateY(-3px);
+  border-color: var(--brand-gold);
+  box-shadow: var(--shadow-sm);
+}
+.gf-card.gf-tapped {
+  transform: rotate(90deg) translateX(8px);
+}
+.gf-card.gf-tapped:hover {
+  transform: rotate(90deg) translateX(8px) translateY(-3px);
+}
+.gf-card.gf-dragging { opacity: 0.5; }
+
+.gf-card-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.gf-card-fallback {
+  padding: 0.4rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  height: 100%;
+  background: linear-gradient(170deg, var(--panel) 0%, var(--panel-2) 100%);
+  color: var(--text);
+  font: 500 10px/1.2 "Montserrat", system-ui, sans-serif;
+  overflow: hidden;
+}
+.gf-card-fb-name { font-weight: 700; font-size: 11px; line-height: 1.2; }
+.gf-card-fb-cost { color: var(--brand-gold); font-size: 10px; }
+.gf-card-fb-type { color: var(--muted); font-size: 9px; font-style: italic; }
+.gf-card-fb-oracle {
+  font-size: 9px;
+  line-height: 1.25;
+  color: var(--text-dim);
+  margin-top: 0.2rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 5;
+  -webkit-box-orient: vertical;
+}
+
+.gf-preview {
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.6rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+.gf-preview-frame {
+  width: 100%;
+  aspect-ratio: 5 / 7;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--panel);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+.gf-preview-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+.gf-preview-empty {
+  font: italic 400 12px/1.4 "Newsreader", Georgia, serif;
+  color: var(--muted);
+  padding: 1rem;
+  text-align: center;
+}
+
+.gf-context-menu {
+  position: fixed;
+  z-index: 1000;
+  min-width: 220px;
+  background: var(--panel);
+  border: 1px solid var(--brand-gold-soft);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow, 0 6px 18px rgba(0,0,0,0.4));
+  padding: 0.25rem;
+  display: flex;
+  flex-direction: column;
+}
+.gf-menu-item {
+  text-align: left;
+  padding: 0.4rem 0.6rem;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font: 500 13px/1 "Montserrat", system-ui, sans-serif;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+}
+.gf-menu-item:hover {
+  background: var(--brand-gold-soft);
+  color: var(--brand-gold);
+}
+
+.gf-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1100;
+}
+.gf-modal[hidden] { display: none; }
+.gf-modal-card {
+  background: var(--panel);
+  border: 1px solid var(--brand-gold-soft);
+  border-radius: var(--radius);
+  max-width: min(900px, 92vw);
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.gf-modal-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--border);
+}
+.gf-modal-body {
+  padding: 0.75rem 1rem;
+  overflow-y: auto;
+}
+.gf-modal-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.gf-modal-empty {
+  font: italic 400 13px/1.4 "Newsreader", Georgia, serif;
+  color: var(--muted);
+  padding: 1rem 0;
+}
+
+/* Responsive: collapse rails + sidebar at narrow widths */
+@media (max-width: 980px) {
+  .gf-board-panel {
+    grid-template-columns: 1fr;
+  }
+  .gf-board {
+    grid-template-columns: 1fr;
+  }
+  .gf-rail {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+  .gf-zone {
+    flex: 1 1 220px;
+  }
+  .gf-preview {
+    order: 99;
+  }
+  .gf-preview-frame {
+    max-width: 320px;
+    margin: 0 auto;
+  }
+}
+
+@media (max-width: 640px) {
+  .gf-card { width: 84px; height: 118px; }
+  .gf-card-back { width: 84px; height: 118px; }
+}
+
+/* ============================================================================
+   v3.30.0 — Goldfish playtester, post-dev-feedback revision
+   Fix 1–3 + Add 4–6. All new rules namespaced .gf-*. Token reuse only.
+   ============================================================================ */
+
+/* Defense: the legacy static <div id="gf-context-menu"> in the template is
+   left in place (no-template constraint); ensure its [hidden] attribute
+   actually hides it. Without this, the .gf-context-menu { display: flex }
+   rule above would override the UA default [hidden] { display: none },
+   which was the empty-menu-husk bug (Fix 2). The active context-menu now
+   uses .gf-ctx (dynamic, removed on close); this rule covers the legacy
+   element so it never surfaces. */
+.gf-context-menu[hidden] { display: none !important; }
+
+/* Dynamic context menu — built on open, removed on close (Fix 2). */
+.gf-ctx {
+  position: fixed;
+  z-index: 1200; /* above .gf-modal (1100) — Fix 3 — so menus opened from
+                    inside the browse modal sit above the overlay */
+  min-width: 220px;
+  background: var(--panel);
+  border: 1px solid var(--brand-gold-soft);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
+  padding: 0.25rem;
+  display: flex;
+  flex-direction: column;
+}
+.gf-ctx-item {
+  text-align: left;
+  padding: 0.4rem 0.6rem;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font: 500 13px/1 "Montserrat", system-ui, sans-serif;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+}
+.gf-ctx-item:hover {
+  background: var(--brand-gold-soft);
+  color: var(--brand-gold);
+}
+
+/* Touch-friendly kebab affordance on every card (Add 4). Discoverable
+   path to the context menu for users who can't right-click. Hover-revealed
+   on pointer-hover viewports; lower-opacity always-visible on touch. */
+.gf-kebab {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.55);
+  color: var(--text);
+  border: 1px solid rgba(181, 138, 71, 0.35);
+  border-radius: 50%;
+  font: 700 14px/1 "Montserrat", system-ui, sans-serif;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.1s, background 0.1s, border-color 0.1s, color 0.1s;
+  z-index: 2;
+}
+.gf-card:hover .gf-kebab,
+.gf-card:focus-within .gf-kebab {
+  opacity: 1;
+}
+.gf-kebab:hover {
+  background: var(--brand-gold);
+  border-color: var(--brand-gold);
+  color: var(--brand-near-black);
+}
+@media (hover: none) {
+  .gf-kebab { opacity: 0.65; }
+}
+
+/* Cards: kill text-selection so touch long-press doesn't trigger a
+   selection bubble before the menu opens (Add 4). */
+.gf-card {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/* Modal overlay click-to-dismiss visual (Add 6 generalized browse). The
+   dimmer carries cursor:pointer so the click affordance is discoverable;
+   the inner card returns to default. */
+.gf-modal { cursor: pointer; }
+.gf-modal-card { cursor: auto; }
+
+/* Mana pool widget (Add 5). Floating bottom-right; six pips + Clear. */
+.gf-mana-pool {
+  position: fixed;
+  right: 1rem;
+  bottom: 1rem;
+  z-index: 900; /* below modal (1100) and menu (1200), above page content */
+  background: var(--panel);
+  border: 1px solid var(--brand-gold-soft);
+  border-radius: var(--radius);
+  padding: 0.5rem 0.6rem;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
+  font: 500 12px/1.3 "Montserrat", system-ui, sans-serif;
+  min-width: 240px;
+}
+.gf-mp-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.4rem;
+  gap: 0.5rem;
+}
+.gf-mp-title {
+  font: italic 500 13px/1 "Newsreader", Georgia, serif;
+  color: var(--text);
+}
+.gf-mp-clear {
+  padding: 0.15rem 0.4rem;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  border-radius: var(--radius-sm);
+  font: 500 11px/1 "Montserrat", system-ui, sans-serif;
+  cursor: pointer;
+}
+.gf-mp-clear:hover {
+  border-color: var(--brand-gold);
+  color: var(--brand-gold);
+}
+.gf-mp-pips {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 0.3rem;
+}
+.gf-mp-pip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.3rem 0.2rem;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+.gf-mp-sym {
+  font: 700 12px/1 "Montserrat", system-ui, sans-serif;
+  letter-spacing: 0.05em;
+}
+.gf-mp-pip.gf-mp-w .gf-mp-sym { color: #f5f1d8; }
+.gf-mp-pip.gf-mp-u .gf-mp-sym { color: #5a9fff; }
+.gf-mp-pip.gf-mp-b .gf-mp-sym { color: #b59cb6; }
+.gf-mp-pip.gf-mp-r .gf-mp-sym { color: #ff6b5c; }
+.gf-mp-pip.gf-mp-g .gf-mp-sym { color: #7bbf6b; }
+.gf-mp-pip.gf-mp-c .gf-mp-sym { color: var(--muted); }
+.gf-mp-btns {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+}
+.gf-mp-val {
+  font: 600 13px/1 "Montserrat", system-ui, sans-serif;
+  color: var(--text);
+  min-width: 1.25rem;
+  text-align: center;
+}
+.gf-mp-pip button {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  border-radius: var(--radius-sm);
+  font: 600 12px/1 "Montserrat", system-ui, sans-serif;
+  cursor: pointer;
+}
+.gf-mp-pip button:hover {
+  border-color: var(--brand-gold);
+  color: var(--brand-gold);
+}
+
+/* Mana picker popover (opens on a land's untapped→tapped transition).
+   Sits between modal (1100) and menu (1200) so a menu opened during
+   picker prompt would still be above it (defense in depth). */
+.gf-mana-picker {
+  position: fixed;
+  z-index: 1150;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.4rem 0.5rem;
+  background: var(--panel);
+  border: 1px solid var(--brand-gold);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
+}
+.gf-mana-picker-prompt {
+  font: italic 400 12px/1 "Newsreader", Georgia, serif;
+  color: var(--muted);
+  margin-right: 0.25rem;
+}
+.gf-mana-picker-btn {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 50%;
+  font: 700 13px/1 "Montserrat", system-ui, sans-serif;
+  cursor: pointer;
+}
+.gf-mana-picker-btn:hover {
+  border-color: var(--brand-gold);
+  color: var(--brand-gold);
+}
+.gf-mana-picker-btn.gf-mp-w { background: #f5f1d8; color: #211810; border-color: #d4cb9f; }
+.gf-mana-picker-btn.gf-mp-u { background: #2c4d8a; color: #f5f1d8; border-color: #5a9fff; }
+.gf-mana-picker-btn.gf-mp-b { background: #2a1a2a; color: #f5f1d8; border-color: #b59cb6; }
+.gf-mana-picker-btn.gf-mp-r { background: #5a1a1a; color: #f5f1d8; border-color: #ff6b5c; }
+.gf-mana-picker-btn.gf-mp-g { background: #1f3f1f; color: #f5f1d8; border-color: #7bbf6b; }
+.gf-mana-picker-btn.gf-mp-c { background: var(--panel); color: var(--text); border-color: var(--muted); }
+.gf-mana-picker-cancel {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  border-radius: var(--radius-sm);
+  font: 600 14px/1 "Montserrat", system-ui, sans-serif;
+  cursor: pointer;
+  margin-left: 0.2rem;
+}
+.gf-mana-picker-cancel:hover {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+/* Responsive: mana pool slides to the top on narrow widths so it doesn't
+   cover the collapsed bottom rail. */
+@media (max-width: 980px) {
+  .gf-mana-pool {
+    right: 0.5rem;
+    bottom: auto;
+    top: 0.5rem;
+    min-width: 0;
+  }
+  .gf-mp-pips { grid-template-columns: repeat(6, auto); }
+}
