@@ -1478,11 +1478,24 @@
     if (!detected) return null;
     const spec = {
       name: detected.token_name,
-      // TokenInventory.type_line drives the classifyRegion bucket;
-      // a loose name-only requirement (no token_inventory link)
-      // falls back to "Token Creature" — same default as the
-      // v3.30.7 custom-token form.
-      typeLine: detected.type_line || "Token Creature",
+      // v3.30.10 — unknown-token fallback discipline. type_line drives
+      // classifyRegion's bucket; a missing value used to fall back to
+      // "Token Creature" (the v3.30.7 custom-token form's default), which
+      // ALWAYS routes to bf-creatures — that was exactly the v3.30.8 bug
+      // (Food/Treasure/Clue tokens landing in Creatures because the
+      // DeckTokenRequirement → TokenInventory join yielded null). With
+      // v3.30.10's panels-cache enrichment in app/routes/goldfish.py,
+      // the payload now usually CARRIES a real type_line ("Token Artifact
+      // — Food", etc.) so this fallback only fires for the residual case
+      // where neither a TokenInventory link nor a panels-cache hit
+      // exists. In that residual case, defaulting to "Token Creature" is
+      // a false assertion that re-creates the bug — better to be honest
+      // and let classifyRegion fall through to bf-other. The bare
+      // string "Token" matches no classifyRegion keyword (creature /
+      // planeswalker / battle / artifact / enchantment / land) so the
+      // classifier's final fallthrough → bf-other. Unknown tokens land
+      // in Other honestly rather than in Creatures falsely.
+      typeLine: detected.type_line || "Token",
       // TokenInventory does not store P/T or colors today. Empty
       // strings → no P/T badge renders (v3.30.7's gating), no
       // colors are stored.

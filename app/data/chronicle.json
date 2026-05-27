@@ -1,5 +1,21 @@
 [
   {
+    "version": "3.30.10",
+    "date": "2026-05-27",
+    "added": [
+      "Goldfish quick-add tokens now arrive on the table with their correct type lines and art. Click '+ Treasure × 3' on a deck and three Treasures land in the Artifacts & Enchantments region with the Scryfall art. Click '+ Food × 4' and four Food tokens land in Artifacts & Enchantments — not in Creatures. Click '+ Servo × 5' and five Servos land in Creatures (because they actually are creatures). The type line + the art come from the per-deck cache the deck-detail 'Tokens' panel already populates, so it's the same data driving both surfaces — no extra lookups, no slower deck or playtester pages."
+    ],
+    "refined": [
+      "Three-layer fallback for token shape. If the token is in your /tokens catalog with a type line + art, those win (your catalog is authoritative). Otherwise the cached deck token data fills in. If neither has it — a token whose name you tracked but Cartarch has never seen — the token now lands in the Other region honestly, instead of being wrongly asserted to be a creature.",
+      "Best-effort against the most recently cached deck-token data. If you've heavily edited a deck since the last time its detail page opened, the playtester quick-add token data may be slightly out of date — re-open the deck-detail page once and the cache refreshes. Same staleness window the deck-detail 'Tokens' panel already has.",
+      "Token-name collisions (Spirit and Spirit from different sets, etc.) pick the first cache entry deterministically — never random, never crashes."
+    ],
+    "resolved": [
+      "Closes the v3.30.8 bug where Food, Treasure, Clue, Map, Blood, and Aura tokens auto-tracked via the v3.30.9 deck-detail suggestion flow all landed in the Creatures battlefield region. The cause was a missing-data fallback that defaulted to 'Token Creature' — a false assertion that lined up with the creature-region classifier. Real creature tokens (Saproling, Zombie, Servo) were never affected; they always had 'Creature' in their type line. The fix is upstream data + a more honest unknown fallback; the region classifier itself was untouched."
+    ],
+    "archivist_note": "The room had a habit. When a token arrived with no type line attached — no creature, no artifact, no land — the room would shrug and call it a creature and slot it among the bodies. A Food sat next to a Saproling sat next to a Servo, and the table looked wrong because the table was wrong. The room now asks a different question first: does the lookbook upstairs (the deck's cached token data) remember this token's type? If yes, the room uses what the lookbook knows. If no, the token sits in the Other region honestly, where unknown things belong — better than being filed as a creature without warrant. And on the side, the room finally hangs the right portrait: tokens with art in the cache arrive on the table with their faces, not as text cards."
+  },
+  {
     "version": "3.30.9",
     "date": "2026-05-27",
     "added": [

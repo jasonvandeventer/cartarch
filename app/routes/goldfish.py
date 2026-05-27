@@ -153,6 +153,68 @@ def goldfish_page(
         # works.
         tokens = []
 
+    # v3.30.10 — panels-cache enrichment for token shape. The v3.30.8
+    # payload above sourced type_line/image_url ONLY from a joined
+    # TokenInventory row; v3.30.9's auto-tracked DeckTokenRequirement
+    # rows are loose (token_inventory_id NULL) so the join produced
+    # null fields and goldfish.js defaulted them to "Token Creature" —
+    # which classifyRegion routed to bf-creatures, regardless of what
+    # the token actually was. Food/Treasure/Clue/etc landed in the
+    # Creatures region. The fix consumes the per-deck panels-cache
+    # (written by fetch_deck_tokens, the same data the deck-detail
+    # "Tokens" panel reads to render correct art + types). For each
+    # token whose type_line or image_url is still null, look up by
+    # case-insensitive name in the cache and fill in. Best-effort
+    # against the LAST-WRITTEN cache (NOT a live read; if the deck
+    # changed since the cache was written, the token data may be stale
+    # — acceptable for a playtester, documented here so a future
+    # reader doesn't mistake this for a live data path). Precedence:
+    # (a) TokenInventory link (user-curated, authoritative) → (b)
+    # panels-cache by name → (c) None (goldfish.js falls back to a
+    # neutral "Token" string that classifyRegion routes to bf-other,
+    # NOT bf-creatures — see goldfish.js quickAddDetectedToken). Reads
+    # _panels_cache_key + _read_panels_cache lazily from app.main to
+    # avoid a circular import (app.main imports this router). Zero
+    # new request-path network calls — the cache is a local JSON
+    # file. Token-name collisions (e.g. "Spirit", "Soldier") resolve
+    # to first-wins deterministically.
+    if tokens:
+        try:
+            from app.main import _panels_cache_key, _read_panels_cache
+
+            ck = _panels_cache_key(rows)
+            cached = _read_panels_cache(deck.id, ck)
+            cache_lookup: dict[str, dict] = {}
+            if cached:
+                for t in cached.get("tokens") or []:
+                    name_key = (t.get("name") or "").strip().lower()
+                    if not name_key:
+                        continue
+                    # First-wins on collisions — deterministic single match
+                    # per spec.
+                    cache_lookup.setdefault(name_key, t)
+            if cache_lookup:
+                for tok in tokens:
+                    key = (tok.get("token_name") or "").strip().lower()
+                    hit = cache_lookup.get(key)
+                    if not hit:
+                        continue
+                    if tok.get("type_line") is None and hit.get("type_line"):
+                        tok["type_line"] = hit["type_line"]
+                    if tok.get("image_url") is None and hit.get("image_url"):
+                        tok["image_url"] = hit["image_url"]
+                    if tok.get("scryfall_id") is None and hit.get("scryfall_id"):
+                        tok["scryfall_id"] = hit["scryfall_id"]
+                    if tok.get("set_code") is None and hit.get("set_code"):
+                        tok["set_code"] = hit["set_code"]
+                    if tok.get("collector_number") is None and hit.get("collector_number"):
+                        tok["collector_number"] = hit["collector_number"]
+        except Exception:
+            # Defensive: cache-read errors must not break payload assembly.
+            # User keeps quick-add buttons (now with raw v3.30.8 shape);
+            # goldfish.js handles missing type_line via the neutral fallback.
+            pass
+
     payload = {
         "deck_id": deck.id,
         "deck_name": deck.name,
