@@ -70,7 +70,12 @@ class User(Base):
     # cascade="all, delete-orphan" on Showcase.items) ShowcaseItem rows
     # in ``app/routes/admin.py:delete_user`` to guarantee the outcome
     # regardless of SQLite's PRAGMA foreign_keys posture.
-    showcase: Mapped[Showcase | None] = relationship(uselist=False)
+    # v3.30.12 — back_populates="user" pairs this with Showcase.user so
+    # SQLAlchemy knows the two relationships address the same FK
+    # (showcases.user_id) and won't issue the "writing the same FK from
+    # two relationships" SAWarning at mapper-configure time. Pre-existing
+    # v3.29.1 ORM-config oversight, closed in passing during v3.30.12.
+    showcase: Mapped[Showcase | None] = relationship(uselist=False, back_populates="user")
 
 
 class Card(Base):
@@ -542,7 +547,12 @@ class Showcase(Base):
     items: Mapped[list[ShowcaseItem]] = relationship(
         back_populates="showcase", cascade="all, delete-orphan"
     )
-    user: Mapped[User] = relationship()
+    # v3.30.12 — back_populates="showcase" pairs this with
+    # User.showcase. Closes the v3.29.1 ORM-config gap that
+    # surfaced as the "Showcase.user will copy column users.id to
+    # column showcases.user_id, which conflicts with relationship(s):
+    # 'User.showcase'" SAWarning at mapper-configure.
+    user: Mapped[User] = relationship(back_populates="showcase")
 
 
 class ShowcaseItem(Base):

@@ -1058,16 +1058,81 @@
   // problems, different shapes.
   const COUNTER_LABELS = ["+1/+1", "-1/-1", "Loyalty", "Charge", "Experience", "Quest"];
 
+  // v3.30.12 — generalized P/T-modifier label match. Reverses
+  // v3.30.12's literal-match-only design. Any label of the form
+  // ±X/±Y (signed integer / signed integer, no spaces) is treated
+  // as a P/T modifier and rendered multiplied by the count. The
+  // v3.30.12 rationale (cautious literal match to avoid surprise
+  // on custom labels) was reconsidered after dev test — users who
+  // type a P/T-shaped custom counter (Anthem-style "+2/+2", an
+  // asymmetric "+1/+0", a mixed-sign "+5/-5") expect P/T behaviour.
+  // Anything that doesn't match the strict ±X/±Y shape falls
+  // through to the "label N" display (Loyalty 4, Time 3, etc.) —
+  // unchanged.
+  const PT_LABEL_RE = /^([+-])(\d+)\/([+-])(\d+)$/;
+
+  /**
+   * v3.30.12 — single source for the counter display string.
+   *
+   * The state shape `counters: { label: count }` (v3.30.5) is correct
+   * as-is. The bug v3.30.5 shipped with: counters labeled "+1/+1"
+   * with count N were rendered as the string concatenation
+   * "+1/+1 N" (e.g. "+1/+1 7" for seven counters) — which the user
+   * reads as the wrong P/T modifier "+1/+17". v3.30.12 introduced
+   * this helper for the two literal labels "+1/+1" / "-1/-1";
+   * v3.30.12 generalizes via PT_LABEL_RE so a custom counter typed
+   * as "+2/+2" (or "+1/+0", or "-2/-1") also gets the P/T
+   * treatment — each numeric component multiplied by the count,
+   * sign preserved per-component (so "+1/+0" × 4 → "+4/+0", not
+   * "+4/+4"). Non-P/T labels (Loyalty, Charge, Experience, Quest,
+   * free-text customs like "Time") keep the "label N" fallback.
+   *
+   * Returns the full display string. The on-card chip in
+   * buildCounterCluster() drops it in directly. The editor row in
+   * buildCounterRow() uses it inside a PT_LABEL_RE-tested branch
+   * (the row's two-span label/value layout collapses to one span
+   * for P/T-shaped labels and preserves the original two-span
+   * layout exactly for every other label — preserves the "NOT a
+   * regression for non-P/T counters" requirement).
+   */
+  function formatCounterDisplay(label, count) {
+    const m = PT_LABEL_RE.exec(label);
+    if (m) {
+      const sign1 = m[1];
+      const mag1 = parseInt(m[2], 10);
+      const sign2 = m[3];
+      const mag2 = parseInt(m[4], 10);
+      // Per-component multiplication with sign preserved. "+1/+0" × 4
+      // → "+4/+0" (not "+4/+4"); "-1/-0" × 7 → "-7/-0" (preserves
+      // the explicit minus the user typed even when the magnitude
+      // is zero).
+      return sign1 + mag1 * count + "/" + sign2 + mag2 * count;
+    }
+    return label + " " + count;
+  }
+
   /**
    * Single mutation site for ANY counters map. Resolves the instance
    * via findInstance, applies the delta (label whitespace-stripped;
-   * empty label → no-op), deletes the key at exactly 0 so no zero-
-   * count entries linger in the map. Negative counts ARE allowed
-   * (the user may want -1/-1 visible as such; this is not a rules
-   * engine). Backward-safe: an instance built before v3.30.5 with no
-   * `counters` key gets one assigned on first mutation. Re-renders
-   * and refreshes the counter panel if it's open against this
-   * instance.
+   * empty label → no-op).
+   *
+   * v3.30.12 — clamped at 0. Reverses v3.30.5's "negative counts
+   * ARE allowed" rule (which was framed as "the user may want
+   * -1/-1 visible as such; this is not a rules engine"). After
+   * v3.30.5 dev test it became clear that negative counts make no
+   * physical sense for an annotation system — a card can't have
+   * "negative four +1/+1 counters." The right model is: −1/−1 is
+   * a separate counter type with its own positive count, not a
+   * negative count of +1/+1. Math.max(0, …) caps the result; the
+   * exact-zero branch below then deletes the key. A subtract past
+   * 0 is a no-op (no new entry created at 0; existing entry at
+   * exactly 0 is deleted).
+   *
+   * Deletes the key at exactly 0 so no zero-count entries linger
+   * in the map. Backward-safe: an instance built before v3.30.5
+   * with no `counters` key gets one assigned on first mutation.
+   * Re-renders and refreshes the counter panel if it's open
+   * against this instance.
    */
   function adjustCounter(instId, label, delta) {
     const found = findInstance(instId);
@@ -1076,7 +1141,11 @@
     if (!cleanLabel) return;
     const inst = found.inst;
     if (!inst.counters) inst.counters = {};
-    const next = (inst.counters[cleanLabel] || 0) + Number(delta || 0);
+    // v3.30.12 — clamp at 0. A subtract past 0 hits the exact-zero
+    // branch below and deletes the key cleanly. Pressing "−" on a
+    // row at count 0 is a no-op (computed next = max(0, 0 + -1) =
+    // 0; key doesn't exist; delete on a missing key is harmless).
+    const next = Math.max(0, (inst.counters[cleanLabel] || 0) + Number(delta || 0));
     if (next === 0) {
       delete inst.counters[cleanLabel];
     } else {
@@ -1105,11 +1174,31 @@
     for (const label of keys) {
       const chip = document.createElement("span");
       chip.className = "gf-counter-chip";
-      // Tag well-known labels for a tighter color treatment.
-      if (label === "+1/+1") chip.classList.add("gf-counter-plus");
-      else if (label === "-1/-1") chip.classList.add("gf-counter-minus");
-      else if (label === "Loyalty") chip.classList.add("gf-counter-loy");
-      chip.textContent = label + " " + counters[label];
+      // v3.30.12 — generalized chip-color treatment. Any label
+      // matching PT_LABEL_RE picks up the green/oxblood tint based
+      // on the SIGNS of its components: both positive → green
+      // (.gf-counter-plus), both negative → oxblood
+      // (.gf-counter-minus), mixed-sign (+1/-1, -2/+0, etc.) →
+      // neutral (no tint). Mirrors the "is this a buff or a debuff
+      // at a glance?" intuition; collapses to v3.30.5's two
+      // literal cases when the label is exactly "+1/+1" / "-1/-1".
+      // Loyalty keeps its brass-gold tint via the literal-match
+      // fallback below.
+      const _ptm = PT_LABEL_RE.exec(label);
+      if (_ptm) {
+        if (_ptm[1] === "+" && _ptm[3] === "+") chip.classList.add("gf-counter-plus");
+        else if (_ptm[1] === "-" && _ptm[3] === "-") chip.classList.add("gf-counter-minus");
+      } else if (label === "Loyalty") {
+        chip.classList.add("gf-counter-loy");
+      }
+      // Route the display through formatCounterDisplay so "+1/+1" ×
+      // 7 reads as "+7/+7" (not the v3.30.5 buggy "+1/+1 7"), and
+      // any custom P/T-shaped label (Anthem-style "+2/+2",
+      // asymmetric "+1/+0", etc.) renders multiplied too. Non-P/T
+      // labels (Loyalty, Charge, Experience, Quest, free-text
+      // customs like "Time") fall through to the helper's "label +
+      // ' ' + count" return.
+      chip.textContent = formatCounterDisplay(label, counters[label]);
       cluster.appendChild(chip);
     }
     return cluster;
@@ -1211,10 +1300,26 @@
     dec.addEventListener("click", () => adjustCounter(instId, label, -1));
     const lab = document.createElement("span");
     lab.className = "gf-counter-row-label";
-    lab.textContent = label;
     const val = document.createElement("span");
     val.className = "gf-counter-row-val";
-    val.textContent = String(count);
+    // v3.30.12 — for ANY P/T-shaped label (matches PT_LABEL_RE:
+    // ±X/±Y), collapse the row's two-span layout (label + value)
+    // into a single label span carrying the computed "+N/+N" /
+    // "-M/-N" display; clear the value span. For every other
+    // label, keep the existing two-span layout byte-identical to
+    // today (label = bare label, value = String(count)) —
+    // preserves the "NOT a regression for non-P/T-modifier
+    // counters" requirement. Generalized from v3.30.12's initial
+    // literal "+1/+1" / "-1/-1" match in the same release after
+    // dev-test feedback that custom P/T-shaped counters should
+    // also multiply.
+    if (PT_LABEL_RE.test(label)) {
+      lab.textContent = formatCounterDisplay(label, count);
+      val.textContent = "";
+    } else {
+      lab.textContent = label;
+      val.textContent = String(count);
+    }
     const inc = document.createElement("button");
     inc.type = "button";
     inc.className = "gf-counter-btn gf-counter-inc";
