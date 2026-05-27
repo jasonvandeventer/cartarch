@@ -165,12 +165,14 @@ from app.set_service import get_set_completion
 from app.token_service import (
     add_deck_token_requirement,
     create_token,
+    deck_requirement_exists_for_name,
     deck_token_status,
     delete_deck_token_requirement,
     delete_token,
     list_token_subtypes,
     list_tokens,
     parse_bulk_token_lines,
+    resolve_token_inventory_id_by_name,
     total_token_count,
     update_token,
 )
@@ -3186,6 +3188,48 @@ def _build_deck_card_items(
     return items, total_value, total_cards
 
 
+def _untracked_auto_tokens_from_cache(
+    deck_id: int,
+    all_deck_rows: list,
+    tracked_names_lower: set[str],
+) -> list[dict]:
+    """v3.30.9 — auto-detected tokens NOT yet tracked, read-only from cache.
+
+    Reads the per-deck panels cache the v3.8.9 "Tokens" panel already
+    populates (via the lazy ``GET /decks/{deck_id}/panels`` fragment) and
+    returns the subset of its token list whose name is not already in
+    ``DeckTokenRequirement`` for this deck. Cache miss returns ``[]`` —
+    explicit graceful degradation; v3.30.9 MUST NEVER call
+    ``fetch_deck_tokens`` on the deck-detail render path (the lazy
+    fragment is the only place that's allowed to, and even there it's
+    cached). Untouched contract: the cache key is computed from the same
+    ``_panels_cache_key`` the fragment uses, so a deck whose contents
+    have changed since the cache was written reads as a miss → empty
+    suggestion list until the user revisits the deck and the fragment
+    refills the cache. Suppresses any tokens whose name (case-insensitive)
+    already appears in this deck's DeckTokenRequirement rows.
+    """
+    if not all_deck_rows:
+        return []
+    try:
+        ck = _panels_cache_key(all_deck_rows)
+        cached = _read_panels_cache(deck_id, ck)
+    except Exception:
+        # Defensive: cache read errors must not break the deck-detail render.
+        return []
+    if not cached:
+        return []
+    out: list[dict] = []
+    for t in cached.get("tokens") or []:
+        name = (t.get("name") or "").strip()
+        if not name:
+            continue
+        if name.lower() in tracked_names_lower:
+            continue
+        out.append(t)
+    return out
+
+
 @app.get("/decks/{deck_id}")
 def deck_detail_page(
     request: Request,
@@ -3328,6 +3372,24 @@ def deck_detail_page(
             _identity_letters.add(letter)
     color_identity = " ".join(pip for pip in ["W", "U", "B", "R", "G"] if pip in _identity_letters)
 
+    # v3.30.9 — compute once before the render dict so suggested_tokens
+    # can derive from the same token_requirements list without a duplicate
+    # service call.
+    _token_requirements = deck_token_status(session, deck.id, current_user.id) if deck else []
+    # deck_token_status returns list[dict]; access via subscript.
+    _tracked_names_lower = {
+        (r.get("token_name") or "").strip().lower() for r in _token_requirements
+    }
+    _suggested_tokens = (
+        _untracked_auto_tokens_from_cache(
+            deck.id,
+            locals().get("all_deck_rows") or [],
+            _tracked_names_lower,
+        )
+        if deck
+        else []
+    )
+
     return render(
         request,
         "deck_detail.html",
@@ -3340,10 +3402,15 @@ def deck_detail_page(
             "deck_total_value": deck_total_value if deck else 0.0,
             "deck_total_cards": total_cards if deck else 0,
             "bracket_v2": bracket_v2,
-            "token_requirements": (
-                deck_token_status(session, deck.id, current_user.id) if deck else []
-            ),
+            "token_requirements": _token_requirements,
             "token_inventory_options": (list_tokens(session, current_user.id) if deck else []),
+            # v3.30.9 — auto-detected tokens NOT yet tracked, read from the
+            # existing per-deck panels cache (no Scryfall, no fresh compute).
+            # The "Tokens Needed" panel surfaces these as one-click "+ Track"
+            # suggestions; clicking inserts a DeckTokenRequirement via the
+            # auto-add route. ALWAYS computed (works alongside partial /
+            # full declared lists too), gated server-side on cache presence.
+            "suggested_tokens": _suggested_tokens,
             "search": search,
             "sort": sort,
             "direction": direction,
@@ -4681,6 +4748,51 @@ def decks_token_requirement_add(
             quantity_needed=max(1, quantity_needed),
             token_inventory_id=link_id,
             notes=notes,
+        )
+    except ValueError:
+        pass
+    return RedirectResponse(url=f"/decks/{deck_id}", status_code=303)
+
+
+@app.post("/decks/{deck_id}/tokens/auto-add")
+def decks_token_requirement_auto_add(
+    deck_id: int,
+    token_name: str = Form(...),
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+    _: None = CsrfRequired,
+):
+    """v3.30.9 — one-click "Track" from a suggested-token row.
+
+    Consumes an auto-detected token name (sourced read-only from the
+    per-deck panels cache by the deck-detail render) and inserts a
+    DeckTokenRequirement via the existing ``add_deck_token_requirement``
+    service function. The TokenInventory link is resolved by
+    case-insensitive name match against the user's catalogue — matched
+    rows get a linked requirement, unmatched names become loose
+    name-only requirements (first-class case per v3.30.8). Server-side
+    idempotency: ``deck_requirement_exists_for_name`` short-circuits
+    duplicate submissions (stale page, double-click) to a no-op.
+    Ownership-gated and CSRF-protected exactly like the manual
+    ``/decks/{deck_id}/tokens/add`` route alongside it. Does NOT touch
+    the panels cache, does NOT call Scryfall.
+    """
+    deck = get_deck(session, deck_id=deck_id, user_id=current_user.id)
+    if not deck:
+        return RedirectResponse(url="/decks", status_code=303)
+    name = (token_name or "").strip()
+    if not name:
+        return RedirectResponse(url=f"/decks/{deck_id}", status_code=303)
+    if deck_requirement_exists_for_name(session, deck.id, name):
+        return RedirectResponse(url=f"/decks/{deck_id}", status_code=303)
+    link_id = resolve_token_inventory_id_by_name(session, current_user.id, name)
+    try:
+        add_deck_token_requirement(
+            session,
+            deck_id=deck.id,
+            token_name=name,
+            quantity_needed=1,
+            token_inventory_id=link_id,
         )
     except ValueError:
         pass

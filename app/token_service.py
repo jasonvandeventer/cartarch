@@ -16,6 +16,55 @@ from sqlalchemy.orm import Session, joinedload
 from app.models import DeckTokenRequirement, TokenInventory
 
 
+def resolve_token_inventory_id_by_name(
+    session: Session, user_id: int, token_name: str
+) -> int | None:
+    """Case-insensitive lookup of the user's TokenInventory by name.
+
+    Returns the matching ``TokenInventory.id`` when the user owns a token
+    with the given name (case-insensitive), else ``None``. Used by the
+    v3.30.9 suggestion-side "+ Track" path so an auto-detected token that
+    the user already catalogued on /tokens links its DeckTokenRequirement
+    to that inventory row automatically; an auto-detected token the user
+    doesn't yet own becomes a loose name-only requirement (null link), a
+    first-class case the v3.30.8 docs already record.
+    """
+    name = (token_name or "").strip()
+    if not name:
+        return None
+    row = (
+        session.query(TokenInventory.id)
+        .filter(
+            TokenInventory.user_id == user_id,
+            func.lower(TokenInventory.name) == name.lower(),
+        )
+        .first()
+    )
+    return row[0] if row else None
+
+
+def deck_requirement_exists_for_name(session: Session, deck_id: int, token_name: str) -> bool:
+    """Server-side idempotency guard for the v3.30.9 auto-add route.
+
+    The suggestion list already excludes tracked tokens at render time, but
+    a stale tab or double-click must NOT produce a duplicate row.
+    Case-insensitive name compare against this deck's existing
+    DeckTokenRequirement rows.
+    """
+    name = (token_name or "").strip()
+    if not name:
+        return False
+    return (
+        session.query(DeckTokenRequirement.id)
+        .filter(
+            DeckTokenRequirement.deck_id == deck_id,
+            func.lower(DeckTokenRequirement.token_name) == name.lower(),
+        )
+        .first()
+        is not None
+    )
+
+
 def list_tokens(
     session: Session,
     user_id: int,

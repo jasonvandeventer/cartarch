@@ -14164,3 +14164,62 @@ body.gf-mode { overflow: hidden; }
   outline: 2px solid var(--brand-gold);
   outline-offset: 2px;
 }
+
+/* ============================================================================
+   v3.30.9 — Deck-detail "Tokens Needed" auto-token suggestions
+   Read-side feature surfacing the per-deck panels-cache token list (the
+   same data the v3.8.9 "Tokens" panel renders) as one-click "+ Track"
+   suggestion rows inside the "Tokens Needed" panel. Pure presentation;
+   no parallel design tokens.
+   ============================================================================ */
+.token-suggestions {
+  margin-top: 0.6rem;
+  padding: 0.6rem 0.75rem;
+  background: var(--panel-2);
+  border: 1px solid var(--brand-gold-soft);
+  border-radius: var(--radius-sm);
+}
+.token-suggestions-label {
+  font: italic 400 12px/1.4 "Newsreader", Georgia, serif;
+  color: var(--text-dim);
+  margin: 0 0 0.4rem 0;
+}
+.token-suggestions-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+.token-suggestion-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.3rem 0.5rem;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+}
+.token-suggestion-name {
+  font-weight: 600;
+  color: var(--text);
+}
+.token-suggestion-type {
+  font: italic 400 11px/1 "Newsreader", Georgia, serif;
+  color: var(--muted);
+}
+.token-suggestion-form {
+  display: inline-flex;
+  margin: 0;
+}
+.token-suggestion-track {
+  padding: 0.2rem 0.55rem;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+.token-suggestion-track:hover {
+  border-color: var(--brand-gold);
+  color: var(--brand-gold);
+}

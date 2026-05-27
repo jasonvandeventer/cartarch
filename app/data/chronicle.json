@@ -1,5 +1,23 @@
 [
   {
+    "version": "3.30.9",
+    "date": "2026-05-27",
+    "added": [
+      "Auto-detected token suggestions in the deck-detail 'Tokens Needed' panel. When a deck creates tokens that you haven't declared as needs yet, each one shows up as a '+ Track' row right inside the panel. One click and that token is in your tracked list, linked to its row on /tokens automatically if you already catalogued it there, or as a loose name-only requirement if you haven't.",
+      "The empty 'Tokens Needed' panel now points you at the suggestions: 'Suggestions auto-detected from this deck's cards appear below — one click to track any of them.' Replaces the old 'No token requirements declared. Add one below…' copy that left it ambiguous what to do next."
+    ],
+    "refined": [
+      "Always-show, not empty-state-only. With one token already declared, the others in the deck still appear as suggestions until you've tracked everything (or chosen to leave the rest alone). When the list is complete, the suggestion section disappears cleanly.",
+      "Token-name resolution: if you've catalogued the token on /tokens (any case), the new 'Track' click links your tracked requirement to that inventory row automatically — owned counts in the panel start working immediately. If you haven't catalogued it yet, you still get a tracked requirement; it just shows up as a loose name match.",
+      "The deck's auto-detected token list comes from the existing per-deck cache that the 'Tokens' panel above 'Tokens Needed' already populates. No new lookups, no slower deck pages, no extra cost. A deck the page has never opened shows an empty suggestion list until you visit it once — that's by design, not an error."
+    ],
+    "resolved": [
+      "Closes a long-standing 'why does my deck show seven tokens above but \"No token requirements declared\" below?' question. Phase 1 of the v3.30.9 work established it wasn't a divergence bug — the two panels were two independently-designed features that had never been wired to talk to each other (the auto 'Tokens' panel from v3.8.9, the manual 'Tokens Needed' catalog from v3.16.0). v3.30.9 is the bridge that makes them collaborate read-side.",
+      "Also helps the v3.30.8 goldfish playtester quick-add panel: any token you track via the new suggestion path appears as a one-click quick-add button on the playtester's controls bar on next open. Same data source; the new path just gets stuff into it faster."
+    ],
+    "archivist_note": "Two panels on one page that did not know about each other. The lookbook of tokens the deck creates sat above the catalogue of tokens the deck needs, and the catalogue would stare back blank even when the lookbook was full. The feature is not new code that knows what a deck creates — that knowledge was always there, kept by the lookbook upstairs. It is the small bridge that lets the lookbook whisper to the catalogue: 'this one, the Saproling, you might want to track,' and a click that hears it."
+  },
+  {
     "version": "3.30.8",
     "date": "2026-05-27",
     "added": [

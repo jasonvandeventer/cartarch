@@ -646,7 +646,38 @@
             </table>
           </div>
         {% else %}
-          <p class="muted">No token requirements declared. Add one below if this deck creates tokens you want to track.</p>
+          <p class="muted">No token requirements declared yet. Suggestions auto-detected from this deck's cards appear below — one click to track any of them.</p>
+        {% endif %}
+        {# v3.30.9 — auto-detected token suggestions. Sourced read-only
+           from the per-deck panels cache (the same data feeding the
+           "Tokens" panel above). Always rendered when suggestions exist,
+           regardless of whether the declared list is empty / partial /
+           full — a fully-declared deck shows no rows here, naturally.
+           One click on "+ Track" posts to /decks/{id}/tokens/auto-add
+           which resolves a TokenInventory link by case-insensitive name
+           match and inserts a DeckTokenRequirement with quantity_needed=1
+           (loose name-only when unmatched, per v3.30.8). #}
+        {% if suggested_tokens %}
+          <div class="token-suggestions">
+            <p class="token-suggestions-label">Auto-detected from this deck — track in one click:</p>
+            <ul class="token-suggestions-list">
+              {% for s in suggested_tokens %}
+                <li class="token-suggestion-row">
+                  <span class="token-suggestion-name">{{ s.name }}</span>
+                  {% if s.type_line %}
+                    <span class="token-suggestion-type muted">{{ s.type_line }}</span>
+                  {% endif %}
+                  <form action="/decks/{{ deck.id }}/tokens/auto-add"
+                        method="post"
+                        class="token-suggestion-form">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                    <input type="hidden" name="token_name" value="{{ s.name }}">
+                    <button type="submit" class="btn-like btn-like-muted token-suggestion-track">+ Track</button>
+                  </form>
+                </li>
+              {% endfor %}
+            </ul>
+          </div>
         {% endif %}
         <details style="margin-top: 0.5rem">
           <summary class="btn-like btn-like-muted" style="display:inline-block">+ Add token requirement</summary>
