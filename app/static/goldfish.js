@@ -1199,6 +1199,34 @@
       // customs like "Time") fall through to the helper's "label +
       // ' ' + count" return.
       chip.textContent = formatCounterDisplay(label, counters[label]);
+      // v3.30.13 — click-pill-to-adjust fast path. Left-click
+      // increments; shift-left-click decrements. Both route through
+      // the existing adjustCounter() helper — single-mutator
+      // discipline preserved (the menu widget's +/- still calls
+      // the same function). stopPropagation prevents the click from
+      // bubbling up to the card's toggleTap handler (which would
+      // tap/untap the underlying card and, for a land, fire the
+      // mana picker on the untap→tap transition). The cluster
+      // wrapper keeps pointer-events: none so clicks on the bare
+      // backdrop between chips still pass through to the card;
+      // .gf-counter-chip sets pointer-events: auto via CSS so the
+      // chip itself becomes a click target.
+      //
+      // Right-click is NOT intercepted — bubbles to the card's
+      // existing contextmenu handler so the user can still open
+      // the per-card menu (e.g. to reach Counters... for the
+      // Custom counter prompt, or to delete all of a type at
+      // once). Touch / long-press is NOT wired — small click
+      // targets are fragile under long-press; touch users
+      // continue to use the context menu → Counters... widget.
+      // Same desktop-pointer scoping as v3.30.4's hand-card mana-
+      // cost overlay.
+      const _chipLabel = label;
+      const _chipInstId = inst.id;
+      chip.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        adjustCounter(_chipInstId, _chipLabel, ev.shiftKey ? -1 : 1);
+      });
       cluster.appendChild(chip);
     }
     return cluster;

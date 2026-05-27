@@ -1,5 +1,22 @@
 [
   {
+    "version": "3.30.13",
+    "date": "2026-05-27",
+    "added": [
+      "Click a counter pill on a battlefield card to increment that counter; shift-click to decrement. The mouse cursor changes to a pointer on hover so the chip reads as interactive. Faster than opening the context menu's Counters... widget for the common 'I just added a +1/+1 to this creature' case."
+    ],
+    "refined": [
+      "The widget hasn't moved — it's still how you ADD a new counter type to a card (a new +1/+1 row, or a Custom... counter you type in), and how you subtract on a counter type that currently has no chip on the card. The pill click is a fast path for adjusting counters that are already present.",
+      "Clicking a pill no longer taps the card underneath. The chip's click handler stops the bubble so the card's tap behaviour (and the mana picker for lands) doesn't fire from a pill click.",
+      "Right-click on a pill still opens the per-card menu — unchanged. The new pill-click behaviour is left-click only.",
+      "Desktop pointers only. Touch users keep using the context menu's Counters... widget — small click targets are unreliable under long-press, and Cartarch doesn't pretend otherwise."
+    ],
+    "resolved": [
+      "Closes the playtester ask for a faster counter-adjustment path. The widget was the only way to add or remove a counter before; now once a counter exists on the card, clicking its pill is enough."
+    ],
+    "archivist_note": "The pip on the bottom of the card is now a button. Click it and the counter goes up; shift-click and it goes down. The widget upstairs is still where new counter types are introduced — you can't conjure a +1/+1 pill out of thin air on the card itself; it has to start somewhere — but once a pill is there, you needn't open the menu to feed or starve it. A small affordance, but the kind that adds up across a long game of triggers."
+  },
+  {
     "version": "3.30.12",
     "date": "2026-05-27",
     "added": [

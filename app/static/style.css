@@ -13844,6 +13844,25 @@ body.gf-mode { overflow: hidden; }
   border-color: var(--brand-gold);
   color: var(--brand-near-black);
 }
+/* v3.30.13 — pill-click-to-adjust fast path. Cluster wrapper still
+   carries `pointer-events: none` so clicks on the bare backdrop
+   between chips pass through to the card; per-chip override here
+   makes the chip itself the click target. Subtle hover affordance
+   tells the user it's interactive — outline-style border brighten
+   keeps the chip's color tint intact (so a +1/+1 hover still reads
+   green, a -1/-1 hover still reads oxblood). */
+.gf-counter-chip {
+  pointer-events: auto;
+  cursor: pointer;
+  transition: border-color 0.12s, filter 0.12s;
+}
+.gf-counter-chip:hover {
+  filter: brightness(1.15);
+}
+.gf-counter-chip:focus-visible {
+  outline: 2px solid var(--brand-gold);
+  outline-offset: 1px;
+}
 
 /* Floating editor panel — opened by "Counters…" from the per-card
    context menu. Same lifecycle idiom as .gf-mana-picker (single
