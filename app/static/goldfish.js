@@ -546,6 +546,14 @@
 
   // ── Render ─────────────────────────────────────────────────────
   function render() {
+    // v3.30.4 — hide the hand-hover mana-cost overlay defensively at
+    // the top of each render(). A card that moves out of the hand
+    // mid-hover (drag, click-to-move, mulligan) would otherwise leave
+    // the floating pill anchored to a card position that no longer
+    // contains that card. Function-declaration hoisting inside this
+    // IIFE makes the call safe even when render() runs from boot
+    // before the helper's source line is reached.
+    hideHandManaCostOverlay();
     document.getElementById("gf-stat-life").textContent = String(state.life);
     document.getElementById("gf-stat-turn").textContent = String(state.turn);
     document.getElementById("gf-count-library").textContent = String(state.library.length);
@@ -653,9 +661,13 @@
     const name = document.createElement("div");
     name.className = "gf-card-fb-name";
     name.textContent = inst.card.name || "(no name)";
+    // v3.30.4 — renderManaCost is the ONE cost parser. The text
+    // card-face's cost line is now styled pips matching the hand-
+    // hover overlay; the prior `textContent = mana_cost` was plain
+    // text in v3.30.0–v3.30.3.
     const cost = document.createElement("div");
     cost.className = "gf-card-fb-cost";
-    cost.textContent = inst.card.mana_cost || "";
+    if (inst.card.mana_cost) cost.appendChild(renderManaCost(inst.card.mana_cost));
     const type = document.createElement("div");
     type.className = "gf-card-fb-type";
     type.textContent = inst.card.type_line || "";
@@ -685,8 +697,24 @@
    * (Addition 6 drag-out).
    */
   function attachCardHandlers(el, inst, zone) {
-    el.addEventListener("mouseenter", () => setPreview(inst));
-    el.addEventListener("focus", () => setPreview(inst));
+    // v3.30.4 — hand-zone cards also fire the mana-cost overlay on
+    // hover/focus alongside the side preview. The overlay is a
+    // single body-level element repositioned via the card's
+    // bounding rect; scoped to the HAND zone only. mouseleave +
+    // blur listeners are added only for hand cards since the
+    // overlay only ever shows there.
+    el.addEventListener("mouseenter", () => {
+      setPreview(inst);
+      if (zone === "hand") showHandManaCostOverlay(inst, el);
+    });
+    el.addEventListener("focus", () => {
+      setPreview(inst);
+      if (zone === "hand") showHandManaCostOverlay(inst, el);
+    });
+    if (zone === "hand") {
+      el.addEventListener("mouseleave", hideHandManaCostOverlay);
+      el.addEventListener("blur", hideHandManaCostOverlay);
+    }
 
     el.addEventListener("click", (e) => {
       if (e.target.closest(".gf-kebab")) return; // kebab handles its own click
@@ -763,6 +791,111 @@
       frame.appendChild(img);
     } else {
       renderFallback(frame, inst);
+    }
+  }
+
+  // ── Mana-cost rendering (v3.30.4) ─────────────────────────────
+  // Single parser used by both:
+  //   - the hand-hover overlay (showHandManaCostOverlay below — the
+  //     Moxfield nicety the tester asked for)
+  //   - renderFallback's text card-face cost line (was plain text in
+  //     v3.30.0–v3.30.3; now styled pips for consistency)
+  // ONE parser, not two — `cost.textContent = inst.card.mana_cost`
+  // is GONE from renderFallback as of v3.30.4.
+  //
+  // Parses `{2}{W}{U}` → three pips in order. Unparseable segments
+  // render as a neutral pip carrying the raw text; never crashes.
+  // Empty / null mana_cost → empty fragment (caller hides the
+  // overlay when the fragment has no children).
+  function renderManaCost(manaCostString) {
+    const frag = document.createDocumentFragment();
+    if (!manaCostString) return frag;
+    // Match every {…} segment; ignore anything outside the braces.
+    const re = /\{([^}]+)\}/g;
+    let m;
+    while ((m = re.exec(manaCostString)) !== null) {
+      frag.appendChild(buildCostPip(m[1]));
+    }
+    return frag;
+  }
+
+  function buildCostPip(symbol) {
+    const pip = document.createElement("span");
+    pip.className = "gf-cost-pip";
+    const s = String(symbol || "").trim();
+    const upper = s.toUpperCase();
+    // Numeric generic (any number of digits): 0, 1, 2, ..., 15, 20.
+    if (/^\d+$/.test(s)) {
+      pip.classList.add("gf-cost-generic");
+      pip.textContent = s;
+      return pip;
+    }
+    // Variable cost — X, Y, Z all render in the generic slot.
+    if (upper === "X" || upper === "Y" || upper === "Z") {
+      pip.classList.add("gf-cost-generic");
+      pip.textContent = upper;
+      return pip;
+    }
+    // Single-letter colored — W/U/B/R/G/C.
+    if (upper === "W" || upper === "U" || upper === "B" || upper === "R" || upper === "G" || upper === "C") {
+      pip.classList.add("gf-cost-" + upper.toLowerCase());
+      pip.textContent = upper;
+      return pip;
+    }
+    // Trivial hybrid — `{W/U}` or `{2/W}` etc. Render as one pip with
+    // the raw text. Do NOT over-engineer rare symbols (phyrexian,
+    // snow, etc.) — they fall through to the neutral pip below.
+    if (/^[WUBRGC0-9XYZ]\/[WUBRGC]$/.test(upper)) {
+      pip.classList.add("gf-cost-hybrid");
+      pip.textContent = upper;
+      return pip;
+    }
+    // Unrecognized — neutral pip carrying the raw text. Catches
+    // {S} (snow), {W/P} (phyrexian), {HW} (half-mana), etc.
+    pip.classList.add("gf-cost-n");
+    pip.textContent = upper;
+    return pip;
+  }
+
+  // Hand-hover overlay — single body-level element repositioned on each
+  // hover via the anchor card's bounding rect. Scoped to the HAND zone
+  // only; the side preview pane carries every other zone.
+  function showHandManaCostOverlay(inst, anchorEl) {
+    if (!inst || !inst.card || !inst.card.mana_cost) {
+      hideHandManaCostOverlay();
+      return;
+    }
+    let overlay = document.getElementById("gf-hand-cost-overlay");
+    if (!overlay) {
+      overlay = document.createElement("div");
+      overlay.id = "gf-hand-cost-overlay";
+      overlay.className = "gf-hand-cost-overlay";
+      overlay.setAttribute("aria-hidden", "true");
+      document.body.appendChild(overlay);
+    }
+    overlay.innerHTML = "";
+    const frag = renderManaCost(inst.card.mana_cost);
+    if (!frag.childNodes.length) {
+      // mana_cost was a malformed string with no parseable segments —
+      // hide the overlay rather than show an empty box.
+      hideHandManaCostOverlay();
+      return;
+    }
+    overlay.appendChild(frag);
+    const r = anchorEl.getBoundingClientRect();
+    // (left, top) anchors at the card's top-center; the CSS rule
+    // translate(-50%, -100%) lifts the pill above the card with a
+    // small offset.
+    overlay.style.left = r.left + r.width / 2 + "px";
+    overlay.style.top = r.top - 6 + "px";
+    overlay.classList.add("gf-hand-cost-show");
+  }
+
+  function hideHandManaCostOverlay() {
+    const overlay = document.getElementById("gf-hand-cost-overlay");
+    if (overlay) {
+      overlay.classList.remove("gf-hand-cost-show");
+      overlay.innerHTML = "";
     }
   }
 

@@ -1,5 +1,21 @@
 [
   {
+    "version": "3.30.4",
+    "date": "2026-05-27",
+    "added": [
+      "Mana cost on hover in your hand. In the Goldfish playtester, when you hover (or move keyboard focus to) a card in your hand, a small floating pill of styled mana-symbol pips now appears above the card. White is white, blue is blue, generic costs render in a neutral circle, and the order matches the card's printed cost \u2014 so you can read what's expensive at a glance without dragging the cursor to the side preview pane.",
+      "The cost pips also appear on the text card-face fallback (the clean rendered card-back that the playtester uses when a Scryfall image isn't cached). Same color palette, same parser, same look. Wherever the playtester needs to show a mana cost, it now uses one consistent visual treatment instead of plain text."
+    ],
+    "refined": [
+      "Hand-zone only. Battlefield cards, pile cards, and cards inside the browse modal don't fire the hover pill \u2014 those already have the side preview pane for a quick read. Lands and other zero-cost cards render no pill at all (no empty box).",
+      "Unrecognized mana symbols don't break anything. Snow ({S}), Phyrexian ({W/P}), and any other rare symbol render as a neutral pip carrying the raw text \u2014 the user always sees something, even when the cost is exotic. Single-color, generic, X, and trivial hybrids like {W/U} are recognized and styled in their colors."
+    ],
+    "resolved": [
+      "Tester feedback: the room used to require a trip to the side preview pane to read a card's cost. With a hand of seven the side pane shows you the highlighted card at a time, and you'd lose orientation if you wanted to compare costs quickly across the hand. The hover pill puts the cost right above each card you point at \u2014 same gesture, immediate read, no break in focus."
+    ],
+    "archivist_note": "The room labels its own pieces. Pick up a card from your hand \u2014 or just look at it long enough to point at it \u2014 and the cost answers without further questions. The pip on the generic 2 is the same shade of brass-on-charcoal as the pip the mana pool draws when you tap a land. The Folio room is finally talking to itself in one language."
+  },
+  {
     "version": "3.30.3",
     "date": "2026-05-27",
     "added": [

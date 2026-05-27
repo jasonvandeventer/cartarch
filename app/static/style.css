@@ -13683,3 +13683,94 @@ body.gf-mode { overflow: hidden; }
 .gf-autodraw-label {
   white-space: nowrap;
 }
+
+/* ============================================================================
+   v3.30.4 — Goldfish hand-hover mana-cost overlay
+   Pure desktop hover affordance — a small floating pill of styled mana
+   pips that appears above any HAND card on mouseenter/focus. Touch has
+   no hover; the side preview pane already serves touch. The overlay is
+   a single body-level element repositioned via the card's bounding
+   rect (see goldfish.js showHandManaCostOverlay). Token reuse only.
+   Color pip palette mirrors the v3.30.0 .gf-mana-picker-btn.gf-mp-*
+   treatment so the playtester's mana-symbol idiom stays consistent
+   between the mana-pool widget, the mana picker, the text card-face
+   fallback, and this overlay.
+   ============================================================================ */
+.gf-hand-cost-overlay {
+  position: fixed;
+  z-index: 1180; /* above the mana pool (900) + modal (1100), below
+                    .gf-mana-picker (1150) and .gf-ctx menu (1200) */
+  display: none;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.3rem 0.5rem;
+  background: var(--panel);
+  border: 1px solid var(--brand-gold);
+  border-radius: var(--radius-pill);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
+  pointer-events: none;
+  /* (left, top) on the element anchors to the card's top-center; the
+     translate lifts the pill above the card. */
+  transform: translate(-50%, -100%);
+  white-space: nowrap;
+}
+.gf-hand-cost-overlay.gf-hand-cost-show {
+  display: inline-flex;
+}
+
+/* Individual mana pip — small filled circle with the symbol glyph.
+   Reuses the .gf-mana-picker-btn.gf-mp-* palette per the spec's "reuse
+   the existing mana-symbol color treatment from .gf-mana-pool /
+   .gf-mana-picker" instruction. */
+.gf-cost-pip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--panel-2);
+  color: var(--text);
+  font: 700 11px/1 "Montserrat", system-ui, sans-serif;
+  letter-spacing: 0.02em;
+}
+.gf-cost-pip.gf-cost-generic {
+  background: var(--panel);
+  color: var(--text);
+  border-color: var(--border);
+}
+.gf-cost-pip.gf-cost-w { background: #f5f1d8; color: #211810; border-color: #d4cb9f; }
+.gf-cost-pip.gf-cost-u { background: #2c4d8a; color: #f5f1d8; border-color: #5a9fff; }
+.gf-cost-pip.gf-cost-b { background: #2a1a2a; color: #f5f1d8; border-color: #b59cb6; }
+.gf-cost-pip.gf-cost-r { background: #5a1a1a; color: #f5f1d8; border-color: #ff6b5c; }
+.gf-cost-pip.gf-cost-g { background: #1f3f1f; color: #f5f1d8; border-color: #7bbf6b; }
+.gf-cost-pip.gf-cost-c { background: var(--panel); color: var(--text); border-color: var(--muted); }
+.gf-cost-pip.gf-cost-hybrid {
+  background: var(--panel-2);
+  color: var(--brand-gold);
+  border-color: var(--brand-gold);
+  font-size: 9px;
+}
+/* Neutral pip — catches snow ({S}), phyrexian ({W/P}), half-mana,
+   and any other rare/unrecognized symbol. Carries the raw text so
+   the user can read what was meant; never crashes. */
+.gf-cost-pip.gf-cost-n {
+  background: var(--panel-2);
+  color: var(--text-dim);
+  border-color: var(--border);
+  font-size: 9px;
+}
+
+/* Tweak: when renderManaCost is used inside the text card-face
+   fallback (renderFallback's .gf-card-fb-cost line, v3.30.4 onward),
+   the pips need a touch less prominence than the hand-hover overlay.
+   Same color palette, slightly tighter sizing so they sit inside the
+   100×140 card without crowding the type + oracle lines. */
+.gf-card-fb-cost .gf-cost-pip {
+  min-width: 14px;
+  height: 14px;
+  font-size: 9px;
+  padding: 0 3px;
+}
