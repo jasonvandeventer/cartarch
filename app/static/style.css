@@ -13641,3 +13641,45 @@ body.gf-mode { overflow: hidden; }
    inside the @media (max-width: 768px) block covers mobile entirely, so
    any html.sidebar-collapsed state has no visible effect at narrow
    widths. The bottom-tab IA + More menu is unchanged. */
+
+/* ============================================================================
+   v3.30.3 — Goldfish "Draw on new turn" opt-in toggle
+   Native checkbox + label sitting in .gf-controls-row adjacent to the
+   New Turn button. Folio register; token reuse only.
+   ============================================================================ */
+.gf-autodraw {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.3rem 0.55rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--panel-2);
+  color: var(--text-dim);
+  font: 500 11px/1 "Montserrat", system-ui, sans-serif;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  user-select: none;
+  transition: border-color 0.12s, color 0.12s;
+}
+.gf-autodraw:hover {
+  border-color: var(--brand-gold);
+  color: var(--brand-gold);
+}
+.gf-autodraw-input {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  cursor: pointer;
+  /* accent-color tints the native check to the Folio brass without
+     having to render a custom checkbox; modern-browser-only and
+     gracefully degrades to UA default. */
+  accent-color: var(--brand-gold);
+}
+.gf-autodraw-input:focus-visible {
+  outline: 2px solid var(--brand-gold);
+  outline-offset: 2px;
+}
+.gf-autodraw-label {
+  white-space: nowrap;
+}

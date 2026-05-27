@@ -1,5 +1,19 @@
 [
   {
+    "version": "3.30.3",
+    "date": "2026-05-27",
+    "added": [
+      "\"Draw on new turn\" toggle in the Goldfish playtester. A new checkbox in the controls row, next to the New Turn button, lets you decide whether clicking New Turn also draws a card. Default is ON \u2014 same as before \u2014 so nothing changes unless you turn it off. When the box is unchecked, New Turn still advances the turn counter, still untaps everything on the battlefield, still clears the mana pool \u2014 it just doesn't draw. Draw the card manually with the existing Draw button whenever you're ready."
+    ],
+    "refined": [
+      "The choice persists in your browser. Turn the box off once and every page-reload of the playtester remembers it. Same place the v3.30.2 sidebar-collapse preference lives \u2014 your browser's localStorage. Open the playtester in a different browser and you get the default again, which is on."
+    ],
+    "resolved": [
+      "Tester feedback: the room used to auto-draw on every New Turn, which broke the workflow if you'd just used Look at top N or were planning a tutor \u2014 the card you'd reserved for next turn would jump to your hand before you could play around it. The toggle puts the decision in your hands without changing anything else about how the turn advances. No \"you forgot to draw\" prompt, no pending-draw indicator \u2014 the playtester is still a goldfish room, not a rules engine."
+    ],
+    "archivist_note": "The room asks before drawing. A small concession to the way real games actually unfold \u2014 the deck is not the only thing on the table; sometimes the card you want is not the next one in the library. The toggle stays where you set it, and the rest of the turn \u2014 untap, mana pool reset, the turn counter ticking forward \u2014 runs unconditionally, the same as before. If you forget to draw, the room doesn't mind."
+  },
+  {
     "version": "3.30.2",
     "date": "2026-05-26",
     "added": [

@@ -122,6 +122,14 @@
     libraryBrowseOpen: false,
     modalContext: null,
     longPressTimer: null,
+    // v3.30.3 — opt-in "Draw on new turn" preference. Default ON
+    // (preserves v3.30.0–v3.30.2 behavior). The running source of
+    // truth: newTurn() reads state.autoDrawOnTurn, never localStorage,
+    // so the per-turn path is allocation-free. Persisted to
+    // localStorage under `cartarch-goldfish-autodraw` ("true"/"false")
+    // by the change handler in the boot sequence below. NOT reset by
+    // newGame() — this is a preference, not a per-session value.
+    autoDrawOnTurn: true,
   };
 
   // ── Boot: parse payload ───────────────────────────────────────
@@ -296,7 +304,14 @@
     state.turn += 1;
     for (const inst of allBattlefieldInstances()) inst.tapped = false;
     clearManaPool();
-    drawN(1);
+    // v3.30.3 — draw step is opt-in. When state.autoDrawOnTurn is false
+    // the turn still advances and the battlefield + mana pool still
+    // reset; the user draws manually via the Draw button. No pending-
+    // draw indicator, no "you forgot to draw" prompt — consistent with
+    // the no-rules-enforcement principle.
+    if (state.autoDrawOnTurn) {
+      drawN(1);
+    }
   }
 
   function mulligan() {
@@ -1051,6 +1066,39 @@
     });
     document.addEventListener("fullscreenchange", refreshFsBtnGlyph);
     document.addEventListener("webkitfullscreenchange", refreshFsBtnGlyph);
+  }
+
+  // ── Draw-on-new-turn preference (v3.30.3) ─────────────────────
+  // Read the persisted preference and sync the checkbox + state.
+  // Boot only UNCHECKS the box when localStorage explicitly holds
+  // "false"; otherwise the box stays checked (which matches the
+  // template's `checked` default, so no-JS / pre-boot state already
+  // matches the runtime default). Wrapped in try/catch — private-
+  // browsing localStorage can throw on read; degrade to default-on
+  // with an in-session-only toggle, never crash boot.
+  const autoDrawToggle = document.getElementById("gf-autodraw-toggle");
+  try {
+    if (window.localStorage && localStorage.getItem("cartarch-goldfish-autodraw") === "false") {
+      state.autoDrawOnTurn = false;
+      if (autoDrawToggle) autoDrawToggle.checked = false;
+    }
+  } catch (e) {
+    /* localStorage disabled (private mode) — fall back to default-on */
+  }
+  if (autoDrawToggle) {
+    autoDrawToggle.addEventListener("change", function () {
+      state.autoDrawOnTurn = !!autoDrawToggle.checked;
+      try {
+        if (window.localStorage) {
+          localStorage.setItem(
+            "cartarch-goldfish-autodraw",
+            state.autoDrawOnTurn ? "true" : "false"
+          );
+        }
+      } catch (e) {
+        /* localStorage disabled — toggle still works for the session */
+      }
+    });
   }
 
   // ── Boot ──────────────────────────────────────────────────────

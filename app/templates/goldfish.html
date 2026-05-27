@@ -32,6 +32,16 @@
       <div class="gf-controls-row">
         <button type="button" id="gf-btn-new-game" class="gf-btn gf-btn-primary">New game</button>
         <button type="button" id="gf-btn-new-turn" class="gf-btn">New turn</button>
+        {# v3.30.3 — opt-in "Draw on new turn" preference. Rendered
+           checked so no-JS / pre-boot state matches the default ON.
+           Boot in goldfish.js reads `cartarch-goldfish-autodraw` from
+           localStorage and unchecks ONLY when the key explicitly
+           holds "false". The change handler updates `state.autoDraw-
+           OnTurn` and writes the preference back. #}
+        <label class="gf-autodraw" for="gf-autodraw-toggle">
+          <input type="checkbox" id="gf-autodraw-toggle" class="gf-autodraw-input" checked>
+          <span class="gf-autodraw-label">Draw on new turn</span>
+        </label>
         <button type="button" id="gf-btn-draw" class="gf-btn">Draw</button>
         <button type="button" id="gf-btn-untap-all" class="gf-btn">Untap all</button>
         <button type="button" id="gf-btn-mulligan" class="gf-btn">Mulligan</button>
