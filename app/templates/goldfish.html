@@ -46,6 +46,13 @@
         <button type="button" id="gf-btn-untap-all" class="gf-btn">Untap all</button>
         <button type="button" id="gf-btn-mulligan" class="gf-btn">Mulligan</button>
         <button type="button" id="gf-btn-shuffle" class="gf-btn">Shuffle library</button>
+        {# v3.30.7 — Create custom token. Opens a small form in the
+           existing .gf-modal that builds a synthetic token card via
+           createToken() and routes it to the battlefield via
+           placeOnBattlefield + classifyRegion. Auto-detection of
+           deck-required tokens is v3.30.8 scope; v3.30.7 is the
+           manual / custom path only. #}
+        <button type="button" id="gf-btn-create-token" class="gf-btn">Create token</button>
         <span class="gf-control-group">
           <label class="gf-control-label" for="gf-input-mill">Mill</label>
           <input type="number" id="gf-input-mill" class="gf-input-num" min="1" max="100" value="1">

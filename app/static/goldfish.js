@@ -309,6 +309,19 @@
     } else {
       dest.push(found.inst);
     }
+    // v3.30.7 — token lifecycle. A token moved to any NON-battlefield
+    // zone vanishes from state entirely; no dead token cards sit in
+    // piles, in hand, or in the library. The vanish runs AFTER the
+    // push so any earlier discipline (v3.30.6 child-detach when a
+    // host leaves the battlefield; v3.30.5 counters clear) fires
+    // first on a clean source-list state — child-detach reads
+    // childrenOf(found.inst.id) which finds children still in their
+    // own arrays, unaffected by where the host is now sitting; the
+    // host is then removed from dest cleanly.
+    if (found.inst.isToken && !isBattlefieldZone(targetZone)) {
+      const idx = dest.indexOf(found.inst);
+      if (idx !== -1) dest.splice(idx, 1);
+    }
     render();
     refreshModalIfOpen();
   }
@@ -757,6 +770,18 @@
       openContextMenu({ clientX: r.right, clientY: r.bottom }, inst, zone);
     });
     el.appendChild(kebab);
+    // v3.30.7 — Token P/T badge. Tokens only, and only when at
+    // least one of power / toughness is non-empty. renderFallback
+    // does NOT render P/T (out of scope of this release to add it
+    // there for non-token cards). The badge sits absolute in the
+    // card's top-left so it doesn't collide with the kebab (top-
+    // right) or the bottom counter cluster (v3.30.5).
+    if (inst.isToken && inst.card && (inst.card.power || inst.card.toughness)) {
+      const pt = document.createElement("span");
+      pt.className = "gf-pt-badge";
+      pt.textContent = (inst.card.power || "") + "/" + (inst.card.toughness || "");
+      el.appendChild(pt);
+    }
     // v3.30.5 — counter pill cluster, battlefield-only and gated on
     // non-empty counters so cards without annotations render exactly
     // as they did in v3.30.0–v3.30.4. The cluster is a child of
@@ -1306,6 +1331,115 @@
     return out;
   }
 
+  // ── Custom token creation (v3.30.7) ───────────────────────────
+  // Tokens reuse the SAME instance shape as payload-built instances
+  // — {id, card, tapped, counters, attachedTo, ...} — plus `isToken:
+  // true`. Tap/untap (v3.30.0), counters (v3.30.5), and attachment
+  // (v3.30.6) all work with ZERO special-casing because nothing in
+  // those systems consults `isToken`. This is the whole reason
+  // tokens were sequenced last in the v3.30.x followups series; the
+  // four prior releases built the substrate.
+  //
+  // The card object on a token is SYNTHETIC — invented in JS, never
+  // touches the payload or InventoryRow. createToken is the ONLY
+  // construction site; placeOnBattlefield routes the new instance
+  // via classifyRegion so a "Token Creature" lands in Creatures, a
+  // "Token Artifact — Treasure" in Artifacts & Enchantments, etc.
+  // No parallel placement path.
+  //
+  // Token ids use the distinct `gf-tok-N` prefix so they never
+  // collide with the `gf-N` payload-instance ids. findInstance is
+  // fully id-agnostic (scans by `x.id === id` strict equality
+  // across all zones), so the prefix split is purely for human
+  // readability — no code conditions on it.
+  //
+  // Lifecycle: a token moved to ANY non-battlefield zone vanishes
+  // (the v3.30.7 moveTo extension below). Goldfish convention,
+  // matches the MTG game-state rule that tokens cease to exist
+  // when they leave the battlefield — except we apply it as a
+  // pure storage policy, not as a rules engine; the user moves
+  // the token wherever they like, and if it lands off the
+  // battlefield it's removed from state.
+  let tokenSeq = 1;
+
+  /** Single construction site for token instances. spec carries:
+   *  - name (string)
+   *  - typeLine (string; default "Token Creature")
+   *  - power, toughness (free-text strings; "" if not given)
+   *  - colors (string of W/U/B/R/G/C letters, space-separated)
+   *  - oracleText (optional, default "")
+   *  Builds the synthetic card, constructs the instance with the
+   *  full v3.30.5/.6 shape + isToken: true, appends to the library
+   *  array (so placeOnBattlefield can find it via findInstance),
+   *  then immediately calls placeOnBattlefield which moves it to
+   *  the classifyRegion-determined battlefield region via the
+   *  existing moveTo path. */
+  function createToken(spec) {
+    const name = String((spec && spec.name) || "").trim() || "Token";
+    const typeLine = String((spec && spec.typeLine) || "").trim() || "Token Creature";
+    const power = String((spec && spec.power) || "").trim();
+    const toughness = String((spec && spec.toughness) || "").trim();
+    const colors = String((spec && spec.colors) || "").trim();
+    const oracleText = String((spec && spec.oracleText) || "");
+    const card = {
+      name: name,
+      // type_line drives classifyRegion + isLand + renderFallback.
+      // Default "Token Creature" routes to Creatures via the v3.30.1
+      // priority Creature → PW/Battle → Art/Ench → Land → Other.
+      type_line: typeLine,
+      // Tokens have no cost. Empty mana_cost is handled gracefully
+      // by renderManaCost (returns empty fragment, the hand-hover
+      // overlay short-circuits, the text card-face hides the cost
+      // line) and by classifyRegion (doesn't read mana_cost).
+      mana_cost: "",
+      cmc: 0,
+      // null image_url → renderFallback paints the text card-face,
+      // which is what every token looks like (no Scryfall art for
+      // user-invented tokens; future deck-token auto-detect in
+      // v3.30.8 might paint a Scryfall image_url here, opt-in).
+      image_url: null,
+      oracle_text: oracleText,
+      colors: colors,
+      // color_identity isn't read by any goldfish render path today,
+      // but include it for symmetry with the payload card shape so
+      // future code that touches it doesn't have to special-case
+      // tokens.
+      color_identity: colors,
+      // P/T fields — token-only, rendered by buildCardEl's
+      // .gf-pt-badge below when isToken AND (power || toughness)
+      // is non-empty. renderFallback does NOT consume these today;
+      // adding P/T to the fallback card face is out of scope.
+      power: power,
+      toughness: toughness,
+      // Backward-compat fields a non-token payload card carries —
+      // tokens fill with safe defaults so any future code that
+      // reads them won't crash.
+      set_code: "",
+      collector_number: "",
+    };
+    const inst = {
+      id: "gf-tok-" + tokenSeq++,
+      card: card,
+      tapped: false,
+      counters: {},
+      attachedTo: null,
+      // v3.30.7 — isToken flag. The lifecycle rule in moveTo reads
+      // this; render code does NOT need to. Counters / attachment /
+      // tap / drag-drop / context menu all work without consulting
+      // it (that's the design: tokens inherit the substrate).
+      isToken: true,
+    };
+    // Land in library temporarily so findInstance / placeOnBattlefield
+    // can resolve the instance. placeOnBattlefield → moveTo → the
+    // classifyRegion-determined battlefield region in a single
+    // synchronous transition. The library momentarily holds the
+    // token between push and place; no render fires between the two
+    // (placeOnBattlefield's moveTo call is the first render).
+    state.library.push(inst);
+    placeOnBattlefield(inst.id);
+    return inst;
+  }
+
   // ── Context menu (Fix 2 + Fix 3) ──────────────────────────────
   function closeContextMenu() {
     if (state.activeMenu) {
@@ -1606,6 +1740,89 @@
     }
   }
 
+  // ── Create-token form (v3.30.7) ───────────────────────────────
+  // Reuses the existing .gf-modal as a lightweight popover by
+  // setting state.modalContext.kind = "create-token". closeModal
+  // handles the close + state-clear; refreshModalIfOpen early-
+  // returns on the "create-token" kind (it only knows browse /
+  // browse-library / look). No new modal system invented.
+  //
+  // The form is JS-built (consistent with how the v3.30.5
+  // .gf-counter-panel and v3.30.6 .gf-ctx menus are built) — no
+  // hardcoded markup in goldfish.html beyond the trigger button.
+  function openCreateTokenForm() {
+    closeContextMenu();
+    closeCounterPanel();
+    closeManaPicker();
+    state.modalContext = { kind: "create-token" };
+    modalTitle.textContent = "Create token";
+    modalBody.innerHTML = "";
+    const form = document.createElement("div");
+    form.className = "gf-create-token-form";
+    form.innerHTML = ""
+      + '<label class="gf-ctf-row"><span class="gf-ctf-label">Name</span>'
+      + '<input type="text" id="gf-ctf-name" class="gf-ctf-input" placeholder="Token"></label>'
+      + '<label class="gf-ctf-row"><span class="gf-ctf-label">Type line</span>'
+      + '<input type="text" id="gf-ctf-type" class="gf-ctf-input" value="Token Creature"></label>'
+      + '<div class="gf-ctf-row gf-ctf-pt-row">'
+      + '<span class="gf-ctf-label">P / T</span>'
+      + '<input type="text" id="gf-ctf-power" class="gf-ctf-input gf-ctf-pt" placeholder="1">'
+      + '<span class="gf-ctf-pt-sep">/</span>'
+      + '<input type="text" id="gf-ctf-toughness" class="gf-ctf-input gf-ctf-pt" placeholder="1">'
+      + '</div>'
+      + '<div class="gf-ctf-row gf-ctf-colors-row">'
+      + '<span class="gf-ctf-label">Colors</span>'
+      + '<div class="gf-ctf-colors" id="gf-ctf-colors">'
+      + ["W", "U", "B", "R", "G", "C"].map(
+          (c) =>
+            '<button type="button" class="gf-ctf-color gf-mp-' +
+            c.toLowerCase() +
+            '" data-color="' +
+            c +
+            '" aria-pressed="false">' +
+            c +
+            "</button>"
+        ).join("")
+      + '</div></div>'
+      + '<label class="gf-ctf-row gf-ctf-oracle-row">'
+      + '<span class="gf-ctf-label">Oracle text</span>'
+      + '<textarea id="gf-ctf-oracle" class="gf-ctf-input gf-ctf-oracle" rows="2" placeholder="Optional"></textarea>'
+      + '</label>'
+      + '<div class="gf-ctf-row gf-ctf-actions">'
+      + '<button type="button" id="gf-ctf-cancel" class="gf-btn">Cancel</button>'
+      + '<button type="button" id="gf-ctf-create" class="gf-btn gf-btn-primary">Create</button>'
+      + '</div>';
+    modalBody.appendChild(form);
+    modal.hidden = false;
+    // Color toggle handlers — aria-pressed reflects state, .selected
+    // class drives the CSS lit-up treatment.
+    form.querySelectorAll(".gf-ctf-color").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const pressed = btn.getAttribute("aria-pressed") === "true";
+        btn.setAttribute("aria-pressed", String(!pressed));
+        btn.classList.toggle("gf-ctf-color-on", !pressed);
+      });
+    });
+    document.getElementById("gf-ctf-cancel").addEventListener("click", closeModal);
+    document.getElementById("gf-ctf-create").addEventListener("click", () => {
+      const colorButtons = form.querySelectorAll('.gf-ctf-color[aria-pressed="true"]');
+      const colorLetters = Array.from(colorButtons).map((b) => b.dataset.color);
+      const spec = {
+        name: document.getElementById("gf-ctf-name").value,
+        typeLine: document.getElementById("gf-ctf-type").value,
+        power: document.getElementById("gf-ctf-power").value,
+        toughness: document.getElementById("gf-ctf-toughness").value,
+        colors: colorLetters.join(" "),
+        oracleText: document.getElementById("gf-ctf-oracle").value,
+      };
+      createToken(spec);
+      closeModal();
+    });
+    // Auto-focus Name so the user can start typing immediately.
+    const nameInput = document.getElementById("gf-ctf-name");
+    if (nameInput) nameInput.focus();
+  }
+
   // ── Controls wiring ───────────────────────────────────────────
   document.getElementById("gf-btn-new-game").addEventListener("click", newGame);
   document.getElementById("gf-btn-new-turn").addEventListener("click", newTurn);
@@ -1616,6 +1833,10 @@
     shuffle(state.library);
     render();
   });
+  // v3.30.7 — Create token opens the in-modal form. The button is
+  // a flat sibling of New game / New turn / Draw / etc.; the form
+  // body is JS-built inside the existing .gf-modal.
+  document.getElementById("gf-btn-create-token").addEventListener("click", openCreateTokenForm);
   document.getElementById("gf-btn-mill").addEventListener("click", () => {
     const n = parseInt(document.getElementById("gf-input-mill").value, 10) || 1;
     millN(Math.max(1, Math.min(100, n)));

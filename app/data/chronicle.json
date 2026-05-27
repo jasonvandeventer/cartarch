@@ -1,5 +1,21 @@
 [
   {
+    "version": "3.30.7",
+    "date": "2026-05-27",
+    "added": [
+      "Custom token creation. A 'Create token' button in the Goldfish controls bar opens a small form: Name, Type line (default 'Token Creature'), Power / Toughness (free text \u2014 accepts '*'), six W/U/B/R/G/C color toggle pills, and an Oracle text box. Click Create and the token lands on the battlefield in the right region \u2014 Token Creature in Creatures, Token Artifact in Artifacts & Enchantments, Token Enchantment in Artifacts & Enchantments, Token Planeswalker in Planeswalkers & Battles, anything else in Other. The token comes with a small P/T badge in the corner showing what you entered.",
+      "Tokens are first-class playtester cards. You can tap and untap them, add counters to them (the v3.30.5 counter system works on tokens identically), attach them to other battlefield cards or have them be the host of attachments (v3.30.6 attachment system works too). Move a token to the graveyard, exile, hand, library, or command zone and it disappears from the table \u2014 the way tokens behave in the actual rules \u2014 but without the room caring about why. No rules enforcement."
+    ],
+    "refined": [
+      "Token creation is manual / custom only in this release. The user picks the name, type, P/T, colors, oracle text. The app does NOT auto-detect that your deck makes Treasures or Servos or Squirrels \u2014 that's the next release (v3.30.8, the final item in the v3.30.x followups series), which will surface deck-required tokens as one-click create buttons.",
+      "Tokens never persist. They live only in browser memory while a goldfish session is open. New game wipes them along with the rest of the playtester state; closing the tab wipes them; nothing about a token ever reaches the server or the database. (Your real cards stay your real cards.)"
+    ],
+    "resolved": [
+      "Resolves the custom / manual half of the long-running 'token spawning' Goldfish follow-up that the v3.30.x series carried since v3.30.0 ship. Tester now has a way to put treasures, soldier tokens, food, plant counters with bodies \u2014 anything \u2014 on the table without scribbling on paper or borrowing a token from another deck. The auto-detect half (deck-required tokens surfaced as one-click buttons) remains as the v3.30.8 finale."
+    ],
+    "archivist_note": "The room makes its own cards now. Not real cards \u2014 those still live in the Catalogue, where they belong \u2014 but cards-for-the-purposes-of-this-game: the Servo that Wanderlust made, the Goblin that Hordeling Outburst made, the Treasure that the Tireless Tracker conjured. Type it, name it, pick a colour, and it sits on the table next to the real ones, taking +1/+1 counters and Bonesplitters like anything else. When it leaves the battlefield it ceases to be \u2014 the room doesn't keep dead tokens in piles."
+  },
+  {
     "version": "3.30.6",
     "date": "2026-05-27",
     "added": [
