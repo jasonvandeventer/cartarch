@@ -87,6 +87,9 @@ from scripts.migrate_v3_29_1_collection_sharing import (
 from scripts.migrate_v3_29_2_pairwise_trading import (
     main as migrate_v3_29_2_pairwise_trading,
 )
+from scripts.migrate_v3_30_11_card_produced_tokens import (
+    main as migrate_v3_30_11_card_produced_tokens,
+)
 
 
 def _is_applied(name: str) -> bool:
@@ -432,6 +435,13 @@ def run():
         _mark_applied("v3_29_2_pairwise_trading")
     else:
         print("v3.29.2 pairwise_trading already applied, skipping")
+
+    if not _is_applied("v3_30_11_card_produced_tokens"):
+        print("Running v3.30.11 card produced_tokens migration...")
+        migrate_v3_30_11_card_produced_tokens()
+        _mark_applied("v3_30_11_card_produced_tokens")
+    else:
+        print("v3.30.11 card_produced_tokens already applied, skipping")
 
     print("Migration runner complete")
 

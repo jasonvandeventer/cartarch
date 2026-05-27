@@ -92,6 +92,39 @@ def _normalize_card_payload(raw: dict[str, Any]) -> dict[str, Any]:
     raw_identity = raw.get("color_identity") or []
     color_identity_str = " ".join(raw_identity)  # "" = colorless, never None after a fetch
 
+    # v3.30.11 — produced_tokens. Capture the subset of Scryfall's all_parts
+    # array whose component is exactly "token" (mirrors the discrimination
+    # in fetch_deck_tokens line 182). Per-entry shape: {name, type_line,
+    # scryfall_id} — `id` from Scryfall is stored as `scryfall_id` so the
+    # v3.30.12 consumer flip can look up token cards in the scryfall_cards
+    # bulk cache directly. component is the filter criterion, not stored
+    # (only-tokens-stored, implicit by presence). object/uri not useful
+    # downstream. Empty list → "[]" (NOT NULL); a NULL column means "this
+    # row predates the v3.30.11 daemon backfill" and is distinguishable
+    # from "we processed this card and it has no tokens". v3.30.11 is the
+    # data half of a two-release sequence; no consumer reads this field
+    # yet — fetch_deck_tokens, compute_deck_tokens, the deck-detail
+    # "Tokens" panel, and the v3.30.10 goldfish enrichment are all
+    # UNCHANGED. v3.30.12 retires fetch_deck_tokens's request-path
+    # Scryfall call once the daemon has populated produced_tokens across
+    # scryfall_cards.
+    produced_tokens_list: list[dict[str, str]] = []
+    seen_token_ids: set[str] = set()
+    for part in raw.get("all_parts") or []:
+        if (part or {}).get("component") != "token":
+            continue
+        tok_id = part.get("id") or ""
+        if not tok_id or tok_id in seen_token_ids:
+            continue
+        seen_token_ids.add(tok_id)
+        produced_tokens_list.append(
+            {
+                "name": part.get("name") or "",
+                "type_line": part.get("type_line") or "",
+                "scryfall_id": tok_id,
+            }
+        )
+
     return {
         "scryfall_id": raw.get("id"),
         "name": raw.get("name"),
@@ -114,6 +147,10 @@ def _normalize_card_payload(raw: dict[str, Any]) -> dict[str, Any]:
         "frame_effects": json.dumps(raw.get("frame_effects") or []),
         "set_type": (raw.get("set_type") or "").lower(),
         "layout": (raw.get("layout") or "").lower(),
+        # v3.30.11 — 22nd key, appended at the end to preserve byte-
+        # identical ordering of the existing 21 keys. _CACHE_COLUMNS
+        # below + _cached_row_to_payload track this addition.
+        "produced_tokens": json.dumps(produced_tokens_list),
     }
 
 
@@ -276,12 +313,14 @@ class BulkFetchResult:
 
 # Column list in the EXACT order _normalize_card_payload emits its keys.
 # _cached_row_to_payload rebuilds the dict in this order so a cache-path
-# value is indistinguishable from an API-path value.
+# value is indistinguishable from an API-path value. v3.30.11 added
+# produced_tokens as the 22nd column, appended at the end — preserves
+# byte-identical ordering of the existing 21 keys.
 _CACHE_COLUMNS = (
     "scryfall_id, name, set_code, set_name, collector_number, rarity, "
     "image_url, type_line, oracle_text, price_usd, price_usd_foil, "
     "price_usd_etched, colors, color_identity, mana_cost, cmc, legalities, "
-    "full_art, frame_effects, set_type, layout"
+    "full_art, frame_effects, set_type, layout, produced_tokens"
 )
 
 
@@ -323,6 +362,12 @@ def _cached_row_to_payload(m) -> dict[str, Any]:
         "frame_effects": m["frame_effects"],
         "set_type": m["set_type"],
         "layout": m["layout"],
+        # v3.30.11 — 22nd field. Stored as JSON text on the v3.25.0
+        # daemon-write path; passed through verbatim here (consumers
+        # parse on demand). NULL means "this row predates the v3.30.11
+        # backfill" — distinguishable from "[]" which means "this card
+        # has no tokens". Either value passes through cleanly.
+        "produced_tokens": m["produced_tokens"],
     }
 
 

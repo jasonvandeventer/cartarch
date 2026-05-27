@@ -14,7 +14,7 @@ round-trip with a real in-memory SQLite table (so INTEGER/REAL/NULL
 coercion is genuinely exercised) and asserts:
 
   * full dict equality (got == expected),
-  * identical key order / shape (the 21-key normalizer contract),
+  * identical key order / shape (the 22-key normalizer contract),
   * full_art is a Python bool, not the stored INTEGER,
   * the None-vs-"" contract: colorless card has colors=None AND
     color_identity="" (distinguishable), empty mana_cost stays "" not None,
@@ -56,7 +56,8 @@ CREATE TABLE scryfall_cards (
     full_art         INTEGER,
     frame_effects    TEXT,
     set_type         TEXT,
-    layout           TEXT
+    layout           TEXT,
+    produced_tokens  TEXT
 )
 """
 
@@ -230,11 +231,11 @@ def test_columns_match_normalizer() -> tuple[int, int]:
     else:
         print(f"  [FAIL] column/normalizer mismatch:\n    cols={_COLS}\n    norm={norm_keys}")
         failed += 1
-    if len(_COLS) == 21:
-        print("  [OK] 21 columns (not 20)")
+    if len(_COLS) == 22:
+        print("  [OK] 22 columns (v3.30.11 added produced_tokens as the 22nd)")
         passed += 1
     else:
-        print(f"  [FAIL] expected 21 columns, got {len(_COLS)}")
+        print(f"  [FAIL] expected 22 columns, got {len(_COLS)}")
         failed += 1
     return passed, failed
 
@@ -347,7 +348,7 @@ def run_all() -> int:
     total_p = total_f = 0
     suites = [
         (
-            "Test 1: _CACHE_COLUMNS matches normalizer (21 keys, in order)",
+            "Test 1: _CACHE_COLUMNS matches normalizer (22 keys, in order)",
             test_columns_match_normalizer,
         ),
         ("Test 2: byte-identical cache-path vs API-path", test_byte_identical),

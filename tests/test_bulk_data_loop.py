@@ -69,7 +69,8 @@ CREATE TABLE scryfall_cards (
     full_art         INTEGER,
     frame_effects    TEXT,
     set_type         TEXT,
-    layout           TEXT
+    layout           TEXT,
+    produced_tokens  TEXT
 )
 """
 _META_DDL = "CREATE TABLE scryfall_bulk_meta (key TEXT PRIMARY KEY, value TEXT)"

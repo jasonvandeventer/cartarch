@@ -1,5 +1,21 @@
 [
   {
+    "version": "3.30.11",
+    "date": "2026-05-27",
+    "added": [
+      "A new column on the local Scryfall bulk cache that records which tokens each card produces. The nightly bulk-data daemon backfills the column from the same Scryfall data it already downloads — no new fetches, no extra round-trips. Nothing on screen changes today; this release is the foundation for the next one."
+    ],
+    "refined": [
+      "First of a deliberate two-release sequence. v3.30.11 quietly populates token-relation data into the local cache; v3.30.12 will repoint the deck-detail 'Tokens' panel + the goldfish quick-add path to read it locally instead of calling Scryfall live every time the panel renders. That's the visible improvement — fewer network round-trips, faster cold deck loads, no Cloudflare ceiling risk. v3.30.11 just gets the data into place first so v3.30.12 has something to read.",
+      "Why split it. The local cache holds ~114,000 cards; the daemon walks the full Scryfall bulk export once a day. v3.30.12 only makes sense once the cache is meaningfully populated for the new field. Shipping both at once would either (a) ship a consumer that reads an empty column for a day, or (b) hold the data plumbing back for no reason. The window between v3.30.11 and v3.30.12 is intentional.",
+      "Internal data shape. Per token: name + type line + Scryfall ID. Cards with no tokens record an empty list explicitly (NOT null), so a future read can distinguish 'we know this card has no tokens' from 'we haven't backfilled this card yet.'"
+    ],
+    "resolved": [
+      "Nothing user-visible yet. v3.30.12 is what retires the long-pending request-path Scryfall call in fetch_deck_tokens — same class of issue v3.27.9 cleared for combos and brackets and v3.27.13 fixed for the per-set page. v3.30.11 is the data half of that closure; v3.30.12 is the consumer flip."
+    ],
+    "archivist_note": "Plumbing day. The bulk daemon already walks Scryfall's whole catalogue every night and writes a normalized row per card into the local cache. Today it also writes a small index of which tokens each card creates — a list of names + type lines + IDs, beside everything else the card already carries locally. Nothing reads that index yet. The reader follows in the next release, once enough nights have passed for the index to be populated. Building the shelf before stocking it would be wrong; stocking the shelf before anyone reaches for it is the correct order. The hand reaches in v3.30.12."
+  },
+  {
     "version": "3.30.10",
     "date": "2026-05-27",
     "added": [
