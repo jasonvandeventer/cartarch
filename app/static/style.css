@@ -13932,3 +13932,62 @@ body.gf-mode { overflow: hidden; }
   border-color: var(--brand-gold);
   color: var(--brand-gold);
 }
+
+/* ============================================================================
+   v3.30.6 — Goldfish equipment/aura attachment fan
+   `attachedTo` is a render pointer — children stay in their own classify-
+   Region battlefield array. Render nests them under the host inside a
+   .gf-card-group flex item. Host sits at the top of the group; children
+   stack beneath with --gf-attach-index-driven offsets. CSS variables let
+   the responsive breakpoint adjust the stride in ONE place. Token reuse
+   only — Folio palette + existing radius/spacing scales.
+   ============================================================================ */
+
+/* Default-viewport card dimensions are 100w × 140h (v3.30.0 .gf-card).
+   The fan stride is 32px — child N's top edge sits at 30px + 32*N, so
+   each subsequent child shows a 32px sliver under the previous layer.
+   Visual cap: ~9 children before the host's bottom strip is fully
+   covered, but goldfishing rarely sees more than 2–3 auras on one
+   permanent. */
+.gf-card-group {
+  position: relative;
+  display: inline-block;
+  width: 100px;
+  /* min-height reserves space in the flex-wrap row so neighboring
+     cards in the region don't overlap the fan. --gf-attach-count is
+     set inline by the renderer; the default 0 keeps the group at the
+     bare host height. */
+  --gf-attach-count: 0;
+  min-height: calc(140px + 32px * var(--gf-attach-count));
+  vertical-align: top;
+}
+.gf-card-group .gf-card-host {
+  position: relative;
+  z-index: 10;
+}
+.gf-card-group .gf-attached-child {
+  position: absolute;
+  left: 0;
+  /* --gf-attach-index is set inline per child (0, 1, 2, …); the
+     30px base offset overlaps the host by 110px so the host card
+     reads as the dominant element with the child's lower strip
+     peeking out below. Each subsequent child adds 32px so the fan
+     reads as a stacked deck of auras / equipment under the host. */
+  --gf-attach-index: 0;
+  top: calc(30px + 32px * var(--gf-attach-index));
+  /* z-index is set inline (10 - i) so each successive child sits
+     a layer further back. */
+}
+
+/* Responsive — match the v3.30.0 ≤640px card-size reduction
+   (.gf-card → 84w × 118h). Fan stride scales proportionally so the
+   visual offset reads the same on phone widths. */
+@media (max-width: 640px) {
+  .gf-card-group {
+    width: 84px;
+    min-height: calc(118px + 28px * var(--gf-attach-count));
+  }
+  .gf-card-group .gf-attached-child {
+    top: calc(26px + 28px * var(--gf-attach-index));
+  }
+}

@@ -1,5 +1,21 @@
 [
   {
+    "version": "3.30.6",
+    "date": "2026-05-27",
+    "added": [
+      "Equipment and aura attachment on the battlefield. Right-click (or long-press on touch) any battlefield card, choose 'Attach to\u2026' from the context menu, and a small picker appears listing every eligible host. Pick one and the card tucks beneath the host with a small fan offset \u2014 the host's body stays visible, and the attached card's bottom strip peeks out below. Multiple attachments stack neatly underneath in order. Right-click an attached card and choose 'Detach' to unattach it; the card returns to its own region as a top-level card.",
+      "Attached cards stay fully interactive. Tap the host alone (children don't follow); tap a child alone. Adjust counters on the host, on each child, independently. Move a host to the graveyard and its attachments stay on the battlefield as top-level cards \u2014 they don't follow the host off. Move an attached card to a different region and it detaches automatically. The fan is a visual / organizational marker \u2014 not a rules engine; the goldfish room still doesn't enforce anything."
+    ],
+    "refined": [
+      "One level only. A card can't attach to something that's already attached, and a card with its own attachments can't itself become attached. The picker only lists hosts that satisfy the rule, so the user never sees an invalid choice \u2014 and if no eligible host exists (lone card on the battlefield, or a card that already has attachments), the 'Attach to\u2026' item simply doesn't appear in the menu.",
+      "Render-only, not a state move. An attached card stays in its own type-based region \u2014 auras live in Artifacts & Enchantments, equipment lives in Artifacts & Enchantments, creature attachments live in Creatures. The render walks the host's region and fans the children underneath wherever they actually live. This keeps the goldfish room's region grouping honest while still letting the user see a permanent and its modifiers as a coherent stack."
+    ],
+    "resolved": [
+      "Closes a tester ask that surfaced once counters (v3.30.5) landed \u2014 a creature with +1/+1 counters wearing two auras and an equipment was a real game-state at v3.30.5, but the playtester rendered them as four unrelated cards floating in different regions of the battlefield, and the user had to keep the association in their head. v3.30.6 makes the room remember which auras / equipment go on which creature, visually."
+    ],
+    "archivist_note": "Cards finally cluster on the table the way they cluster in play. A creature wearing two auras and a sword no longer reads as four separate threats \u2014 they fan together, the host on top, each modifier slipped beneath. Move the creature away and the attachments stay where they were, no longer attached to anything; the rules of who-is-equipped-with-what are still the player's to remember. The room arranges; it does not decide."
+  },
+  {
     "version": "3.30.5",
     "date": "2026-05-27",
     "added": [

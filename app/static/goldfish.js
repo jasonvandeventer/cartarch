@@ -170,6 +170,18 @@
           // safe access against any pre-v3.30.5 instance shape that
           // a stale browser tab might still be running.
           counters: {},
+          // v3.30.6 — attachedTo: instance id string or null. A
+          // RENDER POINTER, not a state-array move — an attached
+          // card stays in its own classifyRegion array; only the
+          // render nests it beneath the host. ONE-LEVEL rule:
+          // attachInstance rejects nested or self-referential
+          // attachments. Cleared by moveTo on ANY leave-host path
+          // (move to non-battlefield, move to a different
+          // battlefield region). Backward-safe: reads use
+          // `inst.attachedTo` directly with `null` semantics, so a
+          // missing field on a pre-v3.30.6 instance is treated as
+          // unattached.
+          attachedTo: null,
         };
         if (c.is_commander) {
           state.command.push(inst);
@@ -254,6 +266,31 @@
   function moveTo(id, targetZone, opts = {}) {
     const found = findInstance(id);
     if (!found) return;
+    // v3.30.6 — attachment discipline. Two rules, applied BEFORE the
+    // splice so the source-list state stays coherent for childrenOf
+    // lookups. Children stay in their own battlefield arrays —
+    // attachedTo is a render pointer, not a state-array move — so
+    // detaching is a plain field assignment, no array bookkeeping.
+    // Internal mutation; bypasses detachInstance to avoid N redundant
+    // per-child renders before this move's own render fires at the
+    // end. Single-source-of-truth discipline is about UI writers;
+    // moveTo is an internal primitive applying the leave-host
+    // semantics.
+    if (!isBattlefieldZone(targetZone)) {
+      // (1) Host moved to non-battlefield → detach every child. The
+      //     children stay on the battlefield in their own regions,
+      //     now top-level (childrenOf() will return [] for the host
+      //     after the loop). They do NOT follow the host off the
+      //     battlefield.
+      const kids = childrenOf(found.inst.id);
+      for (const child of kids) child.attachedTo = null;
+    }
+    // (2) Attached card moved ANYWHERE (including between
+    //     battlefield regions) → clear its own attachedTo. Leaving
+    //     the host, by any path, detaches.
+    if (found.inst.attachedTo) {
+      found.inst.attachedTo = null;
+    }
     found.list.splice(found.idx, 1);
     const dest = ZONE_LISTS[targetZone]();
     found.inst.tapped = false;
@@ -603,10 +640,58 @@
   function renderBattlefieldRegion(regionId, zoneKey, list) {
     const row = document.getElementById("gf-region-" + regionId);
     if (!row) return;
-    Array.from(row.querySelectorAll(".gf-card")).forEach((n) => n.remove());
-    if (list.length === 0) row.classList.add("gf-bf-region-empty");
+    // v3.30.6 — strip BOTH lone .gf-card children and the
+    // .gf-card-group wrappers that hosts-with-children produce.
+    Array.from(row.querySelectorAll(".gf-card, .gf-card-group")).forEach((n) =>
+      n.remove()
+    );
+    // v3.30.6 — render only TOP-LEVEL cards (`attachedTo` falsy).
+    // An attached card is rendered fanned beneath its host (looked
+    // up across all five battlefield arrays by childrenOf), so it
+    // must be SKIPPED in its own region's top-level iteration. The
+    // empty-region class hook tracks top-level count, not raw list
+    // length — a region with only attached cards (whose hosts live
+    // in a different region) reads as empty here, which is correct:
+    // none of its cards render in this region's top level.
+    const topLevel = list.filter((inst) => !inst.attachedTo);
+    if (topLevel.length === 0) row.classList.add("gf-bf-region-empty");
     else row.classList.remove("gf-bf-region-empty");
-    for (const inst of list) row.appendChild(buildCardEl(inst, zoneKey));
+    for (const inst of topLevel) {
+      const children = childrenOf(inst.id);
+      if (children.length === 0) {
+        // No attached cards — render the host directly, no group
+        // wrapper. Keeps the DOM for a card with no fan
+        // byte-equivalent to v3.30.0–v3.30.5 (purely additive
+        // change for unattached cards).
+        row.appendChild(buildCardEl(inst, zoneKey));
+      } else {
+        // Has children — wrap host + fan in a .gf-card-group. The
+        // group is the flex item; the host sits at the top of the
+        // group, children stack beneath with CSS calc()-driven
+        // offsets keyed off --gf-attach-index. Host z-index 10;
+        // children descend (9, 8, …) so each child's bottom strip
+        // peeks out below the next layer up — classic Moxfield /
+        // Cockatrice fan.
+        const group = document.createElement("div");
+        group.className = "gf-card-group";
+        group.style.setProperty("--gf-attach-count", String(children.length));
+        const hostEl = buildCardEl(inst, zoneKey);
+        hostEl.classList.add("gf-card-host");
+        group.appendChild(hostEl);
+        for (let i = 0; i < children.length; i++) {
+          const childEl = buildCardEl(children[i], zoneKey);
+          childEl.classList.add("gf-attached-child");
+          childEl.style.setProperty("--gf-attach-index", String(i));
+          // z-index decreases from 9 → so each subsequent child sits
+          // a layer further back. Visual cap: ~9 children fit before
+          // z-stack inversion — well above any realistic equipment
+          // / aura load for goldfishing.
+          childEl.style.zIndex = String(9 - i);
+          group.appendChild(childEl);
+        }
+        row.appendChild(group);
+      }
+    }
   }
 
   function renderPile(zoneKey, list) {
@@ -1118,6 +1203,109 @@
     return row;
   }
 
+  // ── Equipment / aura attachment (v3.30.6) ─────────────────────
+  // `attachedTo` is a RENDER POINTER, not a state-array move. An
+  // attached card stays in its OWN classifyRegion array; only the
+  // render nests it beneath the host. Moving a host between regions
+  // (via placeOnBattlefield, classifyRegion drift) needs ZERO child
+  // bookkeeping — childrenOf scans across all five battlefield
+  // arrays and the render follows.
+  //
+  // ONE-LEVEL rule: attachInstance REJECTS nested or self-referential
+  // attachments. A child cannot have children of its own; a host
+  // cannot itself be attached. The "Attach to…" picker only lists
+  // eligible hosts (via eligibleHostsFor), but attachInstance
+  // re-validates defensively so any caller path is safe.
+  //
+  // Single mutation site — attachInstance + detachInstance are the
+  // ONLY user-facing writers of `attachedTo`. Same single-source-of-
+  // truth discipline as moveTo / placeOnBattlefield / adjustCounter.
+  // moveTo's internal detach-on-leave is the one internal exception:
+  // it writes attachedTo plainly inside the same transaction without
+  // going through detachInstance (would force redundant per-child
+  // renders before the move's own render fires). That's an internal
+  // mutation, not a UI path.
+  //
+  // Backward-safe: a missing `attachedTo` (pre-v3.30.6 instance held
+  // by a stale browser tab) reads as falsy, which is the same as
+  // null — every read uses truthy-test semantics.
+
+  /** Scan all five battlefield arrays for instances whose
+   *  attachedTo matches the given host id. Preserves the
+   *  classifyRegion display order (Creatures → Lands → Art/Ench →
+   *  PW/Battle → Other). */
+  function childrenOf(hostId) {
+    const out = [];
+    const arrs = [
+      state.bfCreatures,
+      state.bfLands,
+      state.bfArtEnc,
+      state.bfPwBattle,
+      state.bfOther,
+    ];
+    for (const list of arrs) {
+      for (const inst of list) {
+        if (inst.attachedTo === hostId) out.push(inst);
+      }
+    }
+    return out;
+  }
+
+  /** Single mutation site for attaching a child to a host. Defensive
+   *  validation here — the "Attach to…" picker only shows eligible
+   *  hosts but ANY caller path goes through this. Silent no-op on
+   *  rejection (not a rules engine; no error UI). */
+  function attachInstance(childId, hostId) {
+    if (!childId || !hostId || childId === hostId) return;
+    const childFound = findInstance(childId);
+    const hostFound = findInstance(hostId);
+    if (!childFound || !hostFound) return;
+    if (!isBattlefieldZone(childFound.zone)) return;
+    if (!isBattlefieldZone(hostFound.zone)) return;
+    // One-level rule:
+    if (childFound.inst.attachedTo) return; // child already attached
+    if (hostFound.inst.attachedTo) return; // host itself attached
+    if (childrenOf(childId).length > 0) return; // child has children
+    childFound.inst.attachedTo = hostId;
+    render();
+  }
+
+  /** Single mutation site for detaching. Idempotent — no-op if the
+   *  instance is already unattached. */
+  function detachInstance(childId) {
+    const found = findInstance(childId);
+    if (!found) return;
+    if (!found.inst.attachedTo) return;
+    found.inst.attachedTo = null;
+    render();
+  }
+
+  /** Returns the list of battlefield instances that are eligible to
+   *  serve as a host for `childInst`. Empty list → no valid host
+   *  available (caller should suppress the "Attach to…" item). */
+  function eligibleHostsFor(childInst) {
+    if (!childInst) return [];
+    // A card with its own children can't itself become attached
+    // (one-level rule).
+    if (childrenOf(childInst.id).length > 0) return [];
+    const out = [];
+    const arrs = [
+      state.bfCreatures,
+      state.bfLands,
+      state.bfArtEnc,
+      state.bfPwBattle,
+      state.bfOther,
+    ];
+    for (const list of arrs) {
+      for (const host of list) {
+        if (host.id === childInst.id) continue;
+        if (host.attachedTo) continue; // host already attached itself
+        out.push(host);
+      }
+    }
+    return out;
+  }
+
   // ── Context menu (Fix 2 + Fix 3) ──────────────────────────────
   function closeContextMenu() {
     if (state.activeMenu) {
@@ -1132,6 +1320,18 @@
     closeContextMenu();
     const items = buildMenuItems(inst, zone);
     if (items.length === 0) return;
+    openMenuFromItems(e, items);
+  }
+
+  // v3.30.6 — extracted from openContextMenu so other menu paths
+  // (e.g. the host-picker spawned by "Attach to…") can reuse the
+  // exact same .gf-ctx render + dismissal contract without
+  // duplicating the construction code. Item actions receive a
+  // `coord` argument carrying the click event's clientX/clientY —
+  // pre-v3.30.6 items ignore the arg, v3.30.6 sub-flows use it to
+  // anchor the spawned sub-menu near the parent.
+  function openMenuFromItems(coord, items) {
+    closeContextMenu();
     const m = document.createElement("div");
     m.className = "gf-ctx";
     m.setAttribute("role", "menu");
@@ -1143,7 +1343,11 @@
       b.addEventListener("click", (ev) => {
         ev.stopPropagation();
         closeContextMenu();
-        it.action();
+        // Pass the click coord through so sub-flows (Attach to…)
+        // can anchor their spawned picker near the parent menu's
+        // click position. Old-style items that take no argument
+        // ignore it harmlessly.
+        it.action({ clientX: ev.clientX, clientY: ev.clientY });
       });
       m.appendChild(b);
     }
@@ -1155,8 +1359,8 @@
     document.body.appendChild(m);
     const mw = m.offsetWidth;
     const mh = m.offsetHeight;
-    let x = e.clientX || 100;
-    let y = e.clientY || 100;
+    let x = (coord && coord.clientX) || 100;
+    let y = (coord && coord.clientY) || 100;
     if (x + mw > window.innerWidth - 12) x = window.innerWidth - mw - 12;
     if (y + mh > window.innerHeight - 12) y = window.innerHeight - mh - 12;
     if (x < 12) x = 12;
@@ -1164,6 +1368,20 @@
     m.style.left = x + "px";
     m.style.top = y + "px";
     state.activeMenu = m;
+  }
+
+  // v3.30.6 — "Attach to…" sub-flow. Closes the current per-card menu
+  // (already done by the openMenuFromItems → closeContextMenu chain)
+  // and opens a second .gf-ctx listing eligible hosts. Picking one
+  // calls attachInstance which re-validates defensively.
+  function openHostPicker(childInst, coord) {
+    const hosts = eligibleHostsFor(childInst);
+    if (hosts.length === 0) return;
+    const items = hosts.map((host) => ({
+      label: (host.card && host.card.name) || "(unnamed)",
+      action: () => attachInstance(childInst.id, host.id),
+    }));
+    openMenuFromItems(coord, items);
   }
 
   function buildMenuItems(inst, zone) {
@@ -1192,6 +1410,24 @@
           openCounterPanel(inst, cardEl || document.body);
         },
       });
+      // v3.30.6 — attachment paths. An attached card gets a Detach
+      // item; an unattached card with eligible hosts gets an Attach
+      // to… item that spawns a sub-menu listing the hosts. The
+      // "no eligible hosts" case (lone card on battlefield, or a
+      // card with its own children — one-level rule) suppresses
+      // the Attach item entirely so the menu doesn't carry a dead
+      // option.
+      if (inst.attachedTo) {
+        items.push({
+          label: "Detach",
+          action: () => detachInstance(inst.id),
+        });
+      } else if (eligibleHostsFor(inst).length > 0) {
+        items.push({
+          label: "Attach to…",
+          action: (coord) => openHostPicker(inst, coord),
+        });
+      }
     }
     // Single "Move → Battlefield" — placement routes via classifyRegion,
     // so the user never picks a battlefield region directly. v3.30.1
