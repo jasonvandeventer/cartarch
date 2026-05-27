@@ -12721,6 +12721,20 @@ table.dmtx .dmtx-rowhead {
   transform: rotate(90deg) translateX(8px) translateY(-3px);
 }
 .gf-card.gf-dragging { opacity: 0.5; }
+/* v3.30.14 — drag-attach host highlight. Applied via dragenter on
+   battlefield cards when the dragged source is attachable (per
+   isAttachable) AND the host is eligible (per canAttach mirroring
+   attachInstance's rejection rules). Removed via dragleave / drop /
+   dragend. Subtle outline + soft glow in the brand-gold register;
+   token reuse only, zero parallel tokens. The outline goes outside
+   the card border (outline doesn't reflow flex children) so the fan
+   geometry from v3.30.6's .gf-card-group stays intact during a drag
+   onto a host that already has children. */
+.gf-card.gf-attach-target {
+  outline: 2px solid var(--brand-gold);
+  outline-offset: 2px;
+  box-shadow: 0 0 12px var(--brand-gold-soft);
+}
 
 .gf-card-img {
   width: 100%;

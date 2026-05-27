@@ -1,5 +1,24 @@
 [
   {
+    "version": "3.30.14",
+    "date": "2026-05-27",
+    "added": [
+      "Drag-and-drop attach in the goldfish playtester. Drag an Equipment or Aura from your hand onto a creature → it lands on the battlefield AND attaches to the creature in one motion. Drag a bestow creature from hand onto another creature → it attaches as the bestow target. From the battlefield: drag an equipment in Artifacts & Enchantments directly onto a creature in the Creatures region → attaches across regions, no detour through the menu.",
+      "While dragging an attachable card, eligible host cards on the battlefield show a subtle brass-gold outline so you can see at a glance which targets the drop will land on. Non-attachable drags (a Lightning Bolt, a vanilla creature) don't trigger the highlight on any host."
+    ],
+    "refined": [
+      "Only cards that look like attachments — Equipment, Aura, or anything with 'bestow' in its oracle text — can attach now. Vanilla creatures, instants, sorceries, lands, plain artifacts, plain enchantments, planeswalkers won't attach via drag OR via the context menu's Attach to… item (the menu item is now hidden for those cards). v3.30.6's 'anything can attach to anything' was overly permissive in practice; the new filter narrows it to the cards Magic actually means as attachments.",
+      "The filter is source-side only. The room still doesn't validate whether the chosen HOST is a legal target — drop your Pacifism on a planeswalker if you want; the room doesn't argue. Goldfishing isn't a rules engine; the new filter just refuses to call non-attachment cards 'attachments.'",
+      "Dragging a card whose source isn't attachable still works as a normal play: the card falls through to the existing zone-drop and lands on the battlefield in its correct region via classifyRegion. Nothing about the existing drop behaviour is removed — drag-attach is an additional path, not a replacement.",
+      "v3.30.6's 'one-level only' attachment rule stands. An equipment currently attached to creature A can't be re-dragged onto creature B in one motion — detach via the menu first, then drag. Same restriction the menu's Attach to… already enforced.",
+      "Dragging onto a card that already has attachments works (the new attachment joins the fan beneath the host). The outline highlight goes outside the card edge so it doesn't disturb the existing fan geometry."
+    ],
+    "resolved": [
+      "Closes the playtester's follow-up ask after v3.30.6 ('menu-only attach is fine; can we have drag-attach?'). The drop system extended cleanly via per-card drop handlers — no new data attributes, no refactor to the existing zone-drop walk. The attach mutator itself (attachInstance from v3.30.6) is unchanged — all rejection rules, the render-pointer model, the one-level rule all stay exactly as v3.30.6 designed them."
+    ],
+    "archivist_note": "Two paths to the same destination now. The menu's Attach to… is still there for the careful approach (open the menu, pick the host from the list, click); the drag is there for the fast approach (grab the equipment, drop it on the creature, done). The room recognises Equipment, Aura, and bestow as the things meant to attach; the rest of the cards stay general-purpose movers. The fan beneath a host accommodates new arrivals from either path."
+  },
+  {
     "version": "3.30.13",
     "date": "2026-05-27",
     "added": [

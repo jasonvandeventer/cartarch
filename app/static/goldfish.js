@@ -908,12 +908,108 @@
       e.dataTransfer.setData("text/plain", inst.id);
       e.dataTransfer.effectAllowed = "move";
       el.classList.add("gf-dragging");
+      // v3.30.14 — module-level state for the drag-attach highlight
+      // and the modal-source fall-through discriminator. dragenter on
+      // a card reads dragSourceId for highlight + dragSourceZone for
+      // the modal-source bypass (getData returns "" during dragenter
+      // per DOM spec). Both cleared at dragend below.
+      dragSourceId = inst.id;
+      dragSourceZone = zone;
       // Drag-out from modal: close the overlay so drop targets underneath
       // are reachable. The drag operation itself continues — drop fires
       // on the table below.
       if (zone === "modal") closeModal();
     });
-    el.addEventListener("dragend", () => el.classList.remove("gf-dragging"));
+    el.addEventListener("dragend", () => {
+      el.classList.remove("gf-dragging");
+      // v3.30.14 — clear drag-attach highlight state + modal-source
+      // discriminator. Also belt-and-suspenders: clear any lingering
+      // .gf-attach-target highlights in case a card was scrolled out
+      // / hidden mid-drag (dragleave wouldn't fire in that edge case).
+      dragSourceId = null;
+      dragSourceZone = null;
+      document
+        .querySelectorAll(".gf-attach-target")
+        .forEach((n) => n.classList.remove("gf-attach-target"));
+    });
+
+    // v3.30.14 — drag-attach: each card is a drop target. Decides per
+    // event whether to attempt attach (and stopPropagation, ending the
+    // drop) or fall through to the containing zone's drop handler (the
+    // existing wireDropTargets path — placeOnBattlefield for a
+    // battlefield zone). The fall-through is DOM bubbling — no
+    // stopPropagation lets the event bubble naturally. Source
+    // attachability is gated by isAttachable; eligibility by canAttach
+    // (mirrors attachInstance's rejection rules without mutating).
+    // Hand→drop-on-card composes placeOnBattlefield then
+    // attachInstance: one drop = play + attach. Battlefield→drop-on-
+    // card skips the place step (source already there). Modal-source
+    // drops fall through (out of scope per Part A step 5; the
+    // modal-close-on-dragstart from v3.30.0 Add 6 still applies).
+    el.addEventListener("dragover", (e) => {
+      // preventDefault is required for the drop event to fire.
+      e.preventDefault();
+    });
+    el.addEventListener("dragenter", () => {
+      if (!dragSourceId || dragSourceId === inst.id) return;
+      // v3.30.14 — modal-source bypass (Part A step 5). A drag started
+      // from the browse modal must fall through to the existing zone-
+      // drop; no attach highlight either. findInstance(srcId) returns
+      // the underlying state-array zone (graveyard/exile/library/
+      // command), not "modal", so the discriminator has to come from
+      // dragSourceZone (captured at dragstart while the buildCardEl
+      // closure still had the literal "modal" string).
+      if (dragSourceZone === "modal") return;
+      const srcFound = findInstance(dragSourceId);
+      if (!srcFound) return;
+      if (!isAttachable(srcFound.inst.card)) return;
+      if (!canAttach(dragSourceId, inst.id)) return;
+      el.classList.add("gf-attach-target");
+    });
+    el.addEventListener("dragleave", () => {
+      el.classList.remove("gf-attach-target");
+    });
+    el.addEventListener("drop", (e) => {
+      el.classList.remove("gf-attach-target");
+      const srcId = e.dataTransfer.getData("text/plain");
+      if (!srcId || srcId === inst.id) return; // self-drop → fall through
+      // v3.30.14 — modal-source bypass (Part A step 5). A drag from
+      // the browse modal falls through to the existing zone-drop
+      // behavior — the modal-close-on-dragstart (v3.30.0 Add 6)
+      // already fired; the bubble reaches the battlefield region's
+      // existing wireDropTargets handler, which calls
+      // placeOnBattlefield(srcId) and routes via classifyRegion. No
+      // attach attempt; no stopPropagation. Modal-source captured at
+      // dragstart via dragSourceZone because findInstance(srcId)
+      // returns the underlying state-array zone, not "modal".
+      if (dragSourceZone === "modal") return;
+      const srcFound = findInstance(srcId);
+      if (!srcFound) return; // source vanished mid-drag → fall through
+      if (!isAttachable(srcFound.inst.card)) return; // fall through to zone-drop
+      if (!canAttach(srcId, inst.id)) return; // host ineligible → fall through
+      e.preventDefault();
+      // Compose: hand→drop-on-card lands the source on the battlefield
+      // first (placeOnBattlefield routes via classifyRegion); from-
+      // battlefield drops skip the place (already there). Then attach.
+      // attachInstance is the sole mutator (single-source-of-truth
+      // discipline); it carries its own post-place isBattlefieldZone
+      // check so a mid-flight mutation that prevented the place from
+      // landing wouldn't silently corrupt state — the attach would
+      // just reject.
+      if (!isBattlefieldZone(srcFound.zone)) {
+        placeOnBattlefield(srcId);
+      }
+      attachInstance(srcId, inst.id);
+      // Verify the attach actually landed before stopPropagation. If
+      // attachInstance rejected (e.g. a race condition turned the host
+      // into a child of someone else mid-drag), let the event bubble
+      // so the zone's drop handler runs as a fall-back — the card at
+      // least lands somewhere sensible.
+      const post = findInstance(srcId);
+      if (post && post.inst.attachedTo === inst.id) {
+        e.stopPropagation();
+      }
+    });
   }
 
   function setPreview(inst) {
@@ -1428,6 +1524,42 @@
     render();
   }
 
+  // v3.30.14 — source-side attachability filter. Reverses v3.30.6's
+  // "anything can attach to anything" stance toward "Equipment, Aura,
+  // or bestow-creature only." Gates the SOURCE card on both the
+  // drag-attach drop path and the menu's "Attach to…" item. v3.30.6's
+  // "no host validation" stance stays — goldfish is not a rules engine
+  // for targeting; the filter just refuses to call non-attachable
+  // cards attachable. Case-insensitive substring match per the spec.
+  function isAttachable(card) {
+    if (!card) return false;
+    const tl = (card.type_line || "").toLowerCase();
+    const ot = (card.oracle_text || "").toLowerCase();
+    return tl.includes("equipment") || tl.includes("aura") || ot.includes("bestow");
+  }
+
+  // v3.30.14 — pure predicate mirroring attachInstance's rejection
+  // rules without mutating state. Used by the drag-attach highlight
+  // (dragenter) where we need to know "would attach succeed?" before
+  // any mutation, and by the drop handler to decide stopPropagation.
+  // INTENTIONALLY OMITS the source-zone (isBattlefieldZone(childFound.
+  // zone)) check that attachInstance enforces — the drag-attach flow
+  // places-before-attach when the source isn't yet on the battlefield
+  // (drag-from-hand case); attachInstance itself still enforces the
+  // source-zone check after the place. Single mutator (attachInstance)
+  // remains untouched; this predicate is read-only.
+  function canAttach(childId, hostId) {
+    if (!childId || !hostId || childId === hostId) return false;
+    const childFound = findInstance(childId);
+    const hostFound = findInstance(hostId);
+    if (!childFound || !hostFound) return false;
+    if (!isBattlefieldZone(hostFound.zone)) return false;
+    if (childFound.inst.attachedTo) return false; // child already attached
+    if (hostFound.inst.attachedTo) return false; // host itself attached
+    if (childrenOf(childId).length > 0) return false; // child has children
+    return true;
+  }
+
   /** Single mutation site for detaching. Idempotent — no-op if the
    *  instance is already unattached. */
   function detachInstance(childId) {
@@ -1494,6 +1626,30 @@
   // the token wherever they like, and if it lands off the
   // battlefield it's removed from state.
   let tokenSeq = 1;
+
+  // v3.30.14 — module-level state for the drag-attach highlight.
+  // Set at dragstart, cleared at dragend. dragenter on a card
+  // reads this to decide whether to apply the .gf-attach-target
+  // class, because e.dataTransfer.getData() returns "" during
+  // dragenter/dragover (DOM spec — data is only readable during
+  // dragstart and drop, for security/privacy reasons). The drop
+  // handler still reads the id via getData("text/plain") — the
+  // module-level state is highlight-only, not the source of
+  // truth for the attach itself.
+  let dragSourceId = null;
+  // v3.30.14 — sibling state capturing the source zone at dragstart.
+  // findInstance(id) returns the underlying state-array zone
+  // (graveyard / exile / library / command for a modal card), NOT
+  // "modal" — the modal is a VIEW, not a state array. So the
+  // discriminator for "this drag started from the modal browser"
+  // must be captured at dragstart while the buildCardEl(inst, zone)
+  // closure still has the literal "modal" string. Drop and dragenter
+  // both check this for the spec's modal-source-falls-through rule
+  // (Part A step 5): a drag from the modal browser onto a battlefield
+  // card must NOT attempt attach; the v3.30.0 Add 6 modal-close-on-
+  // dragstart + the zone fall-back's placeOnBattlefield(srcId) land
+  // the card via classifyRegion, no attach.
+  let dragSourceZone = null;
 
   /** Single construction site for token instances. spec carries:
    *  - name (string)
@@ -1794,7 +1950,14 @@
           label: "Detach",
           action: () => detachInstance(inst.id),
         });
-      } else if (eligibleHostsFor(inst).length > 0) {
+      } else if (isAttachable(inst.card) && eligibleHostsFor(inst).length > 0) {
+        // v3.30.14 — source-attachability gate added alongside v3.30.6's
+        // "at least one eligible host" gate. BOTH conditions must hold
+        // for the menu item to render. v3.30.6's "anything can attach"
+        // contract is reversed: only Equipment, Aura, or bestow-creature
+        // sources offer the Attach to… affordance. The picker UI itself
+        // is unchanged — when the item IS offered, it still lists every
+        // eligible host the same way.
         items.push({
           label: "Attach to…",
           action: (coord) => openHostPicker(inst, coord),
