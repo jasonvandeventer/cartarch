@@ -1,5 +1,22 @@
 [
   {
+    "version": "3.30.5",
+    "date": "2026-05-27",
+    "added": [
+      "Counters on battlefield permanents. Right-click (or long-press on touch) any creature, planeswalker, artifact, enchantment, or land on the battlefield, choose Counters\u2026 from the context menu, and a small editor panel opens next to the card. Six common counter types are pre-listed \u2014 +1/+1, -1/-1, Loyalty, Charge, Experience, Quest \u2014 each with a \u2212 / count / + row. A Custom counter\u2026 button at the bottom lets you name anything else you need to track. Counters render as small color-coded pills along the bottom of the card so you can read them at a glance.",
+      "+1/+1 chips show in green; -1/-1 in oxblood; Loyalty in brass-gold. Everything else uses the neutral pip palette. The card itself stays fully interactive \u2014 the pill cluster passes mouse events through to the card behind it, so you can still drag, tap, click, and move a counter-bearing creature normally."
+    ],
+    "refined": [
+      "Counters are battlefield-only. Cards in your hand, library, graveyard, exile, command zone, or the browse modal don't show the counter UI \u2014 the playtester is a loose simulation, not a rules engine, and counters are a battlefield concern.",
+      "A card leaving the battlefield (to any zone) has its counters cleared automatically. The +1/+1 counters on your creature don't follow it to the graveyard. Battlefield-to-battlefield movement keeps counters intact.",
+      "Negative counts are allowed and the counter doesn't auto-remove itself \u2014 if you adjust a label to exactly 0 the chip disappears, but you can decrement past zero (to -1, -2, etc.) and the pill will show the negative number. That's deliberate; the playtester doesn't enforce rules."
+    ],
+    "resolved": [
+      "Closes the long-running '+1/+1 counters on cards' goldfish follow-up item that the playtester had carried since v3.30.0 ship. Tester now has a way to track every Commander game's growing creature without scribbling on paper. The room finally remembers what's on what."
+    ],
+    "archivist_note": "The annotations land. A small editor panel opens beside the card, six common counter rows already laid out, and the table picks up the chips a moment later. The room doesn't add or remove counters on its own \u2014 the player decides what survives a board state, the player decides what goes when a creature dies. The room only carries the marks."
+  },
+  {
     "version": "3.30.4",
     "date": "2026-05-27",
     "added": [

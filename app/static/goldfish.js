@@ -119,6 +119,7 @@
     manaPool: { W: 0, U: 0, B: 0, R: 0, G: 0, C: 0 },
     activeMenu: null,
     activeManaPicker: null,
+    activeCounterPanel: null, // v3.30.5 — { node, body, instId } when open
     libraryBrowseOpen: false,
     modalContext: null,
     longPressTimer: null,
@@ -158,6 +159,17 @@
           id: "gf-" + state.instanceSeq++,
           card: c,
           tapped: false,
+          // v3.30.5 — counters: { label → integer count }. Free-form
+          // annotations the user manages by hand; goldfish is not a
+          // rules engine. Battlefield-only — cleared by moveTo when
+          // the card leaves the battlefield. Negative counts allowed
+          // (no clamp). A label dropping to exactly 0 is removed
+          // from the map (no zero-count entries linger). Every
+          // mutation goes through adjustCounter() — single source
+          // of truth. Reads use `inst.counters || {}` for backward-
+          // safe access against any pre-v3.30.5 instance shape that
+          // a stale browser tab might still be running.
+          counters: {},
         };
         if (c.is_commander) {
           state.command.push(inst);
@@ -245,6 +257,15 @@
     found.list.splice(found.idx, 1);
     const dest = ZONE_LISTS[targetZone]();
     found.inst.tapped = false;
+    // v3.30.5 — counters are a battlefield-only annotation; they do
+    // not travel off the battlefield. Single clear-on-leave site,
+    // matching the v3.30.0 single-placement / single-transition
+    // discipline. Battlefield-to-battlefield moves (e.g. a card
+    // re-classified by classifyRegion after a transform) keep their
+    // counters intact.
+    if (!isBattlefieldZone(targetZone)) {
+      found.inst.counters = {};
+    }
     if (targetZone === "library") {
       if (opts.position === "bottom") dest.push(found.inst);
       else dest.unshift(found.inst);
@@ -651,6 +672,16 @@
       openContextMenu({ clientX: r.right, clientY: r.bottom }, inst, zone);
     });
     el.appendChild(kebab);
+    // v3.30.5 — counter pill cluster, battlefield-only and gated on
+    // non-empty counters so cards without annotations render exactly
+    // as they did in v3.30.0–v3.30.4. The cluster is a child of
+    // .gf-card; CSS positions it absolute at the bottom of the card
+    // with a translucent backdrop. Reads use `inst.counters || {}`
+    // via buildCounterCluster() for backward-safe access.
+    if (isBattlefieldZone(zone)) {
+      const cluster = buildCounterCluster(inst);
+      if (cluster) el.appendChild(cluster);
+    }
     attachCardHandlers(el, inst, zone);
     return el;
   }
@@ -899,6 +930,194 @@
     }
   }
 
+  // ── Counters on battlefield permanents (v3.30.5) ──────────────
+  // Free-form annotations the user manages by hand; goldfish is not a
+  // rules engine. Six curated labels + a Custom… path covering the
+  // typical Commander needs (+1/+1 / -1/-1 / Loyalty / Charge /
+  // Experience / Quest). Single mutation site: adjustCounter() is the
+  // ONLY function that touches a counters map. Same single-source-of-
+  // truth discipline as moveTo / placeOnBattlefield. Touching an
+  // instance's counters anywhere else (render code, menu builder, the
+  // panel UI) is a regression.
+  //
+  // The v3.26.5 game-tracker extra-counters subsystem is a styling /
+  // UX REFERENCE only — the goldfish surface does NOT import or share
+  // tracker code; the two state shapes stay independent. Tracker
+  // uses an `extraCounters[]` array per seat; goldfish uses a per-
+  // instance `counters: {label → count}` object map. Different
+  // problems, different shapes.
+  const COUNTER_LABELS = ["+1/+1", "-1/-1", "Loyalty", "Charge", "Experience", "Quest"];
+
+  /**
+   * Single mutation site for ANY counters map. Resolves the instance
+   * via findInstance, applies the delta (label whitespace-stripped;
+   * empty label → no-op), deletes the key at exactly 0 so no zero-
+   * count entries linger in the map. Negative counts ARE allowed
+   * (the user may want -1/-1 visible as such; this is not a rules
+   * engine). Backward-safe: an instance built before v3.30.5 with no
+   * `counters` key gets one assigned on first mutation. Re-renders
+   * and refreshes the counter panel if it's open against this
+   * instance.
+   */
+  function adjustCounter(instId, label, delta) {
+    const found = findInstance(instId);
+    if (!found) return;
+    const cleanLabel = String(label || "").trim();
+    if (!cleanLabel) return;
+    const inst = found.inst;
+    if (!inst.counters) inst.counters = {};
+    const next = (inst.counters[cleanLabel] || 0) + Number(delta || 0);
+    if (next === 0) {
+      delete inst.counters[cleanLabel];
+    } else {
+      inst.counters[cleanLabel] = next;
+    }
+    render();
+    // If the editor panel is open against the same instance, refresh
+    // its rows so the displayed counts match the new state without
+    // forcing a close/reopen.
+    if (state.activeCounterPanel && state.activeCounterPanel.instId === instId) {
+      refreshCounterPanelBody(state.activeCounterPanel);
+    }
+  }
+
+  function buildCounterCluster(inst) {
+    // Returns null when the instance has no counters — caller skips
+    // appending. Battlefield-only check is done at the caller site
+    // (buildCardEl) so this helper is reusable if later code wants
+    // to render a non-battlefield variant (it currently doesn't).
+    const counters = inst.counters || {};
+    const keys = Object.keys(counters);
+    if (keys.length === 0) return null;
+    const cluster = document.createElement("div");
+    cluster.className = "gf-counter-cluster";
+    cluster.setAttribute("aria-hidden", "true");
+    for (const label of keys) {
+      const chip = document.createElement("span");
+      chip.className = "gf-counter-chip";
+      // Tag well-known labels for a tighter color treatment.
+      if (label === "+1/+1") chip.classList.add("gf-counter-plus");
+      else if (label === "-1/-1") chip.classList.add("gf-counter-minus");
+      else if (label === "Loyalty") chip.classList.add("gf-counter-loy");
+      chip.textContent = label + " " + counters[label];
+      cluster.appendChild(chip);
+    }
+    return cluster;
+  }
+
+  // ── Counter editor panel (v3.30.5) ────────────────────────────
+  // Floating panel anchored near a battlefield card, opened via the
+  // "Counters…" item in the per-card context menu. Single panel state:
+  // state.activeCounterPanel = { node, instId } — set on open, cleared
+  // on close. adjustCounter() refreshes the panel body when an update
+  // targets the instance the panel is bound to, so the displayed
+  // counts stay in sync without requiring the user to close/reopen.
+  function openCounterPanel(inst, anchorEl) {
+    closeCounterPanel();
+    const panel = document.createElement("div");
+    panel.className = "gf-counter-panel";
+    panel.setAttribute("role", "dialog");
+    panel.setAttribute("aria-label", "Counters editor");
+    // Stop clicks INSIDE the panel from bubbling to the document
+    // click-away listener (defined down with the context menu's
+    // dismissals). Same shape as .gf-ctx and .gf-mana-picker.
+    panel.addEventListener("click", (ev) => ev.stopPropagation());
+    document.body.appendChild(panel);
+    const head = document.createElement("div");
+    head.className = "gf-counter-panel-head";
+    head.textContent = "Counters";
+    panel.appendChild(head);
+    const body = document.createElement("div");
+    body.className = "gf-counter-panel-body";
+    panel.appendChild(body);
+    state.activeCounterPanel = { node: panel, body: body, instId: inst.id };
+    refreshCounterPanelBody(state.activeCounterPanel);
+    // Position near the anchor card; clamp inside viewport. The panel
+    // floats above the card.
+    const r = anchorEl.getBoundingClientRect();
+    let x = r.left;
+    let y = r.bottom + 6;
+    const pw = panel.offsetWidth;
+    const ph = panel.offsetHeight;
+    if (x + pw > window.innerWidth - 12) x = window.innerWidth - pw - 12;
+    if (y + ph > window.innerHeight - 12) y = r.top - ph - 6;
+    if (x < 12) x = 12;
+    if (y < 12) y = 12;
+    panel.style.left = x + "px";
+    panel.style.top = y + "px";
+  }
+
+  function closeCounterPanel() {
+    if (state.activeCounterPanel) {
+      state.activeCounterPanel.node.remove();
+      state.activeCounterPanel = null;
+    }
+  }
+
+  function refreshCounterPanelBody(panelState) {
+    const body = panelState.body;
+    const inst = (findInstance(panelState.instId) || {}).inst;
+    if (!inst) {
+      // Bound instance has vanished (moved zone + card no longer
+      // exists, or some other unexpected case). Close gracefully.
+      closeCounterPanel();
+      return;
+    }
+    body.innerHTML = "";
+    const counters = inst.counters || {};
+    // Curated labels first, in their stable display order. Any
+    // custom-label counters already on the instance render after
+    // the curated rows so the user can still adjust them.
+    const customLabels = Object.keys(counters).filter(
+      (l) => !COUNTER_LABELS.includes(l)
+    );
+    const allRows = COUNTER_LABELS.concat(customLabels);
+    for (const label of allRows) {
+      body.appendChild(buildCounterRow(panelState.instId, label, counters[label] || 0));
+    }
+    // Custom-counter add affordance.
+    const customBtn = document.createElement("button");
+    customBtn.type = "button";
+    customBtn.className = "gf-counter-custom-btn";
+    customBtn.textContent = "+ Custom counter…";
+    customBtn.addEventListener("click", () => {
+      const raw = window.prompt("New counter label:", "");
+      if (raw === null) return; // user cancelled
+      const clean = String(raw).trim();
+      if (!clean) return; // empty/whitespace ignored per spec
+      adjustCounter(panelState.instId, clean, 1);
+    });
+    body.appendChild(customBtn);
+  }
+
+  function buildCounterRow(instId, label, count) {
+    const row = document.createElement("div");
+    row.className = "gf-counter-row";
+    const dec = document.createElement("button");
+    dec.type = "button";
+    dec.className = "gf-counter-btn gf-counter-dec";
+    dec.setAttribute("aria-label", "Decrement " + label);
+    dec.textContent = "−";
+    dec.addEventListener("click", () => adjustCounter(instId, label, -1));
+    const lab = document.createElement("span");
+    lab.className = "gf-counter-row-label";
+    lab.textContent = label;
+    const val = document.createElement("span");
+    val.className = "gf-counter-row-val";
+    val.textContent = String(count);
+    const inc = document.createElement("button");
+    inc.type = "button";
+    inc.className = "gf-counter-btn gf-counter-inc";
+    inc.setAttribute("aria-label", "Increment " + label);
+    inc.textContent = "+";
+    inc.addEventListener("click", () => adjustCounter(instId, label, 1));
+    row.appendChild(dec);
+    row.appendChild(lab);
+    row.appendChild(val);
+    row.appendChild(inc);
+    return row;
+  }
+
   // ── Context menu (Fix 2 + Fix 3) ──────────────────────────────
   function closeContextMenu() {
     if (state.activeMenu) {
@@ -960,6 +1179,19 @@
         label: inst.tapped ? "Untap" : "Tap",
         action: () => toggleTap(inst.id),
       });
+      // v3.30.5 — Counters… opens the floating editor panel anchored
+      // to the same card. Battlefield-only — counters render and
+      // edit only for cards in the five battlefield regions, never
+      // for hand / library / piles / modal.
+      items.push({
+        label: "Counters…",
+        action: () => {
+          const cardEl = document.querySelector(
+            '.gf-card[data-inst-id="' + inst.id + '"]'
+          );
+          openCounterPanel(inst, cardEl || document.body);
+        },
+      });
     }
     // Single "Move → Battlefield" — placement routes via classifyRegion,
     // so the user never picks a battlefield region directly. v3.30.1
@@ -998,11 +1230,18 @@
     if (state.activeManaPicker && !state.activeManaPicker.contains(e.target)) {
       closeManaPicker();
     }
+    if (
+      state.activeCounterPanel &&
+      !state.activeCounterPanel.node.contains(e.target)
+    ) {
+      closeCounterPanel();
+    }
   });
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") {
       closeContextMenu();
       closeManaPicker();
+      closeCounterPanel();
       closeModal();
     }
   });

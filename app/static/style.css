@@ -13774,3 +13774,161 @@ body.gf-mode { overflow: hidden; }
   font-size: 9px;
   padding: 0 3px;
 }
+
+/* ============================================================================
+   v3.30.5 — Goldfish counters on battlefield permanents
+   Two pieces:
+     1. .gf-counter-cluster — on-card pill cluster at the bottom of every
+        battlefield card with a non-empty counters map (built by JS in
+        buildCardEl, gated on isBattlefieldZone + non-empty counters).
+     2. .gf-counter-panel — floating editor opened from the per-card
+        context menu's "Counters…" item. Single panel state, anchored
+        near the card, same lifecycle pattern as .gf-mana-picker.
+   Both routed through adjustCounter() — single mutation site. Tracker
+   styling is a REFERENCE only; this CSS does not import .tc-* rules.
+   Token reuse only — Folio palette + existing radius/spacing scales;
+   zero parallel tokens.
+   ============================================================================ */
+
+/* On-card pill cluster — sits inside the card's bottom strip (.gf-card
+   has overflow: hidden from v3.30.0, so the cluster has to fit within
+   the card bounds). Translucent dark backdrop keeps the chips legible
+   over either the Scryfall art OR the text card-face fallback. */
+.gf-counter-cluster {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding: 3px 4px;
+  background: rgba(8, 19, 33, 0.78);
+  /* z-index above the card art but below the kebab (which is at
+     z-index: 2 per v3.30.0). Cluster is decorative; mouse events
+     pass through to the card itself via pointer-events:none so the
+     user can still drag / click / tap the card behind the chips. */
+  z-index: 1;
+  pointer-events: none;
+}
+.gf-counter-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1px 5px;
+  min-height: 14px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border);
+  background: var(--panel-2);
+  color: var(--text);
+  font: 700 9px/1.1 "Montserrat", system-ui, sans-serif;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+/* Distinct chip color for the two most-common Commander counters
+   so a glance reads +1/+1 immediately. -1/-1 picks up the oxblood
+   register so it's unmistakably a debuff. Other curated labels
+   share the neutral chip. */
+.gf-counter-chip.gf-counter-plus {
+  background: rgba(106, 130, 83, 0.88); /* var(--brand-green) tinted */
+  border-color: var(--brand-green);
+  color: var(--text);
+}
+.gf-counter-chip.gf-counter-minus {
+  background: rgba(138, 46, 34, 0.88); /* var(--danger) tinted */
+  border-color: var(--danger);
+  color: var(--text);
+}
+.gf-counter-chip.gf-counter-loy {
+  background: rgba(181, 138, 71, 0.88); /* var(--brand-gold) tinted */
+  border-color: var(--brand-gold);
+  color: var(--brand-near-black);
+}
+
+/* Floating editor panel — opened by "Counters…" from the per-card
+   context menu. Same lifecycle idiom as .gf-mana-picker (single
+   panel state, body-level appended, document-click + Escape
+   dismissed). */
+.gf-counter-panel {
+  position: fixed;
+  z-index: 1190; /* above modal (1100) + .gf-hand-cost-overlay (1180),
+                    below context menu (1200) — so the panel does NOT
+                    block a context menu opened from inside it (none
+                    of the panel's rows open another menu today, but
+                    keep z-index sensible). */
+  min-width: 240px;
+  background: var(--panel);
+  border: 1px solid var(--brand-gold);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.55);
+  padding: 0.45rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+.gf-counter-panel-head {
+  font: italic 500 12px/1 "Newsreader", Georgia, serif;
+  color: var(--brand-gold);
+  letter-spacing: 0.04em;
+  padding: 0.1rem 0.2rem 0.25rem;
+  border-bottom: 1px solid var(--border);
+}
+.gf-counter-panel-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+.gf-counter-row {
+  display: grid;
+  grid-template-columns: 24px 1fr 28px 24px;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.15rem 0.1rem;
+}
+.gf-counter-row-label {
+  font: 500 12px/1.2 "Montserrat", system-ui, sans-serif;
+  color: var(--text);
+}
+.gf-counter-row-val {
+  font: 700 13px/1 "Montserrat", system-ui, sans-serif;
+  color: var(--text);
+  text-align: center;
+  min-width: 24px;
+}
+.gf-counter-btn {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: var(--radius-sm);
+  font: 700 13px/1 "Montserrat", system-ui, sans-serif;
+  cursor: pointer;
+  transition: border-color 0.1s, color 0.1s, background 0.1s;
+}
+.gf-counter-btn:hover {
+  border-color: var(--brand-gold);
+  color: var(--brand-gold);
+}
+.gf-counter-btn:focus-visible {
+  outline: 2px solid var(--brand-gold);
+  outline-offset: 2px;
+}
+.gf-counter-custom-btn {
+  margin-top: 0.2rem;
+  padding: 0.35rem 0.55rem;
+  background: var(--panel-2);
+  border: 1px dashed var(--brand-gold-soft);
+  color: var(--text-dim);
+  border-radius: var(--radius-sm);
+  font: italic 500 12px/1 "Newsreader", Georgia, serif;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.12s, color 0.12s, background 0.12s;
+}
+.gf-counter-custom-btn:hover {
+  border-style: solid;
+  border-color: var(--brand-gold);
+  color: var(--brand-gold);
+}
