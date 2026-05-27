@@ -14118,3 +14118,49 @@ body.gf-mode { overflow: hidden; }
   text-align: center;
   pointer-events: none;
 }
+
+/* ============================================================================
+   v3.30.8 — Goldfish deck-token quick-add buttons
+   Surfaces the user's curated DeckTokenRequirement rows for the loaded deck
+   as one-click "+ NAME × QTY" buttons next to the v3.30.7 Create token
+   control. Each click feeds a v3.30.7-shaped spec into the EXISTING
+   createToken() — single construction site preserved. Token reuse only.
+   ============================================================================ */
+.gf-quick-tokens {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  padding-left: 0.5rem;
+  border-left: 1px solid var(--border);
+  margin-left: 0.2rem;
+}
+.gf-quick-tokens-label {
+  font: italic 400 11px/1 "Newsreader", Georgia, serif;
+  color: var(--text-dim);
+  letter-spacing: 0.02em;
+  padding-right: 0.2rem;
+}
+/* Quick-add pill — sized smaller than .gf-btn-primary, brass-soft border
+   that lights up on hover. Reuses the .gf-btn base shape for letter-spacing
+   + radius consistency with the surrounding controls; the .gf-quick-token-
+   btn modifier overrides padding + accent. */
+.gf-quick-token-btn {
+  padding: 0.3rem 0.6rem;
+  background: var(--panel-2);
+  border: 1px solid var(--brand-gold-soft);
+  color: var(--text);
+  font: 600 12px/1 "Montserrat", system-ui, sans-serif;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+.gf-quick-token-btn:hover {
+  background: var(--panel);
+  border-color: var(--brand-gold);
+  color: var(--brand-gold);
+}
+.gf-quick-token-btn:focus-visible {
+  outline: 2px solid var(--brand-gold);
+  outline-offset: 2px;
+}

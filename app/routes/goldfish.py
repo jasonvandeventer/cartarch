@@ -31,7 +31,7 @@ from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session, joinedload
 
 from app.dependencies import get_current_user, get_db_session, render
-from app.models import Card, Deck, InventoryRow, User
+from app.models import Card, Deck, DeckTokenRequirement, InventoryRow, TokenInventory, User
 
 router = APIRouter()
 
@@ -57,6 +57,9 @@ def goldfish_page(
             "deck_name": deck.name,
             "format": deck.format,
             "cards": [],
+            # v3.30.8 — tokens field present on every payload (shape
+            # consistency); empty on the misconfigured-deck branch.
+            "tokens": [],
         }
         return render(
             request,
@@ -103,11 +106,59 @@ def goldfish_page(
             }
         )
 
+    # v3.30.8 — deck-token requirements as quick-add seeds. Reads
+    # the user-curated DeckTokenRequirement rows for this deck and
+    # joinedloads the linked TokenInventory (when present) so the
+    # client can render the token with art + type_line. Loose name-
+    # only requirements (no token_inventory_id link) degrade to a
+    # name + quantity entry; the client falls through to its
+    # renderFallback text card-face when image_url is null. Local
+    # SQLite read only — the request-path network invariant from
+    # v3.25.0 stands. A deck with zero requirements emits
+    # tokens: []; the client suppresses the quick-add panel
+    # entirely so no empty box renders. Defensive try/except so
+    # any unexpected ORM error degrades to an empty list rather
+    # than a 500 — matches the spec's "must not crash the route"
+    # discipline.
+    tokens: list[dict] = []
+    try:
+        reqs = (
+            session.query(DeckTokenRequirement)
+            .options(joinedload(DeckTokenRequirement.token_inventory))
+            .filter(DeckTokenRequirement.deck_id == deck.id)
+            .order_by(DeckTokenRequirement.token_name.asc())
+            .all()
+        )
+        for req in reqs:
+            ti: TokenInventory | None = req.token_inventory
+            tokens.append(
+                {
+                    "requirement_id": req.id,
+                    "token_name": req.token_name,
+                    "quantity_needed": int(req.quantity_needed or 1),
+                    # Joined-row fields when the requirement links a real
+                    # TokenInventory row; null when loose name-only.
+                    "type_line": (ti.type_line if ti else None),
+                    "image_url": (ti.image_url if ti else None),
+                    "scryfall_id": (ti.scryfall_id if ti else None),
+                    "set_code": (ti.set_code if ti else None),
+                    "collector_number": (ti.collector_number if ti else None),
+                }
+            )
+    except Exception:
+        # Belt-and-suspenders against schema drift / missing-table
+        # / ORM-relationship-misconfigured paths. Degrade silently;
+        # the playtester is still fully usable without quick-add
+        # buttons — the v3.30.7 manual Create-token control still
+        # works.
+        tokens = []
+
     payload = {
         "deck_id": deck.id,
         "deck_name": deck.name,
         "format": deck.format,
         "cards": cards,
+        "tokens": tokens,
     }
 
     return render(

@@ -1,5 +1,22 @@
 [
   {
+    "version": "3.30.8",
+    "date": "2026-05-27",
+    "added": [
+      "Deck-token quick-add buttons in the Goldfish playtester. When you've curated a deck's token list on its Deck Detail page (the existing token-curation flow), opening that deck in the playtester shows a row of one-click '+ NAME × QTY' buttons next to the Create token control — '+ Treasure × 3', '+ Pest × 10', whatever your deck is set up to make. One click drops the token on the table in the right battlefield region, with art and type line if the inventory link is set, with a clean text card-face if it's just a name.",
+      "Quick-add tokens behave like every other token from v3.30.7: they tap and untap, accept counters, attach and detach, vanish from the table when moved off the battlefield. Nothing about the playtester's behaviour changes; the new buttons are a faster way to get the same tokens onto the table than the manual Create form."
+    ],
+    "refined": [
+      "The quick-add panel only appears when the deck actually has token requirements set. A deck with no curated tokens shows nothing extra — the controls row is unchanged. The buttons render alphabetically by token name, in a stable order that matches the curation page.",
+      "Token data is read from the deck's curated DeckTokenRequirement rows, not auto-detected from card text. You tell Cartarch what tokens your deck makes (once, on the Deck Detail page), and the playtester picks them up from there. The 'auto-detection' name in the original plan was a misnomer — the source is the user-curated list, not an oracle-text scanner."
+    ],
+    "resolved": [
+      "Resolves the auto-detect half of the long-running 'token spawning' Goldfish follow-up that the v3.30.x series has carried since v3.30.0 ship. Both halves are now done: v3.30.7 covered custom / manual token creation (the operator types the token), v3.30.8 covers deck-driven token creation (the deck's curated requirements drive the buttons). The 'token spawning' follow-up is fully resolved.",
+      "Completes the v3.30.x Goldfish playtester follow-ups series. Nine sub-releases shipped: v3.30.0 (initial playtester + revision pass), v3.30.1 (fullscreen + type-based regions), v3.30.2 (collapsible sidebar), v3.30.3 (Draw-on-new-turn opt-in toggle), v3.30.4 (mana cost on hover in hand), v3.30.5 (counters on battlefield permanents), v3.30.6 (equipment / aura attachment), v3.30.7 (custom token creation), v3.30.8 (deck-token auto-detection). The playtester is feature-complete for the v3.x line."
+    ],
+    "archivist_note": "The deck remembers what it makes. Each Commander brings its own retinue — Treasures for the pirate, Servos for the Saheeli, Saprolings for the Slimefoot — and they appear at the edge of the controls row as buttons, waiting to be summoned. Click 'Treasure × 3' and three Treasures arrive at the table; click 'Saproling × 10' and ten Saprolings stride in. The playtester knows the deck's repertoire because you taught it: once, on the deck's catalogue page, you noted which token-makers the deck runs and which tokens they conjure. The room remembers, and saves you the typing every time you return to play."
+  },
+  {
     "version": "3.30.7",
     "date": "2026-05-27",
     "added": [

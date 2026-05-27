@@ -1381,6 +1381,15 @@
     const toughness = String((spec && spec.toughness) || "").trim();
     const colors = String((spec && spec.colors) || "").trim();
     const oracleText = String((spec && spec.oracleText) || "");
+    // v3.30.8 — optional Scryfall-cached image URL. The v3.30.7
+    // custom-token path leaves this undefined → falls through to null
+    // (the v3.30.7 fallback that paints renderFallback's text card-
+    // face). The v3.30.8 quick-add path passes spec.imageUrl pulled
+    // from the joined TokenInventory row in the payload, giving the
+    // token full Scryfall art via the browser-side image fetch (the
+    // v3.26.1 precedent). Single construction site is preserved —
+    // this is a NEW SPEC FIELD, not a new createToken variant.
+    const imageUrl = (spec && spec.imageUrl) || null;
     const card = {
       name: name,
       // type_line drives classifyRegion + isLand + renderFallback.
@@ -1393,11 +1402,13 @@
       // line) and by classifyRegion (doesn't read mana_cost).
       mana_cost: "",
       cmc: 0,
-      // null image_url → renderFallback paints the text card-face,
-      // which is what every token looks like (no Scryfall art for
-      // user-invented tokens; future deck-token auto-detect in
-      // v3.30.8 might paint a Scryfall image_url here, opt-in).
-      image_url: null,
+      // image_url: null → renderFallback paints the text card-face
+      // (v3.30.7 default behavior). v3.30.8 quick-add passes a
+      // Scryfall-cached URL via spec.imageUrl so detected tokens
+      // get full art via the browser-side image fetch. Either way
+      // is fine; the existing buildCardEl image-vs-fallback
+      // dispatch consumes the field uniformly.
+      image_url: imageUrl,
       oracle_text: oracleText,
       colors: colors,
       // color_identity isn't read by any goldfish render path today,
@@ -1438,6 +1449,87 @@
     state.library.push(inst);
     placeOnBattlefield(inst.id);
     return inst;
+  }
+
+  // ── Deck-token quick-add (v3.30.8) ────────────────────────────
+  // Surfaces the user's curated DeckTokenRequirement rows for this
+  // deck (read in the payload builder from a local SQLite query) as
+  // one-click quick-add buttons near the v3.30.7 Create token
+  // control. Clicking a button feeds a v3.30.7-shaped spec into the
+  // EXISTING createToken() — single construction site preserved.
+  // The ONLY difference from a custom token is the source of the
+  // spec (the curated payload entry instead of the form).
+  //
+  // Truthful framing: this surfaces USER-CURATED requirements
+  // (added via the deck's existing token-requirements UI), NOT
+  // oracle-text auto-extracted ones. The "auto-detect" working
+  // name in the v3.30.x series referred to the playtester
+  // automatically surfacing what the user had already declared,
+  // not to oracle-text parsing.
+
+  /** Thin wrapper — builds a v3.30.7-shaped spec from a detected-
+   *  token payload entry and calls createToken. Each click creates
+   *  ONE token instance; a quantity_needed of 10 means the button
+   *  surfaces "Add Pest × 10" but each click adds one — the user
+   *  clicks N times as they need them. (Loop-on-click is an option
+   *  but tester feedback can request it as a separate item; this
+   *  release ships the one-click-one-token shape.) */
+  function quickAddDetectedToken(detected) {
+    if (!detected) return null;
+    const spec = {
+      name: detected.token_name,
+      // TokenInventory.type_line drives the classifyRegion bucket;
+      // a loose name-only requirement (no token_inventory link)
+      // falls back to "Token Creature" — same default as the
+      // v3.30.7 custom-token form.
+      typeLine: detected.type_line || "Token Creature",
+      // TokenInventory does not store P/T or colors today. Empty
+      // strings → no P/T badge renders (v3.30.7's gating), no
+      // colors are stored.
+      power: "",
+      toughness: "",
+      colors: "",
+      oracleText: "",
+      // v3.30.8 — the new spec field. Scryfall-cached image URL
+      // pulled from the joined TokenInventory.image_url. null when
+      // loose name-only requirement → renderFallback text card-face.
+      imageUrl: detected.image_url || null,
+    };
+    return createToken(spec);
+  }
+
+  /** Render the quick-add panel from payload.tokens. Empty list →
+   *  no panel renders at all (clean empty state; no empty box).
+   *  Runs once at boot from the payload; not re-rendered on state
+   *  changes since the requirements list is immutable for the
+   *  session. */
+  function renderQuickAddTokensPanel() {
+    const container = document.getElementById("gf-quick-tokens");
+    if (!container) return;
+    const tokens = (payload && payload.tokens) || [];
+    if (tokens.length === 0) {
+      container.style.display = "none";
+      return;
+    }
+    container.innerHTML = "";
+    const label = document.createElement("span");
+    label.className = "gf-quick-tokens-label";
+    label.textContent = "Quick-add:";
+    container.appendChild(label);
+    for (const detected of tokens) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "gf-btn gf-quick-token-btn";
+      const qty = Number(detected.quantity_needed || 1);
+      btn.textContent =
+        "+ " + (detected.token_name || "Token") + (qty > 1 ? " × " + qty : "");
+      btn.title =
+        "Create a " +
+        (detected.token_name || "Token") +
+        " token. Click again to add another.";
+      btn.addEventListener("click", () => quickAddDetectedToken(detected));
+      container.appendChild(btn);
+    }
   }
 
   // ── Context menu (Fix 2 + Fix 3) ──────────────────────────────
@@ -1933,4 +2025,10 @@
   // ── Boot ──────────────────────────────────────────────────────
   buildManaPoolWidget();
   newGame();
+  // v3.30.8 — render the deck-token quick-add buttons from
+  // payload.tokens. Runs after newGame() (which has no dependency
+  // on the quick-add panel); the buttons live in the controls row
+  // and are independent of zone state, so a single boot-time
+  // render is enough — they don't refresh on state changes.
+  renderQuickAddTokensPanel();
 })();

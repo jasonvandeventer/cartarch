@@ -53,6 +53,13 @@
            deck-required tokens is v3.30.8 scope; v3.30.7 is the
            manual / custom path only. #}
         <button type="button" id="gf-btn-create-token" class="gf-btn">Create token</button>
+        {# v3.30.8 — deck-token quick-add panel. Populated by
+           renderQuickAddTokensPanel() at boot from payload.tokens
+           (the user's curated DeckTokenRequirement rows for this
+           deck, joined to TokenInventory for art + type_line).
+           Hidden via display:none in JS when payload.tokens is
+           empty. #}
+        <span class="gf-quick-tokens" id="gf-quick-tokens"></span>
         <span class="gf-control-group">
           <label class="gf-control-label" for="gf-input-mill">Mill</label>
           <input type="number" id="gf-input-mill" class="gf-input-num" min="1" max="100" value="1">
