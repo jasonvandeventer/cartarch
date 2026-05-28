@@ -1,5 +1,20 @@
 [
   {
+    "version": "3.30.21",
+    "date": "2026-05-28",
+    "added": [
+      "When you open a deck in the goldfish playtester, all the tokens that the cards in the deck produce are now instantly available as quick-add buttons — no need to manually track them first. Cast Chatterfang and click '+ Squirrel × 1'. Tap a Treasure-maker and click '+ Treasure × 1'. The buttons are there waiting for you, with the correct art and type lines, the moment the playtester loads.",
+      "If you had manually-tracked tokens for a deck before, they still work. The auto-detected list is the primary path; anything you've curated by hand fills in for tokens the auto-detect doesn't cover (non-standard tokens, special-case productions, the occasional card the daemon hasn't backfilled yet)."
+    ],
+    "refined": [
+      "On a token that's both produced by a card in your deck AND manually tracked, the auto-detected entry wins. This means the quantity-needed shown reflects the deck's actual production reach, not whatever quantity you may have typed in when curating the row by hand. Manual quantity tracking still works for tokens the auto-detect path doesn't cover."
+    ],
+    "resolved": [
+      "Closes the loop on the token data platform work. v3.30.11 added a column to the local card cache to record which tokens each card produces. v3.30.19 made the deck-detail Tokens panel read that column locally instead of calling Scryfall. v3.30.21 now uses the same column to auto-populate the goldfish playtester's quick-add panel. Three releases, one column, end-to-end coverage: data plumbing, request-path retirement, user-visible feature."
+    ],
+    "archivist_note": "When we shipped the produced_tokens column eight weeks ago, the plan was a two-release sequence: data, then consumer. The consumer flip waited patiently while seven other releases jumped ahead of it — and arrived as a quiet local-read replacement that produced the exact same Tokens panel on deck-detail, just faster. What the original plan didn't capture was that the column would unlock a SECOND consumer: the goldfish playtester quick-add panel, which had until now required users to manually curate which tokens to track. Today's release reads the same column for a different reader. Open a deck in goldfish and the quick-add buttons are just there — Squirrel, Treasure, Food, Soldier, whatever the deck actually makes. Manual curation still works for the edge cases the auto-detect doesn't cover. The fix touched only three files; the load-bearing discipline was getting the new function to return the exact same dictionary shape the existing inline reader was already assembling, so the template and downstream enrichment didn't have to change. The wider lesson: a daemon-fed local column is a reusable platform. v3.30.11 paid for it once; v3.30.19 and v3.30.21 are two consumers and there could be more. The next time we want to leverage scryfall data without a request-path call, we have a pattern."
+  },
+  {
     "version": "3.30.20",
     "date": "2026-05-28",
     "added": [

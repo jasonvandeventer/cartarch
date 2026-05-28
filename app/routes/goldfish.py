@@ -30,6 +30,7 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session, joinedload
 
+from app.deck_service import get_deck_produced_tokens_for_goldfish
 from app.dependencies import get_current_user, get_db_session, render
 from app.models import Card, Deck, DeckTokenRequirement, InventoryRow, TokenInventory, User
 
@@ -106,21 +107,32 @@ def goldfish_page(
             }
         )
 
-    # v3.30.8 — deck-token requirements as quick-add seeds. Reads
-    # the user-curated DeckTokenRequirement rows for this deck and
-    # joinedloads the linked TokenInventory (when present) so the
-    # client can render the token with art + type_line. Loose name-
-    # only requirements (no token_inventory_id link) degrade to a
-    # name + quantity entry; the client falls through to its
-    # renderFallback text card-face when image_url is null. Local
-    # SQLite read only — the request-path network invariant from
-    # v3.25.0 stands. A deck with zero requirements emits
-    # tokens: []; the client suppresses the quick-add panel
-    # entirely so no empty box renders. Defensive try/except so
-    # any unexpected ORM error degrades to an empty list rather
-    # than a 500 — matches the spec's "must not crash the route"
-    # discipline.
-    tokens: list[dict] = []
+    # v3.30.21 — primary path: auto-detect produced tokens from the
+    # scryfall_cards.produced_tokens column (v3.30.11 daemon-populated,
+    # v3.30.19 consumer-flipped to local reads). For decks whose cards
+    # have been backfilled, this surfaces every produced token in the
+    # quick-add panel without requiring DeckTokenRequirement curation.
+    # The common case on prod: produced_tokens is fully populated
+    # (114,242/114,242 rows at v3.30.19 ship time), goldfish quick-add
+    # works automatically for every deck. Pure local SQLite read; zero
+    # external calls. Defensive try/except so any unexpected ORM error
+    # degrades to an empty list rather than 500 — same posture the
+    # DeckTokenRequirement-fallback block below uses.
+    try:
+        tokens_produced = get_deck_produced_tokens_for_goldfish(deck.id, session)
+    except Exception:
+        tokens_produced = []
+
+    # v3.30.8 fallback — manually-curated DeckTokenRequirement rows.
+    # Retained for edge cases the auto-detect path doesn't cover:
+    # non-standard tokens, manual overrides, scryfall_cards rows the
+    # daemon hasn't backfilled yet (fresh-install case; on prod after
+    # the v3.30.19 backfill this is rare). Loose name-only requirements
+    # (no token_inventory_id link) still degrade to name + quantity;
+    # the client's renderFallback handles missing image_url. Same
+    # defensive try/except as before — schema drift or missing-table
+    # paths degrade silently, the playtester stays usable.
+    tokens_manual: list[dict] = []
     try:
         reqs = (
             session.query(DeckTokenRequirement)
@@ -131,7 +143,7 @@ def goldfish_page(
         )
         for req in reqs:
             ti: TokenInventory | None = req.token_inventory
-            tokens.append(
+            tokens_manual.append(
                 {
                     "requirement_id": req.id,
                     "token_name": req.token_name,
@@ -151,7 +163,23 @@ def goldfish_page(
         # the playtester is still fully usable without quick-add
         # buttons — the v3.30.7 manual Create-token control still
         # works.
-        tokens = []
+        tokens_manual = []
+
+    # v3.30.21 — combine: produced first; append manual entries whose
+    # name isn't already covered by the produced set. Belt-and-suspenders
+    # — the common case on prod is `tokens_manual` is empty and
+    # `tokens_produced` has everything the playtester needs. Edge case
+    # (deck has manual requirements for tokens the daemon hasn't or
+    # can't detect — non-standard tokens, the rare uncached row): those
+    # manual rows still surface so the user keeps the curation they put
+    # in. Token-name match is case-insensitive; produced wins on collision.
+    tokens: list[dict] = list(tokens_produced)
+    if tokens_manual:
+        produced_names = {(t.get("token_name") or "").strip().lower() for t in tokens_produced}
+        for m in tokens_manual:
+            name_key = (m.get("token_name") or "").strip().lower()
+            if name_key and name_key not in produced_names:
+                tokens.append(m)
 
     # v3.30.10 — panels-cache enrichment for token shape. The v3.30.8
     # payload above sourced type_line/image_url ONLY from a joined

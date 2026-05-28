@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session, joinedload
 
 from app.audit_service import log_transaction
 from app.models import Card, Deck, Game, GameSeat, InventoryRow, StorageLocation
-from app.scryfall import fetch_deck_tokens
+from app.scryfall import _cache_get_by_ids, fetch_deck_tokens
 
 # Library search for lands. Anchored to "your library" so opponent-search effects
 # (Demolition Field, Ghost Quarter, Strip Mine giving the opponent a basic) do NOT
@@ -802,6 +802,149 @@ def compute_deck_tokens(rows: list) -> list[dict]:
     if not scryfall_ids:
         return []
     return fetch_deck_tokens(scryfall_ids)
+
+
+def get_deck_produced_tokens_for_goldfish(deck_id: int, session) -> list[dict]:
+    """v3.30.21 — auto-detect produced tokens for the goldfish quick-add panel.
+
+    Reads ``scryfall_cards.produced_tokens`` (the v3.30.11 daemon-populated
+    22nd column; v3.30.19 made consumers read it locally) for every card
+    in the deck. No ``DeckTokenRequirement`` curation needed. The goldfish
+    quick-add panel becomes automatic for any deck whose cards have been
+    backfilled by the bulk-data daemon — the common case on prod.
+
+    Three local reads, **zero external calls** (the request-path network
+    invariant from v3.25.0/v3.27.9/v3.27.13/v3.30.19 holds):
+
+      Pass 1: collect ``Card.scryfall_id`` for every InventoryRow whose
+              storage_location_id matches this deck's. The deck's cards
+              live as InventoryRow rows pointing at the deck's paired
+              StorageLocation per the v3.3 deck-as-StorageLocation model.
+      Pass 2: read ``produced_tokens`` for each deck card via the existing
+              ``_cache_get_by_ids`` helper (same primitive v3.30.19 uses).
+              NULL / "[]" produced_tokens skip silently per the v3.30.11
+              NULL-vs-"[]" contract.
+      Pass 3: resolve token-card full details (image_url, set_code,
+              collector_number, canonical name/type_line) by looking up
+              each token's own ``scryfall_id``.
+
+    Returns a sorted-by-name list of dicts in the **exact shape** the
+    goldfish.py quick-add payload assembly expects, so the template
+    consumes the produced-tokens output identically to the existing
+    DeckTokenRequirement-derived output:
+
+      {
+        "requirement_id": None,           # not a curated requirement
+        "token_name": str,
+        "quantity_needed": 1,             # produced_tokens has no qty
+        "type_line": str | None,
+        "image_url": str | None,
+        "scryfall_id": str,
+        "set_code": str | None,
+        "collector_number": str | None,
+      }
+
+    Deduplicated by token name; if multiple printings of the same token
+    surface, prefer the entry with a non-empty image_url. Canonical
+    name/type_line from the token card's own row wins over the all_parts
+    stub (the stub can lag set releases).
+
+    Pure deck_service layer: no caching (the function is called once per
+    goldfish page load; profiling can add caching later if needed), no
+    external calls, no database writes. ``_cache_get_by_ids`` does carry
+    its own defensive try/except + degrade-to-empty pattern — a missing
+    column or schema drift returns an empty list rather than 500.
+
+    Missing prerequisites (deck doesn't exist, no paired StorageLocation,
+    no cards in the deck, no producers among the cards, daemon hasn't
+    backfilled the relevant cards yet) all degrade to ``[]`` — same
+    graceful posture as ``fetch_deck_tokens``. The route layer combines
+    this result with the existing DeckTokenRequirement-derived fallback
+    so manually-tracked tokens still surface for edge cases.
+    """
+    deck = session.query(Deck).filter(Deck.id == deck_id).first()
+    if deck is None or deck.storage_location_id is None:
+        return []
+
+    # Pass 1 — collect scryfall_ids of cards in this deck.
+    scryfall_id_rows = (
+        session.query(Card.scryfall_id)
+        .join(InventoryRow, InventoryRow.card_id == Card.id)
+        .filter(InventoryRow.storage_location_id == deck.storage_location_id)
+        .filter(Card.scryfall_id.isnot(None))
+        .all()
+    )
+    deck_scryfall_ids = [r[0] for r in scryfall_id_rows if r[0]]
+    if not deck_scryfall_ids:
+        return []
+
+    # Pass 2 — read produced_tokens for the deck cards. _cache_get_by_ids
+    # batches internally and degrades gracefully on schema drift.
+    deck_card_payloads = _cache_get_by_ids(deck_scryfall_ids)
+    seen_token_ids: set[str] = set()
+    token_stubs: list[dict[str, str]] = []
+    for payload in deck_card_payloads.values():
+        raw = payload.get("produced_tokens")
+        if not raw or raw == "[]":
+            continue
+        try:
+            parts = json.loads(raw)
+        except (json.JSONDecodeError, TypeError):
+            continue
+        if not isinstance(parts, list):
+            continue
+        for part in parts:
+            if not isinstance(part, dict):
+                continue
+            tid = part.get("scryfall_id") or part.get("id") or ""
+            if not tid or tid in seen_token_ids:
+                continue
+            seen_token_ids.add(tid)
+            token_stubs.append(
+                {
+                    "id": tid,
+                    "name": (part.get("name") or "").strip(),
+                    "type_line": (part.get("type_line") or "").strip(),
+                }
+            )
+
+    if not token_stubs:
+        return []
+
+    # Pass 3 — resolve full token card details (image_url, set_code,
+    # collector_number, canonical name/type_line). A token id missing from
+    # scryfall_cards (rare — would mean the bulk export hasn't propagated
+    # this token yet) falls back to the stub data with empty image_url;
+    # goldfish.js's text card-face fallback handles render-time.
+    token_payloads = _cache_get_by_ids([t["id"] for t in token_stubs])
+
+    # Build per-token dicts in the goldfish quick-add shape, dedup by name
+    # (multiple cards producing the same token name surface once; if
+    # multiple printings exist, prefer the entry with non-empty image_url).
+    by_name: dict[str, dict] = {}
+    for stub in token_stubs:
+        meta = token_payloads.get(stub["id"], {})
+        name = (meta.get("name") or stub["name"]).strip()
+        if not name:
+            continue
+        type_line = (meta.get("type_line") or stub["type_line"]).strip()
+        entry = {
+            "requirement_id": None,
+            "token_name": name,
+            "quantity_needed": 1,
+            "type_line": type_line or None,
+            "image_url": meta.get("image_url") or None,
+            "scryfall_id": stub["id"],
+            "set_code": meta.get("set_code") or None,
+            "collector_number": meta.get("collector_number") or None,
+        }
+        existing = by_name.get(name)
+        if existing is None:
+            by_name[name] = entry
+        elif not existing.get("image_url") and entry.get("image_url"):
+            by_name[name] = entry
+
+    return sorted(by_name.values(), key=lambda t: t["token_name"])
 
 
 def compute_consistency(rows: list) -> dict:
