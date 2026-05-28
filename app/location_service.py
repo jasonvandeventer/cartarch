@@ -94,6 +94,21 @@ def create_location(
     if type not in VALID_LOCATION_TYPES:
         raise ValueError(f"Invalid location type: {type}")
 
+    # v3.30.17 — deck-type StorageLocations MUST be created through
+    # deck_service.create_deck so the paired Deck row lands atomically.
+    # v3.30.15's auto_create_locations bypassed the v3.8.1 defense (at
+    # /locations/create-inline) by reaching create_location directly with
+    # type="deck", producing orphan deck-locations on confirm. This guard
+    # restores the v3.3 architectural invariant: every type="deck"
+    # StorageLocation has a paired Deck row. The canonical create_deck
+    # path uses raw StorageLocation(...) + session.add(), NOT this
+    # function, so adding the guard here does not break the canonical path.
+    if type == "deck":
+        raise ValueError(
+            "create_location refuses type='deck'; use deck_service.create_deck "
+            "so the paired Deck row is created atomically."
+        )
+
     if mode not in VALID_LOCATION_MODES:
         raise ValueError(f"Invalid location mode: {mode}")
 

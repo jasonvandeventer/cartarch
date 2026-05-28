@@ -987,8 +987,21 @@ def _build_line_to_location_map(
             if raw_type:
                 auto_create_type_overrides[normalized] = raw_type
 
-    if auto_create_names and auto_create_confirm != "yes":
-        return ({}, auto_create_names)
+    # v3.30.17 — deck-type auto-create rows have their own per-row opt-in
+    # checkbox in the preview UI (Part B); the global auto_create_confirm
+    # only gates NON-deck rows. Per-deck checkboxes work by toggling the
+    # row's location_choice_id between "0" (create) and "-1" (skip),
+    # so by the time we reach this code an unchecked deck row already has
+    # cid_int=-1 and never enters auto_create_names. The split below
+    # preserves the same shape for the global-confirm gate: only non-deck
+    # names trigger the "must confirm" re-render. Deck rows that DID make
+    # it into auto_create_names (checkbox checked) proceed straight to
+    # auto_create_locations regardless of the global confirm state.
+    auto_create_non_deck_names = [
+        n for n in auto_create_names if auto_create_type_overrides.get(n.lower(), "") != "deck"
+    ]
+    if auto_create_non_deck_names and auto_create_confirm != "yes":
+        return ({}, auto_create_non_deck_names)
 
     if auto_create_names:
         # Validation barrier already passed; create the missing locations.
@@ -996,6 +1009,8 @@ def _build_line_to_location_map(
         # VALID_LOCATION_TYPES (minus root) and raises ValueError on miss.
         # The route handler catches ValueError and surfaces it via the
         # v3.30.15 auto-create-not-confirmed re-render pattern.
+        # v3.30.17 — auto_create_locations routes type="deck" through
+        # deck_service.create_deck so the paired Deck row lands atomically.
         created = auto_create_locations(
             session, user_id, auto_create_names, name_to_type=auto_create_type_overrides
         )

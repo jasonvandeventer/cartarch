@@ -92,36 +92,81 @@
               </div>
             {% endif %}
             {% if missing_resolutions %}
-              <div class="imports-loc-panel imports-loc-missing">
-                <p class="imports-loc-panel-title">
-                  <strong>New locations will be created</strong> —
-                  pick the type for each. Defaults from the CSV's Location
-                  Type column when present; otherwise <code>other</code>.
-                </p>
-                <ul class="imports-loc-missing-list">
-                  {% for r in missing_resolutions %}
-                    <li>
-                      <code>{{ r.name }}</code>
-                      <input type="hidden" name="location_choice_name" value="{{ r.name }}">
-                      <input type="hidden" name="location_choice_id" value="0">
-                      <select name="location_choice_type" class="imports-loc-type-select">
-                        {% for t in ["binder", "box", "drawer", "deck", "other"] %}
-                          <option value="{{ t }}" {% if r.csv_type_for_create == t %}selected{% endif %}>{{ t }}</option>
-                        {% endfor %}
-                      </select>
-                      {% if r.csv_type_hint and not r.csv_type_valid %}
-                        <span class="imports-loc-type-warning">
-                          (CSV value <code>{{ r.csv_type_hint }}</code> not recognized; defaulted to <code>other</code>)
-                        </span>
-                      {% endif %}
-                    </li>
-                  {% endfor %}
-                </ul>
-                <label class="imports-loc-confirm">
-                  <input type="checkbox" name="auto_create_confirm" value="yes">
-                  Confirm: create these {{ missing_resolutions | length }} new location{{ "s" if missing_resolutions | length != 1 else "" }} on import.
-                </label>
-              </div>
+              {# v3.30.17 — split missing rows by type. Deck-type missing
+                 rows get distinct per-row opt-in checkboxes ("Create deck X")
+                 with no type <select>; non-deck rows keep the v3.30.16 type
+                 <select> + the global confirm gate. Unchecked deck rows fall
+                 through to is_pending=True. Restores the v3.3 invariant that
+                 every type="deck" StorageLocation has a paired Deck row by
+                 routing the auto-create through deck_service.create_deck. #}
+              {% set non_deck_missing = missing_resolutions | rejectattr('csv_type_for_create', 'equalto', 'deck') | list %}
+              {% set deck_missing = missing_resolutions | selectattr('csv_type_for_create', 'equalto', 'deck') | list %}
+              {% if deck_missing %}
+                <div class="imports-loc-panel imports-loc-missing imports-loc-deck-create">
+                  <p class="imports-loc-panel-title">
+                    <strong>Decks will be created</strong> —
+                    check each deck you want to create. Unchecked decks send
+                    their cards to <a href="/pending">Pending</a> for manual
+                    placement instead. Each creates a Deck record (appears on
+                    <a href="/decks">/decks</a>, has goldfish + analytics) with
+                    <em>no format set</em>; edit afterward via the Decks page.
+                  </p>
+                  <ul class="imports-loc-missing-list imports-loc-deck-list">
+                    {% for r in deck_missing %}
+                      <li class="imports-loc-deck-row">
+                        <input type="hidden" name="location_choice_name" value="{{ r.name }}">
+                        {# JS toggles location_choice_id between "0" (create)
+                           and "-1" (skip → fall through to pending) based on
+                           the checkbox state. Default unchecked → cid="-1". #}
+                        <input type="hidden" name="location_choice_id" value="-1">
+                        <input type="hidden" name="location_choice_type" value="deck">
+                        <label class="imports-loc-deck-label">
+                          <input type="checkbox" class="imports-loc-deck-checkbox"
+                                 onchange="this.parentElement.previousElementSibling.previousElementSibling.value = this.checked ? '0' : '-1'">
+                          <span>Create deck <strong>{{ r.name }}</strong></span>
+                        </label>
+                      </li>
+                    {% endfor %}
+                  </ul>
+                </div>
+              {% endif %}
+              {% if non_deck_missing %}
+                <div class="imports-loc-panel imports-loc-missing">
+                  <p class="imports-loc-panel-title">
+                    <strong>New locations will be created</strong> —
+                    pick the type for each. Defaults from the CSV's Location
+                    Type column when present; otherwise <code>other</code>.
+                  </p>
+                  <ul class="imports-loc-missing-list">
+                    {% for r in non_deck_missing %}
+                      <li>
+                        <code>{{ r.name }}</code>
+                        <input type="hidden" name="location_choice_name" value="{{ r.name }}">
+                        <input type="hidden" name="location_choice_id" value="0">
+                        <select name="location_choice_type" class="imports-loc-type-select">
+                          {# v3.30.17 — "deck" intentionally excluded from
+                             non-deck rows. Deck creation is opt-in via the
+                             dedicated deck panel above; a user wanting to
+                             reclassify a non-deck row as a deck should edit
+                             the CSV or use /decks afterward. #}
+                          {% for t in ["binder", "box", "drawer", "other"] %}
+                            <option value="{{ t }}" {% if r.csv_type_for_create == t %}selected{% endif %}>{{ t }}</option>
+                          {% endfor %}
+                        </select>
+                        {% if r.csv_type_hint and not r.csv_type_valid %}
+                          <span class="imports-loc-type-warning">
+                            (CSV value <code>{{ r.csv_type_hint }}</code> not recognized; defaulted to <code>other</code>)
+                          </span>
+                        {% endif %}
+                      </li>
+                    {% endfor %}
+                  </ul>
+                  <label class="imports-loc-confirm">
+                    <input type="checkbox" name="auto_create_confirm" value="yes">
+                    Confirm: create these {{ non_deck_missing | length }} new location{{ "s" if non_deck_missing | length != 1 else "" }} on import.
+                  </label>
+                </div>
+              {% endif %}
             {% endif %}
             {% if clean_resolutions %}
               {% for r in clean_resolutions %}
@@ -132,6 +177,25 @@
                    resolutions per Decision 12 (existing location wins). #}
                 <input type="hidden" name="location_choice_type" value="">
               {% endfor %}
+              {# v3.30.17 — informational note (Part C): clean-match
+                 resolutions whose StorageLocation has a paired Deck land
+                 cards directly into that existing deck. No confirm gate;
+                 just a placement heads-up. #}
+              {% set existing_deck_resolutions = clean_resolutions | selectattr('existing_deck_name') | list %}
+              {% if existing_deck_resolutions %}
+                <div class="imports-loc-panel imports-loc-existing-deck">
+                  <p class="imports-loc-panel-title">
+                    <strong>Cards will be placed into existing decks</strong>
+                  </p>
+                  <ul class="imports-loc-existing-deck-list">
+                    {% for r in existing_deck_resolutions %}
+                      <li>
+                        Cards with <code>Location={{ r.name }}</code> will be placed into your existing deck <strong>{{ r.existing_deck_name }}</strong>.
+                      </li>
+                    {% endfor %}
+                  </ul>
+                </div>
+              {% endif %}
             {% endif %}
             {% if duplicate_counts %}
               <div class="imports-loc-panel imports-loc-duplicates">

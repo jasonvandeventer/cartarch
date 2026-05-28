@@ -20,8 +20,9 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.audit_service import create_import_batch, log_transaction
+from app.deck_service import create_deck
 from app.location_service import VALID_LOCATION_TYPES, create_location
-from app.models import Card, InventoryRow, StorageLocation
+from app.models import Card, Deck, InventoryRow, StorageLocation
 from app.scryfall import (
     BulkFetchResult,
     bulk_fetch_by_set_number,
@@ -958,6 +959,20 @@ def resolve_location_names(
     for loc in locations:
         by_name.setdefault((loc.name or "").strip().lower(), []).append(loc)
 
+    # v3.30.17 — batched lookup of decks paired with deck-type
+    # StorageLocations in the user's set. Surfaces in the preview as the
+    # Part C informational note when a clean-match resolution lands a
+    # batch into an existing deck. Single query, no N+1.
+    deck_loc_ids = [loc.id for locs in by_name.values() for loc in locs if loc.type == "deck"]
+    deck_by_loc: dict[int, Deck] = {}
+    if deck_loc_ids:
+        decks = (
+            session.query(Deck)
+            .filter(Deck.user_id == user_id, Deck.storage_location_id.in_(deck_loc_ids))
+            .all()
+        )
+        deck_by_loc = {d.storage_location_id: d for d in decks if d.storage_location_id is not None}
+
     # User-selectable types — VALID_LOCATION_TYPES minus the structural
     # 'root' kind (which can only appear on the user's auto-seeded root).
     selectable_types = VALID_LOCATION_TYPES - {"root"}
@@ -980,6 +995,17 @@ def resolve_location_names(
         csv_type_valid = (raw_type == "") or (raw_type in selectable_types)
         csv_type_for_create = raw_type if (raw_type in selectable_types) else "other"
 
+        # v3.30.17 — if the clean-match resolution lands in a paired
+        # deck-type location, surface the deck name for the Part C
+        # informational note in the preview UI.
+        existing_deck_name: str | None = None
+        if status == "clean":
+            loc = matches[0]
+            if loc.type == "deck":
+                paired = deck_by_loc.get(loc.id)
+                if paired is not None:
+                    existing_deck_name = paired.name
+
         out.append(
             {
                 "name": raw_name,
@@ -989,6 +1015,7 @@ def resolve_location_names(
                 "csv_type_hint": raw_type,
                 "csv_type_valid": csv_type_valid,
                 "csv_type_for_create": csv_type_for_create,
+                "existing_deck_name": existing_deck_name,
             }
         )
     return out
@@ -1010,10 +1037,22 @@ def auto_create_locations(
     (caught by the route handler and surfaced via preview re-render —
     same shape as v3.30.15's auto-create-not-confirmed branch).
 
-    Goes through ``create_location`` so the same validation +
-    one-name-per-user rule the manual /locations flow uses is honored.
-    If a name already exists by the time this is called (race), the
-    existing row is used and no new row is created.
+    v3.30.17 — type="deck" now routes through ``deck_service.create_deck``
+    so the paired Deck row is created atomically alongside the
+    StorageLocation. v3.30.15/.16 had reached ``create_location`` directly
+    with type="deck", producing orphan deck-locations (no paired Deck row)
+    that were invisible to /decks, /goldfish, deck-detail, and the
+    deck-destination dropdowns. After v3.30.17 the v3.3 invariant holds in
+    every code path: a type="deck" StorageLocation always has a paired
+    Deck row. Existing-Deck-by-name (uq_decks_user_name) is honored:
+    if a Deck with the imported name already exists for this user, its
+    paired ``storage_location_id`` is reused (no duplicate create).
+
+    Non-deck behaviour unchanged: still routes through ``create_location``
+    so the same validation + one-name-per-user rule the manual /locations
+    flow uses is honored. If a StorageLocation already exists by the time
+    this is called (race), the existing row is used and no new row is
+    created.
     """
     out: dict[str, int] = {}
     if not names:
@@ -1042,6 +1081,37 @@ def auto_create_locations(
                 f"Invalid Location Type for auto-create: {requested_type!r} "
                 f"(allowed: {sorted(selectable_types)})"
             )
+        if requested_type == "deck":
+            # v3.30.17 — route deck creation through the canonical atomic
+            # path so the paired Deck row lands with the StorageLocation.
+            # First, honour uq_decks_user_name: if a Deck with this name
+            # already exists for the user, reuse its storage_location_id
+            # rather than letting create_deck fail on the unique constraint.
+            existing_deck = (
+                session.query(Deck)
+                .filter(
+                    Deck.user_id == user_id,
+                    func.lower(Deck.name) == name.lower(),
+                )
+                .first()
+            )
+            if existing_deck is not None and existing_deck.storage_location_id is not None:
+                out[name.lower()] = existing_deck.storage_location_id
+                continue
+            if existing_deck is not None:
+                # Deck exists but is orphaned (no paired location, e.g.
+                # historical drift before v3.10.6 kept names in sync). We
+                # cannot reuse and we cannot create_deck (would violate
+                # uq_decks_user_name). Skip the resolution: row falls
+                # through to target_location_id like an unresolved name.
+                # User can clean up the orphaned Deck separately.
+                continue
+            new_deck = create_deck(session, user_id=user_id, name=name)
+            # create_deck always pairs a StorageLocation — storage_location_id
+            # is non-None by construction.
+            if new_deck.storage_location_id is not None:
+                out[name.lower()] = new_deck.storage_location_id
+            continue
         loc = create_location(
             session=session,
             user_id=user_id,

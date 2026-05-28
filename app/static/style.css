@@ -11388,6 +11388,58 @@ table.dmtx .dmtx-rowhead {
 }
 
 /* ===================================================================
+   v3.30.17 — deck-create panel + existing-deck informational note.
+   Token reuse only (Folio palette + spacing/radius scales). The deck
+   panel uses a slightly stronger brass-gold border than the generic
+   .imports-loc-missing block to draw the eye, because creating a Deck
+   record is a more consequential action than creating a generic
+   storage location.
+   =================================================================== */
+.imports-loc-deck-create {
+  border-color: var(--brand-gold);
+  background: var(--brand-gold-soft);
+}
+.imports-loc-deck-list {
+  list-style: none;
+  padding-left: 0;
+}
+.imports-loc-deck-row {
+  margin: var(--space-2) 0;
+}
+.imports-loc-deck-label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  cursor: pointer;
+  user-select: none;
+}
+.imports-loc-deck-checkbox {
+  margin: 0;
+  cursor: pointer;
+}
+.imports-loc-existing-deck {
+  border-color: var(--brand-gold-soft);
+}
+.imports-loc-existing-deck-list {
+  list-style: disc;
+  padding-left: var(--space-4);
+  margin: var(--space-2) 0 0;
+  font-style: italic;
+  color: var(--text-dim);
+}
+.imports-loc-existing-deck-list li {
+  margin: var(--space-1) 0;
+}
+.imports-loc-existing-deck-list code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  padding: 0 4px;
+  border-radius: var(--radius-sm);
+  background: var(--panel-2);
+  color: var(--brand-gold);
+  font-style: normal;
+}
+
+/* ===================================================================
    v3.28.11 — Folio Watchlist refresh (target price + light polish)
    ===================================================================
    The Watchlist page (v3.27.12) is already on the Folio palette. v3.28.11

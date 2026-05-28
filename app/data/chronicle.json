@@ -1,5 +1,23 @@
 [
   {
+    "version": "3.30.17",
+    "date": "2026-05-28",
+    "added": [
+      "Importing a collection backup now correctly creates real Deck records for deck-type locations. A row whose Location Type is 'deck' (the natural shape of a /collection/export of a user with decks) auto-creates a paired Deck record alongside the StorageLocation, so the deck appears on the Decks page after a round-trip restore, has goldfish + analytics, and is reachable from every deck-facing surface.",
+      "The preview step now shows deck creations distinctly. Decks-to-be-created render in their own panel with per-row 'Create deck X' opt-in checkboxes — pick exactly which decks you want to materialize from the import. Unchecked decks send their cards to Pending instead, which you can place manually afterward.",
+      "Cards heading into an existing deck during import surface a small informational note. 'Cards with Location=X will be placed into your existing deck X' — no confirm gate, just a heads-up that those rows are landing in a deck you already have."
+    ],
+    "refined": [
+      "Auto-created decks ship with no format set. The deck appears on the Decks page; you can edit the format afterward via the existing Decks page Edit popout. Carrying deck format through the export schema is a separate follow-up.",
+      "The non-deck Type dropdown in the auto-create confirm panel no longer offers 'deck' as an option. Deck creation now happens exclusively through the dedicated deck-create panel (with its per-row opt-in checkboxes). Any CSV row asking for 'deck' creates a real Deck record, or, if you uncheck, sends its cards to Pending.",
+      "Deck creation now never goes through the generic create_location code path. A small architectural guard: if any code ever attempts to create a StorageLocation with type='deck' through create_location, the call fails loudly instead of producing a half-finished deck."
+    ],
+    "resolved": [
+      "Closes a latent data-loss class introduced by v3.30.15/.16. The auto-create path could previously create a StorageLocation marked as a deck without ever creating the paired Deck record — an orphan invisible to the Decks page, goldfish, and analytics, even though the cards sat in the location. A diagnostic query against prod confirmed nobody had triggered the bug yet (the confirm gate held). This release closes the hole before any user is affected."
+    ],
+    "archivist_note": "The v3.30.15 importer fix introduced the bypass; the v3.30.16 export schema expansion made it easier to hit by defaulting the Location Type dropdown to 'deck' whenever the CSV said so. Two days, two improvements, one quiet hole between them. The recon ran a diagnostic query against the live database and found zero orphans — caught before harm, exactly the use case the diagnostic was for. v3.30.17 routes deck-type auto-create through the canonical Deck-creation path so the paired Deck row lands atomically alongside the StorageLocation, restoring the v3.3 architectural invariant that has held since the codebase first treated decks as storage locations. Next: the long-deferred fetch_deck_tokens consumer flip (still v3.30.18; the v3.30.11 daemon backfill needs to finish first)."
+  },
+  {
     "version": "3.30.16",
     "date": "2026-05-27",
     "added": [
