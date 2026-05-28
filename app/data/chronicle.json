@@ -1,5 +1,20 @@
 [
   {
+    "version": "3.30.20",
+    "date": "2026-05-28",
+    "added": [
+      "The import preview now warns you when a deck name you've ticked to create is already held by another user on the server. A small note appears next to the row — 'Another user on this server already has a deck named X' — and the row's checkbox is disabled so the import can't try to create it. You'll know before you click commit which decks will be skipped and where their cards will end up (in Pending, where you can place them manually).",
+      "The result page after import now lists any deck names that were skipped due to legacy name conflicts. If a row's name is still held by another user even after the preview warning (for example, via a tampered form submission), the cards land in Pending and the result page shows you which decks were affected and explains why."
+    ],
+    "refined": [
+      "For CSV imports that don't carry a Location Type column (the common third-party-CSV case), the 'deck' option is hidden from a row's type dropdown whenever the name conflicts with another user's deck. The dropdown shows binder/box/drawer/other instead, with a small note explaining why deck is missing. You can still pick a non-deck type for that location — or rename the row to designate it as a deck."
+    ],
+    "resolved": [
+      "Closes a quiet UX gap reported on prod: importing a CSV with seven deck-create checkboxes ticked, only one deck (a pre-existing one, reused via the existing-deck check) actually appeared on the Decks page. The other six names happened to be held by other users on the server, and the v3.30.18 defensive fallback correctly handled each constraint hit by skipping the row — but the skip was invisible to the importing user. v3.30.20 surfaces these collisions at preview time so the user can act before clicking commit, and on the result page so they can see which rows landed in Pending instead of becoming decks."
+    ],
+    "archivist_note": "The investigation was the interesting part. The bug report suspected two code defects — either the session rollback was too broad (corrupting the batch transaction) or the per-user existing-deck check was returning false positives. A 25-assertion HTTP repro exhaustively tested both candidates and refuted both. The rollback recovers cleanly; non-conflicting decks after the failure still create successfully; the per-user check is correctly user-scoped. What looked like a code bug was actually correct behavior with no surface — the legacy single-column UNIQUE constraint on deck names (a v3.0-era artifact predating the multi-user database) was silently filtering out every deck name held by anyone else on the server, and the importing user had no way to know which ones would be skipped. The fix doesn't change any behavior; it just makes the existing behavior visible. The constraint itself will be removed in the v4 database upgrade, at which point the v3.30.20 warnings, the v3.30.18 fallback, and the cross-user lookup field all become safe to delete together. Until then: surface the silent, so the user can act."
+  },
+  {
     "version": "3.30.19",
     "date": "2026-05-28",
     "added": [

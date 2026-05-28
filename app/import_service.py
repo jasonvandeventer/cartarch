@@ -960,6 +960,35 @@ def resolve_location_names(
     for loc in locations:
         by_name.setdefault((loc.name or "").strip().lower(), []).append(loc)
 
+    # v3.30.20 — batched cross-user Deck.name lookup for the legacy
+    # decks.name UNIQUE auto-index (the pre-v3.1.0 single-tenant
+    # constraint v3.30.18 ships a defensive try/except for). ONE query
+    # for every distinct missing name in the batch — captures every
+    # owner-of-that-name across ALL users. The preview surfaces this
+    # at the auto-create panel so the user sees the conflict BEFORE
+    # clicking commit, instead of the v3.30.18 fallback silently skipping
+    # the row at commit time. The try/except fallback stays — defense
+    # in depth for tampered form submissions or future unique-constraint
+    # shapes we don't know about. When v4's table rebuild drops the
+    # legacy auto-index, this entire pre-warn block (and the per-resolution
+    # cross_user_deck_conflict field) becomes unnecessary and should be
+    # removed alongside the try/except fallback.
+    missing_names_lower = [
+        (e.get("name") or "").strip().lower()
+        for e in distinct_entries
+        if (e.get("name") or "").strip() and (e.get("name") or "").strip().lower() not in by_name
+    ]
+    deck_name_owners: dict[str, list[int]] = {}
+    if missing_names_lower:
+        conflict_rows = (
+            session.query(Deck.name, Deck.user_id)
+            .filter(func.lower(Deck.name).in_(missing_names_lower))
+            .all()
+        )
+        for deck_name, owner_id in conflict_rows:
+            key = (deck_name or "").strip().lower()
+            deck_name_owners.setdefault(key, []).append(owner_id)
+
     # v3.30.17 — batched lookup of decks paired with deck-type
     # StorageLocations in the user's set. Surfaces in the preview as the
     # Part C informational note when a clean-match resolution lands a
@@ -1020,6 +1049,21 @@ def resolve_location_names(
                 if paired is not None:
                     existing_deck_name = paired.name
 
+        # v3.30.20 — cross-user Deck.name conflict flag. True iff some
+        # OTHER user on this server owns a deck with this name; the
+        # legacy decks.name UNIQUE auto-index (pre-v3.1.0, present on
+        # installs that pre-date the multi-user migration) would block
+        # `create_deck` for this name. Only meaningful for "missing"
+        # resolutions: clean/ambiguous match against the current user's
+        # own SLs/decks first, so the cross-user check doesn't apply.
+        # Owners equal to the current user are filtered out (their own
+        # Deck is the canonical reuse case, handled by
+        # auto_create_locations' per-user existing-Deck check).
+        cross_user_deck_conflict = False
+        if status == "missing":
+            owners = deck_name_owners.get(key, [])
+            cross_user_deck_conflict = any(owner_id != user_id for owner_id in owners)
+
         out.append(
             {
                 "name": raw_name,
@@ -1031,6 +1075,7 @@ def resolve_location_names(
                 "csv_type_for_create": csv_type_for_create,
                 "csv_type_explicit": csv_type_explicit,
                 "existing_deck_name": existing_deck_name,
+                "cross_user_deck_conflict": cross_user_deck_conflict,
             }
         )
     return out

@@ -931,7 +931,7 @@ def _build_line_to_location_map(
     choice_ids: list[str],
     auto_create_confirm: str,
     choice_types: list[str] | None = None,
-) -> tuple[dict[int, int], list[str]]:
+) -> tuple[dict[int, int], list[str], list[str]]:
     """v3.30.15 — build the per-row line_number → StorageLocation.id map.
 
     Consumes the parallel ``location_choice_name[]`` / ``location_choice_id[]``
@@ -955,13 +955,24 @@ def _build_line_to_location_map(
     ``"other"``. For non-zero choice_id values (picker/clean/skip) the
     type is ignored — the existing location's type wins per Decision 12.
 
-    Returns ``(line_to_location_id, needs_confirm_names)``:
+    Returns ``(line_to_location_id, needs_confirm_names, skipped_deck_conflicts)``:
       * ``line_to_location_id`` — map of CSV line_number → resolved id.
         Empty dict if the caller should take the existing 3-branch dispatch.
       * ``needs_confirm_names`` — non-empty list of names whose auto-create
         was requested but ``auto_create_confirm != "yes"``. The route MUST
         re-render the preview with no writes in this case (Decision 3
         "User cancels → batch is rejected without writes").
+      * ``skipped_deck_conflicts`` (v3.30.20) — display names of deck
+        auto-create rows that the user opted into but that auto_create_locations
+        silently dropped (the v3.30.18 try/except IntegrityError fallback
+        for the pre-v3.1.0 legacy decks.name UNIQUE auto-index — fires when
+        another user owns the name). The route handler threads this list
+        to import_result.html so the result page can warn the user that
+        N decks were skipped due to legacy name conflicts. Belt-and-
+        suspenders alongside the v3.30.20 pre-warn in the preview UI: if
+        a tampered submission slips a conflicting deck-create past the
+        pre-warn, the try/except still catches it AND the result page
+        notes it.
     """
     name_to_id: dict[str, int] = {}
     auto_create_names: list[str] = []
@@ -969,6 +980,9 @@ def _build_line_to_location_map(
     # entering the auto-create flow. Keyed by lowercased name to match
     # auto_create_locations' lookup convention.
     auto_create_type_overrides: dict[str, str] = {}
+    # v3.30.20 — display-form lookup for skipped-deck-conflict reporting.
+    # Keyed by lowercased name; value is the original CSV display form.
+    display_by_normalized: dict[str, str] = {}
 
     choice_types = choice_types or []
     for i, (raw_name, raw_id) in enumerate(zip(choice_names, choice_ids, strict=False)):
@@ -983,6 +997,7 @@ def _build_line_to_location_map(
             name_to_id[normalized] = cid_int
         elif cid_int == 0:
             auto_create_names.append(raw_name.strip())
+            display_by_normalized[normalized] = raw_name.strip()
             raw_type = (choice_types[i] if i < len(choice_types) else "").strip().lower()
             if raw_type:
                 auto_create_type_overrides[normalized] = raw_type
@@ -1001,7 +1016,20 @@ def _build_line_to_location_map(
         n for n in auto_create_names if auto_create_type_overrides.get(n.lower(), "") != "deck"
     ]
     if auto_create_non_deck_names and auto_create_confirm != "yes":
-        return ({}, auto_create_non_deck_names)
+        return ({}, auto_create_non_deck_names, [])
+
+    # v3.30.20 — record the set of names the user intended to create as
+    # decks BEFORE calling auto_create_locations. After the call, anything
+    # missing from the resolution map is a silently-skipped row — either
+    # the v3.30.18 IntegrityError fallback fired (legacy cross-user
+    # constraint) or the orphaned-Deck-no-paired-SL edge case. Both are
+    # surfaced on the result page so the user knows the cards landed in
+    # Pending rather than into the deck they ticked.
+    intended_deck_creates = {
+        n.lower(): display_by_normalized.get(n.lower(), n)
+        for n in auto_create_names
+        if auto_create_type_overrides.get(n.lower(), "") == "deck"
+    }
 
     if auto_create_names:
         # Validation barrier already passed; create the missing locations.
@@ -1016,6 +1044,16 @@ def _build_line_to_location_map(
         )
         name_to_id.update(created)
 
+    # v3.30.20 — diff intended-deck-creates against actually-created.
+    # Names that were requested but never landed in name_to_id are the
+    # skipped-due-to-conflict rows (the v3.30.18 try/except fallback
+    # caught them).
+    skipped_deck_conflicts = [
+        display_by_normalized.get(lname, lname)
+        for lname in intended_deck_creates
+        if lname not in name_to_id
+    ]
+
     line_to_loc: dict[int, int] = {}
     for r in parsed_rows:
         raw = (r.get("location") or "").strip().lower()
@@ -1028,7 +1066,7 @@ def _build_line_to_location_map(
                 continue
             line_to_loc[line_num] = name_to_id[raw]
 
-    return (line_to_loc, [])
+    return (line_to_loc, [], skipped_deck_conflicts)
 
 
 def _deck_for_storage_location(
@@ -1684,19 +1722,22 @@ async def import_commit(
     # through the same preview re-render shape as the not-confirmed path,
     # surfacing the failure to the user without crashing the request.
     try:
-        line_to_location_id, needs_confirm_names = _build_line_to_location_map(
-            session,
-            current_user.id,
-            rows,
-            location_choice_name,
-            location_choice_id,
-            auto_create_confirm,
-            choice_types=location_choice_type,
+        line_to_location_id, needs_confirm_names, skipped_deck_conflicts = (
+            _build_line_to_location_map(
+                session,
+                current_user.id,
+                rows,
+                location_choice_name,
+                location_choice_id,
+                auto_create_confirm,
+                choice_types=location_choice_type,
+            )
         )
         invalid_type_error: str | None = None
     except ValueError as exc:
         line_to_location_id = {}
         needs_confirm_names = []
+        skipped_deck_conflicts = []
         invalid_type_error = str(exc)
 
     if invalid_type_error or needs_confirm_names:
@@ -1812,6 +1853,7 @@ async def import_commit(
                 "placed_in": placed_in,
                 "placed_in_url": placed_in_url,
                 "placed_in_kind": placed_in_kind,
+                "skipped_deck_conflicts": skipped_deck_conflicts,
                 "current_user": current_user,
             },
         )

@@ -11457,6 +11457,45 @@ table.dmtx .dmtx-rowhead {
   margin: 0;
   cursor: pointer;
 }
+/* v3.30.20 — cross-user Deck.name conflict warning at preview time.
+   Pre-v3.1.0 legacy decks.name UNIQUE auto-index would block
+   create_deck on commit; surface to the user BEFORE they tick the
+   confirm checkbox. Two contexts:
+   1. Deck panel — the per-row checkbox is REPLACED by a warning span.
+   2. Non-deck panel (Case 3) — the dropdown silently excludes "deck"
+      and a small warning span explains why. */
+.imports-loc-deck-conflict {
+  background: rgba(138, 46, 34, 0.08);
+  border-left: 3px solid var(--danger);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+}
+.imports-loc-deck-conflict-warning {
+  display: inline-block;
+  color: var(--text);
+  font-style: italic;
+  font-size: 0.95em;
+  line-height: 1.5;
+}
+.imports-loc-deck-conflict-warning strong {
+  font-style: normal;
+  color: var(--brand-gold);
+}
+.imports-loc-deck-conflict-panel {
+  border-left: 3px solid var(--danger);
+}
+.imports-loc-deck-conflict-list {
+  list-style: disc;
+  padding-left: var(--space-4);
+  margin: var(--space-2) 0 0;
+}
+.imports-loc-deck-conflict-list code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  padding: 0 4px;
+  border-radius: var(--radius-sm);
+  background: var(--panel-2);
+  color: var(--brand-gold);
+}
 
 /* ===================================================================
    v3.28.11 — Folio Watchlist refresh (target price + light polish)

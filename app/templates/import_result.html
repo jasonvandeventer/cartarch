@@ -112,6 +112,32 @@
       </a>
     </div>
   </section>
+  {% if skipped_deck_conflicts %}
+    {# v3.30.20 — belt-and-suspenders surface for deck auto-create rows
+       that the v3.30.18 try/except IntegrityError fallback silently
+       skipped (pre-v3.1.0 legacy decks.name UNIQUE auto-index). The
+       v3.30.20 preview pre-warn is the primary guard; this result-page
+       notice catches any tampered submission that slipped past it. #}
+    <section class="panel imports-rows-panel imports-loc-deck-conflict-panel">
+      <h3 class="panel-title imports-step-title"><span class="deck-detail-section-mark">§</span> Deck name conflicts skipped</h3>
+      <p class="imports-step-lede">
+        {{ skipped_deck_conflicts | length }}
+        deck name{{ "s" if skipped_deck_conflicts | length != 1 else "" }}
+        {{ "were" if skipped_deck_conflicts | length != 1 else "was" }}
+        skipped due to legacy name conflicts — those cards landed in
+        <a href="/pending">Pending</a>. The pre-v3.1.0 legacy
+        <code>decks.name</code> UNIQUE constraint blocks creation when
+        another user on this server already has a deck with the same
+        name; this constraint will be removed in the v4 database upgrade.
+        Rename your decks (or wait for v4) and re-import.
+      </p>
+      <ul class="imports-loc-deck-conflict-list">
+        {% for name in skipped_deck_conflicts %}
+          <li><code>{{ name }}</code></li>
+        {% endfor %}
+      </ul>
+    </section>
+  {% endif %}
   {% if failed_rows %}
     <section class="panel imports-rows-panel imports-rows-invalid">
       <h3 class="panel-title imports-step-title"><span class="deck-detail-section-mark">§</span> Failed Rows</h3>

@@ -113,19 +113,50 @@
                   </p>
                   <ul class="imports-loc-missing-list imports-loc-deck-list">
                     {% for r in deck_missing %}
-                      <li class="imports-loc-deck-row">
-                        <input type="hidden" name="location_choice_name" value="{{ r.name }}">
-                        {# JS toggles location_choice_id between "0" (create)
-                           and "-1" (skip → fall through to pending) based on
-                           the checkbox state. Default unchecked → cid="-1". #}
-                        <input type="hidden" name="location_choice_id" value="-1">
-                        <input type="hidden" name="location_choice_type" value="deck">
-                        <label class="imports-loc-deck-label">
-                          <input type="checkbox" class="imports-loc-deck-checkbox"
-                                 onchange="this.parentElement.previousElementSibling.previousElementSibling.value = this.checked ? '0' : '-1'">
-                          <span>Create deck <strong>{{ r.name }}</strong></span>
-                        </label>
-                      </li>
+                      {# v3.30.20 — cross-user Deck.name conflict surface.
+                         If another user owns the name, the pre-v3.1.0 legacy
+                         decks.name UNIQUE auto-index would block create_deck
+                         on commit; v3.30.18's try/except would silently skip
+                         the row. v3.30.20 surfaces the conflict at preview
+                         time so the user can act before submitting: the row
+                         renders a warning and the checkbox is disabled.
+                         Hidden inputs submit location_choice_id="-1" + type
+                         ="deck" — cid=-1 means skip even if a tampered form
+                         submission sneaks past the disabled checkbox. The
+                         v3.30.18 try/except stays as defense in depth. When
+                         v4's table rebuild drops the legacy constraint, this
+                         entire warning branch (and the try/except) becomes
+                         unnecessary. #}
+                      {% if r.cross_user_deck_conflict %}
+                        <li class="imports-loc-deck-row imports-loc-deck-conflict">
+                          <input type="hidden" name="location_choice_name" value="{{ r.name }}">
+                          <input type="hidden" name="location_choice_id" value="-1">
+                          <input type="hidden" name="location_choice_type" value="deck">
+                          <span class="imports-loc-deck-conflict-warning">
+                            ⚠ Another user on this server already has a deck
+                            named <strong>{{ r.name }}</strong>. Due to a
+                            legacy database constraint, this name cannot be
+                            created until the v4 database upgrade. Rename
+                            this deck or uncheck it — cards for this row
+                            will land in <a href="/pending">Pending</a>.
+                          </span>
+                        </li>
+                      {% else %}
+                        <li class="imports-loc-deck-row">
+                          <input type="hidden" name="location_choice_name" value="{{ r.name }}">
+                          {# JS toggles location_choice_id between "0" (create)
+                             and "-1" (skip → fall through to pending) based
+                             on the checkbox state. Default unchecked →
+                             cid="-1". #}
+                          <input type="hidden" name="location_choice_id" value="-1">
+                          <input type="hidden" name="location_choice_type" value="deck">
+                          <label class="imports-loc-deck-label">
+                            <input type="checkbox" class="imports-loc-deck-checkbox"
+                                   onchange="this.parentElement.previousElementSibling.previousElementSibling.value = this.checked ? '0' : '-1'">
+                            <span>Create deck <strong>{{ r.name }}</strong></span>
+                          </label>
+                        </li>
+                      {% endif %}
                     {% endfor %}
                   </ul>
                 </div>
@@ -151,8 +182,17 @@
                          gets binder/box/drawer/deck/other — the third-party-
                          CSV path where the user designates types at import
                          time. The conditional checkbox row below + small JS
-                         block handle the deck→checkbox conversion. #}
-                      {% set allow_deck = not r.csv_type_explicit %}
+                         block handle the deck→checkbox conversion.
+
+                         v3.30.20 — also exclude "deck" from the dropdown if
+                         the row has a cross-user Deck.name conflict (the
+                         pre-v3.1.0 legacy decks.name UNIQUE auto-index would
+                         block create_deck on commit). The user simply can't
+                         designate the row as a deck inline; their options
+                         are non-deck types only. Surfaced as a small warning
+                         note next to the dropdown so the user knows why
+                         "deck" is missing. #}
+                      {% set allow_deck = not r.csv_type_explicit and not r.cross_user_deck_conflict %}
                       <li class="imports-loc-row-unspec{% if not allow_deck %} imports-loc-row-explicit{% endif %}" data-name="{{ r.name }}">
                         <code>{{ r.name }}</code>
                         <input type="hidden" name="location_choice_name" value="{{ r.name }}">
@@ -167,6 +207,18 @@
                         {% if r.csv_type_hint and not r.csv_type_valid %}
                           <span class="imports-loc-type-warning">
                             (CSV value <code>{{ r.csv_type_hint }}</code> not recognized; defaulted to <code>other</code>)
+                          </span>
+                        {% endif %}
+                        {% if r.cross_user_deck_conflict %}
+                          {# v3.30.20 — explain why "deck" is missing from the
+                             dropdown for this row. Cross-user Deck.name
+                             conflict; the pre-v3.1.0 legacy decks.name UNIQUE
+                             auto-index would block create_deck on commit. #}
+                          <span class="imports-loc-deck-conflict-warning">
+                            ⚠ <code>deck</code> excluded — another user has a deck named
+                            <strong>{{ r.name }}</strong>; legacy database constraint
+                            blocks creation until v4. Pick a non-deck type or leave at
+                            <code>other</code>.
                           </span>
                         {% endif %}
                         {% if allow_deck %}
