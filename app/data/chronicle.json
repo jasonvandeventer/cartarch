@@ -1,5 +1,19 @@
 [
   {
+    "version": "3.30.19",
+    "date": "2026-05-28",
+    "added": [
+      "Opening a deck no longer calls Scryfall. Token data — the produced-tokens list, the art, the type line, the set and collector number — now comes from the local card cache. Deck-detail pages render the Tokens panel without any network round-trip; warm or cold cache, the answer is the same."
+    ],
+    "refined": [
+      "The change is invisible to you. The token panel renders the same tokens, sorted the same way, with the same art and details as before. The only difference is where the data came from: yesterday Scryfall over HTTPS; today the local database."
+    ],
+    "resolved": [
+      "The deck-detail token panel was the last surviving request-path Scryfall call in the app. v3.27.9 retired the combos-panel call; v3.27.13 retired the set-completion call; v3.30.19 retires this third one. No Cartarch page now reaches out to Scryfall while you wait. The card data still comes from Scryfall — through the nightly background sync that has populated the bulk cache since v3.25.0 — but the request path itself is fully local."
+    ],
+    "archivist_note": "Eight weeks ago we added a new column to the card cache to make this possible — `produced_tokens`, capturing which tokens each card produces. The column waited patiently for its consumer to ship, while seven other releases jumped ahead of it: counter-pill renders, click-to-adjust ergonomics, drag-attach, two data-loss fixes for the importer, an export schema expansion, and a corrective patch on top of that. Each preempt was a real bug that needed shipping first; the consumer flip wasn't slipping, it was waiting its turn. With the prod backfill at 114,242 of 114,242 rows (every card populated, none remaining), the flip dropped in cleanly — same Tokens panel, same dedup, same art, just sourced locally now. The v3.27.9 release-history note that explicitly tolerated this call — 'kept; the result is cached so worst-case latency is bounded' — is now resolved. The panels-cache stays for warm-load speed; it is no longer load-bearing for network avoidance. Next: open. The major v3.30.x series — the goldfish playtester feedback loop and the round-trip importer/exporter — are both complete. The owner picks the next slot."
+  },
+  {
     "version": "3.30.18",
     "date": "2026-05-28",
     "added": [

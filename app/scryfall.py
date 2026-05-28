@@ -96,18 +96,19 @@ def _normalize_card_payload(raw: dict[str, Any]) -> dict[str, Any]:
     # array whose component is exactly "token" (mirrors the discrimination
     # in fetch_deck_tokens line 182). Per-entry shape: {name, type_line,
     # scryfall_id} — `id` from Scryfall is stored as `scryfall_id` so the
-    # v3.30.12 consumer flip can look up token cards in the scryfall_cards
-    # bulk cache directly. component is the filter criterion, not stored
-    # (only-tokens-stored, implicit by presence). object/uri not useful
-    # downstream. Empty list → "[]" (NOT NULL); a NULL column means "this
-    # row predates the v3.30.11 daemon backfill" and is distinguishable
-    # from "we processed this card and it has no tokens". v3.30.11 is the
-    # data half of a two-release sequence; no consumer reads this field
-    # yet — fetch_deck_tokens, compute_deck_tokens, the deck-detail
-    # "Tokens" panel, and the v3.30.10 goldfish enrichment are all
-    # UNCHANGED. v3.30.12 retires fetch_deck_tokens's request-path
-    # Scryfall call once the daemon has populated produced_tokens across
-    # scryfall_cards.
+    # consumer flip can look up token cards in the scryfall_cards bulk cache
+    # directly. component is the filter criterion, not stored (only-tokens-
+    # stored, implicit by presence). object/uri not useful downstream.
+    # Empty list → "[]" (NOT NULL); a NULL column means "this row predates
+    # the v3.30.11 daemon backfill" and is distinguishable from "we processed
+    # this card and it has no tokens". v3.30.11 is the data half of a
+    # two-release sequence; v3.30.19 is the consumer-flip release that
+    # retires fetch_deck_tokens's request-path Scryfall calls in favour
+    # of local reads against this column. (The consumer flip was renumbered
+    # six times from its original v3.30.12 slot — preempted by counter-pill
+    # render fix, click-to-adjust UX, drag-attach, the round-trip importer
+    # fix, the export schema expansion, the deck auto-create orphan fix,
+    # and the v3.30.17 corrective patch — before shipping as v3.30.19.)
     produced_tokens_list: list[dict[str, str]] = []
     seen_token_ids: set[str] = set()
     for part in raw.get("all_parts") or []:
@@ -194,80 +195,127 @@ _deck_token_cache: dict[tuple, list[dict[str, str]]] = {}
 def fetch_deck_tokens(scryfall_ids: list[str]) -> list[dict[str, str]]:
     """Return deduplicated tokens produceable by the given cards, with images.
 
-    Pass 1: batch-fetch deck cards to collect token stubs from all_parts.
-    Pass 2: batch-fetch the token cards themselves to get image_uris and set info.
-    Result is cached per unique set of scryfall_ids — deck page reloads are free.
-    Returns sorted list of {name, type_line, image_url, set_code, collector_number, scryfall_id}.
+    v3.30.19 — local read path. Reads ``scryfall_cards.produced_tokens``
+    (the v3.30.11 22nd column) for each deck card, then resolves the
+    token cards locally to attach image_url / set_code / collector_number.
+    **Zero Scryfall network calls.** Closes the request-path Scryfall
+    violation v3.27.9 tolerated and v3.30.11 built the data foundation
+    to retire — the third such retirement after v3.27.9 (combos) and
+    v3.27.13 (set completion).
+
+    Pass 1 (local): ``_cache_get_by_ids(deck_card_ids)`` → for each card
+    with non-NULL non-``"[]"`` ``produced_tokens``, parse the JSON list
+    of {name, type_line, scryfall_id} dicts the v3.30.11 daemon wrote.
+    Pass 2 (local): ``_cache_get_by_ids(token_ids)`` → resolve each
+    token's image_url, set_code, collector_number, plus canonical name
+    + type_line from the token card's own row (preferred over the
+    all_parts stub, which can lag set releases).
+
+    NULL ``produced_tokens`` → silently skip (the v3.30.11 NULL-vs-"[]"
+    contract: NULL means "not yet backfilled"; "[]" means "confirmed
+    no tokens"; either way the card contributes no tokens here). Prod
+    has zero NULL after the v3.30.11 daemon's first full pass; fresh
+    installs before the daemon runs will have NULLs and degrade
+    gracefully (the deck's token list will be incomplete for those
+    cards — accepted; the request-path invariant is the hard constraint).
+
+    Result is deduplicated by token name (per the v3.30.19 spec — same
+    token produced by multiple deck cards appears once; if multiple
+    printings exist, prefer the entry with a non-empty image_url) and
+    cached per unique frozenset of input ids. Return shape is byte-
+    identical to the legacy Scryfall path: sorted list of
+    {name, type_line, image_url, set_code, collector_number, scryfall_id}.
+    Downstream consumers (compute_deck_tokens, deck-detail Tokens panel,
+    v3.30.10 goldfish enrichment via the panels-cache) are unchanged.
     """
     cache_key = (_DECK_TOKEN_CACHE_VERSION, frozenset(sid for sid in scryfall_ids if sid))
     if cache_key in _deck_token_cache:
         return _deck_token_cache[cache_key]
-
-    # Pass 1: collect token stubs from all_parts of the deck cards
-    seen_ids: set[str] = set()
-    token_stubs: list[dict[str, str]] = []
     ids = list(cache_key[1])
+    if not ids:
+        _deck_token_cache[cache_key] = []
+        return []
 
-    for i in range(0, len(ids), _COLLECTION_BATCH_SIZE):
-        batch = ids[i : i + _COLLECTION_BATCH_SIZE]
-        payload = {"identifiers": [{"id": sid} for sid in batch]}
-        data = _post_json(f"{SCRYFALL_CARD_URL}/collection", payload)
-        if not data:
+    # Pass 1 (local) — read produced_tokens for the deck cards.
+    # _cache_get_by_ids batches internally; we just hand it the full list.
+    # NULL produced_tokens (not-yet-backfilled) and "[]" (confirmed no
+    # tokens) both end up contributing nothing — graceful degradation
+    # for the not-backfilled case, common-case skip for the empty case.
+    seen_token_ids: set[str] = set()
+    token_stubs: list[dict[str, str]] = []
+    deck_card_payloads = _cache_get_by_ids(ids)
+    for payload in deck_card_payloads.values():
+        raw = payload.get("produced_tokens")
+        if not raw or raw == "[]":
             continue
-        for card in data.get("data", []):
-            for part in card.get("all_parts") or []:
-                if part.get("component") != "token":
-                    continue
-                token_id = part.get("id", "")
-                if token_id and token_id not in seen_ids:
-                    seen_ids.add(token_id)
-                    token_stubs.append(
-                        {
-                            "id": token_id,
-                            "name": part.get("name", ""),
-                            "type_line": part.get("type_line", ""),
-                        }
-                    )
-
-    # Pass 2: batch-fetch the token cards to get image_uris and set info
-    token_meta: dict[str, dict[str, str]] = {}
-    token_ids = [t["id"] for t in token_stubs]
-    for i in range(0, len(token_ids), _COLLECTION_BATCH_SIZE):
-        batch = token_ids[i : i + _COLLECTION_BATCH_SIZE]
-        payload = {"identifiers": [{"id": tid} for tid in batch]}
-        data = _post_json(f"{SCRYFALL_CARD_URL}/collection", payload)
-        if not data:
+        try:
+            parts = json.loads(raw)
+        except (json.JSONDecodeError, TypeError):
             continue
-        for card in data.get("data", []):
-            card_id = card.get("id", "")
-            image_uris = card.get("image_uris") or {}
-            card_faces = card.get("card_faces") or []
-            if not image_uris and card_faces:
-                image_uris = (card_faces[0] or {}).get("image_uris") or {}
-            url = (
-                image_uris.get("normal") or image_uris.get("large") or image_uris.get("small") or ""
-            )
-            if card_id:
-                token_meta[card_id] = {
-                    "image_url": url,
-                    "set_code": card.get("set", ""),
-                    "collector_number": card.get("collector_number", ""),
+        if not isinstance(parts, list):
+            continue
+        for part in parts:
+            if not isinstance(part, dict):
+                continue
+            tid = part.get("scryfall_id") or part.get("id") or ""
+            if not tid or tid in seen_token_ids:
+                continue
+            seen_token_ids.add(tid)
+            token_stubs.append(
+                {
+                    "id": tid,
+                    "name": part.get("name", "") or "",
+                    "type_line": part.get("type_line", "") or "",
                 }
+            )
 
-    result = sorted(
-        [
-            {
-                "name": t["name"],
-                "type_line": t["type_line"],
-                "image_url": token_meta.get(t["id"], {}).get("image_url", ""),
-                "set_code": token_meta.get(t["id"], {}).get("set_code", ""),
-                "collector_number": token_meta.get(t["id"], {}).get("collector_number", ""),
-                "scryfall_id": t["id"],
+    # Pass 2 (local) — resolve token card details (image_url, set_code,
+    # collector_number, canonical name/type_line). Replaces the second
+    # Scryfall POST. A token id that's NOT in scryfall_cards (rare —
+    # would mean the bulk export hasn't propagated this token yet)
+    # falls through to the stub's name/type_line with empty image_url
+    # — render-time fallback renders the text card face per the
+    # v3.30.10 graceful-degradation pattern.
+    token_meta: dict[str, dict[str, str]] = {}
+    if token_stubs:
+        token_payloads = _cache_get_by_ids([t["id"] for t in token_stubs])
+        for tid, payload in token_payloads.items():
+            token_meta[tid] = {
+                "image_url": payload.get("image_url") or "",
+                "set_code": payload.get("set_code") or "",
+                "collector_number": payload.get("collector_number") or "",
+                "name": payload.get("name") or "",
+                "type_line": payload.get("type_line") or "",
             }
-            for t in token_stubs
-        ],
-        key=lambda t: t["name"],
-    )
+
+    # Build per-token dicts, deduplicating BY NAME (per v3.30.19 spec
+    # step 6 — same token produced by multiple deck cards appears once;
+    # if multiple printings exist, prefer the entry with a non-empty
+    # image_url). Canonical name/type_line from the token card's own row
+    # wins over the all_parts stub when available.
+    by_name: dict[str, dict[str, str]] = {}
+    for t in token_stubs:
+        meta = token_meta.get(t["id"], {})
+        name = meta.get("name") or t["name"]
+        if not name:
+            continue
+        type_line = meta.get("type_line") or t["type_line"]
+        entry = {
+            "name": name,
+            "type_line": type_line,
+            "image_url": meta.get("image_url", ""),
+            "set_code": meta.get("set_code", ""),
+            "collector_number": meta.get("collector_number", ""),
+            "scryfall_id": t["id"],
+        }
+        existing = by_name.get(name)
+        if existing is None:
+            by_name[name] = entry
+        elif not existing.get("image_url") and entry.get("image_url"):
+            # Prefer the entry with a non-empty image_url
+            by_name[name] = entry
+
+    result = sorted(by_name.values(), key=lambda t: t["name"])
     _deck_token_cache[cache_key] = result
     return result
 
