@@ -1,5 +1,19 @@
 [
   {
+    "version": "3.30.18",
+    "date": "2026-05-28",
+    "added": [
+      "Third-party CSVs (Moxfield, Deckbox, hand-crafted lists) can now designate a location as a deck at import time. v3.30.17 had been too aggressive about removing the deck option from the auto-create dropdown for CSVs without a Location Type column — leaving these third-party imports with no in-import path to create a deck. v3.30.18 restores the deck option for rows whose CSV didn't specify a type. Selecting it converts the row in-place to a per-row 'Create deck X' checkbox, same shape as the Cartarch-export path."
+    ],
+    "refined": [
+      "CSV rows whose Location Type was explicitly set to something non-deck (binder / box / drawer / other) keep the v3.30.17 behaviour: the dropdown shows the CSV-supplied type pre-selected and does NOT offer deck. Re-classifying an explicit CSV choice from non-deck to deck wasn't a real workflow — better to keep the CSV's intent visible."
+    ],
+    "resolved": [
+      "Closes a real-prod 500 on /import/commit when a CSV happened to use a deck name that another user already owned. The root cause was a pre-v3.1.0 legacy UNIQUE constraint on deck names alone (predating multi-tenancy) that SQLite cannot drop in-place — a full table rebuild deferred to v4. v3.30.18 wraps the deck creation in a try/except that catches this constraint, rolls the session back cleanly, and skips the resolution (cards fall through to Pending). The rest of the import batch continues working. Self-heals when v4's table rebuild drops the legacy constraint."
+    ],
+    "archivist_note": "The v3.30.17 release went out earlier today with two issues the owner caught in verification: a dropdown that quietly broke the third-party-CSV path (most real-world imports lack a Location Type column), and a legacy UNIQUE constraint from before the project was multi-user that surfaced as a 500 on real production data. The first was a scoping miss — easy to fix once flagged. The second was a deeper find: the SQLite error message format gave it away (single-column constraints emit a different shape than compound ones), and `git log -S` on the constraint name traced it back to a v3.1.0 migration that added a multi-user constraint but never dropped its single-user predecessor. SQLite can't drop an inline-UNIQUE auto-index without rebuilding the whole table; the proper cleanup waits for the v4 PostgreSQL migration. For now, a three-line try/except handles the constraint defensively — and the rest of the import batch continues working when one name conflicts. The v3.30.17 tag still exists locally as a dev-process artifact; v3.30.18 is what deploys. Next stop, finally, is the long-deferred fetch_deck_tokens consumer flip (now v3.30.19 — re-numbered seven times)."
+  },
+  {
     "version": "3.30.17",
     "date": "2026-05-28",
     "added": [

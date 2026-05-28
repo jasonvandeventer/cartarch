@@ -136,20 +136,31 @@
                     <strong>New locations will be created</strong> —
                     pick the type for each. Defaults from the CSV's Location
                     Type column when present; otherwise <code>other</code>.
+                    <em>For rows whose CSV did not specify a type (the common
+                    third-party-CSV case), <code>deck</code> appears in the
+                    dropdown — pick it to create a deck instead of a plain
+                    location.</em>
                   </p>
                   <ul class="imports-loc-missing-list">
                     {% for r in non_deck_missing %}
-                      <li>
+                      {# v3.30.17.1 — three-case dropdown scope. CSV explicit
+                         non-deck (csv_type_explicit AND csv_type_for_create
+                         != "deck") gets binder/box/drawer/other only —
+                         "deck" excluded to avoid re-classifying an explicit
+                         CSV choice. CSV blank or unknown (NOT csv_type_explicit)
+                         gets binder/box/drawer/deck/other — the third-party-
+                         CSV path where the user designates types at import
+                         time. The conditional checkbox row below + small JS
+                         block handle the deck→checkbox conversion. #}
+                      {% set allow_deck = not r.csv_type_explicit %}
+                      <li class="imports-loc-row-unspec{% if not allow_deck %} imports-loc-row-explicit{% endif %}" data-name="{{ r.name }}">
                         <code>{{ r.name }}</code>
                         <input type="hidden" name="location_choice_name" value="{{ r.name }}">
-                        <input type="hidden" name="location_choice_id" value="0">
-                        <select name="location_choice_type" class="imports-loc-type-select">
-                          {# v3.30.17 — "deck" intentionally excluded from
-                             non-deck rows. Deck creation is opt-in via the
-                             dedicated deck panel above; a user wanting to
-                             reclassify a non-deck row as a deck should edit
-                             the CSV or use /decks afterward. #}
-                          {% for t in ["binder", "box", "drawer", "other"] %}
+                        <input type="hidden" name="location_choice_id" class="imports-loc-cid" value="0">
+                        <input type="hidden" name="location_choice_type" class="imports-loc-ctype" value="{{ r.csv_type_for_create }}">
+                        <select class="imports-loc-type-select imports-loc-type-picker">
+                          {% set type_options = ["binder", "box", "drawer", "deck", "other"] if allow_deck else ["binder", "box", "drawer", "other"] %}
+                          {% for t in type_options %}
                             <option value="{{ t }}" {% if r.csv_type_for_create == t %}selected{% endif %}>{{ t }}</option>
                           {% endfor %}
                         </select>
@@ -158,14 +169,62 @@
                             (CSV value <code>{{ r.csv_type_hint }}</code> not recognized; defaulted to <code>other</code>)
                           </span>
                         {% endif %}
+                        {% if allow_deck %}
+                          {# Conditional checkbox sub-row — visible only when
+                             the dropdown is on "deck". JS toggles. Default
+                             unchecked → cid="-1" (skip, cards to pending);
+                             checked → cid="0" (create deck). #}
+                          <label class="imports-loc-deck-inline-label" style="display: none;">
+                            <input type="checkbox" class="imports-loc-deck-inline-checkbox">
+                            <span>Create deck <strong>{{ r.name }}</strong></span>
+                          </label>
+                        {% endif %}
                       </li>
                     {% endfor %}
                   </ul>
                   <label class="imports-loc-confirm">
                     <input type="checkbox" name="auto_create_confirm" value="yes">
-                    Confirm: create these {{ non_deck_missing | length }} new location{{ "s" if non_deck_missing | length != 1 else "" }} on import.
+                    Confirm: create the new locations selected above on import.
                   </label>
                 </div>
+                <script>
+                  // v3.30.17.1 — dropdown-to-deck-checkbox conversion. When a
+                  // user selects "deck" from a Case 3 (CSV-blank/unknown)
+                  // dropdown, the row's hidden inputs convert to deck-create
+                  // shape (cid="-1" unchecked / "0" checked, ctype="deck")
+                  // and the per-row checkbox label appears. Switching back
+                  // to a non-deck type restores the standard auto-create
+                  // shape (cid="0", ctype=<selected value>). Case 2 rows
+                  // (csv_type_explicit non-deck) carry the .imports-loc-row-
+                  // explicit class — their dropdown has no "deck" option so
+                  // this handler is a no-op for them.
+                  (function() {
+                    var rows = document.querySelectorAll('.imports-loc-row-unspec:not(.imports-loc-row-explicit)');
+                    rows.forEach(function(row) {
+                      var picker = row.querySelector('.imports-loc-type-picker');
+                      var cidInput = row.querySelector('.imports-loc-cid');
+                      var ctypeInput = row.querySelector('.imports-loc-ctype');
+                      var deckLabel = row.querySelector('.imports-loc-deck-inline-label');
+                      var deckCheckbox = row.querySelector('.imports-loc-deck-inline-checkbox');
+                      if (!picker || !cidInput || !ctypeInput || !deckLabel || !deckCheckbox) return;
+                      picker.addEventListener('change', function() {
+                        var val = picker.value;
+                        ctypeInput.value = val;
+                        if (val === 'deck') {
+                          deckLabel.style.display = '';
+                          deckCheckbox.checked = false;
+                          cidInput.value = '-1';
+                        } else {
+                          deckLabel.style.display = 'none';
+                          cidInput.value = '0';
+                        }
+                      });
+                      deckCheckbox.addEventListener('change', function() {
+                        cidInput.value = deckCheckbox.checked ? '0' : '-1';
+                      });
+                    });
+                  })();
+                </script>
               {% endif %}
             {% endif %}
             {% if clean_resolutions %}

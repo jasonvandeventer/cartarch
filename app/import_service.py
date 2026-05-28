@@ -17,6 +17,7 @@ from datetime import datetime
 from typing import Any
 
 from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.audit_service import create_import_batch, log_transaction
@@ -994,6 +995,19 @@ def resolve_location_names(
         # For clean / ambiguous, the existing data wins (Decision 12).
         csv_type_valid = (raw_type == "") or (raw_type in selectable_types)
         csv_type_for_create = raw_type if (raw_type in selectable_types) else "other"
+        # v3.30.17.1 — distinguish "CSV explicitly named a valid type"
+        # from "CSV was blank or unknown". The preview's auto-create
+        # dropdown uses this to scope the "deck" option: an explicit
+        # non-deck CSV choice (csv_type_explicit=True, csv_type_for_create
+        # != "deck") gets binder/box/drawer/other only (the v3.30.17
+        # rule that the user shouldn't re-classify an explicit CSV
+        # choice); a blank/unknown CSV value (csv_type_explicit=False)
+        # gets binder/box/drawer/deck/other so the user CAN designate
+        # a location as a deck at import time. Third-party CSVs
+        # (Moxfield, Deckbox, hand-crafted) all land here because they
+        # don't carry a Location Type column — without this field the
+        # user has no in-import way to designate a deck.
+        csv_type_explicit = (raw_type != "") and csv_type_valid
 
         # v3.30.17 — if the clean-match resolution lands in a paired
         # deck-type location, surface the deck name for the Part C
@@ -1015,6 +1029,7 @@ def resolve_location_names(
                 "csv_type_hint": raw_type,
                 "csv_type_valid": csv_type_valid,
                 "csv_type_for_create": csv_type_for_create,
+                "csv_type_explicit": csv_type_explicit,
                 "existing_deck_name": existing_deck_name,
             }
         )
@@ -1106,7 +1121,30 @@ def auto_create_locations(
                 # through to target_location_id like an unresolved name.
                 # User can clean up the orphaned Deck separately.
                 continue
-            new_deck = create_deck(session, user_id=user_id, name=name)
+            # v3.30.17.2 — try create_deck with IntegrityError fallback.
+            # The per-user check above handles the canonical
+            # uq_decks_user_name (user_id, name) constraint case. But
+            # installs that pre-date v3.1.0 carry a LEGACY auto-index
+            # `sqlite_autoindex_decks_1` left over from when Deck.name
+            # was declared `unique=True, index=True` (single-tenant
+            # assumption). v3.1.0 switched the model to the compound
+            # (user_id, name) UniqueConstraint but did not drop the
+            # legacy auto-index — SQLite cannot drop an inline-UNIQUE
+            # auto-index without a full table rebuild, deferred to v4.
+            # On those installs, calling create_deck for a name that
+            # ANY other user already owns triggers the legacy constraint
+            # ("UNIQUE constraint failed: decks.name") and 500s. The
+            # try/except catches that case (and any other unique-
+            # constraint shape we don't know about); rollback restores
+            # the session for subsequent rows in the import; the
+            # resolution is skipped so the row falls through to
+            # target_location_id. Self-heals when v4's table rebuild
+            # drops the legacy constraint.
+            try:
+                new_deck = create_deck(session, user_id=user_id, name=name)
+            except IntegrityError:
+                session.rollback()
+                continue
             # create_deck always pairs a StorageLocation — storage_location_id
             # is non-None by construction.
             if new_deck.storage_location_id is not None:

@@ -11438,6 +11438,25 @@ table.dmtx .dmtx-rowhead {
   color: var(--brand-gold);
   font-style: normal;
 }
+/* v3.30.17.1 — inline deck-confirm label appearing under the dropdown
+   in the Case 3 (CSV-blank/unknown) auto-create rows. Indented to
+   visually associate with the dropdown row above it; gold-soft
+   background so it reads as the "yes, create a deck" affordance. */
+.imports-loc-deck-inline-label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: var(--space-1) 0 0 var(--space-3);
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  background: var(--brand-gold-soft);
+  cursor: pointer;
+  user-select: none;
+}
+.imports-loc-deck-inline-checkbox {
+  margin: 0;
+  cursor: pointer;
+}
 
 /* ===================================================================
    v3.28.11 — Folio Watchlist refresh (target price + light polish)
