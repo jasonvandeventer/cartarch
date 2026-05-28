@@ -857,15 +857,38 @@ def _parsed_rows_from_form(
     quantity: list[str],
     location: list[str],
     language: list[str] | None = None,
+    location_type: list[str] | None = None,
+    role: list[str] | None = None,
+    tags: list[str] | None = None,
+    is_proxy: list[str] | None = None,
 ) -> list[dict]:
     """Rebuild the parsed-row dicts from the parallel-array form fields.
 
     Shared by /import/commit, /import/reconcile-preview, and any future
     handler that receives the same field shape from import_preview.html.
+
+    v3.30.16 — extended with four new optional parallel arrays
+    (location_type / role / tags / is_proxy). Each falls back to the
+    safe default when the array is absent or short (matches old 6-column
+    CSVs that never carried these fields). The new fields are written
+    into the parsed-row dict alongside the existing ones so
+    persist_import_rows / the resolution helpers consume them
+    transparently.
     """
     rows = []
     languages = language or []
+    location_types = location_type or []
+    roles = role or []
+    tags_list = tags or []
+    is_proxy_list = is_proxy or []
     for i in range(len(line_number)):
+        # v3.30.16 — is_proxy form field carries the string "true"/"false";
+        # parse_proxy_bool returns (bool, valid). Form values come from
+        # hidden inputs we wrote ourselves so they're always one of the
+        # two strings — invalid values would have already been routed to
+        # invalid_rows at parse_scanner_csv time and never reach a form.
+        raw_proxy = is_proxy_list[i] if i < len(is_proxy_list) else ""
+        proxy_value, _ = normalize_proxy_value_for_commit(raw_proxy)
         rows.append(
             {
                 "line_number": int(line_number[i]),
@@ -876,10 +899,28 @@ def _parsed_rows_from_form(
                 "finish": normalize_finish(finish[i]),
                 "quantity": int(quantity[i]),
                 "location": location[i],
+                "location_type": (location_types[i] if i < len(location_types) else "")
+                .strip()
+                .lower(),
                 "language": normalize_language(languages[i]) if i < len(languages) else "en",
+                "role": (roles[i] if i < len(roles) else "").strip(),
+                "tags": tags_list[i] if i < len(tags_list) else "",
+                "is_proxy": proxy_value,
             }
         )
     return rows
+
+
+def normalize_proxy_value_for_commit(raw: str) -> tuple[bool, bool]:
+    """Mirror of import_service.parse_proxy_bool used at commit-form-rebuild
+    time. Form values are always one of the two recognized strings (we
+    write them ourselves into the hidden inputs); any other value falls
+    back to False with valid=True (the form has no untrusted path here).
+    """
+    cleaned = (raw or "").strip().lower()
+    if cleaned == "true":
+        return (True, True)
+    return (False, True)
 
 
 def _build_line_to_location_map(
@@ -889,6 +930,7 @@ def _build_line_to_location_map(
     choice_names: list[str],
     choice_ids: list[str],
     auto_create_confirm: str,
+    choice_types: list[str] | None = None,
 ) -> tuple[dict[int, int], list[str]]:
     """v3.30.15 — build the per-row line_number → StorageLocation.id map.
 
@@ -905,6 +947,14 @@ def _build_line_to_location_map(
       * ``"-1"`` or empty — skip per-row resolution for this name; rows
         with this Location fall through to ``target_location_id``.
 
+    v3.30.16 — new optional ``choice_types`` parallel array carries the
+    per-name type for auto-create (``""`` / ``"box"`` / ``"binder"`` /
+    ``"drawer"`` / ``"deck"`` / ``"other"``). For names with ``cid_int == 0``
+    the type is threaded through to ``auto_create_locations`` so the
+    auto-created location gets the right type instead of defaulting to
+    ``"other"``. For non-zero choice_id values (picker/clean/skip) the
+    type is ignored — the existing location's type wins per Decision 12.
+
     Returns ``(line_to_location_id, needs_confirm_names)``:
       * ``line_to_location_id`` — map of CSV line_number → resolved id.
         Empty dict if the caller should take the existing 3-branch dispatch.
@@ -915,8 +965,13 @@ def _build_line_to_location_map(
     """
     name_to_id: dict[str, int] = {}
     auto_create_names: list[str] = []
+    # v3.30.16 — per-name type override map; only populated for names
+    # entering the auto-create flow. Keyed by lowercased name to match
+    # auto_create_locations' lookup convention.
+    auto_create_type_overrides: dict[str, str] = {}
 
-    for raw_name, raw_id in zip(choice_names, choice_ids, strict=False):
+    choice_types = choice_types or []
+    for i, (raw_name, raw_id) in enumerate(zip(choice_names, choice_ids, strict=False)):
         normalized = (raw_name or "").strip().lower()
         if not normalized:
             continue
@@ -928,13 +983,22 @@ def _build_line_to_location_map(
             name_to_id[normalized] = cid_int
         elif cid_int == 0:
             auto_create_names.append(raw_name.strip())
+            raw_type = (choice_types[i] if i < len(choice_types) else "").strip().lower()
+            if raw_type:
+                auto_create_type_overrides[normalized] = raw_type
 
     if auto_create_names and auto_create_confirm != "yes":
         return ({}, auto_create_names)
 
     if auto_create_names:
         # Validation barrier already passed; create the missing locations.
-        created = auto_create_locations(session, user_id, auto_create_names)
+        # auto_create_locations validates each requested type against
+        # VALID_LOCATION_TYPES (minus root) and raises ValueError on miss.
+        # The route handler catches ValueError and surfaces it via the
+        # v3.30.15 auto-create-not-confirmed re-render pattern.
+        created = auto_create_locations(
+            session, user_id, auto_create_names, name_to_type=auto_create_type_overrides
+        )
         name_to_id.update(created)
 
     line_to_loc: dict[int, int] = {}
@@ -1005,6 +1069,16 @@ async def import_reconcile_preview(
     quantity: list[str] = Form([]),
     location: list[str] = Form([]),
     language: list[str] = Form([]),
+    # v3.30.16 — receive the five new parallel arrays so HTMX-included
+    # reconciliation requests preserve them through the round trip. Not
+    # used by the reconciliation logic itself (matching the v3.30.15
+    # "reconciliation paths bypassed in v3.30.15 path" contract), but
+    # consumed by _parsed_rows_from_form to keep the form-state shape
+    # consistent.
+    location_type: list[str] = Form([]),
+    role: list[str] = Form([]),
+    tags: list[str] = Form([]),
+    is_proxy: list[str] = Form([]),
     session: Session = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
     _: None = CsrfRequired,
@@ -1036,6 +1110,10 @@ async def import_reconcile_preview(
         quantity,
         location,
         language,
+        location_type,
+        role,
+        tags,
+        is_proxy,
     )
 
     # Decorate each parsed row's resolved card with a display_name for
@@ -1533,12 +1611,17 @@ async def import_commit(
     quantity: list[str] = Form([]),
     location: list[str] = Form([]),
     language: list[str] = Form([]),
+    location_type: list[str] = Form([]),
+    role: list[str] = Form([]),
+    tags: list[str] = Form([]),
+    is_proxy: list[str] = Form([]),
     target_location_id: int = Form(0),
     reconcile_action: list[str] = Form([]),
     reconcile_move_qty: list[str] = Form([]),
     reconcile_new_qty: list[str] = Form([]),
     location_choice_name: list[str] = Form([]),
     location_choice_id: list[str] = Form([]),
+    location_choice_type: list[str] = Form([]),
     auto_create_confirm: str = Form("no"),
     session: Session = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
@@ -1554,6 +1637,10 @@ async def import_commit(
         quantity,
         location,
         language,
+        location_type,
+        role,
+        tags,
+        is_proxy,
     )
 
     placed_in = None
@@ -1576,22 +1663,45 @@ async def import_commit(
     # existing target_location_id / drawer-sorter behavior for the unresolved
     # rows only. The reconciliation paths are bypassed in this case — the
     # CSV is treated as carrying its own destination semantics.
-    line_to_location_id, needs_confirm_names = _build_line_to_location_map(
-        session,
-        current_user.id,
-        rows,
-        location_choice_name,
-        location_choice_id,
-        auto_create_confirm,
-    )
-    if needs_confirm_names:
+    # v3.30.16 — _build_line_to_location_map may raise ValueError when an
+    # auto-create choice carries an invalid type (e.g. tampered form field
+    # with location_choice_type="dungeon"). Caught here and routed back
+    # through the same preview re-render shape as the not-confirmed path,
+    # surfacing the failure to the user without crashing the request.
+    try:
+        line_to_location_id, needs_confirm_names = _build_line_to_location_map(
+            session,
+            current_user.id,
+            rows,
+            location_choice_name,
+            location_choice_id,
+            auto_create_confirm,
+            choice_types=location_choice_type,
+        )
+        invalid_type_error: str | None = None
+    except ValueError as exc:
+        line_to_location_id = {}
+        needs_confirm_names = []
+        invalid_type_error = str(exc)
+
+    if invalid_type_error or needs_confirm_names:
         # Auto-create requested but not confirmed → reject batch, re-render
         # preview with the same row state + an explicit error message.
+        # v3.30.16 — the same re-render shape also handles the
+        # invalid-Location-Type-on-auto-create failure surfaced as a
+        # ValueError above.
         distinct_loc_names = _distinct_locations_from_rows(rows)
         location_resolutions = resolve_location_names(session, current_user.id, distinct_loc_names)
         duplicate_counts = compute_duplicate_counts_for_resolved(
             session, current_user.id, rows, location_resolutions
         )
+        if invalid_type_error:
+            error_message = invalid_type_error
+        else:
+            error_message = (
+                "Confirm the auto-create of new locations before importing, "
+                "or change those rows' choices."
+            )
         return render(
             request,
             "import_preview.html",
@@ -1607,10 +1717,7 @@ async def import_commit(
                 "decks": list_decks_basic(session, user_id=current_user.id),
                 "location_resolutions": location_resolutions,
                 "duplicate_counts": duplicate_counts,
-                "auto_create_error": (
-                    "Confirm the auto-create of new locations before importing, "
-                    "or change those rows' choices."
-                ),
+                "auto_create_error": error_message,
             },
         )
 
@@ -2436,7 +2543,28 @@ def collection_export(
 
     buf = io.StringIO()
     writer = csv.writer(buf)
-    writer.writerow(["Name", "Set", "Collector Number", "Finish", "Quantity", "Location"])
+    # v3.30.16 — expanded schema. The first six columns are UNCHANGED in
+    # name, order, and content (downstream parsers consuming the v3.30.15
+    # 6-column shape continue to work). Five new columns appended at end:
+    # Location Type / Language / Role / Tags / Is Proxy. The importer
+    # recognizes the new headers via HEADER_ALIASES (case + space
+    # tolerant); old 6-column CSVs round-trip as before with the new
+    # fields defaulted on re-import.
+    writer.writerow(
+        [
+            "Name",
+            "Set",
+            "Collector Number",
+            "Finish",
+            "Quantity",
+            "Location",
+            "Location Type",
+            "Language",
+            "Role",
+            "Tags",
+            "Is Proxy",
+        ]
+    )
     for row in rows:
         card = row.card
         loc = row.storage_location
@@ -2448,6 +2576,11 @@ def collection_export(
                 row.finish or "normal",
                 row.quantity,
                 loc.name if loc else "",
+                loc.type if loc else "",
+                row.language or "en",
+                row.role or "",
+                row.tags or "",
+                "true" if row.is_proxy else "false",
             ]
         )
 
@@ -3074,7 +3207,25 @@ def location_export(
 
     buf = io.StringIO()
     writer = csv.writer(buf)
-    writer.writerow(["Name", "Set", "Collector Number", "Finish", "Quantity", "Location"])
+    # v3.30.16 — expanded schema matches /collection/export. Location +
+    # Location Type are constants per row here (the source location is
+    # fixed for this endpoint); Language / Role / Tags / Is Proxy are
+    # per-row.
+    writer.writerow(
+        [
+            "Name",
+            "Set",
+            "Collector Number",
+            "Finish",
+            "Quantity",
+            "Location",
+            "Location Type",
+            "Language",
+            "Role",
+            "Tags",
+            "Is Proxy",
+        ]
+    )
     for row in rows:
         card = row.card
         writer.writerow(
@@ -3085,6 +3236,11 @@ def location_export(
                 row.finish or "normal",
                 row.quantity,
                 location.name,
+                location.type or "",
+                row.language or "en",
+                row.role or "",
+                row.tags or "",
+                "true" if row.is_proxy else "false",
             ]
         )
 

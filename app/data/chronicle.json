@@ -1,5 +1,25 @@
 [
   {
+    "version": "3.30.16",
+    "date": "2026-05-27",
+    "added": [
+      "Collection export now carries five additional columns alongside the existing six: Location Type, Language, Role, Tags, and Is Proxy. Existing six columns stay in their existing positions and contents — downstream parsers that read the previous shape keep working byte-identically; new columns are appended at the end.",
+      "Per-row Location Type is honored on re-import. When the importer auto-creates a missing location, it now uses the CSV-supplied type (binder, box, drawer, deck, other) instead of defaulting everything to 'other'. The preview's auto-create confirm panel surfaces a dropdown per name — defaulted from the CSV value, editable inline if you want to override.",
+      "Per-row Language, Role, Tags, and Is Proxy round-trip exactly. A Japanese-language proxy commander in a deck exports as one row and re-imports as one row with the same finish, language, role, tags, and proxy flag. Tags are preserved verbatim — the importer does not interpret them."
+    ],
+    "refined": [
+      "Round-trip into a fresh account becomes meaningful. With v3.30.15 honoring per-row Location and v3.30.16 carrying the metadata, you can export your collection and re-import it into a new user account and get back the same locations (with the right types), same commanders, same proxies, same languages, same tags.",
+      "Old six-column CSVs continue to import cleanly under v3.30.16. Missing new columns default to their model defaults (Language → 'en', Is Proxy → False, Role / Tags → NULL). Nothing about the v3.30.15 importer behaviour regressed.",
+      "Existing location's type wins silently when a CSV Location Type disagrees with an existing StorageLocation. If your CSV claims 'Mythics Binder' is type='box' but you already have a 'Mythics Binder' marked type='binder', the import puts the row into your existing binder and the binder's type stays as binder. No warning; your data is canonical (the CSV value is only consulted when auto-creating a location that doesn't yet exist).",
+      "Invalid Role / Is Proxy values surface in the existing Invalid Rows panel with explicit reasons (e.g. 'Invalid Role value: \"frodo\" (allowed: empty or commander)'). No silent coercion. You either fix the CSV and re-import, or accept that those rows are skipped while the valid rows commit.",
+      "Invalid Location Type values trigger an inline dropdown in the auto-create confirm panel. The dropdown defaults to 'other' and shows a small warning noting that the CSV value was not recognized. Pick a valid type from the list — or just accept 'other' — and continue."
+    ],
+    "resolved": [
+      "Closes the round-trip fidelity gap. v3.30.15 + v3.30.16 together resolve the long-standing /collection/export → /import data-loss report: locations preserved (v3.30.15), languages preserved (v3.30.16), commander tags preserved (v3.30.16), proxies preserved (v3.30.16), tags preserved (v3.30.16), and auto-created location types preserved (v3.30.16). Exporting your collection now genuinely produces a backup you can restore from."
+    ],
+    "archivist_note": "The pair shipped a day apart by design — v3.30.15 made the importer ready to honor per-row Location data, v3.30.16 made the exporter emit it. The order matters: making backup easier without fixing the import side would have widened the original trap, not closed it. Now both halves are in place. A user who carefully tagged their commanders, marked their proxies, and wrote tags on their cards can export and re-import and get back the same picture. One known limitation carries forward from v3.30.15: re-importing the SAME CSV twice still adds quantities to your existing rows rather than replacing them (a 2-qty Sol Ring import on top of an existing 2-qty becomes 4, not 2). The merge key is load-bearing logic for every import path, not just round-trip; refining it needs its own focused design conversation, recorded as the Round-trip merge semantics follow-up. The next stop, finally, is the long-deferred fetch_deck_tokens consumer flip — gated on the v3.30.11 daemon backfill having populated the bulk cache."
+  },
+  {
     "version": "3.30.15",
     "date": "2026-05-27",
     "added": [

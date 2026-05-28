@@ -20,7 +20,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.audit_service import create_import_batch, log_transaction
-from app.location_service import create_location
+from app.location_service import VALID_LOCATION_TYPES, create_location
 from app.models import Card, InventoryRow, StorageLocation
 from app.scryfall import (
     BulkFetchResult,
@@ -56,12 +56,29 @@ HEADER_ALIASES = {
     "type": "type",
     "language": "language",
     "lang": "language",
+    # v3.30.16 — round-trip fidelity. /collection/export now emits these
+    # five additional columns; the importer recognizes them so a round-trip
+    # preserves language, commander attribution, tags, proxy flag, and the
+    # type of auto-created locations.
+    "locationtype": "location_type",
+    "location_type": "location_type",
+    "role": "role",
+    "tags": "tags",
+    "isproxy": "is_proxy",
+    "is_proxy": "is_proxy",
     # Helvault: finish is in a column called "extras"
     "extras": "finish",
     # Moxfield: set code is in "Edition", foil status is in "Foil"
     "edition": "set_code",
     "foil": "finish",
 }
+
+# v3.30.16 — service-layer enum mirroring the model contract.
+# `InventoryRow.role` is String(32) nullable; only "commander" is in
+# production use today (v3.5 architecture — Currently only value used).
+# Empty / NULL is the unset state. Any non-empty non-commander value
+# routes the row to invalid_rows with an explicit reason at parse time.
+VALID_ROLE_VALUES = frozenset({"commander"})
 
 
 # Scryfall canonical 2-3 char language codes. Anything outside this set is
@@ -177,6 +194,52 @@ def normalize_finish(value: str | None) -> str:
     return "normal"
 
 
+def parse_role(value: str | None) -> tuple[str | None, bool]:
+    """v3.30.16 — parse a CSV Role column value.
+
+    Returns ``(normalized_or_none, is_valid)``:
+      * empty / whitespace → ``(None, True)`` — row carries no role.
+      * "commander" (case-insensitive) → ``("commander", True)``.
+      * any other non-empty value → ``(None, False)`` — caller routes the
+        row to invalid_rows with an explicit reason.
+
+    Mirrors the model contract: ``InventoryRow.role`` is String(32) nullable;
+    only ``"commander"`` is in production use today. Service-layer-enum
+    pattern (matches ``VALID_LOCATION_TYPES`` / ``CANONICAL_GAME_FORMATS``).
+    No silent coercion (spec Decision 9).
+    """
+    cleaned = (value or "").strip()
+    if not cleaned:
+        return (None, True)
+    lowered = cleaned.lower()
+    if lowered in VALID_ROLE_VALUES:
+        return (lowered, True)
+    return (None, False)
+
+
+def parse_proxy_bool(value: str | None) -> tuple[bool, bool]:
+    """v3.30.16 — parse a CSV Is Proxy column value.
+
+    Returns ``(parsed_bool, is_valid)``:
+      * empty / whitespace → ``(False, True)`` — column absent or blank
+        means "not a proxy" (matches ``InventoryRow.is_proxy`` default).
+      * "true" / "True" / "TRUE" → ``(True, True)``.
+      * "false" / "False" / "FALSE" → ``(False, True)``.
+      * any other value → ``(False, False)`` — caller routes the row to
+        invalid_rows with an explicit reason. No silent coercion
+        (spec Decision 11).
+    """
+    cleaned = (value or "").strip()
+    if not cleaned:
+        return (False, True)
+    lowered = cleaned.lower()
+    if lowered == "true":
+        return (True, True)
+    if lowered == "false":
+        return (False, True)
+    return (False, False)
+
+
 def normalize_header(value: str | None) -> str:
     cleaned = (value or "").strip().lower().replace(" ", "_").replace("-", "_")
     cleaned = cleaned.replace("__", "_")
@@ -236,14 +299,22 @@ def parse_scanner_csv(file_bytes: bytes) -> dict[str, Any]:
         collector_number = row.get("collector_number", "")
         finish = normalize_finish(row.get("finish", ""))
         location = row.get("location", "")
+        # v3.30.16 — Location Type rides alongside Location. Empty for old
+        # 6-column CSVs (backward-compatible) or for rows in clean/ambiguous
+        # resolutions (the existing location's type wins per Decision 12;
+        # the CSV value is only consulted at auto-create time).
+        location_type = row.get("location_type", "").lower()
         quantity_raw = row.get("quantity", "1")
         name = row.get("name", "")
         card_type = row.get("type", "")
         language = normalize_language(row.get("language", ""))
-        try:
-            quantity = max(1, int(quantity_raw or "1"))
-        except ValueError:
-            quantity = 1
+        # v3.30.16 — role / tags / is_proxy. Empty for old 6-column CSVs.
+        # Validation is in Pass 3 (after the row's Scryfall identity has
+        # been resolved) so failures route to invalid_rows alongside other
+        # row-level rejection reasons.
+        role_raw = row.get("role", "")
+        tags_raw = row.get("tags", "")
+        is_proxy_raw = row.get("is_proxy", "")
         pre_rows.append(
             {
                 "line_number": line_number,
@@ -251,13 +322,25 @@ def parse_scanner_csv(file_bytes: bytes) -> dict[str, Any]:
                 "set_code": set_code,
                 "collector_number": collector_number,
                 "finish": finish,
-                "quantity": quantity,
+                "quantity": quantity_raw if quantity_raw else "1",  # validated below
                 "location": location,
+                "location_type": location_type,
                 "name": name,
                 "type": card_type,
                 "language": language,
+                "role_raw": role_raw,
+                "tags_raw": tags_raw,
+                "is_proxy_raw": is_proxy_raw,
             }
         )
+
+    # Coerce quantity post-append so the int-conversion failure path here
+    # doesn't drift the dict shape downstream.
+    for r in pre_rows:
+        try:
+            r["quantity"] = max(1, int(r["quantity"] or "1"))
+        except ValueError:
+            r["quantity"] = 1
 
     print(
         f"[import-preview] pass1 parse: {len(pre_rows)} rows "
@@ -312,6 +395,13 @@ def parse_scanner_csv(file_bytes: bytes) -> dict[str, Any]:
     _set_failed = set(set_result.failed)
     _unresolved_count = 0
     for r in pre_rows:
+        # v3.30.16 — validate role + is_proxy at parse time. Failures route
+        # to invalid_rows alongside Scryfall-resolution failures. The
+        # `role` and `is_proxy` keys in the cleaned dict carry the
+        # NORMALIZED values for downstream consumers; the raw inputs stay
+        # in the dict only on the invalid-row branch for the reason string.
+        role_normalized, role_valid = parse_role(r.get("role_raw"))
+        is_proxy_value, is_proxy_valid = parse_proxy_bool(r.get("is_proxy_raw"))
         cleaned = {
             "line_number": r["line_number"],
             "scryfall_id": r["scryfall_id"],
@@ -320,9 +410,13 @@ def parse_scanner_csv(file_bytes: bytes) -> dict[str, Any]:
             "finish": r["finish"],
             "quantity": r["quantity"],
             "location": r["location"],
+            "location_type": r.get("location_type", ""),
             "name": r["name"],
             "type": r["type"],
             "language": r["language"],
+            "role": role_normalized or "",
+            "tags": r.get("tags_raw", ""),
+            "is_proxy": is_proxy_value,
             "warnings": [],
         }
 
@@ -335,6 +429,24 @@ def parse_scanner_csv(file_bytes: bytes) -> dict[str, Any]:
                 cleaned["scryfall_id"] = card_data.get("scryfall_id", "")
 
         has_identifier = bool(r["scryfall_id"]) or bool(r["set_code"] and r["collector_number"])
+
+        # v3.30.16 — explicit per-field validation rejection. The row
+        # surfaces in the existing § II Invalid Rows panel with a clear
+        # reason so the user can fix the CSV and re-import. No silent
+        # coercion (spec Decisions 9, 11).
+        if not role_valid:
+            cleaned["reason"] = (
+                f"Invalid Role value: {r.get('role_raw')!r} " f"(allowed: empty or 'commander')."
+            )
+            invalid_rows.append(cleaned)
+            continue
+        if not is_proxy_valid:
+            cleaned["reason"] = (
+                f"Invalid Is Proxy value: {r.get('is_proxy_raw')!r} "
+                f"(allowed: empty, 'true', or 'false')."
+            )
+            invalid_rows.append(cleaned)
+            continue
 
         if card_data:
             cleaned["warnings"] = build_finish_warnings(card_data, r["finish"])
@@ -612,6 +724,14 @@ def persist_import_rows(
         qty = max(1, int(row.get("quantity") or 1))
         finish = (row.get("finish") or "normal").strip().lower()
         language = normalize_language(row.get("language"))
+        # v3.30.16 — per-row Role / Tags / Is Proxy. Validated at parse
+        # time (parse_role / parse_proxy_bool); invalid values route to
+        # invalid_rows before reaching this function. The cleaned dict
+        # carries the normalized values; an empty string in `role` means
+        # "no role" (NULL on the model).
+        row_role = (row.get("role") or "").strip() or None
+        row_tags = row.get("tags") or None  # preserved verbatim
+        row_is_proxy = bool(row.get("is_proxy"))
 
         # v3.30.15 — per-row location resolution. If the line is in the
         # resolution map, the row lands DIRECTLY placed (no pending-merge
@@ -631,6 +751,9 @@ def persist_import_rows(
                 is_pending=False,
                 storage_location_id=resolved_loc_id,
                 language=language,
+                role=row_role,
+                tags=row_tags,
+                is_proxy=row_is_proxy,
                 notes=None,
                 created_at=now,
                 updated_at=now,
@@ -638,12 +761,29 @@ def persist_import_rows(
             session.add(target_row)
             created_rows.append(target_row)
         else:
-            # Imports always create non-proxy rows (CSV/manual flows don't surface
-            # is_proxy); the existing-row lookup keys on is_proxy=False so a
-            # manually-flagged proxy row never silently absorbs a fresh import.
-            # v3.30.15: notes is NULL on import (was previously the dump-site
+            # v3.30.16: notes is NULL on import (was previously the dump-site
             # for the per-row Location string; the trap that caused
-            # round-trip data loss).
+            # round-trip data loss in v3.30.14 and earlier).
+            #
+            # v3.30.15 Decision 5 — pending-merge key unchanged. The key
+            # below intentionally still hardcodes ``is_proxy=False`` because
+            # any non-False is_proxy from this CSV would have routed
+            # through the resolved-location branch instead (round-trip
+            # exports carry resolvable Location values). A pending row
+            # being created here is from a blank-Location CSV (typical
+            # new-acquisition scanner workflow) where the row is treated
+            # as a fresh non-proxy import.
+            #
+            # NOTE on merge: when an existing pending row is found in the
+            # merge map, the imported row's role / tags / is_proxy are
+            # SILENTLY IGNORED — the merge bumps quantity only. v3.30.15
+            # Decision 5 keeps this contract (the pending-merge key is
+            # load-bearing logic for every import path, not just round-trip;
+            # a refinement needs the "Round-trip merge semantics" follow-up
+            # to settle). For unresolved-Location CSVs the round-trip data
+            # loss this would cause is theoretical anyway — round-trip
+            # CSVs all carry resolvable Location values and go through the
+            # resolved-location branch above.
             key = (user_id, card.id, finish, language, False, None, None, True)
             target_row = inventory_map.get(key)
 
@@ -660,6 +800,9 @@ def persist_import_rows(
                     slot=None,
                     is_pending=True,
                     language=language,
+                    role=row_role,
+                    tags=row_tags,
+                    is_proxy=row_is_proxy,
                     notes=None,
                     created_at=now,
                     updated_at=now,
@@ -754,48 +897,76 @@ def persist_import_rows(
 # ---------------------------------------------------------------------------
 
 
-def _distinct_locations_from_rows(rows: list[dict[str, Any]]) -> list[str]:
+def _distinct_locations_from_rows(rows: list[dict[str, Any]]) -> list[dict[str, str]]:
     """Return the unique case-insensitive Location values in preserved
-    first-seen order. Blank/whitespace values are excluded. Used by the
-    preview step to build the per-distinct-name resolution UI.
+    first-seen order, each paired with the first-seen Location Type hint
+    for that name. Blank/whitespace Location values are excluded.
+
+    v3.30.16 — return shape extended from ``list[str]`` to
+    ``list[{"name": str, "csv_type": str}]``. ``csv_type`` is the
+    (case-folded) Location Type the CSV supplied for the FIRST row carrying
+    that Location value; empty string if absent. Used by ``resolve_location_names``
+    to suggest the right type when a missing name triggers auto-create.
+    First-seen wins; subsequent rows with a different Location Type for the
+    same name are ignored (the user can edit the resolved type in the
+    preview's auto-create dropdown).
     """
-    seen: dict[str, str] = {}
+    seen: dict[str, dict[str, str]] = {}
     for r in rows:
         raw = (r.get("location") or "").strip()
         if not raw:
             continue
         key = raw.lower()
         if key not in seen:
-            seen[key] = raw
+            seen[key] = {
+                "name": raw,
+                "csv_type": (r.get("location_type") or "").strip().lower(),
+            }
     return list(seen.values())
 
 
 def resolve_location_names(
-    session: Session, user_id: int, names: list[str]
+    session: Session, user_id: int, distinct_entries: list[dict[str, str]]
 ) -> list[dict[str, Any]]:
-    """Resolve a list of CSV Location-column values against the user's
+    """Resolve a list of distinct CSV Location entries against the user's
     StorageLocations (case-insensitive name match) and return per-distinct
     resolution metadata for the preview step.
 
-    Each returned dict carries:
-      * ``name`` — the first-seen display form of the location name.
-      * ``key`` — the lowercased name (form-field value).
+    v3.30.16 — input shape extended to accept the ``[{name, csv_type}]``
+    dicts emitted by ``_distinct_locations_from_rows``. Each returned dict
+    carries:
+      * ``name`` — first-seen display form of the location name.
+      * ``key`` — lowercased name (form-field value).
       * ``matches`` — list of matching StorageLocation rows (0, 1, or many).
-      * ``status`` — ``"clean"`` (single match), ``"ambiguous"`` (2+ matches),
-        or ``"missing"`` (no matches; will auto-create on confirm).
+      * ``status`` — ``"clean"`` / ``"ambiguous"`` / ``"missing"``.
+      * ``csv_type_hint`` — the CSV-supplied type (lowercased), empty if
+        absent. Surfaced in the auto-create UI; ignored for clean +
+        ambiguous resolutions (existing data wins per Decision 12).
+      * ``csv_type_valid`` — True iff ``csv_type_hint`` is empty OR matches
+        a value in ``VALID_LOCATION_TYPES`` (root excluded — never a
+        legitimate user choice). False surfaces in the auto-create dropdown
+        defaulting to ``other``.
+      * ``csv_type_for_create`` — the default-fill value for the auto-create
+        dropdown: the validated CSV value when present, else ``"other"``.
 
     Single-pass query against the user's locations — no N+1.
     """
-    if not names:
+    if not distinct_entries:
         return []
     locations = session.query(StorageLocation).filter(StorageLocation.user_id == user_id).all()
     by_name: dict[str, list[StorageLocation]] = {}
     for loc in locations:
         by_name.setdefault((loc.name or "").strip().lower(), []).append(loc)
 
+    # User-selectable types — VALID_LOCATION_TYPES minus the structural
+    # 'root' kind (which can only appear on the user's auto-seeded root).
+    selectable_types = VALID_LOCATION_TYPES - {"root"}
+
     out: list[dict[str, Any]] = []
-    for raw in names:
-        key = raw.strip().lower()
+    for entry in distinct_entries:
+        raw_name = entry["name"]
+        raw_type = (entry.get("csv_type") or "").strip().lower()
+        key = raw_name.lower()
         matches = by_name.get(key, [])
         if len(matches) == 0:
             status = "missing"
@@ -803,29 +974,52 @@ def resolve_location_names(
             status = "clean"
         else:
             status = "ambiguous"
+
+        # csv_type validation only matters for missing → auto-create.
+        # For clean / ambiguous, the existing data wins (Decision 12).
+        csv_type_valid = (raw_type == "") or (raw_type in selectable_types)
+        csv_type_for_create = raw_type if (raw_type in selectable_types) else "other"
+
         out.append(
             {
-                "name": raw,
+                "name": raw_name,
                 "key": key,
                 "matches": matches,
                 "status": status,
+                "csv_type_hint": raw_type,
+                "csv_type_valid": csv_type_valid,
+                "csv_type_for_create": csv_type_for_create,
             }
         )
     return out
 
 
-def auto_create_locations(session: Session, user_id: int, names: list[str]) -> dict[str, int]:
-    """Create one StorageLocation per name with ``type="other"`` and return
-    a map of lowercased-name → new StorageLocation.id.
+def auto_create_locations(
+    session: Session,
+    user_id: int,
+    names: list[str],
+    name_to_type: dict[str, str] | None = None,
+) -> dict[str, int]:
+    """Create one StorageLocation per name and return a map of
+    lowercased-name → new StorageLocation.id.
+
+    v3.30.16 — optional ``name_to_type`` argument supplies the type per
+    name (keyed by lowercased name). Names absent from the map fall back
+    to ``type="other"`` (the v3.30.15 default). Types are validated against
+    ``VALID_LOCATION_TYPES`` minus ``root``; invalid types raise ValueError
+    (caught by the route handler and surfaced via preview re-render —
+    same shape as v3.30.15's auto-create-not-confirmed branch).
 
     Goes through ``create_location`` so the same validation +
-    one-name-per-user rule the manual /locations flow uses is honored. If a
-    name happens to already exist by the time this is called (race), the
-    existing one is used and no new row is created.
+    one-name-per-user rule the manual /locations flow uses is honored.
+    If a name already exists by the time this is called (race), the
+    existing row is used and no new row is created.
     """
     out: dict[str, int] = {}
     if not names:
         return out
+    name_to_type = name_to_type or {}
+    selectable_types = VALID_LOCATION_TYPES - {"root"}
     for raw in names:
         name = raw.strip()
         if not name:
@@ -841,11 +1035,18 @@ def auto_create_locations(session: Session, user_id: int, names: list[str]) -> d
         if existing is not None:
             out[name.lower()] = existing.id
             continue
+        # Resolve the type from the per-name map, defaulting to "other".
+        requested_type = (name_to_type.get(name.lower()) or "other").strip().lower()
+        if requested_type not in selectable_types:
+            raise ValueError(
+                f"Invalid Location Type for auto-create: {requested_type!r} "
+                f"(allowed: {sorted(selectable_types)})"
+            )
         loc = create_location(
             session=session,
             user_id=user_id,
             name=name,
-            type="other",
+            type=requested_type,
         )
         out[name.lower()] = loc.id
     return out

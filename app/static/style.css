@@ -11365,6 +11365,27 @@ table.dmtx .dmtx-rowhead {
   color: var(--danger);
   font-style: italic;
 }
+/* v3.30.16 — per-name Location Type dropdown inside the auto-create panel.
+   Sits inline next to each missing location name; reuses the existing
+   imports-loc-* idiom. The warning span flags an invalid CSV-supplied
+   type that defaulted to "other" — the dropdown still works; the user
+   can pick any valid type from the select. */
+.imports-loc-type-select {
+  margin-left: var(--space-2);
+}
+.imports-loc-type-warning {
+  margin-left: var(--space-2);
+  font-style: italic;
+  color: var(--text-dim);
+  font-size: 0.9em;
+}
+.imports-loc-type-warning code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  padding: 0 4px;
+  border-radius: var(--radius-sm);
+  background: var(--panel-2);
+  color: var(--brand-gold);
+}
 
 /* ===================================================================
    v3.28.11 — Folio Watchlist refresh (target price + light polish)

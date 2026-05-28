@@ -48,6 +48,16 @@
           <input type="hidden" name="quantity" value="{{ row.quantity }}">
           <input type="hidden" name="location" value="{{ row.location }}">
           <input type="hidden" name="language" value="{{ row.language or 'en' }}">
+          {# v3.30.16 — per-row Location Type / Role / Tags / Is Proxy
+             ride through the commit POST so persist_import_rows can
+             write them to the new InventoryRow at commit time. Empty
+             strings round-trip the v3.30.14-and-earlier 6-column shape
+             (the importer falls back to model defaults for empty values
+             per Decision 13). #}
+          <input type="hidden" name="location_type" value="{{ row.location_type or '' }}">
+          <input type="hidden" name="role" value="{{ row.role or '' }}">
+          <input type="hidden" name="tags" value="{{ row.tags or '' }}">
+          <input type="hidden" name="is_proxy" value="{{ 'true' if row.is_proxy else 'false' }}">
         {% endfor %}
         {# v3.30.15 — per-distinct-Location parallel arrays. Single-match
            "clean" resolutions emit a hidden input with the existing
@@ -67,6 +77,10 @@
                   <div class="imports-loc-row">
                     <label class="imports-loc-name">{{ r.name }}</label>
                     <input type="hidden" name="location_choice_name" value="{{ r.name }}">
+                    {# v3.30.16 — parallel empty type field keeps the three
+                       arrays index-aligned. Type is ignored for non-missing
+                       resolutions per Decision 12 (existing data wins). #}
+                    <input type="hidden" name="location_choice_type" value="">
                     <select name="location_choice_id" class="imports-loc-select">
                       {% for m in r.matches %}
                         <option value="{{ m.id }}">{{ m.name }} ({{ m.type }}{% if m.parent %} · under {{ m.parent.name }}{% endif %})</option>
@@ -80,8 +94,9 @@
             {% if missing_resolutions %}
               <div class="imports-loc-panel imports-loc-missing">
                 <p class="imports-loc-panel-title">
-                  <strong>New locations will be created</strong>
-                  (type:&nbsp;<code>other</code>) — edit type later on the Locations page.
+                  <strong>New locations will be created</strong> —
+                  pick the type for each. Defaults from the CSV's Location
+                  Type column when present; otherwise <code>other</code>.
                 </p>
                 <ul class="imports-loc-missing-list">
                   {% for r in missing_resolutions %}
@@ -89,6 +104,16 @@
                       <code>{{ r.name }}</code>
                       <input type="hidden" name="location_choice_name" value="{{ r.name }}">
                       <input type="hidden" name="location_choice_id" value="0">
+                      <select name="location_choice_type" class="imports-loc-type-select">
+                        {% for t in ["binder", "box", "drawer", "deck", "other"] %}
+                          <option value="{{ t }}" {% if r.csv_type_for_create == t %}selected{% endif %}>{{ t }}</option>
+                        {% endfor %}
+                      </select>
+                      {% if r.csv_type_hint and not r.csv_type_valid %}
+                        <span class="imports-loc-type-warning">
+                          (CSV value <code>{{ r.csv_type_hint }}</code> not recognized; defaulted to <code>other</code>)
+                        </span>
+                      {% endif %}
                     </li>
                   {% endfor %}
                 </ul>
@@ -102,6 +127,10 @@
               {% for r in clean_resolutions %}
                 <input type="hidden" name="location_choice_name" value="{{ r.name }}">
                 <input type="hidden" name="location_choice_id" value="{{ r.matches[0].id }}">
+                {# v3.30.16 — parallel empty type field keeps the three
+                   arrays index-aligned. Type is ignored for clean
+                   resolutions per Decision 12 (existing location wins). #}
+                <input type="hidden" name="location_choice_type" value="">
               {% endfor %}
             {% endif %}
             {% if duplicate_counts %}
