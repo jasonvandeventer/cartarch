@@ -14,7 +14,7 @@ from app.import_service import coerce_language_code_strict
 from app.location_service import SORTABLE_SOURCE_MODES
 from app.models import Card, InventoryRow, ShowcaseItem, StorageLocation, TransactionLog
 from app.pricing import effective_price
-from app.scryfall import fetch_card_by_scryfall_id
+from app.scryfall import card_constructor_kwargs, fetch_card_by_scryfall_id
 
 PRICE_STALE_DAYS = 7
 VALUE_THRESHOLD = 5.0
@@ -385,7 +385,12 @@ def get_or_create_card(
     if not payload:
         return None
 
-    card = Card(**payload, updated_at=datetime.utcnow())
+    # v3.30.21 hotfix — strip scryfall_cards-only keys (produced_tokens)
+    # from the payload before Card(). v3.30.11 added produced_tokens as
+    # the 22nd seam key; the Card ORM has no produced_tokens column. Without
+    # the strip, this Card() at switch-printing time 500s with TypeError.
+    # See card_constructor_kwargs docstring in app.scryfall.
+    card = Card(**card_constructor_kwargs(payload), updated_at=datetime.utcnow())
     session.add(card)
     session.flush()
     return card

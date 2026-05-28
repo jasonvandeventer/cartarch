@@ -28,6 +28,7 @@ from app.scryfall import (
     BulkFetchResult,
     bulk_fetch_by_set_number,
     bulk_refresh_prices,
+    card_constructor_kwargs,
     fetch_card_by_set_and_number,
 )
 
@@ -634,7 +635,14 @@ def persist_import_rows(
                             }
                         )
                 continue
-            card = Card(**payload, updated_at=now)
+            # v3.30.21 hotfix — strip scryfall_cards-only keys from the
+            # payload before splatting into Card(). The v3.30.11 seam
+            # extension added produced_tokens as the 22nd key; the daemon
+            # writes it to scryfall_cards and fetch_deck_tokens reads it,
+            # but the Card ORM has no produced_tokens column. Without this
+            # strip, Card(**payload) raises TypeError on every cache-miss
+            # add-card / import path. See card_constructor_kwargs docstring.
+            card = Card(**card_constructor_kwargs(payload), updated_at=now)
             session.add(card)
             new_cards.append(card)
 

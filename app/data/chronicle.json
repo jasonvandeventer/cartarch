@@ -1,5 +1,15 @@
 [
   {
+    "version": "3.30.22",
+    "date": "2026-05-28",
+    "added": [],
+    "refined": [],
+    "resolved": [
+      "Adding a card to a deck no longer 500s. Switching a card's printing no longer 500s. Both routes were broken on production for users who triggered a card the local cache hadn't seen before — the page just errored. The fix is a three-line strip at the two Card-construction sites; behavior on every other surface is unchanged."
+    ],
+    "archivist_note": "A latent bug, lurking in the codebase since the eighth week of the produced_tokens column work. Three releases on that column had shipped without anyone noticing — the daemon wrote it correctly, the deck-detail Tokens panel read it correctly, the goldfish quick-add panel read it correctly. All three exercised the column on cards that already lived in the local cache. The two routes that finally failed — add a card to a deck, switch a card's printing — were the only ones that fetched a fresh card from Scryfall and tried to construct a Card row out of it. The freshly-fetched payload had 22 fields; the Card database table has 21. The 22nd field, produced_tokens, is scryfall_cards-only by design; it never belonged on a Card row. Two short call-site changes restore both routes. The lesson recorded in our notes: when extending the seam between Scryfall's data and our local card table, test the cache-miss code path explicitly. Pre-seeded test rows mask the bug because they hit cache-hit paths that don't go through the Card constructor."
+  },
+  {
     "version": "3.30.21",
     "date": "2026-05-28",
     "added": [

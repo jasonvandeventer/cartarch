@@ -151,8 +151,46 @@ def _normalize_card_payload(raw: dict[str, Any]) -> dict[str, Any]:
         # v3.30.11 — 22nd key, appended at the end to preserve byte-
         # identical ordering of the existing 21 keys. _CACHE_COLUMNS
         # below + _cached_row_to_payload track this addition.
+        # NOT a Card ORM column — scryfall_cards-only field. Card-
+        # constructor call sites MUST strip this key before
+        # ``Card(**payload)`` via ``card_constructor_kwargs`` below.
         "produced_tokens": json.dumps(produced_tokens_list),
     }
+
+
+# v3.30.21 hotfix — keys present in the normalized scryfall payload but
+# NOT modeled as Card columns. Card-constructor call sites must strip
+# these before splatting into ``Card(**payload)`` or SQLAlchemy raises
+# TypeError ("invalid keyword argument for Card"). Centralized here as
+# the single source of truth so any future scryfall_cards-only column
+# additions need exactly one update site (this set) — the daemon writes
+# them via _BULK_UPSERT_SQL (which reads _CACHE_COLUMNS, the FULL set),
+# fetch_deck_tokens reads them via _cache_get_by_ids → _cached_row_to_payload
+# (which also returns the FULL set), and only the Card(**payload) splat
+# path needs the sanitized subset.
+_CARD_PAYLOAD_EXCLUDED_KEYS: frozenset[str] = frozenset({"produced_tokens"})
+
+
+def card_constructor_kwargs(payload: dict[str, Any]) -> dict[str, Any]:
+    """Return a Card-constructor-safe subset of a scryfall payload dict.
+
+    Strips keys that exist in the normalized scryfall payload (v3.30.11
+    extended the seam to 22 keys, adding ``produced_tokens``) but are NOT
+    modeled as ``Card`` ORM columns. Without this strip, ``Card(**payload)``
+    raises TypeError on every cache-miss code path that builds Cards
+    from a fresh Scryfall fetch:
+
+    - ``import_service.py`` ``Card(**payload, updated_at=now)`` — the
+      ``POST /decks/{id}/add-card`` flow and import-rows persistence.
+    - ``inventory_service.py`` ``Card(**payload, updated_at=...)`` — the
+      ``POST /decks/{id}/rows/{row_id}/switch-printing`` flow.
+
+    The daemon's ``_bulk_data_loop`` and the v3.30.19 ``fetch_deck_tokens``
+    / v3.30.21 ``get_deck_produced_tokens_for_goldfish`` consumers all
+    read ``produced_tokens`` from the FULL payload — they MUST NOT use
+    this helper. Only Card-constructor splat sites should call it.
+    """
+    return {k: v for k, v in payload.items() if k not in _CARD_PAYLOAD_EXCLUDED_KEYS}
 
 
 def _get_json(url: str) -> dict[str, Any] | None:
