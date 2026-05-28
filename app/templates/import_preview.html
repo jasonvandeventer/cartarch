@@ -19,6 +19,16 @@
     </p>
     {% if valid_rows %}
       {% set placeable = locations | selectattr("type", "ne", "root") | selectattr("type", "ne", "deck") | list %}
+      {# v3.30.15 — per-row Location resolution surfaces. Three sections
+         conditionally render INSIDE the commit form so their picker / confirm /
+         warning fields submit alongside the existing parsed-row fields:
+           1. Collision picker — per name with ≥2 existing matches.
+           2. Auto-create confirm — names with zero matches; explicit gate.
+           3. Duplicate warning — clean matches whose rows would merge into
+              existing placed copies at that location. Informational; not gated. #}
+      {% set ambiguous_resolutions = location_resolutions | selectattr("status", "equalto", "ambiguous") | list %}
+      {% set missing_resolutions = location_resolutions | selectattr("status", "equalto", "missing") | list %}
+      {% set clean_resolutions = location_resolutions | selectattr("status", "equalto", "clean") | list %}
       <form action="/import/commit"
             method="post"
             class="filter-row imports-commit-form"
@@ -39,6 +49,82 @@
           <input type="hidden" name="location" value="{{ row.location }}">
           <input type="hidden" name="language" value="{{ row.language or 'en' }}">
         {% endfor %}
+        {# v3.30.15 — per-distinct-Location parallel arrays. Single-match
+           "clean" resolutions emit a hidden input with the existing
+           StorageLocation.id; ambiguous use a <select>; missing default to "0"
+           (auto-create) with the explicit confirm checkbox below. #}
+        {% if location_resolutions %}
+          <section class="imports-loc-resolution">
+            {% if auto_create_error %}
+              <div class="imports-loc-error">{{ auto_create_error }}</div>
+            {% endif %}
+            {% if ambiguous_resolutions %}
+              <div class="imports-loc-panel imports-loc-ambiguous">
+                <p class="imports-loc-panel-title">
+                  <strong>Ambiguous locations</strong> — pick the StorageLocation each name resolves to.
+                </p>
+                {% for r in ambiguous_resolutions %}
+                  <div class="imports-loc-row">
+                    <label class="imports-loc-name">{{ r.name }}</label>
+                    <input type="hidden" name="location_choice_name" value="{{ r.name }}">
+                    <select name="location_choice_id" class="imports-loc-select">
+                      {% for m in r.matches %}
+                        <option value="{{ m.id }}">{{ m.name }} ({{ m.type }}{% if m.parent %} · under {{ m.parent.name }}{% endif %})</option>
+                      {% endfor %}
+                      <option value="-1">— skip, use Destination below —</option>
+                    </select>
+                  </div>
+                {% endfor %}
+              </div>
+            {% endif %}
+            {% if missing_resolutions %}
+              <div class="imports-loc-panel imports-loc-missing">
+                <p class="imports-loc-panel-title">
+                  <strong>New locations will be created</strong>
+                  (type:&nbsp;<code>other</code>) — edit type later on the Locations page.
+                </p>
+                <ul class="imports-loc-missing-list">
+                  {% for r in missing_resolutions %}
+                    <li>
+                      <code>{{ r.name }}</code>
+                      <input type="hidden" name="location_choice_name" value="{{ r.name }}">
+                      <input type="hidden" name="location_choice_id" value="0">
+                    </li>
+                  {% endfor %}
+                </ul>
+                <label class="imports-loc-confirm">
+                  <input type="checkbox" name="auto_create_confirm" value="yes">
+                  Confirm: create these {{ missing_resolutions | length }} new location{{ "s" if missing_resolutions | length != 1 else "" }} on import.
+                </label>
+              </div>
+            {% endif %}
+            {% if clean_resolutions %}
+              {% for r in clean_resolutions %}
+                <input type="hidden" name="location_choice_name" value="{{ r.name }}">
+                <input type="hidden" name="location_choice_id" value="{{ r.matches[0].id }}">
+              {% endfor %}
+            {% endif %}
+            {% if duplicate_counts %}
+              <div class="imports-loc-panel imports-loc-duplicates">
+                <p class="imports-loc-panel-title">
+                  <strong>Existing copies will merge</strong>
+                </p>
+                <ul class="imports-loc-dup-list">
+                  {% for r in clean_resolutions %}
+                    {% if duplicate_counts.get(r.key, 0) > 0 %}
+                      <li>
+                        <strong>{{ duplicate_counts[r.key] }}</strong>
+                        {{ "row" if duplicate_counts[r.key] == 1 else "rows" }}
+                        in <code>{{ r.name }}</code> match cards you already have placed there —
+                        imported quantities will be added to your existing placed copies.
+                      </li>
+                    {% endif %}
+                  {% endfor %}
+                </ul>
+              </div>
+            {% endif %}
+          </section>
+        {% endif %}
         <div class="filter-row imports-destination-row" style="margin: 0">
           <label class="imports-destination-label">Destination</label>
           <select name="target_location_id"

@@ -1,5 +1,25 @@
 [
   {
+    "version": "3.30.15",
+    "date": "2026-05-27",
+    "added": [
+      "Per-row location resolution in the CSV importer. When a CSV carries a Location column (as your collection export does), each row's destination is now resolved against your storage locations and the cards land directly placed in their original homes — no more pending queue, no more single-destination collapse on re-import. The preview step shows you the resolutions before you commit so nothing surprises you.",
+      "Ambiguous-name picker in the preview step. If a Location name in your CSV matches two or more of your storage locations (you have more than one 'Bulk'), the preview gives you a dropdown to pick which one each name resolves to.",
+      "Missing-name auto-create with explicit confirm. If a Location name doesn't match anything you have, the preview offers to create it for you (as 'other' type — edit later on the Locations page). You have to check the confirm box; cancelling rejects the whole batch without writing anything.",
+      "Duplicate-merge warning in the preview step. When importing rows match cards you already have placed in the resolved location, the preview tells you up front — those quantities will be added to your existing copies."
+    ],
+    "refined": [
+      "Blank-Location CSVs (new-acquisition scans, no round-trip context) behave exactly as before — rows land pending and the batch-wide destination dropdown applies. No regression to the new-acquisitions workflow.",
+      "Drawer-sorter users with mixed-Location CSVs get the right of both worlds: rows with resolved Locations land directly in those locations (bypassing auto-sort); rows without per-row Location fall through to the existing auto-sort or pending behavior.",
+      "Notes field is no longer hijacked by the importer. Pre-v3.30.15 importing wrote the Location string into the notes field; v3.30.15 stops doing that. Your existing rows with location-strings in notes from past imports are NOT touched — that data is yours.",
+      "Reconciliation paths (the duplicate-detection flow when you import into a single destination) remain intact for CSVs without Location values. A CSV that carries Location values is treated as carrying its own destination semantics and bypasses the reconciliation step."
+    ],
+    "resolved": [
+      "Closes the long-standing round-trip data-loss trap: exporting your collection via /collection/export and re-importing it could lose your location organization, because the Location column the export emitted was parsed by the importer but silently dropped into the notes field instead of being honored as a destination. v3.30.15 honors it properly. Required before v3.30.16 expands the export schema for full round-trip fidelity (Language, Role, Location Type, Tags) — making backup easier without fixing the import side would have been the worse failure mode."
+    ],
+    "archivist_note": "A read-only investigation came first: the importer parsed your Location column, showed it to you in the preview, then quietly stored it as a free-text annotation while one batch-wide destination applied to every row. The Location round-tripped through the screen but never reached the file. The fix is structural — the importer now treats Location as what it always looked like: the per-row destination. Decks resolve like any other location (commander attribution still needs v3.30.16 export work to round-trip; the cards themselves land where they belong). One known limitation: re-importing the same export adds quantities to your existing copies rather than replacing them — recorded as a follow-up. The next stop is v3.30.16, which expands the export schema so deck attribution and other inventory facets round-trip cleanly too."
+  },
+  {
     "version": "3.30.14",
     "date": "2026-05-27",
     "added": [

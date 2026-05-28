@@ -16,10 +16,12 @@ import time
 from datetime import datetime
 from typing import Any
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.audit_service import create_import_batch, log_transaction
-from app.models import Card, InventoryRow
+from app.location_service import create_location
+from app.models import Card, InventoryRow, StorageLocation
 from app.scryfall import (
     BulkFetchResult,
     bulk_fetch_by_set_number,
@@ -386,14 +388,38 @@ def persist_import_rows(
     rows: list[dict[str, Any]],
     user_id: int,
     filename: str = "manual import",
+    line_to_location_id: dict[int, int] | None = None,
 ) -> dict[str, Any]:
-    """Persist imported rows into the current user's pending inventory.
+    """Persist imported rows into the current user's inventory.
 
     User ownership is required at the service boundary. Authentication can change
     later, but this function must never infer or default the owning user.
+
+    v3.30.15 — per-row location resolution
+    ------------------------------------------------------------------
+    ``line_to_location_id`` maps a parsed row's ``line_number`` to the
+    ``StorageLocation.id`` the user resolved its Location column to (via the
+    preview-step picker / auto-create / clean single-match). Rows present in
+    the map are created **directly as placed** (``storage_location_id`` set,
+    ``is_pending=False``); they skip the pending-merge lookup entirely. The
+    commit handler is expected to run ``place_imported_rows`` against the
+    returned ``placed_row_ids_by_location`` so placed-row merge with any
+    existing placed copy at the same location happens through the established
+    code path — keeping the merge invariant in one place.
+
+    Rows whose ``line_number`` is NOT in the map (or if ``line_to_location_id``
+    is ``None``/empty) fall through to the unchanged pending-merge behavior.
+
+    Trap closed in this release: pre-v3.30.15 the per-row Location string was
+    written to ``InventoryRow.notes`` (a free-text annotation field) and the
+    location semantic was silently lost. v3.30.15 stops writing notes on
+    import for both paths (resolved-placed AND pending fallback). Existing
+    rows with location-strings-in-notes from past imports are NOT touched.
     """
     if user_id <= 0:
         raise ValueError("user_id must be a positive integer when importing rows")
+
+    line_to_location_id = line_to_location_id or {}
 
     imported_count = 0
     total_quantity = 0
@@ -586,20 +612,15 @@ def persist_import_rows(
         qty = max(1, int(row.get("quantity") or 1))
         finish = (row.get("finish") or "normal").strip().lower()
         language = normalize_language(row.get("language"))
-        location_note = (row.get("location") or "").strip() or None
 
-        # Imports always create non-proxy rows (CSV/manual flows don't surface
-        # is_proxy); the existing-row lookup keys on is_proxy=False so a
-        # manually-flagged proxy row never silently absorbs a fresh import.
-        key = (user_id, card.id, finish, language, False, None, None, True)
-        target_row = inventory_map.get(key)
+        # v3.30.15 — per-row location resolution. If the line is in the
+        # resolution map, the row lands DIRECTLY placed (no pending-merge
+        # lookup, no notes-dump). The commit handler will run
+        # place_imported_rows per resolved location afterward to merge with
+        # any existing placed copy.
+        resolved_loc_id = line_to_location_id.get(row.get("line_number"))
 
-        if target_row:
-            target_row.quantity += qty
-            target_row.updated_at = now
-            if location_note:
-                target_row.notes = location_note
-        else:
+        if resolved_loc_id:
             target_row = InventoryRow(
                 user_id=user_id,
                 card_id=card.id,
@@ -607,15 +628,45 @@ def persist_import_rows(
                 quantity=qty,
                 drawer=None,
                 slot=None,
-                is_pending=True,
+                is_pending=False,
+                storage_location_id=resolved_loc_id,
                 language=language,
-                notes=location_note,
+                notes=None,
                 created_at=now,
                 updated_at=now,
             )
             session.add(target_row)
             created_rows.append(target_row)
-            inventory_map[key] = target_row
+        else:
+            # Imports always create non-proxy rows (CSV/manual flows don't surface
+            # is_proxy); the existing-row lookup keys on is_proxy=False so a
+            # manually-flagged proxy row never silently absorbs a fresh import.
+            # v3.30.15: notes is NULL on import (was previously the dump-site
+            # for the per-row Location string; the trap that caused
+            # round-trip data loss).
+            key = (user_id, card.id, finish, language, False, None, None, True)
+            target_row = inventory_map.get(key)
+
+            if target_row:
+                target_row.quantity += qty
+                target_row.updated_at = now
+            else:
+                target_row = InventoryRow(
+                    user_id=user_id,
+                    card_id=card.id,
+                    finish=finish,
+                    quantity=qty,
+                    drawer=None,
+                    slot=None,
+                    is_pending=True,
+                    language=language,
+                    notes=None,
+                    created_at=now,
+                    updated_at=now,
+                )
+                session.add(target_row)
+                created_rows.append(target_row)
+                inventory_map[key] = target_row
 
         imported_count += 1
         total_quantity += qty
@@ -633,8 +684,28 @@ def persist_import_rows(
     if created_rows:
         session.flush()
 
+    # v3.30.15 — split imported_row_ids into placed vs pending sub-lists +
+    # group placed ones by resolved location so the commit handler can run
+    # place_imported_rows per-location to apply the existing placed-row
+    # merge logic. imported_row_ids retains its prior semantic (every row
+    # the import touched, in audit order) so existing consumers keep working.
+    placed_row_ids: list[int] = []
+    pending_row_ids: list[int] = []
+    placed_row_ids_by_location: dict[int, list[int]] = {}
+
     for payload in audit_payloads:
-        imported_row_ids.append(payload["inventory_row"].id)
+        inv = payload["inventory_row"]
+        rid = inv.id
+        imported_row_ids.append(rid)
+        if inv.is_pending:
+            pending_row_ids.append(rid)
+            destination_label = "pending"
+        else:
+            placed_row_ids.append(rid)
+            loc_id = inv.storage_location_id
+            if loc_id:
+                placed_row_ids_by_location.setdefault(loc_id, []).append(rid)
+            destination_label = f"location:{loc_id}" if loc_id else "placed"
         log_transaction(
             session=session,
             user_id=user_id,
@@ -643,9 +714,9 @@ def persist_import_rows(
             finish=payload["finish"],
             quantity_delta=payload["quantity_delta"],
             source_location=None,
-            destination_location="pending",
+            destination_location=destination_label,
             batch_id=payload["batch_id"],
-            inventory_row_id=payload["inventory_row"].id,
+            inventory_row_id=rid,
             note=payload["note"],
             flush=False,
         )
@@ -657,7 +728,212 @@ def persist_import_rows(
         "failed_rows": failed_rows,
         "batch_id": batch.id,
         "imported_row_ids": imported_row_ids,
+        "placed_row_ids": placed_row_ids,
+        "pending_row_ids": pending_row_ids,
+        "placed_row_ids_by_location": placed_row_ids_by_location,
     }
+
+
+# ---------------------------------------------------------------------------
+# v3.30.15 — per-row Location resolution helpers
+#
+# The pre-v3.30.15 importer parsed the Location column, surfaced it in the
+# preview UI, then dumped it into ``InventoryRow.notes`` at write time — the
+# Location semantic was silently lost. v3.30.15 resolves Location names
+# against the user's StorageLocations and lands rows directly placed:
+#
+#   - clean (one existing match by case-insensitive name) → use that id.
+#   - ambiguous (2+ existing matches) → preview surfaces a per-distinct-name
+#     picker so the user chooses which match each name resolves to.
+#   - missing (0 existing matches) → preview surfaces an explicit auto-create
+#     confirm; on confirm the locations are created with ``type="other"``
+#     before rows are placed.
+#   - blank or user-cancelled → row falls through to the existing
+#     target_location_id / drawer-sorter / pending behavior (notes still NULL
+#     — no more location-string dump).
+# ---------------------------------------------------------------------------
+
+
+def _distinct_locations_from_rows(rows: list[dict[str, Any]]) -> list[str]:
+    """Return the unique case-insensitive Location values in preserved
+    first-seen order. Blank/whitespace values are excluded. Used by the
+    preview step to build the per-distinct-name resolution UI.
+    """
+    seen: dict[str, str] = {}
+    for r in rows:
+        raw = (r.get("location") or "").strip()
+        if not raw:
+            continue
+        key = raw.lower()
+        if key not in seen:
+            seen[key] = raw
+    return list(seen.values())
+
+
+def resolve_location_names(
+    session: Session, user_id: int, names: list[str]
+) -> list[dict[str, Any]]:
+    """Resolve a list of CSV Location-column values against the user's
+    StorageLocations (case-insensitive name match) and return per-distinct
+    resolution metadata for the preview step.
+
+    Each returned dict carries:
+      * ``name`` — the first-seen display form of the location name.
+      * ``key`` — the lowercased name (form-field value).
+      * ``matches`` — list of matching StorageLocation rows (0, 1, or many).
+      * ``status`` — ``"clean"`` (single match), ``"ambiguous"`` (2+ matches),
+        or ``"missing"`` (no matches; will auto-create on confirm).
+
+    Single-pass query against the user's locations — no N+1.
+    """
+    if not names:
+        return []
+    locations = session.query(StorageLocation).filter(StorageLocation.user_id == user_id).all()
+    by_name: dict[str, list[StorageLocation]] = {}
+    for loc in locations:
+        by_name.setdefault((loc.name or "").strip().lower(), []).append(loc)
+
+    out: list[dict[str, Any]] = []
+    for raw in names:
+        key = raw.strip().lower()
+        matches = by_name.get(key, [])
+        if len(matches) == 0:
+            status = "missing"
+        elif len(matches) == 1:
+            status = "clean"
+        else:
+            status = "ambiguous"
+        out.append(
+            {
+                "name": raw,
+                "key": key,
+                "matches": matches,
+                "status": status,
+            }
+        )
+    return out
+
+
+def auto_create_locations(session: Session, user_id: int, names: list[str]) -> dict[str, int]:
+    """Create one StorageLocation per name with ``type="other"`` and return
+    a map of lowercased-name → new StorageLocation.id.
+
+    Goes through ``create_location`` so the same validation +
+    one-name-per-user rule the manual /locations flow uses is honored. If a
+    name happens to already exist by the time this is called (race), the
+    existing one is used and no new row is created.
+    """
+    out: dict[str, int] = {}
+    if not names:
+        return out
+    for raw in names:
+        name = raw.strip()
+        if not name:
+            continue
+        existing = (
+            session.query(StorageLocation)
+            .filter(
+                StorageLocation.user_id == user_id,
+                func.lower(StorageLocation.name) == name.lower(),
+            )
+            .first()
+        )
+        if existing is not None:
+            out[name.lower()] = existing.id
+            continue
+        loc = create_location(
+            session=session,
+            user_id=user_id,
+            name=name,
+            type="other",
+        )
+        out[name.lower()] = loc.id
+    return out
+
+
+def compute_duplicate_counts_for_resolved(
+    session: Session,
+    user_id: int,
+    rows: list[dict[str, Any]],
+    resolutions: list[dict[str, Any]],
+) -> dict[str, int]:
+    """For each "clean" (single-match) resolution, count how many CSV rows
+    resolve to a card+finish+language already placed at that location. Used
+    by the preview step to surface a duplicate warning (per Decision 5: the
+    rows will merge into existing placed copies via place_imported_rows —
+    not strictly "duplicates" today but the user should know the import will
+    add to existing quantities).
+
+    Only computed for ``status == "clean"`` resolutions — ambiguous/missing
+    don't have a known destination at preview time.
+    """
+    counts: dict[str, int] = {}
+
+    clean_by_key: dict[str, int] = {
+        r["key"]: r["matches"][0].id for r in resolutions if r["status"] == "clean" and r["matches"]
+    }
+    if not clean_by_key:
+        return counts
+
+    rows_by_key: dict[str, list[dict[str, Any]]] = {}
+    for r in rows:
+        key = (r.get("location") or "").strip().lower()
+        if key in clean_by_key:
+            rows_by_key.setdefault(key, []).append(r)
+    if not rows_by_key:
+        return counts
+
+    scryfall_ids = sorted(
+        {
+            (r.get("scryfall_id") or "").strip()
+            for rows_list in rows_by_key.values()
+            for r in rows_list
+            if (r.get("scryfall_id") or "").strip()
+        }
+    )
+    if not scryfall_ids:
+        return counts
+
+    card_id_by_sid: dict[str, int] = dict(
+        session.query(Card.scryfall_id, Card.id).filter(Card.scryfall_id.in_(scryfall_ids)).all()
+    )
+
+    location_ids = list({loc_id for loc_id in clean_by_key.values()})
+    existing_placed = (
+        session.query(InventoryRow)
+        .filter(
+            InventoryRow.user_id == user_id,
+            InventoryRow.is_pending.is_(False),
+            InventoryRow.storage_location_id.in_(location_ids),
+        )
+        .all()
+    )
+    existing_set: set[tuple[int, int, str, str]] = {
+        (
+            row.storage_location_id or 0,
+            row.card_id,
+            (row.finish or "normal"),
+            (row.language or "en"),
+        )
+        for row in existing_placed
+    }
+
+    for key, rows_at_key in rows_by_key.items():
+        loc_id = clean_by_key[key]
+        hits = 0
+        for r in rows_at_key:
+            sid = (r.get("scryfall_id") or "").strip()
+            cid = card_id_by_sid.get(sid)
+            if not cid:
+                continue
+            finish = (r.get("finish") or "normal").strip().lower()
+            language = normalize_language(r.get("language"))
+            if (loc_id, cid, finish, language) in existing_set:
+                hits += 1
+        if hits > 0:
+            counts[key] = hits
+
+    return counts
 
 
 # ---------------------------------------------------------------------------

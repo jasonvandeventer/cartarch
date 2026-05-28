@@ -100,11 +100,15 @@ from app.game_service import (
     update_game_notes,
 )
 from app.import_service import (
+    _distinct_locations_from_rows,
+    auto_create_locations,
+    compute_duplicate_counts_for_resolved,
     normalize_finish,
     normalize_language,
     parse_scanner_csv,
     parse_text_list,
     persist_import_rows,
+    resolve_location_names,
 )
 from app.inventory_service import (
     PRICE_STALE_DAYS,
@@ -769,6 +773,15 @@ async def import_preview(
     result = parse_scanner_csv(file_bytes)
     _t_parsed = time.perf_counter()
 
+    # v3.30.15 — resolve per-row Location values against the user's
+    # StorageLocations. Surfaces ambiguities (2+ matches), missing names
+    # (auto-create confirm), and a duplicate warning for clean matches.
+    distinct_loc_names = _distinct_locations_from_rows(result["valid_rows"])
+    location_resolutions = resolve_location_names(session, current_user.id, distinct_loc_names)
+    duplicate_counts = compute_duplicate_counts_for_resolved(
+        session, current_user.id, result["valid_rows"], location_resolutions
+    )
+
     context = {
         "title": "Import Preview",
         "valid_rows": result["valid_rows"],
@@ -779,6 +792,9 @@ async def import_preview(
         "use_drawer_sorter": current_user.username in DRAWER_SORTER_USERNAMES,
         "locations": list_locations(session, current_user.id),
         "decks": list_decks_basic(session, user_id=current_user.id),
+        "location_resolutions": location_resolutions,
+        "duplicate_counts": duplicate_counts,
+        "auto_create_error": None,
     }
     _t_ctx = time.perf_counter()
     response = render(request, "import_preview.html", context)
@@ -803,6 +819,14 @@ async def import_list_preview(
     _: None = CsrfRequired,
 ):
     result = parse_text_list(card_list)
+    # v3.30.15 — paste-list flow won't typically carry Location values, but
+    # the template branches on the resolution context keys, so they must be
+    # present. The helpers degrade to empty gracefully.
+    distinct_loc_names = _distinct_locations_from_rows(result["valid_rows"])
+    location_resolutions = resolve_location_names(session, current_user.id, distinct_loc_names)
+    duplicate_counts = compute_duplicate_counts_for_resolved(
+        session, current_user.id, result["valid_rows"], location_resolutions
+    )
     return render(
         request,
         "import_preview.html",
@@ -816,6 +840,9 @@ async def import_list_preview(
             "use_drawer_sorter": current_user.username in DRAWER_SORTER_USERNAMES,
             "locations": list_locations(session, current_user.id),
             "decks": list_decks_basic(session, user_id=current_user.id),
+            "location_resolutions": location_resolutions,
+            "duplicate_counts": duplicate_counts,
+            "auto_create_error": None,
         },
     )
 
@@ -853,6 +880,76 @@ def _parsed_rows_from_form(
             }
         )
     return rows
+
+
+def _build_line_to_location_map(
+    session: Session,
+    user_id: int,
+    parsed_rows: list[dict],
+    choice_names: list[str],
+    choice_ids: list[str],
+    auto_create_confirm: str,
+) -> tuple[dict[int, int], list[str]]:
+    """v3.30.15 — build the per-row line_number → StorageLocation.id map.
+
+    Consumes the parallel ``location_choice_name[]`` / ``location_choice_id[]``
+    arrays the preview step emits and the ``auto_create_confirm`` checkbox
+    value, plus the user's existing StorageLocations (so a clean single-match
+    name resolves without requiring a UI choice).
+
+    Each ``choice_id`` value carries one of:
+      * ``"<positive int>"`` — use this StorageLocation.id directly
+        (picker-resolved or single-match).
+      * ``"0"`` — auto-create the corresponding name (gated by
+        ``auto_create_confirm == "yes"``).
+      * ``"-1"`` or empty — skip per-row resolution for this name; rows
+        with this Location fall through to ``target_location_id``.
+
+    Returns ``(line_to_location_id, needs_confirm_names)``:
+      * ``line_to_location_id`` — map of CSV line_number → resolved id.
+        Empty dict if the caller should take the existing 3-branch dispatch.
+      * ``needs_confirm_names`` — non-empty list of names whose auto-create
+        was requested but ``auto_create_confirm != "yes"``. The route MUST
+        re-render the preview with no writes in this case (Decision 3
+        "User cancels → batch is rejected without writes").
+    """
+    name_to_id: dict[str, int] = {}
+    auto_create_names: list[str] = []
+
+    for raw_name, raw_id in zip(choice_names, choice_ids, strict=False):
+        normalized = (raw_name or "").strip().lower()
+        if not normalized:
+            continue
+        try:
+            cid_int = int(raw_id)
+        except (ValueError, TypeError):
+            continue
+        if cid_int > 0:
+            name_to_id[normalized] = cid_int
+        elif cid_int == 0:
+            auto_create_names.append(raw_name.strip())
+
+    if auto_create_names and auto_create_confirm != "yes":
+        return ({}, auto_create_names)
+
+    if auto_create_names:
+        # Validation barrier already passed; create the missing locations.
+        created = auto_create_locations(session, user_id, auto_create_names)
+        name_to_id.update(created)
+
+    line_to_loc: dict[int, int] = {}
+    for r in parsed_rows:
+        raw = (r.get("location") or "").strip().lower()
+        if not raw:
+            continue
+        if raw in name_to_id:
+            try:
+                line_num = int(r.get("line_number"))
+            except (ValueError, TypeError):
+                continue
+            line_to_loc[line_num] = name_to_id[raw]
+
+    return (line_to_loc, [])
 
 
 def _deck_for_storage_location(
@@ -1440,6 +1537,9 @@ async def import_commit(
     reconcile_action: list[str] = Form([]),
     reconcile_move_qty: list[str] = Form([]),
     reconcile_new_qty: list[str] = Form([]),
+    location_choice_name: list[str] = Form([]),
+    location_choice_id: list[str] = Form([]),
+    auto_create_confirm: str = Form("no"),
     session: Session = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
     _: None = CsrfRequired,
@@ -1462,7 +1562,139 @@ async def import_commit(
     moved_count = 0
     stale_match_rows: list[dict] = []
 
-    # 3-branch dispatch:
+    # v3.30.15 — per-row Location resolution.
+    #
+    # Build the line_number → resolved_StorageLocation.id map from the
+    # parallel choice arrays surfaced by the preview step. If the user
+    # asked to auto-create one or more missing locations but did not check
+    # the confirm box, abort the batch with NO writes and re-render the
+    # preview with an explicit error (per Decision 3).
+    #
+    # If the resulting map is non-empty, take the v3.30.15 resolution path:
+    # rows with a resolved Location land directly placed; rows without
+    # (blank Location, or user opted-out per-name) fall through to the
+    # existing target_location_id / drawer-sorter behavior for the unresolved
+    # rows only. The reconciliation paths are bypassed in this case — the
+    # CSV is treated as carrying its own destination semantics.
+    line_to_location_id, needs_confirm_names = _build_line_to_location_map(
+        session,
+        current_user.id,
+        rows,
+        location_choice_name,
+        location_choice_id,
+        auto_create_confirm,
+    )
+    if needs_confirm_names:
+        # Auto-create requested but not confirmed → reject batch, re-render
+        # preview with the same row state + an explicit error message.
+        distinct_loc_names = _distinct_locations_from_rows(rows)
+        location_resolutions = resolve_location_names(session, current_user.id, distinct_loc_names)
+        duplicate_counts = compute_duplicate_counts_for_resolved(
+            session, current_user.id, rows, location_resolutions
+        )
+        return render(
+            request,
+            "import_preview.html",
+            {
+                "title": "Import Preview",
+                "valid_rows": rows,
+                "invalid_rows": [],
+                "format_name": "(re-confirmation needed)",
+                "filename": filename,
+                "current_user": current_user,
+                "use_drawer_sorter": current_user.username in DRAWER_SORTER_USERNAMES,
+                "locations": list_locations(session, current_user.id),
+                "decks": list_decks_basic(session, user_id=current_user.id),
+                "location_resolutions": location_resolutions,
+                "duplicate_counts": duplicate_counts,
+                "auto_create_error": (
+                    "Confirm the auto-create of new locations before importing, "
+                    "or change those rows' choices."
+                ),
+            },
+        )
+
+    if line_to_location_id:
+        result = persist_import_rows(
+            session,
+            rows,
+            user_id=current_user.id,
+            filename=filename,
+            line_to_location_id=line_to_location_id,
+        )
+
+        # Run place_imported_rows per resolved location so newly-placed rows
+        # merge with any existing placed copy at the same destination
+        # (Decision 5 — merge behavior unchanged; reused via the established
+        # place_imported_rows code path rather than duplicated inside
+        # persist_import_rows).
+        placed_by_loc = result.get("placed_row_ids_by_location") or {}
+        for loc_id, row_ids_at_loc in placed_by_loc.items():
+            if row_ids_at_loc:
+                place_imported_rows(
+                    session,
+                    row_ids_at_loc,
+                    user_id=current_user.id,
+                    location_id=loc_id,
+                )
+
+        # Unresolved rows (no per-row Location) fall through to the existing
+        # target_location_id / drawer-sorter behavior. Reconciliation paths
+        # are deliberately bypassed in the v3.30.15 path — a CSV carrying
+        # Location values is treated as carrying its own destination
+        # semantics. Reconciliation remains intact for blank-Location CSVs.
+        pending_row_ids = result.get("pending_row_ids") or []
+        merged_count = 0
+        if pending_row_ids and target_location_id:
+            place_imported_rows(
+                session,
+                pending_row_ids,
+                user_id=current_user.id,
+                location_id=target_location_id,
+            )
+            loc = get_location(session, location_id=target_location_id, user_id=current_user.id)
+            placed_in = loc.name if loc else None
+            placed_in_url = f"/locations/{target_location_id}" if loc else "/pending"
+            placed_in_kind = ("deck" if loc.type == "deck" else "location") if loc else None
+        elif pending_row_ids and current_user.username in DRAWER_SORTER_USERNAMES:
+            resort_collection(session, user_id=current_user.id)
+            return RedirectResponse(url="/pending", status_code=303)
+        elif placed_by_loc:
+            # All rows resolved per-row; surface the first resolved location
+            # as the placed_in for the result page, with a "multiple
+            # locations" hint when more than one was used.
+            first_loc_id = next(iter(placed_by_loc.keys()))
+            loc = get_location(session, location_id=first_loc_id, user_id=current_user.id)
+            if len(placed_by_loc) == 1 and loc:
+                placed_in = loc.name
+                placed_in_url = f"/locations/{first_loc_id}"
+                placed_in_kind = "deck" if loc.type == "deck" else "location"
+            else:
+                placed_in = f"{len(placed_by_loc)} locations"
+                placed_in_url = "/collection"
+                placed_in_kind = "multiple"
+
+        return render(
+            request,
+            "import_result.html",
+            {
+                "title": "Import Results",
+                "imported_count": result["imported_count"],
+                "total_quantity": result.get("total_quantity", result["imported_count"]),
+                "moved_count": moved_count,
+                "merged_count": merged_count,
+                "skipped_count": 0,
+                "stale_match_rows": stale_match_rows,
+                "failed_rows": result["failed_rows"],
+                "batch_id": result["batch_id"],
+                "placed_in": placed_in,
+                "placed_in_url": placed_in_url,
+                "placed_in_kind": placed_in_kind,
+                "current_user": current_user,
+            },
+        )
+
+    # 3-branch dispatch (no per-row resolution):
     #  (a) deck destination + reconciliation → deck per-row helper
     #  (b) non-deck destination + reconciliation → collection per-row helper
     #  (c) no reconciliation fields → existing path, byte-identical

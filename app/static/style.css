@@ -11270,6 +11270,103 @@ table.dmtx .dmtx-rowhead {
    wrapper. No additional breakpoints needed here. */
 
 /* ===================================================================
+   v3.30.15 — per-row Location resolution surfaces on the Import Preview
+   step. Three panels render conditionally inside the existing commit
+   form: ambiguous-name picker, missing-name auto-create confirm, and
+   the clean-match duplicate (merge-with-existing) warning. Token reuse
+   only (Folio palette + the existing imports-* idiom).
+   =================================================================== */
+.imports-loc-resolution {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: var(--space-3) 0;
+}
+.imports-loc-panel {
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--panel);
+}
+.imports-loc-panel-title {
+  margin: 0 0 var(--space-2) 0;
+  font-family: "Newsreader", Georgia, serif;
+  font-style: italic;
+  color: var(--text);
+}
+.imports-loc-panel-title code,
+.imports-loc-missing-list code,
+.imports-loc-dup-list code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-style: normal;
+  font-size: 0.9em;
+  padding: 0 4px;
+  border-radius: var(--radius-sm);
+  background: var(--panel-2);
+  color: var(--brand-gold);
+}
+.imports-loc-ambiguous {
+  border-left: 3px solid var(--brand-gold);
+}
+.imports-loc-missing {
+  border-left: 3px solid var(--brand-gold-soft);
+}
+.imports-loc-duplicates {
+  border-left: 3px solid var(--text-dim);
+}
+.imports-loc-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) 0;
+}
+.imports-loc-row + .imports-loc-row {
+  border-top: 1px dashed var(--border);
+}
+.imports-loc-name {
+  font-weight: 600;
+  color: var(--text);
+  min-width: 12rem;
+}
+.imports-loc-select {
+  flex: 1;
+}
+.imports-loc-missing-list {
+  margin: 0 0 var(--space-2) 0;
+  padding-left: 1.25rem;
+  color: var(--text-dim);
+}
+.imports-loc-missing-list li {
+  margin: 0.25rem 0;
+}
+.imports-loc-confirm {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 0.95em;
+  color: var(--text);
+}
+.imports-loc-confirm input[type="checkbox"] {
+  accent-color: var(--brand-gold);
+}
+.imports-loc-dup-list {
+  margin: 0;
+  padding-left: 1.25rem;
+  color: var(--text-dim);
+}
+.imports-loc-dup-list li {
+  margin: 0.35rem 0;
+}
+.imports-loc-error {
+  padding: var(--space-3);
+  border: 1px solid var(--danger);
+  border-radius: var(--radius);
+  background: var(--panel-2);
+  color: var(--danger);
+  font-style: italic;
+}
+
+/* ===================================================================
    v3.28.11 — Folio Watchlist refresh (target price + light polish)
    ===================================================================
    The Watchlist page (v3.27.12) is already on the Folio palette. v3.28.11
