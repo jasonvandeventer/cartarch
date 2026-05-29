@@ -23,15 +23,15 @@ See [roadmap.md](roadmap.md) for the prioritized backlog.
 
 ## Screenshots
 
-![Deck detail page](docs/screenshots/deck-detail.png)
+![Deck detail page](docs/screenshots/deck-detail.jpg)
 
 _Deck detail — hero with deck stats, Analytics (mana curve, card types, color pips), Health (functional density + pip strain), Synergy classification, dead-cards / upgrade targets, and tokens panels._
 
-![Collection with boolean search](docs/screenshots/collection.png)
+![Collection with boolean search](docs/screenshots/collection.jpg)
 
 _Collection page with Scryfall-syntax search applied (`t:creature c:WU cmc:<=3`)._
 
-![Live game tracker](docs/screenshots/game-tracker.png)
+![Live game tracker](docs/screenshots/game-tracker.jpg)
 
 _Live game tracker — tablet-oriented life/poison/commander-damage UI with per-seat rotations._
 
