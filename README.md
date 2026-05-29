@@ -2,7 +2,7 @@
 
 Self-hosted web application for managing a physical Magic: The Gathering collection. (Identifies as **Cartarch** in user-facing UI as of v3.27.6; the in-repo project identifier is still `mana-archive` pending the full infrastructure rename near actual public launch.)
 
-**Current version: v3.30.22** · [Platform repo](https://github.com/jasonvandeventer/mana-archive-platform)
+**Current version: v3.30.22** · [Platform repo](https://github.com/jasonvandeventer/vanfreckle-platform)
 
 ---
 
@@ -193,7 +193,7 @@ See [docs/screenshots/](docs/screenshots/) for capture guidelines and additional
 This repo contains **application code only**. Platform/infrastructure lives separately:
 
 - **App repo** — this repo (FastAPI app, templates, migrations)
-- **Platform repo** — [mana-archive-platform](https://github.com/jasonvandeventer/mana-archive-platform) (Kubernetes manifests, ArgoCD config)
+- **Platform repo** — [vanfreckle-platform](https://github.com/jasonvandeventer/vanfreckle-platform) (Kubernetes manifests, ArgoCD config)
 
 CI builds and pushes a Docker image to GHCR on any `v*.*.*` tag. ArgoCD Image Updater detects the new tag (semver strategy) and syncs the cluster automatically.
 
