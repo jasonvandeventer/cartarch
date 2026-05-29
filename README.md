@@ -17,7 +17,7 @@ Practical implications:
 - External service data appears as inline enrichment (per-card hover, combo detection, inclusion percentages) rather than as primary navigation surfaces.
 - Features that would route users away from Mana Archive's data toward an aggregator's data are scrutinized closely. Enrichment is welcome; replacement is not.
 
-See [docs/ROADMAP.md](docs/ROADMAP.md) for the prioritized backlog.
+See [roadmap.md](roadmap.md) for the prioritized backlog.
 
 ---
 
