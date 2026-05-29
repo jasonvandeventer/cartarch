@@ -25,7 +25,7 @@ See [roadmap.md](roadmap.md) for the prioritized backlog.
 
 ![Deck detail page](docs/screenshots/deck-detail.png)
 
-_Deck detail — hero with deck stats, Analytics (mana curve, card types, color pips), Health (functional density + pip strain), Synergy classification, dead-cards / upgrade targets, and tokens panels. (Screenshot predates v3.27.9; the bracket badge and combos panel visible in the image were removed pending the Deck Analytics Rebuild.)_
+_Deck detail — hero with deck stats, Analytics (mana curve, card types, color pips), Health (functional density + pip strain), Synergy classification, dead-cards / upgrade targets, and tokens panels._
 
 ![Collection with boolean search](docs/screenshots/collection.png)
 
