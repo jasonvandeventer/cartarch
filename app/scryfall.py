@@ -20,7 +20,7 @@ from sqlalchemy import bindparam, text
 from sqlalchemy.orm import Session
 from urllib3.util.retry import Retry
 
-from app.db import engine
+from app.db import engine, shutdown_event
 from app.models import Card
 
 SCRYFALL_CARD_URL = "https://api.scryfall.com/cards"
@@ -752,6 +752,15 @@ def refresh_bulk_cache() -> int:
                 _flush_bulk_batch(batch)
                 total += len(batch)
                 batch = []
+                if shutdown_event.is_set():
+                    # Abort mid-stream on shutdown. Flushed batches are durable;
+                    # the meta row is NOT advanced below, so the next start
+                    # re-downloads the same export from scratch (idempotent).
+                    print(
+                        f"[bulk-data] shutdown during refresh; stopping after {total} cards",
+                        flush=True,
+                    )
+                    return total
         _flush_bulk_batch(batch)
         total += len(batch)
     finally:
@@ -767,8 +776,9 @@ def refresh_bulk_cache() -> int:
 
 
 def _bulk_data_loop() -> None:
-    time.sleep(_BULK_INITIAL_SLEEP_SECONDS)
-    while True:
+    if shutdown_event.wait(_BULK_INITIAL_SLEEP_SECONDS):  # bail if stopping
+        return
+    while not shutdown_event.is_set():
         try:
             refresh_bulk_cache()
         except Exception as exc:  # noqa: BLE001 — daemon must never die silently
@@ -776,7 +786,7 @@ def _bulk_data_loop() -> None:
                 f"[bulk-data] refresh error (will retry next cycle): {exc}",
                 flush=True,
             )
-        time.sleep(_BULK_POLL_INTERVAL_SECONDS)
+        shutdown_event.wait(_BULK_POLL_INTERVAL_SECONDS)
 
 
 @lru_cache(maxsize=8192)

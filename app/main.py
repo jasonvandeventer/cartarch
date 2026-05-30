@@ -39,7 +39,7 @@ from starlette.middleware.sessions import SessionMiddleware
 from app.audit_service import list_transaction_logs, log_transaction
 from app.auth import hash_password, validate_password_strength
 from app.dashboard_service import get_dashboard_data
-from app.db import DATA_DIR, SessionLocal, init_db
+from app.db import DATA_DIR, SessionLocal, checkpoint_and_dispose, init_db, shutdown_event
 from app.deck_service import (
     CARD_ROLE_TAGS,
     DECK_GROUP_BY_OPTIONS,
@@ -342,10 +342,11 @@ def _run_price_refresh_batch() -> None:
 
 
 def _price_refresh_loop() -> None:
-    time.sleep(60)  # let the app finish starting before first run
-    while True:
+    if shutdown_event.wait(60):  # let the app finish starting; bail if stopping
+        return
+    while not shutdown_event.is_set():
         _run_price_refresh_batch()
-        time.sleep(_PRICE_REFRESH_INTERVAL_SECONDS)
+        shutdown_event.wait(_PRICE_REFRESH_INTERVAL_SECONDS)
 
 
 _TRAIT_BACKFILL_BATCH = 75
@@ -420,10 +421,16 @@ def _run_trait_backfill_batch() -> int:
 
 
 def _trait_backfill_loop() -> None:
-    time.sleep(30)  # after migrations/init, before steady-state work
-    while True:
+    if shutdown_event.wait(30):  # after migrations/init; bail if stopping
+        return
+    while not shutdown_event.is_set():
         processed = _run_trait_backfill_batch()
-        time.sleep(_TRAIT_BACKFILL_BUSY_SECONDS if processed else _TRAIT_BACKFILL_IDLE_SECONDS)
+        shutdown_event.wait(
+            _TRAIT_BACKFILL_BUSY_SECONDS if processed else _TRAIT_BACKFILL_IDLE_SECONDS
+        )
+
+
+_daemon_threads: list[threading.Thread] = []
 
 
 @app.on_event("startup")
@@ -450,9 +457,30 @@ def on_startup() -> None:
         )
     run_migrations()
     init_db()
-    threading.Thread(target=_price_refresh_loop, daemon=True, name="price-refresh").start()
-    threading.Thread(target=_trait_backfill_loop, daemon=True, name="trait-backfill").start()
-    threading.Thread(target=_bulk_data_loop, daemon=True, name="bulk-data").start()
+    for _target, _name in (
+        (_price_refresh_loop, "price-refresh"),
+        (_trait_backfill_loop, "trait-backfill"),
+        (_bulk_data_loop, "bulk-data"),
+    ):
+        thread = threading.Thread(target=_target, daemon=True, name=_name)
+        thread.start()
+        _daemon_threads.append(thread)
+
+
+@app.on_event("shutdown")
+def on_shutdown() -> None:
+    """Clean SQLite shutdown so the volume detaches on a consistent file.
+
+    Stop the writer daemons (they watch ``shutdown_event``), wait briefly for any
+    in-flight batch to finish, then checkpoint the WAL into the main DB and close
+    the pool. Pairs with a generous ``terminationGracePeriodSeconds`` on the
+    Deployment so Kubernetes waits for this before SIGKILL + volume detach. See
+    the SQLite-on-Longhorn corruption mitigation.
+    """
+    shutdown_event.set()
+    for thread in _daemon_threads:
+        thread.join(timeout=10)
+    checkpoint_and_dispose()
 
 
 @app.get("/")
