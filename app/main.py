@@ -30,6 +30,7 @@ from fastapi.responses import (
     Response,
 )
 from fastapi.staticfiles import StaticFiles
+from prometheus_fastapi_instrumentator import Instrumentator
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
@@ -190,6 +191,12 @@ from app.watchlist_service import (
 from scripts.run_migrations import run as run_migrations
 
 app = FastAPI(title="Cartarch")
+
+# Expose Prometheus metrics at /metrics for the kube-prometheus-stack
+# ServiceMonitor (platform observability). include_in_schema=False keeps it out
+# of the public OpenAPI surface. NOTE: the route is still reachable via the
+# public ingress (cartarch.com/metrics) — restrict at Traefik if that matters.
+Instrumentator().instrument(app).expose(app, include_in_schema=False)
 
 app.add_middleware(
     SessionMiddleware,
