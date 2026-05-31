@@ -117,7 +117,7 @@ def showcase_page(
         # Not owned / doesn't exist — non-leaky redirect to the index.
         return RedirectResponse(url="/showcases?error=not_found", status_code=303)
     # v3.31.0 — locations for the bulk "add a whole location" picker.
-    from app.inventory_service import list_locations
+    from app.location_service import list_locations
 
     locations = list_locations(session, user_id=current_user.id)
     error = request.query_params.get("error")
