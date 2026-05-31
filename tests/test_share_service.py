@@ -46,7 +46,15 @@ def _fresh_session():
     return sessionmaker(bind=engine, expire_on_commit=False)()
 
 
-def _make_row(session, user_id: int, price: str | None = None, quantity: int = 1) -> InventoryRow:
+def _make_row(
+    session,
+    user_id: int,
+    price: str | None = None,
+    quantity: int = 1,
+    is_pending: bool = False,
+) -> InventoryRow:
+    # InventoryRow.is_pending defaults to True (rows are pending until
+    # placed); the test fixtures default to placed unless asked otherwise.
     card = Card(
         scryfall_id=f"sid-{user_id}-{price}-{quantity}-{id(object())}",
         name="Test Card",
@@ -56,7 +64,13 @@ def _make_row(session, user_id: int, price: str | None = None, quantity: int = 1
     )
     session.add(card)
     session.flush()
-    row = InventoryRow(card_id=card.id, user_id=user_id, quantity=quantity, finish="normal")
+    row = InventoryRow(
+        card_id=card.id,
+        user_id=user_id,
+        quantity=quantity,
+        finish="normal",
+        is_pending=is_pending,
+    )
     session.add(row)
     session.commit()
     return row
@@ -261,6 +275,70 @@ def test_delete_cascades_items_and_shares() -> int:
     return failed
 
 
+def test_bulk_add_rows() -> int:
+    """add_rows_to_showcase: whole-collection + per-location, idempotent,
+    pending-excluded, ownership-scoped."""
+    failed = 0
+    s = _fresh_session()
+    sc = share_service.create_showcase(s, user_id=1, name="One", description=None)
+
+    # Two placed rows in location 10, one placed row unassigned, one pending.
+    r1 = _make_row(s, user_id=1, quantity=3)
+    r1.storage_location_id = 10
+    r2 = _make_row(s, user_id=1, quantity=1)
+    r2.storage_location_id = 10
+    _make_row(s, user_id=1, quantity=2)  # placed, no location
+    pending = _make_row(s, user_id=1, quantity=1, is_pending=True)  # excluded
+    s.commit()
+
+    # Per-location: only the two rows in location 10.
+    res = share_service.add_rows_to_showcase(s, user_id=1, showcase_id=sc.id, location_id=10)
+    if res is None or res["added"] != 2:
+        print(f"  [FAIL] per-location add expected 2, got {res}")
+        failed += 1
+    else:
+        print("  [OK] per-location bulk add scopes to the location")
+
+    # quantity_offered should track the row's quantity (offer what you own).
+    item_r1 = (
+        s.query(ShowcaseItem)
+        .filter(ShowcaseItem.showcase_id == sc.id, ShowcaseItem.inventory_row_id == r1.id)
+        .first()
+    )
+    if item_r1 is None or item_r1.quantity_offered != 3:
+        print("  [FAIL] bulk add did not offer the full owned quantity")
+        failed += 1
+    else:
+        print("  [OK] bulk add offers the full owned quantity")
+
+    # Whole collection: adds r3 (new), skips r1+r2 (already in), excludes pending.
+    res2 = share_service.add_rows_to_showcase(s, user_id=1, showcase_id=sc.id)
+    if res2 is None or res2["added"] != 1 or res2["skipped"] != 2:
+        print(f"  [FAIL] whole-collection add expected added=1 skipped=2, got {res2}")
+        failed += 1
+    else:
+        print("  [OK] whole-collection add is idempotent + excludes pending")
+
+    if (
+        s.query(ShowcaseItem)
+        .filter(ShowcaseItem.showcase_id == sc.id, ShowcaseItem.inventory_row_id == pending.id)
+        .first()
+        is not None
+    ):
+        print("  [FAIL] pending row leaked into the showcase")
+        failed += 1
+    else:
+        print("  [OK] pending row excluded")
+
+    # Cross-user ownership.
+    if share_service.add_rows_to_showcase(s, user_id=2, showcase_id=sc.id) is not None:
+        print("  [FAIL] bulk add allowed on another user's showcase")
+        failed += 1
+    else:
+        print("  [OK] bulk add rejects cross-user showcase")
+    return failed
+
+
 def main() -> None:
     tests = [
         ("Multiple showcases per user", test_multiple_showcases_per_user),
@@ -268,6 +346,7 @@ def main() -> None:
         ("Add explicit + default", test_add_explicit_and_default),
         ("Item mutation scoped by join", test_item_mutation_scoped_by_join),
         ("Total value", test_total_value),
+        ("Bulk add rows", test_bulk_add_rows),
         ("Delete cascades items + shares", test_delete_cascades_items_and_shares),
     ]
     total_failed = 0

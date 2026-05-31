@@ -32,6 +32,7 @@
   {% if success %}
     <section class="panel showcase-flash showcase-flash-success">
       {% if success == 'added' %}Added to your Showcase.
+      {% elif success == 'bulk_added' %}Added {{ added or 0 }} card{{ 's' if added != '1' else '' }} to your Showcase{% if added == '0' %} (everything eligible was already in it){% endif %}.
       {% elif success == 'created' %}Showcase created.
       {% elif success == 'removed' %}Removed.
       {% elif success == 'updated' %}Saved.
@@ -59,6 +60,31 @@
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
       <button type="submit" class="btn-danger-small">Delete this showcase</button>
     </form>
+  </section>
+
+  {# ── Bulk add (v3.31.0): whole collection or a whole location ── #}
+  <section class="panel">
+    <h3 class="panel-title">Add cards in bulk</h3>
+    <p class="muted">Fill this Showcase without picking cards one at a time. Already-included cards are skipped, and pending (unconfirmed) cards are left out. You can fine-tune offered quantities afterward.</p>
+    <div class="inline-create-row" style="display:flex; gap:0.75rem; flex-wrap:wrap; align-items:flex-end">
+      <form method="post" action="/showcase/{{ showcase.id }}/add-collection" class="inline-form"
+            onsubmit="return confirm('Add every card in your collection to this Showcase?')">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <button type="submit" class="btn-like">Add my whole collection</button>
+      </form>
+      {% set bulk_locations = locations | selectattr("type", "ne", "root") | selectattr("type", "ne", "deck") | list %}
+      {% if bulk_locations %}
+        <form method="post" action="/showcase/{{ showcase.id }}/add-location" class="inline-form" style="flex-wrap:wrap; gap:0.5rem">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <select name="location_id" required>
+            {% for loc in bulk_locations %}
+              <option value="{{ loc.id }}">{{ loc.name }} ({{ loc.type }})</option>
+            {% endfor %}
+          </select>
+          <button type="submit" class="btn-like">Add everything from this location</button>
+        </form>
+      {% endif %}
+    </div>
   </section>
 
   {# ── Items ── #}

@@ -135,6 +135,67 @@ def create_showcase(
     return showcase
 
 
+def add_rows_to_showcase(
+    session: Session,
+    user_id: int,
+    showcase_id: int,
+    location_id: int | None = None,
+) -> dict | None:
+    """Bulk-add the user's inventory rows to one of their Showcases.
+
+    v3.31.0 — the "share my whole collection / a whole location" entry
+    point. ``location_id=None`` adds every placed row the user owns;
+    otherwise only rows in that StorageLocation. Pure DB work — no
+    external calls — so it is safe on the request path (the per-row
+    Scryfall ban in CLAUDE.md does not apply).
+
+    Scope decisions:
+      - ``is_pending`` rows are excluded — they aren't finalised into the
+        collection yet, so they don't belong in a curated "haves" list.
+      - ``quantity_offered`` is set to the row's full quantity (you're
+        showing off what you actually have), not 1 as the single-card
+        add-button uses.
+      - Idempotent: rows already in the Showcase are skipped (the
+        ``UNIQUE(showcase_id, inventory_row_id)`` set semantics), so
+        re-running after adding more cards only tops up the difference.
+
+    Returns ``None`` if the Showcase isn't owned by ``user_id``;
+    otherwise ``{"added": int, "skipped": int, "total": int}`` where
+    ``total`` is the number of eligible rows considered.
+    """
+    showcase = get_showcase(session, user_id, showcase_id)
+    if showcase is None:
+        return None
+    query = session.query(InventoryRow).filter(
+        InventoryRow.user_id == user_id,
+        InventoryRow.is_pending == False,  # noqa: E712
+    )
+    if location_id is not None:
+        query = query.filter(InventoryRow.storage_location_id == location_id)
+    rows = query.all()
+    existing_ids = {
+        row_id
+        for (row_id,) in session.query(ShowcaseItem.inventory_row_id)
+        .filter(ShowcaseItem.showcase_id == showcase.id)
+        .all()
+    }
+    added = 0
+    for row in rows:
+        if row.id in existing_ids:
+            continue
+        session.add(
+            ShowcaseItem(
+                showcase_id=showcase.id,
+                inventory_row_id=row.id,
+                quantity_offered=max(1, row.quantity),
+            )
+        )
+        added += 1
+    if added:
+        session.commit()
+    return {"added": added, "skipped": len(rows) - added, "total": len(rows)}
+
+
 def delete_showcase(session: Session, user_id: int, showcase_id: int) -> bool:
     """Delete one of the user's Showcases. Per-user scoped.
 
@@ -767,6 +828,7 @@ class _ReadOnlyCardProjection:
 
 
 __all__ = [
+    "add_rows_to_showcase",
     "add_showcase_item",
     "build_share_display_items",
     "create_share",

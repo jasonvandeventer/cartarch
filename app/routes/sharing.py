@@ -116,6 +116,10 @@ def showcase_page(
     if data is None:
         # Not owned / doesn't exist — non-leaky redirect to the index.
         return RedirectResponse(url="/showcases?error=not_found", status_code=303)
+    # v3.31.0 — locations for the bulk "add a whole location" picker.
+    from app.inventory_service import list_locations
+
+    locations = list_locations(session, user_id=current_user.id)
     error = request.query_params.get("error")
     success = request.query_params.get("success")
     return render(
@@ -127,6 +131,8 @@ def showcase_page(
             "showcase": data["showcase"],
             "items": data["items"],
             "total_value": data["total_value"],
+            "locations": locations,
+            "added": request.query_params.get("added"),
             "error": error,
             "success": success,
         },
@@ -199,7 +205,11 @@ def showcase_item_quantity(
     _: None = CsrfRequired,
 ):
     share_service.update_quantity_offered(session, current_user.id, item_id, quantity_offered)
-    return RedirectResponse(url="/showcase?success=quantity_updated", status_code=303)
+    # v3.31.0 — bounce back to the specific showcase the user was editing
+    # (the item-scoped routes don't carry a showcase_id; the Referer is the
+    # /showcase/{id} page). Falls back to the index if Referer is missing.
+    referer = request.headers.get("referer") or "/showcases"
+    return RedirectResponse(url=referer, status_code=303)
 
 
 @router.post("/showcase/items/{item_id}/remove")
@@ -211,7 +221,50 @@ def showcase_item_remove(
     _: None = CsrfRequired,
 ):
     share_service.remove_showcase_item(session, current_user.id, item_id)
-    return RedirectResponse(url="/showcase?success=removed", status_code=303)
+    referer = request.headers.get("referer") or "/showcases"
+    return RedirectResponse(url=referer, status_code=303)
+
+
+# ── Bulk add (whole collection / a whole location) ──────────────
+
+
+@router.post("/showcase/{showcase_id}/add-collection")
+def showcase_add_collection(
+    showcase_id: int,
+    request: Request,
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+    _: None = CsrfRequired,
+):
+    """v3.31.0 — bulk-add the user's entire (placed) collection."""
+    result = share_service.add_rows_to_showcase(session, current_user.id, showcase_id)
+    if result is None:
+        return RedirectResponse(url="/showcases?error=not_found", status_code=303)
+    return RedirectResponse(
+        url=f"/showcase/{showcase_id}?success=bulk_added&added={result['added']}",
+        status_code=303,
+    )
+
+
+@router.post("/showcase/{showcase_id}/add-location")
+def showcase_add_location(
+    showcase_id: int,
+    request: Request,
+    location_id: int = Form(...),
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+    _: None = CsrfRequired,
+):
+    """v3.31.0 — bulk-add every placed row in one StorageLocation."""
+    result = share_service.add_rows_to_showcase(
+        session, current_user.id, showcase_id, location_id=location_id
+    )
+    if result is None:
+        return RedirectResponse(url="/showcases?error=not_found", status_code=303)
+    return RedirectResponse(
+        url=f"/showcase/{showcase_id}?success=bulk_added&added={result['added']}",
+        status_code=303,
+    )
 
 
 # ── Share management ────────────────────────────────────────────
