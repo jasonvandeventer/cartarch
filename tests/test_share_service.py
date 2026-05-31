@@ -23,6 +23,7 @@ Covers the v3.31.0 multi-showcase changes specifically:
 
 from __future__ import annotations
 
+import itertools
 import sys
 
 from sqlalchemy import create_engine
@@ -38,6 +39,13 @@ from app.models import (
     Share,
     ShowcaseItem,
 )
+
+# Monotonic counter for unique scryfall_ids. An earlier cut used
+# id(object()), but CPython frees the throwaway object immediately and
+# reuses its id, so two _make_row calls with the same args collided on
+# the cards.scryfall_id UNIQUE constraint (passed locally by luck, failed
+# in CI). A counter is deterministically unique.
+_scryfall_seq = itertools.count(1)
 
 
 def _fresh_session():
@@ -56,7 +64,7 @@ def _make_row(
     # InventoryRow.is_pending defaults to True (rows are pending until
     # placed); the test fixtures default to placed unless asked otherwise.
     card = Card(
-        scryfall_id=f"sid-{user_id}-{price}-{quantity}-{id(object())}",
+        scryfall_id=f"sid-{next(_scryfall_seq)}",
         name="Test Card",
         set_code="TST",
         collector_number="1",
