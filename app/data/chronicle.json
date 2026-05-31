@@ -1,5 +1,15 @@
 [
   {
+    "version": "3.31.1",
+    "date": "2026-05-31",
+    "added": [],
+    "refined": [],
+    "resolved": [
+      "Viewing a Showcase that someone shared with your playgroup could fail with an 'Internal Server Error' instead of showing the cards. The shared view now loads correctly, total value and all. It was a one-line omission, and it's now covered by a new automated test that loads a shared view end-to-end so it can't slip back in."
+    ],
+    "archivist_note": "A one-line omission with an outsized blast radius. The previous release taught the shared-Showcase view to show a total value, and added that value in two of the three places it was needed — the calculation, and the page that displays it — but not the third: the hand-off between them. So the page asked the server for a number it had never been handed, and the template, asked to format nothing, refused with an error. The fix is simply the missing line. The lesson is the test: our pre-release checks had opened the Showcase manager and the list of shares, but never a shared view itself, so the gap sat one click away from everything we looked at. The new test walks a shared view the whole way through — from the request to the finished page — and would have caught it cold. The same release also quietly tidies two workshop-only things no reader ever sees: a flaky internal test made dependable, and the development build's version label now showing its intended number rather than a commit hash."
+  },
+  {
     "version": "3.31.0",
     "date": "2026-05-30",
     "added": [
