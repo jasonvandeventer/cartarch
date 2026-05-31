@@ -1,2 +1,6 @@
 black==24.10.0
 ruff==0.7.4
+# Required by fastapi.testclient.TestClient (used in tests/test_share_service.py
+# for the route->template render regression). Dev/CI only — NOT in
+# requirements.txt, so the prod image is unaffected.
+httpx==0.28.1
