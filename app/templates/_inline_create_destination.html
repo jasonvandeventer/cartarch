@@ -75,6 +75,19 @@
     return payload;
   }
 
+  // After an inline create selects the new destination, (1) close the
+  // popover — setting selectEl.value alone left it open — and (2) fire a
+  // native `change` so the destination <select>'s HTMX trigger
+  // (hx-trigger="load, change") re-runs /import/reconcile-preview.
+  // Assigning .value programmatically does NOT emit `change`, which is
+  // why the reconciliation panel previously went stale after a
+  // create-&-select.
+  function finishSelection(btn) {
+    selectEl.dispatchEvent(new Event('change', { bubbles: true }));
+    const details = btn.closest('details.inline-details');
+    if (details) details.open = false;
+  }
+
   const deckBtn = document.getElementById('inline-deck-submit');
   if (deckBtn) {
     deckBtn.addEventListener('click', async () => {
@@ -98,6 +111,7 @@
         if (submitBtn) submitBtn.disabled = false;
         statusEl.textContent = 'Created and selected.';
         nameEl.value = '';
+        finishSelection(deckBtn);
       } catch (err) {
         statusEl.textContent = 'Failed: ' + err.message;
       }
@@ -127,6 +141,7 @@
         if (submitBtn) submitBtn.disabled = false;
         statusEl.textContent = 'Created and selected.';
         nameEl.value = '';
+        finishSelection(locBtn);
       } catch (err) {
         statusEl.textContent = 'Failed: ' + err.message;
       }
