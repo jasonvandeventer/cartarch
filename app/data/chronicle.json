@@ -1,5 +1,20 @@
 [
   {
+    "version": "3.31.0",
+    "date": "2026-05-30",
+    "added": [
+      "You can now keep more than one Showcase. Build a trade binder, a brag list, a sell pile — as many curated lists as you like — and share any of them, read-only, with a playgroup. A new Showcases page lists them all with a card count and total value, and you pick which one when you add a card or set up a share.",
+      "Filling a Showcase no longer means adding cards one at a time. Open a Showcase and use 'Add my whole collection' or 'Add everything from this location' to bulk-fill it in one click. Cards already in the Showcase are skipped, and unconfirmed (pending) cards are left out.",
+      "Showcases and the read-only shared view now show a total value near the top, so you — and anyone you share with — can see at a glance what a curated list is worth."
+    ],
+    "refined": [
+      "The Collection color filter behaves the way it should now. Clicking a mana pip highlights it instantly, picking several colors filters by all of them, and deselecting one actually clears it. Applying a filter change always shows fresh results — a browser-caching quirk could previously leave a stale view on screen even though the filter had changed.",
+      "Adding cards during an import is smoother: the 'Create & select' popup for a new deck or location now closes itself and immediately updates the reconciliation preview, and the duplicate-cards warning was reworded so it's clear that skipping cards you already own is the normal, expected choice — not something to worry about."
+    ],
+    "resolved": [],
+    "archivist_note": "The Showcase began life deliberately constrained — one per person, the simplest thing that could work, with a note left in the code that a later release would lift the cap 'with no other change.' This is that release, and the note held: the one-per-user limit turned out to be a single database index, and removing it was a single line. Everything else this release is the ergonomics that grew around that one line — a page to hold many lists, a picker wherever you add or share a card, and a bulk fill so a whole binder, or your entire collection, becomes a Showcase in one motion instead of one card at a time. The rest is polish earned in use. A collector importing his entire collection found the color filter's pips didn't quite behave, the import popovers didn't close on their own, a warning read as an alarm when it meant reassurance — each fixed while he watched. The quietest fix is the most general: pages are now marked do-not-cache, because a filter you just changed should always show you the result, never yesterday's. Two things his session asked for that we deliberately did not build today — decks that share a single physical copy between two versions, and a Moxfield-style add-one-card-at-a-time panel — are written down for next time, not forgotten."
+  },
+  {
     "version": "3.30.23",
     "date": "2026-05-29",
     "added": [],
