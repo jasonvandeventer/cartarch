@@ -23,26 +23,42 @@ DRAWER_SORTER_USERNAMES: frozenset[str] = frozenset({"jason@vanfreckle.com", "te
 templates = Jinja2Templates(directory="app/templates")
 
 
-def _dev_version() -> str:
+def _git(*args: str) -> str | None:
+    """Run a git command, returning stripped stdout or None on any failure
+    (non-zero exit, or git missing in the runtime image)."""
     try:
-        tag = (
-            subprocess.check_output(
-                ["git", "describe", "--tags", "--exact-match"],
-                stderr=subprocess.DEVNULL,
-            )
-            .decode()
-            .strip()
-        )
-    except subprocess.CalledProcessError:
-        tag = (
-            subprocess.check_output(
-                ["git", "rev-parse", "--short", "HEAD"],
-                stderr=subprocess.DEVNULL,
-            )
-            .decode()
-            .strip()
-        )
-    return f"dev-{tag}"
+        return subprocess.check_output(["git", *args], stderr=subprocess.DEVNULL).decode().strip()
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return None
+
+
+def _dev_version() -> str:
+    """Version string for builds with no ``APP_VERSION`` env (i.e. Dev).
+
+    - HEAD exactly on a tag → ``dev-<tag>`` verbatim.
+    - Otherwise advertise the NEXT patch version off the latest reachable
+      tag (matching the project's patch-bump release convention), so a Dev
+      build one commit past ``v3.31.0`` reads ``dev-v3.31.1`` rather than a
+      bare git sha.
+    - No parseable tag / no git → ``dev-<short-sha>`` then ``dev-unknown``.
+
+    NOTE: called at import time (the ``app_version`` global below), before
+    ``_VERSION_RE`` is defined — so the semver parse here is inline, not via
+    that module-level regex.
+    """
+    exact = _git("describe", "--tags", "--exact-match")
+    if exact:
+        return f"dev-{exact}"
+    latest = _git("describe", "--tags", "--abbrev=0")
+    if latest:
+        core = latest[1:] if latest.startswith("v") else latest
+        parts = core.split(".")
+        if len(parts) == 3 and all(p.isdigit() for p in parts):
+            major, minor, patch = (int(p) for p in parts)
+            prefix = "v" if latest.startswith("v") else ""
+            return f"dev-{prefix}{major}.{minor}.{patch + 1}"
+    sha = _git("rev-parse", "--short", "HEAD")
+    return f"dev-{sha}" if sha else "dev-unknown"
 
 
 templates.env.globals["app_version"] = os.getenv("APP_VERSION") or _dev_version()
