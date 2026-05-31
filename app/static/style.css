@@ -10748,11 +10748,18 @@ table.dmtx .dmtx-rowhead {
   font-weight: 700;
   font-size: 10px;
 }
-.collection-facet-pip-on {
+.collection-facet-pip-on,
+/* v3.31.0 — instant client-side feedback. The `-on` class is only
+   applied server-side on reload, so before this rule a clicked pip
+   gave no visible signal that its (CSS-hidden) checkbox had toggled —
+   users re-clicked it back off and ended up filtering nothing. `:has`
+   mirrors the active styling the moment the checkbox state flips. */
+.collection-facet-pip:has(input:checked) {
   border-color: var(--brand-gold);
   background: var(--brand-gold-soft);
 }
-.collection-facet-pip-on .collection-facet-pip-c {
+.collection-facet-pip-on .collection-facet-pip-c,
+.collection-facet-pip:has(input:checked) .collection-facet-pip-c {
   color: var(--brand-gold);
   background: var(--bg);
 }

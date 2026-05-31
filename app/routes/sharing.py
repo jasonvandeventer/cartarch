@@ -44,31 +44,47 @@ router = APIRouter()
 # ── Showcase management ─────────────────────────────────────────
 
 
-@router.get("/showcase")
-def showcase_page(
+@router.get("/showcases")
+def showcases_index(
     request: Request,
     session: Session = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
 ):
-    data = share_service.get_showcase_with_items(session, current_user.id)
+    """v3.31.0 — list every Showcase the user owns, with a create form.
+
+    Each row carries its item count and total value so the index is a
+    useful at-a-glance dashboard, not just a list of names.
+    """
+    showcases = share_service.list_showcases(session, current_user.id)
+    summaries = []
+    for sc in showcases:
+        data = share_service.get_showcase_with_items(session, current_user.id, sc.id)
+        if data is None:
+            continue
+        summaries.append(
+            {
+                "showcase": sc,
+                "item_count": len(data["items"]),
+                "total_value": data["total_value"],
+            }
+        )
     error = request.query_params.get("error")
     success = request.query_params.get("success")
     return render(
         request,
-        "showcase.html",
+        "showcases.html",
         {
-            "title": "Showcase",
+            "title": "Showcases",
             "current_user": current_user,
-            "showcase": data["showcase"],
-            "items": data["items"],
+            "summaries": summaries,
             "error": error,
             "success": success,
         },
     )
 
 
-@router.post("/showcase/edit")
-def showcase_edit(
+@router.post("/showcases")
+def showcases_create(
     request: Request,
     name: str = Form(""),
     description: str = Form(""),
@@ -76,32 +92,100 @@ def showcase_edit(
     current_user: User = Depends(get_current_user),
     _: None = CsrfRequired,
 ):
-    share_service.update_showcase(session, current_user.id, name, description)
-    return RedirectResponse(url="/showcase?success=updated", status_code=303)
+    showcase = share_service.create_showcase(session, current_user.id, name, description)
+    return RedirectResponse(url=f"/showcase/{showcase.id}?success=created", status_code=303)
+
+
+@router.get("/showcase")
+def showcase_legacy_redirect(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+):
+    """v3.31.0 — the old single-Showcase page now redirects to the list."""
+    return RedirectResponse(url="/showcases", status_code=303)
+
+
+@router.get("/showcase/{showcase_id}")
+def showcase_page(
+    showcase_id: int,
+    request: Request,
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+):
+    data = share_service.get_showcase_with_items(session, current_user.id, showcase_id)
+    if data is None:
+        # Not owned / doesn't exist — non-leaky redirect to the index.
+        return RedirectResponse(url="/showcases?error=not_found", status_code=303)
+    error = request.query_params.get("error")
+    success = request.query_params.get("success")
+    return render(
+        request,
+        "showcase.html",
+        {
+            "title": data["showcase"].name,
+            "current_user": current_user,
+            "showcase": data["showcase"],
+            "items": data["items"],
+            "total_value": data["total_value"],
+            "error": error,
+            "success": success,
+        },
+    )
+
+
+@router.post("/showcase/{showcase_id}/edit")
+def showcase_edit(
+    showcase_id: int,
+    request: Request,
+    name: str = Form(""),
+    description: str = Form(""),
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+    _: None = CsrfRequired,
+):
+    updated = share_service.update_showcase(
+        session, current_user.id, showcase_id, name, description
+    )
+    if updated is None:
+        return RedirectResponse(url="/showcases?error=not_found", status_code=303)
+    return RedirectResponse(url=f"/showcase/{showcase_id}?success=updated", status_code=303)
+
+
+@router.post("/showcase/{showcase_id}/delete")
+def showcase_delete(
+    showcase_id: int,
+    request: Request,
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+    _: None = CsrfRequired,
+):
+    share_service.delete_showcase(session, current_user.id, showcase_id)
+    return RedirectResponse(url="/showcases?success=deleted", status_code=303)
 
 
 @router.post("/showcase/items/add")
 def showcase_item_add(
     request: Request,
     inventory_row_id: int = Form(...),
+    showcase_id: int = Form(0),
     quantity_offered: int = Form(1),
     session: Session = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
     _: None = CsrfRequired,
 ):
     item = share_service.add_showcase_item(
-        session, current_user.id, inventory_row_id, quantity_offered
+        session, current_user.id, inventory_row_id, showcase_id or None, quantity_offered
     )
     if item is None:
-        # Row not owned by this user (or doesn't exist). Silently send
-        # them back; we don't echo non-ownership signal.
-        return RedirectResponse(url="/showcase?error=add_failed", status_code=303)
+        # Row or showcase not owned by this user (or doesn't exist).
+        # Silently send them back; we don't echo non-ownership signal.
+        return RedirectResponse(url="/showcases?error=add_failed", status_code=303)
     # Inventory-card add path: redirect back to the page the user was
     # on. ``safe_redirect_url`` is not strictly needed here because the
     # POST originates from our own inventory_card macro; the
-    # /showcase fallback gives a sane destination if the Referer is
+    # /showcases fallback gives a sane destination if the Referer is
     # missing.
-    referer = request.headers.get("referer") or "/showcase"
+    referer = request.headers.get("referer") or "/showcases"
     return RedirectResponse(url=referer + "?success=added", status_code=303)
 
 
@@ -145,7 +229,9 @@ def shares_index(
     # ``create_share`` also enforces this; the UI filter just keeps
     # the dropdown honest.
     playgroup_rows = playgroup_service.list_playgroups_for_user(session, current_user.id)
-    showcase = share_service.get_or_create_showcase(session, current_user.id)
+    # v3.31.0 — multi-showcase: the picker now chooses WHICH Showcase to
+    # share, so the page needs the full list (was a single Showcase).
+    showcases = share_service.list_showcases(session, current_user.id)
     error = request.query_params.get("error")
     success = request.query_params.get("success")
     return render(
@@ -156,7 +242,7 @@ def shares_index(
             "current_user": current_user,
             "my_shares": my_shares,
             "playgroup_rows": playgroup_rows,
-            "showcase": showcase,
+            "showcases": showcases,
             "error": error,
             "success": success,
         },
@@ -166,16 +252,18 @@ def shares_index(
 @router.post("/shares")
 def shares_create(
     request: Request,
+    showcase_id: int = Form(...),
     playgroup_id: int = Form(...),
     session: Session = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
     _: None = CsrfRequired,
 ):
-    share = share_service.create_share(session, current_user.id, playgroup_id)
+    share = share_service.create_share(session, current_user.id, showcase_id, playgroup_id)
     if share is None:
-        # Non-member of the playgroup; should never trigger via the
-        # picker (which is scoped to the user's playgroups), but a
-        # tampered POST lands here.
+        # Non-member of the playgroup, or the Showcase isn't owned by
+        # this user. Should never trigger via the picker (scoped to the
+        # user's own playgroups + showcases), but a tampered POST lands
+        # here.
         return RedirectResponse(url="/shares?error=not_a_member", status_code=303)
     return RedirectResponse(url="/shares?success=shared", status_code=303)
 

@@ -221,10 +221,10 @@
                  Playgroups. Showcase curates a list; Shares exposes it to a
                  playgroup, read-only. The two are intentionally separate
                  nav entries — Showcase ≠ Share. #}
-              <a href="/showcase"
+              <a href="/showcases"
                  class="nav-item{% if path.startswith('/showcase') %} active{% endif %}">
                 <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7h18v13H3z"/><path d="M8 7V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v3"/><line x1="3" x2="21" y1="13" y2="13"/></svg>
-                <span>Showcase</span>
+                <span>Showcases</span>
               </a>
               <a href="/shares"
                  class="nav-item{% if path.startswith('/shares') %} active{% endif %}">
@@ -519,7 +519,7 @@
             <a href="/playgroups">Playgroups</a>
             {# v3.29.1 — Showcase + Shares adjacent to Playgroups, same
                nav-group order on desktop. #}
-            <a href="/showcase">Showcase</a>
+            <a href="/showcases">Showcases</a>
             <a href="/shares">Shares</a>
             {# v3.29.2 — Trades closes the social-features minor; same Play
                position on mobile as on desktop sidebar. #}

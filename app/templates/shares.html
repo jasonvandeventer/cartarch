@@ -2,14 +2,15 @@
 {% extends "base.html" %}
 {% block content %}
   {# v3.29.1 — Shares management. Each Share row is ONE act of
-     exposing the user's Showcase to ONE playgroup, read-only. Revoking
-     hard-deletes the Share row (decision B2 — no soft-revoke); the
-     Showcase that the Share pointed at is untouched. #}
+     exposing one of the user's Showcases to ONE playgroup, read-only.
+     Revoking hard-deletes the Share row (decision B2 — no soft-revoke);
+     the Showcase that the Share pointed at is untouched.
+     v3.31.0 — multi-showcase: the create form picks WHICH Showcase. #}
   <section class="panel pagehead share-hero">
     {{ editorial_eyebrow("Play · Shares") }}
     <h1 class="pagehead-title">Shares</h1>
     <p class="pagehead-tagline">
-      <em>Who can see your Showcase.</em> Pick a playgroup and your Showcase becomes visible to its members, read-only. Revoke any share to take it back; the Showcase itself stays put on your <a href="/showcase">Showcase</a> page.
+      <em>Who can see your Showcases.</em> Pick one of your Showcases and a playgroup, and it becomes visible to that playgroup's members, read-only. Revoke any share to take it back; the Showcase itself stays put on your <a href="/showcases">Showcases</a> page.
     </p>
   </section>
 
@@ -39,6 +40,7 @@
         <table class="stacking-table share-table">
           <thead>
             <tr>
+              <th>Showcase</th>
               <th>Playgroup</th>
               <th>Shared</th>
               <th></th>
@@ -47,6 +49,9 @@
           <tbody>
             {% for row in my_shares %}
               <tr>
+                <td data-label="Showcase">
+                  <a href="/showcase/{{ row.showcase.id }}">{{ row.showcase.name }}</a>
+                </td>
                 <td data-label="Playgroup">
                   <a class="share-pg-link" href="/playgroups/{{ row.playgroup.id }}">{{ row.playgroup.name }}</a>
                 </td>
@@ -65,17 +70,27 @@
         </table>
       </div>
     {% else %}
-      <p class="share-empty">You haven't shared your Showcase with anyone yet. Pick a playgroup below to share it.</p>
+      <p class="share-empty">You haven't shared a Showcase with anyone yet. Pick a Showcase and a playgroup below to share it.</p>
     {% endif %}
   </section>
 
   {# ── Share with a playgroup ── #}
   <section class="panel">
     <h3 class="panel-title">Share with a playgroup</h3>
-    {% if playgroup_rows %}
-      <p class="muted">Your Showcase has <strong>{{ showcase.items | length }}</strong> curated card{{ 's' if showcase.items | length != 1 else '' }}. Pick a playgroup; its members will see it on the playgroup detail page.</p>
+    {% if not showcases %}
+      <p class="muted">You don't have a Showcase yet. <a href="/showcases">Create one</a> and add some cards first, then come back to share it.</p>
+    {% elif not playgroup_rows %}
+      <p class="muted">You're not in any playgroup yet. <a href="/playgroups">Create one or join with a code</a> first; sharing scopes to playgroup membership.</p>
+    {% else %}
+      <p class="muted">Pick one of your Showcases and a playgroup; its members will see it on the playgroup detail page.</p>
       <form method="post" action="/shares" class="stack-form share-create-form">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <label for="share-showcase">Showcase</label>
+        <select id="share-showcase" name="showcase_id" required>
+          {% for sc in showcases %}
+            <option value="{{ sc.id }}">{{ sc.name }}</option>
+          {% endfor %}
+        </select>
         <label for="share-playgroup">Playgroup</label>
         <select id="share-playgroup" name="playgroup_id" required>
           <option value="">— choose a playgroup —</option>
@@ -85,8 +100,6 @@
         </select>
         <button type="submit" class="btn-like">Share</button>
       </form>
-    {% else %}
-      <p class="muted">You're not in any playgroup yet. <a href="/playgroups">Create one or join with a code</a> first; sharing scopes to playgroup membership.</p>
     {% endif %}
   </section>
 {% endblock %}

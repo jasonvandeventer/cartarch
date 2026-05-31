@@ -1,0 +1,86 @@
+{% from "_macros.html" import editorial_eyebrow %}
+{% extends "base.html" %}
+{% block content %}
+  {# v3.31.0 — Showcases index. Multi-showcase: a user may keep several
+     curated lists for different purposes (a trade binder, a brag list,
+     a sell pile, …). Each links to its management page at
+     /showcase/{id}. Cards are added from the inventory_card "Actions"
+     drawer on /collection (where the Add-to-Showcase form now carries a
+     showcase picker). #}
+  <section class="panel pagehead showcase-hero">
+    {{ editorial_eyebrow("Play · Showcases") }}
+    <h1 class="pagehead-title">Showcases</h1>
+    <p class="pagehead-tagline">
+      <em>Curated lists.</em> Keep as many as you like — one for trades, one to show off, one for cards you're selling. Each can be shared, read-only, with a playgroup on the <a href="/shares">Shares</a> page.
+    </p>
+  </section>
+
+  {% if error %}
+    <section class="panel showcase-flash showcase-flash-error">
+      <strong>That didn't work.</strong>
+      {% if error == 'not_found' %}That showcase doesn't exist (or isn't yours).
+      {% elif error == 'add_failed' %}That card isn't in your inventory.
+      {% else %}{{ error | replace('_', ' ') }}
+      {% endif %}
+    </section>
+  {% endif %}
+  {% if success %}
+    <section class="panel showcase-flash showcase-flash-success">
+      {% if success == 'deleted' %}Showcase deleted.
+      {% elif success == 'created' %}Showcase created.
+      {% else %}{{ success | replace('_', ' ') }}
+      {% endif %}
+    </section>
+  {% endif %}
+
+  {# ── Existing showcases ── #}
+  <section class="panel">
+    <h3 class="panel-title">Your showcases</h3>
+    {% if summaries %}
+      <div class="table-wrap">
+        <table class="stacking-table">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Cards</th>
+              <th>Total value</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for s in summaries %}
+              <tr>
+                <td data-label="Name">
+                  <a href="/showcase/{{ s.showcase.id }}">{{ s.showcase.name }}</a>
+                  {% if s.showcase.description %}
+                    <br><span class="muted">{{ s.showcase.description }}</span>
+                  {% endif %}
+                </td>
+                <td data-label="Cards">{{ s.item_count }}</td>
+                <td data-label="Total value">${{ '%.2f'|format(s.total_value) }}</td>
+                <td data-label="">
+                  <a class="btn-like" href="/showcase/{{ s.showcase.id }}">Manage</a>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p class="showcase-empty">You don't have any showcases yet. Create one below, then open <a href="/collection">your Collection</a>, find a card, expand its <em>Actions</em> menu, and click <strong>Add to Showcase</strong>.</p>
+    {% endif %}
+  </section>
+
+  {# ── Create a new showcase ── #}
+  <section class="panel">
+    <h3 class="panel-title">New showcase</h3>
+    <form method="post" action="/showcases" class="stack-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <label for="new-showcase-name">Name</label>
+      <input type="text" id="new-showcase-name" name="name" maxlength="128" placeholder="e.g. Trade binder">
+      <label for="new-showcase-description">Description (optional)</label>
+      <textarea id="new-showcase-description" name="description" rows="2" placeholder="A short intro for people viewing this Showcase."></textarea>
+      <button type="submit" class="btn-like">Create showcase</button>
+    </form>
+  </section>
+{% endblock %}

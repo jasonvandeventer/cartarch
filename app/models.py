@@ -63,19 +63,19 @@ class User(Base):
     playgroup_memberships: Mapped[list[PlaygroupMember]] = relationship(
         foreign_keys="PlaygroupMember.user_id"
     )
-    # v3.29.1 — uselist=False because of the v3.29.1 UNIQUE(user_id)
-    # constraint (decision A5 — one Showcase per user, lazily created on
-    # first add-to-showcase action). No cascade from User; the admin
-    # user-deletion path explicitly DELETEs Share, Showcase, and (via
-    # cascade="all, delete-orphan" on Showcase.items) ShowcaseItem rows
-    # in ``app/routes/admin.py:delete_user`` to guarantee the outcome
-    # regardless of SQLite's PRAGMA foreign_keys posture.
-    # v3.30.12 — back_populates="user" pairs this with Showcase.user so
+    # v3.29.1 — a user's curated Showcases. No cascade from User; the
+    # admin user-deletion path explicitly DELETEs Share, Showcase, and
+    # (via cascade="all, delete-orphan" on Showcase.items) ShowcaseItem
+    # rows in ``app/routes/admin.py:delete_user`` to guarantee the
+    # outcome regardless of SQLite's PRAGMA foreign_keys posture.
+    # v3.30.12 — back_populates pairs this with Showcase.user so
     # SQLAlchemy knows the two relationships address the same FK
     # (showcases.user_id) and won't issue the "writing the same FK from
-    # two relationships" SAWarning at mapper-configure time. Pre-existing
-    # v3.29.1 ORM-config oversight, closed in passing during v3.30.12.
-    showcase: Mapped[Showcase | None] = relationship(uselist=False, back_populates="user")
+    # two relationships" SAWarning at mapper-configure time.
+    # v3.31.0 — multi-showcase: the UNIQUE(user_id) constraint is
+    # dropped, so this is now a one-to-many collection (was uselist=False
+    # under the v3.29.1 decision A5 one-per-user cap).
+    showcases: Mapped[list[Showcase]] = relationship(back_populates="user")
 
 
 class Card(Base):
@@ -518,10 +518,12 @@ class Playgroup(Base):
 class Showcase(Base):
     """A user's curated subset of their own inventory, prepared for sharing.
 
-    v3.29.1. One per user (``UniqueConstraint(user_id)``); the model is
-    deliberately general so a future multi-showcase release drops the
-    constraint with no other change, and so v3.29.2 trading may reuse it
-    as a "haves" list. A Showcase is NOT a ``StorageLocation type="binder"``
+    v3.29.1. Originally one per user (``UniqueConstraint(user_id)``); the
+    model was deliberately general so a future multi-showcase release
+    could drop the constraint with no other change, and so v3.29.2
+    trading may reuse it as a "haves" list. v3.31.0 dropped that
+    constraint — a user may now keep several Showcases for different
+    purposes. A Showcase is NOT a ``StorageLocation type="binder"``
     (a physical container). It is a logical curated list — cards can be
     in it without being physically moved.
 
@@ -536,7 +538,9 @@ class Showcase(Base):
     """
 
     __tablename__ = "showcases"
-    __table_args__ = (UniqueConstraint("user_id", name="uq_showcases_user"),)
+    # v3.31.0 — multi-showcase: the v3.29.1 UNIQUE(user_id) constraint
+    # is gone (dropped in migrate_v3_31_0_multi_showcase). A user may
+    # have any number of Showcases.
 
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
@@ -547,12 +551,11 @@ class Showcase(Base):
     items: Mapped[list[ShowcaseItem]] = relationship(
         back_populates="showcase", cascade="all, delete-orphan"
     )
-    # v3.30.12 — back_populates="showcase" pairs this with
-    # User.showcase. Closes the v3.29.1 ORM-config gap that
-    # surfaced as the "Showcase.user will copy column users.id to
-    # column showcases.user_id, which conflicts with relationship(s):
-    # 'User.showcase'" SAWarning at mapper-configure.
-    user: Mapped[User] = relationship(back_populates="showcase")
+    # v3.30.12 — back_populates pairs this with User.showcases. Closes
+    # the v3.29.1 ORM-config gap that surfaced as the "Showcase.user
+    # will copy column users.id to column showcases.user_id, which
+    # conflicts with relationship(s)" SAWarning at mapper-configure.
+    user: Mapped[User] = relationship(back_populates="showcases")
 
 
 class ShowcaseItem(Base):

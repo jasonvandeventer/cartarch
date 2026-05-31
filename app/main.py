@@ -20,7 +20,7 @@ import time
 from datetime import datetime, timedelta
 from urllib.parse import urlencode, urlparse
 
-from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
+from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi.responses import (
     FileResponse,
     HTMLResponse,
@@ -2425,11 +2425,21 @@ def collection_page(
     page: int = 1,
     # v3.28.8 — facet-sidebar params. Each is an independent URL param,
     # AND-composed with `search` at query time (Option A interaction
-    # model). All optional; empty string = facet not active.
-    colors: str = "",
-    types: str = "",
-    status: str = "",
-    finishes: str = "",
+    # model). All optional; empty = facet not active.
+    #
+    # v3.31.0 — accept these as repeated params (``list``). The sidebar
+    # form submits one entry per checked box (``colors=W&colors=U``),
+    # whereas the toolbar hidden inputs / pagination / export links emit
+    # a single pre-joined token (``colors=WU``). Reading them as a bare
+    # ``str`` kept only the FIRST repeated value, so multi-select in the
+    # sidebar silently collapsed to one color/type/etc. — the visible
+    # "mana pips don't filter" bug. Joining the list below makes both
+    # producers converge on the same joined string the rest of the
+    # pipeline already expects.
+    colors: list[str] = Query(default=[]),
+    types: list[str] = Query(default=[]),
+    status: list[str] = Query(default=[]),
+    finishes: list[str] = Query(default=[]),
     price_min: str = "",
     price_max: str = "",
     view: str = "grid",
@@ -2437,6 +2447,17 @@ def collection_page(
     current_user: User = Depends(get_current_user),
 ):
     per_page = 50
+
+    # v3.31.0 — collapse the repeated facet params into the single
+    # joined-token form the downstream query + facet-set construction
+    # expect. Colors are letter tokens joined with no separator ("WU");
+    # the CSV facets join with commas. Works whether each list element
+    # is an individual checkbox value ("W", "Creature") or an already-
+    # joined token from the toolbar/pagination ("WU", "Creature,Instant").
+    colors = "".join(c.strip() for c in colors if c.strip())
+    types = ",".join(t.strip() for t in types if t.strip())
+    status = ",".join(s.strip() for s in status if s.strip())
+    finishes = ",".join(f.strip() for f in finishes if f.strip())
 
     drawer = ""
 
@@ -2522,6 +2543,13 @@ def collection_page(
 
     decks = list_decks_basic(session, user_id=current_user.id)
     locations = list_locations(session, user_id=current_user.id)
+    # v3.31.0 — the inventory_card "Add to Showcase" action now offers a
+    # picker over the user's Showcases (multi-showcase). Empty list →
+    # the macro renders the single-button form that falls back to the
+    # default Showcase.
+    from app import share_service
+
+    showcases = share_service.list_showcases(session, current_user.id)
     items = []
 
     for row in inventory_rows:
@@ -2599,6 +2627,7 @@ def collection_page(
             "location_counts": location_counts,
             "decks": decks,
             "locations": locations,
+            "showcases": showcases,
             "location_id": location_id,
             "current_user": current_user,
             "show_onboarding": show_onboarding,
@@ -3255,6 +3284,11 @@ def location_detail_page(
 
     all_locations = list_locations(session, user_id=current_user.id)
     decks = list_decks_basic(session, user_id=current_user.id)
+    # v3.31.0 — Showcase picker for the inventory_card Add-to-Showcase
+    # action (multi-showcase).
+    from app import share_service
+
+    showcases = share_service.list_showcases(session, current_user.id)
 
     return render(
         request,
@@ -3271,6 +3305,7 @@ def location_detail_page(
             "current_user": current_user,
             "locations": all_locations,
             "decks": decks,
+            "showcases": showcases,
         },
     )
 

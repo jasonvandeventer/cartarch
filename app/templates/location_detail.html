@@ -163,7 +163,8 @@
           {{ inventory_card(item, csrf_token,
                     show_collection_actions=true,
                     locations=locations,
-                    decks=decks) }}
+                    decks=decks,
+                    showcases=showcases) }}
           {% if item.is_pending %}<div class="muted" style="text-align:center;">Pending placement</div>{% endif %}
         {% endfor %}
       </div>

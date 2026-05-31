@@ -33,6 +33,7 @@
     {% endif %}
     <p class="muted share-view-meta">
       {{ items | length }} card{{ 's' if items | length != 1 else '' }} ·
+      total value <strong>${{ '%.2f'|format(total_value) }}</strong> ·
       shared {{ share.created_at | editorial_date }}
     </p>
   </section>

@@ -41,6 +41,7 @@
   deck=none,
   decks=none,
   locations=none,
+  showcases=none,
   use_drawer_sorter=false) %}
   <article class="inventory-card inventory-card-compact">
     <div class="inventory-card-media">
@@ -200,17 +201,30 @@
                   {% endif %}
                 </button>
               </form>
-              {# v3.29.1 — Add to Showcase. The single add-to-Showcase
-                 entry point in v3.29.1; the management page lists/edits
-                 but does not search for inventory rows. ``add_showcase_item``
-                 is idempotent on duplicate (inventory_row_id, showcase_id) —
-                 a second click is a no-op. #}
+              {# v3.29.1 — Add to Showcase. The add-to-Showcase entry
+                 point; the management page lists/edits but does not
+                 search for inventory rows. ``add_showcase_item`` is
+                 idempotent on duplicate (inventory_row_id, showcase_id)
+                 — a second click is a no-op.
+                 v3.31.0 — multi-showcase: when the caller passes the
+                 user's ``showcases`` list, render a picker so the card
+                 lands in the chosen Showcase. With no list (or an empty
+                 one) the form omits showcase_id and the service falls
+                 back to the user's default Showcase, lazily creating one
+                 — preserving the v3.29.1 one-click behaviour. #}
               <form action="/showcase/items/add"
                     method="post"
                     class="inline-form">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                 <input type="hidden" name="inventory_row_id" value="{{ item.id }}">
                 <input type="hidden" name="quantity_offered" value="1">
+                {% if showcases %}
+                  <select name="showcase_id">
+                    {% for sc in showcases %}
+                      <option value="{{ sc.id }}">{{ sc.name }}</option>
+                    {% endfor %}
+                  </select>
+                {% endif %}
                 <button type="submit">Add to Showcase</button>
               </form>
             </div>

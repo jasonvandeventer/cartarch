@@ -1,17 +1,23 @@
 {% from "_macros.html" import editorial_eyebrow %}
 {% extends "base.html" %}
 {% block content %}
-  {# v3.29.1 — Showcase management. The user's curated subset of their
-     inventory, prepared for sharing. ONE Showcase per user (decision A5),
-     lazily created on first add-to-showcase. The Showcase is NOT a
-     Share — Shares (acts of exposing this Showcase to a playgroup) are
-     managed on /shares. Cards are added from the inventory_card
-     "Actions" drawer on /collection, NOT here at v3.29.1. #}
+  {# v3.29.1 — Showcase management. A curated subset of the user's
+     inventory, prepared for sharing. The Showcase is NOT a Share —
+     Shares (acts of exposing this Showcase to a playgroup) are managed
+     on /shares. Cards are added from the inventory_card "Actions"
+     drawer on /collection.
+     v3.31.0 — multi-showcase: this page manages ONE of the user's
+     Showcases (by id); the index lives at /showcases. #}
   <section class="panel pagehead showcase-hero">
-    {{ editorial_eyebrow("Play · Showcase") }}
-    <h1 class="pagehead-title">Showcase</h1>
+    {{ editorial_eyebrow("Play · Showcases · " + showcase.name) }}
+    <h1 class="pagehead-title">{{ showcase.name }}</h1>
     <p class="pagehead-tagline">
       <em>A curated list.</em> Pick cards from your collection that you want to show off, trade, or simply highlight. Then share it, read-only, with a playgroup on the <a href="/shares">Shares</a> page.
+    </p>
+    <p class="muted">
+      <a href="/showcases">← All showcases</a> ·
+      {{ items | length }} card{{ 's' if items | length != 1 else '' }} ·
+      total value <strong>${{ '%.2f'|format(total_value) }}</strong>
     </p>
   </section>
 
@@ -26,6 +32,7 @@
   {% if success %}
     <section class="panel showcase-flash showcase-flash-success">
       {% if success == 'added' %}Added to your Showcase.
+      {% elif success == 'created' %}Showcase created.
       {% elif success == 'removed' %}Removed.
       {% elif success == 'updated' %}Saved.
       {% elif success == 'quantity_updated' %}Quantity updated.
@@ -37,13 +44,20 @@
   {# ── Showcase name + description (always editable) ── #}
   <section class="panel">
     <h3 class="panel-title">Showcase details</h3>
-    <form method="post" action="/showcase/edit" class="stack-form">
+    <form method="post" action="/showcase/{{ showcase.id }}/edit" class="stack-form">
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
       <label for="showcase-name">Name</label>
       <input type="text" id="showcase-name" name="name" value="{{ showcase.name }}" maxlength="128">
       <label for="showcase-description">Description (optional)</label>
       <textarea id="showcase-description" name="description" rows="2" placeholder="A short intro for people viewing this Showcase.">{{ showcase.description or '' }}</textarea>
       <button type="submit" class="btn-like">Save</button>
+    </form>
+    {# v3.31.0 — delete this Showcase. Cascades its items and revokes
+       any shares pointing at it (see share_service.delete_showcase). #}
+    <form method="post" action="/showcase/{{ showcase.id }}/delete" class="inline-form" style="margin-top:0.75rem"
+          onsubmit="return confirm('Delete this entire Showcase? Its curated items and any active shares of it will be removed. Your inventory is untouched.')">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <button type="submit" class="btn-danger-small">Delete this showcase</button>
     </form>
   </section>
 

@@ -60,45 +60,146 @@ from app.pricing import effective_price
 # ── Showcase management ─────────────────────────────────────────
 
 
-def get_or_create_showcase(session: Session, user_id: int) -> Showcase:
-    """Return the user's Showcase, lazily creating it on first call.
+def list_showcases(session: Session, user_id: int) -> list[Showcase]:
+    """All of the user's Showcases, oldest first (creation order).
 
-    One per user via the ``UNIQUE(user_id)`` constraint (decision A5).
-    The first call to this function for a user creates the row; every
-    subsequent call returns the same row. Race-safe via the unique
-    constraint: a duplicate INSERT IntegrityError is caught, the
-    session rolled back, and the now-existing row returned.
+    v3.31.0 — multi-showcase. Returns an empty list if the user has
+    never created one (a Showcase is no longer lazily created just by
+    visiting the area; see :func:`get_or_create_showcase`).
     """
-    showcase = session.query(Showcase).filter(Showcase.user_id == user_id).first()
+    return (
+        session.query(Showcase)
+        .filter(Showcase.user_id == user_id)
+        .order_by(Showcase.created_at.asc(), Showcase.id.asc())
+        .all()
+    )
+
+
+def get_showcase(session: Session, user_id: int, showcase_id: int) -> Showcase | None:
+    """Return one of the user's Showcases by id, or None if not owned.
+
+    Ownership-scoped: a ``showcase_id`` belonging to another user (or a
+    non-existent id) returns None so the route layer can redirect
+    non-leakily rather than 403/500.
+    """
+    return (
+        session.query(Showcase)
+        .filter(Showcase.id == showcase_id, Showcase.user_id == user_id)
+        .first()
+    )
+
+
+def get_or_create_showcase(session: Session, user_id: int) -> Showcase:
+    """Return the user's *default* Showcase, lazily creating one if none.
+
+    v3.31.0 — multi-showcase. "Default" is the oldest Showcase (creation
+    order); if the user has none, one named "My Showcase" is created.
+    This preserves the v3.29.1 lazy-create contract for the legacy
+    single-showcase entry points (the ``/showcase`` redirect, the
+    add-to-showcase fallback when no explicit showcase is chosen) while
+    the unique constraint that used to guarantee singularity is gone.
+    """
+    showcase = (
+        session.query(Showcase)
+        .filter(Showcase.user_id == user_id)
+        .order_by(Showcase.created_at.asc(), Showcase.id.asc())
+        .first()
+    )
     if showcase is not None:
         return showcase
-    showcase = Showcase(user_id=user_id, name="My Showcase", description=None)
+    return create_showcase(session, user_id, "My Showcase", None)
+
+
+def create_showcase(
+    session: Session,
+    user_id: int,
+    name: str | None,
+    description: str | None,
+) -> Showcase:
+    """Create a new Showcase for the user. v3.31.0 — multi-showcase.
+
+    Name normalizes to "My Showcase" when empty/whitespace; description
+    normalizes to None on empty. There is no per-user uniqueness on the
+    name — two Showcases may share a name (the id disambiguates).
+    """
+    trimmed = (name or "").strip()
+    trimmed_desc = (description or "").strip()
+    showcase = Showcase(
+        user_id=user_id,
+        name=trimmed[:128] if trimmed else "My Showcase",
+        description=trimmed_desc or None,
+    )
     session.add(showcase)
-    try:
-        session.commit()
-    except IntegrityError:
-        # Concurrent create won the race; pick up the winner.
-        session.rollback()
-        showcase = session.query(Showcase).filter(Showcase.user_id == user_id).first()
-        assert showcase is not None  # the constraint guarantees it
+    session.commit()
     session.refresh(showcase)
     return showcase
 
 
-def get_showcase_with_items(session: Session, user_id: int) -> dict:
-    """Management-page payload — Showcase + items + computed available.
+def delete_showcase(session: Session, user_id: int, showcase_id: int) -> bool:
+    """Delete one of the user's Showcases. Per-user scoped.
 
-    Returns ``{"showcase": Showcase, "items": [{...}]}`` where each item
-    dict carries the live InventoryRow + Card join AND the computed
-    ``available = min(quantity_offered, InventoryRow.quantity)`` for the
-    sharer's own view. The Showcase is lazily created if missing.
+    v3.31.0 — multi-showcase. Mirrors the admin user-deletion ordering
+    (``routes/admin.py``) so the outcome holds regardless of SQLite's
+    PRAGMA foreign_keys posture:
+
+      1. NULL any ``TradeItem.showcase_item_id`` referencing this
+         Showcase's items (the trade stays live against its
+         ``inventory_row_id`` — decision C1, §10).
+      2. Hard-delete the ``Share`` rows pointing at this Showcase (their
+         audience is going away; the Showcase being deleted means the
+         shares can't outlive it).
+      3. ``session.delete`` the Showcase via ORM so ``cascade="all,
+         delete-orphan"`` on ``Showcase.items`` takes the ShowcaseItem
+         rows with it.
+
+    Returns False if the Showcase isn't owned by ``user_id`` (silently,
+    non-leaky).
+    """
+    showcase = get_showcase(session, user_id, showcase_id)
+    if showcase is None:
+        return False
+    item_ids = [
+        row_id
+        for (row_id,) in session.query(ShowcaseItem.id)
+        .filter(ShowcaseItem.showcase_id == showcase.id)
+        .all()
+    ]
+    if item_ids:
+        # Function-level import — trade_service imports share_service at
+        # module level (see remove_showcase_item's note).
+        from app import trade_service
+
+        trade_service.null_trade_item_showcase_links(session, item_ids)
+    session.query(Share).filter(Share.showcase_id == showcase.id).delete(synchronize_session=False)
+    session.delete(showcase)
+    session.commit()
+    return True
+
+
+def get_showcase_with_items(
+    session: Session,
+    user_id: int,
+    showcase_id: int,
+) -> dict | None:
+    """Management-page payload — one Showcase + items + computed totals.
+
+    v3.31.0 — multi-showcase. Scoped to a specific ``showcase_id`` and
+    ownership-checked: returns ``None`` if the Showcase isn't owned by
+    ``user_id`` (route redirects non-leakily). Returns
+    ``{"showcase": Showcase, "items": [{...}], "total_value": float}``
+    where each item dict carries the live InventoryRow + Card join, the
+    computed ``available = min(quantity_offered, InventoryRow.quantity)``,
+    and a finish-aware ``effective_price`` / ``value`` for the sharer's
+    own view. ``total_value`` is the sum of ``value`` across items.
 
     Defensive: items whose ``inventory_row`` is None (dangling FK — the
     row was deleted somehow, despite the §9 cleanup; defense in depth)
     are silently skipped from the returned list. The DB row stays put
     until removed via the management UI or admin cascade.
     """
-    showcase = get_or_create_showcase(session, user_id)
+    showcase = get_showcase(session, user_id, showcase_id)
+    if showcase is None:
+        return None
     items_q = (
         session.query(ShowcaseItem)
         .filter(ShowcaseItem.showcase_id == showcase.id)
@@ -109,12 +210,16 @@ def get_showcase_with_items(session: Session, user_id: int) -> dict:
         .all()
     )
     items: list[dict] = []
+    total_value = 0.0
     for it in items_q:
         inv = it.inventory_row
         if inv is None or inv.card is None:
             # Dangling FK — defense in depth; §9 cleanup should have caught it.
             continue
         available = min(it.quantity_offered, inv.quantity)
+        price = effective_price(inv.card, inv.finish) or 0.0
+        value = price * available
+        total_value += value
         items.append(
             {
                 "id": it.id,
@@ -122,6 +227,8 @@ def get_showcase_with_items(session: Session, user_id: int) -> dict:
                 "inventory_row_id": inv.id,
                 "quantity_offered": it.quantity_offered,
                 "available": available,
+                "effective_price": price,
+                "value": value,
                 "notes": it.notes,  # sharer-private; only on the OWN management view
                 "card": inv.card,
                 "finish": inv.finish,
@@ -130,22 +237,27 @@ def get_showcase_with_items(session: Session, user_id: int) -> dict:
                 "added_at": it.added_at,
             }
         )
-    return {"showcase": showcase, "items": items}
+    return {"showcase": showcase, "items": items, "total_value": total_value}
 
 
 def update_showcase(
     session: Session,
     user_id: int,
+    showcase_id: int,
     name: str | None,
     description: str | None,
-) -> Showcase:
-    """Update the user's Showcase name and/or description.
+) -> Showcase | None:
+    """Update a Showcase's name and/or description. Per-user scoped.
 
-    Empty/whitespace name leaves the name unchanged (defensive — a
-    Showcase always carries a non-empty name; the DB default is "My
-    Showcase"). Description normalizes to None on empty.
+    v3.31.0 — multi-showcase: scoped to a specific ``showcase_id`` and
+    ownership-checked (returns None if not owned). Empty/whitespace name
+    leaves the name unchanged (defensive — a Showcase always carries a
+    non-empty name; the DB default is "My Showcase"). Description
+    normalizes to None on empty.
     """
-    showcase = get_or_create_showcase(session, user_id)
+    showcase = get_showcase(session, user_id, showcase_id)
+    if showcase is None:
+        return None
     if name is not None:
         trimmed = name.strip()
         if trimmed:
@@ -162,11 +274,18 @@ def add_showcase_item(
     session: Session,
     user_id: int,
     inventory_row_id: int,
+    showcase_id: int | None = None,
     quantity_offered: int = 1,
 ) -> ShowcaseItem | None:
-    """Add an InventoryRow to the user's Showcase. Idempotent on duplicates.
+    """Add an InventoryRow to a Showcase. Idempotent on duplicates.
 
-    The InventoryRow must belong to ``user_id`` — service-layer
+    v3.31.0 — multi-showcase. ``showcase_id`` selects which Showcase to
+    add to; it must be owned by ``user_id``. When ``None`` (or 0 — the
+    legacy single-showcase add-button path, or a card added before any
+    Showcase exists), the user's default Showcase is used / lazily
+    created via :func:`get_or_create_showcase`.
+
+    The InventoryRow must also belong to ``user_id`` — service-layer
     ownership check (a tampered POST with another user's row id is
     silently rejected, returning None). Already-added rows return the
     existing ShowcaseItem without raising or modifying state (the
@@ -183,7 +302,13 @@ def add_showcase_item(
     if row is None:
         return None
     qty = max(1, int(quantity_offered or 1))
-    showcase = get_or_create_showcase(session, user_id)
+    if showcase_id:
+        showcase = get_showcase(session, user_id, showcase_id)
+        if showcase is None:
+            # Showcase id supplied but not owned by this user — reject.
+            return None
+    else:
+        showcase = get_or_create_showcase(session, user_id)
     existing = (
         session.query(ShowcaseItem)
         .filter(
@@ -217,6 +342,26 @@ def add_showcase_item(
     return item
 
 
+def _get_owned_showcase_item(
+    session: Session,
+    user_id: int,
+    showcase_item_id: int,
+) -> ShowcaseItem | None:
+    """Return a ShowcaseItem iff its Showcase is owned by ``user_id``.
+
+    v3.31.0 — multi-showcase. Joins ShowcaseItem → Showcase and filters
+    on ``Showcase.user_id`` so an item-id is only actionable by the user
+    who owns the Showcase it belongs to, regardless of how many
+    Showcases that user has.
+    """
+    return (
+        session.query(ShowcaseItem)
+        .join(Showcase, Showcase.id == ShowcaseItem.showcase_id)
+        .filter(ShowcaseItem.id == showcase_item_id, Showcase.user_id == user_id)
+        .first()
+    )
+
+
 def update_quantity_offered(
     session: Session,
     user_id: int,
@@ -225,18 +370,12 @@ def update_quantity_offered(
 ) -> ShowcaseItem | None:
     """Adjust the quantity_offered on one ShowcaseItem.
 
-    Per-user scoped: an item not in the user's Showcase is rejected
-    (returns None). Clamps to >= 1.
+    Per-user scoped: an item whose Showcase isn't owned by ``user_id``
+    is rejected (returns None). v3.31.0 — multi-showcase: ownership is
+    resolved by joining the item's Showcase rather than assuming a
+    single per-user Showcase. Clamps to >= 1.
     """
-    showcase = get_or_create_showcase(session, user_id)
-    item = (
-        session.query(ShowcaseItem)
-        .filter(
-            ShowcaseItem.id == showcase_item_id,
-            ShowcaseItem.showcase_id == showcase.id,
-        )
-        .first()
-    )
+    item = _get_owned_showcase_item(session, user_id, showcase_item_id)
     if item is None:
         return None
     item.quantity_offered = max(1, int(quantity_offered or 1))
@@ -250,22 +389,17 @@ def remove_showcase_item(
     user_id: int,
     showcase_item_id: int,
 ) -> bool:
-    """Remove a curated card from the user's Showcase. Per-user scoped.
+    """Remove a curated card from a Showcase. Per-user scoped.
 
     v3.29.2 — NULLs any ``TradeItem.showcase_item_id`` references to
     the removed item BEFORE the delete (§10). The trade itself stays
     live; the link is navigation metadata (decision C1) and the trade
     runs against its ``inventory_row_id`` regardless.
+
+    v3.31.0 — multi-showcase: ownership is resolved by joining the
+    item's Showcase rather than assuming a single per-user Showcase.
     """
-    showcase = get_or_create_showcase(session, user_id)
-    item = (
-        session.query(ShowcaseItem)
-        .filter(
-            ShowcaseItem.id == showcase_item_id,
-            ShowcaseItem.showcase_id == showcase.id,
-        )
-        .first()
-    )
+    item = _get_owned_showcase_item(session, user_id, showcase_item_id)
     if item is None:
         return False
     # v3.29.2 — NULL TradeItem.showcase_item_id for any trade-item
@@ -287,16 +421,22 @@ def remove_showcase_item(
 def create_share(
     session: Session,
     user_id: int,
+    showcase_id: int,
     playgroup_id: int,
 ) -> Share | None:
-    """Share the user's Showcase with one playgroup. Idempotent.
+    """Share one of the user's Showcases with one playgroup. Idempotent.
 
-    The user must be a member of the playgroup (PlaygroupMember check);
-    rejected silently otherwise (returns None). The
-    ``UNIQUE(showcase_id, playgroup_id)`` index makes a duplicate Share
-    INSERT IntegrityError; the service catches it and returns the
+    v3.31.0 — multi-showcase: ``showcase_id`` selects which Showcase to
+    expose; it must be owned by ``user_id`` (rejected silently → None
+    otherwise). The user must also be a member of the playgroup
+    (PlaygroupMember check); rejected silently otherwise (returns None).
+    The ``UNIQUE(showcase_id, playgroup_id)`` index makes a duplicate
+    Share INSERT IntegrityError; the service catches it and returns the
     existing Share row.
     """
+    showcase = get_showcase(session, user_id, showcase_id)
+    if showcase is None:
+        return None
     is_member = (
         session.query(PlaygroupMember.id)
         .filter(
@@ -307,7 +447,6 @@ def create_share(
     )
     if is_member is None:
         return None
-    showcase = get_or_create_showcase(session, user_id)
     existing = (
         session.query(Share)
         .filter(
@@ -356,11 +495,16 @@ def revoke_share(session: Session, user_id: int, share_id: int) -> bool:
 
 
 def list_my_shares(session: Session, user_id: int) -> list[dict]:
-    """Shares the user has created. Includes the joined Playgroup."""
+    """Shares the user has created. Includes the joined Playgroup + Showcase.
+
+    v3.31.0 — multi-showcase: the Showcase is joined in so the "my
+    shares" table can name WHICH Showcase each share exposes (a user
+    may now share several different ones).
+    """
     rows = (
         session.query(Share)
         .filter(Share.user_id == user_id)
-        .options(joinedload(Share.playgroup))
+        .options(joinedload(Share.playgroup), joinedload(Share.showcase))
         .order_by(Share.created_at.desc())
         .all()
     )
@@ -368,6 +512,7 @@ def list_my_shares(session: Session, user_id: int) -> list[dict]:
         {
             "share": s,
             "playgroup": s.playgroup,
+            "showcase": s.showcase,
         }
         for s in rows
     ]
@@ -461,12 +606,17 @@ def get_share_view(
         # Defensive — Share should always carry a Showcase.
         return None
     display_items = build_share_display_items(session, showcase)
+    # v3.31.0 — surface the curated list's headline total value. Sum of
+    # the per-item finish-aware ``total_value`` already computed in the
+    # sanitized projection (price × displayed-available).
+    total_value = sum(it["total_value"] for it in display_items)
     return {
         "share": share,
         "showcase": showcase,
         "sharer": share.user,
         "playgroup": share.playgroup,
         "items": display_items,
+        "total_value": total_value,
     }
 
 
@@ -620,11 +770,15 @@ __all__ = [
     "add_showcase_item",
     "build_share_display_items",
     "create_share",
+    "create_showcase",
+    "delete_showcase",
     "get_or_create_showcase",
     "get_share_view",
+    "get_showcase",
     "get_showcase_with_items",
     "list_my_shares",
     "list_shares_for_playgroup",
+    "list_showcases",
     "remove_showcase_item",
     "revoke_share",
     "update_quantity_offered",

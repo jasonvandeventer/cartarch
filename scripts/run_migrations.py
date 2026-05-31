@@ -90,6 +90,9 @@ from scripts.migrate_v3_29_2_pairwise_trading import (
 from scripts.migrate_v3_30_11_card_produced_tokens import (
     main as migrate_v3_30_11_card_produced_tokens,
 )
+from scripts.migrate_v3_31_0_multi_showcase import (
+    main as migrate_v3_31_0_multi_showcase,
+)
 
 
 def _is_applied(name: str) -> bool:
@@ -442,6 +445,13 @@ def run():
         _mark_applied("v3_30_11_card_produced_tokens")
     else:
         print("v3.30.11 card_produced_tokens already applied, skipping")
+
+    if not _is_applied("v3_31_0_multi_showcase"):
+        print("Running v3.31.0 multi-showcase migration...")
+        migrate_v3_31_0_multi_showcase()
+        _mark_applied("v3_31_0_multi_showcase")
+    else:
+        print("v3.31.0 multi_showcase already applied, skipping")
 
     print("Migration runner complete")
 

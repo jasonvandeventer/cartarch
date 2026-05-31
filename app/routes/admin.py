@@ -216,23 +216,24 @@ def delete_user(
     #   1. Drop Share rows OWNED by this user (Share.user_id). These
     #      are the user's acts of exposing their Showcase to other
     #      playgroups; they go away with the account.
-    #   2. Drop the user's Showcase via ORM ``session.delete`` (NOT a
-    #      bulk DELETE) so the ``cascade="all, delete-orphan"`` on
+    #   2. Drop ALL the user's Showcases via ORM ``session.delete`` (NOT
+    #      a bulk DELETE) so the ``cascade="all, delete-orphan"`` on
     #      Showcase.items takes the ShowcaseItem rows with it. A bulk
     #      ``query.delete()`` is DB-level only and would orphan the
     #      ShowcaseItem rows. Done BEFORE the InventoryRow DELETE so
     #      ShowcaseItem cascade resolves while the FK targets still
     #      exist (defense in depth; PRAGMA foreign_keys is OFF
     #      project-wide, but cleaner not to rely on that).
+    #      v3.31.0 — multi-showcase: iterate every Showcase the user
+    #      owns (was a single .first() under the one-per-user cap).
     # Note: handle_user_deletion (above) already deletes Share rows
     # targeting solo-owned playgroups that get auto-deleted. Other
     # users' Shares targeting playgroups the deleted user owned and
     # transferred stay — the new owner keeps that audience.
     session.query(Share).filter(Share.user_id == user_id).delete(synchronize_session=False)
-    user_showcase = session.query(Showcase).filter(Showcase.user_id == user_id).first()
-    if user_showcase is not None:
+    for user_showcase in session.query(Showcase).filter(Showcase.user_id == user_id).all():
         session.delete(user_showcase)
-        session.flush()
+    session.flush()
 
     # Cascade in FK-safe order
     session.query(TransactionLog).filter(TransactionLog.user_id == user_id).delete()
