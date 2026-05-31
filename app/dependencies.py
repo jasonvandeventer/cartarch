@@ -261,12 +261,23 @@ def render(
     }
     if ctx:
         context.update(ctx)
-    return templates.TemplateResponse(
+    response = templates.TemplateResponse(
         request=request,
         name=template,
         context=context,
         status_code=status_code,
     )
+    # v3.31.0 — dynamic, per-user HTML must never be served from the browser
+    # cache. Without this, navigating to a URL the browser has already seen
+    # (e.g. re-applying a Collection color filter whose query string matches
+    # an earlier visit) renders a STALE cached page instead of the fresh
+    # server response — surfaced as "the color filter doesn't refresh after I
+    # deselect a pip" even though the URL and server result were correct.
+    # Static assets keep their own caching (StaticFiles + the ?v= mtime
+    # buster); JSON/redirect responses don't go through render() and are
+    # unaffected.
+    response.headers["Cache-Control"] = "no-store"
+    return response
 
 
 def get_db_session() -> Generator[Session, None, None]:
