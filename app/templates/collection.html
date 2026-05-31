@@ -209,7 +209,7 @@
             <div class="collection-facet-label">Color identity</div>
             <div class="collection-facet-pips">
               {% for letter in ['W', 'U', 'B', 'R', 'G', 'C'] %}
-                <label class="collection-facet-pip {% if letter in facet_colors_set %}collection-facet-pip-on{% endif %}">
+                <label class="collection-facet-pip">
                   <input type="checkbox" name="colors" value="{{ letter }}"
                          {% if letter in facet_colors_set %}checked{% endif %}>
                   {% if letter == 'C' %}

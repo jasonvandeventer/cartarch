@@ -10748,17 +10748,18 @@ table.dmtx .dmtx-rowhead {
   font-weight: 700;
   font-size: 10px;
 }
-.collection-facet-pip-on,
-/* v3.31.0 — instant client-side feedback. The `-on` class is only
-   applied server-side on reload, so before this rule a clicked pip
-   gave no visible signal that its (CSS-hidden) checkbox had toggled —
-   users re-clicked it back off and ended up filtering nothing. `:has`
-   mirrors the active styling the moment the checkbox state flips. */
+/* v3.31.0 — the pip's active styling is driven ENTIRELY by its checkbox
+   state via :has(input:checked). The server renders `checked` for active
+   colors, so the initial (post-Apply) state highlights correctly, and
+   toggling updates live in both directions. An earlier cut also kept a
+   server-rendered `collection-facet-pip-on` class, but that class stuck
+   after a reload — unchecking a previously-applied pip left the highlight
+   on ("deselects invisibly"). Sourcing the highlight only from the live
+   checkbox state removes that stale-class bug. */
 .collection-facet-pip:has(input:checked) {
   border-color: var(--brand-gold);
   background: var(--brand-gold-soft);
 }
-.collection-facet-pip-on .collection-facet-pip-c,
 .collection-facet-pip:has(input:checked) .collection-facet-pip-c {
   color: var(--brand-gold);
   background: var(--bg);
