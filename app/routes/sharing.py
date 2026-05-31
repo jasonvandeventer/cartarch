@@ -362,5 +362,6 @@ def shares_view(
             "sharer": view["sharer"],
             "playgroup": view["playgroup"],
             "items": view["items"],
+            "total_value": view["total_value"],
         },
     )

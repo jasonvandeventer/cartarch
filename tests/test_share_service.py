@@ -28,6 +28,7 @@ import sys
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
 
 from app import share_service
 from app.db import Base
@@ -38,6 +39,7 @@ from app.models import (
     PlaygroupMember,
     Share,
     ShowcaseItem,
+    User,
 )
 
 # Monotonic counter for unique scryfall_ids. An earlier cut used
@@ -347,6 +349,77 @@ def test_bulk_add_rows() -> int:
     return failed
 
 
+def test_share_view_renders_through_route() -> int:
+    """Regression: GET /shares/{id} must actually render.
+
+    A prod 500 (`UndefinedError: 'total_value'`) shipped in v3.31.0 because
+    the value-totals feature updated `get_share_view` (service) + the
+    template but NOT the `shares_view` route's render context — service-only
+    tests didn't catch it. This exercises the full route → template path.
+
+    Uses one shared in-memory DB (StaticPool — otherwise each SQLite
+    connection gets its own empty in-memory DB) + dependency overrides so
+    the route reads the fixtures we commit here, not the dev DB.
+    """
+    from fastapi.testclient import TestClient
+
+    from app import main
+    from app.dependencies import get_current_user, get_db_session
+
+    failed = 0
+    engine = create_engine(
+        "sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool
+    )
+    Base.metadata.create_all(engine)
+    sm = sessionmaker(bind=engine, expire_on_commit=False)
+    s = sm()
+    user = User(username="viewer", password_hash="x")
+    s.add(user)
+    s.flush()
+    sc = share_service.create_showcase(s, user.id, "SC", None)
+    card = Card(scryfall_id="sv-1", name="C", set_code="T", collector_number="1", price_usd="2.00")
+    s.add(card)
+    s.flush()
+    inv = InventoryRow(
+        card_id=card.id, user_id=user.id, quantity=1, finish="normal", is_pending=False
+    )
+    s.add(inv)
+    s.flush()
+    s.add(ShowcaseItem(showcase_id=sc.id, inventory_row_id=inv.id, quantity_offered=1))
+    pg = Playgroup(name="PG", created_by=user.id, join_code="JOINX")
+    s.add(pg)
+    s.flush()
+    share = Share(user_id=user.id, showcase_id=sc.id, playgroup_id=pg.id)
+    s.add(share)
+    s.commit()
+    share_id = share.id
+
+    def _override_db():
+        db = sm()
+        try:
+            yield db
+        finally:
+            db.close()
+
+    main.app.dependency_overrides[get_db_session] = _override_db
+    main.app.dependency_overrides[get_current_user] = lambda: user
+    try:
+        c = TestClient(main.app)
+        r = c.get(f"/shares/{share_id}")
+        if r.status_code != 200:
+            print(f"  [FAIL] /shares/{share_id} -> {r.status_code} (expected 200)")
+            failed += 1
+        elif "total value" not in r.text:
+            print("  [FAIL] share view rendered but 'total value' missing")
+            failed += 1
+        else:
+            print("  [OK] /shares/{id} renders through the route with total value")
+    finally:
+        main.app.dependency_overrides.pop(get_db_session, None)
+        main.app.dependency_overrides.pop(get_current_user, None)
+    return failed
+
+
 def main() -> None:
     tests = [
         ("Multiple showcases per user", test_multiple_showcases_per_user),
@@ -356,6 +429,7 @@ def main() -> None:
         ("Total value", test_total_value),
         ("Bulk add rows", test_bulk_add_rows),
         ("Delete cascades items + shares", test_delete_cascades_items_and_shares),
+        ("Share view renders through route", test_share_view_renders_through_route),
     ]
     total_failed = 0
     for title, fn in tests:
