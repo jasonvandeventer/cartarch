@@ -320,30 +320,36 @@ def list_games(session: Session, user_id: int) -> list[Game]:
     return games
 
 
-def reassign_seat_user(
+def update_seat(
     session: Session,
     game_id: int,
     seat_id: int,
     owner_user_id: int,
-    target_user_id: int | None,
+    player_name: str | None = None,
+    target_user_id: int | None = None,
 ) -> bool | None:
-    """Owner-only: attribute (or clear) a seat's user, re-snapshotting the name.
+    """Owner-only: edit a seat's display name and/or its attributed user.
 
-    The retroactive correction for name-only seats (e.g. a Draft game whose
-    seats were recorded as free-text ``player_name`` only). Only the game
-    OWNER may call this — ``Game.user_id == owner_user_id`` — matching the
-    edit-rights model where participants get read-only access.
+    The retroactive correction surface for a recorded game (e.g. a Draft pod
+    whose seats were captured as free-text ``player_name`` only, or a typo /
+    placeholder like "Player 2"). Only the game OWNER may call this —
+    ``Game.user_id == owner_user_id`` — matching the edit-rights model where
+    participants get read-only access. Works on finalized games too (no
+    ``status`` gate); seat metadata is corrigible after the result is recorded.
 
-    ``target_user_id`` of ``None`` (or 0) clears the attribution: both
-    ``user_id`` and ``user_name_at_game`` reset to NULL, leaving the free-text
-    ``player_name`` as the seat's display. A real user id sets the live FK and
-    re-snapshots ``user_name_at_game`` via :func:`_capture_user_attribution`
-    (same cross-user-permissive, non-blocking validation as game creation — an
+    ``player_name``: a non-empty trimmed value renames the seat; ``None`` or
+    blank leaves the existing name untouched (the column is NOT NULL, so a
+    blank submission is a no-op rather than a wipe).
+
+    ``target_user_id``: ``None`` / ``0`` clears the attribution (``user_id`` +
+    ``user_name_at_game`` → NULL, leaving the free-text name as the display); a
+    real id sets the live FK and re-snapshots ``user_name_at_game`` via
+    :func:`_capture_user_attribution` (cross-user-permissive, non-blocking — an
     unknown id resolves to a cleared attribution rather than erroring).
 
     Returns ``True`` on success, ``False`` if the game isn't owned by
-    ``owner_user_id``, ``None`` if the seat isn't on that game (route maps
-    both misses to 404).
+    ``owner_user_id``, ``None`` if the seat isn't on that game (route maps both
+    misses to 404).
     """
     game = session.query(Game).filter(Game.id == game_id, Game.user_id == owner_user_id).first()
     if not game:
@@ -351,6 +357,10 @@ def reassign_seat_user(
     seat = next((s for s in game.seats if s.id == seat_id), None)
     if seat is None:
         return None
+    if player_name is not None:
+        cleaned = player_name.strip()
+        if cleaned:
+            seat.player_name = cleaned
     resolved_id, resolved_name = _capture_user_attribution(session, target_user_id)
     seat.user_id = resolved_id
     seat.user_name_at_game = resolved_name

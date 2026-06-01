@@ -99,10 +99,10 @@ from app.game_service import (
     get_viewable_game,
     list_games,
     normalize_game_format,
-    reassign_seat_user,
     set_game_playgroup,
     toggle_seat_art_background,
     update_game_notes,
+    update_seat,
 )
 from app.import_service import (
     _distinct_locations_from_rows,
@@ -5907,30 +5907,39 @@ def game_seat_art_toggle(
     return RedirectResponse(url=f"/games/{game_id}", status_code=303)
 
 
-@app.post("/games/{game_id}/seats/{seat_id}/assign-user")
-def game_seat_assign_user(
+@app.post("/games/{game_id}/seats/{seat_id}")
+def game_seat_edit(
     request: Request,
     game_id: int,
     seat_id: int,
+    player_name: str = Form(""),
     user_id: str = Form(""),
     session: Session = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
     _: None = CsrfRequired,
 ):
-    """Owner-only: retroactively attribute (or clear) a seat's user (v3.32.0).
+    """Owner-only: edit a seat's display name and/or attributed user (v3.32.1).
 
-    Fixes name-only seats — e.g. a Draft game recorded with free-text player
-    names but no linked accounts. Empty / ``0`` / invalid ``user_id`` clears
-    the attribution (back to name-only). Ownership + seat membership enforced
-    in :func:`reassign_seat_user`; either miss → 404. Once a seat is attributed
-    to a user, that user can view the game (hybrid visibility).
+    The retroactive correction surface for a recorded game — rename a seat
+    (fix a typo, turn "Player 2" into a real name) and/or link it to a user
+    account (which lets that user view the game; empty/invalid ``user_id``
+    clears the attribution back to name-only). A blank ``player_name`` leaves
+    the existing name untouched. Ownership + seat membership enforced in
+    :func:`update_seat`; either miss → 404. Works on finalized games.
     """
     uid_raw = user_id.strip()
     try:
         target_user_id = int(uid_raw) if uid_raw else None
     except ValueError:
         target_user_id = None
-    result = reassign_seat_user(session, game_id, seat_id, current_user.id, target_user_id)
+    result = update_seat(
+        session,
+        game_id,
+        seat_id,
+        current_user.id,
+        player_name=player_name,
+        target_user_id=target_user_id,
+    )
     if result is None or result is False:
         raise HTTPException(status_code=404, detail="Game or seat not found")
     return RedirectResponse(url=f"/games/{game_id}", status_code=303)

@@ -9,11 +9,11 @@ Covers the v3.32.0 changes:
   - hybrid read visibility: owner, seat-attributed players, and members of a
     linked playgroup may VIEW a game; unrelated users may not
   - list_games returns the hybrid set + a transient is_owned_by_viewer flag
-  - owner-only retroactive seat→user attribution (reassign_seat_user)
+  - owner-only retroactive seat edit — rename + attribute/clear (update_seat)
   - owner-only playgroup link, gated on the owner's own membership
     (set_game_playgroup)
   - route layer: participants get a read-only 200, strangers 404; owner-only
-    mutations (seat-assign, playgroup-set) 404 for non-owners
+    mutations (seat-edit, playgroup-set) 404 for non-owners
 """
 
 from __future__ import annotations
@@ -159,45 +159,70 @@ def test_list_games_hybrid_and_flag() -> int:
 
 
 def test_reassign_seat_user_owner_only() -> int:
-    """Owner attributes/clears a seat; non-owner is rejected; unknown clears."""
+    """Owner renames/attributes/clears a seat; non-owner rejected; unknown clears."""
     failed = 0
     s = _fresh_session()
     owner = _make_user(s, "owner")
     alex = _make_user(s, "alex", display_name="Alex")
     other = _make_user(s, "other")
-    game = _make_game(s, owner, [{"player_name": "Alex"}, {"player_name": "Bob"}])
+    game = _make_game(s, owner, [{"player_name": "Player 1"}, {"player_name": "Bob"}])
     seat1 = game.seats[0]
 
-    # Non-owner cannot reassign.
-    if game_service.reassign_seat_user(s, game.id, seat1.id, other.id, alex.id) is not False:
-        print("  [FAIL] non-owner reassigned a seat")
+    # Non-owner cannot edit.
+    if (
+        game_service.update_seat(s, game.id, seat1.id, other.id, target_user_id=alex.id)
+        is not False
+    ):
+        print("  [FAIL] non-owner edited a seat")
         failed += 1
     else:
-        print("  [OK] non-owner reassign rejected")
+        print("  [OK] non-owner edit rejected")
 
-    # Owner attributes seat 1 to Alex → live FK + name snapshot.
-    ok = game_service.reassign_seat_user(s, game.id, seat1.id, owner.id, alex.id)
+    # Owner renames seat 1 AND attributes it to Alex in one call.
+    ok = game_service.update_seat(
+        s, game.id, seat1.id, owner.id, player_name="  Alexander  ", target_user_id=alex.id
+    )
     s.refresh(seat1)
-    if ok is not True or seat1.user_id != alex.id or seat1.user_name_at_game != "Alex":
+    if (
+        ok is not True
+        or seat1.player_name != "Alexander"
+        or seat1.user_id != alex.id
+        or seat1.user_name_at_game != "Alex"
+    ):
         print(
-            f"  [FAIL] owner attribution wrong: ok={ok} uid={seat1.user_id} "
-            f"name={seat1.user_name_at_game!r}"
+            f"  [FAIL] rename+attribution wrong: ok={ok} name={seat1.player_name!r} "
+            f"uid={seat1.user_id} snap={seat1.user_name_at_game!r}"
         )
         failed += 1
     else:
-        print("  [OK] owner attributes seat (FK + snapshot)")
+        print("  [OK] owner renames (trimmed) + attributes seat")
 
-    # Clearing (None) resets both columns.
-    game_service.reassign_seat_user(s, game.id, seat1.id, owner.id, None)
+    # Blank player_name leaves the existing name untouched (NOT NULL column).
+    game_service.update_seat(
+        s, game.id, seat1.id, owner.id, player_name="   ", target_user_id=alex.id
+    )
     s.refresh(seat1)
-    if seat1.user_id is not None or seat1.user_name_at_game is not None:
-        print("  [FAIL] clear didn't reset attribution")
+    if seat1.player_name != "Alexander":
+        print(f"  [FAIL] blank name overwrote existing: {seat1.player_name!r}")
         failed += 1
     else:
-        print("  [OK] clear resets attribution")
+        print("  [OK] blank name is a no-op")
+
+    # Clearing attribution (None) resets both attribution columns; name stays.
+    game_service.update_seat(s, game.id, seat1.id, owner.id, target_user_id=None)
+    s.refresh(seat1)
+    if (
+        seat1.user_id is not None
+        or seat1.user_name_at_game is not None
+        or seat1.player_name != "Alexander"
+    ):
+        print("  [FAIL] clear didn't reset attribution / clobbered name")
+        failed += 1
+    else:
+        print("  [OK] clear resets attribution, keeps name")
 
     # Unknown user id resolves to cleared (non-blocking), not an error.
-    game_service.reassign_seat_user(s, game.id, seat1.id, owner.id, 99999)
+    game_service.update_seat(s, game.id, seat1.id, owner.id, target_user_id=99999)
     s.refresh(seat1)
     if seat1.user_id is not None:
         print("  [FAIL] unknown id did not resolve to cleared")
@@ -206,7 +231,7 @@ def test_reassign_seat_user_owner_only() -> int:
         print("  [OK] unknown id resolves to cleared (non-blocking)")
 
     # Seat not on this game → None.
-    if game_service.reassign_seat_user(s, game.id, 99999, owner.id, alex.id) is not None:
+    if game_service.update_seat(s, game.id, 99999, owner.id, target_user_id=alex.id) is not None:
         print("  [FAIL] missing seat did not return None")
         failed += 1
     else:
@@ -329,14 +354,14 @@ def test_routes_access_and_owner_only_mutations() -> int:
         # Owner-only mutation routes reject non-owners with 404.
         current["user"] = stranger
         r = c.post(
-            f"/games/{game_id}/seats/{seat1_id}/assign-user",
-            data={"user_id": str(stranger.id)},
+            f"/games/{game_id}/seats/{seat1_id}",
+            data={"player_name": "Hacked", "user_id": str(stranger.id)},
         )
         if r.status_code != 404:
-            print(f"  [FAIL] non-owner seat-assign -> {r.status_code} (expected 404)")
+            print(f"  [FAIL] non-owner seat-edit -> {r.status_code} (expected 404)")
             failed += 1
         else:
-            print("  [OK] non-owner seat-assign 404")
+            print("  [OK] non-owner seat-edit 404")
 
         r = c.post(f"/games/{game_id}/playgroup", data={"playgroup_id": ""})
         if r.status_code != 404:
@@ -355,7 +380,7 @@ def main() -> None:
     tests = [
         ("Hybrid visibility", test_hybrid_visibility),
         ("list_games hybrid + flag", test_list_games_hybrid_and_flag),
-        ("Reassign seat user (owner-only)", test_reassign_seat_user_owner_only),
+        ("Edit seat: rename + attribute (owner-only)", test_reassign_seat_user_owner_only),
         ("Set game playgroup (owner + member)", test_set_game_playgroup),
         ("Routes: access + owner-only mutations", test_routes_access_and_owner_only_mutations),
     ]
