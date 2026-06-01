@@ -1,5 +1,15 @@
 [
   {
+    "version": "3.32.4",
+    "date": "2026-06-01",
+    "added": [
+      "Add a single card to a location without the import funnel: open a location, click \"+ Quick add,\" search a card, pick the printing, set finish/quantity/language/proxy/notes, and Save & Add More to keep going or Save & Close when you're done. The card and the location's totals update on the spot."
+    ],
+    "refined": [],
+    "resolved": [],
+    "archivist_note": "Until now, filing a single card you'd just picked up meant a trip through the whole import machinery — fine for a boxful, absurd for one. A location could hold cards, move them, and delete them, but it had no way to simply take a new one in. This release gives every location an open door: a quick-add panel that searches printings as you type, lets you set the handful of details we track, and offers a choice between settling in for a stack (\"Save & Add More,\" which keeps your finish and quantity and location ready for the next) or filing just the one and closing up. We kept it to the fields the archive actually records — no pretend price-and-condition ledger — and the grid and its running totals refresh the moment a card lands."
+  },
+  {
     "version": "3.32.3",
     "date": "2026-06-01",
     "added": [],

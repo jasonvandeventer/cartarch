@@ -1,0 +1,40 @@
+{% from "_macros.html" import inventory_card %}
+{# v3.32.x — location card grid, extracted so the quick-add modal can refresh
+   it (and the hero stats) via HTMX without a full page reload. On the full
+   page render `oob_stats` is falsy and the hero renders its own stats; in the
+   HTMX add response `oob_stats` is true so this out-of-band block updates the
+   hero stat cards in the same swap. #}
+{% if oob_stats %}
+  <div id="location-stats" hx-swap-oob="true" class="stat-grid collection-stats-grid">
+    <div class="stat-card compact">
+      <div class="stat-label">Total value</div>
+      <div class="stat-number">${{ '%.2f'|format(total_value) }}</div>
+    </div>
+    <div class="stat-card compact">
+      <div class="stat-label">Cards</div>
+      <div class="stat-number">{{ total_quantity }}</div>
+    </div>
+    <div class="stat-card compact">
+      <div class="stat-label">Rows</div>
+      <div class="stat-number">{{ items|length }}</div>
+    </div>
+  </div>
+{% endif %}
+{% if items %}
+  <section class="card-grid-section">
+    <div class="inventory-grid">
+      {% for item in items %}
+        {{ inventory_card(item, csrf_token,
+                  show_collection_actions=true,
+                  locations=locations,
+                  decks=decks,
+                  showcases=showcases) }}
+        {% if item.is_pending %}<div class="muted" style="text-align:center;">Pending placement</div>{% endif %}
+      {% endfor %}
+    </div>
+  </section>
+{% else %}
+  <section class="panel">
+    <p>No inventory rows assigned to this location.</p>
+  </section>
+{% endif %}

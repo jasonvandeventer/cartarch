@@ -10,8 +10,8 @@ from sqlalchemy import and_, case, cast, func, not_, or_, select, text, tuple_
 from sqlalchemy.orm import Session, joinedload
 
 from app.audit_service import log_transaction
-from app.import_service import coerce_language_code_strict
-from app.location_service import SORTABLE_SOURCE_MODES
+from app.import_service import coerce_language_code_strict, normalize_finish
+from app.location_service import SORTABLE_SOURCE_MODES, get_location
 from app.models import Card, InventoryRow, ShowcaseItem, StorageLocation, TransactionLog
 from app.pricing import effective_price
 from app.scryfall import card_constructor_kwargs, fetch_card_by_scryfall_id
@@ -460,6 +460,90 @@ def create_or_merge_inventory_row(
     )
     session.add(row)
     session.flush()
+    return row
+
+
+def add_card_to_location(
+    session: Session,
+    *,
+    user_id: int,
+    location_id: int,
+    scryfall_id: str,
+    finish: str = "normal",
+    quantity: int = 1,
+    language: str = "en",
+    is_proxy: bool = False,
+    notes: str | None = None,
+) -> InventoryRow | None:
+    """Quick-add a single card directly into a StorageLocation (v3.32.x).
+
+    The acquisition primitive behind the location quick-add modal. Unlike
+    ``create_or_merge_inventory_row`` (which keys placement on drawer/slot,
+    defaults to pending, and never sets ``storage_location_id``), this places
+    the card AT the location as a non-pending row and merges into an existing
+    matching placed row using the same key the bulk-place path uses:
+    ``(user_id, card_id, finish, coalesce(language,'en'), is_proxy,
+    storage_location_id, is_pending=False)`` — so language / proxy / finish
+    differences create distinct rows rather than silently folding together.
+
+    Ownership-checked: returns ``None`` if the location isn't owned by
+    ``user_id``. Returns ``None`` if the card can't be resolved (unknown
+    scryfall_id). ``get_or_create_card`` does at most ONE Scryfall fetch on
+    cache miss — a single user-driven lookup, not a per-row loop, so the
+    request-path network invariant holds. Commits on success (mirrors the
+    bulk-place path; ``get_db_session`` does not auto-commit).
+    """
+    location = get_location(session, location_id=location_id, user_id=user_id)
+    if location is None:
+        return None
+
+    quantity = max(1, min(int(quantity), 99))
+    finish = normalize_finish(finish)
+    language = (language or "en").strip().lower() or "en"
+    is_proxy = bool(is_proxy)
+    notes = (notes or "").strip() or None
+
+    card = get_or_create_card(session, scryfall_id)
+    if card is None:
+        return None
+
+    now = datetime.utcnow()
+    existing = (
+        session.query(InventoryRow)
+        .filter(
+            InventoryRow.user_id == user_id,
+            InventoryRow.card_id == card.id,
+            InventoryRow.finish == finish,
+            func.coalesce(InventoryRow.language, "en") == language,
+            InventoryRow.is_proxy == is_proxy,
+            InventoryRow.storage_location_id == location.id,
+            InventoryRow.is_pending.is_(False),
+        )
+        .first()
+    )
+    if existing is not None:
+        existing.quantity += quantity
+        existing.updated_at = now
+        if notes:
+            existing.notes = notes
+        session.commit()
+        return existing
+
+    row = InventoryRow(
+        user_id=user_id,
+        card_id=card.id,
+        storage_location_id=location.id,
+        finish=finish,
+        quantity=quantity,
+        language=language,
+        is_proxy=is_proxy,
+        is_pending=False,
+        notes=notes,
+        created_at=now,
+        updated_at=now,
+    )
+    session.add(row)
+    session.commit()
     return row
 
 

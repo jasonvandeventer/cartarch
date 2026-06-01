@@ -117,6 +117,7 @@ from app.import_service import (
 )
 from app.inventory_service import (
     PRICE_STALE_DAYS,
+    add_card_to_location,
     adjust_inventory_row_quantity,
     apply_collection_search_filters,
     bulk_delete_inventory_rows,
@@ -3220,31 +3221,24 @@ def bulk_delete_location_commit(
     return RedirectResponse(f"/locations/{location_id}", status_code=303)
 
 
-@app.get("/locations/{location_id}")
-def location_detail_page(
-    request: Request,
+def _build_location_items(
+    session: Session,
     location_id: int,
+    user_id: int,
+    *,
     search: str = "",
     sort: str = "slot",
     direction: str = "asc",
-    session: Session = Depends(get_db_session),
-    current_user: User = Depends(get_current_user),
-):
-    location = get_location(session, location_id=location_id, user_id=current_user.id)
-    if location is None:
-        raise HTTPException(status_code=404, detail="Location not found")
-
-    if location.type == "deck":
-        deck = session.query(Deck).filter(Deck.storage_location_id == location_id).first()
-        if deck:
-            return RedirectResponse(f"/decks/{deck.id}", status_code=302)
-
+) -> tuple[list[dict], float, int]:
+    """Build the (items, total_value, total_quantity) for a location's card
+    grid. Shared by ``location_detail_page`` and the quick-add route so the
+    full page and the HTMX partial stay byte-identical."""
     loc_query = (
         session.query(InventoryRow)
         .options(joinedload(InventoryRow.card), joinedload(InventoryRow.storage_location))
         .join(Card)
         .filter(
-            InventoryRow.user_id == current_user.id,
+            InventoryRow.user_id == user_id,
             InventoryRow.storage_location_id == location_id,
         )
     )
@@ -3270,13 +3264,11 @@ def location_detail_page(
     items = []
     total_value = 0.0
     total_quantity = 0
-
     for row in rows:
         price = effective_price(row.card, row.finish) or 0.0
         row_total = price * row.quantity
         total_value += row_total
         total_quantity += row.quantity
-
         items.append(
             {
                 "id": row.id,
@@ -3292,6 +3284,31 @@ def location_detail_page(
                 "storage_location_id": row.storage_location_id,
             }
         )
+    return items, total_value, total_quantity
+
+
+@app.get("/locations/{location_id}")
+def location_detail_page(
+    request: Request,
+    location_id: int,
+    search: str = "",
+    sort: str = "slot",
+    direction: str = "asc",
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+):
+    location = get_location(session, location_id=location_id, user_id=current_user.id)
+    if location is None:
+        raise HTTPException(status_code=404, detail="Location not found")
+
+    if location.type == "deck":
+        deck = session.query(Deck).filter(Deck.storage_location_id == location_id).first()
+        if deck:
+            return RedirectResponse(f"/decks/{deck.id}", status_code=302)
+
+    items, total_value, total_quantity = _build_location_items(
+        session, location_id, current_user.id, search=search, sort=sort, direction=direction
+    )
 
     all_locations = list_locations(session, user_id=current_user.id)
     decks = list_decks_basic(session, user_id=current_user.id)
@@ -3319,6 +3336,76 @@ def location_detail_page(
             "showcases": showcases,
         },
     )
+
+
+@app.post("/locations/{location_id}/add-card")
+def location_add_card(
+    request: Request,
+    location_id: int,
+    scryfall_id: str = Form(...),
+    finish: str = Form("normal"),
+    quantity: int = Form(1),
+    language: str = Form("en"),
+    is_proxy: bool = Form(False),
+    notes: str = Form(""),
+    dest_location_id: int | None = Form(None),
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+    _: None = CsrfRequired,
+):
+    """Quick-add a single card into a StorageLocation (v3.32.x).
+
+    Acquisition flow — places the card directly at the destination (does NOT
+    run the deck "move-if-owned" reconciliation that ``/decks/{id}/add-card``
+    does). The optional ``dest_location_id`` lets the modal target a different
+    location than the page it was opened on; defaults to ``location_id``.
+    """
+    if not scryfall_id.strip():
+        raise HTTPException(status_code=400, detail="No card selected")
+
+    target_id = dest_location_id or location_id
+    row = add_card_to_location(
+        session,
+        user_id=current_user.id,
+        location_id=target_id,
+        scryfall_id=scryfall_id.strip(),
+        finish=finish,
+        quantity=quantity,
+        language=language,
+        is_proxy=is_proxy,
+        notes=notes,
+    )
+    if row is None:
+        # Foreign/unknown location, or the card couldn't be resolved.
+        raise HTTPException(status_code=404, detail="Could not add card")
+
+    # The grid the modal lives on is for ``location_id``; render that list.
+    if request.headers.get("HX-Request"):
+        items, total_value, total_quantity = _build_location_items(
+            session, location_id, current_user.id
+        )
+        location = get_location(session, location_id=location_id, user_id=current_user.id)
+        from app import share_service
+
+        response = render(
+            request,
+            "_location_card_list.html",
+            {
+                "location": location,
+                "items": items,
+                "total_value": total_value,
+                "total_quantity": total_quantity,
+                "current_user": current_user,
+                "locations": list_locations(session, user_id=current_user.id),
+                "decks": list_decks_basic(session, user_id=current_user.id),
+                "showcases": share_service.list_showcases(session, current_user.id),
+                "oob_stats": True,
+            },
+        )
+        response.headers["HX-Push-Url"] = f"/locations/{location_id}"
+        return response
+
+    return RedirectResponse(url=f"/locations/{location_id}", status_code=303)
 
 
 @app.get("/locations/{location_id}/export")

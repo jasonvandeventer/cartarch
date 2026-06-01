@@ -12,6 +12,9 @@
         </p>
       </div>
       <div style="display:flex;gap:0.5rem;flex-wrap:wrap">
+        {% if location.type != "deck" %}
+          <button type="button" class="btn-like" onclick="toggleQuickAddModal()">+ Quick add</button>
+        {% endif %}
         <a href="/locations/{{ location.id }}/export">
           <button type="button">Export CSV</button>
         </a>
@@ -20,7 +23,7 @@
         </a>
       </div>
     </div>
-    <div class="stat-grid collection-stats-grid">
+    <div id="location-stats" class="stat-grid collection-stats-grid">
       <div class="stat-card compact">
         <div class="stat-label">Total value</div>
         <div class="stat-number">${{ '%.2f'|format(total_value) }}</div>
@@ -156,22 +159,26 @@
       </details>
     </section>
   {% endif %}
-  {% if items %}
-    <section class="card-grid-section">
-      <div class="inventory-grid">
-        {% for item in items %}
-          {{ inventory_card(item, csrf_token,
-                    show_collection_actions=true,
-                    locations=locations,
-                    decks=decks,
-                    showcases=showcases) }}
-          {% if item.is_pending %}<div class="muted" style="text-align:center;">Pending placement</div>{% endif %}
-        {% endfor %}
-      </div>
-    </section>
-  {% else %}
-    <section class="panel">
-      <p>No inventory rows assigned to this location.</p>
-    </section>
+  <div id="location-card-list">
+    {% include "_location_card_list.html" %}
+  </div>
+  {% if location.type != "deck" %}
+    {% include "_quick_add_modal.html" %}
+  {% endif %}
+{% endblock %}
+{% block extra_scripts %}
+  {% if location.type != "deck" %}
+    <script>
+      function toggleQuickAddModal() {
+        var m = document.getElementById("quick-add-modal");
+        if (!m) return;
+        var opening = m.style.display !== "flex";
+        m.style.display = opening ? "flex" : "none";
+        if (opening) {
+          var input = document.getElementById("loc-add-search");
+          if (input) input.focus();
+        }
+      }
+    </script>
   {% endif %}
 {% endblock %}

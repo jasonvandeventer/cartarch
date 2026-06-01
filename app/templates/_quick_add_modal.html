@@ -1,0 +1,187 @@
+{# v3.32.x — single-card quick-add modal for a StorageLocation. Reuses the
+   .end-game-modal/.end-game-inner shell + the deck "Add card" autocomplete
+   pattern. Acquisition flow: search → pick a printing → set finish / qty /
+   language / proxy / notes → Save & Add More (stays open) or Save & Close.
+   Posts to /locations/{id}/add-card, which swaps #location-card-list (+ an
+   out-of-band hero-stats refresh) without a full page reload. #}
+{% set quickadd_locations = locations | selectattr("type", "ne", "root") | selectattr("type", "ne", "deck") | list %}
+<div id="quick-add-modal" class="end-game-modal" style="display:none">
+  <div class="end-game-inner">
+    <h3 style="margin:0 0 0.75rem">Quick add a card</h3>
+    <form id="loc-add-card-form"
+          method="post"
+          action="/locations/{{ location.id }}/add-card"
+          hx-post="/locations/{{ location.id }}/add-card"
+          hx-target="#location-card-list"
+          hx-swap="innerHTML">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <input type="hidden" id="loc-add-scryfall-id" name="scryfall_id" value="">
+      <label for="loc-add-search" class="add-card-label">Card name</label>
+      <input type="text"
+             id="loc-add-search"
+             placeholder="e.g. Sol Ring"
+             autocomplete="off"
+             data-mobile-placeholder="Card name…">
+      <div id="loc-add-results" class="add-card-results" role="listbox" aria-live="polite"></div>
+      <div id="loc-add-preview" class="muted small-text" style="margin:0.3rem 0"></div>
+
+      <div class="add-card-finish-row" style="margin-top:0.5rem">
+        <label class="add-card-finish-label">
+          <input type="radio" name="finish" value="normal" checked> Nonfoil
+        </label>
+        <label class="add-card-finish-label">
+          <input type="radio" name="finish" value="foil"> Foil
+        </label>
+        <label class="add-card-finish-label">
+          <input type="radio" name="finish" value="etched"> Etched
+        </label>
+      </div>
+
+      <div class="stack-form" style="margin-top:0.5rem">
+        <label for="loc-add-qty">Quantity</label>
+        <input type="number" id="loc-add-qty" name="quantity" value="1" min="1" max="99" inputmode="numeric">
+
+        <label for="loc-add-language">Language</label>
+        <input type="text" id="loc-add-language" name="language" value="en" maxlength="8">
+
+        <label for="loc-add-dest">Location</label>
+        <select id="loc-add-dest" name="dest_location_id">
+          {% for loc in quickadd_locations %}
+            <option value="{{ loc.id }}" {% if loc.id == location.id %}selected{% endif %}>{{ loc.name }} ({{ loc.type }})</option>
+          {% endfor %}
+        </select>
+
+        <label for="loc-add-notes">Notes (optional)</label>
+        <input type="text" id="loc-add-notes" name="notes" maxlength="255" placeholder="e.g. signed, condition…">
+
+        <label class="add-card-finish-label" style="margin-top:0.25rem">
+          <input type="checkbox" id="loc-add-proxy" name="is_proxy" value="true"> This is a proxy
+        </label>
+      </div>
+
+      <div class="add-card-actions" style="margin-top:0.75rem;display:flex;gap:0.5rem;flex-wrap:wrap;align-items:center">
+        <button type="submit" id="loc-add-more" class="btn-like" disabled
+                onclick="document.getElementById('loc-add-card-form').dataset.intent='addmore'">Save &amp; Add More</button>
+        <button type="submit" id="loc-add-close" class="btn-like" disabled
+                onclick="document.getElementById('loc-add-card-form').dataset.intent='close'">Save &amp; Close</button>
+        <button type="button" class="btn-like" onclick="toggleQuickAddModal()">Cancel</button>
+        <span id="loc-add-status" class="muted small-text" aria-live="polite"></span>
+      </div>
+    </form>
+  </div>
+</div>
+<script>
+  // Quick-add autocomplete + submit gate (adapted from the deck "Add card"
+  // panel). Picking a printing fills the hidden scryfall_id + a preview and
+  // enables both Save buttons. After a successful HTMX add: clear the search
+  // (keep finish/qty/language/location for the next card), then close the
+  // modal for "Save & Close" or refocus the search for "Save & Add More".
+  (function () {
+    var form = document.getElementById('loc-add-card-form');
+    if (!form) return;
+    var nameInput = document.getElementById('loc-add-search');
+    var hiddenId = document.getElementById('loc-add-scryfall-id');
+    var resultsEl = document.getElementById('loc-add-results');
+    var previewEl = document.getElementById('loc-add-preview');
+    var statusEl = document.getElementById('loc-add-status');
+    var btnMore = document.getElementById('loc-add-more');
+    var btnClose = document.getElementById('loc-add-close');
+    var acTimer = null;
+    var lastQuery = '';
+
+    function setEnabled(on) {
+      btnMore.disabled = !on;
+      btnClose.disabled = !on;
+    }
+
+    function resetSelection() {
+      hiddenId.value = '';
+      previewEl.textContent = '';
+      setEnabled(false);
+      form.dataset.selectedPrinting = '';
+    }
+
+    function selectPrinting(card) {
+      hiddenId.value = card.scryfall_id || '';
+      nameInput.value =
+        card.name + ' (' + (card.set_code || '').toUpperCase() +
+        ' #' + (card.collector_number || '') + ')';
+      var img = card.image_uri_small
+        ? '<img src="' + card.image_uri_small + '" alt="" loading="lazy" style="height:48px;border-radius:4px;vertical-align:middle;margin-right:0.4rem">'
+        : '';
+      previewEl.innerHTML = img + '<span>' + (card.name || '') + ' · ' +
+        (card.set_name || '') + '</span>';
+      setEnabled(!!hiddenId.value);
+      form.dataset.selectedPrinting = '1';
+      resultsEl.innerHTML = '';
+      statusEl.textContent = '';
+    }
+
+    function renderResults(items) {
+      if (!items || !items.length) {
+        resultsEl.innerHTML = '<p class="muted small-text" style="margin:0.4rem 0 0">No cards matched on Scryfall.</p>';
+        return;
+      }
+      resultsEl.innerHTML = items.map(function (c, i) {
+        var img = c.image_uri_small
+          ? '<img src="' + c.image_uri_small + '" alt="" loading="lazy">'
+          : '<div class="add-card-result-noimg"></div>';
+        var setCode = (c.set_code || '?').toUpperCase();
+        return (
+          '<button type="button" class="add-card-result" data-idx="' + i + '" role="option">' +
+          img +
+          '<div class="add-card-result-meta">' +
+            '<strong>' + (c.name || '') + '</strong>' +
+            '<span class="muted">' + setCode + ' #' + (c.collector_number || '?') +
+              ' · ' + (c.set_name || '') + '</span>' +
+          '</div>' +
+          '</button>'
+        );
+      }).join('');
+      resultsEl.querySelectorAll('.add-card-result').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          selectPrinting(items[parseInt(btn.dataset.idx, 10)]);
+        });
+      });
+    }
+
+    nameInput.addEventListener('input', function () {
+      if (form.dataset.selectedPrinting) resetSelection();
+      var q = nameInput.value.trim();
+      if (q.length < 2) { resultsEl.innerHTML = ''; lastQuery = ''; return; }
+      if (q === lastQuery) return;
+      lastQuery = q;
+      clearTimeout(acTimer);
+      acTimer = setTimeout(function () {
+        statusEl.textContent = 'Searching…';
+        fetch('/decks/api/card-autocomplete?q=' + encodeURIComponent(q))
+          .then(function (r) { return r.ok ? r.json() : []; })
+          .then(function (data) { statusEl.textContent = ''; renderResults(data); })
+          .catch(function () { statusEl.textContent = ''; });
+      }, 200);
+    });
+
+    nameInput.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' && !form.dataset.selectedPrinting) e.preventDefault();
+    });
+
+    form.addEventListener('htmx:afterRequest', function (evt) {
+      if (evt.detail && evt.detail.successful) {
+        // Clear only the card identity; keep finish/qty/language/location.
+        nameInput.value = '';
+        resultsEl.innerHTML = '';
+        lastQuery = '';
+        resetSelection();
+        if (form.dataset.intent === 'close') {
+          toggleQuickAddModal();
+        } else {
+          statusEl.textContent = 'Added.';
+          setTimeout(function () { statusEl.textContent = ''; }, 1500);
+          nameInput.focus();
+        }
+      }
+    });
+
+    resetSelection();
+  })();
+</script>
