@@ -178,6 +178,14 @@
                     <input type="text" name="blurb" value="{{ deck.blurb or '' }}" maxlength="255" placeholder="e.g. Superfriends · counters · proliferate">
                     <label>Notes</label>
                     <textarea name="notes" rows="3">{{ deck.notes or '' }}</textarea>
+                    <label>Variant group <span class="decks-edit-hint">— builds that share physical cards</span></label>
+                    <select name="variant_group_id">
+                      <option value="">— none —</option>
+                      {% for vg in variant_groups %}
+                        <option value="{{ vg.id }}" {% if deck.variant_group_id == vg.id %}selected{% endif %}>{{ vg.name }}</option>
+                      {% endfor %}
+                    </select>
+                    <input type="text" name="new_variant_group_name" maxlength="128" placeholder="…or create a new group by name">
                     <button type="submit" style="margin-top: 0.25rem">Save</button>
                   </form>
                 </div>
@@ -218,6 +226,14 @@
               <input type="text" name="blurb" value="{{ featured.blurb or '' }}" maxlength="255" placeholder="e.g. Superfriends · counters · proliferate">
               <label>Notes</label>
               <textarea name="notes" rows="3">{{ featured.notes or '' }}</textarea>
+              <label>Variant group <span class="decks-edit-hint">— builds that share physical cards</span></label>
+              <select name="variant_group_id">
+                <option value="">— none —</option>
+                {% for vg in variant_groups %}
+                  <option value="{{ vg.id }}" {% if featured.variant_group_id == vg.id %}selected{% endif %}>{{ vg.name }}</option>
+                {% endfor %}
+              </select>
+              <input type="text" name="new_variant_group_name" maxlength="128" placeholder="…or create a new group by name">
               <button type="submit" style="margin-top: 0.25rem">Save</button>
             </form>
           </div>

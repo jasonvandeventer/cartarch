@@ -1,5 +1,15 @@
 [
   {
+    "version": "3.33.0",
+    "date": "2026-06-01",
+    "added": [
+      "Deck variant groups: link two or more builds of the same deck — say an Atraxa v1 and v2 — that share a single physical copy of many cards. Group them on the deck's edit panel, and when you import one build's list the archive treats a card already held by a sibling build as covered, instead of telling you to buy another copy."
+    ],
+    "refined": [],
+    "resolved": [],
+    "archivist_note": "A long-standing awkwardness, finally answered. The archive has always held to one quiet rule — a physical card lives in exactly one place — which serves it well until you're the sort of player who keeps two versions of the same deck and shuffles the shared cards between them depending on what you're in the mood to play. To the archive those looked like two separate wants for a card you only own once, and an import would dutifully insist you were short. Variant groups teach it the truth without bending the rule: the card still lives in one deck, but the group knows the builds are kin, so a card sitting in one is counted as covered for the other. We deliberately kept this to bookkeeping — no phantom shared shelf, no card cloned into two places at once — just the archive finally understanding that two builds can be one collection."
+  },
+  {
     "version": "3.32.4",
     "date": "2026-06-01",
     "added": [

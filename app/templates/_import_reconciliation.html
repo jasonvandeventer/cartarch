@@ -84,6 +84,13 @@
         existing row{{ "" if total_to_merge == 1 else "s" }} rather than
         creating a duplicate.
       {% endif %}
+      {% if total_covered_by_variant and total_covered_by_variant > 0 %}
+        <br>
+        <strong>{{ total_covered_by_variant }}</strong>
+        {{ "card" if total_covered_by_variant == 1 else "cards" }} are already
+        covered by a sibling build in this deck's variant group — no new copy
+        needed.
+      {% endif %}
     </p>
     <details style="margin-top: 0.5rem">
       <summary class="btn-like" style="cursor: pointer; display: inline-block">
@@ -139,35 +146,51 @@
                       {% endfor %}
                     </div>
                   {% endif %}
+                  {% if row.variant_covered_qty and row.variant_covered_qty > 0 %}
+                    <div class="muted small-text">
+                      Covered by variant group: <strong>{{ row.variant_covered_qty }}×</strong>
+                      (shared with a sibling build — no new copy needed)
+                    </div>
+                  {% endif %}
                 </td>
                 <td>
-                  <select name="reconcile_action" class="reconcile-action-select">
-                    {% set action = row.recommended_action %}
-                    {% if row.total_available >= row.quantity_needed %}
+                  {% set action = row.recommended_action %}
+                  {% set covered = row.variant_covered_qty or 0 %}
+                  {% set remaining = row.quantity_needed - covered %}
+                  <select name="reconcile_action" class="reconcile-action-select"
+                          data-needed="{{ row.quantity_needed }}"
+                          data-available="{{ row.total_available }}"
+                          data-covered="{{ covered }}">
+                    {% if action == "covered_by_variant" %}
+                      <option value="covered_by_variant" selected>
+                        Covered by variant group — no copy needed (default)
+                      </option>
+                    {% endif %}
+                    {% if remaining > 0 and row.total_available >= remaining %}
                       <option value="move_existing"
                               {% if action == "move_existing" %}selected{% endif %}>
-                        Move {{ row.quantity_needed }} (default)
+                        Move {{ remaining }}{% if action == "move_existing" %} (default){% endif %}
                       </option>
-                    {% elif row.total_available > 0 %}
+                    {% elif remaining > 0 and row.total_available > 0 %}
                       <option value="move_existing_plus_new"
                               {% if action == "move_existing_plus_new" %}selected{% endif %}>
-                        Move {{ row.total_available }} + new {{ row.quantity_needed - row.total_available }} (default)
+                        Move {{ row.total_available }} + new {{ remaining - row.total_available }}{% if action == "move_existing_plus_new" %} (default){% endif %}
                       </option>
                     {% endif %}
                     <option value="import_new" {% if action == "import_new" %}selected{% endif %}>
-                      Import {{ row.quantity_needed }} new
+                      Import {{ remaining if remaining > 0 else row.quantity_needed }} new
                       {% if action != "import_new" %}(override){% endif %}
                     </option>
                   </select>
-                  {# Hidden fields encode the actual move/new split for the commit handler.
-                     For single-source moves these are derivable from the action, but we
-                     send them explicitly so the commit handler doesn't have to recompute. #}
+                  {# Hidden fields carry the actual move/new split. Defaults come
+                     straight from the service (already variant-coverage-aware);
+                     the JS below recomputes them on an action override. #}
                   <input type="hidden"
                          name="reconcile_move_qty"
-                         value="{% if action == 'move_existing' %}{{ row.quantity_needed }}{% elif action == 'move_existing_plus_new' %}{{ row.total_available }}{% else %}0{% endif %}">
+                         value="{{ row.recommended_move_qty }}">
                   <input type="hidden"
                          name="reconcile_new_qty"
-                         value="{% if action == 'move_existing' %}0{% elif action == 'move_existing_plus_new' %}{{ row.quantity_needed - row.total_available }}{% else %}{{ row.quantity_needed }}{% endif %}">
+                         value="{{ row.recommended_new_qty }}">
                 </td>
               </tr>
             {% endfor %}
@@ -182,27 +205,34 @@
   <script>
     (function () {
       document.querySelectorAll('.reconcile-action-select').forEach(function (sel) {
-        // Stash the row's needed/available on the select element so we can
-        // recompute move/new on change. Walk to the <tr> and read the cells.
+        // Recompute the move/new split when the user overrides the action.
+        // needed/available/covered come from data-* attributes (v3.33.0 — the
+        // old cell-text parsing couldn't see variant coverage). `remaining` is
+        // the need NOT already covered by a sibling variant deck.
         var row = sel.closest('tr');
         if (!row) return;
         var hiddenMove = row.querySelector('input[name="reconcile_move_qty"]');
         var hiddenNew = row.querySelector('input[name="reconcile_new_qty"]');
-        // The needed qty is in the second cell (e.g. "4×"); strip the suffix.
-        var cells = row.querySelectorAll('td');
-        var needed = parseInt((cells[1].textContent || '').replace(/\D/g, ''), 10) || 0;
-        var available = parseInt((cells[2].textContent || '').replace(/\D/g, ''), 10) || 0;
+        var needed = parseInt(sel.dataset.needed, 10) || 0;
+        var available = parseInt(sel.dataset.available, 10) || 0;
+        var covered = parseInt(sel.dataset.covered, 10) || 0;
+        var remaining = Math.max(0, needed - covered);
         sel.addEventListener('change', function () {
           var v = sel.value;
-          if (v === 'move_existing') {
-            hiddenMove.value = needed;
+          if (v === 'covered_by_variant') {
+            hiddenMove.value = 0;
+            hiddenNew.value = 0;
+          } else if (v === 'move_existing') {
+            hiddenMove.value = remaining;
             hiddenNew.value = 0;
           } else if (v === 'move_existing_plus_new') {
-            hiddenMove.value = Math.min(available, needed);
-            hiddenNew.value = Math.max(0, needed - available);
+            hiddenMove.value = Math.min(available, remaining);
+            hiddenNew.value = Math.max(0, remaining - available);
           } else {
+            // import_new — acquire the uncovered remainder, or the full need
+            // when the row was fully covered ("stop sharing, own my own set").
             hiddenMove.value = 0;
-            hiddenNew.value = needed;
+            hiddenNew.value = remaining > 0 ? remaining : needed;
           }
         });
       });

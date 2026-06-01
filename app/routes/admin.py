@@ -20,6 +20,7 @@ from app.models import (
     Trade,
     TransactionLog,
     User,
+    VariantGroup,
     WatchlistItem,
 )
 
@@ -240,6 +241,9 @@ def delete_user(
     session.query(InventoryRow).filter(InventoryRow.user_id == user_id).delete()
     session.query(ImportBatch).filter(ImportBatch.user_id == user_id).delete()
     session.query(Deck).filter(Deck.user_id == user_id).delete()
+    # v3.33.0 — variant groups are user-owned; decks (the only referencers) are
+    # already deleted above, so there's nothing left to null first.
+    session.query(VariantGroup).filter(VariantGroup.user_id == user_id).delete()
     session.query(StorageLocation).filter(StorageLocation.user_id == user_id).delete()
     # v3.27.5 — null seat→user FK on this user's historical seats. The
     # ``ondelete="SET NULL"`` clause on ``GameSeat.user_id`` is declared on

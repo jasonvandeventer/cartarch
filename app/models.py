@@ -185,9 +185,35 @@ class Deck(Base):
     intent_played: Mapped[str | None] = mapped_column(String(16), nullable=True)
     blurb: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    # v3.33.0 — optional link into a "variant group": a family of builds of the
+    # same deck (e.g. Atraxa v1 / v2) that SHARE one physical copy of many cards.
+    # Accounting-only overlay — one physical card still lives in exactly ONE
+    # deck's location; this never duplicates rows or spans locations. It only
+    # lets deck-import reconciliation treat a card held by a sibling variant
+    # deck as "covered" (no new copy needed). NULL = standalone deck (legacy +
+    # default). ``ondelete="SET NULL"`` documents v4 Postgres intent; SQLite
+    # doesn't enforce it (PRAGMA foreign_keys OFF), so delete_variant_group +
+    # the admin user-deletion cascade null/remove referencing rows explicitly.
+    variant_group_id: Mapped[int | None] = mapped_column(
+        ForeignKey("variant_groups.id", ondelete="SET NULL"), nullable=True, index=True
+    )
 
     storage_location: Mapped[StorageLocation | None] = relationship()
     user: Mapped[User] = relationship(back_populates="decks")
+    variant_group: Mapped[VariantGroup | None] = relationship(back_populates="decks")
+
+
+class VariantGroup(Base):
+    __tablename__ = "variant_groups"
+    __table_args__ = (UniqueConstraint("user_id", "name", name="uq_variant_groups_user_name"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    name: Mapped[str] = mapped_column(String(128), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    user: Mapped[User] = relationship()
+    decks: Mapped[list[Deck]] = relationship(back_populates="variant_group")
 
 
 class ImportBatch(Base):

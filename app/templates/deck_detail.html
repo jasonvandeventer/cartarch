@@ -50,6 +50,24 @@
       <h2 class="panel-title">Deck not found</h2>
     {% endif %}
   </section>
+  {% if deck and variant_group %}
+    {# v3.33.0 — variant group: builds that share physical cards. Read-only;
+       shared cards live in one deck only and are NOT listed here (one-card-
+       one-location). Importing a list into this deck treats cards a sibling
+       already holds as "covered" rather than "buy another". #}
+    <section class="panel variant-group-panel">
+      <p class="muted">
+        <strong>Variant group:</strong> {{ variant_group.name }}
+        {% if variant_siblings %}
+          · Shares cards with
+          {% for s in variant_siblings %}<a href="/decks/{{ s.id }}">{{ s.name }}</a>{% if not loop.last %}, {% endif %}{% endfor %}.
+          A card held by a sibling build is treated as already covered when you import a list here.
+        {% else %}
+          · No other builds in this group yet.
+        {% endif %}
+      </p>
+    </section>
+  {% endif %}
   {% if deck %}
     <section class="panel add-card-panel">
       <h3 class="panel-title" style="margin-bottom: 0.4rem">Add card to this deck</h3>

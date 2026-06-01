@@ -8,7 +8,7 @@ from sqlalchemy import func, tuple_
 from sqlalchemy.orm import Session, joinedload
 
 from app.audit_service import log_transaction
-from app.models import Card, Deck, Game, GameSeat, InventoryRow, StorageLocation
+from app.models import Card, Deck, Game, GameSeat, InventoryRow, StorageLocation, VariantGroup
 from app.scryfall import _cache_get_by_ids, fetch_deck_tokens
 
 # Library search for lands. Anchored to "your library" so opponent-search effects
@@ -2205,6 +2205,134 @@ def get_deck(session: Session, deck_id: int, user_id: int) -> Deck | None:
     )
 
 
+# ── Variant groups (v3.33.0) ────────────────────────────────────
+# A named family of builds of the same deck that SHARE one physical copy of
+# many cards. Accounting-only overlay — one-card-one-location stays intact (no
+# shared pool, no row duplication, no multi-location reads). All functions are
+# user-scoped + ownership-checked. See find_inventory_matches_for_deck_import
+# for the one place this changes behaviour.
+
+
+def create_variant_group(session: Session, user_id: int, name: str) -> VariantGroup:
+    """Create a variant group. Raises ValueError on empty/duplicate name."""
+    name = (name or "").strip()
+    if not name:
+        raise ValueError("Variant group name is required.")
+    existing = (
+        session.query(VariantGroup)
+        .filter(VariantGroup.user_id == user_id, VariantGroup.name == name)
+        .first()
+    )
+    if existing:
+        raise ValueError(f"A variant group named '{name}' already exists.")
+    group = VariantGroup(user_id=user_id, name=name[:128])
+    session.add(group)
+    session.commit()
+    return group
+
+
+def list_variant_groups(session: Session, user_id: int) -> list[VariantGroup]:
+    return (
+        session.query(VariantGroup)
+        .filter(VariantGroup.user_id == user_id)
+        .order_by(VariantGroup.name.asc())
+        .all()
+    )
+
+
+def get_variant_group(session: Session, user_id: int, group_id: int) -> VariantGroup | None:
+    return (
+        session.query(VariantGroup)
+        .filter(VariantGroup.id == group_id, VariantGroup.user_id == user_id)
+        .first()
+    )
+
+
+def rename_variant_group(
+    session: Session, user_id: int, group_id: int, name: str
+) -> VariantGroup | None:
+    """Rename a group. Returns None if not owned; ValueError on empty/duplicate."""
+    group = get_variant_group(session, user_id, group_id)
+    if group is None:
+        return None
+    name = (name or "").strip()
+    if not name:
+        raise ValueError("Variant group name is required.")
+    clash = (
+        session.query(VariantGroup)
+        .filter(
+            VariantGroup.user_id == user_id,
+            VariantGroup.name == name,
+            VariantGroup.id != group_id,
+        )
+        .first()
+    )
+    if clash:
+        raise ValueError(f"A variant group named '{name}' already exists.")
+    group.name = name[:128]
+    session.commit()
+    return group
+
+
+def delete_variant_group(session: Session, user_id: int, group_id: int) -> bool:
+    """Delete a group, first nulling ``variant_group_id`` on its decks.
+
+    SQLite doesn't enforce ``ON DELETE SET NULL`` (PRAGMA foreign_keys OFF), so
+    the decks are cleared explicitly (mirrors playgroup_service.delete_playgroup).
+    Returns False if the group isn't owned by ``user_id``.
+    """
+    group = get_variant_group(session, user_id, group_id)
+    if group is None:
+        return False
+    session.query(Deck).filter(Deck.variant_group_id == group_id, Deck.user_id == user_id).update(
+        {Deck.variant_group_id: None}, synchronize_session=False
+    )
+    session.delete(group)
+    session.commit()
+    return True
+
+
+def assign_deck_variant_group(
+    session: Session, user_id: int, deck_id: int, group_id: int | None
+) -> Deck | None:
+    """Set (or clear, when ``group_id`` is None) a deck's variant group.
+
+    Ownership-checked on both the deck and the group. Returns None if the deck
+    isn't owned; raises ValueError if ``group_id`` is given but not owned.
+    """
+    deck = get_deck(session, deck_id=deck_id, user_id=user_id)
+    if deck is None:
+        return None
+    if group_id is not None:
+        if get_variant_group(session, user_id, group_id) is None:
+            raise ValueError("Variant group not found.")
+        deck.variant_group_id = group_id
+    else:
+        deck.variant_group_id = None
+    session.commit()
+    return deck
+
+
+def sibling_variant_deck_location_ids(session: Session, deck: Deck) -> list[int]:
+    """StorageLocation ids of the deck's SIBLING variant decks (excludes the
+    deck itself and any sibling with no storage location). Empty list when the
+    deck has no variant group — the gate that keeps non-variant reconciliation
+    byte-for-byte unchanged."""
+    if deck.variant_group_id is None:
+        return []
+    return [
+        loc_id
+        for (loc_id,) in session.query(Deck.storage_location_id)
+        .filter(
+            Deck.variant_group_id == deck.variant_group_id,
+            Deck.user_id == deck.user_id,
+            Deck.id != deck.id,
+            Deck.storage_location_id.isnot(None),
+        )
+        .all()
+    ]
+
+
 # Tier priority for ordering reconciliation matches. Lower number = preferred
 # source for the recommended move. "drawer" is most "loose" / fungible
 # inventory; "pending" is last-resort since those rows haven't been physically
@@ -2372,6 +2500,13 @@ def find_inventory_matches_for_deck_import(
         raise ValueError("deck not found")
     target_storage_location_id = deck.storage_location_id
 
+    # v3.33.0 — variant-group coverage. A card physically held by a SIBLING
+    # variant deck is "covered by the group" — not recommended for import and
+    # not moved. ``sibling_location_ids`` is EMPTY for a deck with no variant
+    # group, which is the gate that keeps every branch below byte-for-byte
+    # identical to the pre-feature logic (variant_covered_qty stays 0).
+    sibling_location_ids = set(sibling_variant_deck_location_ids(session, deck))
+
     if not parsed_rows:
         return []
 
@@ -2419,6 +2554,9 @@ def find_inventory_matches_for_deck_import(
     matches_by_key: dict[tuple[int, str], list[dict]] = {key: [] for key in lookup_keys}
     target_deck_by_key: dict[tuple[int, str], list[dict]] = {key: [] for key in lookup_keys}
     other_deck_by_key: dict[tuple[int, str], list[dict]] = {key: [] for key in lookup_keys}
+    # v3.33.0 — per-key quantity held by sibling variant decks (subset of
+    # other_deck_by_key). Always all-zero for a deck with no variant group.
+    variant_covered_by_key: dict[tuple[int, str], int] = {}
     if lookup_keys:
         rows = (
             session.query(InventoryRow, StorageLocation)
@@ -2451,6 +2589,14 @@ def find_inventory_matches_for_deck_import(
                 if row.storage_location_id == target_storage_location_id:
                     target_deck_by_key[key].append(entry)
                 else:
+                    # v3.33.0 — flag + tally copies held by a sibling variant
+                    # deck so the recommendation can treat them as "covered".
+                    is_sibling = row.storage_location_id in sibling_location_ids
+                    entry["is_variant_sibling"] = is_sibling
+                    if is_sibling:
+                        variant_covered_by_key[key] = (
+                            variant_covered_by_key.get(key, 0) + row.quantity
+                        )
                     other_deck_by_key[key].append(entry)
             else:
                 matches_by_key[key].append(entry)
@@ -2493,6 +2639,8 @@ def find_inventory_matches_for_deck_import(
                     "total_available": 0,
                     "total_in_target_deck": 0,
                     "total_in_other_decks": 0,
+                    "variant_covered_qty": 0,
+                    "is_variant_group": deck.variant_group_id is not None,
                     "recommended_action": "import_new",
                     "recommended_move_qty": 0,
                     "recommended_new_qty": quantity_needed,
@@ -2508,23 +2656,37 @@ def find_inventory_matches_for_deck_import(
         total_in_target_deck = sum(m["quantity_available"] for m in target_deck_matches)
         total_in_other_decks = sum(m["quantity_available"] for m in other_deck_matches)
 
+        # v3.33.0 — variant-group coverage is applied FIRST: copies held by a
+        # sibling variant deck satisfy part (or all) of the need without an
+        # import or a move. ``remaining_needed`` then drives the existing
+        # non-deck move/import logic UNCHANGED. With no variant group,
+        # variant_covered_qty is 0 and this reduces byte-for-byte to the prior
+        # three-way recommendation.
+        variant_covered_qty = min(variant_covered_by_key.get(key, 0), quantity_needed)
+        remaining_needed = quantity_needed - variant_covered_qty
+
         # recommended_action / move_qty / new_qty are driven by `matches`
         # (non-deck rows) ONLY. Deck-located rows never auto-move by
         # default — they're informational. The commit handler uses
         # target_deck_matches separately to merge new imports into an
         # existing deck row rather than create a duplicate.
-        if total_available >= quantity_needed:
+        if remaining_needed <= 0:
+            # Fully covered by a sibling variant deck — leave it where it is.
+            action = "covered_by_variant"
+            move_qty = 0
+            new_qty = 0
+        elif total_available >= remaining_needed:
             action = "move_existing"
-            move_qty = quantity_needed
+            move_qty = remaining_needed
             new_qty = 0
         elif total_available > 0:
             action = "move_existing_plus_new"
             move_qty = total_available
-            new_qty = quantity_needed - total_available
+            new_qty = remaining_needed - total_available
         else:
             action = "import_new"
             move_qty = 0
-            new_qty = quantity_needed
+            new_qty = remaining_needed
 
         output.append(
             {
@@ -2539,6 +2701,8 @@ def find_inventory_matches_for_deck_import(
                 "total_available": total_available,
                 "total_in_target_deck": total_in_target_deck,
                 "total_in_other_decks": total_in_other_decks,
+                "variant_covered_qty": variant_covered_qty,
+                "is_variant_group": deck.variant_group_id is not None,
                 "recommended_action": action,
                 "recommended_move_qty": move_qty,
                 "recommended_new_qty": new_qty,

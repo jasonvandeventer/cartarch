@@ -45,6 +45,7 @@ from app.deck_service import (
     DECK_GROUP_BY_OPTIONS,
     DECK_VIEW_MODES,
     add_auto_tags,
+    assign_deck_variant_group,
     bump_deck_row_quantity,
     compute_consistency,
     compute_dead_cards,
@@ -54,6 +55,7 @@ from app.deck_service import (
     compute_deck_synergy,
     compute_deck_tokens,
     create_deck,
+    create_variant_group,
     delete_deck,
     extract_commander_themes,
     find_inventory_matches_for_deck_import,
@@ -65,6 +67,7 @@ from app.deck_service import (
     list_decks,
     list_decks_basic,
     list_user_printings_for_card,
+    list_variant_groups,
     pull_card_to_deck,
     return_card_from_deck,
     set_row_tags,
@@ -1249,6 +1252,8 @@ async def import_reconcile_preview(
             r["recommended_new_qty"] for r in matches_rows if r["total_in_target_deck"] > 0
         )
         total_to_import_new = sum(r["recommended_new_qty"] for r in matches_rows) - total_to_merge
+        # v3.33.0 — copies covered by a sibling variant deck (no move, no import).
+        total_covered_by_variant = sum(r.get("variant_covered_qty", 0) for r in matches_rows)
 
         return render(
             request,
@@ -1260,6 +1265,8 @@ async def import_reconcile_preview(
                 "total_to_move": total_to_move,
                 "total_to_import_new": total_to_import_new,
                 "total_to_merge": total_to_merge,
+                "total_covered_by_variant": total_covered_by_variant,
+                "is_variant_group": deck.variant_group_id is not None,
             },
         )
 
@@ -2127,6 +2134,8 @@ async def manual_import_reconcile_preview(
             r["recommended_new_qty"] for r in matches_rows if r["total_in_target_deck"] > 0
         )
         total_to_import_new = sum(r["recommended_new_qty"] for r in matches_rows) - total_to_merge
+        # v3.33.0 — copies covered by a sibling variant deck (no move, no import).
+        total_covered_by_variant = sum(r.get("variant_covered_qty", 0) for r in matches_rows)
 
         return render(
             request,
@@ -2138,6 +2147,8 @@ async def manual_import_reconcile_preview(
                 "total_to_move": total_to_move,
                 "total_to_import_new": total_to_import_new,
                 "total_to_merge": total_to_merge,
+                "total_covered_by_variant": total_covered_by_variant,
+                "is_variant_group": deck.variant_group_id is not None,
             },
         )
 
@@ -3579,6 +3590,8 @@ def decks_page(
             "featured": featured,
             "current_user": current_user,
             "show_onboarding": show_onboarding,
+            # v3.33.0 — variant-group picker options for the deck-edit popouts.
+            "variant_groups": list_variant_groups(session, current_user.id),
         },
     )
 
@@ -4003,12 +4016,28 @@ def deck_detail_page(
         else []
     )
 
+    # v3.33.0 — sibling decks in the same variant group (read-only panel).
+    variant_siblings = (
+        session.query(Deck)
+        .filter(
+            Deck.variant_group_id == deck.variant_group_id,
+            Deck.user_id == current_user.id,
+            Deck.id != deck.id,
+        )
+        .order_by(Deck.name.asc())
+        .all()
+        if deck and deck.variant_group_id
+        else []
+    )
+
     return render(
         request,
         "deck_detail.html",
         {
             "title": deck.name if deck else "Deck",
             "deck": deck,
+            "variant_group": deck.variant_group if deck else None,
+            "variant_siblings": variant_siblings,
             "color_identity": color_identity,
             "commanders": commanders if deck else [],
             "items": deck_cards if deck else [],
@@ -4342,6 +4371,8 @@ def decks_edit(
     format_name: str = Form(""),
     notes: str = Form(""),
     blurb: str = Form(""),
+    variant_group_id: str = Form(""),
+    new_variant_group_name: str = Form(""),
     session: Session = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
     _: None = CsrfRequired,
@@ -4357,6 +4388,16 @@ def decks_edit(
             blurb=blurb,
             update_blurb=True,
         )
+        # v3.33.0 — variant-group assignment (separate from update_deck so its
+        # signature + callers stay untouched). Create-by-name wins over the
+        # picker; empty picker clears the link.
+        if new_variant_group_name.strip():
+            group = create_variant_group(session, current_user.id, new_variant_group_name)
+            assign_deck_variant_group(session, current_user.id, deck_id, group.id)
+        elif variant_group_id.strip():
+            assign_deck_variant_group(session, current_user.id, deck_id, int(variant_group_id))
+        else:
+            assign_deck_variant_group(session, current_user.id, deck_id, None)
     except ValueError:
         pass
     return RedirectResponse(url="/decks", status_code=303)
