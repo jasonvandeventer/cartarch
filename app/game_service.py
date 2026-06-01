@@ -5,9 +5,18 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
+from sqlalchemy import and_, or_, select
 from sqlalchemy.orm import Session, joinedload
 
-from app.models import Card, Deck, Game, GameSeat, InventoryRow, User
+from app.models import (
+    Card,
+    Deck,
+    Game,
+    GameSeat,
+    InventoryRow,
+    PlaygroupMember,
+    User,
+)
 
 # v3.27.2 — Game.format canonical taxonomy. Service-layer enforcement
 # (matches the existing VALID_LOCATION_TYPES / VALID_LOCATION_MODES pattern
@@ -241,6 +250,13 @@ def create_game(
 
 
 def get_game(session: Session, game_id: int, user_id: int) -> Game | None:
+    """Owner-scoped fetch — returns the game ONLY if ``user_id`` owns it.
+
+    This is the strict guard the *mutation* routes (end / notes / delete /
+    seat-assign / playgroup-set) depend on: a non-owner gets ``None`` and the
+    route raises 404, exactly as before v3.32.0. Read routes that should be
+    visible to participants use :func:`get_viewable_game` instead.
+    """
     return (
         session.query(Game)
         .options(joinedload(Game.seats).joinedload(GameSeat.deck))
@@ -249,14 +265,132 @@ def get_game(session: Session, game_id: int, user_id: int) -> Game | None:
     )
 
 
-def list_games(session: Session, user_id: int) -> list[Game]:
+def _viewable_games_predicate(viewer_user_id: int):
+    """SQLAlchemy predicate for "games ``viewer_user_id`` may view" (v3.32.0).
+
+    Hybrid visibility (decision 2026-06-01): a game is viewable if the viewer
+    (a) owns it, OR (b) is attributed to one of its seats
+    (``GameSeat.user_id``), OR (c) the game is linked to a playgroup the
+    viewer belongs to (``Game.playgroup_id``). Mutation rights are NOT widened
+    by this — only read access.
+    """
+    seat_subq = select(GameSeat.game_id).where(GameSeat.user_id == viewer_user_id)
+    pg_subq = select(PlaygroupMember.playgroup_id).where(PlaygroupMember.user_id == viewer_user_id)
+    return or_(
+        Game.user_id == viewer_user_id,
+        Game.id.in_(seat_subq),
+        and_(Game.playgroup_id.isnot(None), Game.playgroup_id.in_(pg_subq)),
+    )
+
+
+def get_viewable_game(session: Session, game_id: int, viewer_user_id: int) -> Game | None:
+    """Viewer-scoped fetch — returns the game if the viewer may *view* it.
+
+    Hybrid visibility per :func:`_viewable_games_predicate`. Read-only callers
+    (the game detail page) use this; they must still compute ``is_owner``
+    (``game.user_id == viewer_user_id``) to decide whether to render the
+    owner-only edit controls.
+    """
     return (
         session.query(Game)
         .options(joinedload(Game.seats).joinedload(GameSeat.deck))
-        .filter(Game.user_id == user_id)
+        .filter(Game.id == game_id, _viewable_games_predicate(viewer_user_id))
+        .first()
+    )
+
+
+def list_games(session: Session, user_id: int) -> list[Game]:
+    """Games visible to ``user_id`` — owned + played-in + playgroup (v3.32.0).
+
+    Widened from owner-only to the hybrid visibility set
+    (:func:`_viewable_games_predicate`). Each returned game carries a transient
+    ``is_owned_by_viewer`` attribute (not a column) so the list template can
+    badge "played in" games and hide the owner-only Delete control on games the
+    viewer doesn't own.
+    """
+    games = (
+        session.query(Game)
+        .options(joinedload(Game.seats).joinedload(GameSeat.deck))
+        .filter(_viewable_games_predicate(user_id))
         .order_by(Game.played_at.desc())
         .all()
     )
+    for game in games:
+        game.is_owned_by_viewer = game.user_id == user_id
+    return games
+
+
+def reassign_seat_user(
+    session: Session,
+    game_id: int,
+    seat_id: int,
+    owner_user_id: int,
+    target_user_id: int | None,
+) -> bool | None:
+    """Owner-only: attribute (or clear) a seat's user, re-snapshotting the name.
+
+    The retroactive correction for name-only seats (e.g. a Draft game whose
+    seats were recorded as free-text ``player_name`` only). Only the game
+    OWNER may call this — ``Game.user_id == owner_user_id`` — matching the
+    edit-rights model where participants get read-only access.
+
+    ``target_user_id`` of ``None`` (or 0) clears the attribution: both
+    ``user_id`` and ``user_name_at_game`` reset to NULL, leaving the free-text
+    ``player_name`` as the seat's display. A real user id sets the live FK and
+    re-snapshots ``user_name_at_game`` via :func:`_capture_user_attribution`
+    (same cross-user-permissive, non-blocking validation as game creation — an
+    unknown id resolves to a cleared attribution rather than erroring).
+
+    Returns ``True`` on success, ``False`` if the game isn't owned by
+    ``owner_user_id``, ``None`` if the seat isn't on that game (route maps
+    both misses to 404).
+    """
+    game = session.query(Game).filter(Game.id == game_id, Game.user_id == owner_user_id).first()
+    if not game:
+        return False
+    seat = next((s for s in game.seats if s.id == seat_id), None)
+    if seat is None:
+        return None
+    resolved_id, resolved_name = _capture_user_attribution(session, target_user_id)
+    seat.user_id = resolved_id
+    seat.user_name_at_game = resolved_name
+    session.commit()
+    return True
+
+
+def set_game_playgroup(
+    session: Session,
+    game_id: int,
+    owner_user_id: int,
+    playgroup_id: int | None,
+) -> bool:
+    """Owner-only: link a game to a playgroup (or clear the link) (v3.32.0).
+
+    Linking opens the game up to every member of that playgroup (read-only).
+    Only the game OWNER may set this, and only to a playgroup the owner is a
+    MEMBER of — you can't expose a game to a group you don't belong to.
+    ``playgroup_id`` of ``None`` clears the link.
+
+    Returns ``True`` on success, ``False`` if the game isn't owned by
+    ``owner_user_id`` or the owner isn't a member of the target playgroup.
+    """
+    game = session.query(Game).filter(Game.id == game_id, Game.user_id == owner_user_id).first()
+    if not game:
+        return False
+    if playgroup_id is not None:
+        is_member = (
+            session.query(PlaygroupMember.id)
+            .filter(
+                PlaygroupMember.user_id == owner_user_id,
+                PlaygroupMember.playgroup_id == playgroup_id,
+            )
+            .first()
+        )
+        if is_member is None:
+            return False
+    game.playgroup_id = playgroup_id
+    session.commit()
+    return True
 
 
 def end_game(

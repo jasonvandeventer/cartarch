@@ -1,5 +1,18 @@
 [
   {
+    "version": "3.32.0",
+    "date": "2026-06-01",
+    "added": [
+      "Every player in a game can now see that game's record — not just whoever logged it. A game opens up to anyone linked to one of its seats, and, if you choose, to a whole playgroup; everyone else still can't see it.",
+      "You can go back and fix who played. On any game you recorded, link each seat to a real account — handy for games first jotted down with just names — and the moment you do, that player can view the record. You can also share a finished game with one of your playgroups in a single pick."
+    ],
+    "refined": [
+      "The games list now marks the games you played in (but didn't record) so they're easy to tell apart from your own, and it keeps editing controls to the owner. A shared game you're viewing shows a quiet 'read-only' note up top."
+    ],
+    "resolved": [],
+    "archivist_note": "A game was always recorded by one person, and so only that person could ever see it — even though three or four people sat at the table. This release lets the record belong, in a read-only way, to everyone who was there. The mechanism was already half-built: each seat could name the account that filled it, the app just never used that link to decide who may look. Now it does — owner, anyone seated, and, optionally, a whole playgroup. Editing stays with the one who recorded it; sharing is not the same as handing over the pen. And because plenty of older games were written down with nothing but names — a draft night, a kitchen-table pod — the owner can now go back and attach the real players after the fact, which is the moment those players gain the ability to see it. Nothing about the live game-tracker's saved state changed; this is purely about who is allowed through the door to read what's already written."
+  },
+  {
     "version": "3.31.2",
     "date": "2026-05-31",
     "added": [],

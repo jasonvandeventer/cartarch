@@ -93,6 +93,9 @@ from scripts.migrate_v3_30_11_card_produced_tokens import (
 from scripts.migrate_v3_31_0_multi_showcase import (
     main as migrate_v3_31_0_multi_showcase,
 )
+from scripts.migrate_v3_32_0_game_playgroup import (
+    main as migrate_v3_32_0_game_playgroup,
+)
 
 
 def _is_applied(name: str) -> bool:
@@ -452,6 +455,13 @@ def run():
         _mark_applied("v3_31_0_multi_showcase")
     else:
         print("v3.31.0 multi_showcase already applied, skipping")
+
+    if not _is_applied("v3_32_0_game_playgroup"):
+        print("Running v3.32.0 games.playgroup_id migration...")
+        migrate_v3_32_0_game_playgroup()
+        _mark_applied("v3_32_0_game_playgroup")
+    else:
+        print("v3.32.0 game_playgroup already applied, skipping")
 
     print("Migration runner complete")
 

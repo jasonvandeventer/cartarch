@@ -40,3 +40,4 @@ jobs:
         run: |
           python -m tests.test_deck_service
           python -m tests.test_share_service
+          python -m tests.test_game_visibility

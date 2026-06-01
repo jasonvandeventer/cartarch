@@ -28,7 +28,7 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.models import Playgroup, PlaygroupMember, Share, Trade, User
+from app.models import Game, Playgroup, PlaygroupMember, Share, Trade, User
 
 # Service-layer canonical role enum (the v3.27.2 / v3.27.3 pattern, no
 # DB CHECK constraint). v3.29.0 ships two roles; the enum can widen
@@ -597,6 +597,14 @@ def delete_playgroup(
         {Trade.playgroup_id: None},
         synchronize_session=False,
     )
+    # v3.32.0 — unlink any game pointing at this playgroup (SQLite doesn't
+    # enforce ON DELETE SET NULL). A dangling id is access-safe — the
+    # membership visibility check finds nobody once the member rows are gone
+    # — but clearing it keeps game-detail rendering correct (no orphan join).
+    session.query(Game).filter(Game.playgroup_id == playgroup_id).update(
+        {Game.playgroup_id: None},
+        synchronize_session=False,
+    )
     session.delete(pg)
     session.commit()
     return True, None
@@ -661,6 +669,13 @@ def handle_user_deletion(session: Session, user_id: int) -> None:
             trade_service.abandon_pending_trades_for_playgroup(session, pg_id)
             session.query(Trade).filter(Trade.playgroup_id == pg_id).update(
                 {Trade.playgroup_id: None},
+                synchronize_session=False,
+            )
+            # v3.32.0 — unlink games pointing at this playgroup (mirrors the
+            # user-initiated delete_playgroup cleanup so admin-cascade behaves
+            # identically).
+            session.query(Game).filter(Game.playgroup_id == pg_id).update(
+                {Game.playgroup_id: None},
                 synchronize_session=False,
             )
             pg = session.query(Playgroup).filter(Playgroup.id == pg_id).first()

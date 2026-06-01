@@ -261,6 +261,18 @@ class Game(Base):
     client_token: Mapped[str | None] = mapped_column(String(32), nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    # v3.32.0 — optional playgroup link for shared game visibility. A game
+    # is viewable by its owner (user_id), by any user attributed to one of
+    # its seats (GameSeat.user_id), AND — when this is set — by every member
+    # of the linked playgroup. NULL = private to owner + seat-attributed
+    # players only (legacy games and games created without a playgroup pick).
+    # ``ondelete="SET NULL"`` documents v4 Postgres intent; SQLite doesn't
+    # enforce it (PRAGMA foreign_keys OFF), so playgroup_service.delete_playgroup
+    # nulls these explicitly. A dangling id is access-safe regardless: the
+    # membership check returns nobody once the playgroup's member rows are gone.
+    playgroup_id: Mapped[int | None] = mapped_column(
+        ForeignKey("playgroups.id", ondelete="SET NULL"), nullable=True, index=True
+    )
 
     seats: Mapped[list[GameSeat]] = relationship(
         back_populates="game",
@@ -268,6 +280,7 @@ class Game(Base):
         order_by="GameSeat.seat_number",
     )
     user: Mapped[User] = relationship()
+    playgroup: Mapped[Playgroup | None] = relationship()
 
 
 class GameSeat(Base):
