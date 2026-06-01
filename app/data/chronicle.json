@@ -1,5 +1,17 @@
 [
   {
+    "version": "3.32.1",
+    "date": "2026-06-01",
+    "added": [
+      "You can now rename a player on a recorded game — fix a typo, or turn a placeholder like \"Player 2\" into a real name — right alongside linking the seat to an account."
+    ],
+    "refined": [],
+    "resolved": [
+      "The \"Players & sharing\" controls from the last release were there but unreachable — tucked beneath the full-screen game view with no way to scroll to them. They now open in a tidy panel from a \"Players\" button at the top of any game you recorded, on finished games as well as live ones."
+    ],
+    "archivist_note": "A quick correction to the release that introduced shared games. The tools to attribute seats and share a game shipped, but they'd been placed in a spot the page's full-screen layout quietly swallowed — present in the markup, invisible in practice. So this is half repair, half completion: the controls now live behind a plain \"Players\" button in the game's top bar and open as a panel, and while we were in there we taught them one more trick the first cut lacked — editing the player's name itself, not just which account it points to. A name jotted down mid-game as \"Player 2\" can finally become the person who sat there."
+  },
+  {
     "version": "3.32.0",
     "date": "2026-06-01",
     "added": [
