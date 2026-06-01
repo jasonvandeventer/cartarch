@@ -49,9 +49,19 @@
          to viewers who are NOT the sharer (sharer can't trade with
          themselves; trade_service.resolve_propose_from_showcase_item
          filters this case out too). #}
-      <div class="inventory-grid share-view-grid">
+      {% if items | length > 5 %}
+        <div class="list-filter-wrap">
+          <input type="text" class="list-filter-input" placeholder="Filter cards by name…"
+                 aria-label="Filter cards by name"
+                 data-list-filter
+                 data-list-filter-target="#share-view-grid .share-view-item-wrap"
+                 data-list-filter-empty="#share-view-empty">
+          <p id="share-view-empty" class="list-filter-empty" hidden>No cards match that search.</p>
+        </div>
+      {% endif %}
+      <div class="inventory-grid share-view-grid" id="share-view-grid">
         {% for item in items %}
-          <div class="share-view-item-wrap">
+          <div class="share-view-item-wrap" data-filter-text="{{ item.card.name }} {{ item.card.set_code }}">
             {{ inventory_card(item, csrf_token,
                               show_collection_actions=false,
                               show_location_label=false,
@@ -71,4 +81,7 @@
   <section class="panel">
     <p class="muted"><em>You're viewing a read-only share.</em> No edit, audit, or action affordances are available — this is a glance-only window into another collector's curated list.</p>
   </section>
+{% endblock %}
+{% block extra_scripts %}
+  <script src="/static/list-filter.js?v={{ static_v('list-filter.js') }}"></script>
 {% endblock %}

@@ -1,5 +1,16 @@
 [
   {
+    "version": "3.32.2",
+    "date": "2026-06-01",
+    "added": [
+      "Showcases and Shares are now searchable: filter your list of showcases or shares by name, and filter the cards inside any showcase — or a read-only shared view — by card name, all instantly as you type.",
+      "The Collection color filter now thinks like a Commander player. Pick the colors of a deck and you'll see every card that's legal in it — including colorless staples like Sol Ring, which the old filter wrongly hid."
+    ],
+    "refined": [],
+    "resolved": [],
+    "archivist_note": "Three small, deliberate improvements gathered into one quiet release. The headline is a correction of intuition: ask the Collection for your green cards and, until now, it took you literally — only cards whose identity was green, nothing broader, and pointedly not the colorless artifacts every green deck runs. But a Magic player who picks \"green\" almost always means \"things I could put in a green deck,\" and that's the question the filter now answers. Alongside it, the Showcases and Shares pages — which can hold a great many cards once you've curated a while — gained search boxes that filter the moment you start typing. And behind the scenes, a wider safety net: a test that simply visits every page a signed-in collector can reach, so the kind of overlooked corner that slipped past us once before has a harder time doing so again."
+  },
+  {
     "version": "3.32.1",
     "date": "2026-06-01",
     "added": [

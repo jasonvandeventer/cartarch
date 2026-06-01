@@ -37,8 +37,18 @@
   <section class="panel">
     <h3 class="panel-title">Your showcases</h3>
     {% if summaries %}
+      {% if summaries | length > 1 %}
+        <div class="list-filter-wrap">
+          <input type="text" class="list-filter-input" placeholder="Filter showcases by name…"
+                 aria-label="Filter showcases by name"
+                 data-list-filter
+                 data-list-filter-target="#showcase-index-table tbody tr"
+                 data-list-filter-empty="#showcase-index-empty">
+          <p id="showcase-index-empty" class="list-filter-empty" hidden>No showcases match that name.</p>
+        </div>
+      {% endif %}
       <div class="table-wrap">
-        <table class="stacking-table">
+        <table class="stacking-table" id="showcase-index-table">
           <thead>
             <tr>
               <th>Name</th>
@@ -49,7 +59,7 @@
           </thead>
           <tbody>
             {% for s in summaries %}
-              <tr>
+              <tr data-filter-text="{{ s.showcase.name }} {{ s.showcase.description or '' }}">
                 <td data-label="Name">
                   <a href="/showcase/{{ s.showcase.id }}">{{ s.showcase.name }}</a>
                   {% if s.showcase.description %}
@@ -83,4 +93,7 @@
       <button type="submit" class="btn-like">Create showcase</button>
     </form>
   </section>
+{% endblock %}
+{% block extra_scripts %}
+  <script src="/static/list-filter.js?v={{ static_v('list-filter.js') }}"></script>
 {% endblock %}

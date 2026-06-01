@@ -10705,6 +10705,14 @@ table.dmtx .dmtx-rowhead {
   letter-spacing: -0.005em;
 }
 
+.collection-facet-hint {
+  font-size: 10.5px;
+  color: var(--muted);
+  opacity: 0.75;
+  margin: 2px 0 4px;
+  line-height: 1.3;
+}
+
 /* Color identity pip toggles */
 .collection-facet-pips {
   display: flex;
@@ -11838,6 +11846,32 @@ table.dmtx .dmtx-rowhead {
 .showcase-empty {
   color: var(--text-dim);
   font-style: italic;
+}
+
+/* Instant client-side list filter (v3.32.x) — shared by the showcase/share
+   list pages and the per-showcase/share card grids. See list-filter.js. */
+.list-filter-wrap {
+  margin-bottom: 1rem;
+}
+.list-filter-input {
+  padding: 0.6rem 0.9rem;
+  border-radius: var(--radius-sm);
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: "Newsreader", Georgia, serif;
+  font-style: italic;
+  font-size: 0.95rem;
+  width: 100%;
+  max-width: 360px;
+}
+.list-filter-input::placeholder {
+  color: var(--text-dim);
+}
+.list-filter-empty {
+  color: var(--text-dim);
+  font-style: italic;
+  margin-top: 0.5rem;
 }
 
 /* Shares list (on /shares) */

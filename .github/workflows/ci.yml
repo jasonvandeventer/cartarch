@@ -41,3 +41,5 @@ jobs:
           python -m tests.test_deck_service
           python -m tests.test_share_service
           python -m tests.test_game_visibility
+          python -m tests.test_color_facet
+          python -m tests.test_route_smoke

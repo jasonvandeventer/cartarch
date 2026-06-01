@@ -36,8 +36,18 @@
   <section class="panel">
     <h3 class="panel-title">My shares</h3>
     {% if my_shares %}
+      {% if my_shares | length > 1 %}
+        <div class="list-filter-wrap">
+          <input type="text" class="list-filter-input" placeholder="Filter by showcase or playgroup…"
+                 aria-label="Filter shares by showcase or playgroup name"
+                 data-list-filter
+                 data-list-filter-target="#share-index-table tbody tr"
+                 data-list-filter-empty="#share-index-empty">
+          <p id="share-index-empty" class="list-filter-empty" hidden>No shares match that name.</p>
+        </div>
+      {% endif %}
       <div class="table-wrap">
-        <table class="stacking-table share-table">
+        <table class="stacking-table share-table" id="share-index-table">
           <thead>
             <tr>
               <th>Showcase</th>
@@ -48,7 +58,7 @@
           </thead>
           <tbody>
             {% for row in my_shares %}
-              <tr>
+              <tr data-filter-text="{{ row.showcase.name }} {{ row.playgroup.name }}">
                 <td data-label="Showcase">
                   <a href="/showcase/{{ row.showcase.id }}">{{ row.showcase.name }}</a>
                 </td>
@@ -102,4 +112,7 @@
       </form>
     {% endif %}
   </section>
+{% endblock %}
+{% block extra_scripts %}
+  <script src="/static/list-filter.js?v={{ static_v('list-filter.js') }}"></script>
 {% endblock %}

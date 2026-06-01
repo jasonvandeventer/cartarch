@@ -820,10 +820,13 @@ def apply_collection_facet_filters(
 ):
     """Apply faceted-sidebar filters to a Collection query.
 
-    ``facet_colors`` — Letter string from WUBRG (e.g., "WU"). Subset
-    semantics: a card matches if its ``color_identity`` contains EACH of
-    the requested letters. ``C`` (colorless) is a special case — matches
-    rows with empty/NULL color_identity.
+    ``facet_colors`` — Letter string from WUBRG (e.g., "WU"). Commander-legal
+    "within" semantics: a card matches iff its ``color_identity`` is a SUBSET
+    of the requested letters — i.e. the card is castable in a Commander deck
+    of those colors (à la Scryfall ``id<=``). Colorless cards (identity "")
+    are a subset of any selection, so they auto-match; NULL identity (not yet
+    fetched) can't be confirmed and is excluded. ``C`` selected ALONE filters
+    to colorless only; ``C`` alongside colors is a redundant no-op.
 
     ``facet_types`` — CSV of type tokens (e.g., "Creature,Instant"). OR
     semantics: matches if ``type_line`` ILIKEs any of the listed tokens.
@@ -841,11 +844,22 @@ def apply_collection_facet_filters(
 
     if facet_colors:
         upper = facet_colors.upper()
-        # WUBRG subset filter: must contain ALL requested letters
-        for letter in [c for c in upper if c in "WUBRG"]:
-            query = query.filter(Card.color_identity.contains(letter))
-        # C (colorless) special case — empty or NULL color_identity
-        if "C" in upper:
+        selected = [c for c in upper if c in "WUBRG"]
+        if selected:
+            # Commander-legal "within" filter (v3.32.x): a card matches iff its
+            # color_identity is a SUBSET of the selected colors — castable in a
+            # Commander deck of those colors (à la Scryfall id<=). Mirrors the
+            # boolean-search `id:` filter (parse_query_term, key=="id"): exclude
+            # any card whose identity contains a NON-selected color. Colorless
+            # cards (identity="") are a subset of any selection → auto-match;
+            # NULL identity (not yet fetched) can't be confirmed → excluded. The
+            # "C" pip alongside colors is redundant (colorless already matches),
+            # so it is intentionally a no-op here.
+            for letter in [lt for lt in "WUBRG" if lt not in selected]:
+                query = query.filter(not_(Card.color_identity.contains(letter)))
+        elif "C" in upper:
+            # C selected alone — colorless only (identity ""; NULL tolerated as
+            # "no colors known"). Preserves the prior C-pip behavior.
             query = query.filter(or_(Card.color_identity == "", Card.color_identity.is_(None)))
 
     if facet_types:
