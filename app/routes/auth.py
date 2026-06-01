@@ -5,7 +5,12 @@ from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
 from app.auth import authenticate_user
-from app.dependencies import CsrfRequired, get_db_session, render
+from app.dependencies import (
+    CsrfRequired,
+    get_db_session,
+    render,
+    require_csrf_or_reissue,
+)
 
 router = APIRouter()
 
@@ -21,8 +26,16 @@ def login(
     username: str = Form(...),
     password: str = Form(...),
     db: Session = Depends(get_db_session),
-    _: None = CsrfRequired,
+    # Graceful CSRF: a logged-out browser that reaches POST /login with no
+    # usable session cookie (no established token) is re-served the form with
+    # a fresh token+cookie instead of a hard 403, so the immediate retry
+    # works. A real token mismatch still 403s. See require_csrf_or_reissue.
+    csrf_token: str = Form(""),
 ):
+    reissue = require_csrf_or_reissue(request, csrf_token, "login.html")
+    if reissue is not None:
+        return reissue
+
     user = authenticate_user(db, username, password)
 
     if not user:

@@ -87,6 +87,7 @@ from app.dependencies import (
     get_db_session,
     get_optional_current_user,
     render,
+    require_csrf_or_reissue,
 )
 from app.game_service import (
     create_game,
@@ -699,8 +700,15 @@ def register(
     password: str = Form(...),
     display_name: str = Form(""),
     session: Session = Depends(get_db_session),
-    _: None = CsrfRequired,
+    # Graceful CSRF on this public pre-auth form — see auth.login / the
+    # require_csrf_or_reissue docstring. No-session => re-serve with a fresh
+    # token+cookie; a real mismatch still 403s.
+    csrf_token: str = Form(""),
 ):
+    reissue = require_csrf_or_reissue(request, csrf_token, "register.html", {"title": "Register"})
+    if reissue is not None:
+        return reissue
+
     username = username.strip().lower()
     display_name = display_name.strip()
 
@@ -6152,7 +6160,9 @@ def forgot_password_submit(
     request: Request,
     email: str = Form(...),
     session: Session = Depends(get_db_session),
-    _: None = CsrfRequired,
+    # Graceful CSRF on this public pre-auth form — see the
+    # require_csrf_or_reissue docstring.
+    csrf_token: str = Form(""),
 ):
     """Identical response shape for registered vs unregistered emails.
 
@@ -6161,6 +6171,12 @@ def forgot_password_submit(
     we find a user, queue a token, get rate-limited, or fail any
     intermediate check — only the side-effects differ.
     """
+    reissue = require_csrf_or_reissue(
+        request, csrf_token, "forgot_password.html", {"title": "Forgot password"}
+    )
+    if reissue is not None:
+        return reissue
+
     email_clean = (email or "").strip().lower()
     client_ip = _client_ip_for(request)
     neutral_response = render(
@@ -6247,7 +6263,10 @@ def reset_password_submit(
     password: str = Form(...),
     password_confirm: str = Form(...),
     session: Session = Depends(get_db_session),
-    _: None = CsrfRequired,
+    # Graceful CSRF on this public pre-auth form — see the
+    # require_csrf_or_reissue docstring. Re-render keeps the reset token so
+    # the user can resubmit (the token is re-validated in the body anyway).
+    csrf_token: str = Form(""),
 ):
     """Re-validate the token, set the new password, mark used.
 
@@ -6256,6 +6275,15 @@ def reset_password_submit(
     for hours, etc.). Same find_valid_token call, same invalid-state
     branch on the rendered page.
     """
+    reissue = require_csrf_or_reissue(
+        request,
+        csrf_token,
+        "reset_password.html",
+        {"title": "Reset password", "invalid": False, "token": token},
+    )
+    if reissue is not None:
+        return reissue
+
     token_row = find_valid_token(session, token)
     if token_row is None:
         return render(
