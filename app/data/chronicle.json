@@ -1,5 +1,15 @@
 [
   {
+    "version": "3.33.1",
+    "date": "2026-06-01",
+    "added": [],
+    "refined": [],
+    "resolved": [
+      "Signing in is now case-insensitive for your email address, and editing your email on the account page stores it in a consistent lowercase form — so a stray capital letter can never lock you out of your own account."
+    ],
+    "archivist_note": "A quiet safeguard against a trap we'd left half-open. The archive had always tidied your email to lowercase when you registered or asked for a password reset, but the account page's edit-email field didn't, and sign-in insisted on an exact match — so an account changed to \"Jason@…\" could leave you locked out the next time you typed \"jason@…\" out of habit. Now every door treats your email the same way: stored in one canonical form, and recognised whatever case you happen to type. The feature behind it — editing your email and display name — turned out to have been quietly working all along; this is the corner of it we hadn't swept."
+  },
+  {
     "version": "3.33.0",
     "date": "2026-06-01",
     "added": [

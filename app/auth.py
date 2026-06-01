@@ -1,5 +1,6 @@
 from fastapi import Request
 from pwdlib import PasswordHash
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.models import User
@@ -46,7 +47,15 @@ def verify_password(password: str, stored_hash: str | None) -> bool:
 
 
 def get_user_by_username(db: Session, username: str) -> User | None:
-    return db.query(User).filter(User.username == username).first()
+    # v3.33.1 — case-insensitive lookup so a case typo can't block sign-in.
+    # Only caller is authenticate_user (login). Usernames are canonical
+    # lowercase (registration / forgot-password / update-profile all lower()),
+    # so a case-only collision isn't reachable; func.lower also rescues any
+    # legacy mixed-case row. The users table is tiny, so the non-indexed
+    # comparison is negligible.
+    return (
+        db.query(User).filter(func.lower(User.username) == (username or "").strip().lower()).first()
+    )
 
 
 def authenticate_user(db: Session, username: str, password: str) -> User | None:

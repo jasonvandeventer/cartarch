@@ -73,7 +73,10 @@ def update_profile(
     current_user: User = Depends(get_current_user),
     _: None = CsrfRequired,
 ):
-    email = email.strip()
+    # v3.33.1 — canonicalize to lowercase, mirroring registration
+    # (main.py) and forgot-password. Without this a mixed-case edit would
+    # store a mixed-case username and lock the user out at login.
+    email = email.strip().lower()
     display_name = display_name.strip() or None
 
     if "@" not in email or "." not in email.split("@", 1)[1]:
