@@ -96,8 +96,11 @@ from app.game_service import (
     get_deck_record,
     get_game,
     get_seat_commander_image_urls,
+    get_viewable_game,
     list_games,
     normalize_game_format,
+    reassign_seat_user,
+    set_game_playgroup,
     toggle_seat_art_background,
     update_game_notes,
 )
@@ -5680,6 +5683,10 @@ def game_new_page(
     decks_by_user_json = {}
     for d in all_decks:
         decks_by_user_json.setdefault(str(d.user_id), []).append({"id": d.id, "name": d.name})
+    # v3.32.0 — optional playgroup link picker. Linking a game to a playgroup
+    # lets every member view it (read-only). Only the user's own playgroups
+    # are offered. Empty list → the template hides the picker.
+    user_playgroups = playgroup_service.list_playgroups_for_user(session, current_user.id)
     return render(
         request,
         "game_new.html",
@@ -5687,6 +5694,7 @@ def game_new_page(
             "title": "New Game",
             "users_json": users_json,
             "decks_by_user_json": decks_by_user_json,
+            "user_playgroups": user_playgroups,
             "current_user": current_user,
             "current_user_id": current_user.id,
         },
@@ -5704,6 +5712,7 @@ def game_create(
     grid_positions: list[str] = Form(default=[]),
     starting_life: int = Form(40),
     first_seat_number: int | None = Form(None),
+    playgroup_id: str = Form(""),
     session: Session = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
     _: None = CsrfRequired,
@@ -5773,6 +5782,16 @@ def game_create(
         first_seat_number=fsn,
         client_token=secrets.token_urlsafe(8),
     )
+    # v3.32.0 — optional playgroup link. set_game_playgroup validates the
+    # owner is a member of the target playgroup; a bad / non-member / empty
+    # value simply leaves the game private (non-blocking, mirroring the
+    # first_seat_number / format philosophy).
+    pg_raw = playgroup_id.strip()
+    if pg_raw:
+        try:
+            set_game_playgroup(session, game.id, current_user.id, int(pg_raw))
+        except ValueError:
+            pass
     return RedirectResponse(f"/games/{game.id}", status_code=303)
 
 
@@ -5783,11 +5802,28 @@ def game_detail_page(
     session: Session = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
 ):
-    game = get_game(session, game_id, current_user.id)
+    # v3.32.0 — viewer-scoped: owner, seat-attributed players, and members of
+    # a linked playgroup may all view. Mutation controls stay owner-only,
+    # gated on ``is_owner`` in the template.
+    game = get_viewable_game(session, game_id, current_user.id)
     if not game:
         raise HTTPException(status_code=404, detail="Game not found")
-    decks = session.query(Deck).filter(Deck.user_id == current_user.id).order_by(Deck.name).all()
+    is_owner = game.user_id == current_user.id
     seat_commander_images = get_seat_commander_image_urls(session, game)
+    # Owner-only controls need supporting data; participants get none of it.
+    decks: list[Deck] = []
+    pickable_users: list[User] = []
+    user_playgroups: list[dict] = []
+    if is_owner:
+        from app import playgroup_service
+
+        decks = (
+            session.query(Deck).filter(Deck.user_id == current_user.id).order_by(Deck.name).all()
+        )
+        # People picker for retroactive seat→user attribution + playgroup
+        # picker to open the game up to a group.
+        pickable_users = playgroup_service.get_pickable_users(session, current_user.id)
+        user_playgroups = playgroup_service.list_playgroups_for_user(session, current_user.id)
     return render(
         request,
         "game_detail.html",
@@ -5795,6 +5831,9 @@ def game_detail_page(
             "title": f"Game {game_id}",
             "game": game,
             "decks": decks,
+            "is_owner": is_owner,
+            "pickable_users": pickable_users,
+            "user_playgroups": user_playgroups,
             "current_user": current_user,
             "seat_commander_images": seat_commander_images,
         },
@@ -5865,6 +5904,61 @@ def game_seat_art_toggle(
     new_value = toggle_seat_art_background(session, game_id, seat_id, current_user.id)
     if new_value is None:
         raise HTTPException(status_code=404, detail="Game or seat not found")
+    return RedirectResponse(url=f"/games/{game_id}", status_code=303)
+
+
+@app.post("/games/{game_id}/seats/{seat_id}/assign-user")
+def game_seat_assign_user(
+    request: Request,
+    game_id: int,
+    seat_id: int,
+    user_id: str = Form(""),
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+    _: None = CsrfRequired,
+):
+    """Owner-only: retroactively attribute (or clear) a seat's user (v3.32.0).
+
+    Fixes name-only seats — e.g. a Draft game recorded with free-text player
+    names but no linked accounts. Empty / ``0`` / invalid ``user_id`` clears
+    the attribution (back to name-only). Ownership + seat membership enforced
+    in :func:`reassign_seat_user`; either miss → 404. Once a seat is attributed
+    to a user, that user can view the game (hybrid visibility).
+    """
+    uid_raw = user_id.strip()
+    try:
+        target_user_id = int(uid_raw) if uid_raw else None
+    except ValueError:
+        target_user_id = None
+    result = reassign_seat_user(session, game_id, seat_id, current_user.id, target_user_id)
+    if result is None or result is False:
+        raise HTTPException(status_code=404, detail="Game or seat not found")
+    return RedirectResponse(url=f"/games/{game_id}", status_code=303)
+
+
+@app.post("/games/{game_id}/playgroup")
+def game_set_playgroup(
+    request: Request,
+    game_id: int,
+    playgroup_id: str = Form(""),
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+    _: None = CsrfRequired,
+):
+    """Owner-only: link the game to a playgroup, or clear the link (v3.32.0).
+
+    Linking opens the game to every member of that playgroup (read-only).
+    Empty value clears the link. :func:`set_game_playgroup` enforces that the
+    caller owns the game AND is a member of the target playgroup; a violation
+    → 404 (non-leaky, matching the game-not-found path).
+    """
+    pg_raw = playgroup_id.strip()
+    try:
+        target_pg_id = int(pg_raw) if pg_raw else None
+    except ValueError:
+        target_pg_id = None
+    if not set_game_playgroup(session, game_id, current_user.id, target_pg_id):
+        raise HTTPException(status_code=404, detail="Game or playgroup not found")
     return RedirectResponse(url=f"/games/{game_id}", status_code=303)
 
 

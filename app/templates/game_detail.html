@@ -14,6 +14,18 @@
   <div class="game-app"
        id="game-app"
        {% if is_ended %}data-ended="1"{% endif %}>
+    {% if not is_owner %}
+      {# v3.32.0 — participant / playgroup-member read-only view. All
+         server-mutating controls below are gated on is_owner. #}
+      <div class="panel"
+           style="margin:0 0 0.75rem;border-left:3px solid var(--brand-gold, #b8860b)">
+        <p class="muted" style="margin:0">
+          You're viewing a game recorded by
+          <strong>{{ game.user.display_name or game.user.username if game.user else 'another player' }}</strong>
+          — read-only.
+        </p>
+      </div>
+    {% endif %}
     {# ── Editorial masthead (top band) ─────────────────────────── #}
     <div class="game-masthead" id="game-masthead">
       <div class="mast-left">
@@ -72,9 +84,11 @@
                     class="mast-btn"
                     id="pause-btn"
                     onclick="togglePause()">⏸ Pause</button>
-            <button type="button"
-                    class="mast-btn mast-btn-end"
-                    onclick="toggleEndGame()">End game</button>
+            {% if is_owner %}
+              <button type="button"
+                      class="mast-btn mast-btn-end"
+                      onclick="toggleEndGame()">End game</button>
+            {% endif %}
             <button type="button"
                     class="mast-btn mast-btn-fs"
                     id="fs-btn"
@@ -88,14 +102,16 @@
                     id="fs-btn"
                     onclick="toggleFullscreen()"
                     title="Toggle fullscreen">⛶</button>
-            <form method="post"
-                  action="/games/{{ game.id }}/delete"
-                  style="display:inline">
-              <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-              <button type="submit"
-                      class="mast-btn mast-btn-end"
-                      onclick="return confirm('Delete this game record?')">Delete</button>
-            </form>
+            {% if is_owner %}
+              <form method="post"
+                    action="/games/{{ game.id }}/delete"
+                    style="display:inline">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <button type="submit"
+                        class="mast-btn mast-btn-end"
+                        onclick="return confirm('Delete this game record?')">Delete</button>
+              </form>
+            {% endif %}
           </div>
         {% endif %}
       </div>
@@ -168,7 +184,7 @@
                           class="tc-elim-btn"
                           onclick="toggleEliminate({{ seat.id }})"
                           title="Eliminate / revive">☠</button>
-                  {% if seat_commander_images.get(seat.id) %}
+                  {% if is_owner and seat_commander_images.get(seat.id) %}
                     <form action="/games/{{ game.id }}/seats/{{ seat.id }}/art-toggle"
                           method="post"
                           class="tc-art-toggle-form">
@@ -302,6 +318,7 @@
         </div>
       </div>
       {# ── End-game modal (preserved verbatim) ───────────────────── #}
+      {% if is_owner %}
       <div id="end-game-modal" class="end-game-modal" style="display:none">
         <div class="end-game-inner">
           <h3 style="margin:0 0 1rem">Record result</h3>
@@ -368,6 +385,74 @@
                 class="mast-btn mast-btn-delete-discrete"
                 onclick="return confirm('Delete this game record?')">Delete game</button>
       </form>
+      {% endif %}
+    {% endif %}
+    {% if is_owner %}
+      {# ── Players & sharing (owner-only) — retroactive seat→user
+         attribution + optional playgroup link (v3.32.0) ── #}
+      {% set pickable_ids = pickable_users | map(attribute='id') | list %}
+      <section class="panel" style="margin-top:1.5rem" id="game-players-panel">
+        <h3 class="panel-title">Players &amp; sharing</h3>
+        <p class="muted" style="margin-top:-0.35rem">
+          Link each seat to a user so they can view this game, and optionally
+          share the whole record with a playgroup. Only you can change this.
+        </p>
+        <form method="post"
+              action="/games/{{ game.id }}/playgroup"
+              style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap;margin:0.5rem 0 1.25rem">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <label for="game-playgroup-select" style="margin:0">Shared with playgroup</label>
+          <select name="playgroup_id" id="game-playgroup-select">
+            <option value="">— Not shared —</option>
+            {% for pg in user_playgroups %}
+              <option value="{{ pg.playgroup.id }}"
+                      {% if game.playgroup_id == pg.playgroup.id %}selected{% endif %}>{{ pg.playgroup.name }}</option>
+            {% endfor %}
+          </select>
+          <button type="submit">Save</button>
+          {% if not user_playgroups %}
+            <span class="muted" style="font-size:0.85rem">
+              You're not in any playgroup yet. <a href="/playgroups">Create or join one</a> to share by group.
+            </span>
+          {% endif %}
+        </form>
+        <div class="table-wrap">
+          <table class="stacking-table">
+            <thead>
+              <tr><th>Seat</th><th>Player name</th><th>Linked user</th><th></th></tr>
+            </thead>
+            <tbody>
+              {% for seat in game.seats %}
+                <tr>
+                  <td data-label="Seat">{{ seat.seat_number }}</td>
+                  <td data-label="Player">{{ seat.player_name }}</td>
+                  <td data-label="Linked user" colspan="2">
+                    <form method="post"
+                          action="/games/{{ game.id }}/seats/{{ seat.id }}/assign-user"
+                          style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap">
+                      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                      <select name="user_id">
+                        <option value="">— Unattributed —</option>
+                        {% if seat.user_id and seat.user_id not in pickable_ids %}
+                          {# Currently-linked user is outside the picker scope
+                             (e.g. left the playgroup) — keep them selectable so
+                             saving doesn't silently drop the attribution. #}
+                          <option value="{{ seat.user_id }}" selected>{{ seat.user_name_at_game or 'Linked user' }}</option>
+                        {% endif %}
+                        {% for u in pickable_users %}
+                          <option value="{{ u.id }}"
+                                  {% if seat.user_id == u.id %}selected{% endif %}>{{ u.display_name or u.username }}</option>
+                        {% endfor %}
+                      </select>
+                      <button type="submit">Save</button>
+                    </form>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </section>
     {% endif %}
   </div>
 {% endblock %}

@@ -33,6 +33,18 @@
           <option value="20">20 (Standard/Modern)</option>
           <option value="30">30 (Brawl)</option>
         </select>
+        {# v3.32.0 — optional playgroup link. Linking lets every member of the
+           playgroup view the finished game record (read-only). Only the user's
+           own playgroups are offered; omitted entirely when they have none. #}
+        {% if user_playgroups %}
+          <label>Share with Playgroup <span class="muted">(optional)</span></label>
+          <select name="playgroup_id">
+            <option value="" selected>— Not shared —</option>
+            {% for pg in user_playgroups %}
+              <option value="{{ pg.playgroup.id }}">{{ pg.playgroup.name }}</option>
+            {% endfor %}
+          </select>
+        {% endif %}
         <label>Number of Players</label>
         <div class="player-count-row">
           {% for n in [2, 3, 4, 5, 6, 7, 8] %}

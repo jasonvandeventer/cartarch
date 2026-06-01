@@ -43,6 +43,13 @@
               <tr>
                 <td>
                   <a href="/games/{{ game.id }}">{{ game.played_at.strftime("%Y-%m-%d") }}</a>
+                  {% if not game.is_owned_by_viewer %}
+                    <span class="muted"
+                          style="font-size:0.7rem;
+                                 text-transform:uppercase;
+                                 letter-spacing:0.04em"
+                          title="A game you played in or that's shared with your playgroup — read-only">shared</span>
+                  {% endif %}
                 </td>
                 <td class="col-priority-low" data-label="Format">{{ game.format or '—' }}</td>
                 <td data-label="Players">
@@ -64,29 +71,34 @@
                     <span class="muted">In progress</span>
                   {% endif %}
                 </td>
-                <td class="notes-cell col-priority-low"
+                {# Notes are editable only by the owner (the notes POST is
+                   owner-only); participants see a read-only preview. #}
+                <td class="{% if game.is_owned_by_viewer %}notes-cell {% endif %}col-priority-low"
                     data-label="Notes"
-                    data-game-id="{{ game.id }}"
-                    data-notes="{{ game.notes or '' }}">
+                    {% if game.is_owned_by_viewer %}data-game-id="{{ game.id }}" data-notes="{{ game.notes or '' }}"{% endif %}>
                   {% if game.notes %}
                     {% if game.notes|length > 80 %}
                       <span class="notes-cell-preview">{{ game.notes[:80] }}…</span>
                     {% else %}
                       <span class="notes-cell-preview">{{ game.notes }}</span>
                     {% endif %}
-                  {% else %}
+                  {% elif game.is_owned_by_viewer %}
                     <span class="notes-cell-add">Add notes…</span>
+                  {% else %}
+                    <span class="muted">—</span>
                   {% endif %}
                 </td>
                 <td>
-                  <form method="post"
-                        action="/games/{{ game.id }}/delete"
-                        style="display:inline">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                    <button type="submit"
-                            class="btn-danger-small"
-                            onclick="return confirm('Delete this game record?')">Delete</button>
-                  </form>
+                  {% if game.is_owned_by_viewer %}
+                    <form method="post"
+                          action="/games/{{ game.id }}/delete"
+                          style="display:inline">
+                      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                      <button type="submit"
+                              class="btn-danger-small"
+                              onclick="return confirm('Delete this game record?')">Delete</button>
+                    </form>
+                  {% endif %}
                 </td>
               </tr>
             {% endfor %}
