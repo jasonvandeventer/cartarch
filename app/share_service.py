@@ -44,7 +44,7 @@ row goes, with the defensive read-skip in
 from __future__ import annotations
 
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session, contains_eager, joinedload
 
 from app.models import (
     Card,
@@ -237,10 +237,41 @@ def delete_showcase(session: Session, user_id: int, showcase_id: int) -> bool:
     return True
 
 
+def _query_showcase_items(session: Session, showcase_id: int, search: str = ""):
+    """Fetch a Showcase's ShowcaseItems, oldest-display-first, optionally
+    filtered by the app's boolean/Scryfall-style search language (v3.32.3).
+
+    Joins through InventoryRow → Card (INNER, via the relationships) so the
+    shared boolean parser (`apply_collection_search_filters`, the same one
+    that backs the Collection search bar — `t:`, `id:`, `c:`, `is:`, `qty:`,
+    `price:`, `cmc:`, `lang:`, OR/AND/NOT/parentheses) can filter on Card /
+    InventoryRow columns. ``contains_eager`` reuses that join for eager
+    loading so there's no second query per item. The INNER join also drops
+    any dangling-FK ShowcaseItem at the query level (the per-item None guard
+    in the callers stays as defense in depth). The import of
+    `apply_collection_search_filters` is function-local to avoid a module
+    import cycle (inventory_service ↔ share_service).
+    """
+    q = (
+        session.query(ShowcaseItem)
+        .filter(ShowcaseItem.showcase_id == showcase_id)
+        .join(ShowcaseItem.inventory_row)
+        .join(InventoryRow.card)
+        .options(contains_eager(ShowcaseItem.inventory_row).contains_eager(InventoryRow.card))
+        .order_by(ShowcaseItem.added_at.desc())
+    )
+    if search and search.strip():
+        from app.inventory_service import apply_collection_search_filters
+
+        q = apply_collection_search_filters(q, search)
+    return q.all()
+
+
 def get_showcase_with_items(
     session: Session,
     user_id: int,
     showcase_id: int,
+    search: str = "",
 ) -> dict | None:
     """Management-page payload — one Showcase + items + computed totals.
 
@@ -261,15 +292,7 @@ def get_showcase_with_items(
     showcase = get_showcase(session, user_id, showcase_id)
     if showcase is None:
         return None
-    items_q = (
-        session.query(ShowcaseItem)
-        .filter(ShowcaseItem.showcase_id == showcase.id)
-        .options(
-            joinedload(ShowcaseItem.inventory_row).joinedload(InventoryRow.card),
-        )
-        .order_by(ShowcaseItem.added_at.desc())
-        .all()
-    )
+    items_q = _query_showcase_items(session, showcase.id, search)
     items: list[dict] = []
     total_value = 0.0
     for it in items_q:
@@ -625,6 +648,7 @@ def get_share_view(
     session: Session,
     viewer_user_id: int,
     share_id: int,
+    search: str = "",
 ) -> dict | None:
     """Resolve a Share for a viewer. Returns sanitized projection or None.
 
@@ -666,7 +690,7 @@ def get_share_view(
     if showcase is None:
         # Defensive — Share should always carry a Showcase.
         return None
-    display_items = build_share_display_items(session, showcase)
+    display_items = build_share_display_items(session, showcase, search)
     # v3.31.0 — surface the curated list's headline total value. Sum of
     # the per-item finish-aware ``total_value`` already computed in the
     # sanitized projection (price × displayed-available).
@@ -714,6 +738,7 @@ _SHARE_CARD_FIELDS = (
 def build_share_display_items(
     session: Session,
     showcase: Showcase,
+    search: str = "",
 ) -> list[dict]:
     """Return the sanitized projection of a Showcase's items for shared view.
 
@@ -750,15 +775,7 @@ def build_share_display_items(
     render time (dangling FK — should be impossible after §9
     cleanup, defense in depth) are silently skipped from the list.
     """
-    items_q = (
-        session.query(ShowcaseItem)
-        .filter(ShowcaseItem.showcase_id == showcase.id)
-        .options(
-            joinedload(ShowcaseItem.inventory_row).joinedload(InventoryRow.card),
-        )
-        .order_by(ShowcaseItem.added_at.desc())
-        .all()
-    )
+    items_q = _query_showcase_items(session, showcase.id, search)
     display: list[dict] = []
     for it in items_q:
         inv = it.inventory_row

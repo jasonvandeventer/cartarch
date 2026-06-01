@@ -11874,6 +11874,19 @@ table.dmtx .dmtx-rowhead {
   margin-top: 0.5rem;
 }
 
+/* Server-side card search inside a showcase / shared view (v3.32.3) — submits
+   the app's boolean/Scryfall query, mirroring the Collection search bar. */
+.list-search-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+.list-search-form .list-filter-input {
+  flex: 1 1 320px;
+}
+
 /* Shares list (on /shares) */
 .share-table .share-pg-link {
   font-family: Newsreader, Georgia, serif;

@@ -1,5 +1,15 @@
 [
   {
+    "version": "3.32.3",
+    "date": "2026-06-01",
+    "added": [],
+    "refined": [
+      "The card search inside a Showcase — and inside a shared, read-only view — now speaks the same language as the main Collection search bar. Type a query like t:creature, id:gw, c:r, is:foil, or cmc>=4, and combine them with OR, NOT, and parentheses, instead of just matching a card's name."
+    ],
+    "resolved": [],
+    "archivist_note": "A small sharpening of yesterday's addition. When we made Showcases and Shares searchable, the box inside a showcase only matched on a card's name — serviceable, but a step behind the rich query language the Collection page has long understood. Now they're the same tool: ask a showcase for its red instants, its colourless artifacts, its four-drops, in exactly the syntax you'd use anywhere else in the archive. The list pages still search by plain name, as they should — there are no card types in a list of list names. And because the read-only shared view runs your query before it draws the curated cards, a search can only narrow what was already on display; it can never coax out a detail the owner chose to keep private."
+  },
+  {
     "version": "3.32.2",
     "date": "2026-06-01",
     "added": [

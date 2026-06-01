@@ -349,6 +349,84 @@ def test_bulk_add_rows() -> int:
     return failed
 
 
+def test_card_search_scryfall_syntax() -> int:
+    """v3.32.3 — the card search inside a Showcase / shared view accepts the
+    app's boolean/Scryfall query language (same parser as the Collection bar),
+    applied server-side via `get_showcase_with_items(..., search=...)` and
+    `get_share_view(..., search=...)`."""
+    failed = 0
+    s = _fresh_session()
+    user = User(username="searcher", password_hash="x")
+    s.add(user)
+    s.flush()
+    sc = share_service.create_showcase(s, user.id, "Binder", None)
+
+    # name, type_line, color_identity
+    specs = [
+        ("Llanowar Elves", "Creature — Elf Druid", "G"),
+        ("Sol Ring", "Artifact", ""),  # colorless
+        ("Lightning Bolt", "Instant", "R"),
+        ("Birds of Paradise", "Creature — Bird", "G"),
+    ]
+    for name, type_line, ci in specs:
+        card = Card(
+            scryfall_id=f"srch-{next(_scryfall_seq)}",
+            name=name,
+            set_code="tst",
+            collector_number=str(next(_scryfall_seq)),
+            type_line=type_line,
+            color_identity=ci,
+        )
+        s.add(card)
+        s.flush()
+        row = InventoryRow(
+            card_id=card.id, user_id=user.id, quantity=1, finish="normal", is_pending=False
+        )
+        s.add(row)
+        s.flush()
+        s.add(ShowcaseItem(showcase_id=sc.id, inventory_row_id=row.id, quantity_offered=1))
+    s.commit()
+
+    def names(search):
+        data = share_service.get_showcase_with_items(s, user.id, sc.id, search=search)
+        return sorted(i["card"].name for i in data["items"])
+
+    cases = [
+        ("", ["Birds of Paradise", "Lightning Bolt", "Llanowar Elves", "Sol Ring"]),
+        ("t:creature", ["Birds of Paradise", "Llanowar Elves"]),
+        # id: is the commander-legal "within" filter → colorless Sol Ring is a
+        # subset of {G} and matches alongside the green cards.
+        ("id:g", ["Birds of Paradise", "Llanowar Elves", "Sol Ring"]),
+        ("t:instant OR t:artifact", ["Lightning Bolt", "Sol Ring"]),
+        ("-t:creature", ["Lightning Bolt", "Sol Ring"]),
+        ("t:goblin", []),  # no matches
+    ]
+    for search, expected in cases:
+        got = names(search)
+        if got == expected:
+            print(f"  [OK] showcase search {search!r} → {expected}")
+        else:
+            print(f"  [FAIL] showcase search {search!r}: expected {expected}, got {got}")
+            failed += 1
+
+    # The same search threads through the read-only share view, AFTER the
+    # privacy projection (filter runs server-side before projection).
+    pg = Playgroup(name="PG", created_by=user.id, join_code="SRCH1")
+    s.add(pg)
+    s.flush()
+    share = Share(user_id=user.id, showcase_id=sc.id, playgroup_id=pg.id)
+    s.add(share)
+    s.commit()
+    view = share_service.get_share_view(s, user.id, share.id, search="t:creature")
+    sv_names = sorted(i["card"].name for i in view["items"])
+    if sv_names == ["Birds of Paradise", "Llanowar Elves"]:
+        print("  [OK] share view search 't:creature' filters the projection")
+    else:
+        print(f"  [FAIL] share view search: got {sv_names}")
+        failed += 1
+    return failed
+
+
 def test_share_view_renders_through_route() -> int:
     """Regression: GET /shares/{id} must actually render.
 
@@ -428,6 +506,7 @@ def main() -> None:
         ("Item mutation scoped by join", test_item_mutation_scoped_by_join),
         ("Total value", test_total_value),
         ("Bulk add rows", test_bulk_add_rows),
+        ("Card search (Scryfall syntax)", test_card_search_scryfall_syntax),
         ("Delete cascades items + shares", test_delete_cascades_items_and_shares),
         ("Share view renders through route", test_share_view_renders_through_route),
     ]

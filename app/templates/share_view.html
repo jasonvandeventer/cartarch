@@ -40,6 +40,18 @@
 
   <section class="panel">
     <h3 class="panel-title">Showcase</h3>
+    {% if items or search %}
+      {# v3.32.3 — card search uses the app's boolean/Scryfall query language
+         (same parser as the Collection bar), server-side; the filter runs
+         before the privacy projection so it never widens what's exposed. #}
+      <form method="get" action="/shares/{{ share.id }}" class="list-search-form">
+        <input type="search" name="search" value="{{ search }}"
+               placeholder="t:creature · id:gw · c:r · is:foil · cmc&gt;=4 · OR / NOT / ( )"
+               aria-label="Search cards in this showcase" class="list-filter-input">
+        <button type="submit" class="btn-like">Search</button>
+        {% if search %}<a class="btn-like" href="/shares/{{ share.id }}">Clear</a>{% endif %}
+      </form>
+    {% endif %}
     {% if items %}
       {# v3.29.2 — propose-from-share link. Each item gets a small
          "Propose trade for this" link that hops to /trades/new with
@@ -49,19 +61,9 @@
          to viewers who are NOT the sharer (sharer can't trade with
          themselves; trade_service.resolve_propose_from_showcase_item
          filters this case out too). #}
-      {% if items | length > 5 %}
-        <div class="list-filter-wrap">
-          <input type="text" class="list-filter-input" placeholder="Filter cards by name…"
-                 aria-label="Filter cards by name"
-                 data-list-filter
-                 data-list-filter-target="#share-view-grid .share-view-item-wrap"
-                 data-list-filter-empty="#share-view-empty">
-          <p id="share-view-empty" class="list-filter-empty" hidden>No cards match that search.</p>
-        </div>
-      {% endif %}
-      <div class="inventory-grid share-view-grid" id="share-view-grid">
+      <div class="inventory-grid share-view-grid">
         {% for item in items %}
-          <div class="share-view-item-wrap" data-filter-text="{{ item.card.name }} {{ item.card.set_code }}">
+          <div class="share-view-item-wrap">
             {{ inventory_card(item, csrf_token,
                               show_collection_actions=false,
                               show_location_label=false,
@@ -73,6 +75,8 @@
           </div>
         {% endfor %}
       </div>
+    {% elif search %}
+      <p class="muted">No cards in this Showcase match <strong>{{ search }}</strong>. <a href="/shares/{{ share.id }}">Clear search</a>.</p>
     {% else %}
       <p class="muted">This Showcase is empty.</p>
     {% endif %}
@@ -81,7 +85,4 @@
   <section class="panel">
     <p class="muted"><em>You're viewing a read-only share.</em> No edit, audit, or action affordances are available — this is a glance-only window into another collector's curated list.</p>
   </section>
-{% endblock %}
-{% block extra_scripts %}
-  <script src="/static/list-filter.js?v={{ static_v('list-filter.js') }}"></script>
 {% endblock %}

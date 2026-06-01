@@ -112,7 +112,12 @@ def showcase_page(
     session: Session = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
 ):
-    data = share_service.get_showcase_with_items(session, current_user.id, showcase_id)
+    # v3.32.3 — card search inside a Showcase uses the app's boolean/Scryfall
+    # query language (same parser as the Collection bar), applied server-side.
+    search = request.query_params.get("search", "")
+    data = share_service.get_showcase_with_items(
+        session, current_user.id, showcase_id, search=search
+    )
     if data is None:
         # Not owned / doesn't exist — non-leaky redirect to the index.
         return RedirectResponse(url="/showcases?error=not_found", status_code=303)
@@ -132,6 +137,7 @@ def showcase_page(
             "items": data["items"],
             "total_value": data["total_value"],
             "locations": locations,
+            "search": search,
             "added": request.query_params.get("added"),
             "error": error,
             "success": success,
@@ -348,7 +354,11 @@ def shares_view(
     error code — the existence of the share id is non-leaky (same
     pattern as ``/playgroups/{id}``).
     """
-    view = share_service.get_share_view(session, current_user.id, share_id)
+    # v3.32.3 — card search within the read-only shared view uses the app's
+    # boolean/Scryfall query language (server-side; the filter runs before the
+    # privacy projection, so it never widens what's exposed).
+    search = request.query_params.get("search", "")
+    view = share_service.get_share_view(session, current_user.id, share_id, search=search)
     if view is None:
         return RedirectResponse(url="/shares?error=share_unavailable", status_code=303)
     return render(
@@ -363,5 +373,6 @@ def shares_view(
             "playgroup": view["playgroup"],
             "items": view["items"],
             "total_value": view["total_value"],
+            "search": search,
         },
     )

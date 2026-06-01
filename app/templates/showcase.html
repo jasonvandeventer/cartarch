@@ -90,21 +90,22 @@
   {# ── Items ── #}
   <section class="panel">
     <h3 class="panel-title">Items in your Showcase</h3>
+    {% if items or search %}
+      {# v3.32.3 — card search uses the app's boolean/Scryfall query language
+         (same parser as the Collection bar), applied server-side. #}
+      <form method="get" action="/showcase/{{ showcase.id }}" class="list-search-form">
+        <input type="search" name="search" value="{{ search }}"
+               placeholder="t:creature · id:gw · c:r · is:foil · cmc&gt;=4 · OR / NOT / ( )"
+               aria-label="Search cards in this showcase" class="list-filter-input">
+        <button type="submit" class="btn-like">Search</button>
+        {% if search %}<a class="btn-like" href="/showcase/{{ showcase.id }}">Clear</a>{% endif %}
+      </form>
+    {% endif %}
     {% if items %}
-      <p class="muted">{{ items | length }} card{{ 's' if items | length != 1 else '' }} curated. <em>Available</em> is the smaller of what you offered and what's currently in your inventory — it updates automatically when you sell or remove cards.</p>
-      {% if items | length > 5 %}
-        <div class="list-filter-wrap">
-          <input type="text" class="list-filter-input" placeholder="Filter cards by name…"
-                 aria-label="Filter cards by name"
-                 data-list-filter
-                 data-list-filter-target="#showcase-items-grid .showcase-item"
-                 data-list-filter-empty="#showcase-items-empty">
-          <p id="showcase-items-empty" class="list-filter-empty" hidden>No cards match that search.</p>
-        </div>
-      {% endif %}
-      <div class="showcase-items-grid" id="showcase-items-grid">
+      <p class="muted">{{ items | length }} card{{ 's' if items | length != 1 else '' }}{{ ' match' if search else ' curated' }}. <em>Available</em> is the smaller of what you offered and what's currently in your inventory — it updates automatically when you sell or remove cards.</p>
+      <div class="showcase-items-grid">
         {% for item in items %}
-          <article class="showcase-item" data-filter-text="{{ item.card.name }} {{ item.card.set_name }} {{ item.card.set_code }}">
+          <article class="showcase-item">
             <div class="showcase-item-art">
               {% if item.card.image_url %}
                 <img src="{{ item.card.image_url }}" alt="{{ item.card.name }}" loading="lazy">
@@ -146,6 +147,8 @@
           </article>
         {% endfor %}
       </div>
+    {% elif search %}
+      <p class="showcase-empty">No cards in this Showcase match <strong>{{ search }}</strong>. <a href="/showcase/{{ showcase.id }}">Clear search</a>.</p>
     {% else %}
       <p class="showcase-empty">Your Showcase is empty. Open <a href="/collection">your Collection</a>, find a card, expand its <em>Actions</em> menu, and click <strong>Add to Showcase</strong>.</p>
     {% endif %}
@@ -155,7 +158,4 @@
   <section class="panel">
     <p class="muted">Ready to share? Head to the <a href="/shares">Shares</a> page to expose this Showcase to a playgroup, read-only.</p>
   </section>
-{% endblock %}
-{% block extra_scripts %}
-  <script src="/static/list-filter.js?v={{ static_v('list-filter.js') }}"></script>
 {% endblock %}
