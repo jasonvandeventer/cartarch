@@ -1,5 +1,15 @@
 [
   {
+    "version": "3.31.2",
+    "date": "2026-05-31",
+    "added": [],
+    "refined": [],
+    "resolved": [
+      "Signing in could fail with 'Invalid CSRF token' and leave you stuck on the sign-in page no matter how many times you tried. It now recovers on its own: if your browser reached the form without a valid session, the page quietly refreshes itself and your next sign-in goes through. Genuinely bad submissions are still refused, so the protection stays intact."
+    ],
+    "archivist_note": "The sign-in form protects itself with a token: the page hands your browser a secret, and the form has to hand the same secret back. That stops a hostile site from submitting the form on your behalf. The check is sound — but it assumed the browser would always still be holding the secret by the time it submitted, and a browser arriving with a stale, expired, or wrong-host session held nothing to match. The form had no choice but to refuse, and refusing didn't repair the missing secret, so an honest person could be locked out for good. The application code along this path hadn't actually changed from the prior, working line; what changed around the release — a new public landing page and a second public address — was enough to leave some browsers turning up empty-handed. The fix teaches just the public, not-yet-signed-in forms to tell two cases apart: a mismatched secret (still refused, because that's the suspicious one) versus no secret at all (a fresh start — so the form re-issues one and invites you to try again). There is nothing to protect before you've signed in, so handing out a new secret costs nothing and unsticks the door. A new end-to-end test now drives the empty-session sign-in the whole way through, so this particular lock-out can't return unseen."
+  },
+  {
     "version": "3.31.1",
     "date": "2026-05-31",
     "added": [],

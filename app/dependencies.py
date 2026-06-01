@@ -222,6 +222,73 @@ def require_csrf_token(
 CsrfRequired = Depends(require_csrf_token)
 
 
+def csrf_state(request: Request, csrf_token: str) -> str:
+    """Classify a submitted CSRF token against the session, without raising.
+
+    - ``"ok"``        — the form token matches the session token.
+    - ``"mismatch"``  — a session token exists but the form token differs
+                        (a stale form posted against a still-live session, or
+                        a forgery). The strict, suspicious case.
+    - ``"no_session"``— the session carries NO csrf_token at all. This is the
+                        "first contact" state: the request arrived with no
+                        usable session cookie, so the server never had a token
+                        to match against. Kept distinct from ``"mismatch"`` so
+                        the public auth forms can recover instead of dead-
+                        ending the user on a 403 (see ``require_csrf_or_reissue``).
+    """
+    expected = request.session.get("csrf_token", "")
+    if not expected:
+        return "no_session"
+    return "ok" if csrf_token == expected else "mismatch"
+
+
+def require_csrf_or_reissue(
+    request: Request,
+    csrf_token: str,
+    template: str,
+    ctx: dict | None = None,
+):
+    """CSRF guard for the PUBLIC, pre-auth forms (login/register/forgot/reset).
+
+    Same strict double-submit as :func:`require_csrf_token`, with a single
+    softening that is only safe *before* a user is authenticated: when the
+    session has no established token at all (``"no_session"``), re-render the
+    form with a freshly issued token instead of returning 403.
+
+    Why: v3.31.0 surfaced an "Invalid CSRF token" sign-in regression
+    (POST /login -> 403) that was NOT reproducible from the request/response
+    code — that path is byte-identical to the known-good v3.30.x line. It is
+    a *cookie-continuity* failure: a logged-out browser reaches POST /login
+    carrying no usable session cookie (a stale/expired cookie the server now
+    drops as an empty session, a cookie scoped to the pre-cutover host, or a
+    login page served from an edge cache without its per-user Set-Cookie). The
+    form then has no session token to match, so strict double-submit hard-
+    fails — and because GET /login alone can't repair a cookie the browser
+    won't replace, the user is stuck on a permanent 403 dead-end.
+
+    The reissue path is safe here precisely because the session is empty:
+    there is no authenticated state to protect, and login/register are not
+    state-changing for an existing account. Calling :func:`render` runs
+    :func:`get_csrf_token`, which mints a fresh token into the (empty) session;
+    SessionMiddleware then emits a new Set-Cookie, so the user's immediate
+    resubmit carries a matching cookie + token and succeeds. A genuine
+    ``"mismatch"`` (live session, wrong token) still hard-fails with 403.
+
+    Returns ``None`` when validation passes (the caller proceeds with its
+    handler body), or a ``TemplateResponse`` the caller must return as-is.
+    """
+    state = csrf_state(request, csrf_token)
+    if state == "ok":
+        return None
+    if state == "mismatch":
+        raise HTTPException(status_code=403, detail="Invalid CSRF token")
+    # "no_session": re-render with a fresh token + cookie so the retry works.
+    reissue_ctx = {"error": "Your session expired before you submitted. Please try again."}
+    if ctx:
+        reissue_ctx.update(ctx)
+    return render(request, template, reissue_ctx)
+
+
 def _pending_count_for(user_id: int | None) -> int:
     """Count this user's pending-placement rows. Used by the mobile nav badge.
 
