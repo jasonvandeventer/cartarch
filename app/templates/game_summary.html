@@ -1,0 +1,87 @@
+{% from "_macros.html" import editorial_eyebrow %}
+{% extends "base.html" %}
+{% block content %}
+  {# v3.33.2 — read-only summary for a FINALIZED game. Replaces the frozen
+     full-screen life tracker (which read as a "non-functional tracker") with a
+     normal page showing the recorded results: final standings, turn count,
+     elapsed playtime, full notes. Live games still render game_detail.html. #}
+  {% set winner = game.seats | selectattr('placement', 'eq', 1) | first | default(none) %}
+  <section class="panel hero-panel compact-hero">
+    <div class="hero-row">
+      <div>
+        {{ editorial_eyebrow("Play · Games · Record") }}
+        <h2 class="panel-title">{{ game.played_at | format_local_datetime("%-d %B %Y") }}</h2>
+        <p class="muted">
+          {{ game.format or 'Commander' }} pod
+          {% if game.turn_count %}· {{ game.turn_count }} turns{% endif %}
+          · {{ elapsed if elapsed else '—' }} playtime
+          {% if winner %}· 🏆 {{ winner.player_name }}{% endif %}
+          {% if game.playgroup %}· shared with <a href="/playgroups/{{ game.playgroup.id }}">{{ game.playgroup.name }}</a>{% endif %}
+        </p>
+      </div>
+      <div style="display:flex;gap:0.5rem;flex-wrap:wrap">
+        {% if is_owner %}
+          <button type="button" class="btn-like" onclick="togglePlayersModal()">Players</button>
+        {% endif %}
+        <a href="/games"><button type="button">Back to games</button></a>
+        {% if is_owner %}
+          <form method="post" action="/games/{{ game.id }}/delete" style="display:inline"
+                onsubmit="return confirm('Delete this game record?')">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <button type="submit" class="btn-danger-small">Delete</button>
+          </form>
+        {% endif %}
+      </div>
+    </div>
+    {% if not is_owner %}
+      <p class="muted" style="margin:0.5rem 0 0;border-left:3px solid var(--brand-gold, #b8860b);padding-left:0.6rem">
+        You're viewing a game recorded by
+        <strong>{{ game.user.display_name or game.user.username if game.user else 'another player' }}</strong> — read-only.
+      </p>
+    {% endif %}
+  </section>
+
+  <section class="panel">
+    <h3 class="panel-title">Final standings</h3>
+    <div class="table-wrap">
+      <table class="stacking-table">
+        <thead>
+          <tr><th>Place</th><th>Player</th><th>Deck / Commander</th><th>Final life</th></tr>
+        </thead>
+        <tbody>
+          {% for seat in standings %}
+            <tr>
+              <td data-label="Place">
+                {% if seat.placement %}
+                  {{ seat.placement }}{{ {1:'st',2:'nd',3:'rd'}.get(seat.placement, 'th') }}
+                  {% if seat.placement == 1 %}🏆{% endif %}
+                {% else %}<span class="muted">—</span>{% endif %}
+              </td>
+              <td data-label="Player">
+                {{ seat.player_name }}
+                {% if seat.user_id %}<span class="muted" title="Linked to a user account">· linked</span>{% endif %}
+              </td>
+              <td data-label="Deck / Commander">
+                {{ seat.commander_name_at_game or seat.deck_name_at_game or '—' }}
+              </td>
+              <td data-label="Final life">
+                {% if seat.final_life is not none %}{{ seat.final_life }}{% else %}<span class="muted">—</span>{% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h3 class="panel-title">Notes</h3>
+    {% if game.notes %}
+      <p style="white-space:pre-wrap;margin:0">{{ game.notes }}</p>
+    {% else %}
+      <p class="muted" style="margin:0">No notes recorded.</p>
+    {% endif %}
+  </section>
+
+  {% include "_players_modal.html" %}
+{% endblock %}

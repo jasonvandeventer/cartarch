@@ -395,76 +395,9 @@
       </form>
       {% endif %}
     {% endif %}
-    {% if is_owner %}
-      {# ── Players & sharing modal (owner-only) — rename seats, attribute
-         seats to users, optional playgroup link. v3.32.0 introduced the
-         feature; v3.32.1 moved it into this masthead-triggered modal (the
-         old in-flow panel was unreachable below the fixed full-screen
-         .game-app overlay) and added the per-seat name field. ── #}
-      {% set pickable_ids = pickable_users | map(attribute='id') | list %}
-      <div id="players-modal" class="end-game-modal" style="display:none">
-        <div class="end-game-inner" style="max-width:640px">
-          <h3 style="margin:0 0 0.35rem">Players &amp; sharing</h3>
-          <p class="muted" style="margin:0 0 1rem;font-size:0.9rem">
-            Rename a seat, link it to a user (so they can view this game), or
-            share the whole record with a playgroup. Only you can change this.
-          </p>
-          <form method="post"
-                action="/games/{{ game.id }}/playgroup"
-                style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap;margin-bottom:1.25rem">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-            <label for="game-playgroup-select" style="margin:0">Shared with playgroup</label>
-            <select name="playgroup_id" id="game-playgroup-select">
-              <option value="">— Not shared —</option>
-              {% for pg in user_playgroups %}
-                <option value="{{ pg.playgroup.id }}"
-                        {% if game.playgroup_id == pg.playgroup.id %}selected{% endif %}>{{ pg.playgroup.name }}</option>
-              {% endfor %}
-            </select>
-            <button type="submit">Save</button>
-            {% if not user_playgroups %}
-              <span class="muted" style="font-size:0.85rem">No playgroups yet —
-                <a href="/playgroups">create or join one</a>.</span>
-            {% endif %}
-          </form>
-          <div class="stack-form">
-            {% for seat in game.seats %}
-              {# One form per seat: rename + (re)attribute in a single Save. #}
-              <form method="post"
-                    action="/games/{{ game.id }}/seats/{{ seat.id }}"
-                    class="end-game-row"
-                    style="align-items:center">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                <span class="end-game-player" style="min-width:2.25rem">#{{ seat.seat_number }}</span>
-                <input type="text"
-                       name="player_name"
-                       value="{{ seat.player_name }}"
-                       placeholder="Player name"
-                       aria-label="Player name for seat {{ seat.seat_number }}"
-                       style="width:150px">
-                <select name="user_id" aria-label="Linked user for seat {{ seat.seat_number }}">
-                  <option value="">— Unattributed —</option>
-                  {% if seat.user_id and seat.user_id not in pickable_ids %}
-                    {# Currently-linked user is outside the picker scope (e.g.
-                       left the playgroup) — keep them selectable so saving
-                       doesn't silently drop the attribution. #}
-                    <option value="{{ seat.user_id }}" selected>{{ seat.user_name_at_game or 'Linked user' }}</option>
-                  {% endif %}
-                  {% for u in pickable_users %}
-                    <option value="{{ u.id }}"
-                            {% if seat.user_id == u.id %}selected{% endif %}>{{ u.display_name or u.username }}</option>
-                  {% endfor %}
-                </select>
-                <button type="submit">Save</button>
-              </form>
-            {% endfor %}
-          </div>
-          <div style="margin-top:1rem;display:flex;justify-content:flex-end">
-            <button type="button" onclick="togglePlayersModal()">Close</button>
-          </div>
-        </div>
-      </div>
-    {% endif %}
+    {# v3.33.2 — Players & sharing modal extracted to a shared partial
+       (also used by the finalized game-summary page). #}
+    {% include "_players_modal.html" %}
   </div>
 {% endblock %}
 {% block extra_scripts %}
@@ -986,16 +919,6 @@ function undoLast() {
     }
   }
   save(); render();
-}
-
-function togglePlayersModal() {
-  // v3.32.1 — owner-only Players & sharing modal (rename seats / attribute
-  // users / playgroup link). Reachable via the masthead "Players" button on
-  // both live and finalized games; the old in-flow panel was clipped below
-  // the fixed full-screen .game-app overlay.
-  const modal = document.getElementById('players-modal');
-  if (!modal) return;
-  modal.style.display = modal.style.display !== 'none' ? 'none' : 'flex';
 }
 
 function toggleEndGame() {

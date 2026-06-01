@@ -287,6 +287,12 @@ class Game(Base):
     client_token: Mapped[str | None] = mapped_column(String(32), nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    # v3.33.2 — wall-clock end timestamp, stamped once by end_game when the
+    # game is finalized. NULL = never finalized OR a legacy game predating this
+    # column (the game-summary view shows "—" for elapsed in that case; no
+    # backfill — past durations are unrecoverable). Elapsed playtime is
+    # rendered as ``ended_at − played_at`` (played_at ≈ when live play started).
+    ended_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     # v3.32.0 — optional playgroup link for shared game visibility. A game
     # is viewable by its owner (user_id), by any user attributed to one of
     # its seats (GameSeat.user_id), AND — when this is set — by every member

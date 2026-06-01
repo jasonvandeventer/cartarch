@@ -1,5 +1,15 @@
 [
   {
+    "version": "3.33.2",
+    "date": "2026-06-01",
+    "added": [],
+    "refined": [],
+    "resolved": [
+      "Opening a finished game now shows a proper recap — final standings, who won, turn count, how long it ran, and the complete notes — instead of a frozen, do-nothing version of the life tracker. New games also record how long they took to play."
+    ],
+    "archivist_note": "A reader of recorded games pointed out, rightly, that a finished match had nowhere to actually read its ending — clicking through dropped you into the life tracker with its buttons greyed out, a tool with nothing left to do. So finished games now open as a record rather than a frozen instrument: the final standings in order, the winner marked, the turn count, the elapsed time, and — at last — the full notes, which the page had simply never shown. The live tracker is untouched for games still in progress. We also began quietly noting when a game ends, so its playtime can be told; older games, whose endings we never timed, leave that line as a dash rather than guess."
+  },
+  {
     "version": "3.33.1",
     "date": "2026-06-01",
     "added": [],

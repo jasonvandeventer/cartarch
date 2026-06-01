@@ -433,6 +433,11 @@ def end_game(
     # placement → is_ended" derivation that templates used to compute;
     # template-side now reads game.status == "finalized" directly.
     game.status = "finalized"
+    # v3.33.2 — stamp the end timestamp ONCE so the game-summary view can show
+    # elapsed playtime (ended_at − played_at). Guarded so a later results edit
+    # wouldn't inflate the duration by re-stamping to "now".
+    if game.ended_at is None:
+        game.ended_at = datetime.utcnow()
     session.commit()
     return True
 

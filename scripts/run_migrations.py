@@ -99,6 +99,9 @@ from scripts.migrate_v3_32_0_game_playgroup import (
 from scripts.migrate_v3_33_0_variant_groups import (
     main as migrate_v3_33_0_variant_groups,
 )
+from scripts.migrate_v3_33_2_game_ended_at import (
+    main as migrate_v3_33_2_game_ended_at,
+)
 
 
 def _is_applied(name: str) -> bool:
@@ -472,6 +475,13 @@ def run():
         _mark_applied("v3_33_0_variant_groups")
     else:
         print("v3.33.0 variant_groups already applied, skipping")
+
+    if not _is_applied("v3_33_2_game_ended_at"):
+        print("Running v3.33.2 games.ended_at migration...")
+        migrate_v3_33_2_game_ended_at()
+        _mark_applied("v3_33_2_game_ended_at")
+    else:
+        print("v3.33.2 game_ended_at already applied, skipping")
 
     print("Migration runner complete")
 

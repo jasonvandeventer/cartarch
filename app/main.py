@@ -5923,6 +5923,23 @@ def game_create(
     return RedirectResponse(f"/games/{game.id}", status_code=303)
 
 
+def _format_game_elapsed(game) -> str | None:
+    """Human elapsed playtime for a finalized game ("1h 23m" / "45m" / "<1m"),
+    or None when not computable (legacy game with no ``ended_at``, or a clock
+    anomaly). ``played_at`` ≈ when live play started; ``ended_at`` is stamped
+    once at finalize (v3.33.2)."""
+    if not game.ended_at or not game.played_at:
+        return None
+    secs = (game.ended_at - game.played_at).total_seconds()
+    if secs < 0:
+        return None
+    if secs < 60:
+        return "<1m"
+    minutes = int(secs // 60)
+    hours, minutes = divmod(minutes, 60)
+    return f"{hours}h {minutes}m" if hours else f"{minutes}m"
+
+
 @app.get("/games/{game_id}")
 def game_detail_page(
     request: Request,
@@ -5952,20 +5969,30 @@ def game_detail_page(
         # picker to open the game up to a group.
         pickable_users = playgroup_service.get_pickable_users(session, current_user.id)
         user_playgroups = playgroup_service.list_playgroups_for_user(session, current_user.id)
-    return render(
-        request,
-        "game_detail.html",
-        {
-            "title": f"Game {game_id}",
-            "game": game,
-            "decks": decks,
-            "is_owner": is_owner,
-            "pickable_users": pickable_users,
-            "user_playgroups": user_playgroups,
-            "current_user": current_user,
-            "seat_commander_images": seat_commander_images,
-        },
-    )
+
+    ctx = {
+        "title": f"Game {game_id}",
+        "game": game,
+        "decks": decks,
+        "is_owner": is_owner,
+        "pickable_users": pickable_users,
+        "user_playgroups": user_playgroups,
+        "current_user": current_user,
+        "seat_commander_images": seat_commander_images,
+    }
+
+    # v3.33.2 — finalized games render a read-only summary (final standings,
+    # turn count, elapsed playtime, full notes) instead of the frozen
+    # full-screen life tracker, which read as a "non-functional tracker".
+    if game.status == "finalized":
+        ctx["standings"] = sorted(
+            game.seats,
+            key=lambda s: (s.placement is None, s.placement or 0, s.seat_number),
+        )
+        ctx["elapsed"] = _format_game_elapsed(game)
+        return render(request, "game_summary.html", ctx)
+
+    return render(request, "game_detail.html", ctx)
 
 
 @app.post("/games/{game_id}/end")

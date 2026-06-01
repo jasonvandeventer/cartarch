@@ -46,3 +46,4 @@ jobs:
           python -m tests.test_location_add_card
           python -m tests.test_variant_groups
           python -m tests.test_account_profile
+          python -m tests.test_game_summary
