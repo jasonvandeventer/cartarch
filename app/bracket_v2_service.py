@@ -294,7 +294,7 @@ def _gather_deck_signals(session: Session, deck_storage_location_id: int, user_i
     gc_rows = session.execute(
         text(
             "SELECT card_name FROM game_changer_cards "
-            "WHERE active = 1 AND rules_version = :v AND card_name IN ("
+            "WHERE active AND rules_version = :v AND card_name IN ("
             + ",".join(f":n{i}" for i in range(len(rows)))
             + ")"
         ),
@@ -933,6 +933,7 @@ def persist_estimate(session: Session, deck_id: int, estimate: BracketEstimate) 
                 :d, :bracket, :mech, :intent, :final, :score, :v,
                 :ctc, :cmc, :cia, :ccd
             )
+            RETURNING id
             """
         ),
         {
@@ -949,7 +950,10 @@ def persist_estimate(session: Session, deck_id: int, estimate: BracketEstimate) 
             "ccd": estimate.confidence_combo_detection_depth,
         },
     )
-    estimate_id = result.lastrowid
+    # ``RETURNING id`` (SQLite >= 3.35, and Postgres at v4) is dialect-safe and
+    # replaces the SQLite-only ``cursor.lastrowid``, which psycopg does not
+    # populate. Single-row insert -> exactly one returned row.
+    estimate_id = result.scalar_one()
     for f in estimate.findings:
         session.execute(
             text(
