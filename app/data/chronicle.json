@@ -1,5 +1,15 @@
 [
   {
+    "version": "3.34.0",
+    "date": "2026-06-02",
+    "added": [],
+    "refined": [
+      "Reorganized the application's internal code: the routes that handle games, decks, your collection, and card/token/set pages moved out of one oversized file into four clean, separate modules. Nothing about how the app looks or behaves changed — this is groundwork for the larger database upgrade ahead that will let several devices share a game live."
+    ],
+    "resolved": [],
+    "archivist_note": "Not every chapter is written for the reader; some are written so the next ones can be. This release moves no button and changes no screen — it tidies the workshop. The single file that had grown to carry most of the application's traffic was divided into four orderly rooms, each holding one concern, so that the far larger work ahead — moving the collection onto a sturdier database that many devices can use at once — can begin on solid ground instead of in a crowded hallway. We shipped it on its own and let it settle, precisely so that if anything stirs we will know it was the moving and not the foundation."
+  },
+  {
     "version": "3.33.2",
     "date": "2026-06-01",
     "added": [],
