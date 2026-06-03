@@ -235,13 +235,16 @@ def _safe_error_code(message: str) -> str:
     Keep it cheap; the template just renders the raw fallback when no
     code matches."""
     return (
-        message.strip()
-        .lower()
-        .replace(" ", "_")
-        .replace(".", "")
-        .replace(",", "")
-        .replace("'", "")[:64]
-    ) or "validation_error"
+        (
+            message.strip()
+            .lower()
+            .replace(" ", "_")
+            .replace(".", "")
+            .replace(",", "")
+            .replace("'", "")[:64]
+        )
+        or "validation_error"
+    )
 
 
 # ── Detail + transitions ────────────────────────────────────────

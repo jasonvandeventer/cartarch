@@ -1049,7 +1049,7 @@ def search_tokens_by_name(name: str, limit: int = 12) -> list[dict[str, Any]]:
     data = _get_json(url)
     cards = data.get("data", []) if data else []
     formatted = [_format_token_response(c) for c in cards]
-    formatted.sort(key=lambda t: (0 if t["is_double_sided"] else 1))
+    formatted.sort(key=lambda t: 0 if t["is_double_sided"] else 1)
     return formatted[:limit]
 
 

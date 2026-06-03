@@ -38,8 +38,7 @@ def main() -> None:
         if not column_exists(conn, "users", "deck_group_by"):
             conn.execute(
                 text(
-                    "ALTER TABLE users "
-                    "ADD COLUMN deck_group_by VARCHAR(16) DEFAULT 'type' NOT NULL"
+                    "ALTER TABLE users ADD COLUMN deck_group_by VARCHAR(16) DEFAULT 'type' NOT NULL"
                 )
             )
             print("Added deck_group_by column to users (default 'type')")

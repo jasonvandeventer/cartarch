@@ -2502,7 +2502,7 @@ def forgot_password_submit(
     # to add one; for now silent drop is enough.
     if not check_rate_limits(email_clean, client_ip):
         print(
-            f"[password-reset] rate-limited request for email={email_clean!r} " f"ip={client_ip!r}",
+            f"[password-reset] rate-limited request for email={email_clean!r} ip={client_ip!r}",
             flush=True,
         )
         return neutral_response

@@ -1,7 +1,3 @@
-[tool.black]
-line-length = 100
-target-version = ["py312"]
-
 [tool.ruff]
 line-length = 100
 target-version = "py312"
@@ -26,3 +22,15 @@ ignore = [
   "E501",
   "B008"
 ]
+
+[tool.vulture]
+min_confidence = 80
+paths = ["app", "main.py"]
+ignore_decorators = ["@app.*", "@router.*", "@*.get", "@*.post", "@*.put", "@*.delete"]
+
+[tool.deptry]
+ignore = []
+
+[tool.deptry.per_rule_ignores]
+DEP002 = ["uvicorn", "jinja2", "python-multipart", "itsdangerous"]
+DEP003 = ["starlette", "urllib3"]

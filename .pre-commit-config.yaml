@@ -1,0 +1,16 @@
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.15.15
+    hooks:
+      - id: ruff-check
+        args: [--fix]
+      - id: ruff-format
+  - repo: https://github.com/osprey-oss/deptry
+    rev: "0.25.1"
+    hooks:
+      - id: deptry
+  - repo: https://github.com/jendrikseipp/vulture
+    rev: "v2.16"
+    hooks:
+      - id: vulture
+        stages: [manual]

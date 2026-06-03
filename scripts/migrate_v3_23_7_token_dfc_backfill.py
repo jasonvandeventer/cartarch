@@ -40,8 +40,7 @@ def main() -> None:
             )
         )
         print(
-            f"v3.23.7 token DFC backfill: {result.rowcount} row(s) coerced to "
-            "is_double_sided=True"
+            f"v3.23.7 token DFC backfill: {result.rowcount} row(s) coerced to is_double_sided=True"
         )
 
 

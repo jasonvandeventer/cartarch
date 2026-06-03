@@ -40,8 +40,7 @@ def main() -> None:
         if not column_exists(conn, "storage_locations", "mode"):
             conn.execute(
                 text(
-                    "ALTER TABLE storage_locations "
-                    "ADD COLUMN mode TEXT NOT NULL DEFAULT 'managed'"
+                    "ALTER TABLE storage_locations ADD COLUMN mode TEXT NOT NULL DEFAULT 'managed'"
                 )
             )
             print(
@@ -52,7 +51,7 @@ def main() -> None:
             print("storage_locations.mode already exists, skipping ADD COLUMN")
 
         deck_managed = conn.execute(
-            text("SELECT COUNT(*) FROM storage_locations " "WHERE type='deck' AND mode='managed'")
+            text("SELECT COUNT(*) FROM storage_locations WHERE type='deck' AND mode='managed'")
         ).scalar()
         if deck_managed and deck_managed > 0:
             conn.execute(

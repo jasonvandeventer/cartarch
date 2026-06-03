@@ -86,7 +86,8 @@ _WIPE_RE = re.compile(
     r"|each creature (?:gets?|has) -[\dXx]+/-[\dXx]+"
     # Mass damage is wipe-only when the damage hits creatures. Player damage
     # ("deals 1 damage to each opponent") is a per-trigger ping, not a sweeper.
-    r"|deals \d+ damage to each (?:creature|other creature)" r"|\boverload \{"
+    r"|deals \d+ damage to each (?:creature|other creature)"
+    r"|\boverload \{"
     # "Each player ... sacrifices the rest" — Promise of Loyalty wording: each
     # player keeps one creature, sacrifices everything else.
     r"|each player.{0,80}sacrifices? .{0,40}(?:the rest|other (?:creatures?|permanents?)|all but)",

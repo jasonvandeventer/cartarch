@@ -74,7 +74,7 @@ def main() -> None:
         # the index here keeps the migration self-describing.
         conn.execute(text("CREATE INDEX IF NOT EXISTS ix_playgroups_name ON playgroups(name)"))
         conn.execute(
-            text("CREATE INDEX IF NOT EXISTS ix_playgroups_created_by " "ON playgroups(created_by)")
+            text("CREATE INDEX IF NOT EXISTS ix_playgroups_created_by ON playgroups(created_by)")
         )
         # Partial-unique join_code: at most one active code per value across
         # the table; multiple disabled (NULL) playgroups are allowed. Same

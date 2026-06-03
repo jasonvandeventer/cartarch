@@ -598,7 +598,9 @@ def main() -> None:
             else (
                 "commander-ambiguous"
                 if a["commander_ambiguous"]
-                else "complex-oracle" if a["complex_oracle"] else "random"
+                else "complex-oracle"
+                if a["complex_oracle"]
+                else "random"
             )
         )
         lines.append(

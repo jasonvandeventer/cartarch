@@ -344,7 +344,7 @@ def create_trade(
             session, showcase_item, recipient_user_id, playgroup_id
         ):
             raise ValueError(
-                "Requested item is not in the recipient's " "Showcase shared with this playgroup."
+                "Requested item is not in the recipient's Showcase shared with this playgroup."
             )
         inv = showcase_item.inventory_row
         if inv is None or inv.user_id != recipient_user_id:

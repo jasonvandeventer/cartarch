@@ -439,7 +439,7 @@ def parse_scanner_csv(file_bytes: bytes) -> dict[str, Any]:
         # coercion (spec Decisions 9, 11).
         if not role_valid:
             cleaned["reason"] = (
-                f"Invalid Role value: {r.get('role_raw')!r} " f"(allowed: empty or 'commander')."
+                f"Invalid Role value: {r.get('role_raw')!r} (allowed: empty or 'commander')."
             )
             invalid_rows.append(cleaned)
             continue
@@ -476,7 +476,7 @@ def parse_scanner_csv(file_bytes: bytes) -> dict[str, Any]:
                 in _set_failed
             ):
                 cleaned["reason"] = (
-                    "Scryfall lookup temporarily failed for this batch — " "re-import to retry."
+                    "Scryfall lookup temporarily failed for this batch — re-import to retry."
                 )
             else:
                 cleaned["reason"] = "Card not found in Scryfall data."

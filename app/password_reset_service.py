@@ -300,13 +300,12 @@ def _send_reset_email(email: str, reset_url: str, expires_at: datetime) -> None:
         )
     except requests.RequestException as exc:
         print(
-            f"[password-reset] Resend send failed for {email}: " f"{type(exc).__name__}: {exc}",
+            f"[password-reset] Resend send failed for {email}: {type(exc).__name__}: {exc}",
             flush=True,
         )
     except Exception as exc:  # noqa: BLE001 — daemon thread, never raise
         print(
-            f"[password-reset] unexpected error sending to {email}: "
-            f"{type(exc).__name__}: {exc}",
+            f"[password-reset] unexpected error sending to {email}: {type(exc).__name__}: {exc}",
             flush=True,
         )
 

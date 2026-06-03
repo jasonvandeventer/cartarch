@@ -74,7 +74,7 @@ def main() -> None:
         dangling = 0
         for seat_id, deck_id in seats_to_backfill:
             deck = conn.execute(
-                text("SELECT name, user_id, storage_location_id " "FROM decks WHERE id = :id"),
+                text("SELECT name, user_id, storage_location_id FROM decks WHERE id = :id"),
                 {"id": deck_id},
             ).fetchone()
             if deck is None:

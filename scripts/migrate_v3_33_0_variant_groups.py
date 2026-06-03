@@ -72,9 +72,7 @@ def main() -> None:
             print("decks.variant_group_id already exists, skipping")
 
         conn.execute(
-            text(
-                "CREATE INDEX IF NOT EXISTS ix_decks_variant_group_id " "ON decks(variant_group_id)"
-            )
+            text("CREATE INDEX IF NOT EXISTS ix_decks_variant_group_id ON decks(variant_group_id)")
         )
 
 

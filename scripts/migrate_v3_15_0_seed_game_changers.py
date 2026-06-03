@@ -50,8 +50,7 @@ def main() -> None:
         for name in sorted(set(names)):
             existing = conn.execute(
                 text(
-                    "SELECT id FROM game_changer_cards "
-                    "WHERE card_name = :n AND rules_version = :v"
+                    "SELECT id FROM game_changer_cards WHERE card_name = :n AND rules_version = :v"
                 ),
                 {"n": name, "v": RULES_VERSION},
             ).first()

@@ -33,7 +33,7 @@ def main() -> None:
     with engine.begin() as conn:
         # Find pending rows missing the breadcrumb fields.
         pending_rows = conn.execute(
-            text("SELECT id FROM inventory_rows " "WHERE is_pending = 1 AND from_drawer IS NULL")
+            text("SELECT id FROM inventory_rows WHERE is_pending = 1 AND from_drawer IS NULL")
         ).fetchall()
 
         backfilled = 0

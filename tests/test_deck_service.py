@@ -333,11 +333,7 @@ NEGATIVE_FIXTURES = [
     (
         _auntie_ool_themes,
         "Tree of Perdition (in Auntie Ool)",
-        (
-            "Defender\n"
-            "{T}: Exchange target opponent's life total with this creature's "
-            "toughness."
-        ),
+        ("Defender\n{T}: Exchange target opponent's life total with this creature's toughness."),
         "Creature — Plant",
     ),
     (
@@ -391,8 +387,7 @@ def test_teysa_lifegain_narrowing() -> tuple[int, int]:
         passed += 1
     else:
         print(
-            f"  [FAIL] Teysa Karlov UNEXPECTEDLY extracted 'lifegain' "
-            f"— got mechs {sorted(mechs)}"
+            f"  [FAIL] Teysa Karlov UNEXPECTEDLY extracted 'lifegain' — got mechs {sorted(mechs)}"
         )
         failed += 1
 
@@ -404,7 +399,7 @@ def test_teysa_lifegain_narrowing() -> tuple[int, int]:
             print(f"  [OK] Teysa Karlov themes include '{required}'")
             passed += 1
         else:
-            print(f"  [FAIL] Teysa Karlov themes missing '{required}' " f"— got {sorted(mechs)}")
+            print(f"  [FAIL] Teysa Karlov themes missing '{required}' — got {sorted(mechs)}")
             failed += 1
 
     return passed, failed
