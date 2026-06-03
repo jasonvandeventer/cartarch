@@ -208,7 +208,7 @@ def goldfish_page(
     # to first-wins deterministically.
     if tokens:
         try:
-            from app.main import _panels_cache_key, _read_panels_cache
+            from app.routes.decks import _panels_cache_key, _read_panels_cache
 
             ck = _panels_cache_key(rows)
             cached = _read_panels_cache(deck.id, ck)

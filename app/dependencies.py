@@ -6,6 +6,7 @@ import secrets
 import subprocess
 from collections.abc import Generator
 from datetime import UTC, datetime
+from urllib.parse import urlparse
 from zoneinfo import ZoneInfo
 
 from fastapi import Depends, Form, HTTPException, Request, status
@@ -21,6 +22,36 @@ from app.models import InventoryRow, User
 DRAWER_SORTER_USERNAMES: frozenset[str] = frozenset({"jason@vanfreckle.com", "test"})
 
 templates = Jinja2Templates(directory="app/templates")
+
+# v3.27.17 — host allowlist for Referer-based redirect validation.
+# Same-host (request.url.netloc) is always implicitly allowed; this set
+# names the additional hosts cartarch.com lives behind so a user on the
+# legacy hostname can follow a link that bounces them into cartarch.com
+# (or vice versa) without safe_redirect_url() treating the cross-host
+# Referer as an open-redirect attempt and dropping back to the default.
+# No TrustedHostMiddleware in use; this is the only host-allow surface.
+_REDIRECT_ALLOWED_HOSTS: frozenset[str] = frozenset({"cartarch.com", "www.cartarch.com"})
+
+
+def safe_redirect_url(request: Request, default: str = "/collection") -> str:
+    """Validate a Referer before reusing it as a redirect target.
+
+    Lives here (shared) rather than in main.py so every route module can
+    reach it without a circular import. An attacker can set Referer to an
+    external URL, so an off-host Referer (not same-host, not in the
+    allowlist) falls back to ``default``.
+    """
+    referer = request.headers.get("referer", "")
+    if not referer:
+        return default
+    parsed = urlparse(referer)
+    if (
+        parsed.netloc
+        and parsed.netloc != request.url.netloc
+        and parsed.netloc not in _REDIRECT_ALLOWED_HOSTS
+    ):
+        return default
+    return referer
 
 
 def _git(*args: str) -> str | None:
