@@ -102,6 +102,13 @@ def goldfish_page(
                 "oracle_text": card.oracle_text,
                 "colors": card.colors,
                 "color_identity": card.color_identity,
+                # v3.36.1 — dormant payload data for the goldfish loyalty/
+                # defense auto-init (Step 4). Read straight off the cached
+                # Card columns (seam-populated by the daemon); NO request-
+                # path Scryfall call. Raw strings; NULL on cards without.
+                # NOT consumed by the goldfish UI in this release.
+                "loyalty": card.loyalty,
+                "defense": card.defense,
                 "quantity": int(row.quantity or 0),
                 "is_commander": (row.role == "commander"),
             }

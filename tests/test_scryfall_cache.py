@@ -29,7 +29,12 @@ import json
 import sqlite3
 import sys
 
-from app.scryfall import _CACHE_COLUMNS, _cached_row_to_payload, _normalize_card_payload
+from app.scryfall import (
+    _CACHE_COLUMNS,
+    _cached_row_to_payload,
+    _normalize_card_payload,
+    card_constructor_kwargs,
+)
 
 # Mirrors scripts/migrate_v3_25_0_scryfall_cards.py. Kept inline so the test
 # is self-contained; test_columns_match_normalizer() guards drift between
@@ -57,7 +62,9 @@ CREATE TABLE scryfall_cards (
     frame_effects    TEXT,
     set_type         TEXT,
     layout           TEXT,
-    produced_tokens  TEXT
+    produced_tokens  TEXT,
+    loyalty          TEXT,
+    defense          TEXT
 )
 """
 
@@ -120,7 +127,67 @@ RAW_MULTIFACE = {
             "oracle_text": "Tibalt, Cosmic Impostor does devil things.",
             "type_line": "Legendary Planeswalker — Tibalt",
             "mana_cost": "{4}{B}{R}",
+            "loyalty": "7",
             "image_uris": {"normal": "tibalt-n"},
+        },
+    ],
+}
+
+# 5. Single-faced planeswalker: top-level loyalty (the common PW case).
+RAW_PLANESWALKER = {
+    "id": "lili-dka-104",
+    "name": "Liliana of the Veil",
+    "set": "dka",
+    "set_name": "Dark Ascension",
+    "collector_number": "104",
+    "rarity": "mythic",
+    "image_uris": {"normal": "lili-n"},
+    "type_line": "Legendary Planeswalker — Liliana",
+    "oracle_text": "+1: Each player discards a card.",
+    "prices": {"usd": "12.00", "usd_foil": None, "usd_etched": None},
+    "colors": ["B"],
+    "color_identity": ["B"],
+    "mana_cost": "{1}{B}{B}",
+    "cmc": 3.0,
+    "legalities": {"modern": "legal", "commander": "legal"},
+    "full_art": False,
+    "frame_effects": [],
+    "set_type": "expansion",
+    "layout": "normal",
+    "loyalty": "3",
+}
+
+# 6. Battle (front face carries `defense`) — the loyalty analogue, and the
+#    defense face-fallback case (top-level type/oracle absent on the DFC).
+RAW_BATTLE = {
+    "id": "invasion-mom-30",
+    "name": "Invasion of Zendikar // Awakened Skyclave",
+    "set": "mom",
+    "set_name": "March of the Machine",
+    "collector_number": "30",
+    "rarity": "uncommon",
+    "prices": {"usd": "0.50", "usd_foil": "1.00", "usd_etched": None},
+    "colors": ["G"],
+    "color_identity": ["G"],
+    "cmc": 3.0,
+    "legalities": {"standard": "legal", "commander": "legal"},
+    "full_art": False,
+    "frame_effects": [],
+    "set_type": "expansion",
+    "layout": "transform",
+    "card_faces": [
+        {
+            "oracle_text": "When Invasion of Zendikar enters, search your library for up to two basic land cards.",
+            "type_line": "Battle — Siege",
+            "mana_cost": "{2}{G}",
+            "defense": "4",
+            "image_uris": {"normal": "invasion-n"},
+        },
+        {
+            "oracle_text": "Awakened Skyclave's power and toughness are each equal to the number of lands you control.",
+            "type_line": "Creature — Elemental",
+            "mana_cost": "",
+            "image_uris": {"normal": "skyclave-n"},
         },
     ],
 }
@@ -185,6 +252,8 @@ FIXTURES = [
     ("multi-face MDFC", RAW_MULTIFACE),
     ("rich legalities + colorless", RAW_LEGALITIES_COLORLESS),
     ("full_art + frame_effects + image fallback", RAW_FULLART),
+    ("single-face planeswalker (top-level loyalty)", RAW_PLANESWALKER),
+    ("battle (front-face defense)", RAW_BATTLE),
 ]
 
 
@@ -231,11 +300,11 @@ def test_columns_match_normalizer() -> tuple[int, int]:
     else:
         print(f"  [FAIL] column/normalizer mismatch:\n    cols={_COLS}\n    norm={norm_keys}")
         failed += 1
-    if len(_COLS) == 22:
-        print("  [OK] 22 columns (v3.30.11 added produced_tokens as the 22nd)")
+    if len(_COLS) == 24:
+        print("  [OK] 24 columns (v3.36.1 added loyalty + defense as the 23rd + 24th)")
         passed += 1
     else:
-        print(f"  [FAIL] expected 22 columns, got {len(_COLS)}")
+        print(f"  [FAIL] expected 24 columns, got {len(_COLS)}")
         failed += 1
     return passed, failed
 
@@ -339,6 +408,63 @@ def test_legalities_verbatim() -> tuple[int, int]:
     return passed, failed
 
 
+def test_card_construction_on_cache_miss() -> tuple[int, int]:
+    """Build a real ``Card`` from a freshly-normalized payload via
+    ``card_constructor_kwargs`` — the cache-MISS path the import / switch-
+    printing flows take (``Card(**card_constructor_kwargs(payload))``).
+
+    Smoke gates that pre-seed ``scryfall_cards`` only exercise the cache-HIT
+    read path and never splat a payload into ``Card(**...)``; this is the
+    v3.30.22 production-500 lesson (``produced_tokens`` in the 22-key payload
+    is NOT a Card column). This test pins that:
+
+      * the strip still works (construction does not raise), and
+      * the v3.36.1 additions ``loyalty`` / ``defense`` ARE real Card columns
+        — they survive the strip and land on the constructed Card.
+    """
+    from datetime import datetime
+
+    from app.models import Card
+
+    passed = failed = 0
+
+    pw_payload = _normalize_card_payload(RAW_PLANESWALKER)
+    battle_payload = _normalize_card_payload(RAW_BATTLE)
+
+    # produced_tokens must be present in the payload but stripped before splat.
+    if "produced_tokens" in pw_payload and "produced_tokens" not in card_constructor_kwargs(
+        pw_payload
+    ):
+        print("  [OK] produced_tokens present in payload, stripped from Card kwargs")
+        passed += 1
+    else:
+        print("  [FAIL] produced_tokens strip contract broken")
+        failed += 1
+
+    try:
+        pw = Card(**card_constructor_kwargs(pw_payload), updated_at=datetime.utcnow())
+        battle = Card(**card_constructor_kwargs(battle_payload), updated_at=datetime.utcnow())
+    except TypeError as exc:
+        print(f"  [FAIL] Card(**payload) raised TypeError: {exc}")
+        return passed, failed + 1
+
+    checks = [
+        ("planeswalker loyalty set on Card", pw.loyalty == "3"),
+        ("planeswalker defense is None", pw.defense is None),
+        ("battle defense set on Card (face fallback)", battle.defense == "4"),
+        ("battle loyalty is None", battle.loyalty is None),
+        ("Card built cleanly (no produced_tokens attr clash)", pw.name == "Liliana of the Veil"),
+    ]
+    for label, ok in checks:
+        if ok:
+            print(f"  [OK] {label}")
+            passed += 1
+        else:
+            print(f"  [FAIL] {label}")
+            failed += 1
+    return passed, failed
+
+
 # ---------------------------------------------------------------------------
 # Runner
 # ---------------------------------------------------------------------------
@@ -348,12 +474,16 @@ def run_all() -> int:
     total_p = total_f = 0
     suites = [
         (
-            "Test 1: _CACHE_COLUMNS matches normalizer (22 keys, in order)",
+            "Test 1: _CACHE_COLUMNS matches normalizer (24 keys, in order)",
             test_columns_match_normalizer,
         ),
         ("Test 2: byte-identical cache-path vs API-path", test_byte_identical),
         ("Test 3: None-vs-'' contract round-trips distinguishably", test_none_vs_empty_contract),
         ("Test 4: legalities/frame_effects verbatim JSON text", test_legalities_verbatim),
+        (
+            "Test 5: Card(**payload) cache-miss construction (loyalty/defense)",
+            test_card_construction_on_cache_miss,
+        ),
     ]
     for title, fn in suites:
         print(f"\n=== {title} ===")

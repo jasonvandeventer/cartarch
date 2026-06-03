@@ -1,5 +1,13 @@
 [
   {
+    "version": "3.36.1",
+    "date": "2026-06-03",
+    "added": [],
+    "refined": [],
+    "resolved": [],
+    "archivist_note": "Groundwork, plainly: nothing in this release changes a screen. We taught the card catalogue to remember two more facts it had been ignoring — a planeswalker's starting loyalty and a battle's defense — and made sure they flow quietly into the goldfish playtester's data without any extra lookups to the outside world. They sit there unused for now, on purpose. The next step will let the playtester start a planeswalker at its printed loyalty on its own, instead of asking you to dial it in by hand; this release is the plumbing that makes that possible. Existing cards fill in the new facts over the next day or so as the catalogue refreshes, and the playtester behaves exactly as before until then."
+  },
+  {
     "version": "3.36.0",
     "date": "2026-06-03",
     "added": [

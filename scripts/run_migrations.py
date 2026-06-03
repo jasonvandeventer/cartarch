@@ -102,6 +102,9 @@ from scripts.migrate_v3_33_0_variant_groups import (
 from scripts.migrate_v3_33_2_game_ended_at import (
     main as migrate_v3_33_2_game_ended_at,
 )
+from scripts.migrate_v3_36_1_card_loyalty_defense import (
+    main as migrate_v3_36_1_card_loyalty_defense,
+)
 
 
 def _is_applied(name: str) -> bool:
@@ -482,6 +485,13 @@ def run():
         _mark_applied("v3_33_2_game_ended_at")
     else:
         print("v3.33.2 game_ended_at already applied, skipping")
+
+    if not _is_applied("v3_36_1_card_loyalty_defense"):
+        print("Running v3.36.1 card loyalty/defense migration...")
+        migrate_v3_36_1_card_loyalty_defense()
+        _mark_applied("v3_36_1_card_loyalty_defense")
+    else:
+        print("v3.36.1 card_loyalty_defense already applied, skipping")
 
     print("Migration runner complete")
 

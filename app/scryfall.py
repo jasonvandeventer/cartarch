@@ -86,6 +86,20 @@ def _normalize_card_payload(raw: dict[str, Any]) -> dict[str, Any]:
             or None
         )
 
+    # v3.36.1 — loyalty / defense. Faithful raw Scryfall strings, stored
+    # verbatim (parsing/int-coercion is the goldfish Step-4 job, not here).
+    # Same top-level-then-first-face fallback the other face-split attrs
+    # use: planeswalker loyalty rides the PW face on transform/MDFC PWs;
+    # Battle defense rides the front face on Siege/DFC battles. None on
+    # cards that carry neither.
+    loyalty = raw.get("loyalty")
+    if loyalty is None and card_faces:
+        loyalty = next((face.get("loyalty") for face in card_faces if face.get("loyalty")), None)
+
+    defense = raw.get("defense")
+    if defense is None and card_faces:
+        defense = next((face.get("defense") for face in card_faces if face.get("defense")), None)
+
     raw_colors = raw.get("colors") or []
     colors_str = " ".join(raw_colors) if raw_colors else None
 
@@ -155,6 +169,13 @@ def _normalize_card_payload(raw: dict[str, Any]) -> dict[str, Any]:
         # constructor call sites MUST strip this key before
         # ``Card(**payload)`` via ``card_constructor_kwargs`` below.
         "produced_tokens": json.dumps(produced_tokens_list),
+        # v3.36.1 — 23rd + 24th keys, appended LAST to preserve byte-
+        # identical ordering of the existing 22 keys. _CACHE_COLUMNS +
+        # _cached_row_to_payload track these. UNLIKE produced_tokens
+        # these ARE Card ORM columns, so they are NOT stripped by
+        # card_constructor_kwargs.
+        "loyalty": loyalty,
+        "defense": defense,
     }
 
 
@@ -400,13 +421,15 @@ class BulkFetchResult:
 # Column list in the EXACT order _normalize_card_payload emits its keys.
 # _cached_row_to_payload rebuilds the dict in this order so a cache-path
 # value is indistinguishable from an API-path value. v3.30.11 added
-# produced_tokens as the 22nd column, appended at the end — preserves
-# byte-identical ordering of the existing 21 keys.
+# produced_tokens as the 22nd column; v3.36.1 appended loyalty + defense
+# as the 23rd + 24th — all at the end, preserving byte-identical ordering
+# of the existing keys.
 _CACHE_COLUMNS = (
     "scryfall_id, name, set_code, set_name, collector_number, rarity, "
     "image_url, type_line, oracle_text, price_usd, price_usd_foil, "
     "price_usd_etched, colors, color_identity, mana_cost, cmc, legalities, "
-    "full_art, frame_effects, set_type, layout, produced_tokens"
+    "full_art, frame_effects, set_type, layout, produced_tokens, "
+    "loyalty, defense"
 )
 
 
@@ -454,6 +477,12 @@ def _cached_row_to_payload(m) -> dict[str, Any]:
         # backfill" — distinguishable from "[]" which means "this card
         # has no tokens". Either value passes through cleanly.
         "produced_tokens": m["produced_tokens"],
+        # v3.36.1 — 23rd + 24th fields. Faithful raw strings (planeswalker
+        # loyalty / Battle defense), passed through verbatim; NULL when the
+        # card carries neither. Appended LAST, lockstep with _CACHE_COLUMNS
+        # and _normalize_card_payload.
+        "loyalty": m["loyalty"],
+        "defense": m["defense"],
     }
 
 

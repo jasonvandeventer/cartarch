@@ -106,6 +106,12 @@ class Card(Base):
     frame_effects: Mapped[str | None] = mapped_column(Text, nullable=True)
     set_type: Mapped[str | None] = mapped_column(String(64), nullable=True)
     layout: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    # v3.36.1 — planeswalker starting loyalty / Battle defense. Faithful
+    # raw Scryfall strings (can be non-numeric, e.g. loyalty "X"); NULL on
+    # cards that have neither. Dormant payload data for the goldfish
+    # loyalty/defense auto-init (Step 4). Part of the scryfall_cards seam.
+    loyalty: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    defense: Mapped[str | None] = mapped_column(String(16), nullable=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     inventory_rows: Mapped[list[InventoryRow]] = relationship(back_populates="card")
