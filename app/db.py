@@ -19,7 +19,12 @@ DATA_DIR.mkdir(parents=True, exist_ok=True)
 DB_PATH = DATA_DIR / "mana_archive.db"
 DATABASE_URL = f"sqlite:///{DB_PATH}"
 
-engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+# ``check_same_thread`` is a SQLite-only DBAPI argument. Passing it to any other
+# driver (psycopg/asyncpg at the v4 Postgres cutover) raises at connect time, so
+# it is applied only when the configured backend is SQLite. On SQLite the engine
+# is created exactly as before; on any other dialect ``connect_args`` is empty.
+_connect_args = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
+engine = create_engine(DATABASE_URL, connect_args=_connect_args)
 
 
 @event.listens_for(engine, "connect")
@@ -39,7 +44,13 @@ def _set_sqlite_pragmas(dbapi_connection, connection_record) -> None:
       crash, at most the last transaction is lost on power loss.
     - ``busy_timeout``: the three background writer daemons + request path
       contend for the single writer; wait rather than erroring with SQLITE_BUSY.
+
+    These PRAGMAs are SQLite-only syntax. On any other backend (Postgres at v4)
+    this listener must no-op rather than run them, so the body is gated on the
+    engine dialect. On SQLite the branch runs exactly as it always has.
     """
+    if engine.dialect.name != "sqlite":
+        return
     cursor = dbapi_connection.cursor()
     cursor.execute("PRAGMA journal_mode=WAL")
     cursor.execute("PRAGMA synchronous=NORMAL")
