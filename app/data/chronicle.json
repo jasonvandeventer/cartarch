@@ -1,5 +1,15 @@
 [
   {
+    "version": "3.35.0",
+    "date": "2026-06-03",
+    "added": [
+      "The goldfish playtester now has a dedicated opponent-life tracker. It counts down from a starting total you can flip between 20 and 40 (40 by default, since this corner of the app leans Commander), and it sits in the top bar next to your own life — tinted differently so the two are never mixed up. Crucially, it stays put when you start a new turn (it only resets when you start a new game), so you can finally answer \"how many turns to lethal?\" without borrowing the mana counter, which clears every turn."
+    ],
+    "refined": [],
+    "resolved": [],
+    "archivist_note": "Every tool gets pressed into service it wasn't built for. Goldfishing a deck — playing it solo to see how fast it can kill — the mana counter kept getting drafted as a damage tally, and kept betraying its conscript: mana empties at the top of each turn, as it should, taking the running total with it. So rather than teach the mana pool to hoard, we gave the table the counter it was actually reaching for — an opponent's life total that ticks down, holds its ground turn to turn, and only forgets when a new game begins. It starts at forty, the Commander default, but flips to twenty for the duels; it allows going below zero and back, because a misclick shouldn't cost you the count. A small dial on the dashboard, but the right one."
+  },
+  {
     "version": "3.34.6",
     "date": "2026-06-03",
     "added": [],

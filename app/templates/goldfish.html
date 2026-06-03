@@ -19,6 +19,14 @@
       <div class="gf-mast-center" id="gf-mast-center">
         <span class="gf-mast-stat"><strong id="gf-stat-life">40</strong> Life</span>
         <span class="gf-mast-stat">Turn <strong id="gf-stat-turn">1</strong></span>
+        {# v3.30.x — Opponent-life tracker (B1). A session-only counter,
+           distinct from the player's own Life above (oxblood tint via
+           .gf-mast-stat-opp) so the two are never confused. Counts DOWN
+           from a 20/40 start (toggled in the controls row); persists
+           across New turn, resets only on New game. Adjusted by the
+           [data-opp-life-delta] buttons below, mirroring the Life
+           control. #}
+        <span class="gf-mast-stat gf-mast-stat-opp">Opp <strong id="gf-stat-opp-life">40</strong></span>
       </div>
       <div class="gf-mast-right">
         <button type="button"
@@ -76,6 +84,23 @@
           <button type="button" class="gf-btn gf-btn-small" data-life-delta="1">+1</button>
           <button type="button" class="gf-btn gf-btn-small" data-life-delta="-5">−5</button>
           <button type="button" class="gf-btn gf-btn-small" data-life-delta="5">+5</button>
+        </span>
+        {# v3.30.x — Opponent-life control (B1). Mirrors the Life group
+           above (same .gf-btn-small delta mechanism, [data-opp-life-delta]).
+           Counts DOWN — order is −5 / −1 / +1 / +5 so the common
+           damage direction reads left-to-right. Going below 0 and back
+           up is allowed (no rules enforcement; misclick recovery). The
+           Start toggle flips the configured start between 20 and 40
+           (default 40 — this surface skews Commander) and re-seeds the
+           counter to it. #}
+        <span class="gf-control-group gf-control-group-opp">
+          <label class="gf-control-label">Opp life</label>
+          <button type="button" class="gf-btn gf-btn-small" data-opp-life-delta="-5">−5</button>
+          <button type="button" class="gf-btn gf-btn-small" data-opp-life-delta="-1">−1</button>
+          <button type="button" class="gf-btn gf-btn-small" data-opp-life-delta="1">+1</button>
+          <button type="button" class="gf-btn gf-btn-small" data-opp-life-delta="5">+5</button>
+          <button type="button" class="gf-btn gf-btn-small" id="gf-btn-opp-start"
+                  title="Toggle opponent starting life (20 / 40) and re-seed">Start 40</button>
         </span>
         <span class="gf-control-group gf-readout-inline">
           <span class="gf-readout">Hand: <strong id="gf-readout-hand">—</strong></span>

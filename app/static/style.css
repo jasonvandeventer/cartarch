@@ -13540,6 +13540,14 @@ body.gf-mode { overflow: hidden; }
   color: var(--text);
   font-weight: 700;
 }
+/* v3.30.x — Opponent-life stat (B1). Oxblood tint sets it apart from the
+   player's own Life so the two readouts are never confused at a glance. */
+.gf-mast-stat-opp {
+  color: var(--danger);
+}
+.gf-mast-stat-opp strong {
+  color: var(--accent-2);
+}
 .gf-mast-right {
   display: flex;
   justify-content: flex-end;

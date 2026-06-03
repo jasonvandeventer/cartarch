@@ -114,6 +114,17 @@
     exile: [],
     command: [],
     life: 40,
+    // v3.30.x — Opponent-life tracker (B1). Session-only, like every
+    // other goldfish state field (no persistence, no gameFingerprint).
+    // `opponentLife` counts DOWN from `opponentStart` (the configured
+    // 20/40 start, default 40 — this surface skews Commander). It is
+    // deliberately NOT reset by newTurn() (that's the whole point: the
+    // owner was abusing the mana pool for this and mana correctly
+    // clears each turn); only newGame() re-seeds it to opponentStart.
+    // No clamp — going below 0 and back up is allowed (no rules
+    // enforcement; misclick recovery).
+    opponentLife: 40,
+    opponentStart: 40,
     turn: 1,
     instanceSeq: 1,
     manaPool: { W: 0, U: 0, B: 0, R: 0, G: 0, C: 0 },
@@ -364,6 +375,11 @@
   function newGame() {
     buildInstances();
     state.life = 40;
+    // v3.30.x — re-seed opponent life to the configured start (B1).
+    // newGame() is the ONLY reset point; the chosen 20/40 start carries
+    // across games until the user toggles it. newTurn() intentionally
+    // does NOT touch opponentLife.
+    state.opponentLife = state.opponentStart;
     state.turn = 1;
     clearManaPool();
     drawN(7);
@@ -637,6 +653,11 @@
     hideHandManaCostOverlay();
     document.getElementById("gf-stat-life").textContent = String(state.life);
     document.getElementById("gf-stat-turn").textContent = String(state.turn);
+    // v3.30.x — opponent-life readout + Start-toggle label (B1). Both
+    // kept in sync here so every mutation path (delta buttons, the
+    // 20/40 toggle, newGame) repaints through the single render().
+    document.getElementById("gf-stat-opp-life").textContent = String(state.opponentLife);
+    document.getElementById("gf-btn-opp-start").textContent = "Start " + String(state.opponentStart);
     document.getElementById("gf-count-library").textContent = String(state.library.length);
     document.getElementById("gf-count-hand").textContent = String(state.hand.length);
     document.getElementById("gf-count-graveyard").textContent = String(state.graveyard.length);
@@ -2262,6 +2283,25 @@
       state.life += d;
       render();
     });
+  });
+  // v3.30.x — opponent-life delta buttons (B1), mirroring the player-life
+  // handler above. No clamp — opponentLife may go below 0 (no rules
+  // enforcement) and back up (misclick recovery).
+  document.querySelectorAll("[data-opp-life-delta]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const d = parseInt(btn.dataset.oppLifeDelta, 10) || 0;
+      state.opponentLife += d;
+      render();
+    });
+  });
+  // v3.30.x — 20/40 starting-life toggle (B1). Flips the configured
+  // start and re-seeds the live counter to it (so the toggle reads as
+  // "reset opponent to N"). render() repaints both the counter and the
+  // button label.
+  document.getElementById("gf-btn-opp-start").addEventListener("click", () => {
+    state.opponentStart = state.opponentStart === 40 ? 20 : 40;
+    state.opponentLife = state.opponentStart;
+    render();
   });
 
   // Pile zone-heads — click to browse. Library uses the special browseLibrary
