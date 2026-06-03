@@ -1,5 +1,16 @@
 [
   {
+    "version": "3.36.0",
+    "date": "2026-06-03",
+    "added": [
+      "The goldfish playtester now lets you hand-edit any permanent on the battlefield. A new \"Move to region…\" option on a card's menu moves it between the board's areas — Creatures, Lands, Artifacts & Enchantments, Planeswalkers & Battles, or Other — so you can, say, treat an animated artifact as a creature for the rest of the game. Your choice sticks (and survives the card leaving and re-entering play) until you start a new game.",
+      "Power and toughness changes are right where you'd expect, too: the existing \"Counters…\" panel already carries +1/+1 and -1/-1, and they stack into the running total shown on the card (two +1/+1 counters read as +2/+2). Nothing new to learn — we just confirmed it works cleanly on creatures and left it alone."
+    ],
+    "refined": [],
+    "resolved": [],
+    "archivist_note": "A goldfishing table is a thinking space, not a rules court, and this release leans into that. The playtester has always sorted your board into tidy areas by reading each card's type — but cards lie, or rather, they change: an artifact stands up and swings, a creature is, for the moment, just a wall. So we handed the sorting back to you. A card's menu now offers to move it to whichever area you say, and it remembers, because you had a reason. We resisted the urge to make the program clever about it — no detecting, no second-guessing — since the whole pleasure of goldfishing is being the one who decides. And the well-worn counters that track a creature's swelling power needed nothing but a nod: they were already doing the job."
+  },
+  {
     "version": "3.35.0",
     "date": "2026-06-03",
     "added": [

@@ -193,6 +193,18 @@
           // missing field on a pre-v3.30.6 instance is treated as
           // unattached.
           attachedTo: null,
+          // v3.30.x — regionOverride (B3 PART A): a battlefield-region
+          // key (one of BATTLEFIELD_REGION_KEYS) chosen manually by the
+          // user via the "Move to region…" menu, or null to derive the
+          // region from type_line. effectiveBattlefieldRegion() reads
+          // this FIRST and only falls back to classifyRegion(card) when
+          // it's falsy — so placement for any instance WITHOUT an
+          // override is byte-identical to the pre-B3 behaviour. Session-
+          // only; persists across newTurn(); reset by newGame() (which
+          // rebuilds every instance). Backward-safe: reads use the field
+          // directly with null semantics, so a missing field on a pre-
+          // B3 instance shape derives normally.
+          regionOverride: null,
         };
         if (c.is_commander) {
           state.command.push(inst);
@@ -236,6 +248,17 @@
     "bf-pwbattle",
     "bf-other",
   ]);
+
+  // v3.30.x — human labels for the five battlefield regions (B3 PART A).
+  // Drives the "Move to region…" sub-menu; the insertion order is the
+  // display order. Keys are BATTLEFIELD_REGION_KEYS members.
+  const REGION_LABELS = {
+    "bf-creatures": "Creatures",
+    "bf-lands": "Lands",
+    "bf-artenc": "Artifacts & Enchantments",
+    "bf-pwbattle": "Planeswalkers & Battles",
+    "bf-other": "Other",
+  };
 
   /**
    * Classify a card into a battlefield region by type_line, strict
@@ -347,7 +370,49 @@
   function placeOnBattlefield(id) {
     const found = findInstance(id);
     if (!found) return;
-    moveTo(id, classifyRegion(found.inst.card));
+    moveTo(id, effectiveBattlefieldRegion(found.inst));
+  }
+
+  /**
+   * v3.30.x — resolve which battlefield region an instance belongs to
+   * (B3 PART A). A manual `regionOverride` wins; otherwise fall back to
+   * the type_line derivation. CRITICAL: for any instance WITHOUT a valid
+   * override this returns EXACTLY `classifyRegion(inst.card)`, so every
+   * pre-B3 placement path stays byte-identical — the only change to
+   * placeOnBattlefield is swapping the direct classifyRegion call for
+   * this wrapper. The `BATTLEFIELD_REGION_KEYS.has` guard means a stale
+   * or bogus override can never route a card into a non-region zone.
+   */
+  function effectiveBattlefieldRegion(inst) {
+    if (inst && inst.regionOverride && BATTLEFIELD_REGION_KEYS.has(inst.regionOverride)) {
+      return inst.regionOverride;
+    }
+    return classifyRegion(inst.card);
+  }
+
+  /**
+   * v3.30.x — manual battlefield-region reclassification (B3 PART A).
+   * Sets `regionOverride` and moves the permanent into that region NOW.
+   * Deliberately a surgical splice/push rather than moveTo(): the card
+   * never leaves the battlefield, so moveTo()'s zone-CHANGE semantics
+   * (untap, detach-self, clear-counters-on-leave, token-vanish) are
+   * wrong here — a re-type must preserve tap state, counters, and any
+   * attachment. Children of a host follow for free (childrenOf scans
+   * all five region arrays; the render nests them — same invariant the
+   * v3.30.6 attach code relies on). No-ops cleanly when the card is
+   * already in the target region (still records the override so a later
+   * leave/replay honours it).
+   */
+  function setRegionOverride(instId, regionKey) {
+    if (!BATTLEFIELD_REGION_KEYS.has(regionKey)) return;
+    const found = findInstance(instId);
+    if (!found || !isBattlefieldZone(found.zone)) return;
+    found.inst.regionOverride = regionKey;
+    if (found.zone !== regionKey) {
+      found.list.splice(found.idx, 1);
+      ZONE_LISTS[regionKey]().push(found.inst);
+    }
+    render();
   }
 
   function isBattlefieldZone(zone) {
@@ -1754,6 +1819,9 @@
       tapped: false,
       counters: {},
       attachedTo: null,
+      // v3.30.x — regionOverride (B3 PART A); see buildInstances. A
+      // token can be manually re-zoned like any permanent.
+      regionOverride: null,
       // v3.30.7 — isToken flag. The lifecycle rule in moveTo reads
       // this; render code does NOT need to. Counters / attachment /
       // tap / drag-drop / context menu all work without consulting
@@ -1943,6 +2011,24 @@
     openMenuFromItems(coord, items);
   }
 
+  // v3.30.x — "Move to region…" sub-flow (B3 PART A). Mirrors the
+  // openHostPicker idiom: replaces the per-card menu with a second
+  // .gf-ctx listing the five battlefield regions (the card's CURRENT
+  // region omitted — moving there would be a no-op). Picking one calls
+  // setRegionOverride, which records the override and re-zones the card.
+  function openRegionPicker(inst, coord) {
+    const found = findInstance(inst.id);
+    const current = found ? found.zone : null;
+    const items = Object.keys(REGION_LABELS)
+      .filter((key) => key !== current)
+      .map((key) => ({
+        label: "→ " + REGION_LABELS[key],
+        action: () => setRegionOverride(inst.id, key),
+      }));
+    if (items.length === 0) return;
+    openMenuFromItems(coord, items);
+  }
+
   function buildMenuItems(inst, zone) {
     const items = [];
     if (zone === "hand") {
@@ -1994,6 +2080,15 @@
           action: (coord) => openHostPicker(inst, coord),
         });
       }
+      // v3.30.x — manual region reclassification (B3 PART A). Opens a
+      // sub-menu of the five battlefield regions; picking one sets the
+      // instance's regionOverride and re-zones it (e.g. "convert a
+      // non-creature to a creature" = → Creatures). No-rules-enforcement:
+      // the user drives the type/zone, there is no auto-detection.
+      items.push({
+        label: "Move to region…",
+        action: (coord) => openRegionPicker(inst, coord),
+      });
     }
     // Single "Move → Battlefield" — placement routes via classifyRegion,
     // so the user never picks a battlefield region directly. v3.30.1
