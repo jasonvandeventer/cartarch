@@ -230,6 +230,12 @@ def _run_price_refresh_batch() -> None:
                 card.frame_effects = fresh.get("frame_effects")
                 card.set_type = fresh.get("set_type")
                 card.layout = fresh.get("layout")
+                # v3.36.x — carry the v3.36.1 seam columns onto the working
+                # `cards` row too, so the goldfish loyalty/defense auto-init
+                # (which reads Card, not scryfall_cards) populates as cards
+                # naturally re-refresh on the staleness cycle.
+                card.loyalty = fresh.get("loyalty")
+                card.defense = fresh.get("defense")
                 card.updated_at = now
                 updated += 1
         session.commit()
@@ -304,6 +310,9 @@ def _run_trait_backfill_batch() -> int:
                 card.frame_effects = fresh.get("frame_effects")
                 card.set_type = fresh.get("set_type")
                 card.layout = fresh.get("layout")
+                # v3.36.x — carry the v3.36.1 seam columns (see price-refresh).
+                card.loyalty = fresh.get("loyalty")
+                card.defense = fresh.get("defense")
                 card.updated_at = now
             else:
                 # Scryfall didn't return it — mark done (non-NULL) so the
@@ -328,6 +337,94 @@ def _trait_backfill_loop() -> None:
         shutdown_event.wait(
             _TRAIT_BACKFILL_BUSY_SECONDS if processed else _TRAIT_BACKFILL_IDLE_SECONDS
         )
+
+
+_LOYALTY_BACKFILL_BATCH = 75
+_LOYALTY_BACKFILL_BUSY_SECONDS = 3  # between batches while work remains
+
+
+def _run_loyalty_defense_backfill_batch(after_id: int) -> tuple[int, int]:
+    """Backfill ``cards.loyalty`` / ``cards.defense`` for OWNED planeswalkers
+    and battles that still lack them — the one-shot catch-up for collections
+    that predate v3.36.1.
+
+    The goldfish loyalty/defense auto-init reads the working ``cards`` table
+    (via ``InventoryRow.card``), NOT the daemon-populated ``scryfall_cards``
+    cache. The price-refresh / trait-backfill loops now carry these columns
+    too, but only re-touch a card when it next goes stale; this loop
+    populates the existing owned planeswalkers/battles immediately on deploy.
+
+    PAGINATED BY ``Card.id`` (not by a "still NULL" cursor) so the pass
+    always terminates: a DFC planeswalker whose loyalty lives on the back
+    face normalizes to NULL and simply stays NULL — it is advanced past,
+    never looped on. Selection still filters to rows that NEED a value so a
+    converged collection re-scans cheaply on restart. Off the request path;
+    one batched Scryfall lookup per batch (never per-row); commit per batch.
+    Returns ``(rows_processed, new_after_id)``.
+    """
+    session = SessionLocal()
+    try:
+        pending = (
+            session.query(Card)
+            .join(InventoryRow, InventoryRow.card_id == Card.id)
+            .filter(
+                Card.id > after_id,
+                (Card.type_line.like("%Planeswalker%") & (Card.loyalty == None))  # noqa: E711
+                | (Card.type_line.like("%Battle%") & (Card.defense == None)),  # noqa: E711
+            )
+            .order_by(Card.id.asc())
+            .limit(_LOYALTY_BACKFILL_BATCH)
+            .distinct()
+            .all()
+        )
+        if not pending:
+            return 0, after_id
+        # Advance the cursor unconditionally to the last id in this batch so a
+        # batch whose fetch failed (or returned NULL) is never re-selected in
+        # THIS pass — guarantees termination. Transient misses are retried on
+        # the next process start, and the price-refresh loop is the backstop.
+        new_after = pending[-1].id
+        _bulk = bulk_refresh_prices([c.scryfall_id for c in pending])
+        fresh_by_id = _bulk.cards
+        for card in pending:
+            fresh = fresh_by_id.get(card.scryfall_id)
+            if not fresh:
+                continue
+            if card.loyalty is None:
+                card.loyalty = fresh.get("loyalty")
+            if card.defense is None:
+                card.defense = fresh.get("defense")
+        session.commit()
+        print(
+            f"[loyalty-backfill] processed {len(pending)} cards (through id {new_after})",
+            flush=True,
+        )
+        return len(pending), new_after
+    except Exception as exc:
+        session.rollback()
+        print(f"[loyalty-backfill] error: {exc}", flush=True)
+        # Advance past the attempted batch so a poison row can't wedge the pass.
+        return 0, after_id
+    finally:
+        session.close()
+
+
+def _loyalty_defense_backfill_loop() -> None:
+    """One-shot catch-up: page through owned planeswalkers/battles once per
+    process, then exit the thread. Ongoing coverage is the price-refresh /
+    trait-backfill loops (which now carry loyalty/defense) plus request-path
+    Card construction for new imports — so this does not need to run forever.
+    """
+    if shutdown_event.wait(45):  # after migrations/init; bail if stopping
+        return
+    after_id = 0
+    while not shutdown_event.is_set():
+        processed, after_id = _run_loyalty_defense_backfill_batch(after_id)
+        if not processed:
+            print("[loyalty-backfill] catch-up complete", flush=True)
+            return
+        if shutdown_event.wait(_LOYALTY_BACKFILL_BUSY_SECONDS):
+            return
 
 
 _daemon_threads: list[threading.Thread] = []
@@ -361,6 +458,7 @@ def on_startup() -> None:
         (_price_refresh_loop, "price-refresh"),
         (_trait_backfill_loop, "trait-backfill"),
         (_bulk_data_loop, "bulk-data"),
+        (_loyalty_defense_backfill_loop, "loyalty-backfill"),
     ):
         thread = threading.Thread(target=_target, daemon=True, name=_name)
         thread.start()

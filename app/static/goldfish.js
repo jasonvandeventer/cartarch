@@ -356,6 +356,21 @@
       const idx = dest.indexOf(found.inst);
       if (idx !== -1) dest.splice(idx, 1);
     }
+    // v3.30.x — Step 4: auto-init loyalty/defense on battlefield ENTRY.
+    // Every battlefield-bound path converges here (placeOnBattlefield →
+    // moveTo), so this single hook covers play-from-hand, drag-drop, the
+    // "Move → Battlefield" menu item, and token creation. Type-keyed +
+    // stamp-if-absent (see autoInitTypeCounter). A token that vanished
+    // above (non-battlefield target) is excluded by the isBattlefieldZone
+    // guard. NOTE: counters are still cleared on LEAVE by the v3.30.5
+    // clear above, so a bounced-and-replayed permanent re-stamps to its
+    // printed value — rules-accurate-ish, but it does NOT preserve a prior
+    // manual edit across a bounce (auto-clear-on-leave persistence is
+    // deferred). In-play idempotency (re-render / tap / adjust never
+    // reset) is fully preserved.
+    if (isBattlefieldZone(targetZone)) {
+      autoInitTypeCounter(found.inst);
+    }
     render();
     refreshModalIfOpen();
   }
@@ -1248,7 +1263,11 @@
   // uses an `extraCounters[]` array per seat; goldfish uses a per-
   // instance `counters: {label → count}` object map. Different
   // problems, different shapes.
-  const COUNTER_LABELS = ["+1/+1", "-1/-1", "Loyalty", "Charge", "Experience", "Quest"];
+  // v3.30.x — "Defense" added (Step 4) alongside "Loyalty": the Battle
+  // analogue, auto-stamped on a Battle entering the battlefield and
+  // manually adjustable via the same widget. Same adjustCounter() path,
+  // no new mechanism.
+  const COUNTER_LABELS = ["+1/+1", "-1/-1", "Loyalty", "Defense", "Charge", "Experience", "Quest"];
 
   // v3.30.12 — generalized P/T-modifier label match. Reverses
   // v3.30.12's literal-match-only design. Any label of the form
@@ -1349,6 +1368,44 @@
     // forcing a close/reopen.
     if (state.activeCounterPanel && state.activeCounterPanel.instId === instId) {
       refreshCounterPanelBody(state.activeCounterPanel);
+    }
+  }
+
+  // v3.30.x — auto-init starting loyalty / defense (Step 4).
+  //
+  // loyalty/defense arrive on the card payload as nullable Scryfall STRINGS
+  // (v3.36.1 seam). They can be non-numeric ("X"), NULL (card not yet
+  // backfilled, or a DFC whose value sits on the back face), or a plain
+  // integer string. Return a finite integer or null; null means "skip
+  // auto-init" — never throw.
+  function parseStartingCounter(raw) {
+    if (raw === null || raw === undefined) return null;
+    const n = parseInt(String(raw).trim(), 10);
+    return Number.isFinite(n) ? n : null;
+  }
+
+  // Stamp a Loyalty/Defense counter on a permanent ENTERING the battlefield,
+  // keyed off CARD TYPE (type_line), NOT region — so a non-planeswalker
+  // manually moved into bf-pwbattle never gets a Loyalty counter, and a
+  // planeswalker re-zoned to any region still carries one. STAMP-IF-ABSENT:
+  // only set the counter when it is not already present, so a re-render,
+  // tap, or any later manual +/- is never reset to the printed value
+  // (manual edits are sacred). NULL / non-numeric → silently skip; the
+  // manual counter remains available via the Counters… widget. Called from
+  // moveTo on every battlefield entry; idempotent within a tenure because
+  // nothing on the battlefield clears the counter (the v3.30.5 clear fires
+  // only on LEAVE), so a fresh entry after a bounce re-stamps to printed.
+  function autoInitTypeCounter(inst) {
+    if (!inst || !inst.card) return;
+    if (!inst.counters) inst.counters = {};
+    const tl = (inst.card.type_line || "").toLowerCase();
+    if (tl.includes("planeswalker") && inst.counters.Loyalty === undefined) {
+      const v = parseStartingCounter(inst.card.loyalty);
+      if (v !== null) inst.counters.Loyalty = v;
+    }
+    if (tl.includes("battle") && inst.counters.Defense === undefined) {
+      const v = parseStartingCounter(inst.card.defense);
+      if (v !== null) inst.counters.Defense = v;
     }
   }
 

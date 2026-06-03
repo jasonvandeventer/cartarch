@@ -1,5 +1,15 @@
 [
   {
+    "version": "3.36.2",
+    "date": "2026-06-03",
+    "added": [
+      "In the goldfish playtester, planeswalkers and battles now enter the battlefield with their starting counters already set — a planeswalker arrives at its printed loyalty, a battle at its printed defense — so you don't have to dial them in by hand. Adjust them like any other counter; they hold steady through a new turn and reset when you start a new game. (A permanent that leaves and comes back returns at its printed value, just like the real rules.) Cards we don't have a printed value for simply get no auto-counter — you can still add one yourself."
+    ],
+    "refined": [],
+    "resolved": [],
+    "archivist_note": "This is the last stone in a small arch we've been building for the goldfish table. Over the past few releases the playtester learned to track an opponent's life, to let you re-sort and re-stat a permanent by hand, and — quietly, underneath — to remember two facts about cards it had been ignoring. Today those facts come to the surface: cast a planeswalker and it stands up at its real loyalty; bring in a battle and its defense is already counting down. The work that makes this possible is deliberately humble — the program reads what it already knows and stamps the number once, then gets out of your way. We even taught the catalogue to fill in those numbers for the cards you already own, so the feature works on your whole collection and not just on cards added from here on. With this, the goldfish wishlist that started all of it is complete."
+  },
+  {
     "version": "3.36.1",
     "date": "2026-06-03",
     "added": [],
