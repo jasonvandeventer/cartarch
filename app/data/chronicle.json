@@ -1,5 +1,15 @@
 [
   {
+    "version": "3.34.6",
+    "date": "2026-06-03",
+    "added": [],
+    "refined": [],
+    "resolved": [
+      "Fixed the goldfish playtester's \"New turn\" button: it now advances and repaints the turn counter the moment you click it. Previously, if you'd turned off automatic draws, the counter sat still until your next \"Draw\" and then jumped ahead all at once."
+    ],
+    "archivist_note": "A small thing the eye notices immediately: you press \"New turn\" and nothing moves. The turn was advancing all along — the screen simply wasn't being told to redraw unless a card was also drawn, a side effect we'd quietly leaned on and then, months ago, removed without noticing. So the counter saved up its changes and spent them all at once on the next draw. The repair is a single line restoring the redraw to where it belongs. No saved game was touched, no in-progress tracker disturbed — just the button doing, visibly, what it always claimed to."
+  },
+  {
     "version": "3.34.5",
     "date": "2026-06-02",
     "added": [],

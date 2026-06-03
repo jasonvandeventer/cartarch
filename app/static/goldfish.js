@@ -380,8 +380,18 @@
     // reset; the user draws manually via the Draw button. No pending-
     // draw indicator, no "you forgot to draw" prompt — consistent with
     // the no-rules-enforcement principle.
+    //
+    // The repaint MUST happen here. drawN() ends in render(), so the
+    // auto-draw path repaints for free; the manual path has no drawN
+    // and so must render() itself, or the turn counter (and the battle-
+    // field/mana-pool reset) only become visible on the NEXT render —
+    // which, for a manual-draw user, is the next Draw click, making the
+    // counter appear to jump by the number of New-turn clicks since the
+    // last draw (regression introduced when v3.30.3 made drawN opt-in).
     if (state.autoDrawOnTurn) {
       drawN(1);
+    } else {
+      render();
     }
   }
 
