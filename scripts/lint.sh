@@ -1,6 +1,6 @@
 #!/bin/bash
 
 ruff check . --fix
-black .
+ruff format .
 djlint app/templates --reformat
 npx prettier . --write
