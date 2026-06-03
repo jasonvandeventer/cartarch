@@ -1,5 +1,45 @@
 [
   {
+    "version": "3.34.5",
+    "date": "2026-06-02",
+    "added": [],
+    "refined": [
+      "More groundwork for the larger database upgrade ahead: two internal queries behind deck power-level analysis were rewritten to behave identically on both today's database and the sturdier one we're moving to — with no visible change to the app."
+    ],
+    "resolved": [],
+    "archivist_note": "A short run of releases — 3.34.1 through 3.34.5 — spent entirely on the unglamorous work that makes a safe move possible. None of it moves a button or changes a screen. We taught the code to speak to both the current database and its successor without having to choose between them; we swept the whole collection for the kind of broken internal reference the new database would reject, and found almost none — five, all harmless, among tens of thousands of records; and we retired an old code-formatting tool that had quietly been tripping our own automated checks. Foundations, not façades — laid now, deliberately, so that the move itself can be boring."
+  },
+  {
+    "version": "3.34.4",
+    "date": "2026-06-02",
+    "added": [],
+    "refined": [
+      "Repaired our internal automated-checks pipeline, which had been failing after an old code-formatting tool was retired. Behind-the-scenes tooling only."
+    ],
+    "resolved": [],
+    "archivist_note": null
+  },
+  {
+    "version": "3.34.3",
+    "date": "2026-06-02",
+    "added": [],
+    "refined": [
+      "Database-upgrade groundwork: the app now adapts automatically to whichever database it is running on, and we added an internal tool that scans the entire collection for broken links the new database wouldn't accept — it found only five, all harmless."
+    ],
+    "resolved": [],
+    "archivist_note": null
+  },
+  {
+    "version": "3.34.1",
+    "date": "2026-06-02",
+    "added": [],
+    "refined": [
+      "Tightened our pre-release quality checks and added an internal audit command to help plan the database upgrade. Behind-the-scenes tooling only."
+    ],
+    "resolved": [],
+    "archivist_note": null
+  },
+  {
     "version": "3.34.0",
     "date": "2026-06-02",
     "added": [],
