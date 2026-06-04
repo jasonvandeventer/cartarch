@@ -1,5 +1,15 @@
 [
   {
+    "version": "3.36.5",
+    "date": "2026-06-03",
+    "added": [],
+    "refined": [
+      "More groundwork for the coming database upgrade. The price search filter (e.g. 'price:>=5') reads card prices that are stored as text and converts them to numbers on the fly. The current database treats a blank price as zero; the new one would instead reject the whole search with an error. We checked every price in the collection first — all 12,753 cards are clean, no blanks or bad values — and then added a guard that turns any stray blank into 'no price' so the search keeps working after the move. No visible change today."
+    ],
+    "resolved": [],
+    "archivist_note": "Two kinds of diligence in one release: we looked before we leapt — auditing every stored price and finding them all sound — and then fitted the safety rail anyway, for the one blank value that doesn't exist yet but someday might. The audit said 'you don't strictly need this'; we built it regardless, because the cost of the rail is a line of code and the cost of its absence is a broken search the day after the migration."
+  },
+  {
     "version": "3.36.4",
     "date": "2026-06-03",
     "added": [],

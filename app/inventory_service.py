@@ -849,17 +849,33 @@ def _parse_atom(tokens: list[tuple], pos: int) -> tuple:
 # sees on the row. Used by the new v3.28.8 facet price range AND
 # retroactively fixes the `price:` boolean-search keyword.
 def _effective_price_expr():
+    # v4-prep (pg-readiness "Type affinity" finding / cutover-checklist price
+    # audit): the price_usd* columns are TEXT and get CAST
+    # to Float here. SQLite coerces leniently (CAST('' AS REAL) -> 0.0); Postgres
+    # is STRICT and ERRORs on CAST('' AS double precision) -> 'invalid input
+    # syntax', which would 500 the price:/usd: search keyword and the facet price
+    # range post-cutover. NULLIF(col, '') maps an empty string to NULL so the
+    # cast is safe on both dialects (CAST(NULL) -> NULL). The 2026-06-03 prod
+    # scan found ZERO empty and ZERO non-numeric values across all three columns
+    # (Scryfall always sends a decimal string or nothing), so this is a defensive
+    # guard, not a cleanup -- and it is behavior-identical on today's SQLite (a
+    # real price is never '', so NULLIF is a no-op on every actual row).
+    def nz(col):
+        return func.nullif(col, "")
+
     return cast(
         case(
             (
                 InventoryRow.finish == "foil",
-                func.coalesce(Card.price_usd_foil, Card.price_usd),
+                func.coalesce(nz(Card.price_usd_foil), nz(Card.price_usd)),
             ),
             (
                 InventoryRow.finish == "etched",
-                func.coalesce(Card.price_usd_etched, Card.price_usd_foil, Card.price_usd),
+                func.coalesce(
+                    nz(Card.price_usd_etched), nz(Card.price_usd_foil), nz(Card.price_usd)
+                ),
             ),
-            else_=Card.price_usd,
+            else_=nz(Card.price_usd),
         ),
         SAFloat,
     )
