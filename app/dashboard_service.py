@@ -273,7 +273,11 @@ def get_dashboard_data(session: Session, user_id: int, now: datetime | None = No
         commander_rows = (
             session.query(
                 Deck.id.label("deck_id"),
-                func.group_concat(Card.color_identity, " ").label("ci_concat"),
+                # aggregate_strings() is dialect-portable: compiles to
+                # group_concat() on SQLite (behavior-identical to before) and
+                # string_agg() on Postgres at the v4 cutover. func.group_concat
+                # would 500 on PG (no such function). v4-prep, safe on SQLite.
+                func.aggregate_strings(Card.color_identity, " ").label("ci_concat"),
             )
             .join(InventoryRow, InventoryRow.storage_location_id == Deck.storage_location_id)
             .join(Card, InventoryRow.card_id == Card.id)

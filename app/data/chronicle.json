@@ -1,5 +1,15 @@
 [
   {
+    "version": "3.36.4",
+    "date": "2026-06-03",
+    "added": [],
+    "refined": [
+      "Groundwork for the coming database upgrade. One command that builds the dashboard's per-deck colour summaries was written in a dialect only the current database engine understands; we swapped it for a portable equivalent that works on both the current engine and the one we're migrating to. Nothing changes on screen — the dashboard renders exactly as before — but one more thing that would have broken during the move is now safe ahead of time."
+    ],
+    "resolved": [],
+    "archivist_note": "A database migration is made of many small, invisible repairs like this one — each a spot where the old code spoke a private dialect. Found and swapped before the move it costs nothing; found during the move it would be an outage. This is the first of the catalogued few being cleared in advance, and the dashboard never noticed."
+  },
+  {
     "version": "3.36.3",
     "date": "2026-06-03",
     "resolved": [
