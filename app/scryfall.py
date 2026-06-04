@@ -599,6 +599,38 @@ def bulk_refresh_prices(scryfall_ids: list[str]) -> BulkFetchResult:
     return BulkFetchResult(cards=results, not_found=not_found, failed=failed)
 
 
+def fetch_payloads_uncached(scryfall_ids: list[str]) -> dict[str, dict[str, Any]]:
+    """Fetch normalized card payloads straight from Scryfall's /cards/collection
+    batch endpoint, BYPASSING the local ``scryfall_cards`` cache.
+
+    The cache-first ``bulk_refresh_prices`` is correct for the request path and
+    most backfills, but it returns the cached row even when a field has not yet
+    been re-streamed into the cache — e.g. a freshly added seam column (v3.36.1
+    ``loyalty`` / ``defense``) whose daily bulk backfill has not run, so the
+    cache still holds NULL. An off-request daemon that needs authoritative
+    values for such a column reads the live source directly via this helper.
+
+    **Request-path invariant**: this makes Scryfall calls, so it MUST NOT be
+    reachable from an HTTP request handler — daemon/one-shot use only. Batched
+    (``ceil(N/75)`` POSTs), bounded by the caller. Returns
+    ``{scryfall_id: normalized_payload}`` for whatever Scryfall resolved;
+    unresolved ids are simply absent.
+    """
+    results: dict[str, dict[str, Any]] = {}
+    ids = [sid for sid in scryfall_ids if sid]
+    for i in range(0, len(ids), _COLLECTION_BATCH_SIZE):
+        batch = ids[i : i + _COLLECTION_BATCH_SIZE]
+        data = _post_json(
+            f"{SCRYFALL_CARD_URL}/collection",
+            {"identifiers": [{"id": sid} for sid in batch]},
+        )
+        for card in (data or {}).get("data", []):
+            normalized = _normalize_card_payload(card)
+            if normalized.get("scryfall_id"):
+                results[normalized["scryfall_id"]] = normalized
+    return results
+
+
 def bulk_fetch_by_set_number(
     pairs: list[tuple[str, str]],
 ) -> BulkFetchResult:

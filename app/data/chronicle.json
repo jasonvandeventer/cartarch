@@ -1,5 +1,15 @@
 [
   {
+    "version": "3.36.3",
+    "date": "2026-06-03",
+    "resolved": [
+      "Fixed the planeswalker/battle starting-counter feature from the last release, which wasn't actually populating: the goldfish playtester now reliably stamps a planeswalker's loyalty (and a battle's defense) when it enters, for the cards you already own. The values are read straight from the source so the feature works on deploy regardless of when the card catalogue last refreshed."
+    ],
+    "added": [],
+    "refined": [],
+    "archivist_note": "A feature that ships but does nothing is just a rumor of a feature. The previous release taught the playtester to set a planeswalker's loyalty automatically — but it was reading those numbers from a local catalogue that hadn't yet been refreshed with them, so it quietly set nothing. This release has it read the numbers from the source directly, so it no longer depends on that refresh having happened first. Small, surgical, and the right place to end a long thread of related work: the goldfish wishlist is complete, and our attention now turns to the larger move — the sturdier database that several devices can share at once."
+  },
+  {
     "version": "3.36.2",
     "date": "2026-06-03",
     "added": [

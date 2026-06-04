@@ -100,6 +100,7 @@ from app.scryfall import (
     bulk_refresh_prices,
     fetch_card_by_scryfall_id,
     fetch_card_by_set_and_number,
+    fetch_payloads_uncached,
     search_cards_by_name,
 )
 from app.watchlist_service import (
@@ -361,6 +362,15 @@ def _run_loyalty_defense_backfill_batch(after_id: int) -> tuple[int, int]:
     converged collection re-scans cheaply on restart. Off the request path;
     one batched Scryfall lookup per batch (never per-row); commit per batch.
     Returns ``(rows_processed, new_after_id)``.
+
+    v3.36.3 — fetches via ``fetch_payloads_uncached`` (a direct Scryfall
+    lookup), NOT the cache-first ``bulk_refresh_prices``. The v3.36.2 version
+    used the cache, which returns the cached row even when ``loyalty`` /
+    ``defense`` have not been re-streamed into ``scryfall_cards`` yet — so on
+    a deploy where the daily bulk backfill hasn't run, every fetch came back
+    NULL and the backfill was a silent no-op. Reading the live source makes
+    this authoritative regardless of cache freshness, and decouples the
+    feature from the (lock-contention-prone) 2 GB bulk re-stream.
     """
     session = SessionLocal()
     try:
@@ -384,8 +394,10 @@ def _run_loyalty_defense_backfill_batch(after_id: int) -> tuple[int, int]:
         # THIS pass — guarantees termination. Transient misses are retried on
         # the next process start, and the price-refresh loop is the backstop.
         new_after = pending[-1].id
-        _bulk = bulk_refresh_prices([c.scryfall_id for c in pending])
-        fresh_by_id = _bulk.cards
+        # v3.36.3 — cache-BYPASS fetch (authoritative for not-yet-streamed
+        # seam columns). Off-request daemon, so the request-path invariant
+        # against per-row Scryfall I/O is respected (this is batched + bounded).
+        fresh_by_id = fetch_payloads_uncached([c.scryfall_id for c in pending])
         for card in pending:
             fresh = fresh_by_id.get(card.scryfall_id)
             if not fresh:
