@@ -1,5 +1,15 @@
 [
   {
+    "version": "3.36.6",
+    "date": "2026-06-03",
+    "added": [],
+    "refined": [
+      "Two more invisible portability fixes ahead of the database upgrade. (1) A pair of internal catalogue lookups that match card types by text now use a case-insensitive match explicitly, so they keep working on the new database engine, which (unlike the current one) treats upper- and lower-case as different. (2) A background price-refresh queue now states its sort order explicitly, so cards are refreshed in the same priority order on both the current and new engines. Neither changes anything you can see today."
+    ],
+    "resolved": [],
+    "archivist_note": "The current database engine is forgiving in ways the next one is not — it ignores letter case in text matches and quietly orders empty values one way where the successor orders them the other. Each such difference is a trapdoor that opens only after the migration. This release nails two of them shut while they're still cheap to reach, and checks the catalogue to confirm one of them couldn't have sprung at all."
+  },
+  {
     "version": "3.36.5",
     "date": "2026-06-03",
     "added": [],

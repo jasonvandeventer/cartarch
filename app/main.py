@@ -198,7 +198,15 @@ def _run_price_refresh_batch() -> None:
                 | (Card.color_identity == None)  # noqa: E711
                 | (Card.legalities == None)  # noqa: E711
             )
-            .order_by(Card.updated_at.asc())
+            # v4-prep (pg-readiness NULL-ordering): the audit flagged this
+            # work-queue ORDER BY for the SQLite-NULLs-first vs Postgres-NULLs-
+            # last divergence. In fact Card.updated_at is NOT NULL (the
+            # Mapped[datetime] annotation infers it; prod schema notnull=1, 0
+            # NULL rows), so the divergence cannot occur today -- nulls_first()
+            # is a DEFENSIVE pin: it makes the intended "stalest first" order
+            # explicit and stays correct if the column is ever made nullable at
+            # the Alembic baseline. No-op and neutral on SQLite either way.
+            .order_by(Card.updated_at.asc().nulls_first())
             .limit(_PRICE_REFRESH_BATCH)
             .distinct()
             .all()
@@ -379,8 +387,13 @@ def _run_loyalty_defense_backfill_batch(after_id: int) -> tuple[int, int]:
             .join(InventoryRow, InventoryRow.card_id == Card.id)
             .filter(
                 Card.id > after_id,
-                (Card.type_line.like("%Planeswalker%") & (Card.loyalty == None))  # noqa: E711
-                | (Card.type_line.like("%Battle%") & (Card.defense == None)),  # noqa: E711
+                # v4-prep (pg-readiness case-sensitivity): ilike, not like.
+                # SQLite LIKE is case-insensitive for ASCII (so these matched
+                # today); Postgres LIKE is case-SENSITIVE. type_line is canonical
+                # title-case from Scryfall so PG LIKE would happen to work, but
+                # ilike is the portable-intent form and is neutral on SQLite.
+                (Card.type_line.ilike("%Planeswalker%") & (Card.loyalty == None))  # noqa: E711
+                | (Card.type_line.ilike("%Battle%") & (Card.defense == None)),  # noqa: E711
             )
             .order_by(Card.id.asc())
             .limit(_LOYALTY_BACKFILL_BATCH)
