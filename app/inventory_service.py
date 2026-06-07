@@ -222,25 +222,47 @@ def is_substitute_card(card: Card) -> bool:
     return card_traits(card)["is_token_substitute"]
 
 
+def is_oversized_card(card: Card) -> bool:
+    """True when the card is a physically oversized type that won't fit the
+    normal card slots — Planechase ``Plane`` / ``Phenomenon`` and Archenemy
+    ``Scheme`` / ``Vanguard`` cards. These route to the BACK of drawer 6.
+
+    Detection is by card TYPE, read from the portion of ``type_line`` before
+    the em dash (subtypes follow it). Word-level matching is deliberate so
+    ``Planeswalker`` — whose type word is "planeswalker", not "plane" — is
+    never mistaken for a Plane. Resolves entirely from the local ``type_line``
+    column, so it is safe on the request path (no Scryfall fetch).
+    """
+    head = (card.type_line or "").lower().split("—")[0]
+    types = head.split()
+    return any(t in types for t in ("plane", "phenomenon", "scheme", "vanguard"))
+
+
 def assign_drawer(row: InventoryRow) -> int:
     """Return the target drawer number (1-6) for an InventoryRow.
 
     Priority order (first match wins):
-      1. value >= VALUE_THRESHOLD ($5) → drawer 1
-      2. is_proxy=True → drawer 6 (proxies section)
-      3. token card → drawer 6 (tokens section)
-      4. substitute card → drawer 6 (substitutes section)
-      5. foreign language (language not en/None) → drawer 6 (foreign section)
-      6. premium basic → drawer 6 (premium basics section)
-      7. plain basic → drawer 6 (plain basics section)
-      8. numeric set code or empty set → drawer 6 (numeric sets section)
-      9. otherwise: letter-range routes to drawers 2-5
+      1. oversized card (Plane/Phenomenon/Scheme/Vanguard) → drawer 6 (back)
+      2. value >= VALUE_THRESHOLD ($5) → drawer 1
+      3. is_proxy=True → drawer 6 (proxies section)
+      4. token card → drawer 6 (tokens section)
+      5. substitute card → drawer 6 (substitutes section)
+      6. foreign language (language not en/None) → drawer 6 (foreign section)
+      7. premium basic → drawer 6 (premium basics section)
+      8. plain basic → drawer 6 (plain basics section)
+      9. numeric set code or empty set → drawer 6 (numeric sets section)
+      10. otherwise: letter-range routes to drawers 2-5
 
-    The drawer-6 *section* (vs the drawer number) is determined by
-    ``drawer_sort_key`` for the in-drawer sort ordering.
+    Oversized cards win over the value rule on purpose: the reason they go to
+    drawer 6 is physical size (they don't fit the normal slots), so even a $5+
+    Plane can't live in drawer 1. The drawer-6 *section* (vs the drawer number)
+    is determined by ``drawer_sort_key`` for the in-drawer sort ordering.
     """
     card = row.card
     finish = row.finish
+
+    if is_oversized_card(card):
+        return 6
 
     price = effective_price(card, finish) or 0.0
     if price >= VALUE_THRESHOLD:
@@ -277,7 +299,8 @@ def assign_drawer(row: InventoryRow) -> int:
 def drawer_sort_key(row: InventoryRow) -> tuple:
     """In-drawer sort key. For drawer 6, a leading section number controls
     top-to-bottom physical layout: 0=numeric sets, 1=foreign, 2=premium
-    basics, 3=plain basics, 4=tokens, 5=substitutes, 6=proxies.
+    basics, 3=plain basics, 4=tokens, 5=substitutes, 6=proxies, 7=oversized
+    (Plane/Phenomenon/Scheme/Vanguard — physically last, at the back).
     """
     card = row.card
     drawer = assign_drawer(row)
@@ -304,6 +327,11 @@ def drawer_sort_key(row: InventoryRow) -> tuple:
 
         # Highest-priority classifications win the section assignment when
         # multiple apply (matches assign_drawer's first-match-wins ordering).
+        # Oversized first: its section number is the largest named section, so
+        # these sort to the very back of the drawer regardless of any other
+        # trait they carry.
+        if is_oversized_card(card):
+            return (7, set_code, collector, name, row.id)
         if row.is_proxy:
             return (6, set_code, collector, name, row.id)
         if is_token:
@@ -320,7 +348,7 @@ def drawer_sort_key(row: InventoryRow) -> tuple:
             return (0, set_code, collector, name, row.id)
         # Fallback — shouldn't happen given assign_drawer's exhaustive rules,
         # but guard against future drift by sorting after every named section.
-        return (7, set_code, collector, name, row.id)
+        return (8, set_code, collector, name, row.id)
 
     return (set_code, collector, name, row.id)
 

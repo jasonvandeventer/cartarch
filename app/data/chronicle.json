@@ -1,5 +1,15 @@
 [
   {
+    "version": "3.36.7",
+    "date": "2026-06-06",
+    "added": [],
+    "refined": [
+      "The automatic drawer sorter now files oversized cards — Planechase planes and phenomena, and Archenemy schemes and vanguards — at the very back of Drawer 6. These cards are physically larger than a normal card and don't sit neatly in the regular slots, so grouping them together at the back keeps the drawer tidy. Planeswalkers (despite the similar name) are unaffected. Cards already filed elsewhere move to their new home the next time you auto-sort or apply the sorter."
+    ],
+    "resolved": [],
+    "archivist_note": "Some cards simply refuse to fit. The big Planechase and Archenemy cards have always sat awkwardly among their letter-sorted neighbors, so the sorter now gathers them where size, not set code, decides the address: the back of the last drawer. A small courtesy to anyone who has ever tried to wedge a plane between two ordinary cards."
+  },
+  {
     "version": "3.36.6",
     "date": "2026-06-03",
     "added": [],
