@@ -1,0 +1,91 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    argocd-image-updater.argoproj.io/image-list: obsidian-mcp=ghcr.io/jasonvandeventer/obsidian-mcp
+    argocd-image-updater.argoproj.io/obsidian-mcp.update-strategy: semver
+    argocd.argoproj.io/tracking-id: obsidian-mcp:apps/Deployment:mcp/obsidian-mcp
+    deployment.kubernetes.io/revision: "2"
+  creationTimestamp: "2026-05-29T02:04:23Z"
+  generation: 2
+  name: obsidian-mcp
+  namespace: mcp
+  resourceVersion: "15539767"
+  uid: 6f5e2afa-3626-41f9-9555-55cb32499112
+spec:
+  progressDeadlineSeconds: 600
+  replicas: 1
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app: obsidian-mcp
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: obsidian-mcp
+    spec:
+      containers:
+      - env:
+        - name: OBSIDIAN_VAULT_PATH
+          value: /vault
+        image: ghcr.io/jasonvandeventer/obsidian-mcp:v0.1.0
+        imagePullPolicy: IfNotPresent
+        name: obsidian-mcp
+        ports:
+        - containerPort: 8000
+          protocol: TCP
+        readinessProbe:
+          failureThreshold: 3
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          successThreshold: 1
+          tcpSocket:
+            port: 8000
+          timeoutSeconds: 1
+        resources:
+          limits:
+            cpu: 200m
+            memory: 256Mi
+          requests:
+            cpu: 50m
+            memory: 64Mi
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+        volumeMounts:
+        - mountPath: /vault
+          name: vault
+          readOnly: true
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      terminationGracePeriodSeconds: 30
+      volumes:
+      - name: vault
+        persistentVolumeClaim:
+          claimName: obsidian-vault-nfs
+          readOnly: true
+status:
+  availableReplicas: 1
+  conditions:
+  - lastTransitionTime: "2026-05-29T02:18:35Z"
+    lastUpdateTime: "2026-05-29T02:18:49Z"
+    message: ReplicaSet "obsidian-mcp-79bd7d7d56" has successfully progressed.
+    reason: NewReplicaSetAvailable
+    status: "True"
+    type: Progressing
+  - lastTransitionTime: "2026-06-03T23:45:17Z"
+    lastUpdateTime: "2026-06-03T23:45:17Z"
+    message: Deployment has minimum availability.
+    reason: MinimumReplicasAvailable
+    status: "True"
+    type: Available
+  observedGeneration: 2
+  readyReplicas: 1
+  replicas: 1
+  updatedReplicas: 1
