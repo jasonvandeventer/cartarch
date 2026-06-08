@@ -2,7 +2,7 @@
 
 Self-hosted web application for managing a physical Magic: The Gathering collection. (Identifies as **Cartarch** in user-facing UI as of v3.27.6; the in-repo project identifier is still `mana-archive` pending the full infrastructure rename near actual public launch.)
 
-**Current version: v3.36.10** · [Platform repo](https://github.com/jasonvandeventer/vanfreckle-platform)
+**Current version: v3.36.11** · [Platform repo](https://github.com/jasonvandeventer/vanfreckle-platform)
 
 ---
 
@@ -63,7 +63,8 @@ See [docs/screenshots/](docs/screenshots/) for capture guidelines and additional
 - Browse and search your full inventory with Scryfall-style boolean syntax
 - Keywords: `t:creature`, `c:WU`, `cmc:>3`, `o:"draw a card"`, `id:gb`, `price:>=5`, `is:foil`, `qty:>1`, and more
 - Full boolean logic: `OR`, `AND`, `-negation`, `(grouping)`, quoted multi-word values
-- Sort by name, type, mana cost, color, price, or **owned count** (count-sorted view groups all printings of a high-count name together — three-level grouping name → printing → location)
+- Sort by name, type, mana value, color, set, rarity, price, quantity available, or **owned count** (count-sorted view groups all printings of a high-count name together — three-level grouping name → printing → location)
+- **Shared sort control (v3.36.11)**: the same Sort dropdown (field + asc/desc) appears on every card-listing surface — Collection, Decks, Locations, Showcases, and shared views — backed by one source of truth (`app/sort_spec.py`); it composes with the active search/filters and isn't stored as a preference
 
 ### Decklist Check
 

@@ -1,5 +1,19 @@
 [
   {
+    "version": "3.36.11",
+    "date": "2026-06-08",
+    "added": [
+      "A Sort control is now on every page that lists cards — your Collection, each Deck, every storage Location, and your Showcases and shared views. Pick a field (Name, Mana Value, Color, Set, Rarity, Price, or Quantity Available) and a direction (ascending or descending), and the list reorders without disturbing your active search or filters. Sorting and searching now work together: changing the sort keeps your search, and searching keeps your sort. The choice rides along in the page address, so it survives a refresh — but it isn't saved as a preference, so every page starts in its familiar default order until you change it."
+    ],
+    "refined": [
+      "Sorting that used to be a guess is now exact: Rarity sorts common → uncommon → rare → mythic (not alphabetically), Color follows the usual W-U-B-R-G order with multicolour then colourless after, and cards with no price drop to the end instead of masquerading as the cheapest."
+    ],
+    "resolved": [
+      "Showcases and shared views had no real order — newly added cards led, but cards added together (for example when you shared a whole shelf at once) fell in an unpredictable order that could shuffle between visits. They now hold a steady, predictable order, and you can sort them however you like."
+    ],
+    "archivist_note": "Five different pages had each grown their own idea of sorting — one had every option, two had a few, two had none at all — and the one we trusted most turned out to be ordering a showcase by nothing in particular. So we did the unglamorous thing: wrote the rules down once, in a single place, and taught every page to read from it. The reward is consistency you shouldn't have to think about — Rarity means the same thing on your Collection as it does on a deck, and equal cards stop quietly trading places when the page redraws. The hardest calls were the ones with no tidy answer: a card's colours aren't a single value, 'rarity' isn't alphabetical, and a missing price isn't the same as a free card. We picked an order for each, on purpose, and now they hold everywhere."
+  },
+  {
     "version": "3.36.10",
     "date": "2026-06-07",
     "added": [],

@@ -568,16 +568,10 @@
                placeholder="t:creature OR t:artifact · id:gb · -t:land · cmc:&gt;=3 · is:commander · lang:ja"
                data-mobile-placeholder="Search…"
                value="{{ search }}">
-        <select name="sort">
-          <option value="name" {% if sort == 'name' %}selected{% endif %}>Name</option>
-          <option value="type" {% if sort == 'type' %}selected{% endif %}>Type</option>
-          <option value="cmc" {% if sort == 'cmc' %}selected{% endif %}>Mana Cost</option>
-          <option value="value" {% if sort == 'value' %}selected{% endif %}>Price</option>
-        </select>
-        <select name="direction">
-          <option value="asc" {% if direction == 'asc' %}selected{% endif %}>Ascending</option>
-          <option value="desc" {% if direction == 'desc' %}selected{% endif %}>Descending</option>
-        </select>
+        {# v3.36.11 — shared SORT control (sort_spec.DECK_SORT_OPTIONS). In list
+           view this sorts WITHIN each group_by bucket (group_deck_items keeps
+           input order per group); the Group select below is a separate axis. #}
+        {% include "_sort_controls.html" %}
         <input type="hidden" name="view" value="{{ view_mode }}">
         <select name="group" {% if view_mode != 'list' %}disabled{% endif %}>
           <option value="type" {% if group_by == 'type' %}selected{% endif %}>Group: Type</option>

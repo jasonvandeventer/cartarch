@@ -97,7 +97,11 @@
         <input type="search" name="search" value="{{ search }}"
                placeholder="t:creature · id:gw · c:r · is:foil · cmc&gt;=4 · OR / NOT / ( )"
                aria-label="Search cards in this showcase" class="list-filter-input">
-        <button type="submit" class="btn-like">Search</button>
+        {# Shared SORT control (v3.36.11). Inside the same GET form so sort +
+           search travel together: changing sort keeps the search, searching
+           keeps the sort. #}
+        {% include "_sort_controls.html" %}
+        <button type="submit" class="btn-like">Apply</button>
         {% if search %}<a class="btn-like" href="/showcase/{{ showcase.id }}">Clear</a>{% endif %}
       </form>
     {% endif %}

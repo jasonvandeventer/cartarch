@@ -150,26 +150,11 @@
           {% endif %}
         {% endfor %}
       </select>
-      <select name="sort">
-        <option value="newest" {% if sort == 'newest' %}selected{% endif %}>Date Added</option>
-        <option value="name" {% if sort == 'name' %}selected{% endif %}>Name</option>
-        <option value="set" {% if sort == 'set' %}selected{% endif %}>Set</option>
-        <option value="type" {% if sort == 'type' %}selected{% endif %}>Type</option>
-        <option value="color" {% if sort == 'color' %}selected{% endif %}>Color</option>
-        <option value="cmc" {% if sort == 'cmc' %}selected{% endif %}>Mana Cost</option>
-        <option value="value" {% if sort == 'value' %}selected{% endif %}>Price (Each)</option>
-        <option value="placement" {% if sort == 'placement' %}selected{% endif %}>Placement</option>
-        {# v3.27.19 — owned-count sort. Groups all printings of a
-           high-count name together (e.g. a dozen Sol Ring printings),
-           ordered by total copies owned across all printings + all
-           locations. Three-level grouping (name → printing → location)
-           rendered via group headers in the card grid below. #}
-        <option value="count" {% if sort == 'count' %}selected{% endif %}>Owned Count</option>
-      </select>
-      <select name="direction">
-        <option value="asc" {% if direction == 'asc' %}selected{% endif %}>Ascending</option>
-        <option value="desc" {% if direction == 'desc' %}selected{% endif %}>Descending</option>
-      </select>
+      {# v3.36.11 — shared SORT control (app/sort_spec.py: COLLECTION_SORT_OPTIONS).
+         Canonical seven fields incl. Rarity (by rank) + Quantity Available, plus
+         the collection-specific extras Date Added / Placement / Owned Count. The
+         "value" key = Price; "count" = the owned-count grouped view (v3.27.19). #}
+      {% include "_sort_controls.html" %}
       {# v3.28.8 — facet state forwarded as hidden inputs so the toolbar
          form preserves the sidebar state when Apply/Clear are clicked. #}
       <input type="hidden" name="colors" value="{{ facet_colors_set | sort | join('') }}">

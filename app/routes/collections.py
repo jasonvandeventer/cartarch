@@ -22,6 +22,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Resp
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
 
+from app import sort_spec
 from app.audit_service import list_transaction_logs
 from app.deck_service import create_deck, list_decks_basic
 from app.decklist_service import name_owned_counts
@@ -397,6 +398,7 @@ def collection_page(
             "drawer_filter": drawer,
             "sort": sort,
             "direction": direction,
+            "sort_options": sort_spec.COLLECTION_SORT_OPTIONS,
             "page": page,
             "per_page": per_page,
             "total_count": total_count,
@@ -1240,21 +1242,12 @@ def _build_location_items(
     if search.strip():
         loc_query = apply_collection_search_filters(loc_query, search)
 
-    reverse = direction == "desc"
-    if sort == "name":
-        loc_query = loc_query.order_by(Card.name.desc() if reverse else Card.name.asc())
-    elif sort == "value":
-        rows = loc_query.all()
-        rows.sort(key=lambda r: effective_price(r.card, r.finish) or 0.0, reverse=reverse)
-    elif sort == "cmc":
-        loc_query = loc_query.order_by(Card.cmc.desc() if reverse else Card.cmc.asc())
-    elif sort == "type":
-        loc_query = loc_query.order_by(Card.type_line.desc() if reverse else Card.type_line.asc())
-    else:
-        loc_query = loc_query.order_by(InventoryRow.slot.asc())
-
-    if sort not in ("value",):
-        rows = loc_query.all()
+    # v3.36.11 — shared SORT control. The location grid fetches all rows (no
+    # pagination), so it sorts in Python via the shared spec (sort_inventory_rows)
+    # — uniform with Decks and reaching the computed Price/Color too. Default
+    # "slot" preserves the prior order; unknown keys fall back to name (the
+    # sorter's tiebreaker default).
+    rows = sort_spec.sort_inventory_rows(loc_query.all(), sort or "slot", direction)
 
     items = []
     total_value = 0.0
@@ -1325,6 +1318,7 @@ def location_detail_page(
             "search": search,
             "sort": sort,
             "direction": direction,
+            "sort_options": sort_spec.LOCATION_SORT_OPTIONS,
             "current_user": current_user,
             "locations": all_locations,
             "decks": decks,

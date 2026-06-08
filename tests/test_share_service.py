@@ -557,3 +557,88 @@ def test_share_view_renders_through_route():
         main.app.dependency_overrides.pop(get_db_session, None)
         main.app.dependency_overrides.pop(get_current_user, None)
     assert failed == 0
+
+
+def _make_named_row(session, user_id, name, *, cmc=None, rarity=None, price=None):
+    """A placed inventory row with a custom Card, for sort assertions (v3.36.11)."""
+    card = Card(
+        scryfall_id=f"sid-{next(_scryfall_seq)}",
+        name=name,
+        set_code="TST",
+        collector_number="1",
+        cmc=cmc,
+        rarity=rarity,
+        price_usd=price,
+    )
+    session.add(card)
+    session.flush()
+    row = InventoryRow(
+        card_id=card.id,
+        user_id=user_id,
+        quantity=1,
+        finish="normal",
+        is_pending=False,
+    )
+    session.add(row)
+    session.commit()
+    return row
+
+
+def test_get_showcase_with_items_honours_sort():
+    """v3.36.11 — the shared SORT control flows through get_showcase_with_items.
+
+    Default (sort='added', desc) preserves the prior added_at-desc order; an
+    explicit sort re-orders the built item dicts (incl. the computed values).
+    """
+    s = _fresh_session()
+    sc = share_service.create_showcase(s, user_id=1, name="Sortable", description=None)
+    for nm, cmc, rar, pr in [
+        ("Bayou", 0.0, "rare", "350.00"),
+        ("Aether Vial", 1.0, "uncommon", "30.00"),
+        ("Counterspell", 2.0, None, None),
+    ]:
+        row = _make_named_row(s, 1, nm, cmc=cmc, rarity=rar, price=pr)
+        share_service.add_showcase_item(s, user_id=1, inventory_row_id=row.id, showcase_id=sc.id)
+
+    def names(sort, direction):
+        data = share_service.get_showcase_with_items(
+            s, user_id=1, showcase_id=sc.id, sort=sort, direction=direction
+        )
+        return [it["card"].name for it in data["items"]]
+
+    # Default = added_at desc -> reverse insertion order.
+    default = share_service.get_showcase_with_items(s, user_id=1, showcase_id=sc.id)
+    assert [it["card"].name for it in default["items"]] == [
+        "Counterspell",
+        "Aether Vial",
+        "Bayou",
+    ]
+    assert names("name", "asc") == ["Aether Vial", "Bayou", "Counterspell"]
+    assert names("name", "desc") == ["Counterspell", "Bayou", "Aether Vial"]
+    assert names("cmc", "asc") == ["Bayou", "Aether Vial", "Counterspell"]
+    # Price desc with NULL price ("Counterspell") forced last.
+    assert names("price", "desc") == ["Bayou", "Aether Vial", "Counterspell"]
+    # Rarity asc by rank (uncommon < rare < unknown-last).
+    assert names("rarity", "asc") == ["Aether Vial", "Bayou", "Counterspell"]
+
+
+def test_build_share_display_items_honours_sort():
+    """v3.36.11 — the shared SORT control flows through the read-only share
+    projection too. The sort runs AFTER the privacy projection (can't widen
+    exposure); available there lives under the "quantity" key."""
+    s = _fresh_session()
+    sc = share_service.create_showcase(s, user_id=1, name="Shared", description=None)
+    for nm, pr in [("Bayou", "350.00"), ("Aether Vial", "30.00"), ("Counterspell", None)]:
+        row = _make_named_row(s, 1, nm, price=pr)
+        share_service.add_showcase_item(s, user_id=1, inventory_row_id=row.id, showcase_id=sc.id)
+
+    def names(sort, direction):
+        items = share_service.build_share_display_items(s, sc, sort=sort, direction=direction)
+        return [it["card"].name for it in items]
+
+    assert names("name", "asc") == ["Aether Vial", "Bayou", "Counterspell"]
+    # Price desc with the NULL-price card forced last.
+    assert names("price", "desc") == ["Bayou", "Aether Vial", "Counterspell"]
+    # The projection carries added_at for the "added" sort but never renders it.
+    items = share_service.build_share_display_items(s, sc)
+    assert all("added_at" in it for it in items)

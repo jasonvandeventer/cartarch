@@ -45,17 +45,9 @@
              placeholder="t:rat -t:pirate · t:creature OR t:artifact · id:gb · cmc:&gt;=3 · is:foil · lang:ja"
              data-mobile-placeholder="Search…"
              value="{{ search }}">
-      <select name="sort">
-        <option value="slot" {% if sort == 'slot' %}selected{% endif %}>Slot</option>
-        <option value="name" {% if sort == 'name' %}selected{% endif %}>Name</option>
-        <option value="type" {% if sort == 'type' %}selected{% endif %}>Type</option>
-        <option value="cmc" {% if sort == 'cmc' %}selected{% endif %}>Mana Cost</option>
-        <option value="value" {% if sort == 'value' %}selected{% endif %}>Price</option>
-      </select>
-      <select name="direction">
-        <option value="asc" {% if direction == 'asc' %}selected{% endif %}>Ascending</option>
-        <option value="desc" {% if direction == 'desc' %}selected{% endif %}>Descending</option>
-      </select>
+      {# v3.36.11 — shared SORT control (sort_spec.LOCATION_SORT_OPTIONS):
+         Slot default + the canonical seven (Rarity by rank, Quantity Available). #}
+      {% include "_sort_controls.html" %}
       <button type="submit">Apply</button>
       <a href="/locations/{{ location.id }}">
         <button type="button">Clear</button>

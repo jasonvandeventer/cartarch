@@ -1,0 +1,23 @@
+{# Shared sort + direction controls (v3.36.11).
+
+   Single source for the user-facing SORT dropdown across every card-listing
+   surface. Sort is carried as a query param so it survives HTMX swaps / page
+   reloads and composes with the active search + filters — the partial is just
+   the two <select> elements; the enclosing <form> (GET or hx-get) and any
+   hidden-input replay of the active search/facets live in the including
+   template, so this composes with each surface's existing pipeline.
+
+   Params:
+     sort_options : list of (key, label) tuples, in display order
+     sort         : current sort key (selected option)
+     direction    : 'asc' | 'desc'
+#}
+<select name="sort" aria-label="Sort by">
+  {% for key, label in sort_options %}
+  <option value="{{ key }}" {% if sort == key %}selected{% endif %}>{{ label }}</option>
+  {% endfor %}
+</select>
+<select name="direction" aria-label="Sort direction">
+  <option value="asc" {% if direction == 'asc' %}selected{% endif %}>Ascending</option>
+  <option value="desc" {% if direction == 'desc' %}selected{% endif %}>Descending</option>
+</select>

@@ -46,6 +46,7 @@ from __future__ import annotations
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, contains_eager, joinedload
 
+from app import sort_spec
 from app.models import (
     Card,
     InventoryRow,
@@ -283,6 +284,8 @@ def get_showcase_with_items(
     user_id: int,
     showcase_id: int,
     search: str = "",
+    sort: str = "added",
+    direction: str = "desc",
 ) -> dict | None:
     """Management-page payload — one Showcase + items + computed totals.
 
@@ -332,6 +335,11 @@ def get_showcase_with_items(
                 "added_at": it.added_at,
             }
         )
+    # v3.36.11 — shared SORT control. The query yields added_at desc; re-sort the
+    # built item dicts (price/available already computed) by the shared spec.
+    # Default sort="added" + direction="desc" reproduces the prior order with a
+    # stable name->id tiebreaker (decision e).
+    items = sort_spec.sort_showcase_items(items, sort, direction)
     return {"showcase": showcase, "items": items, "total_value": total_value}
 
 
@@ -660,6 +668,8 @@ def get_share_view(
     viewer_user_id: int,
     share_id: int,
     search: str = "",
+    sort: str = "added",
+    direction: str = "desc",
 ) -> dict | None:
     """Resolve a Share for a viewer. Returns sanitized projection or None.
 
@@ -701,7 +711,7 @@ def get_share_view(
     if showcase is None:
         # Defensive — Share should always carry a Showcase.
         return None
-    display_items = build_share_display_items(session, showcase, search)
+    display_items = build_share_display_items(session, showcase, search, sort, direction)
     # v3.31.0 — surface the curated list's headline total value. Sum of
     # the per-item finish-aware ``total_value`` already computed in the
     # sanitized projection (price × displayed-available).
@@ -750,6 +760,8 @@ def build_share_display_items(
     session: Session,
     showcase: Showcase,
     search: str = "",
+    sort: str = "added",
+    direction: str = "desc",
 ) -> list[dict]:
     """Return the sanitized projection of a Showcase's items for shared view.
 
@@ -820,12 +832,21 @@ def build_share_display_items(
                 "quantity": available,
                 "effective_price": price,
                 "total_value": total,
+                # v3.36.11 — ShowcaseItem add-time, for the shared SORT control's
+                # "Date Added" key only. NOT rendered (not a Card/InventoryRow
+                # leak field, not in the §8 forbidden list) — sort input only.
+                "added_at": it.added_at,
                 # Deliberately NOT set: drawer_label, slot, role,
                 # is_pending, notes, tags, storage_location_id,
                 # from_drawer, from_slot, created_at, updated_at,
                 # user_id, ShowcaseItem.notes. Absent = unleakable.
             }
         )
+    # v3.36.11 — shared SORT control. The query yields added_at desc; re-sort the
+    # sanitized dicts by the shared spec (same sorter as the owner's Showcase;
+    # tolerates the share dict's "quantity" available key). Runs AFTER the
+    # privacy projection, so it can never widen what is exposed.
+    display = sort_spec.sort_showcase_items(display, sort, direction)
     return display
 
 

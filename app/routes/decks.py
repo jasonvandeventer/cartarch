@@ -21,6 +21,7 @@ from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse, RedirectResponse
 from sqlalchemy.orm import Session, joinedload
 
+from app import sort_spec
 from app.db import DATA_DIR
 from app.deck_service import (
     CARD_ROLE_TAGS,
@@ -309,20 +310,13 @@ def _build_deck_card_items(
     if search.strip():
         deck_query = apply_collection_search_filters(deck_query, search)
 
-    reverse = direction == "desc"
-    if sort == "type":
-        deck_query = deck_query.order_by(Card.type_line.desc() if reverse else Card.type_line.asc())
-    elif sort == "cmc":
-        deck_query = deck_query.order_by(Card.cmc.desc() if reverse else Card.cmc.asc())
-    elif sort == "value":
-        # Computed in Python after fetch (price is a per-finish attribute)
-        deck_rows = deck_query.all()
-        deck_rows.sort(key=lambda r: effective_price(r.card, r.finish) or 0.0, reverse=reverse)
-    else:
-        deck_query = deck_query.order_by(Card.name.desc() if reverse else Card.name.asc())
-
-    if sort != "value":
-        deck_rows = deck_query.all()
+    # v3.36.11 — shared SORT control. The deck card list is fetched whole (no
+    # pagination), so it sorts in Python via the shared spec (sort_inventory_rows)
+    # — reaching the computed Price/Color uniformly with the other surfaces.
+    # In list view the result is then bucketed by group_deck_items, which
+    # preserves this order WITHIN each group (sort acts within groups). Default
+    # "name"; unknown keys fall back to name via the sorter's tiebreaker.
+    deck_rows = sort_spec.sort_inventory_rows(deck_query.all(), sort or "name", direction)
 
     for row in deck_rows:
         price = effective_price(row.card, row.finish) or 0.0
@@ -592,6 +586,7 @@ def deck_detail_page(
             "search": search,
             "sort": sort,
             "direction": direction,
+            "sort_options": sort_spec.DECK_SORT_OPTIONS,
             "collection_search": collection_search,
             "collection_results": collection_results if deck else [],
             "analytics": analytics,

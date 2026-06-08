@@ -29,7 +29,7 @@ from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
-from app import playgroup_service, share_service
+from app import playgroup_service, share_service, sort_spec
 from app.dependencies import (
     CsrfRequired,
     get_current_user,
@@ -115,8 +115,12 @@ def showcase_page(
     # v3.32.3 — card search inside a Showcase uses the app's boolean/Scryfall
     # query language (same parser as the Collection bar), applied server-side.
     search = request.query_params.get("search", "")
+    # v3.36.11 — shared SORT control. Carried as query params so it survives the
+    # search submit and composes with the active card search.
+    sort = request.query_params.get("sort", "added")
+    direction = sort_spec.normalize_direction(request.query_params.get("direction"))
     data = share_service.get_showcase_with_items(
-        session, current_user.id, showcase_id, search=search
+        session, current_user.id, showcase_id, search=search, sort=sort, direction=direction
     )
     if data is None:
         # Not owned / doesn't exist — non-leaky redirect to the index.
@@ -138,6 +142,9 @@ def showcase_page(
             "total_value": data["total_value"],
             "locations": locations,
             "search": search,
+            "sort": sort,
+            "direction": direction,
+            "sort_options": sort_spec.SHOWCASE_SORT_OPTIONS,
             "added": request.query_params.get("added"),
             "error": error,
             "success": success,
@@ -358,7 +365,12 @@ def shares_view(
     # boolean/Scryfall query language (server-side; the filter runs before the
     # privacy projection, so it never widens what's exposed).
     search = request.query_params.get("search", "")
-    view = share_service.get_share_view(session, current_user.id, share_id, search=search)
+    # v3.36.11 — shared SORT control (runs after the privacy projection).
+    sort = request.query_params.get("sort", "added")
+    direction = sort_spec.normalize_direction(request.query_params.get("direction"))
+    view = share_service.get_share_view(
+        session, current_user.id, share_id, search=search, sort=sort, direction=direction
+    )
     if view is None:
         return RedirectResponse(url="/shares?error=share_unavailable", status_code=303)
     return render(
@@ -374,5 +386,8 @@ def shares_view(
             "items": view["items"],
             "total_value": view["total_value"],
             "search": search,
+            "sort": sort,
+            "direction": direction,
+            "sort_options": sort_spec.SHOWCASE_SORT_OPTIONS,
         },
     )

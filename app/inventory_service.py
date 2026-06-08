@@ -9,6 +9,7 @@ from sqlalchemy import Float as SAFloat
 from sqlalchemy import and_, case, cast, func, not_, or_, select, text, tuple_
 from sqlalchemy.orm import Session, joinedload
 
+from app import sort_spec
 from app.audit_service import log_transaction
 from app.import_service import coerce_language_code_strict, normalize_finish
 from app.location_service import SORTABLE_SOURCE_MODES, get_location
@@ -1372,16 +1373,6 @@ def list_inventory_rows(
 
     total_count = base_query.count()
 
-    _COLOR_ORDER = {"W": 0, "U": 1, "B": 2, "R": 3, "G": 4}
-
-    def _color_sort_key(row: InventoryRow) -> tuple:
-        colors = (row.card.colors or "").split()
-        if not colors:
-            return (6, "")
-        if len(colors) > 1:
-            return (5, " ".join(colors))
-        return (_COLOR_ORDER.get(colors[0], 7), colors[0])
-
     if sort == "name":
         query = base_query.order_by(
             Card.name.desc() if reverse else Card.name.asc(),
@@ -1412,9 +1403,29 @@ def list_inventory_rows(
             InventoryRow.id.desc() if reverse else InventoryRow.id.asc(),
         )
         rows = query.offset((page - 1) * per_page).limit(per_page).all()
+    elif sort == "rarity":
+        # v3.36.11 — shared SORT control. Rarity by RANK (common<...<mythic;
+        # unknown last) via the shared CASE, not alphabetical. SQL so the
+        # paginated collection never fetches-all. Ascending name/id tiebreaker.
+        rarity_order = sort_spec.rarity_case()
+        query = base_query.order_by(
+            rarity_order.desc() if reverse else rarity_order.asc(),
+            Card.name.asc(),
+            InventoryRow.id.asc(),
+        )
+        rows = query.offset((page - 1) * per_page).limit(per_page).all()
+    elif sort == "available":
+        # v3.36.11 — quantity available = the owned InventoryRow.quantity here
+        # (collection rows are not "offered"). SQL + stable tiebreaker.
+        query = base_query.order_by(
+            InventoryRow.quantity.desc() if reverse else InventoryRow.quantity.asc(),
+            Card.name.asc(),
+            InventoryRow.id.asc(),
+        )
+        rows = query.offset((page - 1) * per_page).limit(per_page).all()
     elif sort == "color":
         rows = base_query.all()
-        rows.sort(key=_color_sort_key, reverse=reverse)
+        rows.sort(key=lambda r: sort_spec.color_sort_value(r.card), reverse=reverse)
         rows = rows[(page - 1) * per_page : (page - 1) * per_page + per_page]
     elif sort == "placement":
         rows = base_query.all()
