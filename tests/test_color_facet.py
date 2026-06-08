@@ -26,7 +26,10 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from app.db import Base
-from app.inventory_service import apply_collection_facet_filters
+from app.inventory_service import (
+    apply_collection_facet_filters,
+    apply_collection_search_filters,
+)
 from app.models import Card, InventoryRow
 
 _scryfall_seq = itertools.count(1)
@@ -38,12 +41,20 @@ def _fresh_session():
     return sessionmaker(bind=engine, expire_on_commit=False)()
 
 
-def _make_row(session, name: str, color_identity: str | None, user_id: int = 1) -> str:
+def _make_row(
+    session,
+    name: str,
+    color_identity: str | None,
+    user_id: int = 1,
+    colors: str | None = None,
+) -> str:
     """Create a placed InventoryRow for a card with the given identity.
 
     ``color_identity`` is space-separated WUBRG ("" = colorless,
-    ``None`` = not yet fetched from Scryfall). Returns the card name so
-    tests can assert on the result set by name.
+    ``None`` = not yet fetched from Scryfall). ``colors`` (the card's
+    *casting* colors, used by the search-bar ``c:`` term) defaults to
+    ``None`` so existing identity-facet tests are unaffected. Returns the
+    card name so tests can assert on the result set by name.
     """
     card = Card(
         scryfall_id=f"sid-{next(_scryfall_seq)}",
@@ -51,6 +62,7 @@ def _make_row(session, name: str, color_identity: str | None, user_id: int = 1) 
         set_code="TST",
         collector_number=str(next(_scryfall_seq)),
         color_identity=color_identity,
+        colors=colors,
     )
     session.add(card)
     session.flush()
@@ -148,6 +160,83 @@ def test_c_with_colors_is_noop() -> int:
     return _check("GC == G (C no-op)", _matches(s, "GC"), {"Mono-G", "Sol Ring"})
 
 
+def _search_names(session, search: str) -> set[str]:
+    """Run a search-bar query string through the boolean parser and return
+    the matching card names. Exercises ``_term_to_clause`` (the ``id:`` /
+    ``c:`` terms), distinct from the sidebar facet filter above."""
+    query = session.query(InventoryRow).join(Card)
+    query = apply_collection_search_filters(query, search)
+    return {row.card.name for row in query.all()}
+
+
+def _seed_alias(session) -> None:
+    """Cards with both casting ``colors`` and ``color_identity`` so the
+    ``c:`` (colors) and ``id:`` (identity subset) terms can both be asserted."""
+    _make_row(session, "Izzet Spell", "U R", colors="U R")
+    _make_row(session, "Mono-U", "U", colors="U")
+    _make_row(session, "Mono-G", "G", colors="G")
+    _make_row(session, "Bant Thing", "G W U", colors="G W U")
+    _make_row(session, "Golgari", "B G", colors="B G")
+    _make_row(session, "Sol Ring", "", colors="")  # colorless
+
+
+def test_id_guild_name_alias() -> int:
+    """`id:izzet` (and `id:<=izzet`) resolve to the UR subset — the live bug.
+    Colorless Sol Ring is included by the subset rule."""
+    s = _fresh_session()
+    _seed_alias(s)
+    expected = {"Izzet Spell", "Mono-U", "Sol Ring"}
+    failed = 0
+    failed += _check("id:izzet → UR subset", _search_names(s, "id:izzet"), expected)
+    failed += _check("id:<=izzet → UR subset", _search_names(s, "id:<=izzet"), expected)
+    return failed
+
+
+def test_id_shard_name_alias() -> int:
+    """`id:bant` resolves to the GWU subset (excludes B/R identities)."""
+    s = _fresh_session()
+    _seed_alias(s)
+    return _check(
+        "id:bant → GWU subset",
+        _search_names(s, "id:bant"),
+        {"Mono-U", "Mono-G", "Bant Thing", "Sol Ring"},
+    )
+
+
+def test_c_guild_name_alias() -> int:
+    """`c:izzet` resolves to colors-contain-U-AND-R (membership, not subset)."""
+    s = _fresh_session()
+    _seed_alias(s)
+    return _check("c:izzet → U+R membership", _search_names(s, "c:izzet"), {"Izzet Spell"})
+
+
+def test_c_colorless_name_alias() -> int:
+    """`c:colorless` resolves to the colorless card only."""
+    s = _fresh_session()
+    _seed_alias(s)
+    return _check("c:colorless → colorless only", _search_names(s, "c:colorless"), {"Sol Ring"})
+
+
+def test_alias_regressions() -> int:
+    """Bare letters and full sets are unchanged — pass through the alias map
+    untouched. `id:wubrg` stays a no-op (matches everything)."""
+    s = _fresh_session()
+    _seed_alias(s)
+    failed = 0
+    failed += _check(
+        "id:ur unchanged (== id:izzet)",
+        _search_names(s, "id:ur"),
+        {"Izzet Spell", "Mono-U", "Sol Ring"},
+    )
+    failed += _check(
+        "id:wubrg still no-op (all rows)",
+        _search_names(s, "id:wubrg"),
+        {"Izzet Spell", "Mono-U", "Mono-G", "Bant Thing", "Golgari", "Sol Ring"},
+    )
+    failed += _check("c:w unchanged", _search_names(s, "c:w"), {"Bant Thing"})
+    return failed
+
+
 def main() -> None:
     tests = [
         ("Mono selection", test_mono_selection),
@@ -156,6 +245,11 @@ def main() -> None:
         ("NULL identity excluded", test_null_excluded),
         ("C alone is colorless", test_c_alone_is_colorless),
         ("C with colors is a no-op", test_c_with_colors_is_noop),
+        ("id: guild-name alias", test_id_guild_name_alias),
+        ("id: shard-name alias", test_id_shard_name_alias),
+        ("c: guild-name alias", test_c_guild_name_alias),
+        ("c: colorless-name alias", test_c_colorless_name_alias),
+        ("alias regressions", test_alias_regressions),
     ]
     total_failed = 0
     for title, fn in tests:

@@ -1,5 +1,15 @@
 [
   {
+    "version": "3.36.8",
+    "date": "2026-06-07",
+    "added": [],
+    "refined": [],
+    "resolved": [
+      "Searching your collection by a colour-pair or guild name now works. A search like `id:izzet` or `c:azorius` used to either return everything or quietly return the wrong cards, because the search box only understood the single colour letters (W, U, B, R, G) and not the colour names players actually use. It now recognises all ten guild names, the five shards and five wedges, the mono-colour names, and \"colorless\" — so `id:izzet` correctly finds your blue-red cards. Typing the raw letters (`id:ur`) still works exactly as before."
+    ],
+    "archivist_note": "A search box ought to speak the language of the people using it. Magic players reach for guild names — izzet, azorius, golgari — far more readily than for letters, yet the filter quietly understood only the letters and made a silent guess at the rest, sometimes returning everything, sometimes nothing of use. Now the names resolve to their colours before the search runs, and a request for an izzet card returns an izzet card. The finer grammar of comparison — \"at most these colours\" versus \"exactly these\" — remains a task for another day."
+  },
+  {
     "version": "3.36.7",
     "date": "2026-06-06",
     "added": [],

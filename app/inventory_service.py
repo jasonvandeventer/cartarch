@@ -670,6 +670,57 @@ def _tokenize_search(search: str) -> list[tuple]:
     return tokens
 
 
+# Guild / shard / wedge / mono / colorless names → WUBRG letters. Used by the
+# `c:` and `id:` search terms so a value like "izzet" resolves to "UR" before
+# the per-letter scan (which otherwise extracts zero color letters from a name,
+# silently producing the wrong filter — colorless-only for `id:`, a no-op for
+# `c:`). 4-color nicknames are deliberately omitted (rarely typed, error-prone).
+COLOR_NAME_ALIASES = {
+    # mono
+    "white": "W",
+    "blue": "U",
+    "black": "B",
+    "red": "R",
+    "green": "G",
+    "colorless": "C",
+    # guilds (2c)
+    "azorius": "WU",
+    "dimir": "UB",
+    "rakdos": "BR",
+    "gruul": "RG",
+    "selesnya": "GW",
+    "orzhov": "WB",
+    "izzet": "UR",
+    "golgari": "BG",
+    "boros": "RW",
+    "simic": "GU",
+    # shards (allied 3c)
+    "bant": "GWU",
+    "esper": "WUB",
+    "grixis": "UBR",
+    "jund": "BRG",
+    "naya": "RGW",
+    # wedges (enemy 3c)
+    "abzan": "WBG",
+    "jeskai": "URW",
+    "sultai": "BGU",
+    "mardu": "RWB",
+    "temur": "GUR",
+}
+
+
+def expand_color_alias(value: str) -> str:
+    """Map a guild/shard/wedge/mono/colorless name to WUBRG letters.
+
+    Strips a leading comparison operator (``id:`` ignores it anyway) so
+    ``"<=izzet"`` resolves the same as ``"izzet"``. Non-alias values pass
+    through unchanged, so bare letters (``"ur"``) and full sets (``"wubrg"``)
+    still work.
+    """
+    v = value.strip().lstrip("<>=:").strip().lower()
+    return COLOR_NAME_ALIASES.get(v, value)
+
+
 def _term_to_clause(key: str | None, value: str):
     """Convert a single parsed term to a SQLAlchemy filter clause, or None."""
     if not value:
@@ -706,6 +757,7 @@ def _term_to_clause(key: str | None, value: str):
             return or_(InventoryRow.language == "en", InventoryRow.language.is_(None))
         return InventoryRow.language == code
     if key in ("c", "color", "colors"):
+        value = expand_color_alias(value)
         color_clauses = []
         for letter in value.upper():
             if letter in "WUBRG":
@@ -719,6 +771,7 @@ def _term_to_clause(key: str | None, value: str):
         # Color identity "within" filter: card's identity must be a subset of the given colors.
         # Uses Card.color_identity (space-sep WUBRG, "" = colorless, NULL = not yet fetched).
         # NULL cards are excluded — we can't confirm they fit the identity.
+        value = expand_color_alias(value)
         excluded = [lt for lt in "WUBRG" if lt not in value.upper()]
         if not excluded:
             return None  # id:wubrg matches everything

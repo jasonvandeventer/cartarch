@@ -686,7 +686,6 @@ def locations_page(
     session: Session = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
 ):
-
     location_summaries = get_location_summary(session, user_id=current_user.id)
     locations = [summary["location"] for summary in location_summaries]
 
