@@ -15,6 +15,7 @@ from __future__ import annotations
 import csv
 import io
 import math
+from urllib.parse import urlencode
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
@@ -36,6 +37,7 @@ from app.inventory_service import (
     add_card_to_location,
     adjust_inventory_row_quantity,
     apply_collection_search_filters,
+    build_collection_filter_query,
     bulk_delete_inventory_rows,
     confirm_all_pending,
     confirm_pending_row,
@@ -369,11 +371,26 @@ def collection_page(
     total_pages = max(1, math.ceil(total_count / per_page))
     show_onboarding = total_count == 0
 
+    # v3.x — filter-scoped bulk-action result, passed back via query string by
+    # the /collection/bulk-* routes (same query-param flash pattern as the
+    # showcase/share routes). The template renders a one-shot banner; absent
+    # `bulk` param → no banner.
+    bulk_msg = {
+        "kind": request.query_params.get("bulk"),
+        "added": request.query_params.get("added"),
+        "skipped": request.query_params.get("skipped"),
+        "moved": request.query_params.get("moved"),
+        "pending": request.query_params.get("pending"),
+        "name": request.query_params.get("name"),
+        "reason": request.query_params.get("reason"),
+    }
+
     return render(
         request,
         "collection.html",
         {
             "title": "Collection",
+            "bulk_msg": bulk_msg,
             "items": items,
             "search": search,
             "finish_filter": finish,
@@ -537,6 +554,230 @@ async def collection_resort(
     if current_user.username in DRAWER_SORTER_USERNAMES:
         resort_collection(session, user_id=current_user.id)
     return RedirectResponse(url="/collection", status_code=303)
+
+
+# -----------------------------------------------------------------------------
+# Filter-scoped bulk actions (v3.x) — "add/move all cards matching the filter"
+#
+# The Collection grid is paginated (50/page); these act on the WHOLE matching
+# set, not the visible page. The set is resolved server-side from the SAME
+# filter params the grid uses (via build_collection_filter_query), so it equals
+# what the user sees. Placed (non-pending) rows only — pending matches are
+# counted and surfaced, never silently dropped. Showcase add = static
+# materialization; location move = the existing move primitive, deck-type
+# destinations excluded, resort NOT triggered. (Recon Q-premises A–D.)
+# -----------------------------------------------------------------------------
+
+
+def _bulk_filter_placed_ids(
+    session: Session,
+    user_id: int,
+    *,
+    search: str,
+    colors: str,
+    types: str,
+    status: str,
+    finishes: str,
+    price_min: str,
+    price_max: str,
+    finish: str,
+    location_id: int,
+) -> tuple[list[int], int]:
+    """Resolve the current Collection filter to ``(placed_row_ids,
+    pending_excluded_count)``.
+
+    Mirrors ``collection_page``'s param handling so the bulk set equals the
+    visible grid: price strings → floats (blank / non-numeric → None, i.e.
+    facet skipped), and a drawer-type ``location_id`` becomes a drawer-name
+    scope (the page never feeds a drawer location id straight through —
+    drawer is its own filter dimension). Only PLACED rows are returned; the
+    matching pending rows are counted so the caller can surface the drop.
+    """
+    facet_price_min: float | None = None
+    facet_price_max: float | None = None
+    if price_min and price_min.strip():
+        try:
+            facet_price_min = float(price_min.strip())
+        except ValueError:
+            facet_price_min = None
+    if price_max and price_max.strip():
+        try:
+            facet_price_max = float(price_max.strip())
+        except ValueError:
+            facet_price_max = None
+
+    drawer = ""
+    scope_location_id = location_id
+    if location_id:
+        selected_location = get_location(session, location_id=location_id, user_id=user_id)
+        if selected_location and selected_location.type == "drawer":
+            drawer = selected_location.name.replace("Drawer", "").strip()
+            scope_location_id = 0
+
+    base_query = build_collection_filter_query(
+        session,
+        user_id,
+        search=search,
+        facet_colors=colors,
+        facet_types=types,
+        facet_status=status,
+        facet_finishes=finishes,
+        facet_price_min=facet_price_min,
+        facet_price_max=facet_price_max,
+        finish=finish,
+        location_id=scope_location_id,
+        drawer=drawer,
+    )
+    placed_ids = [
+        row_id
+        for (row_id,) in base_query.with_entities(InventoryRow.id)
+        .filter(InventoryRow.is_pending == False)  # noqa: E712
+        .all()
+    ]
+    pending_excluded = (
+        base_query.with_entities(InventoryRow.id)
+        .filter(InventoryRow.is_pending == True)  # noqa: E712
+        .count()
+    )
+    return placed_ids, pending_excluded
+
+
+def _collection_filter_redirect(filter_params: dict, message: dict) -> RedirectResponse:
+    """303 back to /collection preserving the active filter (so the user lands
+    on the same view) with the bulk-action result appended as query params the
+    page renders into a flash banner. Empty filter values are dropped to keep
+    the URL clean (``location_id=0`` == all locations)."""
+    merged = {k: v for k, v in filter_params.items() if v not in ("", 0, None)}
+    merged.update(message)
+    return RedirectResponse(url=f"/collection?{urlencode(merged)}", status_code=303)
+
+
+@router.post("/collection/bulk-add-showcase")
+def collection_bulk_add_showcase(
+    showcase_id: int = Form(...),
+    search: str = Form(""),
+    colors: str = Form(""),
+    types: str = Form(""),
+    status: str = Form(""),
+    finishes: str = Form(""),
+    price_min: str = Form(""),
+    price_max: str = Form(""),
+    finish: str = Form(""),
+    location_id: int = Form(0),
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+    _: None = CsrfRequired,
+):
+    from app import share_service
+
+    filter_params = {
+        "search": search,
+        "colors": colors,
+        "types": types,
+        "status": status,
+        "finishes": finishes,
+        "price_min": price_min,
+        "price_max": price_max,
+        "finish": finish,
+        "location_id": location_id,
+    }
+    placed_ids, pending_excluded = _bulk_filter_placed_ids(
+        session,
+        current_user.id,
+        search=search,
+        colors=colors,
+        types=types,
+        status=status,
+        finishes=finishes,
+        price_min=price_min,
+        price_max=price_max,
+        finish=finish,
+        location_id=location_id,
+    )
+    result = share_service.add_rows_to_showcase(
+        session, current_user.id, showcase_id, row_ids=placed_ids
+    )
+    if result is None:
+        return _collection_filter_redirect(
+            filter_params, {"bulk": "error", "reason": "no_showcase"}
+        )
+    showcase = share_service.get_showcase(session, current_user.id, showcase_id)
+    return _collection_filter_redirect(
+        filter_params,
+        {
+            "bulk": "added",
+            "added": result["added"],
+            "skipped": result["skipped"],
+            "pending": pending_excluded,
+            "name": showcase.name if showcase else "showcase",
+        },
+    )
+
+
+@router.post("/collection/bulk-move")
+def collection_bulk_move(
+    target_location_id: int = Form(...),
+    search: str = Form(""),
+    colors: str = Form(""),
+    types: str = Form(""),
+    status: str = Form(""),
+    finishes: str = Form(""),
+    price_min: str = Form(""),
+    price_max: str = Form(""),
+    finish: str = Form(""),
+    location_id: int = Form(0),
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+    _: None = CsrfRequired,
+):
+    filter_params = {
+        "search": search,
+        "colors": colors,
+        "types": types,
+        "status": status,
+        "finishes": finishes,
+        "price_min": price_min,
+        "price_max": price_max,
+        "finish": finish,
+        "location_id": location_id,
+    }
+    # Destination must be owned and NOT a deck: moving straight into a deck
+    # location would bypass pull_card_to_deck reconciliation / role / variant
+    # accounting (recon Premise D — move_inventory_row_to_location is unguarded).
+    # Decks remain reachable only via the deck import/add flows.
+    target = get_location(session, location_id=target_location_id, user_id=current_user.id)
+    if target is None or target.type == "deck":
+        return _collection_filter_redirect(filter_params, {"bulk": "error", "reason": "bad_target"})
+
+    placed_ids, pending_excluded = _bulk_filter_placed_ids(
+        session,
+        current_user.id,
+        search=search,
+        colors=colors,
+        types=types,
+        status=status,
+        finishes=finishes,
+        price_min=price_min,
+        price_max=price_max,
+        finish=finish,
+        location_id=location_id,
+    )
+    moved = 0
+    for row_id in placed_ids:
+        try:
+            move_inventory_row_to_location(
+                session, row_id=row_id, user_id=current_user.id, location_id=target_location_id
+            )
+            moved += 1
+        except ValueError:
+            pass
+    # NB: resort_collection is intentionally NOT called — an explicit
+    # destination must not be hijacked back into the drawers (matches the
+    # explicit-destination import rule).
+    return _collection_filter_redirect(
+        filter_params,
+        {"bulk": "moved", "moved": moved, "pending": pending_excluded, "name": target.name},
+    )
 
 
 # -----------------------------------------------------------------------------

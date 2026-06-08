@@ -1,5 +1,15 @@
 [
   {
+    "version": "3.36.9",
+    "date": "2026-06-07",
+    "added": [
+      "Bulk actions on the Collection page. Filter your collection however you like — a search, a colour, a price range, a guild name like `id:izzet` — then add every matching card to a showcase, or move them all to a storage location, in a single step. It acts on the whole matching set across every page, not just the cards on screen. Cards still waiting to be placed (pending) are left out, and the number skipped is shown, so nothing ever moves silently. A confirmation step guards the move."
+    ],
+    "refined": [],
+    "resolved": [],
+    "archivist_note": "The collection page already knew how to narrow thousands of cards to the handful you meant. What it couldn't do was act on that selection as a whole — you saw your izzet spellslingers, then filed them one by one. Now the filter and the action meet: describe a set, and send all of it to a showcase or a shelf at once. The page acts on every match, not merely the fifty it happens to be showing, and it tells you plainly what it left behind."
+  },
+  {
     "version": "3.36.8",
     "date": "2026-06-07",
     "added": [],

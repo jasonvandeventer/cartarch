@@ -48,6 +48,20 @@
     </section>
   {% endif %}
 
+  {# v3.x — filter-scoped bulk-action result banner. One-shot; rendered only
+     when the /collection/bulk-* routes redirect back with a `bulk` param. #}
+  {% if bulk_msg and bulk_msg.kind %}
+    <section class="panel collection-bulk-flash collection-bulk-flash-{{ 'error' if bulk_msg.kind == 'error' else 'success' }}">
+      {% if bulk_msg.kind == 'added' %}
+        Added <b>{{ bulk_msg.added }}</b> card{{ '' if bulk_msg.added == '1' else 's' }} to <b>{{ bulk_msg.name or 'showcase' }}</b>{% if bulk_msg.skipped and bulk_msg.skipped != '0' %} · {{ bulk_msg.skipped }} already present{% endif %}{% if bulk_msg.pending and bulk_msg.pending != '0' %} · {{ bulk_msg.pending }} pending excluded{% endif %}.
+      {% elif bulk_msg.kind == 'moved' %}
+        Moved <b>{{ bulk_msg.moved }}</b> card{{ '' if bulk_msg.moved == '1' else 's' }} to <b>{{ bulk_msg.name or 'location' }}</b>{% if bulk_msg.pending and bulk_msg.pending != '0' %} · {{ bulk_msg.pending }} pending excluded{% endif %}.
+      {% elif bulk_msg.kind == 'error' %}
+        {% if bulk_msg.reason == 'bad_target' %}That destination can't receive a bulk move — decks are managed through the deck import flow.{% else %}The bulk action couldn't be completed.{% endif %}
+      {% endif %}
+    </section>
+  {% endif %}
+
   {# === HERO with hybrid stat presentation per Option B ===
      Three production stat tiles preserved verbatim; the tagline restyles
      as the editorial italic lede beneath the eyebrow. #}
@@ -184,6 +198,73 @@
       </span>
     </form>
   </section>
+
+  {# === FILTER-SCOPED BULK ACTIONS (v3.x) ===
+     Acts on the WHOLE matching set (placed cards), not just the visible 50-row
+     page: each form replays the full filter param set as hidden inputs — the
+     SAME set the toolbar forwards (search + six facets + finish + location) —
+     so the server resolves "all N matching" identically to the grid. Pending
+     cards are excluded server-side and counted in the result banner. The Move
+     destination list excludes deck-type locations (decks go through the deck
+     import flow). #}
+  {% if total_count > 0 %}
+    <section class="panel collection-bulk-panel">
+      <details>
+        <summary>Bulk actions — {{ '{:,}'.format(total_count) }} card{{ '' if total_count == 1 else 's' }} match the current filter</summary>
+        <div class="collection-bulk-body">
+          {% if showcases %}
+            <form action="/collection/bulk-add-showcase" method="post" class="collection-bulk-form inline-form">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+              <input type="hidden" name="search" value="{{ search }}">
+              <input type="hidden" name="colors" value="{{ facet_colors_set | sort | join('') }}">
+              <input type="hidden" name="types" value="{{ facet_types_set | sort | join(',') }}">
+              <input type="hidden" name="status" value="{{ facet_status_set | sort | join(',') }}">
+              <input type="hidden" name="finishes" value="{{ facet_finishes_set | sort | join(',') }}">
+              <input type="hidden" name="price_min" value="{{ facet_price_min_raw }}">
+              <input type="hidden" name="price_max" value="{{ facet_price_max_raw }}">
+              <input type="hidden" name="finish" value="{{ finish_filter }}">
+              <input type="hidden" name="location_id" value="{{ location_id }}">
+              <label>Add matching to showcase:
+                <select name="showcase_id" required>
+                  {% for sc in showcases %}
+                    <option value="{{ sc.id }}">{{ sc.name }}</option>
+                  {% endfor %}
+                </select>
+              </label>
+              <button type="submit">Add {{ total_count }} →</button>
+            </form>
+          {% else %}
+            <p class="muted">Create a <a href="/showcases">showcase</a> to add matching cards to it.</p>
+          {% endif %}
+
+          <form action="/collection/bulk-move" method="post" class="collection-bulk-form inline-form"
+                onsubmit="return confirm('Move ' + {{ total_count }} + ' matching placed card(s) to the selected location? Pending cards are skipped.');">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <input type="hidden" name="search" value="{{ search }}">
+            <input type="hidden" name="colors" value="{{ facet_colors_set | sort | join('') }}">
+            <input type="hidden" name="types" value="{{ facet_types_set | sort | join(',') }}">
+            <input type="hidden" name="status" value="{{ facet_status_set | sort | join(',') }}">
+            <input type="hidden" name="finishes" value="{{ facet_finishes_set | sort | join(',') }}">
+            <input type="hidden" name="price_min" value="{{ facet_price_min_raw }}">
+            <input type="hidden" name="price_max" value="{{ facet_price_max_raw }}">
+            <input type="hidden" name="finish" value="{{ finish_filter }}">
+            <input type="hidden" name="location_id" value="{{ location_id }}">
+            <label>Move matching to location:
+              <select name="target_location_id" required>
+                {% for loc in locations %}
+                  {% if loc.type not in ("root", "deck") %}
+                    <option value="{{ loc.id }}">{{ loc.name }} ({{ loc.type }})</option>
+                  {% endif %}
+                {% endfor %}
+              </select>
+            </label>
+            <button type="submit">Move {{ total_count }} →</button>
+          </form>
+          <p class="collection-bulk-note muted">Acts on placed cards matching the filter — across every page, not just this one. Pending cards are excluded.</p>
+        </div>
+      </details>
+    </section>
+  {% endif %}
 
   {# === MAIN LAYOUT — two-column: faceted sidebar + content === #}
   <div class="collection-layout">

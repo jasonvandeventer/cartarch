@@ -349,6 +349,68 @@ def test_bulk_add_rows() -> int:
     return failed
 
 
+def test_bulk_add_rows_by_row_ids() -> int:
+    """add_rows_to_showcase(row_ids=...): the filter-scoped Collection bulk
+    path. row_ids takes precedence over location_id; the user_id + is_pending
+    guards still apply (a foreign or pending id can't leak in); idempotent."""
+    failed = 0
+    s = _fresh_session()
+    sc = share_service.create_showcase(s, user_id=1, name="Filtered", description=None)
+
+    r1 = _make_row(s, user_id=1, quantity=2)
+    r2 = _make_row(s, user_id=1, quantity=1)
+    placed_other = _make_row(s, user_id=1, quantity=1)  # owned but NOT in the id set
+    pending = _make_row(s, user_id=1, quantity=1, is_pending=True)
+    foreign = _make_row(s, user_id=2, quantity=1)  # another user's row
+    s.commit()
+
+    # Explicit id set: only r1 + r2 added, even though a foreign id and a
+    # pending id are passed in (both filtered out by the guards).
+    res = share_service.add_rows_to_showcase(
+        s, user_id=1, showcase_id=sc.id, row_ids=[r1.id, r2.id, pending.id, foreign.id]
+    )
+    if res is None or res["added"] != 2:
+        print(f"  [FAIL] row_ids add expected 2, got {res}")
+        failed += 1
+    else:
+        print("  [OK] row_ids add inserts exactly the owned, placed ids")
+
+    if (
+        s.query(ShowcaseItem)
+        .filter(
+            ShowcaseItem.showcase_id == sc.id,
+            ShowcaseItem.inventory_row_id.in_([pending.id, foreign.id, placed_other.id]),
+        )
+        .count()
+        != 0
+    ):
+        print("  [FAIL] a guarded/excluded id leaked into the showcase")
+        failed += 1
+    else:
+        print("  [OK] pending / foreign / out-of-set ids excluded")
+
+    # row_ids takes precedence over location_id (location_id ignored when both).
+    placed_other.storage_location_id = 99
+    s.commit()
+    res_prec = share_service.add_rows_to_showcase(
+        s, user_id=1, showcase_id=sc.id, location_id=99, row_ids=[r1.id, r2.id]
+    )
+    if res_prec is None or res_prec["added"] != 0 or res_prec["skipped"] != 2:
+        print(f"  [FAIL] row_ids precedence expected added=0 skipped=2, got {res_prec}")
+        failed += 1
+    else:
+        print("  [OK] row_ids takes precedence over location_id + idempotent re-add")
+
+    # Empty id set matches nothing, never raises.
+    res_empty = share_service.add_rows_to_showcase(s, user_id=1, showcase_id=sc.id, row_ids=[])
+    if res_empty is None or res_empty["added"] != 0 or res_empty["total"] != 0:
+        print(f"  [FAIL] empty row_ids expected added=0 total=0, got {res_empty}")
+        failed += 1
+    else:
+        print("  [OK] empty row_ids is a safe no-op")
+    return failed
+
+
 def test_card_search_scryfall_syntax() -> int:
     """v3.32.3 — the card search inside a Showcase / shared view accepts the
     app's boolean/Scryfall query language (same parser as the Collection bar),
@@ -506,6 +568,7 @@ def main() -> None:
         ("Item mutation scoped by join", test_item_mutation_scoped_by_join),
         ("Total value", test_total_value),
         ("Bulk add rows", test_bulk_add_rows),
+        ("Bulk add rows by row_ids", test_bulk_add_rows_by_row_ids),
         ("Card search (Scryfall syntax)", test_card_search_scryfall_syntax),
         ("Delete cascades items + shares", test_delete_cascades_items_and_shares),
         ("Share view renders through route", test_share_view_renders_through_route),

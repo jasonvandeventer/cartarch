@@ -140,6 +140,7 @@ def add_rows_to_showcase(
     user_id: int,
     showcase_id: int,
     location_id: int | None = None,
+    row_ids: list[int] | None = None,
 ) -> dict | None:
     """Bulk-add the user's inventory rows to one of their Showcases.
 
@@ -148,6 +149,14 @@ def add_rows_to_showcase(
     otherwise only rows in that StorageLocation. Pure DB work — no
     external calls — so it is safe on the request path (the per-row
     Scryfall ban in CLAUDE.md does not apply).
+
+    v3.x — ``row_ids`` is the filter-scoped Collection bulk-action entry
+    point: an explicit set of inventory-row ids (resolved by the route
+    from the Collection filter). When given it **takes precedence over**
+    ``location_id`` and replaces the location filter with
+    ``InventoryRow.id.in_(row_ids)``; the ``user_id`` + ``is_pending``
+    guards below still apply, so a forged or foreign id can never leak in.
+    An empty list matches nothing (adds 0), never raises.
 
     Scope decisions:
       - ``is_pending`` rows are excluded — they aren't finalised into the
@@ -170,7 +179,9 @@ def add_rows_to_showcase(
         InventoryRow.user_id == user_id,
         InventoryRow.is_pending == False,  # noqa: E712
     )
-    if location_id is not None:
+    if row_ids is not None:
+        query = query.filter(InventoryRow.id.in_(row_ids))
+    elif location_id is not None:
         query = query.filter(InventoryRow.storage_location_id == location_id)
     rows = query.all()
     existing_ids = {

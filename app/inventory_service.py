@@ -1252,6 +1252,71 @@ def get_collection_facet_counts(
     }
 
 
+def build_collection_filter_query(
+    session: Session,
+    user_id: int,
+    *,
+    search: str = "",
+    facet_colors: str = "",
+    facet_types: str = "",
+    facet_status: str = "",
+    facet_finishes: str = "",
+    facet_price_min: float | None = None,
+    facet_price_max: float | None = None,
+    finish: str = "",
+    location_id: int = 0,
+    drawer: str = "",
+):
+    """Joined + filtered Collection base query, BEFORE sort / count / paginate.
+
+    The single source of the Collection result set's filter composition, in
+    order: the boolean search clause (``apply_collection_search_filters``)
+    AND the faceted-sidebar filters (``apply_collection_facet_filters``) AND
+    the legacy single-value ``finish`` dropdown AND the drawer / location
+    scope. ``list_inventory_rows`` builds on this (adding sort + pagination),
+    and the filter-scoped bulk actions (``/collection/bulk-*``) reuse it
+    verbatim so "add/move all matching" resolves to EXACTLY the set the user
+    sees — no reimplementation drift (the recon's Q4 risk).
+    """
+    base_query = (
+        session.query(InventoryRow)
+        .options(joinedload(InventoryRow.card), joinedload(InventoryRow.storage_location))
+        .join(Card)
+        .filter(InventoryRow.user_id == user_id)
+    )
+
+    base_query = apply_collection_search_filters(base_query, search)
+
+    # v3.28.8 — facet filters applied on top of the search filter (AND).
+    # Backward compatibility: the legacy single-value `finish` dropdown
+    # filter below still works; facet_finishes (csv) layers on top via AND.
+    base_query = apply_collection_facet_filters(
+        session,
+        base_query,
+        user_id=user_id,
+        facet_colors=facet_colors,
+        facet_types=facet_types,
+        facet_status=facet_status,
+        facet_finishes=facet_finishes,
+        facet_price_min=facet_price_min,
+        facet_price_max=facet_price_max,
+    )
+
+    if finish.strip():
+        base_query = base_query.filter(InventoryRow.finish == finish.strip().lower())
+
+    if drawer.strip():
+        base_query = base_query.join(InventoryRow.storage_location).filter(
+            StorageLocation.user_id == user_id,
+            StorageLocation.name == f"Drawer {drawer.strip()}",
+            StorageLocation.type == "drawer",
+        )
+    elif location_id:
+        base_query = base_query.filter(InventoryRow.storage_location_id == location_id)
+
+    return base_query
+
+
 def list_inventory_rows(
     session: Session,
     user_id: int,
@@ -1290,41 +1355,20 @@ def list_inventory_rows(
     per_page = max(1, min(per_page, 100))
     reverse = direction == "desc"
 
-    base_query = (
-        session.query(InventoryRow)
-        .options(joinedload(InventoryRow.card), joinedload(InventoryRow.storage_location))
-        .join(Card)
-        .filter(InventoryRow.user_id == user_id)
-    )
-
-    base_query = apply_collection_search_filters(base_query, search)
-
-    # v3.28.8 — facet filters applied on top of the search filter (AND).
-    # Backward compatibility: the legacy single-value `finish` dropdown
-    # filter below still works; facet_finishes (csv) layers on top via AND.
-    base_query = apply_collection_facet_filters(
+    base_query = build_collection_filter_query(
         session,
-        base_query,
-        user_id=user_id,
+        user_id,
+        search=search,
         facet_colors=facet_colors,
         facet_types=facet_types,
         facet_status=facet_status,
         facet_finishes=facet_finishes,
         facet_price_min=facet_price_min,
         facet_price_max=facet_price_max,
+        finish=finish,
+        location_id=location_id,
+        drawer=drawer,
     )
-
-    if finish.strip():
-        base_query = base_query.filter(InventoryRow.finish == finish.strip().lower())
-
-    if drawer.strip():
-        base_query = base_query.join(InventoryRow.storage_location).filter(
-            StorageLocation.user_id == user_id,
-            StorageLocation.name == f"Drawer {drawer.strip()}",
-            StorageLocation.type == "drawer",
-        )
-    elif location_id:
-        base_query = base_query.filter(InventoryRow.storage_location_id == location_id)
 
     total_count = base_query.count()
 

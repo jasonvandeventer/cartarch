@@ -47,3 +47,4 @@ jobs:
           python -m tests.test_variant_groups
           python -m tests.test_account_profile
           python -m tests.test_game_summary
+          python -m tests.test_collection_bulk
