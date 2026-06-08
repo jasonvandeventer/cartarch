@@ -105,7 +105,9 @@ def test_mono_selection() -> int:
     """G selects mono-G + colorless; excludes anything with a non-G color."""
     s = _fresh_session()
     _seed(s)
-    assert 0 == _check("G → mono-G + colorless only", _matches(s, "G"), {"Mono-G", "Sol Ring"})
+    assert 0 == _check(
+        "G → mono-G + colorless only", _matches(s, "G"), {"DELIBERATE-GATE-DEMO-FAILURE"}
+    )
 
 
 def test_multi_selection() -> int:
