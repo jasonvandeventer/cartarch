@@ -18,15 +18,14 @@ token mismatch against a live session still hard-fails with 403.
 Exercises the full route -> SessionMiddleware -> CSRF path with a real cookie
 jar, so it would have caught the regression that service-only tests missed.
 
-Standalone runner (matches tests/test_share_service):
+Pytest module (matches tests/test_share_service):
 
-    DATA_DIR=dev-data DEV_MODE=true python -m tests.test_auth_csrf
+    DATA_DIR=dev-data DEV_MODE=true pytest tests/test_auth_csrf.py
 """
 
 from __future__ import annotations
 
 import re
-import sys
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -142,15 +141,4 @@ def test_login_csrf_recovery() -> int:
 
     # Hard assert so pytest fails (not just warns) on a regression.
     assert failed == 0, f"{failed} CSRF-recovery check(s) failed"
-    return failed
-
-
-def main() -> None:
-    print("\n=== Login CSRF recovery ===")
-    if test_login_csrf_recovery():
-        sys.exit(1)
-    print("\nAll auth-CSRF checks passed.")
-
-
-if __name__ == "__main__":
-    main()
+    assert failed == 0

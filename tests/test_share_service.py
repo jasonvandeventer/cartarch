@@ -1,9 +1,9 @@
 """Unit tests for multi-showcase service behaviour (v3.31.0).
 
-Standalone runner (no pytest dependency — matches tests/test_deck_service).
+Pytest module (matches tests/test_deck_service).
 Invoke via:
 
-    DATA_DIR=dev-data DEV_MODE=true python -m tests.test_share_service
+    DATA_DIR=dev-data DEV_MODE=true pytest tests/test_share_service.py
 
 Uses an ISOLATED in-memory SQLite engine (NOT the shared dev DB) so the
 test can freely create/delete rows. ``share_service`` takes the Session
@@ -24,7 +24,6 @@ Covers the v3.31.0 multi-showcase changes specifically:
 from __future__ import annotations
 
 import itertools
-import sys
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -104,7 +103,7 @@ def test_multiple_showcases_per_user() -> int:
         failed += 1
     else:
         print("  [OK] list_showcases is oldest-first")
-    return failed
+    assert failed == 0
 
 
 def test_ownership_scoping() -> int:
@@ -146,7 +145,7 @@ def test_ownership_scoping() -> int:
         failed += 1
     else:
         print("  [OK] add_showcase_item rejects unowned showcase_id")
-    return failed
+    assert failed == 0
 
 
 def test_add_explicit_and_default() -> int:
@@ -176,7 +175,7 @@ def test_add_explicit_and_default() -> int:
         failed += 1
     else:
         print("  [OK] add_showcase_item falls back to the default showcase")
-    return failed
+    assert failed == 0
 
 
 def test_item_mutation_scoped_by_join() -> int:
@@ -216,7 +215,7 @@ def test_item_mutation_scoped_by_join() -> int:
         failed += 1
     else:
         print("  [OK] owner updates item in a non-default showcase")
-    return failed
+    assert failed == 0
 
 
 def test_total_value() -> int:
@@ -232,7 +231,7 @@ def test_total_value() -> int:
     data = share_service.get_showcase_with_items(s, user_id=1, showcase_id=sc.id)
     if data is None:
         print("  [FAIL] owner got None for their own showcase")
-        return failed + 1
+        assert failed == 0 + 1
     # available = min(quantity_offered=1, quantity=2) = 1; value = 1 * 1.50
     if abs(data["total_value"] - 1.50) > 1e-6:
         print(f"  [FAIL] total_value expected 1.50, got {data['total_value']}")
@@ -245,7 +244,7 @@ def test_total_value() -> int:
         failed += 1
     else:
         print("  [OK] get_showcase_with_items rejects cross-user access")
-    return failed
+    assert failed == 0
 
 
 def test_delete_cascades_items_and_shares() -> int:
@@ -266,7 +265,7 @@ def test_delete_cascades_items_and_shares() -> int:
     share = share_service.create_share(s, user_id=1, showcase_id=sc.id, playgroup_id=pg.id)
     if share is None:
         print("  [FAIL] could not create share fixture")
-        return failed + 1
+        assert failed == 0 + 1
 
     if share_service.delete_showcase(s, user_id=1, showcase_id=sc.id) is not True:
         print("  [FAIL] delete_showcase returned False for owner")
@@ -282,7 +281,7 @@ def test_delete_cascades_items_and_shares() -> int:
         failed += 1
     if not failed:
         print("  [OK] delete_showcase cascades items and revokes shares")
-    return failed
+    assert failed == 0
 
 
 def test_bulk_add_rows() -> int:
@@ -346,7 +345,7 @@ def test_bulk_add_rows() -> int:
         failed += 1
     else:
         print("  [OK] bulk add rejects cross-user showcase")
-    return failed
+    assert failed == 0
 
 
 def test_bulk_add_rows_by_row_ids() -> int:
@@ -408,7 +407,7 @@ def test_bulk_add_rows_by_row_ids() -> int:
         failed += 1
     else:
         print("  [OK] empty row_ids is a safe no-op")
-    return failed
+    assert failed == 0
 
 
 def test_card_search_scryfall_syntax() -> int:
@@ -486,7 +485,7 @@ def test_card_search_scryfall_syntax() -> int:
     else:
         print(f"  [FAIL] share view search: got {sv_names}")
         failed += 1
-    return failed
+    assert failed == 0
 
 
 def test_share_view_renders_through_route() -> int:
@@ -557,32 +556,4 @@ def test_share_view_renders_through_route() -> int:
     finally:
         main.app.dependency_overrides.pop(get_db_session, None)
         main.app.dependency_overrides.pop(get_current_user, None)
-    return failed
-
-
-def main() -> None:
-    tests = [
-        ("Multiple showcases per user", test_multiple_showcases_per_user),
-        ("Ownership scoping", test_ownership_scoping),
-        ("Add explicit + default", test_add_explicit_and_default),
-        ("Item mutation scoped by join", test_item_mutation_scoped_by_join),
-        ("Total value", test_total_value),
-        ("Bulk add rows", test_bulk_add_rows),
-        ("Bulk add rows by row_ids", test_bulk_add_rows_by_row_ids),
-        ("Card search (Scryfall syntax)", test_card_search_scryfall_syntax),
-        ("Delete cascades items + shares", test_delete_cascades_items_and_shares),
-        ("Share view renders through route", test_share_view_renders_through_route),
-    ]
-    total_failed = 0
-    for title, fn in tests:
-        print(f"\n=== {title} ===")
-        total_failed += fn()
-    print("\n" + "=" * 60)
-    if total_failed:
-        print(f"TOTAL: {total_failed} failed")
-        sys.exit(1)
-    print("TOTAL: all passed")
-
-
-if __name__ == "__main__":
-    main()
+    assert failed == 0

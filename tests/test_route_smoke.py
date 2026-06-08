@@ -1,9 +1,9 @@
 """Authenticated route-render smoke (v3.32.x).
 
-Standalone runner (no pytest dependency — matches tests/test_share_service).
+Pytest module (matches tests/test_share_service).
 Invoke via:
 
-    DATA_DIR=dev-data DEV_MODE=true python -m tests.test_route_smoke
+    DATA_DIR=dev-data DEV_MODE=true pytest tests/test_route_smoke.py
 
 Closes a recurring gap: two prod 500s (the v3.31.0 value-totals feature's
 ``list_locations`` import bug caught on Dev, and the ``shares_view`` missing
@@ -22,8 +22,6 @@ dev DB.
 """
 
 from __future__ import annotations
-
-import sys
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -182,18 +180,4 @@ def test_authenticated_pages_render() -> int:
     finally:
         main.app.dependency_overrides.pop(get_db_session, None)
         main.app.dependency_overrides.pop(get_current_user, None)
-    return failed
-
-
-def main() -> None:
-    print("\n=== Authenticated page routes render ===")
-    failed = test_authenticated_pages_render()
-    print("\n" + "=" * 60)
-    if failed:
-        print(f"TOTAL: {failed} failed")
-        sys.exit(1)
-    print("TOTAL: all passed")
-
-
-if __name__ == "__main__":
-    main()
+    assert failed == 0

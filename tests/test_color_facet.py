@@ -1,9 +1,9 @@
 """Unit tests for the Collection color-identity facet filter (v3.32.x).
 
-Standalone runner (no pytest dependency — matches tests/test_share_service).
+Pytest module (matches tests/test_share_service).
 Invoke via:
 
-    DATA_DIR=dev-data DEV_MODE=true python -m tests.test_color_facet
+    DATA_DIR=dev-data DEV_MODE=true pytest tests/test_color_facet.py
 
 Pins the commander-legal "within" semantics: a card matches a color-pip
 selection iff its ``color_identity`` is a SUBSET of the selected colors
@@ -20,7 +20,6 @@ selected colors" (superset) rule. Covers:
 from __future__ import annotations
 
 import itertools
-import sys
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -106,14 +105,16 @@ def test_mono_selection() -> int:
     """G selects mono-G + colorless; excludes anything with a non-G color."""
     s = _fresh_session()
     _seed(s)
-    return _check("G → mono-G + colorless only", _matches(s, "G"), {"Mono-G", "Sol Ring"})
+    assert 0 == _check("G → mono-G + colorless only", _matches(s, "G"), {"Mono-G", "Sol Ring"})
 
 
 def test_multi_selection() -> int:
     """WU selects mono-W, Azorius, and colorless (all subsets of {W,U})."""
     s = _fresh_session()
     _seed(s)
-    return _check("WU → W + WU + colorless", _matches(s, "WU"), {"Mono-W", "Azorius", "Sol Ring"})
+    assert 0 == _check(
+        "WU → W + WU + colorless", _matches(s, "WU"), {"Mono-W", "Azorius", "Sol Ring"}
+    )
 
 
 def test_colorless_matches_any_selection() -> int:
@@ -128,7 +129,7 @@ def test_colorless_matches_any_selection() -> int:
         print("  [FAIL] colorless card not matched by a color selection")
     else:
         print("  [OK] colorless card matches any color selection")
-    return failed
+    assert failed == 0
 
 
 def test_null_excluded() -> int:
@@ -137,11 +138,7 @@ def test_null_excluded() -> int:
     s = _fresh_session()
     _seed(s)
     got = _matches(s, "G")
-    if "Unfetched" in got:
-        print("  [FAIL] NULL-identity card leaked into a color selection")
-        return 1
-    print("  [OK] NULL-identity card excluded from a color selection")
-    return 0
+    assert "Unfetched" not in got, "NULL-identity card leaked into a color selection"
 
 
 def test_c_alone_is_colorless() -> int:
@@ -149,7 +146,7 @@ def test_c_alone_is_colorless() -> int:
     'no colors known', preserving the prior C-pip behavior)."""
     s = _fresh_session()
     _seed(s)
-    return _check("C alone → colorless + NULL", _matches(s, "C"), {"Sol Ring", "Unfetched"})
+    assert 0 == _check("C alone → colorless + NULL", _matches(s, "C"), {"Sol Ring", "Unfetched"})
 
 
 def test_c_with_colors_is_noop() -> int:
@@ -157,7 +154,7 @@ def test_c_with_colors_is_noop() -> int:
     selection) → GC behaves exactly like G; NULL stays excluded."""
     s = _fresh_session()
     _seed(s)
-    return _check("GC == G (C no-op)", _matches(s, "GC"), {"Mono-G", "Sol Ring"})
+    assert 0 == _check("GC == G (C no-op)", _matches(s, "GC"), {"Mono-G", "Sol Ring"})
 
 
 def _search_names(session, search: str) -> set[str]:
@@ -189,14 +186,14 @@ def test_id_guild_name_alias() -> int:
     failed = 0
     failed += _check("id:izzet → UR subset", _search_names(s, "id:izzet"), expected)
     failed += _check("id:<=izzet → UR subset", _search_names(s, "id:<=izzet"), expected)
-    return failed
+    assert failed == 0
 
 
 def test_id_shard_name_alias() -> int:
     """`id:bant` resolves to the GWU subset (excludes B/R identities)."""
     s = _fresh_session()
     _seed_alias(s)
-    return _check(
+    assert 0 == _check(
         "id:bant → GWU subset",
         _search_names(s, "id:bant"),
         {"Mono-U", "Mono-G", "Bant Thing", "Sol Ring"},
@@ -207,14 +204,16 @@ def test_c_guild_name_alias() -> int:
     """`c:izzet` resolves to colors-contain-U-AND-R (membership, not subset)."""
     s = _fresh_session()
     _seed_alias(s)
-    return _check("c:izzet → U+R membership", _search_names(s, "c:izzet"), {"Izzet Spell"})
+    assert 0 == _check("c:izzet → U+R membership", _search_names(s, "c:izzet"), {"Izzet Spell"})
 
 
 def test_c_colorless_name_alias() -> int:
     """`c:colorless` resolves to the colorless card only."""
     s = _fresh_session()
     _seed_alias(s)
-    return _check("c:colorless → colorless only", _search_names(s, "c:colorless"), {"Sol Ring"})
+    assert 0 == _check(
+        "c:colorless → colorless only", _search_names(s, "c:colorless"), {"Sol Ring"}
+    )
 
 
 def test_alias_regressions() -> int:
@@ -234,33 +233,4 @@ def test_alias_regressions() -> int:
         {"Izzet Spell", "Mono-U", "Mono-G", "Bant Thing", "Golgari", "Sol Ring"},
     )
     failed += _check("c:w unchanged", _search_names(s, "c:w"), {"Bant Thing"})
-    return failed
-
-
-def main() -> None:
-    tests = [
-        ("Mono selection", test_mono_selection),
-        ("Multi selection", test_multi_selection),
-        ("Colorless matches any selection", test_colorless_matches_any_selection),
-        ("NULL identity excluded", test_null_excluded),
-        ("C alone is colorless", test_c_alone_is_colorless),
-        ("C with colors is a no-op", test_c_with_colors_is_noop),
-        ("id: guild-name alias", test_id_guild_name_alias),
-        ("id: shard-name alias", test_id_shard_name_alias),
-        ("c: guild-name alias", test_c_guild_name_alias),
-        ("c: colorless-name alias", test_c_colorless_name_alias),
-        ("alias regressions", test_alias_regressions),
-    ]
-    total_failed = 0
-    for title, fn in tests:
-        print(f"\n=== {title} ===")
-        total_failed += fn()
-    print("\n" + "=" * 60)
-    if total_failed:
-        print(f"TOTAL: {total_failed} failed")
-        sys.exit(1)
-    print("TOTAL: all passed")
-
-
-if __name__ == "__main__":
-    main()
+    assert failed == 0

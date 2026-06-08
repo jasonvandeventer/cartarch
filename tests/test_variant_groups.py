@@ -1,9 +1,9 @@
 """Unit tests for deck variant groups (v3.33.0).
 
-Standalone runner (no pytest dependency — matches tests/test_share_service).
+Pytest module (matches tests/test_share_service).
 Invoke via:
 
-    DATA_DIR=dev-data DEV_MODE=true python -m tests.test_variant_groups
+    DATA_DIR=dev-data DEV_MODE=true pytest tests/test_variant_groups.py
 
 A variant group is an accounting overlay: builds of the same deck that share
 one physical copy of many cards. One-card-one-location is preserved — the
@@ -26,7 +26,6 @@ Covers:
 from __future__ import annotations
 
 import itertools
-import sys
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -132,7 +131,7 @@ def test_group_crud() -> int:
     else:
         print("  [FAIL] delete")
         failed += 1
-    return failed
+    assert failed == 0
 
 
 def test_ownership_scoping() -> int:
@@ -151,7 +150,7 @@ def test_ownership_scoping() -> int:
     else:
         print("  [FAIL] ownership not enforced")
         failed += 1
-    return failed
+    assert failed == 0
 
 
 def test_sibling_lookup() -> int:
@@ -180,7 +179,7 @@ def test_sibling_lookup() -> int:
     else:
         print("  [FAIL] standalone deck returned siblings")
         failed += 1
-    return failed
+    assert failed == 0
 
 
 def test_delete_nulls_decks() -> int:
@@ -199,7 +198,7 @@ def test_delete_nulls_decks() -> int:
     else:
         print("  [FAIL] decks not cleared / removed by group delete")
         failed += 1
-    return failed
+    assert failed == 0
 
 
 def _reconcile(s, user_id, deck, card, qty=1):
@@ -230,7 +229,7 @@ def test_reconcile_covered() -> int:
     else:
         print(f"  [FAIL] covered: {r['recommended_action']} cov={r['variant_covered_qty']}")
         failed += 1
-    return failed
+    assert failed == 0
 
 
 def test_reconcile_import_new() -> int:
@@ -251,7 +250,7 @@ def test_reconcile_import_new() -> int:
     else:
         print(f"  [FAIL] import_new: {r}")
         failed += 1
-    return failed
+    assert failed == 0
 
 
 def test_reconcile_partial() -> int:
@@ -273,7 +272,7 @@ def test_reconcile_partial() -> int:
     else:
         print(f"  [FAIL] partial: {r}")
         failed += 1
-    return failed
+    assert failed == 0
 
 
 def test_reconcile_no_group_unchanged() -> int:
@@ -298,7 +297,7 @@ def test_reconcile_no_group_unchanged() -> int:
     else:
         print(f"  [FAIL] no-group regression: {r}")
         failed += 1
-    return failed
+    assert failed == 0
 
 
 def test_migration_idempotent() -> int:
@@ -336,7 +335,7 @@ def test_migration_idempotent() -> int:
         print(f"  [FAIL] migration: cols={cols.count('variant_group_id')} tbls={tbls}")
         failed += 1
     # Reload app.db back to the dev DATA_DIR so later tests aren't affected.
-    return failed
+    assert failed == 0
 
 
 def test_route_smoke() -> int:
@@ -419,32 +418,4 @@ def test_route_smoke() -> int:
         main.app.dependency_overrides.pop(get_db_session, None)
         main.app.dependency_overrides.pop(get_current_user, None)
         main.app.dependency_overrides.pop(require_csrf_token, None)
-    return failed
-
-
-def main() -> None:
-    tests = [
-        ("Group CRUD", test_group_crud),
-        ("Ownership scoping", test_ownership_scoping),
-        ("Sibling lookup", test_sibling_lookup),
-        ("Delete nulls decks", test_delete_nulls_decks),
-        ("Reconcile: covered", test_reconcile_covered),
-        ("Reconcile: import_new", test_reconcile_import_new),
-        ("Reconcile: partial", test_reconcile_partial),
-        ("Reconcile: no-group unchanged", test_reconcile_no_group_unchanged),
-        ("Route smoke", test_route_smoke),
-        ("Migration idempotent", test_migration_idempotent),
-    ]
-    total = 0
-    for title, fn in tests:
-        print(f"\n=== {title} ===")
-        total += fn()
-    print("\n" + "=" * 60)
-    if total:
-        print(f"TOTAL: {total} failed")
-        sys.exit(1)
-    print("TOTAL: all passed")
-
-
-if __name__ == "__main__":
-    main()
+    assert failed == 0

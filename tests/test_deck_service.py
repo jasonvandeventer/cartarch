@@ -1,9 +1,9 @@
 """Unit tests for the tag-system theme matchers.
 
-Standalone runner (no pytest dependency — see scripts/manual_test_*.py for
+Pytest module (see scripts/manual_test_*.py for
 the established pattern). Invoke via:
 
-    DATA_DIR=dev-data DEV_MODE=true python -m tests.test_deck_service
+    DATA_DIR=dev-data DEV_MODE=true pytest tests/test_deck_service.py
 
 Each test function returns (passed, failed) tuples. The main runner
 aggregates and exits non-zero on any failure.
@@ -14,8 +14,6 @@ is the authoritative source-of-truth.
 """
 
 from __future__ import annotations
-
-import sys
 
 from app.deck_service import card_matches_theme, extract_commander_themes
 
@@ -97,7 +95,7 @@ def test_gorma_themes() -> tuple[int, int]:
         else:
             print(f"  [FAIL] Gorma themes missing '{required}' — got {sorted(mechs)}")
             failed += 1
-    return passed, failed
+    assert failed == 0
 
 
 def test_auntie_ool_themes() -> tuple[int, int]:
@@ -112,7 +110,7 @@ def test_auntie_ool_themes() -> tuple[int, int]:
         else:
             print(f"  [FAIL] Auntie Ool themes missing '{required}' — got {sorted(mechs)}")
             failed += 1
-    return passed, failed
+    assert failed == 0
 
 
 # ---------------------------------------------------------------------------
@@ -236,7 +234,7 @@ def test_gorma_fixtures() -> tuple[int, int]:
         else:
             print(f"  [FAIL] Gorma fixture '{name}' did NOT match")
             failed += 1
-    return passed, failed
+    assert failed == 0
 
 
 # ---------------------------------------------------------------------------
@@ -306,7 +304,7 @@ def test_auntie_ool_fixtures() -> tuple[int, int]:
         else:
             print(f"  [FAIL] Auntie Ool fixture '{name}' did NOT match")
             failed += 1
-    return passed, failed
+    assert failed == 0
 
 
 # ---------------------------------------------------------------------------
@@ -362,7 +360,7 @@ def test_negative_fixtures() -> tuple[int, int]:
         else:
             print(f"  [FAIL] Negative '{name}' UNEXPECTEDLY matched")
             failed += 1
-    return passed, failed
+    assert failed == 0
 
 
 # ---------------------------------------------------------------------------
@@ -402,36 +400,9 @@ def test_teysa_lifegain_narrowing() -> tuple[int, int]:
             print(f"  [FAIL] Teysa Karlov themes missing '{required}' — got {sorted(mechs)}")
             failed += 1
 
-    return passed, failed
+    assert failed == 0
 
 
 # ---------------------------------------------------------------------------
 # Runner
 # ---------------------------------------------------------------------------
-
-
-def run_all() -> int:
-    total_p = total_f = 0
-    suites = [
-        ("Test 1: Commander theme extraction (Gorma)", test_gorma_themes),
-        ("Test 1: Commander theme extraction (Auntie Ool)", test_auntie_ool_themes),
-        ("Test 2: Gorma precon fixtures (should MATCH)", test_gorma_fixtures),
-        ("Test 3: Auntie Ool fixtures (should MATCH)", test_auntie_ool_fixtures),
-        ("Test 4: Negative controls (should NOT match)", test_negative_fixtures),
-        (
-            "Test 5: Teysa Karlov negative control (lifegain narrowing)",
-            test_teysa_lifegain_narrowing,
-        ),
-    ]
-    for title, fn in suites:
-        print(f"\n=== {title} ===")
-        p, f = fn()
-        total_p += p
-        total_f += f
-    print(f"\n{'=' * 60}")
-    print(f"TOTAL: {total_p} passed, {total_f} failed")
-    return total_f
-
-
-if __name__ == "__main__":
-    sys.exit(run_all())

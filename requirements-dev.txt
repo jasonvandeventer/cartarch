@@ -1,5 +1,7 @@
 ruff==0.15.15
-# Required by fastapi.testclient.TestClient (used in tests/test_share_service.py
-# for the route->template render regression). Dev/CI only — NOT in
-# requirements.txt, so the prod image is unaffected.
+# pytest is the test runner / CI gate (the test-suite pytest migration).
+# Dev/CI only — NOT in requirements.txt, so the prod image is unaffected.
+pytest==9.0.3
+# Required by fastapi.testclient.TestClient (route->template render tests +
+# the conftest `client` fixture). Dev/CI only.
 httpx==0.28.1

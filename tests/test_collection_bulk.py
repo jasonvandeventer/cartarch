@@ -1,8 +1,8 @@
 """Tests for the filter-scoped Collection bulk actions (v3.x).
 
-Standalone runner (no pytest dependency — matches tests/test_share_service):
+Pytest module (matches tests/test_share_service):
 
-    DATA_DIR=dev-data DEV_MODE=true python -m tests.test_collection_bulk
+    DATA_DIR=dev-data DEV_MODE=true pytest tests/test_collection_bulk.py
 
 The feature: "add / move all cards matching the current /collection filter"
 (not just the visible 50-row page). The matching set is resolved server-side
@@ -24,7 +24,6 @@ pending rows counted and surfaced. Covered:
 from __future__ import annotations
 
 import itertools
-import sys
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -139,7 +138,7 @@ def test_build_query_matches_view() -> int:
     else:
         print(f"  [FAIL] list_inventory_rows drift: total={total}, page_len={len(items)}")
         failed += 1
-    return failed
+    assert failed == 0
 
 
 def _client(sm, user):
@@ -216,7 +215,7 @@ def test_bulk_add_showcase_route() -> int:
     finally:
         for dep in (get_db_session, get_current_user, require_csrf_token):
             app.dependency_overrides.pop(dep, None)
-    return failed
+    assert failed == 0
 
 
 def test_bulk_move_route() -> int:
@@ -263,7 +262,7 @@ def test_bulk_move_route() -> int:
     finally:
         for dep in (get_db_session, get_current_user, require_csrf_token):
             app.dependency_overrides.pop(dep, None)
-    return failed
+    assert failed == 0
 
 
 def test_bulk_move_rejects_deck_and_skips_resort() -> int:
@@ -308,26 +307,4 @@ def test_bulk_move_rejects_deck_and_skips_resort() -> int:
         routes.collections.resort_collection = orig
         for dep in (get_db_session, get_current_user, require_csrf_token):
             app.dependency_overrides.pop(dep, None)
-    return failed
-
-
-def main() -> None:
-    tests = [
-        ("build_collection_filter_query matches view", test_build_query_matches_view),
-        ("bulk-add-showcase route", test_bulk_add_showcase_route),
-        ("bulk-move route", test_bulk_move_route),
-        ("bulk-move rejects deck + skips resort", test_bulk_move_rejects_deck_and_skips_resort),
-    ]
-    total = 0
-    for title, fn in tests:
-        print(f"\n=== {title} ===")
-        total += fn()
-    print("\n" + "=" * 60)
-    if total:
-        print(f"TOTAL: {total} failed")
-        sys.exit(1)
-    print("TOTAL: all passed")
-
-
-if __name__ == "__main__":
-    main()
+    assert failed == 0

@@ -1,9 +1,9 @@
 """Unit tests for the single-card quick-add to a StorageLocation (v3.32.x).
 
-Standalone runner (no pytest dependency — matches tests/test_share_service).
+Pytest module (matches tests/test_share_service).
 Invoke via:
 
-    DATA_DIR=dev-data DEV_MODE=true python -m tests.test_location_add_card
+    DATA_DIR=dev-data DEV_MODE=true pytest tests/test_location_add_card.py
 
 Covers `inventory_service.add_card_to_location` — the acquisition primitive
 behind the location quick-add modal — and the `POST /locations/{id}/add-card`
@@ -23,7 +23,6 @@ route. Key behaviours pinned:
 from __future__ import annotations
 
 import itertools
-import sys
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -114,7 +113,7 @@ def test_create_new_row() -> int:
     else:
         print(f"  [FAIL] create_new_row: {row and vars(row)}")
         failed += 1
-    return failed
+    assert failed == 0
 
 
 def test_merge_existing() -> int:
@@ -132,7 +131,7 @@ def test_merge_existing() -> int:
     else:
         print(f"  [FAIL] merge: {[(r.quantity) for r in rows]}")
         failed += 1
-    return failed
+    assert failed == 0
 
 
 def test_distinct_fields_separate_rows() -> int:
@@ -152,7 +151,7 @@ def test_distinct_fields_separate_rows() -> int:
     else:
         print(f"  [FAIL] expected 4 distinct rows, got {len(rows)}")
         failed += 1
-    return failed
+    assert failed == 0
 
 
 def test_finish_normalization() -> int:
@@ -169,7 +168,7 @@ def test_finish_normalization() -> int:
     else:
         print(f"  [FAIL] finish normalization: {row and row.finish}")
         failed += 1
-    return failed
+    assert failed == 0
 
 
 def test_ownership_rejection() -> int:
@@ -187,7 +186,7 @@ def test_ownership_rejection() -> int:
     else:
         print("  [FAIL] ownership not enforced")
         failed += 1
-    return failed
+    assert failed == 0
 
 
 def test_cache_miss_creates_card(monkeypatch_fetch=None) -> int:
@@ -248,7 +247,7 @@ def test_cache_miss_creates_card(monkeypatch_fetch=None) -> int:
             failed += 1
     finally:
         inventory_service.fetch_card_by_scryfall_id = orig
-    return failed
+    assert failed == 0
 
 
 def test_route_renders_and_adds() -> int:
@@ -322,29 +321,4 @@ def test_route_renders_and_adds() -> int:
         main.app.dependency_overrides.pop(get_db_session, None)
         main.app.dependency_overrides.pop(get_current_user, None)
         main.app.dependency_overrides.pop(require_csrf_token, None)
-    return failed
-
-
-def main() -> None:
-    tests = [
-        ("Create new row", test_create_new_row),
-        ("Merge existing", test_merge_existing),
-        ("Distinct fields -> separate rows", test_distinct_fields_separate_rows),
-        ("Finish normalization", test_finish_normalization),
-        ("Ownership rejection", test_ownership_rejection),
-        ("Cache-miss card creation", test_cache_miss_creates_card),
-        ("Route renders + adds", test_route_renders_and_adds),
-    ]
-    total = 0
-    for title, fn in tests:
-        print(f"\n=== {title} ===")
-        total += fn()
-    print("\n" + "=" * 60)
-    if total:
-        print(f"TOTAL: {total} failed")
-        sys.exit(1)
-    print("TOTAL: all passed")
-
-
-if __name__ == "__main__":
-    main()
+    assert failed == 0

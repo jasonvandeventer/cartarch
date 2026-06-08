@@ -1,9 +1,9 @@
 """Tests for shared game visibility + retroactive seat attribution (v3.32.0).
 
-Standalone runner (no pytest dependency — matches tests/test_share_service).
+Pytest module (matches tests/test_share_service).
 Invoke via:
 
-    DATA_DIR=dev-data DEV_MODE=true python -m tests.test_game_visibility
+    DATA_DIR=dev-data DEV_MODE=true pytest tests/test_game_visibility.py
 
 Covers the v3.32.0 changes:
   - hybrid read visibility: owner, seat-attributed players, and members of a
@@ -17,8 +17,6 @@ Covers the v3.32.0 changes:
 """
 
 from __future__ import annotations
-
-import sys
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -115,7 +113,7 @@ def test_hybrid_visibility() -> int:
     else:
         print("  [OK] unrelated user cannot view")
 
-    return failed
+    assert failed == 0
 
 
 def test_list_games_hybrid_and_flag() -> int:
@@ -155,7 +153,7 @@ def test_list_games_hybrid_and_flag() -> int:
     else:
         print("  [OK] stranger list empty")
 
-    return failed
+    assert failed == 0
 
 
 def test_reassign_seat_user_owner_only() -> int:
@@ -237,7 +235,7 @@ def test_reassign_seat_user_owner_only() -> int:
     else:
         print("  [OK] missing seat returns None")
 
-    return failed
+    assert failed == 0
 
 
 def test_set_game_playgroup() -> int:
@@ -284,7 +282,7 @@ def test_set_game_playgroup() -> int:
     else:
         print("  [OK] clear nulls playgroup_id")
 
-    return failed
+    assert failed == 0
 
 
 def test_routes_access_and_owner_only_mutations() -> int:
@@ -373,27 +371,4 @@ def test_routes_access_and_owner_only_mutations() -> int:
         main.app.dependency_overrides.pop(get_db_session, None)
         main.app.dependency_overrides.pop(get_current_user, None)
         main.app.dependency_overrides.pop(require_csrf_token, None)
-    return failed
-
-
-def main() -> None:
-    tests = [
-        ("Hybrid visibility", test_hybrid_visibility),
-        ("list_games hybrid + flag", test_list_games_hybrid_and_flag),
-        ("Edit seat: rename + attribute (owner-only)", test_reassign_seat_user_owner_only),
-        ("Set game playgroup (owner + member)", test_set_game_playgroup),
-        ("Routes: access + owner-only mutations", test_routes_access_and_owner_only_mutations),
-    ]
-    total_failed = 0
-    for title, fn in tests:
-        print(f"\n=== {title} ===")
-        total_failed += fn()
-    print("\n" + "=" * 60)
-    if total_failed:
-        print(f"TOTAL: {total_failed} failed")
-        sys.exit(1)
-    print("TOTAL: all passed")
-
-
-if __name__ == "__main__":
-    main()
+    assert failed == 0

@@ -1,9 +1,9 @@
 """Offline contract test for the v3.25.0 _bulk_data_loop daemon.
 
-Standalone runner (no pytest — same pattern as tests/test_scryfall_cache.py).
+Pytest module (same pattern as tests/test_scryfall_cache.py).
 Invoke via:
 
-    DATA_DIR=dev-data DEV_MODE=true python -m tests.test_bulk_data_loop
+    DATA_DIR=dev-data DEV_MODE=true pytest tests/test_bulk_data_loop.py
 
 Drives the REAL ``refresh_bulk_cache`` with zero network: ``_get_json`` and
 ``_session`` are monkeypatched to feed a BytesIO body, and ``engine`` is
@@ -30,7 +30,6 @@ from __future__ import annotations
 import io
 import json
 import os
-import sys
 import tempfile
 import types
 
@@ -241,7 +240,7 @@ def test_stream_byte_identical() -> tuple[int, int]:
     finally:
         eng.dispose()
         os.unlink(path)
-    return passed, failed
+    assert failed == 0
 
 
 def test_idempotent_rerun_and_freshness_skip() -> tuple[int, int]:
@@ -294,7 +293,7 @@ def test_idempotent_rerun_and_freshness_skip() -> tuple[int, int]:
     finally:
         eng.dispose()
         os.unlink(path)
-    return passed, failed
+    assert failed == 0
 
 
 def test_partial_write_recovery() -> tuple[int, int]:
@@ -352,7 +351,7 @@ def test_partial_write_recovery() -> tuple[int, int]:
     finally:
         eng.dispose()
         os.unlink(path)
-    return passed, failed
+    assert failed == 0
 
 
 def test_batch_boundary_no_trailing_loss() -> tuple[int, int]:
@@ -386,37 +385,9 @@ def test_batch_boundary_no_trailing_loss() -> tuple[int, int]:
     finally:
         eng.dispose()
         os.unlink(path)
-    return passed, failed
+    assert failed == 0
 
 
 # ---------------------------------------------------------------------------
 # Runner
 # ---------------------------------------------------------------------------
-
-
-def run_all() -> int:
-    total_p = total_f = 0
-    suites = [
-        ("Test 1: streamed cards byte-identical to normalizer", test_stream_byte_identical),
-        (
-            "Test 2: idempotent re-run + freshness-guard skip",
-            test_idempotent_rerun_and_freshness_skip,
-        ),
-        (
-            "Test 3: partial-write recovery (meta never advances on failure)",
-            test_partial_write_recovery,
-        ),
-        ("Test 4: batch boundary — no trailing-batch loss", test_batch_boundary_no_trailing_loss),
-    ]
-    for title, fn in suites:
-        print(f"\n=== {title} ===")
-        p, f = fn()
-        total_p += p
-        total_f += f
-    print(f"\n{'=' * 60}")
-    print(f"TOTAL: {total_p} passed, {total_f} failed")
-    return total_f
-
-
-if __name__ == "__main__":
-    sys.exit(run_all())

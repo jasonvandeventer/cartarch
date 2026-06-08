@@ -1,9 +1,9 @@
 """Email-case hardening for profile edit + login (v3.33.1).
 
-Standalone runner (no pytest dependency — matches tests/test_share_service).
+Pytest module (matches tests/test_share_service).
 Invoke via:
 
-    DATA_DIR=dev-data DEV_MODE=true python -m tests.test_account_profile
+    DATA_DIR=dev-data DEV_MODE=true pytest tests/test_account_profile.py
 
 The /account "Update Profile" form already existed; this pins the v3.33.1
 case-normalization fix:
@@ -17,7 +17,6 @@ case-normalization fix:
 from __future__ import annotations
 
 import re
-import sys
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -65,7 +64,7 @@ def test_authenticate_case_insensitive() -> int:
     else:
         print("  [FAIL] inactive account authenticated")
         failed += 1
-    return failed
+    assert failed == 0
 
 
 def _client(seed):
@@ -167,7 +166,7 @@ def test_update_profile_lowercases() -> int:
     finally:
         for dep in overrides:
             main.app.dependency_overrides.pop(dep, None)
-    return failed
+    assert failed == 0
 
 
 def test_login_route_case_insensitive() -> int:
@@ -197,25 +196,4 @@ def test_login_route_case_insensitive() -> int:
     finally:
         for dep in overrides:
             main.app.dependency_overrides.pop(dep, None)
-    return failed
-
-
-def main() -> None:
-    tests = [
-        ("authenticate_user case-insensitive", test_authenticate_case_insensitive),
-        ("update-profile lowercases", test_update_profile_lowercases),
-        ("login route case-insensitive", test_login_route_case_insensitive),
-    ]
-    total = 0
-    for title, fn in tests:
-        print(f"\n=== {title} ===")
-        total += fn()
-    print("\n" + "=" * 60)
-    if total:
-        print(f"TOTAL: {total} failed")
-        sys.exit(1)
-    print("TOTAL: all passed")
-
-
-if __name__ == "__main__":
-    main()
+    assert failed == 0

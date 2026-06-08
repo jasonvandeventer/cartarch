@@ -1,9 +1,9 @@
 """Byte-identical contract test for the v3.25.0 local Scryfall cache seam.
 
-Standalone runner (no pytest dependency — same pattern as
+Pytest module (same pattern as
 tests/test_deck_service.py). Invoke via:
 
-    DATA_DIR=dev-data DEV_MODE=true python -m tests.test_scryfall_cache
+    DATA_DIR=dev-data DEV_MODE=true pytest tests/test_scryfall_cache.py
 
 The seam's correctness rests entirely on a cache-path value being
 indistinguishable from an API-path value. The API path is exactly
@@ -27,7 +27,6 @@ from __future__ import annotations
 
 import json
 import sqlite3
-import sys
 
 from app.scryfall import (
     _CACHE_COLUMNS,
@@ -306,7 +305,7 @@ def test_columns_match_normalizer() -> tuple[int, int]:
     else:
         print(f"  [FAIL] expected 24 columns, got {len(_COLS)}")
         failed += 1
-    return passed, failed
+    assert failed == 0
 
 
 def test_byte_identical() -> tuple[int, int]:
@@ -336,7 +335,7 @@ def test_byte_identical() -> tuple[int, int]:
         else:
             print(f"  [FAIL] {label}: full_art type/value wrong: {got['full_art']!r}")
             failed += 1
-    return passed, failed
+    assert failed == 0
 
 
 def test_none_vs_empty_contract() -> tuple[int, int]:
@@ -377,7 +376,7 @@ def test_none_vs_empty_contract() -> tuple[int, int]:
             f"id={got_g['color_identity']!r} mana={got_g['mana_cost']!r}"
         )
         failed += 1
-    return passed, failed
+    assert failed == 0
 
 
 def test_legalities_verbatim() -> tuple[int, int]:
@@ -405,7 +404,7 @@ def test_legalities_verbatim() -> tuple[int, int]:
                 f"frame_effects={got['frame_effects']!r}"
             )
             failed += 1
-    return passed, failed
+    assert failed == 0
 
 
 def test_card_construction_on_cache_miss() -> tuple[int, int]:
@@ -445,8 +444,7 @@ def test_card_construction_on_cache_miss() -> tuple[int, int]:
         pw = Card(**card_constructor_kwargs(pw_payload), updated_at=datetime.utcnow())
         battle = Card(**card_constructor_kwargs(battle_payload), updated_at=datetime.utcnow())
     except TypeError as exc:
-        print(f"  [FAIL] Card(**payload) raised TypeError: {exc}")
-        return passed, failed + 1
+        raise AssertionError(f"Card(**payload) raised TypeError: {exc}") from exc
 
     checks = [
         ("planeswalker loyalty set on Card", pw.loyalty == "3"),
@@ -462,38 +460,9 @@ def test_card_construction_on_cache_miss() -> tuple[int, int]:
         else:
             print(f"  [FAIL] {label}")
             failed += 1
-    return passed, failed
+    assert failed == 0
 
 
 # ---------------------------------------------------------------------------
 # Runner
 # ---------------------------------------------------------------------------
-
-
-def run_all() -> int:
-    total_p = total_f = 0
-    suites = [
-        (
-            "Test 1: _CACHE_COLUMNS matches normalizer (24 keys, in order)",
-            test_columns_match_normalizer,
-        ),
-        ("Test 2: byte-identical cache-path vs API-path", test_byte_identical),
-        ("Test 3: None-vs-'' contract round-trips distinguishably", test_none_vs_empty_contract),
-        ("Test 4: legalities/frame_effects verbatim JSON text", test_legalities_verbatim),
-        (
-            "Test 5: Card(**payload) cache-miss construction (loyalty/defense)",
-            test_card_construction_on_cache_miss,
-        ),
-    ]
-    for title, fn in suites:
-        print(f"\n=== {title} ===")
-        p, f = fn()
-        total_p += p
-        total_f += f
-    print(f"\n{'=' * 60}")
-    print(f"TOTAL: {total_p} passed, {total_f} failed")
-    return total_f
-
-
-if __name__ == "__main__":
-    sys.exit(run_all())

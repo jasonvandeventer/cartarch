@@ -23,6 +23,15 @@ ignore = [
   "B008"
 ]
 
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+filterwarnings = [
+  # Pre-existing app tech debt (datetime.utcnow(), FastAPI on_event) — warnings,
+  # not failures, and they predate this suite. Silenced to keep `pytest` output
+  # readable; flagged for a separate cleanup before the next Python/dep upgrade.
+  "ignore::DeprecationWarning",
+]
+
 [tool.vulture]
 min_confidence = 80
 paths = ["app", "main.py"]

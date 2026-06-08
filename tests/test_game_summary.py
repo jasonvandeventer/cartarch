@@ -1,9 +1,9 @@
 """Read-only game summary for finalized games (v3.33.2).
 
-Standalone runner (no pytest dependency — matches tests/test_share_service).
+Pytest module (matches tests/test_share_service).
 Invoke via:
 
-    DATA_DIR=dev-data DEV_MODE=true python -m tests.test_game_summary
+    DATA_DIR=dev-data DEV_MODE=true pytest tests/test_game_summary.py
 
 User feedback: a finalized game opened the frozen full-screen life tracker with
 no consolidated results. Now finalized games render a summary page; live games
@@ -20,7 +20,6 @@ keep the tracker. Covers:
 from __future__ import annotations
 
 import itertools
-import sys
 from datetime import datetime, timedelta
 
 from sqlalchemy import create_engine
@@ -87,7 +86,7 @@ def test_end_game_stamps_ended_at_once() -> int:
     else:
         print(f"  [FAIL] ended_at moved on re-finalize: {first} -> {g.ended_at}")
         failed += 1
-    return failed
+    assert failed == 0
 
 
 def _client_session():
@@ -182,7 +181,7 @@ def test_routes_summary_vs_tracker() -> int:
     finally:
         main.app.dependency_overrides.pop(get_db_session, None)
         main.app.dependency_overrides.pop(get_current_user, None)
-    return failed
+    assert failed == 0
 
 
 def test_elapsed_none_for_legacy() -> int:
@@ -215,7 +214,7 @@ def test_elapsed_none_for_legacy() -> int:
     finally:
         main.app.dependency_overrides.pop(get_db_session, None)
         main.app.dependency_overrides.pop(get_current_user, None)
-    return failed
+    assert failed == 0
 
 
 def test_migration_idempotent() -> int:
@@ -244,26 +243,4 @@ def test_migration_idempotent() -> int:
     else:
         print(f"  [FAIL] migration: ended_at count={cols.count('ended_at')}")
         failed += 1
-    return failed
-
-
-def main() -> None:
-    tests = [
-        ("end_game stamps ended_at once", test_end_game_stamps_ended_at_once),
-        ("routes: summary vs tracker", test_routes_summary_vs_tracker),
-        ("elapsed '—' for legacy game", test_elapsed_none_for_legacy),
-        ("migration idempotent", test_migration_idempotent),
-    ]
-    total = 0
-    for title, fn in tests:
-        print(f"\n=== {title} ===")
-        total += fn()
-    print("\n" + "=" * 60)
-    if total:
-        print(f"TOTAL: {total} failed")
-        sys.exit(1)
-    print("TOTAL: all passed")
-
-
-if __name__ == "__main__":
-    main()
+    assert failed == 0

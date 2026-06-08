@@ -35,16 +35,9 @@ jobs:
 
       - name: Run unit tests
         env:
-          DATA_DIR: dev-data
           DEV_MODE: "true"
-        run: |
-          python -m tests.test_deck_service
-          python -m tests.test_share_service
-          python -m tests.test_game_visibility
-          python -m tests.test_color_facet
-          python -m tests.test_route_smoke
-          python -m tests.test_location_add_card
-          python -m tests.test_variant_groups
-          python -m tests.test_account_profile
-          python -m tests.test_game_summary
-          python -m tests.test_collection_bulk
+        # Single pytest invocation collects ALL of tests/ (v3.37.0 migration) —
+        # this now includes the seam tests (test_scryfall_cache,
+        # test_bulk_data_loop) and test_auth_csrf that the old per-module list
+        # omitted. DATA_DIR is set by tests/conftest.py to a temp dir.
+        run: pytest tests/
