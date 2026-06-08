@@ -407,6 +407,9 @@ def test_legalities_verbatim() -> tuple[int, int]:
     assert failed == 0
 
 
+# invariant: architecture.md → "Card-constructor sites must use
+# card_constructor_kwargs(payload)" (produced_tokens is the sole seam-key-
+# without-a-Card-column; splatting the full payload is the v3.30.22 prod-500).
 def test_card_construction_on_cache_miss() -> tuple[int, int]:
     """Build a real ``Card`` from a freshly-normalized payload via
     ``card_constructor_kwargs`` — the cache-MISS path the import / switch-
