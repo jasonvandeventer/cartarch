@@ -83,7 +83,7 @@ def _teysa_karlov_themes() -> dict:
 # ---------------------------------------------------------------------------
 
 
-def test_gorma_themes() -> tuple[int, int]:
+def test_gorma_themes():
     """Gorma's themes should include +1/+1 counters, death_triggers."""
     passed = failed = 0
     themes = _gorma_themes()
@@ -98,7 +98,7 @@ def test_gorma_themes() -> tuple[int, int]:
     assert failed == 0
 
 
-def test_auntie_ool_themes() -> tuple[int, int]:
+def test_auntie_ool_themes():
     """Auntie Ool's themes should include -1/-1 counters, blight."""
     passed = failed = 0
     themes = _auntie_ool_themes()
@@ -221,7 +221,7 @@ GORMA_FIXTURES = [
 ]
 
 
-def test_gorma_fixtures() -> tuple[int, int]:
+def test_gorma_fixtures():
     """All listed Gorma precon cards should match the Gorma synergy themes."""
     passed = failed = 0
     themes = _gorma_themes()
@@ -291,7 +291,7 @@ AUNTIE_OOL_FIXTURES = [
 ]
 
 
-def test_auntie_ool_fixtures() -> tuple[int, int]:
+def test_auntie_ool_fixtures():
     """All listed Auntie Ool cards should match the Auntie Ool synergy themes."""
     passed = failed = 0
     themes = _auntie_ool_themes()
@@ -347,7 +347,7 @@ NEGATIVE_FIXTURES = [
 ]
 
 
-def test_negative_fixtures() -> tuple[int, int]:
+def test_negative_fixtures():
     """Negative-control fixtures should NOT match their respective decks."""
     passed = failed = 0
     for themes_fn, name, oracle, type_line in NEGATIVE_FIXTURES:
@@ -368,7 +368,7 @@ def test_negative_fixtures() -> tuple[int, int]:
 # ---------------------------------------------------------------------------
 
 
-def test_teysa_lifegain_narrowing() -> tuple[int, int]:
+def test_teysa_lifegain_narrowing():
     """The v3.23.5 narrow Gorma-style lifegain rule must NOT extract a
     lifegain theme from Teysa Karlov. Teysa has a death trigger AND grants
     lifelink to tokens, but never has bare lifelink on herself — exactly the

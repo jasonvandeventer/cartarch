@@ -85,7 +85,7 @@ def _make_row(
     return row
 
 
-def test_multiple_showcases_per_user() -> int:
+def test_multiple_showcases_per_user():
     """A user may own several Showcases; list_showcases returns them all."""
     failed = 0
     s = _fresh_session()
@@ -106,7 +106,7 @@ def test_multiple_showcases_per_user() -> int:
     assert failed == 0
 
 
-def test_ownership_scoping() -> int:
+def test_ownership_scoping():
     """get/update/delete/add reject Showcases owned by another user."""
     failed = 0
     s = _fresh_session()
@@ -148,7 +148,7 @@ def test_ownership_scoping() -> int:
     assert failed == 0
 
 
-def test_add_explicit_and_default() -> int:
+def test_add_explicit_and_default():
     """add_showcase_item honours showcase_id; falls back to default when None."""
     failed = 0
     s = _fresh_session()
@@ -178,7 +178,7 @@ def test_add_explicit_and_default() -> int:
     assert failed == 0
 
 
-def test_item_mutation_scoped_by_join() -> int:
+def test_item_mutation_scoped_by_join():
     """quantity/remove resolve ownership by joining the item's Showcase."""
     failed = 0
     s = _fresh_session()
@@ -218,7 +218,7 @@ def test_item_mutation_scoped_by_join() -> int:
     assert failed == 0
 
 
-def test_total_value() -> int:
+def test_total_value():
     """get_showcase_with_items sums finish-aware value; None when not owned."""
     failed = 0
     s = _fresh_session()
@@ -247,7 +247,7 @@ def test_total_value() -> int:
     assert failed == 0
 
 
-def test_delete_cascades_items_and_shares() -> int:
+def test_delete_cascades_items_and_shares():
     """delete_showcase removes the Showcase, its items, and its shares."""
     failed = 0
     s = _fresh_session()
@@ -284,7 +284,7 @@ def test_delete_cascades_items_and_shares() -> int:
     assert failed == 0
 
 
-def test_bulk_add_rows() -> int:
+def test_bulk_add_rows():
     """add_rows_to_showcase: whole-collection + per-location, idempotent,
     pending-excluded, ownership-scoped."""
     failed = 0
@@ -348,7 +348,7 @@ def test_bulk_add_rows() -> int:
     assert failed == 0
 
 
-def test_bulk_add_rows_by_row_ids() -> int:
+def test_bulk_add_rows_by_row_ids():
     """add_rows_to_showcase(row_ids=...): the filter-scoped Collection bulk
     path. row_ids takes precedence over location_id; the user_id + is_pending
     guards still apply (a foreign or pending id can't leak in); idempotent."""
@@ -410,7 +410,7 @@ def test_bulk_add_rows_by_row_ids() -> int:
     assert failed == 0
 
 
-def test_card_search_scryfall_syntax() -> int:
+def test_card_search_scryfall_syntax():
     """v3.32.3 — the card search inside a Showcase / shared view accepts the
     app's boolean/Scryfall query language (same parser as the Collection bar),
     applied server-side via `get_showcase_with_items(..., search=...)` and
@@ -488,7 +488,7 @@ def test_card_search_scryfall_syntax() -> int:
     assert failed == 0
 
 
-def test_share_view_renders_through_route() -> int:
+def test_share_view_renders_through_route():
     """Regression: GET /shares/{id} must actually render.
 
     A prod 500 (`UndefinedError: 'total_value'`) shipped in v3.31.0 because

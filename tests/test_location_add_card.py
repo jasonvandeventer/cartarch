@@ -80,7 +80,7 @@ def _rows(session, user_id):
     return session.query(InventoryRow).filter(InventoryRow.user_id == user_id).all()
 
 
-def test_create_new_row() -> int:
+def test_create_new_row():
     failed = 0
     s = _fresh_session()
     u = _seed_user(s)
@@ -116,7 +116,7 @@ def test_create_new_row() -> int:
     assert failed == 0
 
 
-def test_merge_existing() -> int:
+def test_merge_existing():
     failed = 0
     s = _fresh_session()
     u = _seed_user(s)
@@ -134,7 +134,7 @@ def test_merge_existing() -> int:
     assert failed == 0
 
 
-def test_distinct_fields_separate_rows() -> int:
+def test_distinct_fields_separate_rows():
     failed = 0
     s = _fresh_session()
     u = _seed_user(s)
@@ -154,7 +154,7 @@ def test_distinct_fields_separate_rows() -> int:
     assert failed == 0
 
 
-def test_finish_normalization() -> int:
+def test_finish_normalization():
     failed = 0
     s = _fresh_session()
     u = _seed_user(s)
@@ -171,7 +171,7 @@ def test_finish_normalization() -> int:
     assert failed == 0
 
 
-def test_ownership_rejection() -> int:
+def test_ownership_rejection():
     failed = 0
     s = _fresh_session()
     owner = _seed_user(s, "owner")
@@ -189,7 +189,7 @@ def test_ownership_rejection() -> int:
     assert failed == 0
 
 
-def test_cache_miss_creates_card(monkeypatch_fetch=None) -> int:
+def test_cache_miss_creates_card(monkeypatch_fetch=None):
     """An unknown scryfall_id triggers exactly one get_or_create_card fetch;
     the patched fetch both supplies the payload AND proves no real network
     call happens (a live call would hit Scryfall, which tests must not)."""
@@ -250,7 +250,7 @@ def test_cache_miss_creates_card(monkeypatch_fetch=None) -> int:
     assert failed == 0
 
 
-def test_route_renders_and_adds() -> int:
+def test_route_renders_and_adds():
     from fastapi.testclient import TestClient
 
     from app import main

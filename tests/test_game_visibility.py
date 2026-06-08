@@ -64,7 +64,7 @@ def _make_game(s, owner: User, seat_specs: list[dict]) -> Game:
     )
 
 
-def test_hybrid_visibility() -> int:
+def test_hybrid_visibility():
     """get_viewable_game: owner, seat-attributed player, playgroup member yes;
     unrelated user no."""
     failed = 0
@@ -116,7 +116,7 @@ def test_hybrid_visibility() -> int:
     assert failed == 0
 
 
-def test_list_games_hybrid_and_flag() -> int:
+def test_list_games_hybrid_and_flag():
     """list_games returns owned + played-in; is_owned_by_viewer is set."""
     failed = 0
     s = _fresh_session()
@@ -156,7 +156,7 @@ def test_list_games_hybrid_and_flag() -> int:
     assert failed == 0
 
 
-def test_reassign_seat_user_owner_only() -> int:
+def test_reassign_seat_user_owner_only():
     """Owner renames/attributes/clears a seat; non-owner rejected; unknown clears."""
     failed = 0
     s = _fresh_session()
@@ -238,7 +238,7 @@ def test_reassign_seat_user_owner_only() -> int:
     assert failed == 0
 
 
-def test_set_game_playgroup() -> int:
+def test_set_game_playgroup():
     """Owner-only + member-only playgroup link."""
     failed = 0
     s = _fresh_session()
@@ -285,7 +285,7 @@ def test_set_game_playgroup() -> int:
     assert failed == 0
 
 
-def test_routes_access_and_owner_only_mutations() -> int:
+def test_routes_access_and_owner_only_mutations():
     """Route layer: participant 200 (read-only), stranger 404; owner-only
     mutations 404 for non-owners."""
     from fastapi.testclient import TestClient

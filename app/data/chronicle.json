@@ -1,5 +1,15 @@
 [
   {
+    "version": "3.36.10",
+    "date": "2026-06-07",
+    "added": [],
+    "refined": [],
+    "resolved": [
+      "The deck card auto-tagger now recognises two kinds of card it had been quietly missing. Creatures and enchantments that deal damage equal to a creature's power when something enters the battlefield — like Warstorm Surge and Terror of the Peaks — are now tagged as Threats. And repeatable 'tap to draw a card' engines that switch on once a condition is met — like Idol of Oblivion — are now tagged as card-draw Engines. Tags on cards you already own update the next time the tagger runs over them."
+    ],
+    "archivist_note": "Both gaps were quiet ones: the rules to catch these cards existed, but each was written just slightly askew of how the cards are actually worded, so they matched nothing. A new test pass — checking the tagger against real card text rather than card names — caught both, and the fixes were small once the misalignment was visible. The lesson keeps: a rule is only as good as the words it actually reads."
+  },
+  {
     "version": "3.36.9",
     "date": "2026-06-07",
     "added": [

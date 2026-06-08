@@ -204,7 +204,7 @@ def _clone(base: dict, n: int) -> list[dict]:
 # ---------------------------------------------------------------------------
 
 
-def test_stream_byte_identical() -> tuple[int, int]:
+def test_stream_byte_identical():
     """Streamed+upserted rows == _normalize_card_payload for each input."""
     passed = failed = 0
     eng, path = _temp_engine()
@@ -243,7 +243,7 @@ def test_stream_byte_identical() -> tuple[int, int]:
     assert failed == 0
 
 
-def test_idempotent_rerun_and_freshness_skip() -> tuple[int, int]:
+def test_idempotent_rerun_and_freshness_skip():
     passed = failed = 0
     eng, path = _temp_engine()
     try:
@@ -296,7 +296,7 @@ def test_idempotent_rerun_and_freshness_skip() -> tuple[int, int]:
     assert failed == 0
 
 
-def test_partial_write_recovery() -> tuple[int, int]:
+def test_partial_write_recovery():
     """Exception mid-population => meta NEVER advances to the new value;
     already-committed batches stay durable.
     """
@@ -354,7 +354,7 @@ def test_partial_write_recovery() -> tuple[int, int]:
     assert failed == 0
 
 
-def test_batch_boundary_no_trailing_loss() -> tuple[int, int]:
+def test_batch_boundary_no_trailing_loss():
     """1500 rows, batch=1000 -> flushes of [1000, 500]; all 1500 present
     (trailing partial batch not dropped).
     """

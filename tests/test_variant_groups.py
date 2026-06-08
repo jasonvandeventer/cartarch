@@ -98,7 +98,7 @@ def _row(card, qty=1):
     }
 
 
-def test_group_crud() -> int:
+def test_group_crud():
     failed = 0
     s = _fresh_session()
     u = _user(s)
@@ -134,7 +134,7 @@ def test_group_crud() -> int:
     assert failed == 0
 
 
-def test_ownership_scoping() -> int:
+def test_ownership_scoping():
     failed = 0
     s = _fresh_session()
     u1 = _user(s, "u1")
@@ -153,7 +153,7 @@ def test_ownership_scoping() -> int:
     assert failed == 0
 
 
-def test_sibling_lookup() -> int:
+def test_sibling_lookup():
     failed = 0
     s = _fresh_session()
     u = _user(s)
@@ -182,7 +182,7 @@ def test_sibling_lookup() -> int:
     assert failed == 0
 
 
-def test_delete_nulls_decks() -> int:
+def test_delete_nulls_decks():
     failed = 0
     s = _fresh_session()
     u = _user(s)
@@ -207,7 +207,7 @@ def _reconcile(s, user_id, deck, card, qty=1):
     )[0]
 
 
-def test_reconcile_covered() -> int:
+def test_reconcile_covered():
     failed = 0
     s = _fresh_session()
     u = _user(s)
@@ -232,7 +232,7 @@ def test_reconcile_covered() -> int:
     assert failed == 0
 
 
-def test_reconcile_import_new() -> int:
+def test_reconcile_import_new():
     failed = 0
     s = _fresh_session()
     u = _user(s)
@@ -253,7 +253,7 @@ def test_reconcile_import_new() -> int:
     assert failed == 0
 
 
-def test_reconcile_partial() -> int:
+def test_reconcile_partial():
     failed = 0
     s = _fresh_session()
     u = _user(s)
@@ -275,7 +275,7 @@ def test_reconcile_partial() -> int:
     assert failed == 0
 
 
-def test_reconcile_no_group_unchanged() -> int:
+def test_reconcile_no_group_unchanged():
     """Regression guard: a deck with NO variant group behaves exactly as
     before — a copy in an UNRELATED deck stays informational (other_deck) and
     is never treated as covered."""
@@ -300,7 +300,7 @@ def test_reconcile_no_group_unchanged() -> int:
     assert failed == 0
 
 
-def test_migration_idempotent() -> int:
+def test_migration_idempotent():
     """migrate twice on a throwaway DB -> exactly one variant_group_id column."""
     import os
     import tempfile
@@ -338,7 +338,7 @@ def test_migration_idempotent() -> int:
     assert failed == 0
 
 
-def test_route_smoke() -> int:
+def test_route_smoke():
     from fastapi.testclient import TestClient
 
     from app import main

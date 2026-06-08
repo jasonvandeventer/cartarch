@@ -62,7 +62,7 @@ def _seat(s, game_id, n, name, **kw) -> GameSeat:
     return seat
 
 
-def test_end_game_stamps_ended_at_once() -> int:
+def test_end_game_stamps_ended_at_once():
     failed = 0
     s = _fresh_session()
     u = _user(s)
@@ -103,7 +103,7 @@ def _client_session():
     return TestClient(main.app, follow_redirects=False), main, sm, get_db_session, get_current_user
 
 
-def test_routes_summary_vs_tracker() -> int:
+def test_routes_summary_vs_tracker():
     failed = 0
     client, main, sm, get_db_session, get_current_user = _client_session()
     s = sm()
@@ -184,7 +184,7 @@ def test_routes_summary_vs_tracker() -> int:
     assert failed == 0
 
 
-def test_elapsed_none_for_legacy() -> int:
+def test_elapsed_none_for_legacy():
     """A finalized game with no ended_at (legacy) shows '—' for playtime."""
     failed = 0
     client, main, sm, get_db_session, get_current_user = _client_session()
@@ -217,7 +217,7 @@ def test_elapsed_none_for_legacy() -> int:
     assert failed == 0
 
 
-def test_migration_idempotent() -> int:
+def test_migration_idempotent():
     import importlib
     import os
     import tempfile

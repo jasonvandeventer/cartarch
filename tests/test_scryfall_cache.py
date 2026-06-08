@@ -287,7 +287,7 @@ def _roundtrip(expected: dict) -> dict:
 # ---------------------------------------------------------------------------
 
 
-def test_columns_match_normalizer() -> tuple[int, int]:
+def test_columns_match_normalizer():
     """_CACHE_COLUMNS must list exactly the normalizer's keys, in order —
     this is what makes the column-order guarantee real.
     """
@@ -308,7 +308,7 @@ def test_columns_match_normalizer() -> tuple[int, int]:
     assert failed == 0
 
 
-def test_byte_identical() -> tuple[int, int]:
+def test_byte_identical():
     passed = failed = 0
     for label, raw in FIXTURES:
         expected = _normalize_card_payload(raw)
@@ -338,7 +338,7 @@ def test_byte_identical() -> tuple[int, int]:
     assert failed == 0
 
 
-def test_none_vs_empty_contract() -> tuple[int, int]:
+def test_none_vs_empty_contract():
     """colors=NULL must stay None and color_identity="" must stay "" — and
     the two must remain distinguishable through the round-trip.
     """
@@ -379,7 +379,7 @@ def test_none_vs_empty_contract() -> tuple[int, int]:
     assert failed == 0
 
 
-def test_legalities_verbatim() -> tuple[int, int]:
+def test_legalities_verbatim():
     """legalities/frame_effects are returned as the stored JSON text,
     verbatim and JSON-loadable — same as the API path.
     """
@@ -410,7 +410,7 @@ def test_legalities_verbatim() -> tuple[int, int]:
 # invariant: architecture.md → "Card-constructor sites must use
 # card_constructor_kwargs(payload)" (produced_tokens is the sole seam-key-
 # without-a-Card-column; splatting the full payload is the v3.30.22 prod-500).
-def test_card_construction_on_cache_miss() -> tuple[int, int]:
+def test_card_construction_on_cache_miss():
     """Build a real ``Card`` from a freshly-normalized payload via
     ``card_constructor_kwargs`` — the cache-MISS path the import / switch-
     printing flows take (``Card(**card_constructor_kwargs(payload))``).

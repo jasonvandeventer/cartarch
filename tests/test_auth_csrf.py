@@ -85,7 +85,7 @@ def _login(client, token, **kw):
     )
 
 
-def test_login_csrf_recovery() -> int:
+def test_login_csrf_recovery():
     from fastapi.testclient import TestClient
 
     client, main, get_db_session = _client_and_user()

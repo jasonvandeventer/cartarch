@@ -35,7 +35,7 @@ def _fresh_session():
     return sessionmaker(bind=engine, expire_on_commit=False)()
 
 
-def test_authenticate_case_insensitive() -> int:
+def test_authenticate_case_insensitive():
     failed = 0
     s = _fresh_session()
     s.add(User(username="user@x.com", password_hash=auth.hash_password("pw123456")))
@@ -105,7 +105,7 @@ def _client(seed):
     )
 
 
-def test_update_profile_lowercases() -> int:
+def test_update_profile_lowercases():
     from app.dependencies import get_current_user, require_csrf_token
 
     failed = 0
@@ -169,7 +169,7 @@ def test_update_profile_lowercases() -> int:
     assert failed == 0
 
 
-def test_login_route_case_insensitive() -> int:
+def test_login_route_case_insensitive():
     failed = 0
 
     def seed(s):

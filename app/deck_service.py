@@ -127,6 +127,11 @@ _PROTECTION_RE = re.compile(
 #      ("Whenever … creature … dies … return … to the battlefield"). One-shot
 #      reanimate spells (Reanimate, Animate Dead) use "Return target creature
 #      card from your graveyard" wording — those match (2) above, not (8).
+#   9) Conditional repeating tap-to-draw — Idol of Oblivion ("{T}: Draw a card.
+#      Activate this ability only if …"). v3.36.10 fix: docs/tag_audit_findings
+#      Pattern C #3 was recommended but never shipped (only 5 of 6 landed). The
+#      gated "Activate … only if" reading is what distinguishes a repeatable
+#      engine from a one-shot "{T}: Draw a card" cantrip.
 _ENGINE_RE = re.compile(
     r"\bsacrifice (?:a|an|another)\s+(?:[\w'-]+\s+){0,3}(?:creature|permanent|artifact|token|treasure|food|clue|blood)\s*:"
     r"|(?:return|put) [^.]{0,80}from [^.]{0,30}graveyards?[^.]{0,30}(?:to|onto) the battlefield"
@@ -135,7 +140,8 @@ _ENGINE_RE = re.compile(
     r"|\bwhenever (?:a|an|another)[^.]{0,40}\benters\b[^.]{0,40}\bcreate\b"
     r"|\b(?:cast|play) (?:that|a|an?|the chosen|target|those|them)[^.]{0,80}without paying (?:its|their) mana costs?\b"
     r"|\bwhenever [^.]{0,40}creatures?[^.]{0,40}\bdies\b[^.]{0,60}draw (?:a card|\w+ cards?|cards? equal)"
-    r"|\bwhen(?:ever)? [^.]{0,40}\bcreature[^.]{0,40}\bdies\b[^.]{0,60}return [^.]{0,40}to the battlefield",
+    r"|\bwhen(?:ever)? [^.]{0,40}\bcreature[^.]{0,40}\bdies\b[^.]{0,60}return [^.]{0,40}to the battlefield"
+    r"|\{[t0-9wubrgcxs,/\s]+\}:\s*draw a card\.\s*activate (?:this ability )?only if",
     re.IGNORECASE,
 )
 # Hard threat indicators only. Power/toughness aren't in the Card model so
@@ -149,9 +155,13 @@ _ENGINE_RE = re.compile(
 #   - P/T doublers — Unnatural Growth ("double the power and toughness").
 #     The "(?:power and toughness|power|toughness)" suffix excludes
 #     "double the amount of mana" (Doubling Cube — ramp, not threat).
-#   - ETB damage equal to power — Terror of the Peaks / Warstorm Surge. The
-#     `enters … damage to … equal to … power` shape is specific enough that
-#     Lightning Bolt-style direct-damage spells don't false-positive.
+#   - ETB damage equal to power — Terror of the Peaks / Warstorm Surge. The real
+#     oracle wording is "deals damage equal to <its / that creature's> power to
+#     any target", so the clause anchors on `enters … deals damage equal to …
+#     power` (v3.36.10 fix: the prior `damage to <target> … equal to … power`
+#     ordering had the words in the wrong order and matched NEITHER card it was
+#     added for). The `enters` + `equal to … power` shape keeps Lightning-Bolt-
+#     style fixed direct-damage spells from false-positiving.
 _THREAT_RE = re.compile(
     r"\byou win the game\b"
     r"|(?:target |each |that )?(?:opponents?|players?)\s+loses? the game\b"
@@ -161,7 +171,7 @@ _THREAT_RE = re.compile(
     r"|\bdeals? double that (?:much )?damage\b"
     r"|\b(?:double|triple) (?:the |that )?(?:amount of )?damage\b"
     r"|\bdouble the (?:power and toughness|power|toughness)\b"
-    r"|\bwhenever [^.]{0,60}\benters\b[^.]{0,80}\bdamage to (?:any target|target)[^.]{0,40}\bequal to (?:its|that creature'?s) power\b",
+    r"|\bwhenever [^.]{0,80}\benters\b[^.]{0,80}\bdeals? damage equal to [^.]{0,40}\bpower\b",
     re.IGNORECASE,
 )
 # Death-trigger drain payoffs — Blood Artist, Zulaport Cutthroat, Syr Konrad,

@@ -101,14 +101,14 @@ def _check(label: str, got: set[str], expected: set[str]) -> int:
     return 1
 
 
-def test_mono_selection() -> int:
+def test_mono_selection():
     """G selects mono-G + colorless; excludes anything with a non-G color."""
     s = _fresh_session()
     _seed(s)
     assert 0 == _check("G → mono-G + colorless only", _matches(s, "G"), {"Mono-G", "Sol Ring"})
 
 
-def test_multi_selection() -> int:
+def test_multi_selection():
     """WU selects mono-W, Azorius, and colorless (all subsets of {W,U})."""
     s = _fresh_session()
     _seed(s)
@@ -117,7 +117,7 @@ def test_multi_selection() -> int:
     )
 
 
-def test_colorless_matches_any_selection() -> int:
+def test_colorless_matches_any_selection():
     """A colorless card is a subset of every non-empty selection (Sol Ring
     is legal in a mono-G deck) — the key behavior change from the old rule."""
     s = _fresh_session()
@@ -132,7 +132,7 @@ def test_colorless_matches_any_selection() -> int:
     assert failed == 0
 
 
-def test_null_excluded() -> int:
+def test_null_excluded():
     """NULL identity (not yet fetched) can't be confirmed → excluded from a
     color selection."""
     s = _fresh_session()
@@ -141,7 +141,7 @@ def test_null_excluded() -> int:
     assert "Unfetched" not in got, "NULL-identity card leaked into a color selection"
 
 
-def test_c_alone_is_colorless() -> int:
+def test_c_alone_is_colorless():
     """C selected alone → colorless only (identity ""; NULL tolerated as
     'no colors known', preserving the prior C-pip behavior)."""
     s = _fresh_session()
@@ -149,7 +149,7 @@ def test_c_alone_is_colorless() -> int:
     assert 0 == _check("C alone → colorless + NULL", _matches(s, "C"), {"Sol Ring", "Unfetched"})
 
 
-def test_c_with_colors_is_noop() -> int:
+def test_c_with_colors_is_noop():
     """C alongside colors is redundant (colorless already matches a color
     selection) → GC behaves exactly like G; NULL stays excluded."""
     s = _fresh_session()
@@ -177,7 +177,7 @@ def _seed_alias(session) -> None:
     _make_row(session, "Sol Ring", "", colors="")  # colorless
 
 
-def test_id_guild_name_alias() -> int:
+def test_id_guild_name_alias():
     """`id:izzet` (and `id:<=izzet`) resolve to the UR subset — the live bug.
     Colorless Sol Ring is included by the subset rule."""
     s = _fresh_session()
@@ -189,7 +189,7 @@ def test_id_guild_name_alias() -> int:
     assert failed == 0
 
 
-def test_id_shard_name_alias() -> int:
+def test_id_shard_name_alias():
     """`id:bant` resolves to the GWU subset (excludes B/R identities)."""
     s = _fresh_session()
     _seed_alias(s)
@@ -200,14 +200,14 @@ def test_id_shard_name_alias() -> int:
     )
 
 
-def test_c_guild_name_alias() -> int:
+def test_c_guild_name_alias():
     """`c:izzet` resolves to colors-contain-U-AND-R (membership, not subset)."""
     s = _fresh_session()
     _seed_alias(s)
     assert 0 == _check("c:izzet → U+R membership", _search_names(s, "c:izzet"), {"Izzet Spell"})
 
 
-def test_c_colorless_name_alias() -> int:
+def test_c_colorless_name_alias():
     """`c:colorless` resolves to the colorless card only."""
     s = _fresh_session()
     _seed_alias(s)
@@ -216,7 +216,7 @@ def test_c_colorless_name_alias() -> int:
     )
 
 
-def test_alias_regressions() -> int:
+def test_alias_regressions():
     """Bare letters and full sets are unchanged — pass through the alias map
     untouched. `id:wubrg` stays a no-op (matches everything)."""
     s = _fresh_session()

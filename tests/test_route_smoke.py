@@ -119,7 +119,7 @@ def _seed(s):
     }
 
 
-def test_authenticated_pages_render() -> int:
+def test_authenticated_pages_render():
     from fastapi.testclient import TestClient
 
     from app import main

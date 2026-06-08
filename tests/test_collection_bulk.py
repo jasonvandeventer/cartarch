@@ -103,7 +103,7 @@ def _seed(s):
     return u, src, dst, deck, {"g1": g1, "g2": g2, "r1": r1, "gp": gp}
 
 
-def test_build_query_matches_view() -> int:
+def test_build_query_matches_view():
     """build_collection_filter_query composes search + the placed filter into
     exactly the grid's set; pending is separable for the excluded count."""
     failed = 0
@@ -177,7 +177,7 @@ def _filter_form(**over):
     return form
 
 
-def test_bulk_add_showcase_route() -> int:
+def test_bulk_add_showcase_route():
     from app import share_service
     from app.dependencies import get_current_user, get_db_session, require_csrf_token
     from app.models import ShowcaseItem
@@ -218,7 +218,7 @@ def test_bulk_add_showcase_route() -> int:
     assert failed == 0
 
 
-def test_bulk_move_route() -> int:
+def test_bulk_move_route():
     from app.dependencies import get_current_user, get_db_session, require_csrf_token
 
     failed = 0
@@ -265,7 +265,7 @@ def test_bulk_move_route() -> int:
     assert failed == 0
 
 
-def test_bulk_move_rejects_deck_and_skips_resort() -> int:
+def test_bulk_move_rejects_deck_and_skips_resort():
     from app import routes
     from app.dependencies import get_current_user, get_db_session, require_csrf_token
 

@@ -188,16 +188,13 @@ def test_consequence_draw_still_detected():
     assert "Engine" in r
 
 
-# ── KNOWN-BROKEN punch-list (assert correct + xfail strict) ───────────────────
+# ── Formerly the strict-xfail punch-list — both bugs FIXED in v3.36.10 ────────
+# These two patterns shipped broken and were pinned as xfail(strict=True) in
+# Session C; v3.36.10 fixed the underlying regexes (_THREAT_RE word order;
+# _ENGINE_RE conditional tap-to-draw), so the xfail markers were removed and
+# these are now ordinary passing assertions.
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="tag_audit Pattern D: _THREAT_RE expects 'damage to <target> ... equal to "
-    "power' word order, but the real oracle reads 'damage equal to its power to any "
-    "target' — so the ETB-damage rule matches neither Warstorm Surge nor Terror of "
-    "the Peaks. Fix the regex word order, then this XPASSes and the marker comes off.",
-)
 @pytest.mark.parametrize(
     "name,oracle",
     [
@@ -217,12 +214,6 @@ def test_pattern_d_etb_damage_equal_to_power_is_threat(name, oracle):
     assert "Threat" in roles(oracle, "Creature")
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="tag_audit Pattern C: the conditional tap-to-draw engine (Idol of Oblivion) "
-    "was recommended but never added to _ENGINE_RE — only 5 of the 6 recommended "
-    "patterns shipped. Add the pattern, then this XPASSes and the marker comes off.",
-)
 def test_pattern_c_conditional_tap_to_draw_is_engine():
     idol_of_oblivion = (
         "Whenever a token you control enters, put a charge counter on Idol of Oblivion. "
