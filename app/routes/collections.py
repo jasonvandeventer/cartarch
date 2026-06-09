@@ -15,6 +15,7 @@ from __future__ import annotations
 import csv
 import io
 import math
+from dataclasses import dataclass
 from urllib.parse import urlencode
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Query, Request
@@ -63,8 +64,11 @@ from app.location_service import (
     list_locations,
     update_location,
 )
-from app.models import Card, Deck, ImportBatch, InventoryRow, User
-from app.presentation_service import build_pending_batch_groups, build_pending_view_model
+from app.models import Card, Deck, ImportBatch, InventoryRow, StorageLocation, User
+from app.presentation_service import (
+    build_pending_batch_groups,
+    build_pending_view_model,
+)
 from app.pricing import effective_price
 
 router = APIRouter()
@@ -184,9 +188,55 @@ def delete_inventory_row_action(
 # -----------------------------------------------------------------------------
 
 
-@router.get("/collection")
-def collection_page(
-    request: Request,
+# -----------------------------------------------------------------------------
+# Shared Collection filter (v3.x) — ONE parse of the /collection filter surface,
+# consumed by BOTH the grid page and the CSV export so the two can never drift
+# on what "the filtered collection" means. The query COMPOSITION already lives
+# in inventory_service.build_collection_filter_query; this is the param-parse
+# half (facet-list collapse + tolerant price-string→float) that used to be
+# inline in collection_page, plus the drawer/location scope derivation.
+# -----------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class CollectionFilter:
+    """Parsed /collection filter params (the filter surface only).
+
+    ``colors`` is a joined letter token ("WU"); ``types``/``status``/``finishes``
+    are comma-joined CSV; the ``*_raw`` price strings are echoed back to the
+    template while ``facet_price_*`` are their tolerant float parse (blank /
+    non-numeric → None, i.e. the price facet is skipped). ``sort``/``direction``/
+    ``page``/``view`` ride along for the page; export ignores them.
+    """
+
+    search: str
+    finish: str
+    location_id: int
+    sort: str
+    direction: str
+    page: int
+    colors: str
+    types: str
+    status: str
+    finishes: str
+    price_min_raw: str
+    price_max_raw: str
+    facet_price_min: float | None
+    facet_price_max: float | None
+    view: str
+
+
+def _parse_facet_price(value: str) -> float | None:
+    """Tolerant price-string → float: blank / non-numeric → None (facet skipped)."""
+    if value and value.strip():
+        try:
+            return float(value.strip())
+        except ValueError:
+            return None
+    return None
+
+
+def collection_filter(
     search: str = "",
     finish: str = "",
     location_id: int = 0,
@@ -203,7 +253,7 @@ def collection_page(
     # a single pre-joined token (``colors=WU``). Reading them as a bare
     # ``str`` kept only the FIRST repeated value, so multi-select in the
     # sidebar silently collapsed to one color/type/etc. — the visible
-    # "mana pips don't filter" bug. Joining the list below makes both
+    # "mana pips don't filter" bug. Joining the lists below makes both
     # producers converge on the same joined string the rest of the
     # pipeline already expects.
     colors: list[str] = Query(default=[]),
@@ -213,34 +263,105 @@ def collection_page(
     price_min: str = "",
     price_max: str = "",
     view: str = "grid",
+) -> CollectionFilter:
+    """FastAPI dependency: bind + parse the /collection filter query params.
+
+    Collapses the repeated facet params into the single joined-token form the
+    downstream query + facet-set construction expect (colors joined with no
+    separator, CSV facets with commas — works whether each element is an
+    individual checkbox value or an already-joined toolbar/pagination token),
+    and parses the price strings to floats. Used by ``collection_page`` and
+    ``collection_export`` alike.
+    """
+    return CollectionFilter(
+        search=search,
+        finish=finish,
+        location_id=location_id,
+        sort=sort,
+        direction=direction,
+        page=page,
+        colors="".join(c.strip() for c in colors if c.strip()),
+        types=",".join(t.strip() for t in types if t.strip()),
+        status=",".join(s.strip() for s in status if s.strip()),
+        finishes=",".join(f.strip() for f in finishes if f.strip()),
+        price_min_raw=price_min or "",
+        price_max_raw=price_max or "",
+        facet_price_min=_parse_facet_price(price_min),
+        facet_price_max=_parse_facet_price(price_max),
+        view=view,
+    )
+
+
+def _resolve_collection_scope(
+    session: Session, user_id: int, location_id: int
+) -> tuple[StorageLocation | None, str, int]:
+    """Derive ``(selected_location, drawer_name, scope_location_id)`` from a raw
+    ``location_id``, matching ``collection_page``: a drawer-type location becomes
+    a drawer-name filter (its own query dimension) with the plain location scope
+    cleared to 0; a non-drawer location keeps its id as the scope; a missing /
+    unowned location scopes to 0 (all locations)."""
+    selected_location = None
+    if location_id:
+        selected_location = get_location(session, location_id=location_id, user_id=user_id)
+    drawer = ""
+    if selected_location and selected_location.type == "drawer":
+        drawer = selected_location.name.replace("Drawer", "").strip()
+    scope_location_id = (
+        location_id if (selected_location and selected_location.type != "drawer") else 0
+    )
+    return selected_location, drawer, scope_location_id
+
+
+def _filtered_collection_query(session: Session, user_id: int, filters: CollectionFilter):
+    """Resolve a ``CollectionFilter`` to the shared joined+filtered base query
+    (``build_collection_filter_query``), applying the same drawer/location scope
+    the grid page uses. Returns ``(base_query, selected_location, drawer)``."""
+    selected_location, drawer, scope_location_id = _resolve_collection_scope(
+        session, user_id, filters.location_id
+    )
+    base_query = build_collection_filter_query(
+        session,
+        user_id,
+        search=filters.search,
+        facet_colors=filters.colors,
+        facet_types=filters.types,
+        facet_status=filters.status,
+        facet_finishes=filters.finishes,
+        facet_price_min=filters.facet_price_min,
+        facet_price_max=filters.facet_price_max,
+        finish=filters.finish,
+        location_id=scope_location_id,
+        drawer=drawer,
+    )
+    return base_query, selected_location, drawer
+
+
+@router.get("/collection")
+def collection_page(
+    request: Request,
+    filters: CollectionFilter = Depends(collection_filter),
     session: Session = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
 ):
+    search = filters.search
+    finish = filters.finish
+    location_id = filters.location_id
+    sort = filters.sort
+    direction = filters.direction
+    page = filters.page
+    colors = filters.colors
+    types = filters.types
+    status = filters.status
+    finishes = filters.finishes
+    price_min = filters.price_min_raw
+    price_max = filters.price_max_raw
+    view = filters.view
+    facet_price_min = filters.facet_price_min
+    facet_price_max = filters.facet_price_max
+
     per_page = 50
 
-    # v3.31.0 — collapse the repeated facet params into the single
-    # joined-token form the downstream query + facet-set construction
-    # expect. Colors are letter tokens joined with no separator ("WU");
-    # the CSV facets join with commas. Works whether each list element
-    # is an individual checkbox value ("W", "Creature") or an already-
-    # joined token from the toolbar/pagination ("WU", "Creature,Instant").
-    colors = "".join(c.strip() for c in colors if c.strip())
-    types = ",".join(t.strip() for t in types if t.strip())
-    status = ",".join(s.strip() for s in status if s.strip())
-    finishes = ",".join(f.strip() for f in finishes if f.strip())
-
-    drawer = ""
-
-    selected_location = None
-
-    if location_id:
-        selected_location = get_location(
-            session,
-            location_id=location_id,
-            user_id=current_user.id,
-        )
-    if selected_location and selected_location.type == "drawer":
-        drawer = selected_location.name.replace("Drawer", "").strip()
+    _, drawer, scope_location_id = _resolve_collection_scope(session, current_user.id, location_id)
 
     # v3.27.19 — when count-sorting, run the name-level owned-count
     # aggregation ONCE up front. Pass the dict into list_inventory_rows
@@ -252,20 +373,8 @@ def collection_page(
     if sort == "count":
         owned_counts = name_owned_counts(session, current_user.id)
 
-    # v3.28.8 — parse facet params. Price floats are tolerant: empty / non-
-    # numeric → None (skip facet). View is whitelisted.
-    facet_price_min: float | None = None
-    facet_price_max: float | None = None
-    if price_min and price_min.strip():
-        try:
-            facet_price_min = float(price_min.strip())
-        except ValueError:
-            facet_price_min = None
-    if price_max and price_max.strip():
-        try:
-            facet_price_max = float(price_max.strip())
-        except ValueError:
-            facet_price_max = None
+    # v3.28.8 — facet price floats + view mode are parsed in the shared
+    # ``collection_filter`` dependency now; view is whitelisted here.
     view_mode = "rows" if view == "rows" else "grid"
 
     inventory_rows, total_count = list_inventory_rows(
@@ -274,7 +383,7 @@ def collection_page(
         search=search,
         finish=finish,
         drawer=drawer,
-        location_id=location_id if selected_location and selected_location.type != "drawer" else 0,
+        location_id=scope_location_id,
         sort=sort,
         direction=direction,
         page=page,
@@ -300,7 +409,7 @@ def collection_page(
         search=search,
         finish=finish,
         drawer=drawer,
-        location_id=location_id if selected_location and selected_location.type != "drawer" else 0,
+        location_id=scope_location_id,
     )
 
     location_counts = {}
@@ -436,17 +545,20 @@ def collection_page(
 
 @router.get("/collection/export")
 def collection_export(
+    filters: CollectionFilter = Depends(collection_filter),
     session: Session = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
 ):
-    rows = (
-        session.query(InventoryRow)
-        .options(joinedload(InventoryRow.card), joinedload(InventoryRow.storage_location))
-        .join(Card)
-        .filter(InventoryRow.user_id == current_user.id)
-        .order_by(Card.name.asc())
-        .all()
+    # v3.x — the export now honors the active /collection filter. It consumes
+    # the SAME shared filter unit the grid page does (``collection_filter`` +
+    # ``_filtered_collection_query``), so a filtered export == the rows the
+    # user sees, never a full dump. No filter params → the whole collection
+    # (build_collection_filter_query with empty filters), preserving the old
+    # default behavior.
+    base_query, _selected_location, _drawer = _filtered_collection_query(
+        session, current_user.id, filters
     )
+    rows = base_query.order_by(Card.name.asc()).all()
 
     buf = io.StringIO()
     writer = csv.writer(buf)
@@ -457,6 +569,12 @@ def collection_export(
     # recognizes the new headers via HEADER_ALIASES (case + space
     # tolerant); old 6-column CSVs round-trip as before with the new
     # fields defaulted on re-import.
+    #
+    # v3.x — two MORE columns appended at the end: Scryfall ID (a stable join
+    # key for downstream tools; the importer already reads it via
+    # HEADER_ALIASES for high-precision matching) and Price (the finish-aware
+    # effective_price from PERSISTED Scryfall data — NO network call on the
+    # request path; "Price" is not an importer alias so re-import ignores it).
     writer.writerow(
         [
             "Name",
@@ -470,11 +588,16 @@ def collection_export(
             "Role",
             "Tags",
             "Is Proxy",
+            "Scryfall ID",
+            "Price",
         ]
     )
     for row in rows:
         card = row.card
         loc = row.storage_location
+        # effective_price reads only persisted price columns (price_usd*),
+        # so this is request-path-safe. "" when no price is cached yet.
+        price = effective_price(card, row.finish)
         writer.writerow(
             [
                 card.name or "",
@@ -488,6 +611,8 @@ def collection_export(
                 row.role or "",
                 row.tags or "",
                 "true" if row.is_proxy else "false",
+                card.scryfall_id or "",
+                f"{price:.2f}" if price else "",
             ]
         )
 
@@ -768,7 +893,10 @@ def collection_bulk_move(
     for row_id in placed_ids:
         try:
             move_inventory_row_to_location(
-                session, row_id=row_id, user_id=current_user.id, location_id=target_location_id
+                session,
+                row_id=row_id,
+                user_id=current_user.id,
+                location_id=target_location_id,
             )
             moved += 1
         except ValueError:
@@ -778,7 +906,12 @@ def collection_bulk_move(
     # explicit-destination import rule).
     return _collection_filter_redirect(
         filter_params,
-        {"bulk": "moved", "moved": moved, "pending": pending_excluded, "name": target.name},
+        {
+            "bulk": "moved",
+            "moved": moved,
+            "pending": pending_excluded,
+            "name": target.name,
+        },
     )
 
 
@@ -1136,7 +1269,10 @@ def bulk_move_location_cards(
     for row_id in row_ids:
         try:
             move_inventory_row_to_location(
-                session, row_id=row_id, user_id=current_user.id, location_id=target_location_id
+                session,
+                row_id=row_id,
+                user_id=current_user.id,
+                location_id=target_location_id,
             )
         except ValueError:
             pass
@@ -1295,7 +1431,12 @@ def location_detail_page(
             return RedirectResponse(f"/decks/{deck.id}", status_code=302)
 
     items, total_value, total_quantity = _build_location_items(
-        session, location_id, current_user.id, search=search, sort=sort, direction=direction
+        session,
+        location_id,
+        current_user.id,
+        search=search,
+        sort=sort,
+        direction=direction,
     )
 
     all_locations = list_locations(session, user_id=current_user.id)

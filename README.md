@@ -2,7 +2,7 @@
 
 Self-hosted web application for managing a physical Magic: The Gathering collection. (Identifies as **Cartarch** in user-facing UI as of v3.27.6; the in-repo project identifier is still `mana-archive` pending the full infrastructure rename near actual public launch.)
 
-**Current version: v3.36.11** · [Platform repo](https://github.com/jasonvandeventer/vanfreckle-platform)
+**Current version: v3.36.12** · [Platform repo](https://github.com/jasonvandeventer/vanfreckle-platform)
 
 ---
 
@@ -116,7 +116,7 @@ See [docs/screenshots/](docs/screenshots/) for capture guidelines and additional
 - Move cards between locations from the location detail page or deck detail page
 - **Bulk move**: select multiple cards from a location or deck and move them in one action; destination picker includes both storage locations and other decks; drawer-sorter users get a "Return to Sorter" option that bulk-returns rows to pending and triggers auto-placement
 - Return cards from decks to pending/collection
-- **CSV export**: download your full collection or any individual location as a CSV (Name, Set, Collector Number, Finish, Quantity, Location)
+- **CSV export**: download your collection or any individual location as a CSV. The collection export honors the active filter (search, facets, location, price range) so you get exactly the rows you're viewing — not always the whole collection — and includes a finish-aware Price column plus a Scryfall ID join key (columns: Name, Set, Collector Number, Finish, Quantity, Location, Location Type, Language, Role, Tags, Is Proxy, Scryfall ID, Price)
 
 ### Pricing & Card Data
 

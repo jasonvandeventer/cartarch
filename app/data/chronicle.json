@@ -1,5 +1,19 @@
 [
   {
+    "version": "3.36.12",
+    "date": "2026-06-08",
+    "added": [
+      "Your collection CSV export now includes two new columns: Price (the current value of each card, for its finish) and Scryfall ID. The price makes the export a ready-made worksheet — sort by value to build a “surplus bulk” pull list — and the Scryfall ID is a stable key for joining the file against other tools."
+    ],
+    "refined": [
+      "Exporting your collection now respects whatever you’ve filtered the page down to. Narrow the view to a single drawer, one color, or everything under a dollar, and the downloaded file contains exactly those cards. Sorting and searching already travelled with the page; now the export does too."
+    ],
+    "resolved": [
+      "The CSV export used to ignore your active filters and always download your entire collection, no matter how carefully you’d narrowed the page. It now exports the filtered view you actually see."
+    ],
+    "archivist_note": "The page and its export button had quietly grown apart — the page understood your filters, the export didn’t — so “export” still meant “export everything” even while the screen showed a careful slice. We gave the two a single, shared idea of what you’re looking at, so they can never disagree again, and slipped a price beside each card so a download can leave as a working list rather than a flat inventory."
+  },
+  {
     "version": "3.36.11",
     "date": "2026-06-08",
     "added": [
