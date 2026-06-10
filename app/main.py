@@ -22,6 +22,7 @@ from fastapi.responses import (
 )
 from fastapi.staticfiles import StaticFiles
 from prometheus_fastapi_instrumentator import Instrumentator
+from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from starlette.middleware.sessions import SessionMiddleware
@@ -163,6 +164,25 @@ def favicon() -> FileResponse:
     the bundled .ico from the new brand directory.
     """
     return FileResponse("app/static/brand/icon/favicon.ico")
+
+
+@app.get("/health", include_in_schema=False)
+def health(session: Session = Depends(get_db_session)):
+    """Unauthenticated readiness probe.
+
+    No ``get_current_user`` dependency — this app has no auth middleware (auth is
+    enforced per-route via that dependency), so omitting it leaves the route
+    public, exactly the way /favicon.ico above is public. Kept out of the OpenAPI
+    schema (``include_in_schema=False``).
+
+    Touches the DB (``SELECT 1`` via the session dependency) so this is a real
+    *readiness* signal, not just a liveness ping: if the session can't be
+    acquired or the query fails, the request raises and the probe is non-200.
+    Gives k8s a probe target and clears the cartarch-mcp probe 404 noise. The
+    platform-repo probe config pointing here is a separate follow-up.
+    """
+    session.execute(text("SELECT 1"))
+    return {"status": "ok"}
 
 
 # v3.28.2 — Chronicle content artifact. Loaded ONCE at module import.
