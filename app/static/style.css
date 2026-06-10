@@ -1838,6 +1838,8 @@ textarea {
 .pending-item.cross-drawer {
   border: 1px solid var(--accent-2);
   box-shadow: 0 0 0 1px rgba(255, 213, 122, 0.25);
+  border-radius: 10px;
+  padding: 0.85rem 1.1rem;
 }
 .pending-thumb-wrap {
   width: 96px;

@@ -1,5 +1,15 @@
 [
   {
+    "version": "3.36.14",
+    "date": "2026-06-10",
+    "added": [],
+    "refined": [
+      "Polished the Pending Placement page: the set code now shows the card's collector number beside it (e.g. \"SOA #58\"), and that label is a clickable link straight to the card's Scryfall page. The Confirm and Remove buttons no longer sit flush against the card's outline — each pending card now has comfortable padding so the controls breathe inside their border."
+    ],
+    "resolved": [],
+    "archivist_note": null
+  },
+  {
     "version": "3.36.13",
     "date": "2026-06-09",
     "added": [],

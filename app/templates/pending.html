@@ -115,7 +115,11 @@
                   <div>
                     <div class="pending-name">{{ item.card.name }}</div>
                     <div class="pending-meta">
-                      {{ item.card.set_name }} ({{ item.card.set_code|upper }}) · {{ item.finish|capitalize }}
+                      {{ item.card.set_name }}
+                      (<a href="https://scryfall.com/card/{{ item.card.set_code }}/{{ item.card.collector_number }}"
+                          target="_blank"
+                          rel="noreferrer">{{ item.card.set_code|upper }} #{{ item.card.collector_number }}</a>)
+                      · {{ item.finish|capitalize }}
                       {% if item.language and item.language != 'en' %}
                         · <span class="language-badge">{{ item.language|upper }}</span>
                       {% endif %}
@@ -196,7 +200,11 @@
                 <div>
                   <div class="pending-name">{{ item.card.name }}</div>
                   <div class="pending-meta">
-                    {{ item.card.set_name }} ({{ item.card.set_code|upper }}) · {{ item.finish|capitalize }}
+                    {{ item.card.set_name }}
+                    (<a href="https://scryfall.com/card/{{ item.card.set_code }}/{{ item.card.collector_number }}"
+                        target="_blank"
+                        rel="noreferrer">{{ item.card.set_code|upper }} #{{ item.card.collector_number }}</a>)
+                    · {{ item.finish|capitalize }}
                     {% if item.language and item.language != 'en' %}
                       · <span class="language-badge">{{ item.language|upper }}</span>
                     {% endif %}
