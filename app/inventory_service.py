@@ -16,6 +16,7 @@ from app.location_service import SORTABLE_SOURCE_MODES, get_location
 from app.models import Card, InventoryRow, ShowcaseItem, StorageLocation, TransactionLog
 from app.pricing import effective_price
 from app.scryfall import card_constructor_kwargs, fetch_card_by_scryfall_id
+from app.timeutil import utc_now
 
 PRICE_STALE_DAYS = 7
 VALUE_THRESHOLD = 5.0
@@ -379,7 +380,7 @@ def get_or_create_card(
             existing.mana_cost = payload.get("mana_cost")
             existing.cmc = payload.get("cmc")
             _apply_card_traits(existing, payload)
-            existing.updated_at = datetime.utcnow()
+            existing.updated_at = utc_now()
             session.flush()
         elif (
             not existing.image_url
@@ -406,7 +407,7 @@ def get_or_create_card(
                 existing.mana_cost = payload.get("mana_cost")
                 existing.cmc = payload.get("cmc")
                 _apply_card_traits(existing, payload)
-                existing.updated_at = datetime.utcnow()
+                existing.updated_at = utc_now()
                 session.flush()
         return existing
 
@@ -419,7 +420,7 @@ def get_or_create_card(
     # the 22nd seam key; the Card ORM has no produced_tokens column. Without
     # the strip, this Card() at switch-printing time 500s with TypeError.
     # See card_constructor_kwargs docstring in app.scryfall.
-    card = Card(**card_constructor_kwargs(payload), updated_at=datetime.utcnow())
+    card = Card(**card_constructor_kwargs(payload), updated_at=utc_now())
     session.add(card)
     session.flush()
     return card
@@ -469,7 +470,7 @@ def create_or_merge_inventory_row(
 
     if existing:
         existing.quantity += quantity
-        existing.updated_at = datetime.utcnow()
+        existing.updated_at = utc_now()
         if notes:
             existing.notes = notes
         session.flush()
@@ -484,8 +485,8 @@ def create_or_merge_inventory_row(
         slot=slot,
         is_pending=is_pending,
         notes=notes,
-        created_at=datetime.utcnow(),
-        updated_at=datetime.utcnow(),
+        created_at=utc_now(),
+        updated_at=utc_now(),
     )
     session.add(row)
     session.flush()
@@ -536,7 +537,7 @@ def add_card_to_location(
     if card is None:
         return None
 
-    now = datetime.utcnow()
+    now = utc_now()
     existing = (
         session.query(InventoryRow)
         .filter(
@@ -1477,7 +1478,7 @@ def list_inventory_rows(
 def is_price_stale(price_updated_at: datetime | None) -> bool:
     if price_updated_at is None:
         return True
-    return price_updated_at < datetime.utcnow() - timedelta(days=PRICE_STALE_DAYS)
+    return price_updated_at < utc_now() - timedelta(days=PRICE_STALE_DAYS)
 
 
 def get_inventory_row_stats(
@@ -2161,7 +2162,7 @@ def confirm_pending_row(
     # placed at its new home, so the FROM hints stop being useful.
     row.from_drawer = None
     row.from_slot = None
-    row.updated_at = datetime.utcnow()
+    row.updated_at = utc_now()
 
     if row.drawer:
         dest = f"drawer={row.drawer} slot={row.slot or '-'}"
@@ -2191,7 +2192,7 @@ def confirm_all_pending(session: Session, user_id: int) -> int:
         .all()
     )
     count = 0
-    now = datetime.utcnow()
+    now = utc_now()
 
     for row in rows:
         if not row.drawer or not row.slot:
@@ -2288,7 +2289,7 @@ def adjust_inventory_row_quantity(
         return None
 
     row.quantity -= quantity
-    row.updated_at = datetime.utcnow()
+    row.updated_at = utc_now()
 
     session.commit()
     return row
@@ -2402,7 +2403,7 @@ def undo_last_import(session: Session, user_id: int) -> bool:
     )
     if row:
         row.quantity -= abs(last_import.quantity_delta)
-        row.updated_at = datetime.utcnow()
+        row.updated_at = utc_now()
         if row.quantity <= 0:
             session.delete(row)
 
@@ -2447,7 +2448,7 @@ def undo_last_batch(session: Session, batch_id: int, user_id: int) -> int:
         )
         if row:
             row.quantity -= abs(log.quantity_delta)
-            row.updated_at = datetime.utcnow()
+            row.updated_at = utc_now()
             if row.quantity <= 0:
                 session.delete(row)
 
@@ -2548,7 +2549,7 @@ def resort_collection(
     for row in rows:
         grouped[row_target_drawer[row.id]].append(row)
 
-    now = datetime.utcnow()
+    now = utc_now()
     bulk_updates: list[dict] = []
     audit_logs: list[dict] = []
 

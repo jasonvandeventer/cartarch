@@ -12,7 +12,7 @@ import json
 import os
 import threading
 import time
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 from fastapi import Depends, FastAPI, File, Form, Request, UploadFile
 from fastapi.responses import (
@@ -103,6 +103,7 @@ from app.scryfall import (
     fetch_payloads_uncached,
     search_cards_by_name,
 )
+from app.timeutil import utc_now
 from app.watchlist_service import (
     add_to_watchlist,
     list_watchlist,
@@ -189,7 +190,7 @@ def _run_price_refresh_batch() -> None:
     """Refresh up to 75 of the oldest-priced cards that are owned by any user."""
     session = SessionLocal()
     try:
-        cutoff = datetime.utcnow() - timedelta(days=PRICE_STALE_DAYS)
+        cutoff = utc_now() - timedelta(days=PRICE_STALE_DAYS)
         stale = (
             session.query(Card)
             .join(InventoryRow, InventoryRow.card_id == Card.id)
@@ -222,7 +223,7 @@ def _run_price_refresh_batch() -> None:
                 f"{len(_bulk.not_found)} not_found, {len(_bulk.failed)} failed",
                 flush=True,
             )
-        now = datetime.utcnow()
+        now = utc_now()
         updated = 0
         for card in stale:
             fresh = fresh_by_id.get(card.scryfall_id)
@@ -303,7 +304,7 @@ def _run_trait_backfill_batch() -> int:
                 f"{len(_bulk.not_found)} not_found, {len(_bulk.failed)} failed",
                 flush=True,
             )
-        now = datetime.utcnow()
+        now = utc_now()
         for card in pending:
             fresh = fresh_by_id.get(card.scryfall_id)
             if fresh:
@@ -1478,7 +1479,7 @@ def _commit_deck_import_with_reconciliation(
             }
             rows_to_place: list[int] = []
             merged_row_ids: set[int] = set()
-            now_ts = datetime.utcnow()
+            now_ts = utc_now()
             for new_row in new_pending_rows:
                 key = (new_row.card_id, new_row.finish)
                 existing = existing_by_key.get(key)
@@ -2647,7 +2648,7 @@ def forgot_password_submit(
             queue_reset_email(
                 email=email_clean,
                 reset_url=reset_url,
-                expires_at=datetime.utcnow() + timedelta(minutes=30),
+                expires_at=utc_now() + timedelta(minutes=30),
             )
 
     return neutral_response

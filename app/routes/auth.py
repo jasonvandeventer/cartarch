@@ -1,5 +1,3 @@
-from datetime import datetime
-
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
@@ -11,6 +9,7 @@ from app.dependencies import (
     render,
     require_csrf_or_reissue,
 )
+from app.timeutil import utc_now
 
 router = APIRouter()
 
@@ -46,7 +45,7 @@ def login(
     # aggregate proxy). Naive UTC to match the project-wide datetime
     # convention; format_local_datetime in dependencies.py converts at
     # render time.
-    user.last_signed_in_at = datetime.utcnow()
+    user.last_signed_in_at = utc_now()
     db.commit()
 
     request.session["user_id"] = user.id

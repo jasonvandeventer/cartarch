@@ -8,12 +8,11 @@ inventory_rows.
 
 from __future__ import annotations
 
-from datetime import datetime
-
 from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
 from app.models import DeckTokenRequirement, TokenInventory
+from app.timeutil import utc_now
 
 
 def resolve_token_inventory_id_by_name(
@@ -192,7 +191,7 @@ def update_token(
         token.back_set_code,
         token.back_collector_number,
     )
-    token.updated_at = datetime.utcnow()
+    token.updated_at = utc_now()
     session.commit()
     return token
 

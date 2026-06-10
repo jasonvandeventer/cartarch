@@ -22,6 +22,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
+from app.timeutil import utc_now
 
 
 class User(Base):
@@ -38,7 +39,7 @@ class User(Base):
     deck_view_mode: Mapped[str] = mapped_column(String(16), default="grid", nullable=False)
     deck_group_by: Mapped[str] = mapped_column(String(16), default="type", nullable=False)
 
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
     # v3.27.4 — replaces the misleading "last activity" proxy on the Admin
     # page (which was `func.max(TransactionLog.created_at)`, i.e. last
     # inventory event — users who only play games / edit decks / log in
@@ -112,7 +113,7 @@ class Card(Base):
     # loyalty/defense auto-init (Step 4). Part of the scryfall_cards seam.
     loyalty: Mapped[str | None] = mapped_column(String(16), nullable=True)
     defense: Mapped[str | None] = mapped_column(String(16), nullable=True)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
 
     inventory_rows: Mapped[list[InventoryRow]] = relationship(back_populates="card")
     transaction_logs: Mapped[list[TransactionLog]] = relationship(back_populates="card")
@@ -132,7 +133,7 @@ class StorageLocation(Base):
     mode: Mapped[str] = mapped_column(String(16), default="managed", nullable=False, index=True)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
     capacity: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
 
     user: Mapped[User] = relationship(back_populates="storage_locations")
     parent: Mapped[StorageLocation | None] = relationship(
@@ -164,8 +165,8 @@ class InventoryRow(Base):
     from_drawer: Mapped[str | None] = mapped_column(String(32), nullable=True)
     from_slot: Mapped[str | None] = mapped_column(String(32), nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
 
     user: Mapped[User] = relationship(back_populates="inventory_rows")
     card: Mapped[Card] = relationship(back_populates="inventory_rows")
@@ -190,7 +191,7 @@ class Deck(Base):
     intent_winning: Mapped[str | None] = mapped_column(String(16), nullable=True)
     intent_played: Mapped[str | None] = mapped_column(String(16), nullable=True)
     blurb: Mapped[str | None] = mapped_column(Text, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
     # v3.33.0 — optional link into a "variant group": a family of builds of the
     # same deck (e.g. Atraxa v1 / v2) that SHARE one physical copy of many cards.
     # Accounting-only overlay — one physical card still lives in exactly ONE
@@ -216,7 +217,7 @@ class VariantGroup(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
     name: Mapped[str] = mapped_column(String(128), index=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
 
     user: Mapped[User] = relationship()
     decks: Mapped[list[Deck]] = relationship(back_populates="variant_group")
@@ -228,7 +229,7 @@ class ImportBatch(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
     filename: Mapped[str] = mapped_column(String(255))
-    imported_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    imported_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
     row_count: Mapped[int] = mapped_column(Integer, default=0)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
 
@@ -251,7 +252,7 @@ class TransactionLog(Base):
         ForeignKey("import_batches.id"), nullable=True, index=True
     )
     inventory_row_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, index=True)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     user: Mapped[User] = relationship(back_populates="transaction_logs")
@@ -264,7 +265,7 @@ class Game(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
-    played_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    played_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
     # v3.27.2 — service-layer enum (CANONICAL_GAME_FORMATS in game_service.py).
     # Column stays nullable=True at the DB level because SQLite can't alter
     # NULL→NOT NULL on an existing column without a table rebuild (reserved
@@ -292,7 +293,7 @@ class Game(Base):
     # falls back to the bare ``mana-game-${gameId}`` key.
     client_token: Mapped[str | None] = mapped_column(String(32), nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
     # v3.33.2 — wall-clock end timestamp, stamped once by end_game when the
     # game is finalized. NULL = never finalized OR a legacy game predating this
     # column (the game-summary view shows "—" for elapsed in that case; no
@@ -396,8 +397,8 @@ class TokenInventory(Base):
         ForeignKey("storage_locations.id"), nullable=True, index=True
     )
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
 
     storage_location: Mapped[StorageLocation | None] = relationship()
 
@@ -419,7 +420,7 @@ class DeckTokenRequirement(Base):
     token_name: Mapped[str] = mapped_column(String(255), nullable=False)
     quantity_needed: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
 
     token_inventory: Mapped[TokenInventory | None] = relationship()
 
@@ -460,7 +461,7 @@ class WatchlistItem(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
     card_id: Mapped[int | None] = mapped_column(ForeignKey("cards.id"), nullable=True)
     card_name: Mapped[str | None] = mapped_column(Text, nullable=True)
-    added_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    added_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
     # v3.28.11 — optional buy-target. When the watched card's current
     # price drops to or below target_price, the watchlist row gets a
@@ -516,7 +517,7 @@ class PasswordResetToken(Base):
     token_hash: Mapped[str] = mapped_column(Text, nullable=False)
     expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     used_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)
 
     user: Mapped[User] = relationship(back_populates="password_reset_tokens")
 
@@ -558,7 +559,7 @@ class Playgroup(Base):
     created_by: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     join_code: Mapped[str | None] = mapped_column(String(32), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)
 
     members: Mapped[list[PlaygroupMember]] = relationship(
         back_populates="playgroup", cascade="all, delete-orphan"
@@ -597,7 +598,7 @@ class Showcase(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
     name: Mapped[str] = mapped_column(String(128), nullable=False, default="My Showcase")
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)
 
     items: Mapped[list[ShowcaseItem]] = relationship(
         back_populates="showcase", cascade="all, delete-orphan"
@@ -650,7 +651,7 @@ class ShowcaseItem(Base):
     )
     quantity_offered: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
-    added_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    added_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)
 
     showcase: Mapped[Showcase] = relationship(back_populates="items")
     inventory_row: Mapped[InventoryRow | None] = relationship()
@@ -695,7 +696,7 @@ class Share(Base):
     playgroup_id: Mapped[int] = mapped_column(
         ForeignKey("playgroups.id"), nullable=False, index=True
     )
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)
 
     user: Mapped[User] = relationship()
     showcase: Mapped[Showcase] = relationship()
@@ -735,7 +736,7 @@ class PlaygroupMember(Base):
     )
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
     role: Mapped[str] = mapped_column(String(16), default="member", nullable=False)
-    joined_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    joined_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)
 
     playgroup: Mapped[Playgroup] = relationship(back_populates="members")
     user: Mapped[User] = relationship(foreign_keys=[user_id], overlaps="playgroup_memberships")
@@ -811,8 +812,8 @@ class Trade(Base):
     # deletion of either party.
     proposer_name_at_trade: Mapped[str | None] = mapped_column(Text, nullable=True)
     recipient_name_at_trade: Mapped[str | None] = mapped_column(Text, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)
     # NULL while the trade is still ``proposed``; written on every terminal
     # transition. The single source of truth for "when did this close?".
     closed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

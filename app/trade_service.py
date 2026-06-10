@@ -73,8 +73,6 @@ project convention.
 
 from __future__ import annotations
 
-from datetime import datetime
-
 from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session, joinedload
 
@@ -92,6 +90,7 @@ from app.models import (
 )
 from app.pricing import effective_price
 from app.share_service import _ReadOnlyCardProjection
+from app.timeutil import utc_now
 
 # ── Canonical enums ─────────────────────────────────────────────
 
@@ -367,7 +366,7 @@ def create_trade(
             )
         )
 
-    now = datetime.utcnow()
+    now = utc_now()
     note = (proposer_note or "").strip() or None
     trade = Trade(
         proposer_user_id=proposer_user_id,
@@ -406,7 +405,7 @@ def transition_trade(
       - any terminal → anything: rejected (already closed)
 
     On any terminal transition: writes the *_at_trade snapshots,
-    sets ``closed_at = utcnow()``, sets ``updated_at``. All in one
+    sets ``closed_at = utc_now()``, sets ``updated_at``. All in one
     transaction. ``recipient_note`` is captured on accept/decline
     transitions (a short note the recipient sends back; optional).
 
@@ -452,7 +451,7 @@ def transition_trade(
         rn = recipient_note.strip()
         trade.recipient_note = rn or None
 
-    now = datetime.utcnow()
+    now = utc_now()
     trade.status = new_status
     trade.closed_at = now
     trade.updated_at = now
@@ -1006,7 +1005,7 @@ def _abandon_query(session: Session, q) -> int:
         joinedload(Trade.proposer),
         joinedload(Trade.recipient),
     ).all()
-    now = datetime.utcnow()
+    now = utc_now()
     for trade in pending_trades:
         trade.status = "abandoned"
         trade.closed_at = now

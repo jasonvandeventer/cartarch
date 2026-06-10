@@ -158,7 +158,7 @@ def get_location_summary(session: Session, user_id: int) -> list[dict]:
     # per location, no per-location query. Faithful "last activity at this
     # location" because every inventory mutation (placement, move, quantity
     # adjustment) writes InventoryRow.updated_at via 15+ explicit
-    # `updated_at = datetime.utcnow()` sites in inventory_service.py /
+    # `updated_at = utc_now()` sites in inventory_service.py /
     # import_service.py / main.py — verified pre-implementation.
     last_touched_map: dict[int, object] = dict(
         session.query(

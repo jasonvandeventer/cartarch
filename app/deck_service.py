@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import re
-from datetime import datetime
 
 from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
@@ -10,6 +9,7 @@ from sqlalchemy.orm import Session, joinedload
 from app.audit_service import log_transaction
 from app.models import Card, Deck, Game, GameSeat, InventoryRow, StorageLocation, VariantGroup
 from app.scryfall import _cache_get_by_ids, extract_token_stubs, fetch_deck_tokens
+from app.timeutil import utc_now
 
 # Library search for lands. Anchored to "your library" so opponent-search effects
 # (Demolition Field, Ghost Quarter, Strip Mine giving the opponent a basic) do NOT
@@ -2664,7 +2664,7 @@ def switch_deck_row_printing(
 
     row.card_id = new_card.id
     row.finish = finish_clean
-    row.updated_at = datetime.utcnow()
+    row.updated_at = utc_now()
     session.commit()
     return True
 
@@ -2714,7 +2714,7 @@ def bump_deck_row_quantity(
         return {"row_id": row_id, "quantity": 0, "deleted": True}
 
     row.quantity = new_qty
-    row.updated_at = datetime.utcnow()
+    row.updated_at = utc_now()
     session.commit()
     return {"row_id": row_id, "quantity": new_qty, "deleted": False}
 
@@ -2767,7 +2767,7 @@ def pull_card_to_deck(
         # per-deck role context. Source tags (if any) reflect a different
         # location's context and shouldn't pollute it.
         existing_deck_row.quantity += quantity
-        existing_deck_row.updated_at = datetime.utcnow()
+        existing_deck_row.updated_at = utc_now()
     else:
         # No deck row yet — inherit the source row's tags so role context
         # carries into the deck (closes the v3.16.13/14-era tag-loss bug
@@ -2784,14 +2784,14 @@ def pull_card_to_deck(
             slot=None,
             is_pending=False,
             tags=row.tags,
-            created_at=datetime.utcnow(),
-            updated_at=datetime.utcnow(),
+            created_at=utc_now(),
+            updated_at=utc_now(),
         )
         session.add(existing_deck_row)
         session.flush()
 
     row.quantity -= quantity
-    row.updated_at = datetime.utcnow()
+    row.updated_at = utc_now()
 
     if row.quantity <= 0:
         session.delete(row)
@@ -2870,7 +2870,7 @@ def return_card_from_deck(
         existing_row.quantity += deck_row.quantity
         existing_row.storage_location_id = None
         existing_row.is_pending = True
-        existing_row.updated_at = datetime.utcnow()
+        existing_row.updated_at = utc_now()
     else:
         existing_row = InventoryRow(
             user_id=user_id,
@@ -2881,8 +2881,8 @@ def return_card_from_deck(
             slot=normalized_slot,
             storage_location_id=None,
             is_pending=True,
-            created_at=datetime.utcnow(),
-            updated_at=datetime.utcnow(),
+            created_at=utc_now(),
+            updated_at=utc_now(),
         )
         session.add(existing_row)
         session.flush()

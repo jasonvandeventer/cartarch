@@ -64,6 +64,7 @@ from app.models import (
     TransactionLog,
     WatchlistItem,
 )
+from app.timeutil import utc_now
 
 
 def _placed_value_expr() -> object:
@@ -155,9 +156,9 @@ def get_dashboard_data(session: Session, user_id: int, now: datetime | None = No
       ``collection_stats`` — six summary stats (totals + sets + largest + avg + watchlist)
 
     Live aggregation; no cache. ``now`` is a hook for tests; defaults to
-    ``datetime.utcnow()``.
+    ``utc_now()``.
     """
-    now = now or datetime.utcnow()
+    now = now or utc_now()
 
     # ── HEADLINE AGGREGATES (reused across multiple panels) ──────────────────
     placed_cards = (

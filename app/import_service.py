@@ -13,7 +13,6 @@ import csv
 import io
 import re
 import time
-from datetime import datetime
 from typing import Any
 
 from sqlalchemy import func
@@ -31,6 +30,7 @@ from app.scryfall import (
     card_constructor_kwargs,
     fetch_card_by_set_and_number,
 )
+from app.timeutil import utc_now
 
 # Matches the trailing (SET) or [SET] and optional collector number on a list line.
 # SET must be 2–6 alphanumeric chars to distinguish from long parenthetical phrases.
@@ -546,7 +546,7 @@ def persist_import_rows(
         filename=filename,
         row_count=len(rows),
     )
-    now = datetime.utcnow()
+    now = utc_now()
 
     # Batch-resolve any rows that are missing a scryfall_id (safety net — preview should
     # have populated these, but handle gracefully if the commit path is called directly)

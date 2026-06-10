@@ -14,7 +14,6 @@ from __future__ import annotations
 import hashlib
 import json
 import time
-from datetime import datetime
 from urllib.parse import urlencode
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
@@ -80,6 +79,7 @@ from app.location_service import list_locations
 from app.models import Card, Deck, InventoryRow, User
 from app.pricing import effective_price
 from app.scryfall import autocomplete_cards_for_add, fetch_card_printings
+from app.timeutil import utc_now
 from app.token_service import deck_token_status, list_tokens
 
 router = APIRouter()
@@ -1434,7 +1434,7 @@ async def update_row_tags(
     )
     if row:
         set_row_tags(row, [t for t in tags if t in CARD_ROLE_TAGS])
-        row.updated_at = datetime.utcnow()
+        row.updated_at = utc_now()
         session.commit()
     return RedirectResponse(url=f"/decks/{deck_id}", status_code=303)
 
@@ -1512,7 +1512,7 @@ async def review_tag_action(
             set_row_tags(row, promoted)
 
     if changed:
-        row.updated_at = datetime.utcnow()
+        row.updated_at = utc_now()
         session.commit()
 
     # HTMX response: re-render the panel content from fresh deck state.

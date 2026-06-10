@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from datetime import datetime
 from typing import Any
 
 from sqlalchemy import and_, or_, select
@@ -17,6 +16,7 @@ from app.models import (
     PlaygroupMember,
     User,
 )
+from app.timeutil import utc_now
 
 # v3.27.2 — Game.format canonical taxonomy. Service-layer enforcement
 # (matches the existing VALID_LOCATION_TYPES / VALID_LOCATION_MODES pattern
@@ -211,7 +211,7 @@ def create_game(
     snapshotted at creation via :func:`_capture_deck_identity` (v3.27.0b-1)
     so subsequent deck edits / deletes don't retroactively rewrite history.
     """
-    now = datetime.utcnow()
+    now = utc_now()
     game = Game(
         user_id=user_id,
         played_at=now,
@@ -437,7 +437,7 @@ def end_game(
     # elapsed playtime (ended_at − played_at). Guarded so a later results edit
     # wouldn't inflate the duration by re-stamping to "now".
     if game.ended_at is None:
-        game.ended_at = datetime.utcnow()
+        game.ended_at = utc_now()
     session.commit()
     return True
 

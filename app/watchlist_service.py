@@ -29,12 +29,11 @@ dashboard tiles already use). No request-path network calls.
 
 from __future__ import annotations
 
-from datetime import datetime
-
 from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
 from app.models import Card, InventoryRow, WatchlistItem
+from app.timeutil import utc_now
 
 
 def _min_finish_price(card: Card | None) -> float | None:
@@ -262,7 +261,7 @@ def add_to_watchlist(
         card_id=card_id,
         card_name=name,
         note=(note.strip() if note and note.strip() else None),
-        added_at=datetime.utcnow(),
+        added_at=utc_now(),
     )
     session.add(item)
     session.flush()

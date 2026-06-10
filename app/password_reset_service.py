@@ -68,6 +68,7 @@ import requests
 from sqlalchemy.orm import Session
 
 from app.models import PasswordResetToken, User
+from app.timeutil import utc_now
 
 # Token lifetime + email retry config — change here if the policy changes.
 TOKEN_LIFETIME = timedelta(minutes=30)
@@ -159,7 +160,7 @@ def create_reset_token(session: Session, user: User) -> str:
     """
     _invalidate_existing_tokens(session, user.id)
     raw_token = secrets.token_urlsafe(32)
-    now = datetime.utcnow()
+    now = utc_now()
     row = PasswordResetToken(
         user_id=user.id,
         token_hash=_hash_token(raw_token),
@@ -191,7 +192,7 @@ def find_valid_token(session: Session, raw_token: str) -> PasswordResetToken | N
         return None
     if row.used_at is not None:
         return None
-    if row.expires_at <= datetime.utcnow():
+    if row.expires_at <= utc_now():
         return None
     return row
 
@@ -206,7 +207,7 @@ def consume_token(session: Session, token_row: PasswordResetToken) -> None:
     attacker who somehow has a second outstanding token can't use it
     after the first one resets the password).
     """
-    token_row.used_at = datetime.utcnow()
+    token_row.used_at = utc_now()
     session.query(PasswordResetToken).filter(
         PasswordResetToken.user_id == token_row.user_id,
         PasswordResetToken.id != token_row.id,
@@ -295,7 +296,7 @@ def _send_reset_email(email: str, reset_url: str, expires_at: datetime) -> None:
             return
         # Success — log lightly so we have an audit trail.
         print(
-            f"[password-reset] sent to {email} at {datetime.utcnow().isoformat()}",
+            f"[password-reset] sent to {email} at {utc_now().isoformat()}",
             flush=True,
         )
     except requests.RequestException as exc:

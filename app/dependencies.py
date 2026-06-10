@@ -112,7 +112,7 @@ templates.env.globals["static_v"] = static_v
 
 
 # v3.27.4 — local-time display filter for naive-UTC ``datetime`` values.
-# The project's convention is ``datetime.utcnow()`` for all stored timestamps
+# The project's convention is ``utc_now()`` for all stored timestamps
 # (naive UTC); template-side ``strftime`` therefore renders UTC dates labeled
 # as if local, which displays evening activity as the following day from a
 # Central Time perspective. This filter attaches UTC, converts to

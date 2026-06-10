@@ -9,7 +9,6 @@ from __future__ import annotations
 import json
 import time
 from dataclasses import dataclass, field
-from datetime import datetime
 from functools import lru_cache
 from typing import Any
 
@@ -22,6 +21,7 @@ from urllib3.util.retry import Retry
 
 from app.db import engine, shutdown_event
 from app.models import Card
+from app.timeutil import utc_now
 
 SCRYFALL_CARD_URL = "https://api.scryfall.com/cards"
 HEADERS = {"User-Agent": "ManaArchive/1.0", "Accept": "application/json"}
@@ -957,7 +957,7 @@ def refresh_card_from_scryfall(session: Session, card_id: int) -> bool:
     card.frame_effects = fresh["frame_effects"]
     card.set_type = fresh["set_type"]
     card.layout = fresh["layout"]
-    card.updated_at = datetime.utcnow()
+    card.updated_at = utc_now()
     return True
 
 
