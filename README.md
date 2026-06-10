@@ -99,7 +99,7 @@ See [docs/screenshots/](docs/screenshots/) for capture guidelines and additional
 - **Role tag system** with 10 tags (Ramp, Draw, Tutor, Removal, Wipe, Protection, Engine, Synergy, Threat, Hate); auto-detected from oracle text and commander themes with per-tag source + confidence tracking (auto/medium vs user/high vs auto/certain); **Retag** button re-runs detection over already-tagged rows additively; **Review tags** panel on deck detail surfaces auto/medium suggestions for one-click confirm or remove
 - Click any health metric count to filter the deck grid to just those cards
 
-> _Brackets and combo display were removed from deck surfaces in v3.27.9 pending the Deck Analytics Rebuild. The underlying `bracket_v2_service` module, Commander Spellbook integration, and `compute_deck_combos` / `compute_deck_bracket` functions are preserved as dormant code for the rebuild to reuse. See `roadmap.md` Deferred / latent items "Deck Analytics Rebuild" for the path back._
+> _Brackets and combo display were removed from deck surfaces in v3.27.9 pending the Deck Analytics Rebuild. The underlying `bracket_v2_service` module (the sole bracket estimator), Commander Spellbook integration, and the `compute_deck_combos` function are preserved as dormant code for the rebuild to reuse. (The superseded V1 `compute_deck_bracket` estimator was deleted in the 2026-06-09 pre-v4 cleanup.) See `roadmap.md` Deferred / latent items "Deck Analytics Rebuild" for the path back._
 
 ### Watchlist
 

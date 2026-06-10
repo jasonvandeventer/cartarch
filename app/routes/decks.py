@@ -778,8 +778,9 @@ def deck_panels_fragment(
     # membership" classification path, keeps tribal / payoff / engine paths).
     # tokens / synergy / dead_cards are all local computations against the
     # bulk Scryfall cache and stay on the request path. compute_deck_combos
-    # / compute_deck_bracket / bracket_v2_service are dormant code — left
-    # importable for the analytics rebuild to reuse.
+    # / bracket_v2_service are dormant code — left importable for the
+    # analytics rebuild to reuse. (The V1 compute_deck_bracket estimator was
+    # deleted in the pre-v4 cleanup sprint, 2026-06-09.)
     bracket = None
     synergy = None
     combos: dict = {"included": [], "almost": []}
