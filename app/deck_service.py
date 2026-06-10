@@ -4,7 +4,7 @@ import json
 import re
 from datetime import datetime
 
-from sqlalchemy import func, tuple_
+from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
 from app.audit_service import log_transaction
@@ -2370,36 +2370,16 @@ def find_inventory_matches_for_deck_import(
     if not parsed_rows:
         return []
 
-    # Resolve scryfall_ids → card_ids in one query. Skip rows with no
-    # scryfall_id (the import preview shouldn't pass these through but the
-    # function is defensive).
-    scryfall_ids = sorted({r.get("scryfall_id") for r in parsed_rows if r.get("scryfall_id")})
-    card_by_sid: dict[str, int] = {}
-    if scryfall_ids:
-        for card_row in (
-            session.query(Card.id, Card.scryfall_id)
-            .filter(Card.scryfall_id.in_(scryfall_ids))
-            .all()
-        ):
-            card_by_sid[card_row.scryfall_id] = card_row.id
+    # Shared scaffold (with find_inventory_matches_for_collection_import):
+    # resolve sid→card_id, build the (card_id, finish) keys, and run the
+    # tuple-IN outerjoin fetch (pending rows come through with loc=None).
+    # Local import to avoid the deck_service↔inventory_service cycle (same
+    # precedent as get_or_create_card below).
+    from app.inventory_service import resolve_import_inventory_matches
 
-    # Build the set of (card_id, finish) tuples we need to look up.
-    lookup_keys: set[tuple[int, str]] = set()
-    for r in parsed_rows:
-        sid = r.get("scryfall_id")
-        if not sid:
-            continue
-        card_id = card_by_sid.get(sid)
-        if card_id is None:
-            continue
-        finish = (r.get("finish") or "normal").strip().lower()
-        lookup_keys.add((card_id, finish))
+    card_by_sid, lookup_keys, rows = resolve_import_inventory_matches(session, user_id, parsed_rows)
 
-    # One tuple-IN query for all matching inventory rows + their storage
-    # locations. Outerjoin so pending rows (storage_location_id IS NULL)
-    # come through with loc=None.
-    #
-    # Rows are bucketed into three lists per (card_id, finish):
+    # Bucket the fetched rows into three lists per (card_id, finish):
     #   matches             — non-deck rows. Eligible to MOVE into the target
     #                         deck (this is the existing "movable inventory"
     #                         list that drives recommended_action).
@@ -2417,49 +2397,34 @@ def find_inventory_matches_for_deck_import(
     # v3.33.0 — per-key quantity held by sibling variant decks (subset of
     # other_deck_by_key). Always all-zero for a deck with no variant group.
     variant_covered_by_key: dict[tuple[int, str], int] = {}
-    if lookup_keys:
-        rows = (
-            session.query(InventoryRow, StorageLocation)
-            .outerjoin(
-                StorageLocation,
-                InventoryRow.storage_location_id == StorageLocation.id,
-            )
-            .filter(
-                InventoryRow.user_id == user_id,
-                tuple_(InventoryRow.card_id, InventoryRow.finish).in_(list(lookup_keys)),
-            )
-            .all()
-        )
-        for row, loc in rows:
-            if loc is None:
-                location_name = "Pending"
-                location_type = "pending"
+    for row, loc in rows:
+        if loc is None:
+            location_name = "Pending"
+            location_type = "pending"
+        else:
+            location_name = loc.name
+            location_type = loc.type
+        entry = {
+            "inventory_row_id": row.id,
+            "location_name": location_name,
+            "location_type": location_type,
+            "quantity_available": row.quantity,
+            "tags": get_row_tags(row),
+        }
+        key = (row.card_id, row.finish)
+        if loc is not None and loc.type == "deck":
+            if row.storage_location_id == target_storage_location_id:
+                target_deck_by_key[key].append(entry)
             else:
-                location_name = loc.name
-                location_type = loc.type
-            entry = {
-                "inventory_row_id": row.id,
-                "location_name": location_name,
-                "location_type": location_type,
-                "quantity_available": row.quantity,
-                "tags": get_row_tags(row),
-            }
-            key = (row.card_id, row.finish)
-            if loc is not None and loc.type == "deck":
-                if row.storage_location_id == target_storage_location_id:
-                    target_deck_by_key[key].append(entry)
-                else:
-                    # v3.33.0 — flag + tally copies held by a sibling variant
-                    # deck so the recommendation can treat them as "covered".
-                    is_sibling = row.storage_location_id in sibling_location_ids
-                    entry["is_variant_sibling"] = is_sibling
-                    if is_sibling:
-                        variant_covered_by_key[key] = (
-                            variant_covered_by_key.get(key, 0) + row.quantity
-                        )
-                    other_deck_by_key[key].append(entry)
-            else:
-                matches_by_key[key].append(entry)
+                # v3.33.0 — flag + tally copies held by a sibling variant
+                # deck so the recommendation can treat them as "covered".
+                is_sibling = row.storage_location_id in sibling_location_ids
+                entry["is_variant_sibling"] = is_sibling
+                if is_sibling:
+                    variant_covered_by_key[key] = variant_covered_by_key.get(key, 0) + row.quantity
+                other_deck_by_key[key].append(entry)
+        else:
+            matches_by_key[key].append(entry)
 
     # Sort each per-key match list by tier then row id.
     for match_list in matches_by_key.values():

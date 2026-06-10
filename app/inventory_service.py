@@ -1810,6 +1810,69 @@ _COLLECTION_TIER_PRIORITY: dict[str, int] = {
 }
 
 
+def resolve_import_inventory_matches(
+    session: Session,
+    user_id: int,
+    parsed_rows: list[dict],
+) -> tuple[dict[str, int], set[tuple[int, str]], list[tuple]]:
+    """Shared read-only scaffold for the two import-reconciliation lookups
+    (``find_inventory_matches_for_collection_import`` here, and
+    ``find_inventory_matches_for_deck_import`` in ``deck_service``).
+
+    Performs the three steps both functions share, then hands the raw results
+    back so each caller does its own (divergent) bucketing + recommendation:
+
+      1. Resolve ``scryfall_id`` → ``card_id`` for all parsed rows in ONE query.
+      2. Build the set of ``(card_id, finish)`` lookup keys (skipping rows with
+         no scryfall_id / no catalog match; ``finish`` defaults to ``"normal"``,
+         lower-cased + stripped).
+      3. Run ONE ``tuple_(card_id, finish).in_(...)`` query for all matching
+         InventoryRows, ``outerjoin``-ed to StorageLocation so pending rows
+         (``storage_location_id IS NULL``) come through with ``loc=None``.
+
+    Returns ``(card_by_sid, lookup_keys, rows)`` where ``rows`` is the list of
+    ``(InventoryRow, StorageLocation | None)`` tuples. No DB writes, no N+1 —
+    at most two queries regardless of row count.
+    """
+    scryfall_ids = sorted({r.get("scryfall_id") for r in parsed_rows if r.get("scryfall_id")})
+    card_by_sid: dict[str, int] = {}
+    if scryfall_ids:
+        for card_row in (
+            session.query(Card.id, Card.scryfall_id)
+            .filter(Card.scryfall_id.in_(scryfall_ids))
+            .all()
+        ):
+            card_by_sid[card_row.scryfall_id] = card_row.id
+
+    lookup_keys: set[tuple[int, str]] = set()
+    for r in parsed_rows:
+        sid = r.get("scryfall_id")
+        if not sid:
+            continue
+        card_id = card_by_sid.get(sid)
+        if card_id is None:
+            continue
+        finish = (r.get("finish") or "normal").strip().lower()
+        lookup_keys.add((card_id, finish))
+
+    rows: list[tuple] = []
+    if lookup_keys:
+        rows = (
+            session.query(InventoryRow, StorageLocation)
+            .outerjoin(
+                StorageLocation,
+                InventoryRow.storage_location_id == StorageLocation.id,
+            )
+            .filter(
+                InventoryRow.user_id == user_id,
+                tuple_(InventoryRow.card_id, InventoryRow.finish).in_(list(lookup_keys)),
+            )
+            .all()
+        )
+
+    return card_by_sid, lookup_keys, rows
+
+
 def find_inventory_matches_for_collection_import(
     session: Session,
     user_id: int,
@@ -1937,60 +2000,27 @@ def find_inventory_matches_for_collection_import(
     if not parsed_rows:
         return []
 
-    # Resolve scryfall_ids → card_ids in one query.
-    scryfall_ids = sorted({r.get("scryfall_id") for r in parsed_rows if r.get("scryfall_id")})
-    card_by_sid: dict[str, int] = {}
-    if scryfall_ids:
-        for card_row in (
-            session.query(Card.id, Card.scryfall_id)
-            .filter(Card.scryfall_id.in_(scryfall_ids))
-            .all()
-        ):
-            card_by_sid[card_row.scryfall_id] = card_row.id
+    # Shared scaffold: resolve sid→card_id, build (card_id, finish) keys, and
+    # run the tuple-IN outerjoin fetch (pending rows come through with loc=None).
+    card_by_sid, lookup_keys, rows = resolve_import_inventory_matches(session, user_id, parsed_rows)
 
-    # Build the set of (card_id, finish) tuples to look up.
-    lookup_keys: set[tuple[int, str]] = set()
-    for r in parsed_rows:
-        sid = r.get("scryfall_id")
-        if not sid:
-            continue
-        card_id = card_by_sid.get(sid)
-        if card_id is None:
-            continue
-        finish = (r.get("finish") or "normal").strip().lower()
-        lookup_keys.add((card_id, finish))
-
-    # One tuple-IN query for all matching inventory rows. Outerjoin so
-    # pending rows (storage_location_id IS NULL) come through with loc=None.
+    # Bucket each matching row into its (card_id, finish) breakdown.
     breakdown_by_key: dict[tuple[int, str], list[dict]] = {key: [] for key in lookup_keys}
-    if lookup_keys:
-        rows = (
-            session.query(InventoryRow, StorageLocation)
-            .outerjoin(
-                StorageLocation,
-                InventoryRow.storage_location_id == StorageLocation.id,
-            )
-            .filter(
-                InventoryRow.user_id == user_id,
-                tuple_(InventoryRow.card_id, InventoryRow.finish).in_(list(lookup_keys)),
-            )
-            .all()
+    for row, loc in rows:
+        if loc is None:
+            location_name = "Pending"
+            location_type = "pending"
+        else:
+            location_name = loc.name
+            location_type = loc.type
+        breakdown_by_key[(row.card_id, row.finish)].append(
+            {
+                "location_name": location_name,
+                "location_type": location_type,
+                "quantity": row.quantity,
+                "_inventory_row_id": row.id,  # for sort, stripped before return
+            }
         )
-        for row, loc in rows:
-            if loc is None:
-                location_name = "Pending"
-                location_type = "pending"
-            else:
-                location_name = loc.name
-                location_type = loc.type
-            breakdown_by_key[(row.card_id, row.finish)].append(
-                {
-                    "location_name": location_name,
-                    "location_type": location_type,
-                    "quantity": row.quantity,
-                    "_inventory_row_id": row.id,  # for sort, stripped before return
-                }
-            )
 
     # Sort each per-key breakdown by tier then row id, then drop the sort key.
     for entries in breakdown_by_key.values():
