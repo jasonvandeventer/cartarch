@@ -251,6 +251,51 @@ _DECK_TOKEN_CACHE_VERSION = 2
 _deck_token_cache: dict[tuple, list[dict[str, str]]] = {}
 
 
+def extract_token_stubs(payloads: dict) -> list[dict[str, str]]:
+    """Parse the ``produced_tokens`` JSON of a set of card payloads into
+    deduped token stubs ``{id, name, type_line}``.
+
+    ``payloads`` is the dict returned by ``_cache_get_by_ids`` (id → payload);
+    only ``.values()`` are read. Per-payload, ``produced_tokens`` is the v3.30.11
+    daemon-written JSON list of ``{name, type_line, scryfall_id}`` dicts. NULL
+    (not-yet-backfilled) and ``"[]"`` (confirmed no tokens) both contribute
+    nothing; malformed JSON / non-list / non-dict entries are skipped. Stubs are
+    deduplicated by token id across all payloads.
+
+    ``name``/``type_line`` are ``.strip()``-ed — whitespace padding in the
+    all_parts payload was never intentional. This is the single source for both
+    ``fetch_deck_tokens`` (here) and ``get_deck_produced_tokens_for_goldfish``
+    (deck_service), which previously held drifted copies of this block.
+    """
+    seen_token_ids: set[str] = set()
+    token_stubs: list[dict[str, str]] = []
+    for payload in payloads.values():
+        raw = payload.get("produced_tokens")
+        if not raw or raw == "[]":
+            continue
+        try:
+            parts = json.loads(raw)
+        except (json.JSONDecodeError, TypeError):
+            continue
+        if not isinstance(parts, list):
+            continue
+        for part in parts:
+            if not isinstance(part, dict):
+                continue
+            tid = part.get("scryfall_id") or part.get("id") or ""
+            if not tid or tid in seen_token_ids:
+                continue
+            seen_token_ids.add(tid)
+            token_stubs.append(
+                {
+                    "id": tid,
+                    "name": (part.get("name") or "").strip(),
+                    "type_line": (part.get("type_line") or "").strip(),
+                }
+            )
+    return token_stubs
+
+
 def fetch_deck_tokens(scryfall_ids: list[str]) -> list[dict[str, str]]:
     """Return deduplicated tokens produceable by the given cards, with images.
 
@@ -300,33 +345,9 @@ def fetch_deck_tokens(scryfall_ids: list[str]) -> list[dict[str, str]]:
     # NULL produced_tokens (not-yet-backfilled) and "[]" (confirmed no
     # tokens) both end up contributing nothing — graceful degradation
     # for the not-backfilled case, common-case skip for the empty case.
-    seen_token_ids: set[str] = set()
-    token_stubs: list[dict[str, str]] = []
+    # Stub parse/dedup is the shared extract_token_stubs helper.
     deck_card_payloads = _cache_get_by_ids(ids)
-    for payload in deck_card_payloads.values():
-        raw = payload.get("produced_tokens")
-        if not raw or raw == "[]":
-            continue
-        try:
-            parts = json.loads(raw)
-        except (json.JSONDecodeError, TypeError):
-            continue
-        if not isinstance(parts, list):
-            continue
-        for part in parts:
-            if not isinstance(part, dict):
-                continue
-            tid = part.get("scryfall_id") or part.get("id") or ""
-            if not tid or tid in seen_token_ids:
-                continue
-            seen_token_ids.add(tid)
-            token_stubs.append(
-                {
-                    "id": tid,
-                    "name": part.get("name", "") or "",
-                    "type_line": part.get("type_line", "") or "",
-                }
-            )
+    token_stubs = extract_token_stubs(deck_card_payloads)
 
     # Pass 2 (local) — resolve token card details (image_url, set_code,
     # collector_number, canonical name/type_line). Replaces the second

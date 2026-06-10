@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session, joinedload
 
 from app.audit_service import log_transaction
 from app.models import Card, Deck, Game, GameSeat, InventoryRow, StorageLocation, VariantGroup
-from app.scryfall import _cache_get_by_ids, fetch_deck_tokens
+from app.scryfall import _cache_get_by_ids, extract_token_stubs, fetch_deck_tokens
 
 # Library search for lands. Anchored to "your library" so opponent-search effects
 # (Demolition Field, Ghost Quarter, Strip Mine giving the opponent a basic) do NOT
@@ -890,34 +890,10 @@ def get_deck_produced_tokens_for_goldfish(deck_id: int, session) -> list[dict]:
         return []
 
     # Pass 2 — read produced_tokens for the deck cards. _cache_get_by_ids
-    # batches internally and degrades gracefully on schema drift.
+    # batches internally and degrades gracefully on schema drift. Stub
+    # parse/dedup is the shared extract_token_stubs helper.
     deck_card_payloads = _cache_get_by_ids(deck_scryfall_ids)
-    seen_token_ids: set[str] = set()
-    token_stubs: list[dict[str, str]] = []
-    for payload in deck_card_payloads.values():
-        raw = payload.get("produced_tokens")
-        if not raw or raw == "[]":
-            continue
-        try:
-            parts = json.loads(raw)
-        except (json.JSONDecodeError, TypeError):
-            continue
-        if not isinstance(parts, list):
-            continue
-        for part in parts:
-            if not isinstance(part, dict):
-                continue
-            tid = part.get("scryfall_id") or part.get("id") or ""
-            if not tid or tid in seen_token_ids:
-                continue
-            seen_token_ids.add(tid)
-            token_stubs.append(
-                {
-                    "id": tid,
-                    "name": (part.get("name") or "").strip(),
-                    "type_line": (part.get("type_line") or "").strip(),
-                }
-            )
+    token_stubs = extract_token_stubs(deck_card_payloads)
 
     if not token_stubs:
         return []
