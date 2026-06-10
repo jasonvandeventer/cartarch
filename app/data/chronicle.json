@@ -1,5 +1,15 @@
 [
   {
+    "version": "3.36.13",
+    "date": "2026-06-09",
+    "added": [],
+    "refined": [
+      "A behind-the-scenes cleanup pass with no visible changes to how Cartarch looks or works. We removed duplicated and dead code, tidied how the app starts up and shuts down, and lifted the entire card-import section out of the app's most crowded file into its own home — all groundwork to keep things healthy and quick to change as we prepare for the upcoming database upgrade. The full test suite passed unchanged at every step, confirming nothing about your collection, decks, or imports behaves differently."
+    ],
+    "resolved": [],
+    "archivist_note": "Not every release is something you can see. This one was a deliberate tidying-up before the larger move to a new database: we deleted an old scoring routine that had quietly drifted out of step with its replacement, folded several near-identical copies of the same logic back into single shared pieces, and moved the whole card-import flow out of the app's busiest file — which shrank from roughly 2,800 lines to about 1,200. We also added a small health check the servers can ping to know the app is ready. None of this changes your day to day; it just makes the next, larger step safer to take."
+  },
+  {
     "version": "3.36.12",
     "date": "2026-06-08",
     "added": [
