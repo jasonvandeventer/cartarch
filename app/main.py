@@ -12,6 +12,7 @@ import json
 import os
 import threading
 import time
+from contextlib import asynccontextmanager
 from datetime import timedelta
 
 from fastapi import Depends, FastAPI, File, Form, Request, UploadFile
@@ -114,7 +115,68 @@ from app.watchlist_service import (
 )
 from scripts.run_migrations import run as run_migrations
 
-app = FastAPI(title="Cartarch")
+_daemon_threads: list[threading.Thread] = []
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Application lifecycle (replaces the deprecated ``@app.on_event`` pair).
+
+    The startup and shutdown bodies below are moved here VERBATIM from the former
+    ``on_startup`` / ``on_shutdown`` handlers. The shutdown ordering (stop the
+    writer daemons → join → checkpoint the WAL → dispose the pool) is load-bearing
+    for the SQLite-on-Longhorn clean-detach story — preserve it exactly.
+    """
+    # --- startup ---
+    # Prevent accidental deploys with the default dev secret — sessions would be forgeable.
+    if (
+        os.getenv("DEV_MODE", "false").lower() != "true"
+        and os.getenv("SESSION_SECRET_KEY", "dev-only-change-me") == "dev-only-change-me"
+    ):
+        raise RuntimeError("SESSION_SECRET_KEY must be set in production (DEV_MODE is not 'true')")
+    # v3.27.14 — Resend API key startup check. Same shape as the
+    # SESSION_SECRET_KEY check above: refuse to boot in production
+    # without it. The key is consumed by app/password_reset_service.py
+    # for outbound /forgot-password emails. DEV_MODE skips the check
+    # and falls back to logging the reset URL to stdout instead of
+    # sending — preserves the local-dev story without a fake-SMTP
+    # dependency.
+    if os.getenv("DEV_MODE", "false").lower() != "true" and not os.getenv("RESEND_API_KEY"):
+        raise RuntimeError(
+            "RESEND_API_KEY must be set in production (DEV_MODE is not 'true'). "
+            "Wire it via Kubernetes Secret + secretKeyRef — see the "
+            "mana-archive-platform deployment.yaml for the SESSION_SECRET_KEY "
+            "pattern this mirrors."
+        )
+    run_migrations()
+    init_db()
+    for _target, _name in (
+        (_price_refresh_loop, "price-refresh"),
+        (_trait_backfill_loop, "trait-backfill"),
+        (_bulk_data_loop, "bulk-data"),
+        (_loyalty_defense_backfill_loop, "loyalty-backfill"),
+    ):
+        thread = threading.Thread(target=_target, daemon=True, name=_name)
+        thread.start()
+        _daemon_threads.append(thread)
+
+    yield
+
+    # --- shutdown ---
+    # Clean SQLite shutdown so the volume detaches on a consistent file.
+    #
+    # Stop the writer daemons (they watch ``shutdown_event``), wait briefly for any
+    # in-flight batch to finish, then checkpoint the WAL into the main DB and close
+    # the pool. Pairs with a generous ``terminationGracePeriodSeconds`` on the
+    # Deployment so Kubernetes waits for this before SIGKILL + volume detach. See
+    # the SQLite-on-Longhorn corruption mitigation.
+    shutdown_event.set()
+    for thread in _daemon_threads:
+        thread.join(timeout=10)
+    checkpoint_and_dispose()
+
+
+app = FastAPI(title="Cartarch", lifespan=lifespan)
 
 # Expose Prometheus metrics at /metrics for the kube-prometheus-stack
 # ServiceMonitor (platform observability). include_in_schema=False keeps it out
@@ -471,60 +533,6 @@ def _loyalty_defense_backfill_loop() -> None:
             return
         if shutdown_event.wait(_LOYALTY_BACKFILL_BUSY_SECONDS):
             return
-
-
-_daemon_threads: list[threading.Thread] = []
-
-
-@app.on_event("startup")
-def on_startup() -> None:
-    # Prevent accidental deploys with the default dev secret — sessions would be forgeable.
-    if (
-        os.getenv("DEV_MODE", "false").lower() != "true"
-        and os.getenv("SESSION_SECRET_KEY", "dev-only-change-me") == "dev-only-change-me"
-    ):
-        raise RuntimeError("SESSION_SECRET_KEY must be set in production (DEV_MODE is not 'true')")
-    # v3.27.14 — Resend API key startup check. Same shape as the
-    # SESSION_SECRET_KEY check above: refuse to boot in production
-    # without it. The key is consumed by app/password_reset_service.py
-    # for outbound /forgot-password emails. DEV_MODE skips the check
-    # and falls back to logging the reset URL to stdout instead of
-    # sending — preserves the local-dev story without a fake-SMTP
-    # dependency.
-    if os.getenv("DEV_MODE", "false").lower() != "true" and not os.getenv("RESEND_API_KEY"):
-        raise RuntimeError(
-            "RESEND_API_KEY must be set in production (DEV_MODE is not 'true'). "
-            "Wire it via Kubernetes Secret + secretKeyRef — see the "
-            "mana-archive-platform deployment.yaml for the SESSION_SECRET_KEY "
-            "pattern this mirrors."
-        )
-    run_migrations()
-    init_db()
-    for _target, _name in (
-        (_price_refresh_loop, "price-refresh"),
-        (_trait_backfill_loop, "trait-backfill"),
-        (_bulk_data_loop, "bulk-data"),
-        (_loyalty_defense_backfill_loop, "loyalty-backfill"),
-    ):
-        thread = threading.Thread(target=_target, daemon=True, name=_name)
-        thread.start()
-        _daemon_threads.append(thread)
-
-
-@app.on_event("shutdown")
-def on_shutdown() -> None:
-    """Clean SQLite shutdown so the volume detaches on a consistent file.
-
-    Stop the writer daemons (they watch ``shutdown_event``), wait briefly for any
-    in-flight batch to finish, then checkpoint the WAL into the main DB and close
-    the pool. Pairs with a generous ``terminationGracePeriodSeconds`` on the
-    Deployment so Kubernetes waits for this before SIGKILL + volume detach. See
-    the SQLite-on-Longhorn corruption mitigation.
-    """
-    shutdown_event.set()
-    for thread in _daemon_threads:
-        thread.join(timeout=10)
-    checkpoint_and_dispose()
 
 
 @app.get("/")
