@@ -1090,9 +1090,11 @@ async def decks_add_card(
     rc = matches[0]
     action = rc["recommended_action"]
 
-    # Lazy import to avoid a circular import (main.py imports this module).
-    # The reconciliation-commit helper lives with the import flow in main.py.
-    from app.main import _commit_deck_import_with_reconciliation
+    # Lazy import to avoid a circular import (app.routes.imports imports nothing
+    # from here, but keeping it lazy matches the established precedent and is
+    # robust to future wiring). The reconciliation-commit helper lives with the
+    # import flow in app/routes/imports.py (extracted from main.py in the v4 reorg).
+    from app.routes.imports import _commit_deck_import_with_reconciliation
 
     _commit_deck_import_with_reconciliation(
         session=session,
