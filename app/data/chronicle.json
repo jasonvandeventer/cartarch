@@ -1,5 +1,18 @@
 [
   {
+    "version": "3.39.0",
+    "date": "2026-06-12",
+    "added": [],
+    "refined": [
+      "Pasting a deck list into a brew now recognizes cards you own in any printing — if you own a card, it gets pulled into the brew instead of being marked \"to buy,\" even when the list names a different printing than the one in your drawers. Cards you own only inside another deck now show as \"owned — in another deck\" rather than something to purchase.",
+      "The import preview no longer silently skips lines it can't read. Set codes that start with a number (40K, 2X2) and collector numbers with dashes or stars (2026-1, ★) now parse, and any line it still can't match is listed for you to acknowledge before the import runs."
+    ],
+    "resolved": [
+      "Deleting a deck no longer destroys the cards in it. Your real cards return to the collection — drawer-sorted users get them re-filed to their drawers automatically — and only the proxies are discarded. Building a brew and then tearing it down now leaves your collection exactly as it was."
+    ],
+    "archivist_note": "A brew should know what you already own — in any printing, in any drawer — and giving a deck back should give the cards back too. This release closes both gaps: the buy-list stops crying wolf over cards you own, and disbanding a deck stopped quietly eating them."
+  },
+  {
     "version": "3.38.0",
     "date": "2026-06-11",
     "added": [
