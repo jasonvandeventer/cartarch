@@ -14549,3 +14549,62 @@ body.gf-mode { overflow: hidden; }
   border-color: var(--brand-gold);
   color: var(--brand-gold);
 }
+
+/* ============================================================================
+   Brew Mode (v3.37.0) — reuses existing Folio tokens (--accent / --accent-2 /
+   --panel-2 / --text / --text-dim); no new design tokens. The brew badge mirrors
+   the .proxy-badge pill shape; the buy-list rides the standard .panel surface.
+   ============================================================================ */
+.brew-badge {
+  display: inline-block;
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  background: rgba(181, 138, 71, 0.18); /* --accent at low alpha */
+  border: 1px solid var(--accent);
+  color: var(--accent-2);
+  letter-spacing: 0.04em;
+  margin-left: 0.35rem;
+  vertical-align: middle;
+}
+.brew-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.9rem;
+  color: var(--text-dim);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.brew-toggle input {
+  margin: 0;
+}
+.brew-buylist-sub {
+  margin: 0.7rem 0 0.3rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+.brew-buylist-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.25rem;
+}
+.brew-buylist-list li {
+  padding: 0.3rem 0.5rem;
+  border-radius: 6px;
+  background: var(--panel-2);
+  color: var(--text);
+  font-size: 0.92rem;
+}
+.brew-buylist-qty {
+  display: inline-block;
+  min-width: 2.1rem;
+  font-weight: 700;
+  color: var(--accent-2);
+}

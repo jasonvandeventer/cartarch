@@ -1,5 +1,17 @@
 [
   {
+    "version": "3.37.0",
+    "date": "2026-06-10",
+    "added": [
+      "Brew Mode for decks. Flip on the new \"Brew\" toggle when you create or edit a deck, and it becomes a place to build with cards you don't own yet — for testing ideas before you buy. When you add a card you don't own to a brew, Cartarch automatically marks it as a proxy so it never inflates your real collection totals, and the deck page shows a buy-list: what you still need, what you partly have, and what you already own a real copy of elsewhere (your proxies and the brew's own cards don't count as owned). A \"Brew\" badge marks these decks throughout."
+    ],
+    "refined": [
+      "The owned-vs-missing comparison that powers the existing Decklist Check is now the single shared engine behind the brew buy-list too, so the two can never disagree about what you own."
+    ],
+    "resolved": [],
+    "archivist_note": "Alex asked in passing whether Cartarch could hold a deck of cards you don't own — for brewing. It could, sort of, but only by hand. This makes it a first-class mode: a brew keeps unowned cards as proxies so your collection stays honest, and tells you exactly what it would cost to make the deck real. It is also the first deck-table change in a long, deliberately quiet run of releases — a small, careful step taken with the coming database move already in mind."
+  },
+  {
     "version": "3.36.14",
     "date": "2026-06-10",
     "added": [],

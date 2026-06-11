@@ -204,6 +204,14 @@ class Deck(Base):
     variant_group_id: Mapped[int | None] = mapped_column(
         ForeignKey("variant_groups.id", ondelete="SET NULL"), nullable=True, index=True
     )
+    # v3.37.0 — Brew Mode. Marks a deck as a "brew" (a deck built from cards the
+    # user may not own, for planning/testing). When set, the add-card path flags
+    # an unowned add as a proxy row so it never pollutes owned totals, and the
+    # deck detail shows an owned/missing buy-list. Declared BOOLEAN and queried
+    # ONLY through the ORM (``Deck.is_brew`` / ``.is_(True)``) — zero raw SQL
+    # against this column, so pgloader's default BOOLEAN→boolean map is correct
+    # at v4 with no cast-file entry (the v7/v8 blueprint boolean lesson).
+    is_brew: Mapped[bool] = mapped_column(default=False)
 
     storage_location: Mapped[StorageLocation | None] = relationship()
     user: Mapped[User] = relationship(back_populates="decks")

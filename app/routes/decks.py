@@ -57,6 +57,7 @@ from app.deck_service import (
     switch_deck_row_printing,
     update_deck,
 )
+from app.decklist_service import build_brew_buylist
 from app.dependencies import (
     DRAWER_SORTER_USERNAMES,
     CsrfRequired,
@@ -138,6 +139,7 @@ async def decks_create(
     name: str = Form(...),
     format_name: str = Form(""),
     notes: str = Form(""),
+    is_brew: bool = Form(False),
     session: Session = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
     _: None = CsrfRequired,
@@ -148,6 +150,7 @@ async def decks_create(
         name=name,
         format_name=format_name,
         notes=notes,
+        is_brew=is_brew,
     )
 
     return RedirectResponse(url="/decks", status_code=303)
@@ -546,6 +549,20 @@ def deck_detail_page(
         else []
     )
 
+    # v3.37.0 Brew Mode — owned/missing buy-list for a brew deck. Reuses the
+    # already-loaded all_deck_rows (no extra row query) and the shared Decklist
+    # Check comparison unit, EXCLUDING this deck's own location + all proxies so
+    # a card counts as owned only when a real copy exists outside the brew
+    # (owner decision 2026-06-10). None for non-brew decks → panel hidden.
+    brew_buylist = None
+    if deck and deck.is_brew and deck.storage_location_id:
+        brew_buylist = build_brew_buylist(
+            session,
+            current_user.id,
+            locals().get("all_deck_rows") or [],
+            deck.storage_location_id,
+        )
+
     # v3.33.0 — sibling decks in the same variant group (read-only panel).
     variant_siblings = (
         session.query(Deck)
@@ -568,6 +585,7 @@ def deck_detail_page(
             "deck": deck,
             "variant_group": deck.variant_group if deck else None,
             "variant_siblings": variant_siblings,
+            "brew_buylist": brew_buylist,
             "color_identity": color_identity,
             "commanders": commanders if deck else [],
             "items": deck_cards if deck else [],
@@ -909,6 +927,7 @@ def decks_edit(
     blurb: str = Form(""),
     variant_group_id: str = Form(""),
     new_variant_group_name: str = Form(""),
+    is_brew: bool = Form(False),
     session: Session = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
     _: None = CsrfRequired,
@@ -923,6 +942,7 @@ def decks_edit(
             notes=notes,
             blurb=blurb,
             update_blurb=True,
+            is_brew=is_brew,
         )
         # v3.33.0 — variant-group assignment (separate from update_deck so its
         # signature + callers stay untouched). Create-by-name wins over the
@@ -1089,6 +1109,17 @@ async def decks_add_card(
     matches = find_inventory_matches_for_deck_import(session, current_user.id, deck.id, parsed_rows)
     rc = matches[0]
     action = rc["recommended_action"]
+
+    # v3.37.0 Brew Mode: adding an UNOWNED card (recommended_action ==
+    # "import_new", i.e. no owned copies to move) to a brew deck flags the
+    # created row as a proxy, so it never counts toward owned totals / set
+    # completion. persist_import_rows reads this "is_proxy" key (parse_proxy_bool
+    # accepts "true"). The row still lands in the deck's storage location below
+    # (deck membership = location), so it appears in the deck — just proxy. When
+    # the user DOES own copies (move_* / covered_by_variant), behavior is
+    # unchanged: normal pull semantics still apply.
+    if deck.is_brew and action == "import_new":
+        parsed_rows[0]["is_proxy"] = "true"
 
     # Lazy import to avoid a circular import (app.routes.imports imports nothing
     # from here, but keeping it lazy matches the established precedent and is

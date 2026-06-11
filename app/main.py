@@ -31,9 +31,7 @@ from app.auth import hash_password, validate_password_strength
 from app.dashboard_service import get_dashboard_data
 from app.db import SessionLocal, checkpoint_and_dispose, init_db, shutdown_event
 from app.decklist_service import (
-    bucket_decklist_results,
-    name_owned_counts,
-    owned_inventory_for_names,
+    compare_entries_to_owned,
     parse_decklist_text,
     resolve_short_form_lines,
 )
@@ -884,18 +882,12 @@ def decklist_check(
             merged[key] = dict(e)
     all_entries = list(merged.values())
 
-    # Single GROUP BY aggregation against the user's full inventory,
-    # narrowed to the decklist's names. Returns a name→total-owned dict
-    # for O(1) application-side lookup. Stress-tested at 20–50k rows
-    # (see release-history entry for measurement details).
-    owned_names = [e["name"] for e in all_entries]
-    owned_counts = name_owned_counts(session, current_user.id, names=owned_names)
-    # Per-row detail fetch for the matched names (single batched query
-    # with LEFT JOIN to StorageLocation; sorted tradeable-first inside
-    # the service helper).
-    owned_detail = owned_inventory_for_names(session, current_user.id, owned_names)
-
-    buckets = bucket_decklist_results(all_entries, owned_counts, owned_detail)
+    # v3.37.0 — the count + per-printing detail + bucketing is now the
+    # shared decklist_service.compare_entries_to_owned unit (one GROUP BY +
+    # one batched detail fetch, stress-tested at 20–50k rows). No exclusions
+    # here → byte-identical to the pre-extraction path; the Brew Mode buy-list
+    # reuses the same unit with exclusions.
+    buckets = compare_entries_to_owned(session, current_user.id, all_entries)
 
     return render(
         request,

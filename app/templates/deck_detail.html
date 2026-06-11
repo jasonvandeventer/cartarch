@@ -9,6 +9,7 @@
           <h2 class="panel-title">
             {{ deck.name }}
             <span class="mana-pip-row">{{ mana_pips(color_identity) }}</span>
+            {% if deck.is_brew %}<span class="brew-badge" title="Brew deck — may contain cards you don't own; unowned cards are proxies">Brew</span>{% endif %}
           </h2>
           <p class="muted">{{ deck.format or 'Unspecified format' }}</p>
           {% if deck.notes %}<p class="muted">{{ deck.notes }}</p>{% endif %}
@@ -66,6 +67,45 @@
           · No other builds in this group yet.
         {% endif %}
       </p>
+    </section>
+  {% endif %}
+  {% if deck and brew_buylist %}
+    {# v3.37.0 Brew Mode buy-list. "Owned" = real (non-proxy) copies OUTSIDE
+       this deck (the brew's own proxy rows never count). Basics are bucketed
+       out — you don't buy basic lands. None for non-brew decks (panel hidden). #}
+    {% set bl = brew_buylist %}
+    <section class="panel brew-buylist-panel">
+      <h3 class="panel-title" style="margin-bottom: 0.3rem">
+        <span class="deck-detail-section-mark">§</span> Buy-list
+      </h3>
+      <p class="muted" style="margin-top: 0">
+        Counts only real copies you own outside this deck — proxies and this deck's own cards don't count.
+      </p>
+      <div class="hero-stats-inline" style="margin: 0.5rem 0 0.7rem">
+        <span>{{ bl.have|length }} owned</span>
+        <span>{{ bl.partial|length }} partial</span>
+        <span>{{ bl.missing|length }} to buy</span>
+      </div>
+      {% if bl.missing or bl.partial %}
+        {% if bl.missing %}
+          <h4 class="brew-buylist-sub">To buy ({{ bl.missing|length }})</h4>
+          <ul class="brew-buylist-list">
+            {% for e in bl.missing %}
+              <li><span class="brew-buylist-qty">{{ e.wanted }}×</span> {{ e.name }}</li>
+            {% endfor %}
+          </ul>
+        {% endif %}
+        {% if bl.partial %}
+          <h4 class="brew-buylist-sub">Partially owned ({{ bl.partial|length }})</h4>
+          <ul class="brew-buylist-list">
+            {% for e in bl.partial %}
+              <li><span class="brew-buylist-qty">{{ e.wanted }}×</span> {{ e.name }} <span class="muted">— own {{ e.owned }} of {{ e.wanted }}</span></li>
+            {% endfor %}
+          </ul>
+        {% endif %}
+      {% else %}
+        <p class="muted">You own a real copy of every non-basic card in this brew.</p>
+      {% endif %}
     </section>
   {% endif %}
   {% if deck %}

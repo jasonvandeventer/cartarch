@@ -1827,6 +1827,7 @@ def create_deck(
     name: str,
     format_name: str = "",
     notes: str = "",
+    is_brew: bool = False,
 ) -> Deck:
     deck_name = name.strip()
 
@@ -1850,6 +1851,7 @@ def create_deck(
         name=deck_name,
         format=format_name.strip() or None,
         notes=notes.strip() or None,
+        is_brew=bool(is_brew),
     )
     session.add(deck)
     session.commit()
@@ -1866,6 +1868,7 @@ def update_deck(
     notes: str = "",
     blurb: str | None = None,
     update_blurb: bool = False,
+    is_brew: bool = False,
 ) -> Deck:
     """Update a deck's editable attributes.
 
@@ -1894,6 +1897,10 @@ def update_deck(
     deck.name = name
     deck.format = format_name.strip() or None
     deck.notes = notes.strip() or None
+    # v3.37.0 — is_brew is always sent by the edit form (a checkbox that
+    # posts "true" when checked, absent→False), so set it directly like
+    # format/notes rather than via the blurb-style update flag.
+    deck.is_brew = bool(is_brew)
     if update_blurb:
         deck.blurb = (blurb.strip() if blurb else None) or None
 

@@ -46,6 +46,11 @@
         <option value="Vintage">Vintage</option>
         <option value="Cube">Cube</option>
       </select>
+      {# v3.37.0 Brew Mode — a brew is built from cards you may not own; unowned
+         adds become proxies so they never count toward owned totals. #}
+      <label class="brew-toggle" title="Build with cards you don't own — unowned adds become proxies and a buy-list shows what's missing.">
+        <input type="checkbox" name="is_brew" value="true"> Brew
+      </label>
       <button type="submit">Create Deck</button>
     </form>
   </section>
@@ -74,6 +79,7 @@
               {% endif %}
               <span class="decks-featured-fmt">{{ featured.format or 'Commander' }}</span>
               <span class="decks-featured-cards">{{ featured.card_count or 0 }} cards</span>
+              {% if featured.is_brew %}<span class="brew-badge" title="Brew deck — may contain cards you don't own">Brew</span>{% endif %}
             </div>
             {% if featured.blurb %}
               <p class="decks-featured-blurb">{{ featured.blurb }}</p>
@@ -123,6 +129,7 @@
                 {% endif %}
                 <span class="decks-row-fmt">{{ deck.format or 'Commander' }}</span>
                 <span class="decks-row-cards">· {{ deck.card_count or 0 }} cards</span>
+                {% if deck.is_brew %}<span class="brew-badge" title="Brew deck — may contain cards you don't own">Brew</span>{% endif %}
               </div>
               {% if deck.blurb %}
                 <p class="decks-row-blurb">{{ deck.blurb }}</p>
@@ -186,6 +193,13 @@
                       {% endfor %}
                     </select>
                     <input type="text" name="new_variant_group_name" maxlength="128" placeholder="…or create a new group by name">
+                    {# v3.37.0 Brew Mode toggle. MUST stay present in BOTH edit
+                       popouts: the route reads is_brew via Form(False), so an
+                       edit form omitting this box would silently clear the flag. #}
+                    <label class="brew-toggle" style="margin-top: 0.35rem">
+                      <input type="checkbox" name="is_brew" value="true" {% if deck.is_brew %}checked{% endif %}>
+                      Brew deck <span class="decks-edit-hint">— unowned adds become proxies; shows a buy-list</span>
+                    </label>
                     <button type="submit" style="margin-top: 0.25rem">Save</button>
                   </form>
                 </div>
@@ -234,6 +248,12 @@
                 {% endfor %}
               </select>
               <input type="text" name="new_variant_group_name" maxlength="128" placeholder="…or create a new group by name">
+              {# v3.37.0 Brew Mode toggle (featured edit popout) — see the
+                 compact-row edit above for why this must mirror it. #}
+              <label class="brew-toggle" style="margin-top: 0.35rem">
+                <input type="checkbox" name="is_brew" value="true" {% if featured.is_brew %}checked{% endif %}>
+                Brew deck <span class="decks-edit-hint">— unowned adds become proxies; shows a buy-list</span>
+              </label>
               <button type="submit" style="margin-top: 0.25rem">Save</button>
             </form>
           </div>

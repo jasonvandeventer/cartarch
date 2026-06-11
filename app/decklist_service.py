@@ -304,6 +304,8 @@ def name_owned_counts(
     session: Session,
     user_id: int,
     names: Iterable[str] | None = None,
+    exclude_location_id: int | None = None,
+    exclude_proxies: bool = False,
 ) -> dict[str, int]:
     """Return ``{lowercased_card_name: total_owned_copies}`` for a user.
 
@@ -320,6 +322,14 @@ def name_owned_counts(
     "Count all" semantics: copies in built decks (decks are
     StorageLocations) and pending placements all count. Per the spec,
     "you own this" is the question — placement state isn't a filter.
+
+    v3.37.0 — two optional exclusions for the Brew Mode buy-list, both
+    default-off so the /decklist + collection-view callers are unchanged:
+      * ``exclude_location_id`` drops rows physically in that location
+        (the brew deck's own rows) — NULL-location rows still count;
+      * ``exclude_proxies`` drops proxy rows.
+    Together they answer "do I own a REAL copy OUTSIDE this deck?" — the
+    owner-chosen brew "owned" semantics (2026-06-10).
     """
     query = (
         session.query(
@@ -330,6 +340,13 @@ def name_owned_counts(
         .filter(InventoryRow.user_id == user_id)
         .group_by(func.lower(Card.name))
     )
+    if exclude_location_id is not None:
+        query = query.filter(
+            (InventoryRow.storage_location_id != exclude_location_id)
+            | (InventoryRow.storage_location_id.is_(None))
+        )
+    if exclude_proxies:
+        query = query.filter(InventoryRow.is_proxy.is_(False))
     if names is not None:
         lowered = {n.strip().lower() for n in names if n and n.strip()}
         if not lowered:
@@ -407,6 +424,8 @@ def owned_inventory_for_names(
     session: Session,
     user_id: int,
     names: Iterable[str],
+    exclude_location_id: int | None = None,
+    exclude_proxies: bool = False,
 ) -> dict[str, list[dict[str, Any]]]:
     """Fetch per-row inventory detail for a set of card names.
 
@@ -430,7 +449,7 @@ def owned_inventory_for_names(
     if not lowered:
         return {}
 
-    rows = (
+    query = (
         session.query(InventoryRow, Card, StorageLocation)
         .join(Card, InventoryRow.card_id == Card.id)
         .outerjoin(StorageLocation, InventoryRow.storage_location_id == StorageLocation.id)
@@ -438,8 +457,17 @@ def owned_inventory_for_names(
             InventoryRow.user_id == user_id,
             func.lower(Card.name).in_(lowered),
         )
-        .all()
     )
+    # v3.37.0 — mirror name_owned_counts' Brew Mode exclusions so the
+    # per-printing detail matches the counts (default-off elsewhere).
+    if exclude_location_id is not None:
+        query = query.filter(
+            (InventoryRow.storage_location_id != exclude_location_id)
+            | (InventoryRow.storage_location_id.is_(None))
+        )
+    if exclude_proxies:
+        query = query.filter(InventoryRow.is_proxy.is_(False))
+    rows = query.all()
 
     # Batch-fetch parent locations for any rows whose location has a
     # parent_id. One query rather than N parent walks. The dict is
@@ -568,3 +596,85 @@ def bucket_decklist_results(
         "missing": missing,
         "basics": basics,
     }
+
+
+# ---------------------------------------------------------------------------
+# Shared owned/missing comparison (v3.37.0) — the single orchestration of
+# counts + per-printing detail + bucketing, consumed by BOTH the Decklist
+# Check route (no exclusions) and the Brew Mode buy-list (exclude the brew's
+# own rows + proxies). Extracted from main.py's /decklist handler so the two
+# surfaces can never drift (the v3.36.12 filter-drift lesson).
+# ---------------------------------------------------------------------------
+
+
+def compare_entries_to_owned(
+    session: Session,
+    user_id: int,
+    entries: Sequence[dict[str, Any]],
+    *,
+    exclude_location_id: int | None = None,
+    exclude_proxies: bool = False,
+) -> dict[str, list[dict[str, Any]]]:
+    """Compare wanted ``entries`` against the user's owned inventory.
+
+    ``entries`` is the merged want-list shape ``bucket_decklist_results``
+    consumes — each ``{"name", "quantity", "is_basic", "line_numbers"}``.
+    Runs the one GROUP-BY count + one batched per-printing detail fetch,
+    then buckets into Have / Partial / Missing / Basics.
+
+    The two ``exclude_*`` kwargs thread straight through to both queries
+    (default-off → byte-identical to the pre-extraction /decklist path).
+    """
+    names = [e["name"] for e in entries]
+    owned_counts = name_owned_counts(
+        session,
+        user_id,
+        names=names,
+        exclude_location_id=exclude_location_id,
+        exclude_proxies=exclude_proxies,
+    )
+    owned_detail = owned_inventory_for_names(
+        session,
+        user_id,
+        names,
+        exclude_location_id=exclude_location_id,
+        exclude_proxies=exclude_proxies,
+    )
+    return bucket_decklist_results(entries, owned_counts, owned_detail)
+
+
+def build_brew_buylist(
+    session: Session,
+    user_id: int,
+    deck_rows: Sequence[Any],
+    deck_location_id: int,
+) -> dict[str, list[dict[str, Any]]]:
+    """Owned/missing buy-list for a brew deck (v3.37.0).
+
+    ``deck_rows`` are the brew deck's ``InventoryRow`` objects (``.card``
+    eager-loaded). Aggregates them by card name into want-entries (basics
+    detected so they don't show as "buy these"), then compares against the
+    user's inventory EXCLUDING this deck's own location and all proxies —
+    so a card counts as "owned" only when a real copy exists outside the
+    brew (owner decision 2026-06-10). Reuses :func:`compare_entries_to_owned`.
+    """
+    entries: dict[str, dict[str, Any]] = {}
+    for row in deck_rows:
+        name = row.card.name
+        key = name.lower()
+        if key in entries:
+            entries[key]["quantity"] += int(row.quantity)
+        else:
+            entries[key] = {
+                "name": name,
+                "quantity": int(row.quantity),
+                "is_basic": _is_basic_land(name),
+                "line_numbers": [],
+            }
+    return compare_entries_to_owned(
+        session,
+        user_id,
+        list(entries.values()),
+        exclude_location_id=deck_location_id,
+        exclude_proxies=True,
+    )

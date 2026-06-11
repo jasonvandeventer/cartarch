@@ -105,6 +105,9 @@ from scripts.migrate_v3_33_2_game_ended_at import (
 from scripts.migrate_v3_36_1_card_loyalty_defense import (
     main as migrate_v3_36_1_card_loyalty_defense,
 )
+from scripts.migrate_v3_37_0_brew_mode import (
+    main as migrate_v3_37_0_brew_mode,
+)
 
 
 def _is_applied(name: str) -> bool:
@@ -492,6 +495,13 @@ def run():
         _mark_applied("v3_36_1_card_loyalty_defense")
     else:
         print("v3.36.1 card_loyalty_defense already applied, skipping")
+
+    if not _is_applied("v3_37_0_brew_mode"):
+        print("Running v3.37.0 decks.is_brew migration...")
+        migrate_v3_37_0_brew_mode()
+        _mark_applied("v3_37_0_brew_mode")
+    else:
+        print("v3.37.0 brew_mode already applied, skipping")
 
     print("Migration runner complete")
 
