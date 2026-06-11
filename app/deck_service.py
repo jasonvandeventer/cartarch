@@ -3040,7 +3040,6 @@ def delete_deck(session: Session, deck_id: int, user_id: int) -> bool:
         return False
 
     if deck.storage_location_id:
-        # Delete all inventory rows in this deck
         deck_rows = (
             session.query(InventoryRow)
             .filter(
@@ -3050,8 +3049,37 @@ def delete_deck(session: Session, deck_id: int, user_id: int) -> bool:
             .all()
         )
 
+        # Disband, not destroy (decision 2026-06-12). A PROXY row represents a
+        # card the user does not own — discard it outright. A REAL (claimed)
+        # row returns to the collection as PENDING: for drawer-sorter users the
+        # caller's post-delete ``resort_collection`` re-files it to its drawer
+        # (byte-identical round trip); others place it manually. No
+        # prior-location persistence — pending + resort (the brew-buylist v4
+        # note records why exact-location memory is deferred to the nullable
+        # inventory link). This makes deck deletion non-destructive of owned
+        # inventory and closes the brew import→delete→export idempotent loop.
         for row in deck_rows:
-            session.delete(row)
+            if row.is_proxy:
+                session.delete(row)
+                continue
+            row.storage_location_id = None
+            row.is_pending = True
+            row.drawer = None
+            row.slot = None
+            row.updated_at = utc_now()
+            log_transaction(
+                session=session,
+                user_id=user_id,
+                event_type="return_from_deck",
+                card_id=row.card_id,
+                finish=row.finish,
+                quantity_delta=row.quantity,
+                source_location=f"deck:{deck.name}",
+                destination_location="collection",
+                inventory_row_id=row.id,
+                note=f"Returned to collection on delete of deck {deck.name}",
+                flush=False,
+            )
 
         # Delete the storage location itself
         location = (

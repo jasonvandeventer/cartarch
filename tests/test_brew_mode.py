@@ -625,3 +625,122 @@ def test_buylist_truly_unowned_still_to_buy():
     bl = build_brew_buylist(s, u.id, deck_rows, brew_loc.id)
     assert _names(bl["missing"]) == ["Ponder"]
     assert bl["owned_elsewhere"] == []
+
+
+# --------------------------------------------------------------------------- #
+# Phase 3 — deck deletion DISBANDS (returns real rows, deletes proxies) so the
+# import→delete→export round trip is idempotent (no destroyed inventory).
+# --------------------------------------------------------------------------- #
+
+
+def test_delete_deck_disbands_returns_reals_deletes_proxies():
+    """delete_deck no longer destroys owned inventory: a real (claimed) row
+    returns to the collection as PENDING; a proxy row is deleted outright."""
+    sm = _fresh()
+    s = sm()
+    u = _user(s)
+    brew = deck_service.create_deck(s, u.id, "Brew", is_brew=True)
+    real = _card_set(s, "Storm-Kiln Artist", "afr", 10)
+    proxy = _card_set(s, "Ponder", "m12", 73)
+    _place(s, u.id, real, brew.storage_location_id, proxy=False)
+    _place(s, u.id, proxy, brew.storage_location_id, proxy=True)
+    s.commit()
+
+    assert deck_service.delete_deck(s, u.id, brew.id) is True
+
+    rows = s.query(InventoryRow).all()
+    assert len(rows) == 1  # the proxy is gone, the real copy survives
+    survivor = rows[0]
+    assert survivor.card_id == real.id
+    assert survivor.is_proxy is False
+    assert survivor.storage_location_id is None  # returned to collection (pending)
+    assert survivor.is_pending is True
+
+
+def test_delete_normal_deck_also_returns_reals():
+    """The non-destructive semantics apply to ALL decks, not just brews — a
+    real card in a normal deck is returned to the collection on delete, never
+    destroyed."""
+    sm = _fresh()
+    s = sm()
+    u = _user(s)
+    deck = deck_service.create_deck(s, u.id, "Normal")
+    card = _card_set(s, "Sol Ring", "c21", 263)
+    _place(s, u.id, card, deck.storage_location_id, proxy=False)
+    s.commit()
+
+    deck_service.delete_deck(s, u.id, deck.id)
+    rows = s.query(InventoryRow).all()
+    assert len(rows) == 1
+    assert rows[0].card_id == card.id and rows[0].is_pending is True
+
+
+def _export_tuples(s, user_id):
+    """The export-relevant projection (Location name/type, not drawer/slot) —
+    the byte-identical contract for the round-trip test."""
+    out = []
+    for r in s.query(InventoryRow).filter(InventoryRow.user_id == user_id).all():
+        c = s.get(Card, r.card_id)
+        loc = s.get(StorageLocation, r.storage_location_id) if r.storage_location_id else None
+        out.append(
+            (
+                c.name,
+                c.set_code,
+                r.finish,
+                r.quantity,
+                loc.name if loc else "",
+                loc.type if loc else "",
+                bool(r.is_proxy),
+            )
+        )
+    return sorted(out)
+
+
+def test_brew_import_delete_round_trip_is_idempotent():
+    """Acceptance: a drawer-sorter user imports owned cards into a brew (claimed)
+    plus an unowned card (proxy), then deletes the deck. After the post-delete
+    resort the collection is byte-identical to the pre-import baseline — claimed
+    cards are back, the proxy is gone. resort_collection is deterministic, so
+    the disbanded reals re-file to exactly where they started."""
+    from app.inventory_service import resort_collection
+    from app.routes.imports import _commit_deck_import_with_reconciliation
+
+    sm = _fresh()
+    s = sm()
+    u = _user(s, username="test")  # drawer-sorter
+    c1 = _card_set(s, "Storm-Kiln Artist", "afr", 10)
+    c2 = _card_set(s, "Guttersnipe", "dmu", 200)
+    # Seed as pending and let the deterministic sorter place them → baseline.
+    _place(s, u.id, c1, None)
+    _place(s, u.id, c2, None)
+    for r in s.query(InventoryRow).all():
+        r.is_pending = True
+        r.storage_location_id = None
+    s.commit()
+    resort_collection(s, user_id=u.id)
+    baseline = _export_tuples(s, u.id)
+
+    brew = deck_service.create_deck(s, u.id, "Brew", is_brew=True)
+    ponder = _card_set(s, "Ponder", "m12", 73)  # unowned → proxy
+    s.commit()
+    parsed = [_parsed(c, line=i + 1) for i, c in enumerate([c1, c2, ponder])]
+    out = deck_service.find_inventory_matches_for_deck_import(s, u.id, brew.id, parsed)
+    _commit_deck_import_with_reconciliation(
+        session=s,
+        user_id=u.id,
+        deck=brew,
+        parsed_rows=parsed,
+        actions=[o["recommended_action"] for o in out],
+        move_qtys=[o["recommended_move_qty"] for o in out],
+        new_qtys=[o["recommended_new_qty"] for o in out],
+        filename="paste",
+    )
+    # Sanity: two claimed reals + one proxy now live in the brew.
+    brew_rows = _deck_rows_for(s, brew)
+    assert sum(1 for r in brew_rows if not r.is_proxy) == 2
+    assert sum(1 for r in brew_rows if r.is_proxy) == 1
+
+    deck_service.delete_deck(s, u.id, brew.id)
+    resort_collection(s, user_id=u.id)
+
+    assert _export_tuples(s, u.id) == baseline

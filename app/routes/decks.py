@@ -968,6 +968,13 @@ async def decks_delete(
     _: None = CsrfRequired,
 ):
     delete_deck(session, deck_id=deck_id, user_id=current_user.id)
+
+    # delete_deck disbands rather than destroys: real (claimed) rows return to
+    # the collection as pending. For drawer-sorter users, re-file them into
+    # their drawers so the round trip is byte-identical (mirrors decks_return).
+    if current_user.username in DRAWER_SORTER_USERNAMES:
+        resort_collection(session, user_id=current_user.id)
+
     return RedirectResponse(url="/decks", status_code=303)
 
 
