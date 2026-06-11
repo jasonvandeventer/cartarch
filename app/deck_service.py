@@ -2214,6 +2214,43 @@ _RECONCILE_TIER_PRIORITY: dict[str, int] = {
 }
 
 
+def _brew_same_name_rows(
+    session: Session,
+    user_id: int,
+    card_names: set[str],
+) -> dict[str, list[tuple]]:
+    """Brew oracle-level fallback source: the user's real (non-proxy) inventory
+    rows of the given card names, with StorageLocation joined, bucketed by
+    lower-cased ``Card.name``.
+
+    Keyed on name because reprints share the exact name (including full DFC
+    names like "Docent of Perfection // Final Iteration") and the local catalog
+    has no ``oracle_id`` column — so name is the oracle proxy, with NO schema
+    change. Callers split each bucket into the UNASSIGNED pool (``loc is None``
+    or ``type != 'deck'`` — claimable by a brew) vs DECK-resident copies
+    (informational "owned in another deck"; never claimed per the 2026-06-11
+    amendment). One query regardless of row count.
+    """
+    wanted = {n.lower() for n in card_names if n}
+    if not wanted:
+        return {}
+    rows = (
+        session.query(InventoryRow, StorageLocation, Card.name, Card.set_code)
+        .join(Card, InventoryRow.card_id == Card.id)
+        .outerjoin(StorageLocation, InventoryRow.storage_location_id == StorageLocation.id)
+        .filter(
+            InventoryRow.user_id == user_id,
+            InventoryRow.is_proxy.is_(False),
+            func.lower(Card.name).in_(wanted),
+        )
+        .all()
+    )
+    by_name: dict[str, list[tuple]] = {}
+    for inv, loc, cname, set_code in rows:
+        by_name.setdefault(cname.lower(), []).append((inv, loc, set_code))
+    return by_name
+
+
 def find_inventory_matches_for_deck_import(
     session: Session,
     user_id: int,
@@ -2448,6 +2485,23 @@ def find_inventory_matches_for_deck_import(
     for match_list in other_deck_by_key.values():
         match_list.sort(key=lambda m: m["inventory_row_id"])
 
+    # v3.38.x Brew Mode — oracle-level fallback. For a BREW deck the claimable
+    # pool is the UNASSIGNED inventory of the SAME CARD (any printing/finish),
+    # not just the exact requested printing+finish (owner decision 2026-06-11:
+    # "foil is a preference; claim the printing you own; proxy only when no
+    # unassigned copy exists"). Build the per-name buckets once; the per-row
+    # loop ranks + folds them in. Gated on is_brew so non-brew decks keep the
+    # exact-printing matches byte-for-byte.
+    brew_rows_by_name: dict[str, list[tuple]] = {}
+    name_by_card_id: dict[int, str] = {}
+    if deck.is_brew and card_by_sid:
+        resolved_ids = set(card_by_sid.values())
+        name_by_card_id = {
+            c.id: c.name
+            for c in session.query(Card.id, Card.name).filter(Card.id.in_(resolved_ids)).all()
+        }
+        brew_rows_by_name = _brew_same_name_rows(session, user_id, set(name_by_card_id.values()))
+
     # Build per-parsed-row output in input order.
     output: list[dict] = []
     for r in parsed_rows:
@@ -2473,6 +2527,11 @@ def find_inventory_matches_for_deck_import(
                     "total_in_other_decks": 0,
                     "variant_covered_qty": 0,
                     "is_variant_group": deck.variant_group_id is not None,
+                    "is_brew": deck.is_brew,
+                    "brew_owned_in_other_deck": False,
+                    "brew_other_deck_names": [],
+                    "brew_claim_fallback": False,
+                    "brew_claim_set": "",
                     "recommended_action": "import_new",
                     "recommended_move_qty": 0,
                     "recommended_new_qty": quantity_needed,
@@ -2484,6 +2543,64 @@ def find_inventory_matches_for_deck_import(
         matches = matches_by_key.get(key, [])
         target_deck_matches = target_deck_by_key.get(key, [])
         other_deck_matches = other_deck_by_key.get(key, [])
+
+        # v3.38.x Brew — replace the exact-printing movable set with the
+        # oracle-aware UNASSIGNED pool (same card, any printing/finish), ranked
+        # by the owner's preference ladder (exact printing+finish → exact
+        # printing → finish match → anything, then tier, then row id). Surface
+        # deck-resident copies of the same card as "owned in another deck" —
+        # informational only; a brew never claims them (2026-06-11 amendment).
+        brew_owned_in_other_deck = False
+        brew_other_deck_names: list[str] = []
+        brew_claim_fallback = False
+        brew_claim_set = ""
+        if deck.is_brew:
+            cname = (name_by_card_id.get(card_id) or "").lower()
+            unassigned: list[dict] = []
+            other_deck: list[dict] = []
+            for inv, loc, set_code in brew_rows_by_name.get(cname, []):
+                if loc is not None and loc.type == "deck":
+                    if inv.storage_location_id != target_storage_location_id:
+                        other_deck.append(
+                            {
+                                "inventory_row_id": inv.id,
+                                "location_name": loc.name,
+                                "location_type": "deck",
+                                "quantity_available": inv.quantity,
+                                "tags": get_row_tags(inv),
+                                "set_code": set_code,
+                            }
+                        )
+                    # Rows already in THIS deck are not movable and not "other".
+                    continue
+                unassigned.append(
+                    {
+                        "inventory_row_id": inv.id,
+                        "location_name": "Pending" if loc is None else loc.name,
+                        "location_type": "pending" if loc is None else loc.type,
+                        "quantity_available": inv.quantity,
+                        "tags": get_row_tags(inv),
+                        "set_code": set_code,
+                        "_entry_card_id": inv.card_id,
+                        "_entry_finish": inv.finish,
+                    }
+                )
+            unassigned.sort(
+                key=lambda m: (
+                    0 if m["_entry_card_id"] == card_id else 1,
+                    0 if m["_entry_finish"] == finish else 1,
+                    _RECONCILE_TIER_PRIORITY.get(m["location_type"], 99),
+                    m["inventory_row_id"],
+                )
+            )
+            matches = unassigned
+            other_deck_matches = sorted(other_deck, key=lambda m: m["inventory_row_id"])
+            brew_other_deck_names = sorted({m["location_name"] for m in other_deck})
+            brew_owned_in_other_deck = bool(other_deck)
+            if unassigned:
+                brew_claim_set = unassigned[0].get("set_code") or ""
+                brew_claim_fallback = unassigned[0]["_entry_card_id"] != card_id
+
         total_available = sum(m["quantity_available"] for m in matches)
         total_in_target_deck = sum(m["quantity_available"] for m in target_deck_matches)
         total_in_other_decks = sum(m["quantity_available"] for m in other_deck_matches)
@@ -2535,6 +2652,11 @@ def find_inventory_matches_for_deck_import(
                 "total_in_other_decks": total_in_other_decks,
                 "variant_covered_qty": variant_covered_qty,
                 "is_variant_group": deck.variant_group_id is not None,
+                "is_brew": deck.is_brew,
+                "brew_owned_in_other_deck": brew_owned_in_other_deck,
+                "brew_other_deck_names": brew_other_deck_names,
+                "brew_claim_fallback": brew_claim_fallback,
+                "brew_claim_set": brew_claim_set,
                 "recommended_action": action,
                 "recommended_move_qty": move_qty,
                 "recommended_new_qty": new_qty,

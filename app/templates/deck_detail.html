@@ -87,8 +87,9 @@
         <span>{{ bl.have|length }} owned</span>
         <span>{{ bl.partial|length }} partial</span>
         <span>{{ bl.missing|length }} to buy</span>
+        {% if bl.owned_elsewhere %}<span>{{ bl.owned_elsewhere|length }} in other decks</span>{% endif %}
       </div>
-      {% if bl.missing or bl.partial %}
+      {% if bl.missing or bl.partial or bl.owned_elsewhere %}
         {% if bl.missing %}
           <h4 class="brew-buylist-sub">To buy ({{ bl.missing|length }})</h4>
           <ul class="brew-buylist-list">
@@ -102,6 +103,16 @@
           <ul class="brew-buylist-list">
             {% for e in bl.partial %}
               <li><span class="brew-buylist-qty">{{ e.wanted }}×</span> {{ e.name }} <span class="muted">— own {{ e.owned }} of {{ e.wanted }}</span></li>
+            {% endfor %}
+          </ul>
+        {% endif %}
+        {% if bl.owned_elsewhere %}
+          {# v3.38.x Option B — owned, but the only real copy sits in another
+             deck. NOT "to buy": pull it physically when you dismantle that deck. #}
+          <h4 class="brew-buylist-sub">Owned — in another deck ({{ bl.owned_elsewhere|length }})</h4>
+          <ul class="brew-buylist-list">
+            {% for e in bl.owned_elsewhere %}
+              <li><span class="brew-buylist-qty">{{ e.wanted }}×</span> {{ e.name }} <span class="muted">— in {{ e.in_deck }}</span></li>
             {% endfor %}
           </ul>
         {% endif %}

@@ -665,9 +665,14 @@ def build_brew_buylist(
     outside-count to zero, so a card you own showed as "to buy". Now a real
     deck row counts as owned no matter where the copy physically lives.
 
-    ``session`` / ``user_id`` / ``deck_location_id`` are retained for a stable
-    call signature but are no longer queried — the deck's own rows are the
-    single source of truth. Basics are bucketed out (you don't buy basic lands).
+    ``session`` / ``user_id`` / ``deck_location_id`` ARE queried again (v3.38.x,
+    Option B): a proxy row whose oracle card is owned but lives in ANOTHER deck
+    ("owned in Buttercup") is split out of *to buy* into a separate
+    **owned_elsewhere** bucket, so the buy-list never tells the owner to
+    purchase a card that's sitting in a different deck (2026-06-11 amendment).
+    The deck's own rows remain the source of truth for owned-vs-proxy; the only
+    new query is a single name-IN lookup over deck-resident real copies. Basics
+    are bucketed out (you don't buy basic lands).
     """
     # Aggregate the deck's own rows by card name: wanted = total copies,
     # owned = the non-proxy (real-copy-backed) portion.
@@ -689,9 +694,36 @@ def build_brew_buylist(
         if not bool(row.is_proxy):
             entry["owned"] += qty
 
+    # Option B — for entries that are fully proxy (owned == 0, non-basic), find
+    # which ones the user actually owns as a REAL copy inside ANOTHER deck. One
+    # scoped name-IN query (no N+1, no network); deck-resident rows of the same
+    # Card.name, excluding this brew's own location and proxies.
+    fully_proxy_names = [
+        e["name"] for e in entries.values() if e["owned"] == 0 and not e["is_basic"]
+    ]
+    deck_resident: dict[str, str] = {}  # name.lower() -> a holding deck's name
+    if fully_proxy_names and deck_location_id:
+        rows = (
+            session.query(Card.name, StorageLocation.name)
+            .select_from(InventoryRow)
+            .join(Card, InventoryRow.card_id == Card.id)
+            .join(StorageLocation, InventoryRow.storage_location_id == StorageLocation.id)
+            .filter(
+                InventoryRow.user_id == user_id,
+                InventoryRow.is_proxy.is_(False),
+                StorageLocation.type == "deck",
+                StorageLocation.id != deck_location_id,
+                func.lower(Card.name).in_({n.lower() for n in fully_proxy_names}),
+            )
+            .all()
+        )
+        for card_name, loc_name in rows:
+            deck_resident.setdefault(card_name.lower(), loc_name)
+
     have: list[dict[str, Any]] = []
     partial: list[dict[str, Any]] = []
     missing: list[dict[str, Any]] = []
+    owned_elsewhere: list[dict[str, Any]] = []
     basics: list[dict[str, Any]] = []
     for entry in entries.values():
         if entry["is_basic"]:
@@ -700,6 +732,15 @@ def build_brew_buylist(
             have.append(entry)
         elif entry["owned"] > 0:
             partial.append(entry)
+        elif entry["name"].lower() in deck_resident:
+            entry["in_deck"] = deck_resident[entry["name"].lower()]
+            owned_elsewhere.append(entry)
         else:
             missing.append(entry)
-    return {"have": have, "partial": partial, "missing": missing, "basics": basics}
+    return {
+        "have": have,
+        "partial": partial,
+        "missing": missing,
+        "owned_elsewhere": owned_elsewhere,
+        "basics": basics,
+    }

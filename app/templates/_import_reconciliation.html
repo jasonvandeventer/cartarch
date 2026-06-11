@@ -152,6 +152,27 @@
                       (shared with a sibling build — no new copy needed)
                     </div>
                   {% endif %}
+                  {# v3.38.x Brew Mode — make the proxy-vs-claim outcome explicit.
+                     A brew claims an UNASSIGNED owned copy (any printing); cards
+                     owned nowhere unassigned become proxy rows (to buy, or — if
+                     the only copy is in another deck — pull-to-claim later). #}
+                  {% if is_brew %}
+                    {% if row.recommended_action == "import_new" %}
+                      <div class="brew-recon-note small-text">
+                        {% if row.brew_owned_in_other_deck %}
+                          → proxy — owned in
+                          <em>{{ row.brew_other_deck_names | join(", ") }}</em>
+                          (pull physically to claim)
+                        {% else %}
+                          → proxy — not owned (to buy)
+                        {% endif %}
+                      </div>
+                    {% elif row.brew_claim_fallback and row.brew_claim_set %}
+                      <div class="brew-recon-note small-text">
+                        → claim your <strong>{{ row.brew_claim_set | upper }}</strong> copy
+                      </div>
+                    {% endif %}
+                  {% endif %}
                 </td>
                 <td>
                   {% set action = row.recommended_action %}

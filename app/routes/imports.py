@@ -561,6 +561,7 @@ async def import_reconcile_preview(
                 "total_to_merge": total_to_merge,
                 "total_covered_by_variant": total_covered_by_variant,
                 "is_variant_group": deck.variant_group_id is not None,
+                "is_brew": deck.is_brew,
             },
         )
 
@@ -1467,6 +1468,7 @@ async def manual_import_reconcile_preview(
                 "total_to_merge": total_to_merge,
                 "total_covered_by_variant": total_covered_by_variant,
                 "is_variant_group": deck.variant_group_id is not None,
+                "is_brew": deck.is_brew,
             },
         )
 

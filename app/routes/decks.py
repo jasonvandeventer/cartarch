@@ -549,11 +549,12 @@ def deck_detail_page(
         else []
     )
 
-    # v3.37.0 Brew Mode — owned/missing buy-list for a brew deck. Reuses the
-    # already-loaded all_deck_rows (no extra row query) and the shared Decklist
-    # Check comparison unit, EXCLUDING this deck's own location + all proxies so
-    # a card counts as owned only when a real copy exists outside the brew
-    # (owner decision 2026-06-10). None for non-brew decks → panel hidden.
+    # Brew Mode — owned/missing buy-list for a brew deck. Reuses the
+    # already-loaded all_deck_rows; buckets the brew's own rows by proxy status
+    # (real = owned, proxy = to buy, owner decision 2026-06-11) and (v3.38.x
+    # Option B) splits fully-proxy cards the user owns inside ANOTHER deck into
+    # an "owned_elsewhere" bucket so the buy-list never lists a deck-resident
+    # card as "to buy". None for non-brew decks → panel hidden.
     brew_buylist = None
     if deck and deck.is_brew and deck.storage_location_id:
         brew_buylist = build_brew_buylist(
