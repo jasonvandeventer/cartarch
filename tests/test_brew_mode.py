@@ -1,14 +1,21 @@
-"""Brew Mode (v3.37.0) tests.
+"""Brew Mode tests.
 
-A "brew" is a deck built from cards the user may not own. Adding an UNOWNED
-card to a brew flags the created row as a proxy (so it never counts toward owned
-totals); the deck detail shows an owned/missing buy-list where "owned" means a
-REAL (non-proxy) copy OUTSIDE this deck (owner decision 2026-06-10).
+A "brew" is a deck built from cards the user may not own. Adding/importing an
+UNOWNED card to a brew flags the created row as a proxy (so it never counts
+toward owned totals).
 
-Covers (design note §Migration-plan touchpoint 3):
+Buy-list semantics REVISED 2026-06-11 (see brew-buylist-bug-2026-06-11): the
+brew's own rows are self-describing — a real (non-proxy) deck row = owned, a
+proxy deck row = to buy — regardless of where the physical copy sits. This
+supersedes the v3.37.0 "real copy OUTSIDE this deck" rule, which false-flagged
+every singleton the user deliberately decked.
+
+Covers:
   - create_deck / update_deck is_brew round-trip
-  - build_brew_buylist exclusion semantics (proxy-in-deck excluded; real-outside
-    counts; real-INSIDE-deck excluded)
+  - build_brew_buylist row-classification semantics (proxy deck row -> to buy;
+    real deck row -> owned, even when it's the only copy and sits in the deck)
+  - the proxy rule lives in _commit_deck_import_with_reconciliation, so BOTH a
+    paste/CSV deck import AND the single-card add-card route proxy unowned cards
   - compare_entries_to_owned with no exclusions == pre-extraction bucketing
     (have / partial / missing / basics) — pins the /decklist extraction
   - add-card route: brew + unowned -> proxy row in deck location;
@@ -121,38 +128,55 @@ def test_create_and_update_is_brew():
 # --------------------------------------------------------------------------- #
 
 
-def test_buylist_excludes_proxies_and_own_deck():
+def test_buylist_proxy_rows_are_to_buy_real_rows_are_owned():
     s = _fresh()()
     u = _user(s)
     brew_loc = _loc(s, u.id, "Brew", type_="deck", mode="manual")
-    box = _loc(s, u.id, "Box")
     sol = _card(s, "Sol Ring")
     man = _card(s, "Mana Crypt")
-    # Brew holds both as its own proxies; a REAL Sol Ring lives in a box.
-    _place(s, u.id, sol, brew_loc.id, proxy=True)
+    # The brew holds a REAL (pulled) Sol Ring and a PROXY Mana Crypt.
+    _place(s, u.id, sol, brew_loc.id, proxy=False)
     _place(s, u.id, man, brew_loc.id, proxy=True)
-    _place(s, u.id, sol, box.id, proxy=False)
     s.commit()
 
     deck_rows = s.query(InventoryRow).filter(InventoryRow.storage_location_id == brew_loc.id).all()
     bl = build_brew_buylist(s, u.id, deck_rows, brew_loc.id)
-    assert _names(bl["have"]) == ["Sol Ring"]  # real copy outside the deck
-    assert _names(bl["missing"]) == ["Mana Crypt"]  # only proxies -> must buy
+    assert _names(bl["have"]) == ["Sol Ring"]  # real deck row -> owned
+    assert _names(bl["missing"]) == ["Mana Crypt"]  # proxy deck row -> to buy
 
 
-def test_buylist_real_copy_inside_deck_still_missing():
-    """A REAL (non-proxy) copy pulled INTO the brew deck is still excluded by
-    location — owner decision is 'outside THIS deck'."""
+def test_buylist_real_copy_inside_deck_is_owned():
+    """Regression for brew-buylist-bug-2026-06-11: a REAL (non-proxy) singleton
+    pulled INTO the brew deck must count as OWNED, even though its only copy
+    now lives in the deck. The old 'outside THIS deck' rule wrongly flagged it
+    to buy."""
     s = _fresh()()
     u = _user(s)
     brew_loc = _loc(s, u.id, "Brew", type_="deck", mode="manual")
     sol = _card(s, "Sol Ring")
-    _place(s, u.id, sol, brew_loc.id, proxy=False)  # real, but inside the deck
+    _place(s, u.id, sol, brew_loc.id, proxy=False)  # real, the only copy, in the deck
     s.commit()
     deck_rows = s.query(InventoryRow).filter(InventoryRow.storage_location_id == brew_loc.id).all()
     bl = build_brew_buylist(s, u.id, deck_rows, brew_loc.id)
-    assert _names(bl["missing"]) == ["Sol Ring"]
-    assert bl["have"] == []
+    assert _names(bl["have"]) == ["Sol Ring"]
+    assert bl["missing"] == []
+
+
+def test_buylist_partial_when_real_and_proxy_mix():
+    """Want 2, one real + one proxy deck row -> partially owned."""
+    s = _fresh()()
+    u = _user(s)
+    brew_loc = _loc(s, u.id, "Brew", type_="deck", mode="manual")
+    bolt = _card(s, "Lightning Bolt")
+    _place(s, u.id, bolt, brew_loc.id, qty=1, proxy=False)
+    _place(s, u.id, bolt, brew_loc.id, qty=1, proxy=True)
+    s.commit()
+    deck_rows = s.query(InventoryRow).filter(InventoryRow.storage_location_id == brew_loc.id).all()
+    bl = build_brew_buylist(s, u.id, deck_rows, brew_loc.id)
+    assert _names(bl["partial"]) == ["Lightning Bolt"]
+    entry = bl["partial"][0]
+    assert entry["owned"] == 1
+    assert entry["wanted"] == 2
 
 
 def test_buylist_basics_not_in_buy_sections():
@@ -286,6 +310,68 @@ def test_addcard_brew_owned_is_moved_not_proxied():
     # Owned add uses normal pull semantics — moved in, NOT flagged proxy.
     assert rows[0].is_proxy is False
     assert rows[0].card_id == card.id
+
+
+def test_import_brew_proxies_unowned_moves_owned():
+    """The paste/CSV deck-import path (the reconciliation commit handler) is the
+    single source of the brew proxy rule: an UNOWNED row (import_new) becomes a
+    proxy deck row, while an OWNED row (move_existing) is pulled in as a real
+    (non-proxy) deck row. Regression for brew-buylist-bug-2026-06-11, where the
+    paste import created real rows for everything and the buy-list then
+    false-flagged owned singletons."""
+    from app.routes.imports import _commit_deck_import_with_reconciliation
+
+    sm = _fresh()
+    s = sm()
+    u = _user(s)
+    deck = deck_service.create_deck(s, u.id, "Brew", is_brew=True)
+    box = _loc(s, u.id, "Box", mode="managed")
+    owned = _card(s, "Smothering Tithe")
+    unowned = _card(s, "Rhystic Study")
+    _place(s, u.id, owned, box.id, qty=1, proxy=False)  # a REAL owned copy to pull
+    s.commit()
+
+    parsed_rows = [
+        {
+            "line_number": 1,
+            "name": "",
+            "scryfall_id": owned.scryfall_id,
+            "set_code": "",
+            "collector_number": "",
+            "finish": "normal",
+            "quantity": 1,
+            "location": "",
+        },
+        {
+            "line_number": 2,
+            "name": "",
+            "scryfall_id": unowned.scryfall_id,
+            "set_code": "",
+            "collector_number": "",
+            "finish": "normal",
+            "quantity": 1,
+            "location": "",
+        },
+    ]
+    _commit_deck_import_with_reconciliation(
+        session=s,
+        user_id=u.id,
+        deck=deck,
+        parsed_rows=parsed_rows,
+        actions=["move_existing", "import_new"],
+        move_qtys=[1, 0],
+        new_qtys=[0, 1],
+        filename="paste",
+    )
+
+    rows = {r.card_id: r for r in _deck_rows_for(s, deck)}
+    assert rows[owned.id].is_proxy is False  # pulled real copy
+    assert rows[unowned.id].is_proxy is True  # unowned -> proxy
+
+    # And the buy-list reflects it: owned -> have, unowned -> to buy.
+    bl = build_brew_buylist(s, u.id, list(rows.values()), deck.storage_location_id)
+    assert _names(bl["have"]) == ["Smothering Tithe"]
+    assert _names(bl["missing"]) == ["Rhystic Study"]
 
 
 def test_addcard_non_brew_unowned_not_proxied():

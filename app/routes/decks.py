@@ -1111,15 +1111,12 @@ async def decks_add_card(
     action = rc["recommended_action"]
 
     # v3.37.0 Brew Mode: adding an UNOWNED card (recommended_action ==
-    # "import_new", i.e. no owned copies to move) to a brew deck flags the
-    # created row as a proxy, so it never counts toward owned totals / set
-    # completion. persist_import_rows reads this "is_proxy" key (parse_proxy_bool
-    # accepts "true"). The row still lands in the deck's storage location below
-    # (deck membership = location), so it appears in the deck — just proxy. When
-    # the user DOES own copies (move_* / covered_by_variant), behavior is
-    # unchanged: normal pull semantics still apply.
-    if deck.is_brew and action == "import_new":
-        parsed_rows[0]["is_proxy"] = "true"
+    # "import_new") to a brew deck creates a PROXY row so it never counts toward
+    # owned totals / the buy-list. That proxy-flagging now lives in the single
+    # source — _commit_deck_import_with_reconciliation, which both this route
+    # and the paste/CSV deck import funnel through — so it is NOT injected here.
+    # When the user owns copies (move_* / covered_by_variant) normal pull
+    # semantics apply (no proxy).
 
     # Lazy import to avoid a circular import (app.routes.imports imports nothing
     # from here, but keeping it lazy matches the established precedent and is

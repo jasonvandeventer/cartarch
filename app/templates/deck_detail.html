@@ -70,16 +70,18 @@
     </section>
   {% endif %}
   {% if deck and brew_buylist %}
-    {# v3.37.0 Brew Mode buy-list. "Owned" = real (non-proxy) copies OUTSIDE
-       this deck (the brew's own proxy rows never count). Basics are bucketed
-       out — you don't buy basic lands. None for non-brew decks (panel hidden). #}
+    {# Brew Mode buy-list (semantics revised 2026-06-11). The brew's own rows
+       are self-describing: a real (non-proxy) row = a card you own; a proxy
+       row = a card to buy. "Owned" counts real copies wherever they physically
+       sit; "to buy" = the deck's proxy rows. Basics are bucketed out — you
+       don't buy basic lands. None for non-brew decks (panel hidden). #}
     {% set bl = brew_buylist %}
     <section class="panel brew-buylist-panel">
       <h3 class="panel-title" style="margin-bottom: 0.3rem">
         <span class="deck-detail-section-mark">§</span> Buy-list
       </h3>
       <p class="muted" style="margin-top: 0">
-        Counts only real copies you own outside this deck — proxies and this deck's own cards don't count.
+        "To buy" = the proxy cards in this brew (cards you don't own). "Owned" = cards backed by a real copy.
       </p>
       <div class="hero-stats-inline" style="margin: 0.5rem 0 0.7rem">
         <span>{{ bl.have|length }} owned</span>

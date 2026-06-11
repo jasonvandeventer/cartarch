@@ -649,32 +649,57 @@ def build_brew_buylist(
     deck_rows: Sequence[Any],
     deck_location_id: int,
 ) -> dict[str, list[dict[str, Any]]]:
-    """Owned/missing buy-list for a brew deck (v3.37.0).
+    """Owned/missing buy-list for a brew deck (semantics revised 2026-06-11).
 
     ``deck_rows`` are the brew deck's ``InventoryRow`` objects (``.card``
-    eager-loaded). Aggregates them by card name into want-entries (basics
-    detected so they don't show as "buy these"), then compares against the
-    user's inventory EXCLUDING this deck's own location and all proxies —
-    so a card counts as "owned" only when a real copy exists outside the
-    brew (owner decision 2026-06-10). Reuses :func:`compare_entries_to_owned`.
+    eager-loaded). A brew's rows are **self-describing**: a *proxy* row is a
+    card the user does NOT own (added as a placeholder), a *real* (non-proxy)
+    row is backed by a physical copy that was pulled into the deck on import.
+    So the buy-list is simply the deck's own rows bucketed by proxy status —
+    *to buy* = proxy copies, *owned* = real copies — regardless of whether the
+    physical copy sits inside or outside the deck (owner decision 2026-06-11).
+
+    This SUPERSEDES the v3.37.0 "a real copy must exist OUTSIDE this deck"
+    rule, which structurally false-flagged every singleton the user
+    deliberately decked: pulling the only copy into the deck dropped its
+    outside-count to zero, so a card you own showed as "to buy". Now a real
+    deck row counts as owned no matter where the copy physically lives.
+
+    ``session`` / ``user_id`` / ``deck_location_id`` are retained for a stable
+    call signature but are no longer queried — the deck's own rows are the
+    single source of truth. Basics are bucketed out (you don't buy basic lands).
     """
+    # Aggregate the deck's own rows by card name: wanted = total copies,
+    # owned = the non-proxy (real-copy-backed) portion.
     entries: dict[str, dict[str, Any]] = {}
     for row in deck_rows:
         name = row.card.name
         key = name.lower()
-        if key in entries:
-            entries[key]["quantity"] += int(row.quantity)
-        else:
-            entries[key] = {
+        qty = int(row.quantity)
+        entry = entries.get(key)
+        if entry is None:
+            entry = entries[key] = {
                 "name": name,
-                "quantity": int(row.quantity),
+                "wanted": 0,
+                "owned": 0,
                 "is_basic": _is_basic_land(name),
-                "line_numbers": [],
+                "printings": [],
             }
-    return compare_entries_to_owned(
-        session,
-        user_id,
-        list(entries.values()),
-        exclude_location_id=deck_location_id,
-        exclude_proxies=True,
-    )
+        entry["wanted"] += qty
+        if not bool(row.is_proxy):
+            entry["owned"] += qty
+
+    have: list[dict[str, Any]] = []
+    partial: list[dict[str, Any]] = []
+    missing: list[dict[str, Any]] = []
+    basics: list[dict[str, Any]] = []
+    for entry in entries.values():
+        if entry["is_basic"]:
+            basics.append(entry)
+        elif entry["owned"] >= entry["wanted"]:
+            have.append(entry)
+        elif entry["owned"] > 0:
+            partial.append(entry)
+        else:
+            missing.append(entry)
+    return {"have": have, "partial": partial, "missing": missing, "basics": basics}

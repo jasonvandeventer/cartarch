@@ -651,6 +651,14 @@ def _commit_deck_import_with_reconciliation(
         new_qty = int(new_qtys[idx]) if idx < len(new_qtys) else int(row["quantity"])
 
         if action == "import_new":
+            # v3.37.x Brew Mode: a card owned NOWHERE (import_new) added to a
+            # brew becomes a PROXY row so it shows in the deck but never counts
+            # as owned (the buy-list reads this flag). persist_import_rows reads
+            # the row's "is_proxy" key. This is the single source for the brew
+            # proxy rule — both the paste/CSV deck import AND the single-card
+            # add-card route funnel through here, so add-card no longer sets it.
+            if deck.is_brew:
+                row["is_proxy"] = "true"
             new_import_rows.append(row)
             new_import_indices.append(idx)
             continue
@@ -698,6 +706,10 @@ def _commit_deck_import_with_reconciliation(
             # Schedule a new import for the remaining quantity.
             row_for_new = dict(row)
             row_for_new["quantity"] = compensating_new
+            # Brew Mode: the new portion of a partial move isn't backed by a
+            # pulled real copy, so it's a proxy too (same rule as import_new).
+            if deck.is_brew:
+                row_for_new["is_proxy"] = "true"
             new_import_rows.append(row_for_new)
             new_import_indices.append(idx)
 

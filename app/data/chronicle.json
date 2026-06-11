@@ -1,5 +1,17 @@
 [
   {
+    "version": "3.37.1",
+    "date": "2026-06-11",
+    "added": [],
+    "refined": [
+      "The brew buy-list now reads a brew's own cards directly: a real copy in the deck counts as owned, a proxy counts as \"to buy.\" Whether your single physical copy sits in the brew or in a drawer no longer matters."
+    ],
+    "resolved": [
+      "Fixed brew buy-lists wrongly listing cards you own as \"to buy.\" Any card you owned just one copy of got flagged to buy the moment you put it in the brew — because building the deck moved your only copy into it. Importing a deck-list into a brew now also marks the cards you don't own as proxies, so owned and to-buy come out right (the Mizzix brew now reads 93 owned / 7 to buy instead of 31 / 47)."
+    ],
+    "archivist_note": null
+  },
+  {
     "version": "3.37.0",
     "date": "2026-06-10",
     "added": [
