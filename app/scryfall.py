@@ -723,6 +723,104 @@ def bulk_fetch_by_set_number(
     return BulkFetchResult(cards=results, not_found=not_found, failed=failed)
 
 
+def bulk_fetch_by_name(
+    names: list[tuple[str, str]],
+) -> BulkFetchResult:
+    """Batch-resolve card *names* (optionally hinted with a set) via the
+    /cards/collection ``{"name": ...}`` identifier.
+
+    This is the batched, request-path-safe analogue of the single-card
+    "Import by name" flow: it makes ceil(N/75) POSTs — never one-per-name —
+    so a paste list of bare names resolves without the per-row live-lookup
+    pattern that caused the v3.23.x import outages. Scryfall's name
+    identifier does exact (case-insensitive) matching and returns its
+    preferred printing for the name (or the named printing when a ``set``
+    hint is supplied), so a typo'd name lands in ``.not_found`` rather than
+    silently resolving to a wrong card.
+
+    ``names`` is a list of ``(name, set_code)`` tuples; ``set_code`` may be
+    "" for a truly bare name. The key shape (for ``.cards`` / ``.not_found``
+    / ``.failed``) is ``(name_lower, set_lower)`` mirroring the request, so
+    the caller looks up by exactly what it asked for.
+
+    Unlike the id / set+number resolvers this path is **API-only — it does
+    NOT consult the local ``scryfall_cards`` cache.** The cache has no
+    ``released_at`` column, so it cannot replicate Scryfall's "preferred
+    printing" selection for a bare name deterministically; letting cache
+    state decide which printing a name resolves to would make the result
+    depend on what the daemon happened to have mirrored. Bare-name lines are
+    the minority and are fully batched, so always querying Scryfall is both
+    correct and deterministic.
+    """
+    results: dict[tuple[str, str], dict[str, Any]] = {}
+    not_found: list[tuple[str, str]] = []
+    failed: list[tuple[str, str]] = []
+    seen: dict[tuple[str, str], None] = {}
+    for n, s in names:
+        key = ((n or "").strip().lower(), (s or "").strip().lower())
+        if key[0]:
+            seen[key] = None
+    unique = list(seen.keys())
+
+    for i in range(0, len(unique), _COLLECTION_BATCH_SIZE):
+        bn = i // _COLLECTION_BATCH_SIZE
+        batch = unique[i : i + _COLLECTION_BATCH_SIZE]
+        identifiers: list[dict[str, str]] = []
+        for name_l, set_l in batch:
+            ident = {"name": name_l}
+            if set_l:
+                ident["set"] = set_l
+            identifiers.append(ident)
+        data = _post_json(f"{SCRYFALL_CARD_URL}/collection", {"identifiers": identifiers})
+        if not data:
+            # (a) follow-on: _post_json already logged the cause; the whole
+            # chunk is transiently unresolved for this call.
+            failed.extend(batch)
+            print(
+                f"[scryfall-bulk] bulk_fetch_by_name batch {bn} dropped "
+                f"({len(batch)} names unresolved this call)",
+                flush=True,
+            )
+            continue
+        found = [_normalize_card_payload(c) for c in data.get("data", []) if isinstance(c, dict)]
+        # Scryfall does NOT echo which identifier produced each returned
+        # card, so match each requested (name, set) back to a card
+        # explicitly. A double-faced card resolves on either its full
+        # "A // B" name or its front-face name; the optional set hint must
+        # also match when supplied. O(batch^2) over <=75 items.
+        resolved_this_batch = 0
+        for key in batch:
+            name_l, set_l = key
+            match: dict[str, Any] | None = None
+            for card in found:
+                if not card.get("scryfall_id"):
+                    continue
+                cname = (card.get("name") or "").lower()
+                cfront = cname.split(" // ")[0]
+                if name_l not in (cname, cfront):
+                    continue
+                if set_l and (card.get("set_code") or "").lower() != set_l:
+                    continue
+                match = card
+                break
+            if match is not None:
+                results[key] = match
+                resolved_this_batch += 1
+            else:
+                # Batch POST succeeded but this name had no match — genuinely
+                # unknown to Scryfall (or the set hint excluded it). Permanent.
+                not_found.append(key)
+        if resolved_this_batch < len(batch):
+            print(
+                f"[scryfall-bulk] bulk_fetch_by_name batch {bn}: "
+                f"{resolved_this_batch} resolved, "
+                f"{len(batch) - resolved_this_batch} not_found",
+                flush=True,
+            )
+
+    return BulkFetchResult(cards=results, not_found=not_found, failed=failed)
+
+
 # ---------------------------------------------------------------------------
 # Local cache population daemon (v3.25.0).
 #

@@ -128,11 +128,16 @@ def test_bare_card_name_is_not_a_short_form_match():
 
 
 def _no_network(monkeypatch):
-    """Force every set+collector batch lookup to miss (no network)."""
+    """Force BOTH batch lookups (set+collector and name) to miss (no network)."""
     monkeypatch.setattr(
         import_service,
         "bulk_fetch_by_set_number",
         lambda pairs: BulkFetchResult(),
+    )
+    monkeypatch.setattr(
+        import_service,
+        "bulk_fetch_by_name",
+        lambda names: BulkFetchResult(),
     )
 
 
@@ -193,3 +198,123 @@ def test_slash_prefix_does_not_swallow_dfc_card_names(monkeypatch):
     assert parsed["name"] == "Expansion // Explosion"
     assert parsed["set_code"] == "rvr"
     assert parsed["collector_number"] == "243"
+
+
+# ---------------------------------------------------------------------------
+# Bare-name batch resolution (v3.39.x bulk_fetch_by_name) — the single-card
+# "Import by name" matching, scaled to the batch paste importer.
+# ---------------------------------------------------------------------------
+
+
+def _card(name, set_code, collector, scryfall_id="sid-x"):
+    return {
+        "scryfall_id": scryfall_id,
+        "name": name,
+        "set_code": set_code,
+        "collector_number": collector,
+        "price_usd": "1.00",
+        "price_usd_foil": "2.00",
+        "price_usd_etched": None,
+    }
+
+
+def test_bare_name_line_resolves_via_name_batch(monkeypatch):
+    # The set+collector batch misses; the name batch resolves "Mizzix of the
+    # Izmagnus" (a bare name with a leading quantity) — the exact case the old
+    # "can't be batch-resolved" message rejected.
+    monkeypatch.setattr(import_service, "bulk_fetch_by_set_number", lambda pairs: BulkFetchResult())
+
+    captured = {}
+
+    def fake_name_batch(names):
+        captured["names"] = names
+        return BulkFetchResult(
+            cards={("mizzix of the izmagnus", ""): _card("Mizzix of the Izmagnus", "c15", "39")}
+        )
+
+    monkeypatch.setattr(import_service, "bulk_fetch_by_name", fake_name_batch)
+
+    result = parse_text_list("1 Mizzix of the Izmagnus")
+    assert result["invalid_rows"] == []
+    assert len(result["valid_rows"]) == 1
+    row = result["valid_rows"][0]
+    assert row["name"] == "Mizzix of the Izmagnus"
+    assert row["scryfall_id"] == "sid-x"
+    assert row["quantity"] == 1
+    # The line was handed to the name batch with an empty set hint.
+    assert captured["names"] == [("Mizzix of the Izmagnus", "")]
+
+
+def test_name_with_set_hint_passes_set_to_name_batch(monkeypatch):
+    # A "Name (SET)" line with no collector number is name-batchable WITH the
+    # set as a hint (resolves that printing), not rejected.
+    monkeypatch.setattr(import_service, "bulk_fetch_by_set_number", lambda pairs: BulkFetchResult())
+
+    captured = {}
+
+    def fake_name_batch(names):
+        captured["names"] = names
+        return BulkFetchResult(cards={("sol ring", "c21"): _card("Sol Ring", "c21", "263")})
+
+    monkeypatch.setattr(import_service, "bulk_fetch_by_name", fake_name_batch)
+
+    result = parse_text_list("1 Sol Ring (C21)")
+    assert result["invalid_rows"] == []
+    assert result["valid_rows"][0]["set_code"] == "c21"
+    assert captured["names"] == [("Sol Ring", "c21")]
+
+
+def test_set_plus_collector_line_is_not_routed_to_name_batch(monkeypatch):
+    # Strictness: a line carrying BOTH set+collector is resolved only by the
+    # set batch. If that printing doesn't resolve, the line is invalid — it is
+    # NEVER silently substituted with a different printing via the name batch.
+    monkeypatch.setattr(import_service, "bulk_fetch_by_set_number", lambda pairs: BulkFetchResult())
+
+    captured = {"names": None}
+
+    def fake_name_batch(names):
+        captured["names"] = names
+        return BulkFetchResult()
+
+    monkeypatch.setattr(import_service, "bulk_fetch_by_name", fake_name_batch)
+
+    result = parse_text_list("1 Sol Ring (C21) 263")
+    # The name batch was never invoked — a set+collector line is not name-batchable.
+    assert captured["names"] is None
+    assert result["valid_rows"] == []
+    assert len(result["invalid_rows"]) == 1
+
+
+def test_unknown_bare_name_is_invalid_with_spelling_reason(monkeypatch):
+    # Name batch ran but found nothing (typo / not a real card) → invalid row
+    # whose reason points at spelling / adding a set+collector, NOT the old
+    # "can't be batch-resolved" message.
+    monkeypatch.setattr(import_service, "bulk_fetch_by_set_number", lambda pairs: BulkFetchResult())
+    monkeypatch.setattr(
+        import_service,
+        "bulk_fetch_by_name",
+        lambda names: BulkFetchResult(not_found=[("definitely not a card", "")]),
+    )
+
+    result = parse_text_list("1 Definitely Not A Card")
+    assert result["valid_rows"] == []
+    assert len(result["invalid_rows"]) == 1
+    reason = result["invalid_rows"][0]["reason"]
+    assert "not found" in reason.lower()
+    assert "batch-resolved" not in reason
+
+
+def test_transient_name_batch_failure_reports_retry(monkeypatch):
+    # Name batch POST errored after retries (Scryfall down) → the line's reason
+    # is the transient "re-import to retry", distinct from a genuine not-found.
+    monkeypatch.setattr(import_service, "bulk_fetch_by_set_number", lambda pairs: BulkFetchResult())
+    monkeypatch.setattr(
+        import_service,
+        "bulk_fetch_by_name",
+        lambda names: BulkFetchResult(failed=[("sol ring", "")]),
+    )
+
+    result = parse_text_list("1 Sol Ring")
+    assert result["valid_rows"] == []
+    reason = result["invalid_rows"][0]["reason"]
+    assert "temporarily failed" in reason.lower()

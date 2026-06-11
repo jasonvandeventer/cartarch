@@ -1,5 +1,19 @@
 [
   {
+    "version": "3.39.1",
+    "date": "2026-06-12",
+    "added": [
+      "Pasting a card list now resolves cards by name alone — a line like \"1 Mizzix of the Izmagnus\" with no set or collector number just works, picking the default printing. Add a set in parentheses, e.g. \"1 Mizzix of the Izmagnus (C15)\", to pin a specific one. It resolves a whole pasted list of names in one batched lookup, so even long lists come back fast."
+    ],
+    "refined": [
+      "When a pasted name can't be found, the message now points at the likely cause — a misspelling, or a card that needs a set + collector to disambiguate — instead of flatly refusing names. A line that already names a specific set and collector still resolves to exactly that printing and is never quietly swapped for a different one."
+    ],
+    "resolved": [
+      "Removed the old \"bare card names can't be batch-resolved\" wall on the paste importer. Name-only lines used to be rejected with a note to add a set + collector or use the single-card \"Import by name\" tool; now they resolve directly in the batch import."
+    ],
+    "archivist_note": "The single-card importer could always find a card by name; the batch importer couldn't, and said so. It turned out the batch lookup could take names all along — we'd just never asked it to. So now a pasted list of plain names lands the same way one careful single card does."
+  },
+  {
     "version": "3.39.0",
     "date": "2026-06-12",
     "added": [],

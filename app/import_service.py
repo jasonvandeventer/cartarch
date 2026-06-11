@@ -25,6 +25,7 @@ from app.location_service import VALID_LOCATION_TYPES, create_location
 from app.models import Card, Deck, InventoryRow, StorageLocation
 from app.scryfall import (
     BulkFetchResult,
+    bulk_fetch_by_name,
     bulk_fetch_by_set_number,
     bulk_refresh_prices,
     card_constructor_kwargs,
@@ -1474,31 +1475,41 @@ def _parse_list_line(line: str) -> dict[str, Any] | None:
 
 
 def _text_list_unresolved_reason(
-    parsed: dict[str, Any], label: str, set_failed: set[tuple[str, str]]
+    parsed: dict[str, Any],
+    label: str,
+    set_failed: set[tuple[str, str]],
+    name_failed: set[tuple[str, str]],
 ) -> str:
-    """Reason string for a paste-list line Pass 2's batch did not resolve.
+    """Reason string for a paste-list line the batch passes did not resolve.
 
-    Distinguishes the three post-v3.23.x cases so the user knows what to do:
-    transient batch failure (retry), bare name (no batch path — needs a
-    set+collector or the name-search import UI), or genuinely-unknown card.
+    Distinguishes transient batch failure (retry) from a genuinely-unknown
+    card, for BOTH resolution paths: the set+collector batch
+    (``set_failed``) and the name batch (``name_failed``). Bare names ARE
+    batch-resolvable now (v3.39.x ``bulk_fetch_by_name``), so a bare-name
+    miss means the name was unknown to Scryfall (typo / not a real card),
+    not "unsupported".
     """
     if parsed["set_code"] and parsed["collector_number"]:
         if (parsed["set_code"], parsed["collector_number"]) in set_failed:
             return f"Scryfall lookup temporarily failed — re-import to retry: {label}"
         return f"Card not found on Scryfall: {label}"
-    # No set+collector: a bare name line. There is no batch name endpoint,
-    # and per-line live name lookup was removed (request-path immunity).
+    # Name path (bare name, or name + set hint without a collector number).
+    name_key = (parsed["name"].strip().lower(), parsed["set_code"].strip().lower())
+    if name_key in name_failed:
+        return f"Scryfall lookup temporarily failed — re-import to retry: {label}"
     return (
-        f"Bare card names can't be batch-resolved — add a set + collector "
-        f'(e.g. "MH3 145") or use Import by name: {label}'
+        f"Card not found on Scryfall — check the spelling, or add a set + "
+        f'collector (e.g. "MH3 145"): {label}'
     )
 
 
 def parse_text_list(text: str) -> dict[str, Any]:
     """Parse a pasted card list in Moxfield / MTGA / MTGO format.
 
-    Resolves each line via Scryfall. Uses set+collector when available,
-    falls back to exact name (then fuzzy) when only a name is given.
+    Resolves each line via two batched /cards/collection passes (never
+    per-row): set+collector when both are present (exact printing), then the
+    name identifier for bare names / name-only-with-set lines. Both are
+    ceil(N/75) POSTs, preserving the request-path network invariant.
     """
     valid_rows: list[dict[str, Any]] = []
     invalid_rows: list[dict[str, Any]] = []
@@ -1543,17 +1554,38 @@ def parse_text_list(text: str) -> dict[str, Any]:
         set_result = bulk_fetch_by_set_number(batchable)
         set_map = set_result.cards
 
-    # --- Pass 3: resolve each line from Pass 2's batch ONLY (no network) ---
-    # Same invariant as parse_scanner_csv: nothing in this loop calls
-    # Scryfall. Bare card-name lines (no set/collector) cannot be
-    # batch-resolved — Scryfall has no batch name endpoint — so they now
-    # surface as invalid rows instead of triggering a per-line live name
-    # lookup (the v3.23.9 request-path-immunity principle).
+    # --- Pass 2b: batch-resolve bare-name lines via the name identifier ---
+    # Any line WITHOUT a full set+collector pair (a bare name, or a name with
+    # only a set hint) is resolved by /cards/collection's {"name": ...}
+    # identifier — ceil(N/75) POSTs, never one-per-row, so the request-path
+    # network invariant holds (v3.39.x). Lines that DO carry set+collector are
+    # left strictly to the set batch: if the explicit printing doesn't resolve
+    # we surface it as invalid rather than silently substituting a different
+    # printing. Key shape (name_lower, set_lower) mirrors the request.
+    name_map: dict[tuple[str, str], dict[str, Any]] = {}
+    name_result = BulkFetchResult()
+    name_batchable = [
+        (p["name"], p["set_code"])
+        for _, p in pre_lines
+        if p["name"] and not (p["set_code"] and p["collector_number"])
+    ]
+    if name_batchable:
+        name_result = bulk_fetch_by_name(name_batchable)
+        name_map = name_result.cards
+
+    # --- Pass 3: resolve each line from Pass 2 / 2b ONLY (no per-row network) ---
+    # Same invariant as parse_scanner_csv: nothing in this loop calls Scryfall.
+    # Resolution is set+collector first (exact printing), then the name batch.
     _set_failed = set(set_result.failed)
+    _name_failed = set(name_result.failed)
     for line_number, parsed in pre_lines:
         card_data: dict[str, Any] | None = None
         if parsed["set_code"] and parsed["collector_number"]:
             card_data = set_map.get((parsed["set_code"], parsed["collector_number"]))
+        elif parsed["name"]:
+            card_data = name_map.get(
+                (parsed["name"].strip().lower(), parsed["set_code"].strip().lower())
+            )
 
         if card_data:
             valid_rows.append(
@@ -1587,7 +1619,9 @@ def parse_text_list(text: str) -> dict[str, Any]:
                     "collector_number": parsed["collector_number"],
                     "finish": parsed["finish"],
                     "quantity": parsed["quantity"],
-                    "reason": _text_list_unresolved_reason(parsed, label, _set_failed),
+                    "reason": _text_list_unresolved_reason(
+                        parsed, label, _set_failed, _name_failed
+                    ),
                 }
             )
 

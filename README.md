@@ -78,7 +78,7 @@ See [docs/screenshots/](docs/screenshots/) for capture guidelines and additional
 ### Imports
 
 - **CSV upload** — auto-detects Scanner App, Helvault (free/pro), and Moxfield collection CSV formats
-- **Paste list** — parses Moxfield deck exports, MTGA, MTGO, and standard `N CardName (SET) #` format; also accepts bare `SET COLLECTOR` lines (`MH3 145`, `MH3 145 2`, `2 MH3 145`, `*F*` for foil) so you can add cards by set + collector number alone
+- **Paste list** — parses Moxfield deck exports, MTGA, MTGO, and standard `N CardName (SET) #` format; name-only lines with a quantity (`1 Mizzix of the Izmagnus`) resolve to the default printing, or add a `(SET)` to pin one; also accepts bare `SET COLLECTOR` lines (`MH3 145`, `MH3 145 2`, `2 MH3 145`, `*F*` for foil) so you can add cards by set + collector number alone. All lookups are batched (resolves a whole pasted list in a fixed number of requests, never one per line)
 - Import directly to a deck or storage location at commit time
 - **Inline create** — "+ Create new deck" / "+ Create new location" popouts on the import preview screen create the destination via JSON endpoints and pre-select it in the dropdown without leaving the wizard
 - Import complete screen shows total cards imported + unique-row count, and a "Go to [destination]" button that links straight to the deck or location
