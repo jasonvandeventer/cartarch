@@ -86,3 +86,84 @@ def test_deck_creation_route_creates_deck_and_paired_location(client, db, user):
     loc = db.query(StorageLocation).filter(StorageLocation.id == deck.storage_location_id).first()
     assert loc is not None
     assert loc.type == "deck"
+
+
+# ---------------------------------------------------------------------------
+# Import preview blocks commit on unparsed/unresolved lines (brew-buylist
+# Defect B): the commit button is disabled and an acknowledgment checkbox is
+# rendered whenever the parser reports invalid_rows. The parser itself is
+# mocked here so this test pins the route/template gating, not the grammar
+# (grammar lives in tests/test_import_parser.py).
+# ---------------------------------------------------------------------------
+
+
+def _mock_preview_result(monkeypatch, *, valid, invalid):
+    from app.routes import imports as imports_routes
+
+    def _fake_parse(_text):
+        return {"valid_rows": valid, "invalid_rows": invalid, "format_name": "Text List"}
+
+    monkeypatch.setattr(imports_routes, "parse_text_list", _fake_parse)
+
+
+def _valid_row():
+    return {
+        "line_number": 1,
+        "name": "Sol Ring",
+        "scryfall_id": "sid-solring",
+        "set_code": "c21",
+        "collector_number": "263",
+        "finish": "normal",
+        "quantity": 1,
+        "location": "",
+        "language": "en",
+        "location_type": "",
+        "role": "",
+        "tags": "",
+        "is_proxy": False,
+        "warnings": [],
+    }
+
+
+def _invalid_row():
+    return {
+        "line_number": 2,
+        "name": "garblednonsense",
+        "set_code": "",
+        "collector_number": "",
+        "finish": "normal",
+        "quantity": 1,
+        "reason": "Could not parse line",
+    }
+
+
+def _seed_placeable_location(db, user):
+    """A non-deck, non-root StorageLocation so the commit button isn't disabled
+    purely for lack of a destination — isolates the invalid-row gating."""
+    loc = StorageLocation(user_id=user.id, name="Box A", type="box")
+    db.add(loc)
+    db.commit()
+
+
+def test_preview_blocks_commit_when_invalid_rows_present(client, db, user, monkeypatch):
+    _seed_placeable_location(db, user)
+    _mock_preview_result(monkeypatch, valid=[_valid_row()], invalid=[_invalid_row()])
+    r = client.post("/import/list/preview", data={"card_list": "x", "csrf_token": "x"})
+    assert r.status_code == 200
+    # Acknowledgment checkbox is rendered and the commit button is disabled.
+    assert 'id="import-ack-skip"' in r.text
+    btn = r.text.split('id="import-submit-btn"', 1)[1].split(">", 1)[0]
+    assert "disabled" in btn
+    # The dropped line is enumerated for the user.
+    assert "garblednonsense" in r.text
+
+
+def test_preview_allows_commit_when_no_invalid_rows(client, db, user, monkeypatch):
+    _seed_placeable_location(db, user)
+    _mock_preview_result(monkeypatch, valid=[_valid_row()], invalid=[])
+    r = client.post("/import/list/preview", data={"card_list": "x", "csrf_token": "x"})
+    assert r.status_code == 200
+    # No acknowledgment gate; the commit button is not invalid-row-disabled.
+    assert 'id="import-ack-skip"' not in r.text
+    btn = r.text.split('id="import-submit-btn"', 1)[1].split(">", 1)[0]
+    assert "disabled" not in btn

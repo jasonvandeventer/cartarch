@@ -1306,11 +1306,36 @@ _SECTION_HEADERS = frozenset(
     {"deck", "sideboard", "commander", "companion", "maybeboard", "considering", "tokens"}
 )
 
+# A trailing "(15)" count or trailing ":" on an otherwise-bare section header —
+# stripped before matching _SECTION_HEADERS so decorated headers ("Sideboard (15)",
+# "Maybeboard:") are skipped like their bare forms rather than surfacing as
+# unparseable lines (brew-buylist Defect B follow-up).
+_HEADER_DECORATION_RE = re.compile(r"\s*\([^)]*\)\s*$")
+
+
+def _is_skippable_list_line(stripped: str) -> bool:
+    """True for non-card lines that should be skipped, NOT reported as invalid.
+
+    Blank lines, comment lines (``#`` or ``//`` prefix — note ``//`` only as a
+    line PREFIX, so it can't swallow a DFC name like "Expansion // Explosion"),
+    and section headers including decorated variants ("Sideboard (15)",
+    "Maybeboard:").
+    """
+    if not stripped or stripped.startswith("#") or stripped.startswith("//"):
+        return True
+    candidate = _HEADER_DECORATION_RE.sub("", stripped).strip().rstrip(":").strip()
+    return candidate.lower() in _SECTION_HEADERS
+
+
 # Short-form: bare set + collector with optional qty / foil marker.
-# SET = 2-6 chars starting with a letter; COLLECTOR = digits with optional letter suffix
-# (e.g. "145", "23a"); QTY = 1-3 digits.
-_SHORT_SET_RE = re.compile(r"^[A-Za-z][A-Za-z0-9]{1,5}$")
-_SHORT_COLL_RE = re.compile(r"^[0-9]+[A-Za-z]?$")
+# SET = 2-6 alphanumerics that include at least one letter, so digit-leading
+#   codes (40K, 2X2, 2XM) and longer codes (PMEI, PLST) parse, but an all-digit
+#   token (a qty or a collector) is never mistaken for a set.
+# COLLECTOR = starts with a digit or a unicode star, then may contain digits,
+#   letters, hyphens, or stars (e.g. "145", "23a", "2026-1", "353a", "★").
+# QTY = 1-3 digits.
+_SHORT_SET_RE = re.compile(r"^(?=[A-Za-z0-9]*[A-Za-z])[A-Za-z0-9]{2,6}$")
+_SHORT_COLL_RE = re.compile(r"^[0-9★][0-9A-Za-z★-]*$")
 _SHORT_QTY_RE = re.compile(r"^[0-9]{1,3}$")
 
 
@@ -1482,12 +1507,27 @@ def parse_text_list(text: str) -> dict[str, Any]:
     pre_lines: list[tuple[int, dict[str, Any]]] = []
     for line_number, raw_line in enumerate(text.splitlines(), start=1):
         stripped = raw_line.strip()
-        if not stripped or stripped.startswith("#"):
-            continue
-        if stripped.lower() in _SECTION_HEADERS:
+        if _is_skippable_list_line(stripped):
             continue
         parsed = _parse_list_line(stripped)
         if not parsed:
+            # No silent drops (brew-buylist Defect B): a non-empty,
+            # non-comment, non-section-header line we cannot parse becomes an
+            # invalid row the preview surfaces, rather than vanishing.
+            invalid_rows.append(
+                {
+                    "line_number": line_number,
+                    "name": stripped,
+                    "set_code": "",
+                    "collector_number": "",
+                    "finish": "normal",
+                    "quantity": 1,
+                    "reason": (
+                        "Could not parse line — expected "
+                        '"Qty Name (SET) Collector" (e.g. "1 Ponder (M12) 73")'
+                    ),
+                }
+            )
             continue
         pre_lines.append((line_number, parsed))
 

@@ -329,6 +329,23 @@
             {% endif %}
           </section>
         {% endif %}
+        {% if invalid_rows %}
+          {# Blocking acknowledgment (brew-buylist Defect B): when the parser
+             couldn't parse / resolve some lines, the user must explicitly
+             confirm those lines will be skipped before the commit button
+             enables. The button is disabled below until #import-ack-skip is
+             ticked; see § II for the full list. #}
+          <label class="imports-ack-skip warning-text"
+                 for="import-ack-skip"
+                 style="display: block; margin: 0 0 0.75rem">
+            <input type="checkbox"
+                   id="import-ack-skip"
+                   onchange="document.getElementById('import-submit-btn').disabled = !this.checked;">
+            I understand <b>{{ invalid_rows|length }}</b>
+            {{ "line" if invalid_rows|length == 1 else "lines" }}
+            couldn't be parsed or matched (see below) and will be <b>skipped</b>.
+          </label>
+        {% endif %}
         <div class="filter-row imports-destination-row" style="margin: 0">
           <label class="imports-destination-label">Destination</label>
           <select name="target_location_id"
@@ -354,7 +371,7 @@
           <button type="submit"
                   id="import-submit-btn"
                   class="imports-commit-btn"
-                  {% if not use_drawer_sorter and not placeable and not decks %}disabled{% endif %}>
+                  {% if (not use_drawer_sorter and not placeable and not decks) or invalid_rows %}disabled{% endif %}>
             Import Valid Rows
           </button>
         </div>
