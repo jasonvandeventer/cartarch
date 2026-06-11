@@ -1,0 +1,77 @@
+{% from "_macros.html" import editorial_eyebrow %}
+{% extends "base.html" %}
+{% block content %}
+  {# Verify-before-commit gate for the retroactive drawer cull (v3.38.0). The
+     numbers here are recomputed by /collection/cull-to-bulk on Confirm, so this
+     page can never commit something different from what it shows. #}
+  <section class="panel hero-panel compact-hero">
+    {{ editorial_eyebrow("Collection · Drawers · Cull") }}
+    <h2 class="panel-title">Cull cheap drawer dupes to {{ target.name }}</h2>
+    <p class="pagehead-tagline">
+      <em>Nothing has moved yet.</em> These are surplus copies in your drawers of cards
+      under ${{ '%.2f' | format(threshold) }} that aren't basics and aren't in a deck. One
+      findable copy of each printing stays in the drawers; the rest move to
+      <b>{{ target.name }}</b>.
+    </p>
+  </section>
+
+  {% if total_copies > 0 %}
+    <section class="panel">
+      <p>
+        <b>{{ total_copies }}</b> surplus cop{{ 'y' if total_copies == 1 else 'ies' }}
+        across <b>{{ total_cards }}</b> card{{ '' if total_cards == 1 else 's' }} will move to
+        <b>{{ target.name }}</b>.
+      </p>
+      <form action="/collection/cull-to-bulk" method="post" class="inline-form"
+            onsubmit="return confirm('Move {{ total_copies }} surplus copy(ies) to {{ target.name }}? One copy of each printing stays in the drawers.');">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <input type="hidden" name="target_location_id" value="{{ target.id }}">
+        <input type="hidden" name="search" value="{{ filter_params.search }}">
+        <input type="hidden" name="colors" value="{{ filter_params.colors }}">
+        <input type="hidden" name="types" value="{{ filter_params.types }}">
+        <input type="hidden" name="status" value="{{ filter_params.status }}">
+        <input type="hidden" name="finishes" value="{{ filter_params.finishes }}">
+        <input type="hidden" name="price_min" value="{{ filter_params.price_min }}">
+        <input type="hidden" name="price_max" value="{{ filter_params.price_max }}">
+        <input type="hidden" name="finish" value="{{ filter_params.finish }}">
+        <input type="hidden" name="location_id" value="{{ filter_params.location_id }}">
+        <button type="submit">Move {{ total_copies }} surplus to {{ target.name }} →</button>
+        <a href="/collection" class="button-secondary">Cancel</a>
+      </form>
+    </section>
+
+    <section class="panel">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Card</th>
+            <th>Set</th>
+            <th>Finish</th>
+            <th>Price</th>
+            <th>Have</th>
+            <th>Move</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for it in items %}
+            <tr>
+              <td>{{ it.name }}</td>
+              <td>{{ it.set_code }} #{{ it.collector_number }}</td>
+              <td>{{ it.finish }}</td>
+              <td>${{ '%.2f' | format(it.price) }}</td>
+              <td>{{ it.quantity }}</td>
+              <td>{{ it.surplus }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </section>
+  {% else %}
+    <section class="panel">
+      <p>No surplus drawer dupes qualify for culling right now. Every cheap dupe is
+      either already a single copy, a basic land, a card you run in a deck, or worth
+      more than ${{ '%.2f' | format(threshold) }}.</p>
+      <a href="/collection" class="button-secondary">← Back to Collection</a>
+    </section>
+  {% endif %}
+{% endblock %}

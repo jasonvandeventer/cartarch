@@ -36,6 +36,7 @@ from app.dependencies import (
     safe_redirect_url,
 )
 from app.inventory_service import (
+    DRAWER_KEEP_PRICE_THRESHOLD,
     add_card_to_location,
     adjust_inventory_row_quantity,
     apply_collection_search_filters,
@@ -51,6 +52,8 @@ from app.inventory_service import (
     list_inventory_rows,
     list_pending_rows,
     move_inventory_row_to_location,
+    move_surplus_to_location,
+    resolve_drawer_cull_candidates,
     resort_collection,
     undo_last_batch,
     undo_last_import,
@@ -493,6 +496,8 @@ def collection_page(
         "pending": request.query_params.get("pending"),
         "name": request.query_params.get("name"),
         "reason": request.query_params.get("reason"),
+        "culled_cards": request.query_params.get("culled_cards"),
+        "culled_copies": request.query_params.get("culled_copies"),
     }
 
     return render(
@@ -910,6 +915,218 @@ def collection_bulk_move(
             "bulk": "moved",
             "moved": moved,
             "pending": pending_excluded,
+            "name": target.name,
+        },
+    )
+
+
+def _cull_resolver_kwargs(
+    *,
+    search: str,
+    colors: str,
+    types: str,
+    status: str,
+    finishes: str,
+    price_min: str,
+    price_max: str,
+    finish: str,
+    location_id: int,
+) -> dict:
+    """Parse the replayed ``/collection`` filter into ``resolve_drawer_cull_candidates``
+    kwargs — same tolerant price-string→float handling as ``_bulk_filter_placed_ids``
+    so the cull set matches the grid. ``location_id`` is passed through so the cull
+    can be narrowed to a SINGLE drawer when the grid is scoped to one (the resolver
+    honors it only when it names a drawer-type location; otherwise it spans every
+    drawer). The cull is drawer-scoped + ``quantity > 1`` on top of this."""
+    facet_price_min: float | None = None
+    facet_price_max: float | None = None
+    if price_min and price_min.strip():
+        try:
+            facet_price_min = float(price_min.strip())
+        except ValueError:
+            facet_price_min = None
+    if price_max and price_max.strip():
+        try:
+            facet_price_max = float(price_max.strip())
+        except ValueError:
+            facet_price_max = None
+    return {
+        "location_id": location_id,
+        "search": search,
+        "facet_colors": colors,
+        "facet_types": types,
+        "facet_status": status,
+        "facet_finishes": finishes,
+        "facet_price_min": facet_price_min,
+        "facet_price_max": facet_price_max,
+        "finish": finish,
+    }
+
+
+@router.post("/collection/cull-preview")
+def collection_cull_preview(
+    request: Request,
+    target_location_id: int = Form(...),
+    search: str = Form(""),
+    colors: str = Form(""),
+    types: str = Form(""),
+    status: str = Form(""),
+    finishes: str = Form(""),
+    price_min: str = Form(""),
+    price_max: str = Form(""),
+    finish: str = Form(""),
+    location_id: int = Form(0),
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+    _: None = CsrfRequired,
+):
+    """Verify-before-commit gate for the retroactive drawer cull (v3.38.0).
+
+    Computes the cull candidates (drawer rows, ``quantity > 1``, surplus copies
+    NOT intrinsically protected) and renders a confirmation page showing exactly
+    how many cards / copies would move to the chosen Bulk location — never a
+    silent move. The Confirm button posts the same params to
+    ``/collection/cull-to-bulk``, which recomputes the set (single source of
+    truth — no drift)."""
+    filter_params = {
+        "search": search,
+        "colors": colors,
+        "types": types,
+        "status": status,
+        "finishes": finishes,
+        "price_min": price_min,
+        "price_max": price_max,
+        "finish": finish,
+        "location_id": location_id,
+    }
+    # Same non-deck guard as bulk-move: a deck destination would bypass deck
+    # reconciliation. Bulk must be a real (non-deck) StorageLocation.
+    target = get_location(session, location_id=target_location_id, user_id=current_user.id)
+    if target is None or target.type == "deck":
+        return _collection_filter_redirect(filter_params, {"bulk": "error", "reason": "bad_target"})
+
+    candidates = resolve_drawer_cull_candidates(
+        session,
+        current_user.id,
+        **_cull_resolver_kwargs(
+            search=search,
+            colors=colors,
+            types=types,
+            status=status,
+            finishes=finishes,
+            price_min=price_min,
+            price_max=price_max,
+            finish=finish,
+            location_id=location_id,
+        ),
+    )
+    items = []
+    total_copies = 0
+    for row in candidates:
+        surplus = row.quantity - 1
+        total_copies += surplus
+        items.append(
+            {
+                "name": row.card.name if row.card else "(unknown)",
+                "set_code": (row.card.set_code or "").upper() if row.card else "",
+                "collector_number": row.card.collector_number if row.card else "",
+                "finish": row.finish,
+                "quantity": row.quantity,
+                "surplus": surplus,
+                "price": effective_price(row.card, row.finish) if row.card else 0.0,
+            }
+        )
+
+    return render(
+        request,
+        "cull_preview.html",
+        {
+            "title": "Cull drawer dupes to Bulk",
+            "items": items,
+            "total_cards": len(items),
+            "total_copies": total_copies,
+            "target": target,
+            "filter_params": filter_params,
+            "threshold": DRAWER_KEEP_PRICE_THRESHOLD,
+            "current_user": current_user,
+        },
+    )
+
+
+@router.post("/collection/cull-to-bulk")
+def collection_cull_to_bulk(
+    target_location_id: int = Form(...),
+    search: str = Form(""),
+    colors: str = Form(""),
+    types: str = Form(""),
+    status: str = Form(""),
+    finishes: str = Form(""),
+    price_min: str = Form(""),
+    price_max: str = Form(""),
+    finish: str = Form(""),
+    location_id: int = Form(0),
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+    _: None = CsrfRequired,
+):
+    """Commit the retroactive drawer cull: each candidate keeps one findable
+    copy in its drawer (the layer-2 keeper) and its surplus copies move to the
+    Bulk location. ``resort_collection`` is intentionally NOT called — an
+    explicit destination must not be hijacked back into the drawers (the same
+    rule the bulk-move and explicit-destination-import paths follow)."""
+    filter_params = {
+        "search": search,
+        "colors": colors,
+        "types": types,
+        "status": status,
+        "finishes": finishes,
+        "price_min": price_min,
+        "price_max": price_max,
+        "finish": finish,
+        "location_id": location_id,
+    }
+    target = get_location(session, location_id=target_location_id, user_id=current_user.id)
+    if target is None or target.type == "deck":
+        return _collection_filter_redirect(filter_params, {"bulk": "error", "reason": "bad_target"})
+
+    candidates = resolve_drawer_cull_candidates(
+        session,
+        current_user.id,
+        **_cull_resolver_kwargs(
+            search=search,
+            colors=colors,
+            types=types,
+            status=status,
+            finishes=finishes,
+            price_min=price_min,
+            price_max=price_max,
+            finish=finish,
+            location_id=location_id,
+        ),
+    )
+    moved_copies = 0
+    moved_cards = 0
+    for row in candidates:
+        try:
+            moved = move_surplus_to_location(
+                session,
+                row_id=row.id,
+                user_id=current_user.id,
+                location_id=target_location_id,
+                keep=1,
+            )
+        except ValueError:
+            moved = 0
+        if moved:
+            moved_copies += moved
+            moved_cards += 1
+
+    return _collection_filter_redirect(
+        filter_params,
+        {
+            "bulk": "culled",
+            "culled_cards": moved_cards,
+            "culled_copies": moved_copies,
             "name": target.name,
         },
     )

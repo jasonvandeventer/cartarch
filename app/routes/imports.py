@@ -49,6 +49,8 @@ from app.inventory_service import (
     find_inventory_matches_for_collection_import,
     place_imported_rows,
     resort_collection,
+    route_intake_to_bulk,
+    summarize_intake_routing,
 )
 from app.location_service import (
     get_location,
@@ -409,6 +411,22 @@ def _deck_for_storage_location(
     return session.query(Deck).filter(Deck.storage_location_id == loc.id).first()
 
 
+def _intake_routing_preview(
+    session: Session, current_user: User, target_location_id: int, matches_rows: list[dict]
+) -> dict | None:
+    """v3.38.0 — the auto-sort intake-routing verdict for the reconcile-preview:
+    ``{"drawers": N, "bulk": M}`` of imported copies, or ``None`` when it doesn't
+    apply (an explicit destination was chosen so nothing auto-sorts, the user
+    isn't a drawer-sorter, or nothing would route). Keeps the "N → drawers,
+    M → bulk" line off previews where intake routing won't run."""
+    if target_location_id != 0 or current_user.username not in DRAWER_SORTER_USERNAMES:
+        return None
+    drawers_n, bulk_n = summarize_intake_routing(session, current_user.id, matches_rows)
+    if drawers_n == 0 and bulk_n == 0:
+        return None
+    return {"drawers": drawers_n, "bulk": bulk_n}
+
+
 def _annotate_collection_dupes(rows: list[dict]) -> None:
     """Tag each collection-mode reconciliation row with display flags so the
     partial can render a focused "show only duplicates" view.
@@ -587,6 +605,9 @@ async def import_reconcile_preview(
             "total_to_new": total_to_new,
             "manual_mode": False,
             "has_deck_only_dupes": has_deck_only_dupes,
+            "bulk_routing": _intake_routing_preview(
+                session, current_user, target_location_id, matches_rows
+            ),
         },
     )
 
@@ -1162,6 +1183,9 @@ async def import_commit(
             placed_in_url = f"/locations/{target_location_id}" if loc else "/pending"
             placed_in_kind = ("deck" if loc.type == "deck" else "location") if loc else None
         elif pending_row_ids and current_user.username in DRAWER_SORTER_USERNAMES:
+            # v3.38.0 intake routing: divert cheap non-staple surplus to Bulk
+            # BEFORE the sorter runs, so the sorter only ever places keepers.
+            route_intake_to_bulk(session, current_user.id, pending_row_ids)
             resort_collection(session, user_id=current_user.id)
             return RedirectResponse(url="/pending", status_code=303)
         elif placed_by_loc:
@@ -1251,6 +1275,9 @@ async def import_commit(
             # sorter only runs on the "Auto-sort to drawers" path (the elif
             # below, where no target_location_id was selected).
         elif row_ids and current_user.username in DRAWER_SORTER_USERNAMES:
+            # v3.38.0 intake routing: divert cheap non-staple surplus to Bulk
+            # BEFORE the sorter runs, so the sorter only ever places keepers.
+            route_intake_to_bulk(session, current_user.id, row_ids)
             resort_collection(session, user_id=current_user.id)
             return RedirectResponse(url="/pending", status_code=303)
     else:
@@ -1273,6 +1300,9 @@ async def import_commit(
             # below, where no target_location_id was selected).
 
         elif row_ids and current_user.username in DRAWER_SORTER_USERNAMES:
+            # v3.38.0 intake routing: divert cheap non-staple surplus to Bulk
+            # BEFORE the sorter runs, so the sorter only ever places keepers.
+            route_intake_to_bulk(session, current_user.id, row_ids)
             resort_collection(session, user_id=current_user.id)
             return RedirectResponse(url="/pending", status_code=303)
 
@@ -1480,6 +1510,9 @@ async def manual_import_reconcile_preview(
             "total_to_new": total_to_new,
             "manual_mode": True,  # default flips to import_new
             "has_deck_only_dupes": has_deck_only_dupes,
+            "bulk_routing": _intake_routing_preview(
+                session, current_user, target_location_id, matches_rows
+            ),
         },
     )
 
@@ -1567,6 +1600,9 @@ async def manual_import_commit(
             # sorter only runs on the "Auto-sort to drawers" path (the elif
             # below, where no target_location_id was selected).
         elif row_ids and current_user.username in DRAWER_SORTER_USERNAMES:
+            # v3.38.0 intake routing: divert cheap non-staple surplus to Bulk
+            # BEFORE the sorter runs, so the sorter only ever places keepers.
+            route_intake_to_bulk(session, current_user.id, row_ids)
             resort_collection(session, user_id=current_user.id)
     else:
         result = persist_import_rows(
@@ -1588,6 +1624,9 @@ async def manual_import_commit(
             # sorter only runs on the "Auto-sort to drawers" path (the elif
             # below, where no target_location_id was selected).
         elif row_ids and current_user.username in DRAWER_SORTER_USERNAMES:
+            # v3.38.0 intake routing: divert cheap non-staple surplus to Bulk
+            # BEFORE the sorter runs, so the sorter only ever places keepers.
+            route_intake_to_bulk(session, current_user.id, row_ids)
             resort_collection(session, user_id=current_user.id)
 
     return render(

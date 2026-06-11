@@ -2,7 +2,7 @@
 
 Self-hosted web application for managing a physical Magic: The Gathering collection. (Identifies as **Cartarch** in user-facing UI as of v3.27.6; the in-repo project identifier is still `mana-archive` pending the full infrastructure rename near actual public launch.)
 
-**Current version: v3.37.1** · [Platform repo](https://github.com/jasonvandeventer/vanfreckle-platform)
+**Current version: v3.38.0** · [Platform repo](https://github.com/jasonvandeventer/vanfreckle-platform)
 
 ---
 
@@ -115,6 +115,7 @@ See [docs/screenshots/](docs/screenshots/) for capture guidelines and additional
 - Custom storage locations: create, edit (name/type/parent/sort order), and delete
 - Move cards between locations from the location detail page or deck detail page
 - **Bulk move**: select multiple cards from a location or deck and move them in one action; destination picker includes both storage locations and other decks; drawer-sorter users get a "Return to Sorter" option that bulk-returns rows to pending and triggers auto-placement
+- **Drawer-vs-Bulk routing (v3.38.0)** _(drawer-sorter users)_: cheap, non-staple surplus is kept out of prime drawer slots and routed to a **Bulk** location. One predicate protects basics, anything you run in a deck, and anything worth more than $1 (threshold configurable); everything else, once you already keep one findable copy in the drawers, routes its extras to Bulk. Applied two ways from the same logic: a retroactive **"cull cheap drawer dupes to Bulk"** action on the Collection page (with a confirmation screen showing exactly what moves; all drawers or just one), and **automatic routing at import time** on the auto-sort path (the reconcile preview shows "N → drawers · M → Bulk" before you commit). The hand-tuned drawer sorter is untouched — routing is a new step in front of it. The Bulk location must be `manual` mode so the sorter doesn't re-absorb it
 - Return cards from decks to pending/collection
 - **CSV export**: download your collection or any individual location as a CSV. The collection export honors the active filter (search, facets, location, price range) so you get exactly the rows you're viewing — not always the whole collection — and includes a finish-aware Price column plus a Scryfall ID join key (columns: Name, Set, Collector Number, Finish, Quantity, Location, Location Type, Language, Role, Tags, Is Proxy, Scryfall ID, Price)
 

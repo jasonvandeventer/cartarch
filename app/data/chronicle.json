@@ -1,5 +1,16 @@
 [
   {
+    "version": "3.38.0",
+    "date": "2026-06-11",
+    "added": [
+      "Drawer-vs-Bulk routing. When you import a cheap, non-staple card you already keep a copy of in your drawers, the extra copies now go to a Bulk box automatically instead of taking up prime drawer space — one findable copy always stays in the drawers. Basics, anything you run in a deck, and anything worth more than $1 are always kept. The import preview tells you up front how many copies are headed to the drawers versus Bulk.",
+      "A matching \"cull cheap drawer dupes to Bulk\" action on the Collection page does the same housekeeping for cards already sitting in your drawers — surplus copies of cheap non-staples move to Bulk, one of each stays. It shows a confirmation screen with exactly what will move before anything happens, and you can sweep every drawer at once or just the one you're looking at."
+    ],
+    "refined": [],
+    "resolved": [],
+    "archivist_note": "The drawers are for finding things; bulk is for everything else. This release teaches the collection that distinction — the same judgment applied whether a card is arriving or already in a slot — without touching the hand-tuned sorter underneath it."
+  },
+  {
     "version": "3.37.1",
     "date": "2026-06-11",
     "added": [],

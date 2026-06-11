@@ -189,6 +189,159 @@ def is_premium_basic(card: Card, finish: str) -> bool:
     )
 
 
+# -----------------------------------------------------------------------------
+# Drawer-vs-Bulk routing predicate (v3.38.0)
+# -----------------------------------------------------------------------------
+# One routing predicate, two call sites — the retroactive cull (Call site A) and
+# intake routing (Call site B). See drawer-vs-bulk-routing-design-2026-06-08.md.
+# Pure + offline: price is the cached ``Card.price_usd*`` columns, never a
+# Scryfall fetch, so the request-path network invariant holds. Per-printing
+# grain == ``(card_id, finish)`` — the v3.17.0 merge key (owner F2 decision,
+# 2026-06-10; deliberately NO oracle_id grouping).
+#
+# ``should_keep_in_drawer`` covers the INTRINSIC-protection layers only —
+# 1 (basic), 3 (in-deck), 4 (value). Layer 2 (the drawer-presence "always keep
+# one findable copy" rule) is keep-exactly-one-of-N quantity arithmetic, not a
+# per-row boolean, so both call sites apply it identically as a shared keep-one
+# mechanic ON TOP of this predicate rather than folding it in here (one
+# predicate + one shared keep-one rule, two call sites — no drift). Layer 5
+# (manual keep-list) is Phase 4 / post-v4 schema and intentionally absent.
+
+DRAWER_KEEP_PRICE_THRESHOLD = 1.0
+
+
+def deck_member_card_ids(session: Session, user_id: int) -> set[int]:
+    """Set of ``card_id`` values the user holds in ANY deck location
+    (``StorageLocation.type == "deck"``). One query; both routing call sites
+    precompute it once and pass it into ``should_keep_in_drawer`` so layer 3
+    (in-deck protection) never fires a per-row query inside a loop.
+    """
+    rows = (
+        session.query(InventoryRow.card_id)
+        .join(StorageLocation, InventoryRow.storage_location_id == StorageLocation.id)
+        .filter(
+            InventoryRow.user_id == user_id,
+            StorageLocation.type == "deck",
+        )
+        .distinct()
+        .all()
+    )
+    return {card_id for (card_id,) in rows}
+
+
+def should_keep_in_drawer(
+    session: Session,
+    row: InventoryRow,
+    *,
+    user_id: int,
+    price_threshold: float = DRAWER_KEEP_PRICE_THRESHOLD,
+    deck_card_ids: set[int] | None = None,
+) -> bool:
+    """True when this printing has intrinsic drawer protection (it stays in the
+    drawers); False when surplus copies are bulk-eligible.
+
+    Layers, earliest match wins (per the routing design, minus the keeper and
+    manual layers handled elsewhere):
+
+      1. Basic land  → keep. Basics are stock you keep a pool of (any kind /
+         finish / frame), and this leaves in-deck mana bases alone.
+      3. In a deck   → keep. The ``card_id`` appears in one of the user's decks
+         — a strong personal-staple signal (finish-agnostic: running any finish
+         of a printing protects the printing).
+      4. Value       → keep. Cached ``effective_price`` STRICTLY greater than
+         ``price_threshold`` (default $1.00).
+
+    Otherwise → False. Pure + offline; no Scryfall fetch. A row whose ``card``
+    is not yet loaded keeps (conservative — never bulk something we cannot
+    classify). ``deck_card_ids`` may be precomputed by the caller (see
+    ``deck_member_card_ids``); when omitted it is resolved once here.
+    """
+    if deck_card_ids is None:
+        deck_card_ids = deck_member_card_ids(session, user_id)
+    return _is_intrinsically_protected(
+        row.card,
+        row.finish,
+        row.card_id,
+        deck_card_ids=deck_card_ids,
+        price_threshold=price_threshold,
+    )
+
+
+def _is_intrinsically_protected(
+    card: Card | None,
+    finish: str,
+    card_id: int,
+    *,
+    deck_card_ids: set[int],
+    price_threshold: float,
+) -> bool:
+    """Shared core of the routing predicate (layers 1 / 3 / 4), keyed on the
+    bare printing fields so BOTH ``should_keep_in_drawer`` (operates on a placed
+    InventoryRow, the cull) AND ``split_intake_quantity`` (operates on rows
+    being imported, the intake) read ONE source of truth — no drift between the
+    two call sites. A None card cannot be classified → protected (never bulk
+    something we can't see)."""
+    if card is None:
+        return True
+    if _is_basic_land_any_kind(card):  # layer 1 — basic land stock
+        return True
+    if card_id in deck_card_ids:  # layer 3 — in any deck (personal staple)
+        return True
+    if effective_price(card, finish) > price_threshold:  # layer 4 — value floor
+        return True
+    return False
+
+
+def _drawer_copy_exists(session: Session, user_id: int, card_id: int, finish: str) -> bool:
+    """True when a PLACED copy of this exact printing ``(card_id, finish)`` already
+    sits in a drawer-type location. The layer-2 keeper lookup for intake routing:
+    if a findable drawer copy already exists, an incoming cheap copy has no keeper
+    duty and the whole quantity is bulk-eligible; if none exists, one copy stays.
+    Pending rows (the import being processed) are excluded — they aren't in a
+    drawer yet."""
+    return (
+        session.query(InventoryRow.id)
+        .join(StorageLocation, InventoryRow.storage_location_id == StorageLocation.id)
+        .filter(
+            InventoryRow.user_id == user_id,
+            InventoryRow.card_id == card_id,
+            InventoryRow.finish == finish,
+            InventoryRow.is_pending.is_(False),
+            StorageLocation.type == "drawer",
+        )
+        .first()
+        is not None
+    )
+
+
+def split_intake_quantity(
+    card: Card | None,
+    finish: str,
+    card_id: int,
+    quantity: int,
+    *,
+    has_drawer_copy: bool,
+    deck_card_ids: set[int],
+    price_threshold: float = DRAWER_KEEP_PRICE_THRESHOLD,
+) -> tuple[int, int]:
+    """Split ``quantity`` freshly-acquired copies of one printing into
+    ``(drawer_bound, bulk_bound)`` per the routing design (Call site B).
+
+    Intrinsically protected (basic / in-deck / value) → all to drawers.
+    Otherwise the layer-2 keeper rule: keep ONE findable drawer copy only when
+    none exists yet (``has_drawer_copy`` False); the rest are bulk-bound. The
+    single decision both the commit router and the preview summary use, so they
+    can never disagree."""
+    if quantity <= 0:
+        return (0, 0)
+    if _is_intrinsically_protected(
+        card, finish, card_id, deck_card_ids=deck_card_ids, price_threshold=price_threshold
+    ):
+        return (quantity, 0)
+    keep = 0 if has_drawer_copy else min(1, quantity)
+    return (keep, quantity - keep)
+
+
 def is_token_card(card: Card) -> bool:
     """True when the inventory row holds a token card (vs. a real spell).
 
@@ -1319,6 +1472,93 @@ def build_collection_filter_query(
     return base_query
 
 
+def resolve_drawer_cull_candidates(
+    session: Session,
+    user_id: int,
+    *,
+    price_threshold: float = DRAWER_KEEP_PRICE_THRESHOLD,
+    location_id: int = 0,
+    search: str = "",
+    facet_colors: str = "",
+    facet_types: str = "",
+    facet_status: str = "",
+    facet_finishes: str = "",
+    facet_price_min: float | None = None,
+    facet_price_max: float | None = None,
+    finish: str = "",
+) -> list[InventoryRow]:
+    """Retroactive-cull candidates: placed drawer rows with ``quantity > 1``
+    whose surplus copies are NOT intrinsically protected (Call site A of the
+    drawer-vs-bulk routing design, v3.38.0).
+
+    Rides the v3.36.9 filter path — the candidate base is
+    ``build_collection_filter_query`` (so the cull respects any active
+    ``/collection`` filter and can never drift from the grid the user sees),
+    intersected with the user's drawer locations + ``quantity > 1`` + placed,
+    then ``should_keep_in_drawer`` drops the keepers (basic / in-deck / value).
+    Per-row "keep one copy" is the caller's job (see ``move_surplus_to_location``);
+    each returned row contributes ``quantity - 1`` bulk-bound copies.
+
+    ``location_id`` narrows the scope to ONE drawer when it names a drawer-type
+    location (so the user can cull a single drawer from the grid's drawer view);
+    any other value — 0, a box/binder, an unknown id — is ignored and the cull
+    spans all drawers (a drawer operation has nothing to do with a non-drawer
+    scope, so it falls back rather than returning nothing).
+
+    Pure read; ``deck_card_ids`` is resolved once (no per-row query). No
+    Scryfall fetch — price is cached. Empty list when nothing qualifies.
+    """
+    drawer_loc_ids = [
+        loc_id
+        for (loc_id,) in session.query(StorageLocation.id).filter(
+            StorageLocation.user_id == user_id,
+            StorageLocation.type == "drawer",
+        )
+    ]
+    if not drawer_loc_ids:
+        return []
+
+    # Single-drawer scope: only when location_id IS one of this user's drawers.
+    scope_loc_ids = [location_id] if location_id in drawer_loc_ids else drawer_loc_ids
+
+    base_query = build_collection_filter_query(
+        session,
+        user_id,
+        search=search,
+        facet_colors=facet_colors,
+        facet_types=facet_types,
+        facet_status=facet_status,
+        facet_finishes=facet_finishes,
+        facet_price_min=facet_price_min,
+        facet_price_max=facet_price_max,
+        finish=finish,
+    )
+    rows = (
+        base_query.filter(
+            InventoryRow.storage_location_id.in_(scope_loc_ids),
+            InventoryRow.quantity > 1,
+            InventoryRow.is_pending.is_(False),
+        )
+        .order_by(InventoryRow.id)
+        .all()
+    )
+    if not rows:
+        return []
+
+    deck_card_ids = deck_member_card_ids(session, user_id)
+    return [
+        row
+        for row in rows
+        if not should_keep_in_drawer(
+            session,
+            row,
+            user_id=user_id,
+            price_threshold=price_threshold,
+            deck_card_ids=deck_card_ids,
+        )
+    ]
+
+
 def list_inventory_rows(
     session: Session,
     user_id: int,
@@ -1715,6 +1955,245 @@ def move_inventory_row_to_location(
     )
     session.commit()
     return row
+
+
+def move_surplus_to_location(
+    session: Session, row_id: int, user_id: int, location_id: int, *, keep: int = 1
+) -> int:
+    """Move SURPLUS copies of ``row_id`` to ``location_id``, leaving ``keep``
+    copies behind in the source row. Returns the number of copies moved.
+
+    The quantity-aware sibling of :func:`move_inventory_row_to_location` — that
+    one relocates a whole row, this one splits a row's quantity. Used by the
+    retroactive drawer cull (v3.38.0): a ``quantity > 1`` drawer row keeps one
+    findable copy (the layer-2 keeper) and ships ``quantity - keep`` copies to
+    Bulk. Merges into any existing non-pending destination row matching
+    ``(card_id, finish, language, is_proxy)`` exactly as the whole-row move
+    does; otherwise creates a fresh placed row at the destination carrying the
+    same printing identity (drawer/slot/role/tags are NOT copied — surplus
+    cardboard has no slot and no deck role).
+
+    No-op (returns 0) when ``quantity <= keep``. ``resort_collection`` is NOT
+    called here — the caller owns that decision (the cull never resorts).
+    """
+    if keep < 0:
+        raise ValueError("keep must be >= 0.")
+
+    row = (
+        session.query(InventoryRow)
+        .filter(InventoryRow.id == row_id, InventoryRow.user_id == user_id)
+        .first()
+    )
+    if not row:
+        raise ValueError("Inventory row not found.")
+
+    surplus = row.quantity - keep
+    if surplus <= 0:
+        return 0
+
+    new_location = (
+        session.query(StorageLocation)
+        .filter(StorageLocation.id == location_id, StorageLocation.user_id == user_id)
+        .one_or_none()
+    )
+    if new_location is None:
+        raise ValueError("Storage location not found.")
+
+    old_location = row.storage_location.name if row.storage_location else "unassigned"
+    now = utc_now()
+
+    existing = (
+        session.query(InventoryRow)
+        .filter(
+            InventoryRow.user_id == user_id,
+            InventoryRow.card_id == row.card_id,
+            InventoryRow.finish == row.finish,
+            func.coalesce(InventoryRow.language, "en") == (row.language or "en"),
+            InventoryRow.is_proxy == bool(row.is_proxy),
+            InventoryRow.storage_location_id == new_location.id,
+            InventoryRow.is_pending.is_(False),
+            InventoryRow.id != row.id,
+        )
+        .first()
+    )
+
+    if existing is not None:
+        existing.quantity += surplus
+        existing.updated_at = now
+        dest_row_id = existing.id
+    else:
+        moved_row = InventoryRow(
+            user_id=user_id,
+            card_id=row.card_id,
+            finish=row.finish,
+            language=row.language,
+            is_proxy=bool(row.is_proxy),
+            quantity=surplus,
+            storage_location_id=new_location.id,
+            is_pending=False,
+        )
+        session.add(moved_row)
+        session.flush()
+        dest_row_id = moved_row.id
+
+    row.quantity -= surplus
+    row.updated_at = now
+
+    log_transaction(
+        session=session,
+        user_id=user_id,
+        event_type="location_updated",
+        card_id=row.card_id,
+        finish=row.finish,
+        quantity_delta=surplus,
+        source_location=old_location,
+        destination_location=new_location.name,
+        inventory_row_id=dest_row_id,
+        note=f"Moved {surplus} surplus copy(ies) to {new_location.name} (drawer cull)",
+    )
+    session.commit()
+    return surplus
+
+
+def _get_or_create_bulk_location(session: Session, user_id: int) -> StorageLocation:
+    """The Bulk overflow destination for intake routing — a user's existing
+    non-deck location named "Bulk" (case-insensitive), else a freshly created
+    ``box`` in ``manual`` mode.
+
+    ``manual`` is load-bearing: a ``managed``/``sink`` Bulk is a SORTABLE SOURCE,
+    so ``resort_collection`` would scoop its contents straight back into the
+    drawers on the next auto-sort, undoing every routing decision. We create it
+    ``manual``; if the user already has a "Bulk" location we use it as-is (we
+    do not silently rewrite their chosen mode — a managed one is on them)."""
+    location = (
+        session.query(StorageLocation)
+        .filter(
+            StorageLocation.user_id == user_id,
+            func.lower(StorageLocation.name) == "bulk",
+            StorageLocation.type != "deck",
+        )
+        .first()
+    )
+    if location is None:
+        location = StorageLocation(
+            user_id=user_id,
+            name="Bulk",
+            type="box",
+            mode="manual",
+            parent_id=None,
+            sort_order=0,
+        )
+        session.add(location)
+        session.flush()
+    return location
+
+
+def route_intake_to_bulk(
+    session: Session,
+    user_id: int,
+    row_ids: Iterable[int],
+    *,
+    price_threshold: float = DRAWER_KEEP_PRICE_THRESHOLD,
+) -> tuple[int, int]:
+    """Divert the cheap, non-staple SURPLUS among freshly-imported rows to the
+    Bulk location BEFORE the drawer sorter runs (Call site B of the routing
+    design, v3.38.0). Returns ``(drawer_bound, bulk_bound)`` copy counts.
+
+    Sits UPSTREAM of ``resort_collection`` (which is never modified): bulk-bound
+    copies are moved out to a ``manual`` Bulk location (so the sorter leaves them
+    alone), and the keepers stay pending for the sorter to place. Per imported
+    row of quantity Q: intrinsically protected → all Q stay; otherwise keep one
+    findable drawer copy only if none exists yet, the rest go to Bulk. Whole-row
+    moves reuse ``move_inventory_row_to_location`` (keep 0), partial moves
+    ``move_surplus_to_location`` (keep 1). The Bulk location is resolved lazily —
+    no location is created unless something actually routes there."""
+    row_ids = list(row_ids)
+    if not row_ids:
+        return (0, 0)
+
+    deck_card_ids = deck_member_card_ids(session, user_id)
+    bulk_location: StorageLocation | None = None
+    drawer_bound = 0
+    bulk_bound = 0
+
+    for row_id in row_ids:
+        row = (
+            session.query(InventoryRow)
+            .options(joinedload(InventoryRow.card))
+            .filter(InventoryRow.id == row_id, InventoryRow.user_id == user_id)
+            .first()
+        )
+        if row is None:
+            continue
+        quantity = row.quantity
+        has_drawer_copy = _drawer_copy_exists(session, user_id, row.card_id, row.finish)
+        keep, to_bulk = split_intake_quantity(
+            row.card,
+            row.finish,
+            row.card_id,
+            quantity,
+            has_drawer_copy=has_drawer_copy,
+            deck_card_ids=deck_card_ids,
+            price_threshold=price_threshold,
+        )
+        if to_bulk <= 0:
+            drawer_bound += quantity
+            continue
+        if bulk_location is None:
+            bulk_location = _get_or_create_bulk_location(session, user_id)
+        if keep == 0:
+            move_inventory_row_to_location(session, row.id, user_id, bulk_location.id)
+        else:
+            move_surplus_to_location(session, row.id, user_id, bulk_location.id, keep=keep)
+        bulk_bound += to_bulk
+        drawer_bound += keep
+
+    return (drawer_bound, bulk_bound)
+
+
+def summarize_intake_routing(
+    session: Session,
+    user_id: int,
+    matches_rows: list[dict],
+    *,
+    price_threshold: float = DRAWER_KEEP_PRICE_THRESHOLD,
+) -> tuple[int, int]:
+    """Preview-time ``(drawer_bound, bulk_bound)`` for the auto-sort path, over
+    the collection reconcile ``matches_rows`` — so the reconcile-preview can show
+    "N → drawers, M → bulk" before anything commits (never silent). Reuses
+    ``split_intake_quantity`` (the same decision the commit router applies), so
+    the preview cannot drift from the result. Only the copies that will actually
+    be imported (``import_new`` / ``import_delta`` × ``recommended_new_qty``)
+    count; already-owned skips don't enter the drawers."""
+    importable = [
+        (r["card_id"], r.get("finish") or "normal", int(r.get("recommended_new_qty") or 0))
+        for r in matches_rows
+        if r.get("card_id")
+        and r.get("recommended_action") in ("import_new", "import_delta")
+        and int(r.get("recommended_new_qty") or 0) > 0
+    ]
+    if not importable:
+        return (0, 0)
+
+    card_ids = {cid for cid, _finish, _qty in importable}
+    cards = {c.id: c for c in session.query(Card).filter(Card.id.in_(card_ids))}
+    deck_card_ids = deck_member_card_ids(session, user_id)
+
+    drawer_bound = 0
+    bulk_bound = 0
+    for card_id, finish, qty in importable:
+        keep, to_bulk = split_intake_quantity(
+            cards.get(card_id),
+            finish,
+            card_id,
+            qty,
+            has_drawer_copy=_drawer_copy_exists(session, user_id, card_id, finish),
+            deck_card_ids=deck_card_ids,
+            price_threshold=price_threshold,
+        )
+        drawer_bound += keep
+        bulk_bound += to_bulk
+    return (drawer_bound, bulk_bound)
 
 
 def _safe_load_tags(raw: str | None) -> list[str]:

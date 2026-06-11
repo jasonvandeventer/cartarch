@@ -271,6 +271,15 @@
       {% if _to_delta > 0 %}<strong>{{ _to_delta }}</strong> partial (your collection is short),{% endif %}
       {% if _to_skip > 0 %}<strong>{{ _to_skip }}</strong> already owned (will skip).{% endif %}
     </p>
+    {% if bulk_routing %}
+      {# v3.38.0 — auto-sort intake routing verdict (drawer-sorter, auto-sort path
+         only). Never silent: cheap non-staple surplus heads to Bulk, not drawers. #}
+      <p class="muted" style="margin-top: 0.25rem">
+        Auto-sort: <strong>{{ bulk_routing.drawers }}</strong> → drawers ·
+        <strong>{{ bulk_routing.bulk }}</strong> → Bulk
+        {% if bulk_routing.bulk > 0 %}(cheap dupes you already have a copy of){% endif %}
+      </p>
+    {% endif %}
     {% if _show_dupes_only %}
       <p class="warning-text"
          style="margin-top: 0.5rem;
