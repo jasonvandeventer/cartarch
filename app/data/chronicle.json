@@ -1,5 +1,17 @@
 [
   {
+    "version": "3.39.2",
+    "date": "2026-06-12",
+    "added": [],
+    "refined": [
+      "The Watchlist is now the Wishlist. Same feature — a private list of cards you want to acquire, with optional price targets — renamed to say what it's for. The page now leads with hunting cards for upgrades, brews, or someday, with price-target alerts as the secondary note. On a card's page the button now reads \"Add to Wishlist\" instead of \"Watch this printing.\""
+    ],
+    "resolved": [
+      "Fixed the empty Wishlist's getting-started hint. It used to tell you to find a card via your Collection — circular if your collection is empty. It now points you to browse Sets, which reaches any card's page whether you own it or not, where you can add it to your Wishlist."
+    ],
+    "archivist_note": "A rename that's really a clarification. \"Watchlist\" read like a price ticker, so players hunting cards for their next deck never thought to open it. \"Wishlist\" is the word they were already looking for — so now the feature is found by the people it was built for."
+  },
+  {
     "version": "3.39.1",
     "date": "2026-06-12",
     "added": [
