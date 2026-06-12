@@ -1,5 +1,20 @@
 [
   {
+    "version": "3.39.3",
+    "date": "2026-06-12",
+    "added": [
+      "Two new shortcuts on the dashboard — Showcases and Trades — so the trading features are one click from the home page.",
+      "A \"Share with a playgroup\" button right on each Showcase, so you can share it without first hunting for the Shares page."
+    ],
+    "refined": [
+      "The Showcases page now says what it's for — a trade binder, a show-off shelf, a sale pile — instead of leaving you to guess. The card-detail \"Watch\" controls and the Storage \"Binder\" type were the two words new players tripped over: Storage now reads \"Binder (physical)\" so it isn't mistaken for a trade binder. The read-only notice on a shared Showcase moved up under the title, where you'll actually see it before scrolling."
+    ],
+    "resolved": [
+      "New players kept hitting a dead end trying to trade. The rule that makes trading work — a playmate has to share a Showcase to a playgroup you're both in — was only spelled out on the propose-a-trade screen. It now appears on the Playgroup and Trades pages too, with a nudge to share one of your own to get things moving."
+    ],
+    "archivist_note": "Everything in this release already worked; it just wasn't findable. A week alongside a new playgroup made the gaps plain — people went looking for a \"binder,\" landed in Storage, and never found Showcases. So this is a signposting pass: the same machinery, with clearer doors."
+  },
+  {
     "version": "3.39.2",
     "date": "2026-06-12",
     "added": [],
