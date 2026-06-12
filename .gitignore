@@ -30,3 +30,6 @@ deployment.md
 
 resend.txt
 
+.env.cfaccess
+.playwright-mcp.config.json
+.playwright-mcp/
