@@ -175,11 +175,14 @@ construct is the fallback if the SQLAlchemy version lacks `aggregate_strings`.)
    renders on the dashboard.
 2. **[data]** Clean the 5 known declared-FK orphan rows (v3.34.3 audit) so FK enforcement is a switch-flip.
 2a. **[data, cutover-day]** **Run the `showcase_items`/`trade_items` orphan sweep on the prod
-    snapshot** before enabling FK constraints — these orphans (from pre-v3.39.x merge/undo deletes)
+    snapshot** before enabling FK constraints — orphans (from pre-v3.39.x merge/undo deletes)
     block `ALTER TABLE ... ADD CONSTRAINT`. Command (idempotent; safe to re-run):
-    `DATA_DIR=<prod-data-dir> python -m scripts.sweep_fk_orphans` (or `--dry-run` first to preview
-    counts). It must report **0/0 on a second run** before proceeding; a non-zero first run is a
-    remediation step, not a formality.
+    `DATA_DIR=<prod-data-dir> python -m scripts.sweep_fk_orphans` (or `--dry-run` first).
+    **The historic backlog of 84 `showcase_items` orphans was already swept on live prod on
+    2026-06-12 (84 deleted → 0/0), and the v3.39.6 code fix stops new ones accruing — so at
+    cutover this should read 0/0 on the FIRST run.** A non-zero count is now a **stop-and-
+    investigate** signal (something deleted rows uncleanly after the fix), NOT routine
+    remediation. Still confirm 0/0 before proceeding.
 3. **[data, verify]** Audit `cards.price_usd*` for empty/non-numeric strings (Category 3); if present,
    plan a safe-cast wrapper or data cleanup before enabling the `price:` filter on PG.
 4. **[baseline]** Generate the Alembic baseline from current schema: IDENTITY PKs, FK `ondelete`
