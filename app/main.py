@@ -817,7 +817,7 @@ def watchlist_page(
         request,
         "watchlist.html",
         {
-            "title": "Watchlist",
+            "title": "Wishlist",
             "items": items,
             "current_user": current_user,
         },

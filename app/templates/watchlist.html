@@ -7,10 +7,10 @@
        when current price ≤ target. Inline edit mirrors the note-field
        pattern exactly (same <details>/edit-popout shape, same CSRF). #}
   <section class="panel pagehead watchlist-hero">
-    {{ editorial_eyebrow("Overview · Watchlist") }}
-    <h1 class="pagehead-title">Watchlist</h1>
+    {{ editorial_eyebrow("Overview · Wishlist") }}
+    <h1 class="pagehead-title">Wishlist</h1>
     <p class="pagehead-tagline watchlist-lede">
-      Cards you're tracking — to acquire later, compare prices on, or just remember. <em>Set a target price</em> on any row and Cartarch will mark it the moment the current price meets it.
+      Cards you're hunting — for upgrades, brews, or someday. <em>Set a target price</em> on any row and Cartarch flags it the moment the price meets it.
     </p>
   </section>
   {% if items %}
@@ -20,7 +20,7 @@
           <thead>
             <tr>
               <th>Card</th>
-              <th class="col-priority-low">Watch type</th>
+              <th class="col-priority-low">Printing</th>
               <th>Owned</th>
               <th>Current</th>
               <th>Target</th>
@@ -42,7 +42,7 @@
                     <span>{{ item.display_name }}</span>
                   {% endif %}
                 </td>
-                <td class="col-priority-low" data-label="Watch type">
+                <td class="col-priority-low" data-label="Printing">
                   {% if item.identity_mode == 'card' %}
                     <span class="watch-type-badge watch-type-printing">Specific printing</span>
                   {% else %}
@@ -129,7 +129,7 @@
                     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                     <button type="submit"
                             class="btn-danger-small"
-                            onclick="return confirm('Remove {{ item.display_name }} from your watchlist?');">
+                            onclick="return confirm('Remove {{ item.display_name }} from your wishlist?');">
                       Remove
                     </button>
                   </form>
@@ -142,9 +142,9 @@
     </section>
   {% else %}
     <section class="panel">
-      <h3 class="panel-title">Your watchlist is empty</h3>
+      <h3 class="panel-title">Your wishlist is empty</h3>
       <p class="muted">
-        Find a card via <a href="/collection">Collection</a> or <a href="/sets">Sets</a>, open its detail page, and click <strong>Watch this printing</strong> or <strong>Watch any printing</strong>. The card will appear here with the count you currently own.
+        Browse <a href="/sets">Sets</a> to open any card's detail page — whether you own it or not — then click <strong>Add to Wishlist (this printing)</strong> or <strong>(any printing)</strong>. Set a target price and Cartarch flags it the moment the price meets it.
       </p>
     </section>
   {% endif %}

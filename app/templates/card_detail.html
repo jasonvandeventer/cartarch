@@ -72,25 +72,25 @@
           {% if watch_printing_id %}
             <form method="post" action="/watchlist/{{ watch_printing_id }}/delete" style="display: inline">
               <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-              <button type="submit" class="btn-like watch-btn watch-btn-on">★ Watching this printing — stop</button>
+              <button type="submit" class="btn-like watch-btn watch-btn-on">★ On your Wishlist (this printing) — remove</button>
             </form>
           {% else %}
             <form method="post" action="/watchlist/add" style="display: inline">
               <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
               <input type="hidden" name="card_id" value="{{ card.id }}">
-              <button type="submit" class="btn-like watch-btn">☆ Watch this printing</button>
+              <button type="submit" class="btn-like watch-btn">☆ Add to Wishlist (this printing)</button>
             </form>
           {% endif %}
           {% if watch_name_id %}
             <form method="post" action="/watchlist/{{ watch_name_id }}/delete" style="display: inline">
               <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-              <button type="submit" class="btn-like watch-btn watch-btn-on">★ Watching any printing — stop</button>
+              <button type="submit" class="btn-like watch-btn watch-btn-on">★ On your Wishlist (any printing) — remove</button>
             </form>
           {% else %}
             <form method="post" action="/watchlist/add" style="display: inline">
               <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
               <input type="hidden" name="card_name" value="{{ card.name }}">
-              <button type="submit" class="btn-like watch-btn">☆ Watch any printing</button>
+              <button type="submit" class="btn-like watch-btn">☆ Add to Wishlist (any printing)</button>
             </form>
           {% endif %}
         </div>
@@ -129,7 +129,7 @@
             <span class="card-detail-printings-set">{{ p.card.set_code|upper }}</span>
             <span class="card-detail-printings-collector">
               <a href="/cards/{{ p.card.id }}">#{{ p.card.collector_number }}</a>
-              {% if p.is_watched %}<span class="card-detail-printings-watch" title="Watching this printing">★</span>{% endif %}
+              {% if p.is_watched %}<span class="card-detail-printings-watch" title="On your Wishlist (this printing)">★</span>{% endif %}
             </span>
             <span class="card-detail-printings-r card-detail-printings-px">
               {% if p.card.price_usd %}${{ p.card.price_usd }}{% else %}—{% endif %}

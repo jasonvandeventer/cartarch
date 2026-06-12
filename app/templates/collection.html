@@ -334,7 +334,7 @@
           <div class="collection-facet-group">
             <div class="collection-facet-label">Status</div>
             <div class="collection-facet-checks">
-              {% for s, label in [('placed', 'Placed'), ('pending', 'Pending'), ('in_deck', 'In deck'), ('watchlist', 'Watchlist')] %}
+              {% for s, label in [('placed', 'Placed'), ('pending', 'Pending'), ('in_deck', 'In deck'), ('watchlist', 'Wishlist')] %}
                 <label class="collection-facet-check">
                   <input type="checkbox" name="status" value="{{ s }}"
                          {% if s in facet_status_set %}checked{% endif %}>
