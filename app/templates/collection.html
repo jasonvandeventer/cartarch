@@ -58,8 +58,10 @@
         Moved <b>{{ bulk_msg.moved }}</b> card{{ '' if bulk_msg.moved == '1' else 's' }} to <b>{{ bulk_msg.name or 'location' }}</b>{% if bulk_msg.pending and bulk_msg.pending != '0' %} · {{ bulk_msg.pending }} pending excluded{% endif %}.
       {% elif bulk_msg.kind == 'culled' %}
         Moved <b>{{ bulk_msg.culled_copies }}</b> surplus cop{{ 'y' if bulk_msg.culled_copies == '1' else 'ies' }} across <b>{{ bulk_msg.culled_cards }}</b> card{{ '' if bulk_msg.culled_cards == '1' else 's' }} to <b>{{ bulk_msg.name or 'Bulk' }}</b> · one findable copy of each kept in the drawers.
+      {% elif bulk_msg.kind == 'deleted' %}
+        Deleted <b>{{ bulk_msg.deleted_rows }}</b> row{{ '' if bulk_msg.deleted_rows == '1' else 's' }} (<b>{{ bulk_msg.deleted_cards }}</b> card{{ '' if bulk_msg.deleted_cards == '1' else 's' }}){% if bulk_msg.pending and bulk_msg.pending != '0' %} · {{ bulk_msg.pending }} pending excluded{% endif %}.
       {% elif bulk_msg.kind == 'error' %}
-        {% if bulk_msg.reason == 'bad_target' %}That destination can't receive a bulk move — decks are managed through the deck import flow.{% else %}The bulk action couldn't be completed.{% endif %}
+        {% if bulk_msg.reason == 'bad_target' %}That destination can't receive a bulk move — decks are managed through the deck import flow.{% elif bulk_msg.reason == 'confirm_required' %}Deleting your entire collection requires typing DELETE to confirm.{% else %}The bulk action couldn't be completed.{% endif %}
       {% endif %}
     </section>
   {% endif %}
@@ -274,6 +276,22 @@
             <button type="submit">Preview cull →</button>
           </form>
           <p class="collection-bulk-note muted">Moves SURPLUS copies (keeps one findable copy of each printing in the drawers) of cards under ${{ '%.2f' | format(1.00) }} that aren't basics and aren't in a deck. Shows a confirmation before anything moves.</p>
+
+          <hr class="collection-bulk-divider">
+          <form action="/collection/delete-preview" method="post" class="collection-bulk-form inline-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <input type="hidden" name="search" value="{{ search }}">
+            <input type="hidden" name="colors" value="{{ facet_colors_set | sort | join('') }}">
+            <input type="hidden" name="types" value="{{ facet_types_set | sort | join(',') }}">
+            <input type="hidden" name="status" value="{{ facet_status_set | sort | join(',') }}">
+            <input type="hidden" name="finishes" value="{{ facet_finishes_set | sort | join(',') }}">
+            <input type="hidden" name="price_min" value="{{ facet_price_min_raw }}">
+            <input type="hidden" name="price_max" value="{{ facet_price_max_raw }}">
+            <input type="hidden" name="finish" value="{{ finish_filter }}">
+            <input type="hidden" name="location_id" value="{{ location_id }}">
+            <button type="submit" class="btn-danger-small">Delete matching ({{ '{:,}'.format(total_count) }} rows) →</button>
+          </form>
+          <p class="collection-bulk-note muted">Permanently deletes the placed cards matching the filter (pending excluded). Shows a preview with the blast radius — decks, showcases, shared showcases — and requires confirmation; an unfiltered whole-collection delete also requires typing DELETE.</p>
         </div>
       </details>
     </section>

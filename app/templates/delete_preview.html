@@ -1,0 +1,94 @@
+{% from "_macros.html" import editorial_eyebrow %}
+{% extends "base.html" %}
+{% block content %}
+  {# Verify-before-commit gate for the filter-scoped Collection delete (Stage 2).
+     The numbers here are RECOMPUTED by /collection/delete-matching on Confirm, so
+     this page can never delete something different from what it shows. The Confirm
+     button is disabled until the user acknowledges the impact; an unfiltered
+     (whole-collection) delete additionally requires typing DELETE. #}
+  <section class="panel hero-panel compact-hero">
+    {{ editorial_eyebrow("Collection · Delete matching") }}
+    <h2 class="panel-title">Delete matching cards</h2>
+    <p class="pagehead-tagline">
+      <em>Nothing has been deleted yet.</em> This permanently removes the placed cards
+      matching your current Collection filter — across every page, not just this one.
+      Pending cards are never touched. <strong>This cannot be undone.</strong>
+    </p>
+  </section>
+
+  {% if row_count > 0 %}
+    <section class="panel">
+      <p>
+        This will permanently delete <b>{{ '{:,}'.format(row_count) }}</b>
+        row{{ '' if row_count == 1 else 's' }}
+        (<b>{{ '{:,}'.format(card_count) }}</b> card{{ '' if card_count == 1 else 's' }} by quantity).
+        {% if pending_excluded %}<span class="muted">· {{ pending_excluded }} pending card(s) excluded.</span>{% endif %}
+      </p>
+
+      {# Blast radius — informed consent before enabling Confirm. #}
+      <ul class="delete-blast-radius">
+        <li><b>{{ '{:,}'.format(rows_in_decks) }}</b> of these rows {{ 'is' if rows_in_decks == 1 else 'are' }} <b>in decks</b> — deleting removes them from those decks.</li>
+        <li><b>{{ '{:,}'.format(rows_in_showcases) }}</b> {{ 'is' if rows_in_showcases == 1 else 'are' }} <b>in showcases</b>{% if rows_in_shared_showcases %} — <b>{{ '{:,}'.format(rows_in_shared_showcases) }}</b> of those {{ 'is' if rows_in_shared_showcases == 1 else 'are' }} in <b>showcases you've shared</b> with a playgroup (they'll vanish from what your playgroup sees){% endif %}.</li>
+      </ul>
+      {% if is_unfiltered %}
+        <p class="warning-text">⚠ No filter is active — this is your <b>ENTIRE</b> placed collection.</p>
+      {% endif %}
+
+      <form action="/collection/delete-matching" method="post" id="delete-matching-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <input type="hidden" name="search" value="{{ filter_params.search }}">
+        <input type="hidden" name="colors" value="{{ filter_params.colors }}">
+        <input type="hidden" name="types" value="{{ filter_params.types }}">
+        <input type="hidden" name="status" value="{{ filter_params.status }}">
+        <input type="hidden" name="finishes" value="{{ filter_params.finishes }}">
+        <input type="hidden" name="price_min" value="{{ filter_params.price_min }}">
+        <input type="hidden" name="price_max" value="{{ filter_params.price_max }}">
+        <input type="hidden" name="finish" value="{{ filter_params.finish }}">
+        <input type="hidden" name="location_id" value="{{ filter_params.location_id }}">
+
+        <label style="display:block; margin:0.6rem 0">
+          <input type="checkbox" id="delete-ack">
+          I understand this permanently deletes {{ '{:,}'.format(row_count) }} row(s) ({{ '{:,}'.format(card_count) }} card(s)) and cannot be undone.
+        </label>
+
+        {% if is_unfiltered %}
+          <label style="display:block; margin:0.4rem 0">
+            Type <b>DELETE</b> to confirm deleting your entire collection:
+            <input type="text" id="delete-confirm-text" name="confirm_text" autocomplete="off"
+                   placeholder="DELETE" style="margin-left:0.4rem">
+          </label>
+        {% endif %}
+
+        <button type="submit" id="delete-confirm-btn" class="btn-danger-small" disabled>
+          Delete {{ '{:,}'.format(row_count) }} row(s) →
+        </button>
+        <a href="/collection" class="button-secondary">Cancel</a>
+      </form>
+    </section>
+  {% else %}
+    <section class="panel">
+      <p>No placed cards match the current filter — nothing to delete.</p>
+      <a href="/collection" class="button-secondary">← Back to Collection</a>
+    </section>
+  {% endif %}
+{% endblock %}
+{% block extra_scripts %}
+  <script>
+    // Gate the Confirm button: require the acknowledgment checkbox, plus (for an
+    // unfiltered whole-collection delete) the literal text DELETE.
+    (function () {
+      var form = document.getElementById('delete-matching-form');
+      if (!form) return;
+      var ack = document.getElementById('delete-ack');
+      var typed = document.getElementById('delete-confirm-text'); // null unless unfiltered
+      var btn = document.getElementById('delete-confirm-btn');
+      function update() {
+        var ok = ack.checked && (!typed || typed.value === 'DELETE');
+        btn.disabled = !ok;
+      }
+      ack.addEventListener('change', update);
+      if (typed) typed.addEventListener('input', update);
+      update();
+    })();
+  </script>
+{% endblock %}

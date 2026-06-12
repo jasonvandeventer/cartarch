@@ -68,7 +68,16 @@ from app.location_service import (
     list_locations,
     update_location,
 )
-from app.models import Card, Deck, ImportBatch, InventoryRow, StorageLocation, User
+from app.models import (
+    Card,
+    Deck,
+    ImportBatch,
+    InventoryRow,
+    Share,
+    ShowcaseItem,
+    StorageLocation,
+    User,
+)
 from app.presentation_service import (
     build_pending_batch_groups,
     build_pending_view_model,
@@ -523,6 +532,8 @@ def collection_page(
         "reason": request.query_params.get("reason"),
         "culled_cards": request.query_params.get("culled_cards"),
         "culled_copies": request.query_params.get("culled_copies"),
+        "deleted_rows": request.query_params.get("deleted_rows"),
+        "deleted_cards": request.query_params.get("deleted_cards"),
     }
 
     return render(
@@ -1157,6 +1168,210 @@ def collection_cull_to_bulk(
             "culled_cards": moved_cards,
             "culled_copies": moved_copies,
             "name": target.name,
+        },
+    )
+
+
+# -----------------------------------------------------------------------------
+# Delete matching (v3.39.x, Stage 2 of the collection-delete work) — filter-scoped
+# bulk delete, reusing _bulk_filter_placed_ids + bulk_delete_inventory_rows (the
+# FK-safe primitive). Preview-then-confirm like the cull; typed confirmation for a
+# whole-collection (unfiltered) delete. NO new deletion logic.
+# -----------------------------------------------------------------------------
+
+
+def _is_unfiltered(filter_params: dict) -> bool:
+    """True when the Collection filter is empty — i.e. the delete targets the
+    WHOLE placed collection. Drives the extra typed-confirmation requirement."""
+    text_blank = all(
+        not str(filter_params.get(k, "")).strip()
+        for k in (
+            "search",
+            "colors",
+            "types",
+            "status",
+            "finishes",
+            "price_min",
+            "price_max",
+            "finish",
+        )
+    )
+    loc = filter_params.get("location_id", 0)
+    return text_blank and (loc in (0, "0", "", None))
+
+
+def _delete_blast_radius(session: Session, user_id: int, row_ids: list[int]) -> dict:
+    """Impact summary for a set of about-to-be-deleted placed rows: total card
+    count (quantity sum) and how many of the rows are in decks, in showcases, and
+    in *shared* showcases. Read-only; counts only — drives the preview's
+    informed-consent gate before the confirm button is enabled."""
+    if not row_ids:
+        return {
+            "card_count": 0,
+            "rows_in_decks": 0,
+            "rows_in_showcases": 0,
+            "rows_in_shared_showcases": 0,
+        }
+    card_count = (
+        session.query(func.coalesce(func.sum(InventoryRow.quantity), 0))
+        .filter(InventoryRow.id.in_(row_ids))
+        .scalar()
+    )
+    rows_in_decks = (
+        session.query(InventoryRow.id)
+        .join(StorageLocation, InventoryRow.storage_location_id == StorageLocation.id)
+        .filter(InventoryRow.id.in_(row_ids), StorageLocation.type == "deck")
+        .count()
+    )
+    showcased = {
+        r[0]
+        for r in session.query(ShowcaseItem.inventory_row_id)
+        .filter(ShowcaseItem.inventory_row_id.in_(row_ids))
+        .distinct()
+    }
+    shared = {
+        r[0]
+        for r in session.query(ShowcaseItem.inventory_row_id)
+        .join(Share, Share.showcase_id == ShowcaseItem.showcase_id)
+        .filter(ShowcaseItem.inventory_row_id.in_(row_ids))
+        .distinct()
+    }
+    return {
+        "card_count": int(card_count or 0),
+        "rows_in_decks": rows_in_decks,
+        "rows_in_showcases": len(showcased),
+        "rows_in_shared_showcases": len(shared),
+    }
+
+
+@router.post("/collection/delete-preview")
+def collection_delete_preview(
+    request: Request,
+    search: str = Form(""),
+    colors: str = Form(""),
+    types: str = Form(""),
+    status: str = Form(""),
+    finishes: str = Form(""),
+    price_min: str = Form(""),
+    price_max: str = Form(""),
+    finish: str = Form(""),
+    location_id: int = Form(0),
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+    _: None = CsrfRequired,
+):
+    """Verify-before-commit gate for the filter-scoped Collection delete. Shows
+    the row count, card count (quantity sum) and blast radius (decks / showcases /
+    shared showcases). The Confirm form posts the SAME params to
+    ``/collection/delete-matching``, which recomputes the set — no drift."""
+    filter_params = {
+        "search": search,
+        "colors": colors,
+        "types": types,
+        "status": status,
+        "finishes": finishes,
+        "price_min": price_min,
+        "price_max": price_max,
+        "finish": finish,
+        "location_id": location_id,
+    }
+    placed_ids, pending_excluded = _bulk_filter_placed_ids(
+        session,
+        current_user.id,
+        search=search,
+        colors=colors,
+        types=types,
+        status=status,
+        finishes=finishes,
+        price_min=price_min,
+        price_max=price_max,
+        finish=finish,
+        location_id=location_id,
+    )
+    blast = _delete_blast_radius(session, current_user.id, placed_ids)
+    return render(
+        request,
+        "delete_preview.html",
+        {
+            "title": "Delete matching cards",
+            "current_user": current_user,
+            "filter_params": filter_params,
+            "row_count": len(placed_ids),
+            "card_count": blast["card_count"],
+            "rows_in_decks": blast["rows_in_decks"],
+            "rows_in_showcases": blast["rows_in_showcases"],
+            "rows_in_shared_showcases": blast["rows_in_shared_showcases"],
+            "pending_excluded": pending_excluded,
+            "is_unfiltered": _is_unfiltered(filter_params),
+        },
+    )
+
+
+@router.post("/collection/delete-matching")
+def collection_delete_matching(
+    search: str = Form(""),
+    colors: str = Form(""),
+    types: str = Form(""),
+    status: str = Form(""),
+    finishes: str = Form(""),
+    price_min: str = Form(""),
+    price_max: str = Form(""),
+    finish: str = Form(""),
+    location_id: int = Form(0),
+    confirm_text: str = Form(""),
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+    _: None = CsrfRequired,
+):
+    """Commit the filter-scoped delete: recompute the placed set (single source of
+    truth) and hard-delete via ``bulk_delete_inventory_rows`` (the FK-safe primitive
+    — cleans showcase/trade references). A whole-collection (unfiltered) delete
+    additionally requires the typed confirmation ``DELETE``. ``resort_collection``
+    is NOT called (nothing to re-file — the rows are gone).
+
+    Recompute-on-confirm is deliberate: the delete acts on whatever matches the
+    filter *now*, not on a count snapshotted by the preview — so if the matching set
+    shifted between preview and confirm, the result banner reflects the ACTUAL rows
+    deleted, never a stale preview number. (Same single-source-of-truth contract the
+    cull's preview/confirm follows.)"""
+    filter_params = {
+        "search": search,
+        "colors": colors,
+        "types": types,
+        "status": status,
+        "finishes": finishes,
+        "price_min": price_min,
+        "price_max": price_max,
+        "finish": finish,
+        "location_id": location_id,
+    }
+    if _is_unfiltered(filter_params) and confirm_text.strip() != "DELETE":
+        return _collection_filter_redirect(
+            filter_params, {"bulk": "error", "reason": "confirm_required"}
+        )
+
+    placed_ids, pending_excluded = _bulk_filter_placed_ids(
+        session,
+        current_user.id,
+        search=search,
+        colors=colors,
+        types=types,
+        status=status,
+        finishes=finishes,
+        price_min=price_min,
+        price_max=price_max,
+        finish=finish,
+        location_id=location_id,
+    )
+    card_count = _delete_blast_radius(session, current_user.id, placed_ids)["card_count"]
+    deleted = bulk_delete_inventory_rows(session, row_ids=placed_ids, user_id=current_user.id)
+    return _collection_filter_redirect(
+        filter_params,
+        {
+            "bulk": "deleted",
+            "deleted_rows": deleted,
+            "deleted_cards": card_count,
+            "pending": pending_excluded,
         },
     )
 

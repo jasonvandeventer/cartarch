@@ -1,5 +1,15 @@
 [
   {
+    "version": "3.39.7",
+    "date": "2026-06-12",
+    "added": [
+      "You can now delete cards in bulk from the Collection page. Open \"Bulk actions\", narrow the filter to the cards you want gone (or leave it empty for the whole collection), and \"Delete matching\" shows a preview first — how many rows and cards, and how many are in decks, in showcases, and in showcases you've shared — before you confirm. It acts on everything matching the filter across all pages, never just the page you're looking at. Deleting your entire collection additionally asks you to type DELETE."
+    ],
+    "refined": [],
+    "resolved": [],
+    "archivist_note": "The last piece of the collection-delete work: a real \"wipe and redo\" for the day an import goes sideways. Built on the reference-cleanup plumbing from the previous release, so a deleted card leaves a shared binder cleanly instead of as a dangling ghost — and the preview tells you the blast radius before you commit, not after."
+  },
+  {
     "version": "3.39.6",
     "date": "2026-06-12",
     "added": [],
