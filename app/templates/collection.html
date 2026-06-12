@@ -197,7 +197,7 @@
   {% if total_count > 0 %}
     <section class="panel collection-bulk-panel">
       <details>
-        <summary>Bulk actions — {{ '{:,}'.format(total_count) }} card{{ '' if total_count == 1 else 's' }} match the current filter</summary>
+        <summary>Bulk actions — {{ '{:,}'.format(total_count) }} row{{ '' if total_count == 1 else 's' }} ({{ '{:,}'.format(total_cards_matching) }} card{{ '' if total_cards_matching == 1 else 's' }}) match the current filter</summary>
         <div class="collection-bulk-body">
           {% if showcases %}
             <form action="/collection/bulk-add-showcase" method="post" class="collection-bulk-form inline-form">

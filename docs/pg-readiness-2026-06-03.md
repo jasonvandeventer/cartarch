@@ -53,7 +53,24 @@ Catalogued per the invariants; do not "fix" these in SQLite-era code:
   That order is children-before-parents and should satisfy RESTRICT.
 - The v3.34.3 orphan audit (`scripts/orphan_audit.py`, `docs/pg-readiness-2026-06-02.md`) found
   **5 orphans across the declared FKs** (`game_seats.deck_id` ×4 by-design; `deck_token_requirements.deck_id` ×1).
-- **Cutover action:** clean the 5 known orphans; enable FK enforcement; verify *every* parent-delete
+- **NEW orphan class — `showcase_items` / `trade_items` → `inventory_rows` (added 2026-06-12).** The
+  `collection-delete-investigation.md` cascade study found the **merge path**
+  (`move_inventory_row_to_location` / placement-merge) and the **import-undo paths** were deleting
+  inventory rows **without** cleaning their referencing `showcase_items` (NOT NULL FK) /
+  `trade_items` (nullable FK) — silently orphaning under SQLite, and a **hard FK error under
+  Postgres**. The **demo account alone carried 8 real orphaned `showcase_items`** from normal merge
+  use (0 trade_items). The code paths are **fixed in v3.39.x** (all `session.delete(row)` sites now
+  call the shared `clean_inventory_row_references`), so no NEW orphans accrue — but **existing prod
+  rows from before the fix still violate the FK** and must be swept before constraints are enabled.
+  These were NOT in the v3.34.3 "5 known orphans" count; that number is understated for this class.
+- **Remediation — `scripts/sweep_fk_orphans.py`** (idempotent): deletes orphaned `showcase_items`
+  (meaningless pointers; NOT NULL FK can't be NULLed) and **NULLs** the dangling
+  `trade_items.inventory_row_id` (nullable FK; the `*_at_trade` snapshot is the durable trade record
+  — decision A4, so the trade row is kept, matching `abandon_pending_trades_for_inventory_rows`).
+  Reports counts by type; a second run reports zero. Dev run (2026-06-12): **8 showcase_items deleted,
+  0 trade_items nulled**, second run 0/0.
+- **Cutover action:** clean the 5 known declared-FK orphans **AND run the orphan sweep on the
+  prod snapshot** (see checklist step below); enable FK enforcement; verify *every* parent-delete
   path (user, playgroup, variant group, deck, showcase) either runs explicit cleanup or has an
   `ondelete` — RESTRICT failures only surface at delete time, which the orphan audit (existing-data)
   does not catch. Adopt FK `ondelete` in the Alembic baseline rather than relying solely on app code.
@@ -156,7 +173,13 @@ construct is the fallback if the SQLAlchemy version lacks `aggregate_strings`.)
 1. **[code, do first — safe on SQLite]** Swap `func.group_concat` → portable string-agg in
    `dashboard_service.py:276`. The only runtime SQL break; verify the commander color signature still
    renders on the dashboard.
-2. **[data]** Clean the 5 known orphan rows (v3.34.3 audit) so FK enforcement is a switch-flip.
+2. **[data]** Clean the 5 known declared-FK orphan rows (v3.34.3 audit) so FK enforcement is a switch-flip.
+2a. **[data, cutover-day]** **Run the `showcase_items`/`trade_items` orphan sweep on the prod
+    snapshot** before enabling FK constraints — these orphans (from pre-v3.39.x merge/undo deletes)
+    block `ALTER TABLE ... ADD CONSTRAINT`. Command (idempotent; safe to re-run):
+    `DATA_DIR=<prod-data-dir> python -m scripts.sweep_fk_orphans` (or `--dry-run` first to preview
+    counts). It must report **0/0 on a second run** before proceeding; a non-zero first run is a
+    remediation step, not a formality.
 3. **[data, verify]** Audit `cards.price_usd*` for empty/non-numeric strings (Category 3); if present,
    plan a safe-cast wrapper or data cleanup before enabling the `price:` filter on PG.
 4. **[baseline]** Generate the Alembic baseline from current schema: IDENTITY PKs, FK `ondelete`

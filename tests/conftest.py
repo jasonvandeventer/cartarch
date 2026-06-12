@@ -101,3 +101,41 @@ def client(db_engine, user):
     finally:
         for dep in (get_db_session, get_current_user, require_csrf_token):
             main.app.dependency_overrides.pop(dep, None)
+
+
+@pytest.fixture
+def fk_db_engine(tmp_path):
+    """Temp-file SQLite engine with **PRAGMA foreign_keys=ON** — the Postgres
+    cutover posture (production SQLite runs with FKs OFF). For tests that must
+    verify delete/merge/undo paths are FK-safe *under enforcement*: an unclean
+    delete that orphans a referencing row raises ``IntegrityError`` here, exactly
+    as Postgres will. Kept in conftest so FK-on tests share one seam going forward.
+    """
+    from sqlalchemy import event
+
+    engine = create_engine(
+        f"sqlite:///{tmp_path / 'fk_test.db'}",
+        connect_args={"check_same_thread": False},
+    )
+
+    @event.listens_for(engine, "connect")
+    def _enable_fk(dbapi_connection, _record):  # noqa: ANN001
+        cur = dbapi_connection.cursor()
+        cur.execute("PRAGMA foreign_keys=ON")
+        cur.close()
+
+    Base.metadata.create_all(engine)
+    try:
+        yield engine
+    finally:
+        engine.dispose()
+
+
+@pytest.fixture
+def fk_db(fk_db_engine):
+    """A Session on the FK-enforcing engine (see ``fk_db_engine``)."""
+    session = sessionmaker(bind=fk_db_engine, expire_on_commit=False)()
+    try:
+        yield session
+    finally:
+        session.close()

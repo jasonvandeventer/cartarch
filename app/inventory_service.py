@@ -1933,6 +1933,12 @@ def move_inventory_row_to_location(
             inventory_row_id=existing.id,
             note=f"Merged {merged_quantity} into existing row on move",
         )
+        # The merged-away row is deleted — clean its dangling ShowcaseItem /
+        # TradeItem refs first (FK-safe; this path previously orphaned them —
+        # see collection-delete-investigation.md). References move to nothing,
+        # not to the surviving row: a Showcase entry for a now-gone row is
+        # meaningless, matching the delete paths' semantics.
+        clean_inventory_row_references(session, [row.id])
         session.delete(row)
         session.commit()
         return existing
@@ -2266,6 +2272,8 @@ def place_imported_rows(
         if existing is not None:
             existing.quantity += row.quantity
             existing.updated_at = now
+            # Merged-away row is deleted — FK-safe cleanup of its references first.
+            clean_inventory_row_references(session, [row.id])
             session.delete(row)
         else:
             row.storage_location_id = location.id
@@ -2702,6 +2710,35 @@ def confirm_all_pending(session: Session, user_id: int) -> int:
     return count
 
 
+def clean_inventory_row_references(session: Session, row_ids: list[int]) -> None:
+    """Drop dangling references to inventory rows that are about to be deleted.
+
+    The single FK-safe cleanup shared by EVERY path that ``session.delete()``s an
+    InventoryRow. Two referencing tables point at ``inventory_rows.id``:
+
+      - ``showcase_items.inventory_row_id`` — **NOT NULL / ON DELETE NO ACTION**.
+        Under enforced FKs (Postgres) deleting the row would FK-error unless the
+        ShowcaseItem is removed first; under SQLite (FK off today) it would
+        silently orphan. Deleted here.
+      - ``trade_items.inventory_row_id`` — nullable / NO ACTION. Pending trades
+        referencing the row are abandoned and remaining TradeItem references are
+        NULLed (the ``*_at_trade`` snapshot is the durable record — decision A4).
+
+    Idempotent and a no-op on an empty list. **Call BEFORE deleting the rows.**
+    Extracted (v3.39.x) from the bulk-delete + single-delete paths so the merge
+    and import-undo paths use the *same* semantics — see
+    ``collection-delete-investigation.md`` for why those two paths orphaned.
+    """
+    if not row_ids:
+        return
+    session.query(ShowcaseItem).filter(ShowcaseItem.inventory_row_id.in_(row_ids)).delete(
+        synchronize_session=False
+    )
+    from app import trade_service
+
+    trade_service.abandon_pending_trades_for_inventory_rows(session, row_ids)
+
+
 def adjust_inventory_row_quantity(
     session: Session,
     row_id: int,
@@ -2746,23 +2783,9 @@ def adjust_inventory_row_quantity(
     )
 
     if quantity == row.quantity:
-        # v3.29.1 — cleanup any ShowcaseItem rows referencing this
-        # InventoryRow before deletion (§9). With PRAGMA foreign_keys
-        # OFF the FK isn't enforced, so a dangling ShowcaseItem would
-        # survive otherwise. ``build_share_display_items`` skips
-        # dangling rows defensively, but the cleanup keeps the DB
-        # honest.
-        session.query(ShowcaseItem).filter(ShowcaseItem.inventory_row_id == row.id).delete(
-            synchronize_session=False
-        )
-        # v3.29.2 — abandon any pending Trade whose TradeItem references
-        # this row; NULL the inventory_row_id on remaining (terminal or
-        # now-abandoned) TradeItem references. Trade snapshots survive
-        # the inventory disappearing (decision A4 — the *_at_trade
-        # columns are the durable historical record).
-        from app import trade_service
-
-        trade_service.abandon_pending_trades_for_inventory_rows(session, [row.id])
+        # FK-safe cleanup of dangling ShowcaseItem / TradeItem refs before the
+        # row goes (shared helper; see clean_inventory_row_references).
+        clean_inventory_row_references(session, [row.id])
         session.delete(row)
         session.commit()
         return None
@@ -2817,24 +2840,13 @@ def bulk_delete_inventory_rows(session: Session, row_ids: list[int], user_id: in
         .all()
     )
 
-    # v3.29.1 — drop ShowcaseItems referencing any of these rows
-    # before the rows go (§9). Single batched DELETE keyed on the
-    # actually-resolvable row ids (rows the user owns); a tampered
-    # batch with someone else's row ids gets neither the InventoryRow
-    # nor the ShowcaseItem deleted (the filter on user_id above
-    # silently skips non-owned rows).
+    # FK-safe cleanup of referencing ShowcaseItems + pending trades, keyed on the
+    # actually-resolvable (owned) row ids — a tampered batch with someone else's
+    # ids gets neither the InventoryRow nor its references deleted (the user_id
+    # filter above already dropped non-owned rows). Shared helper.
     if rows:
         owned_ids = [r.id for r in rows]
-        session.query(ShowcaseItem).filter(ShowcaseItem.inventory_row_id.in_(owned_ids)).delete(
-            synchronize_session=False
-        )
-        # v3.29.2 — auto-abandon pending trades referencing any of
-        # these rows; NULL inventory_row_id on remaining TradeItem
-        # references. Same identity-snapshot rationale as the single-
-        # row deletion path above.
-        from app import trade_service
-
-        trade_service.abandon_pending_trades_for_inventory_rows(session, owned_ids)
+        clean_inventory_row_references(session, owned_ids)
 
     for row in rows:
         source_location = (
@@ -2884,6 +2896,9 @@ def undo_last_import(session: Session, user_id: int) -> bool:
         row.quantity -= abs(last_import.quantity_delta)
         row.updated_at = utc_now()
         if row.quantity <= 0:
+            # FK-safe cleanup before the row goes (this path previously orphaned
+            # ShowcaseItem / TradeItem refs — see the investigation doc).
+            clean_inventory_row_references(session, [row.id])
             session.delete(row)
 
     session.flush()
@@ -2929,6 +2944,8 @@ def undo_last_batch(session: Session, batch_id: int, user_id: int) -> int:
             row.quantity -= abs(log.quantity_delta)
             row.updated_at = utc_now()
             if row.quantity <= 0:
+                # FK-safe cleanup before the row goes (undo previously orphaned refs).
+                clean_inventory_row_references(session, [row.id])
                 session.delete(row)
 
         log_transaction(

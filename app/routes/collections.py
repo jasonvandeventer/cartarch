@@ -20,6 +20,7 @@ from urllib.parse import urlencode
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
+from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
 
@@ -400,6 +401,30 @@ def collection_page(
         facet_price_max=facet_price_max,
     )
 
+    # v3.39.x — card count (SUM of quantity) over the SAME filtered set
+    # ``total_count`` (rows) covers, so the bulk panel can render the accurate
+    # "N rows (M cards)" instead of mislabelling a row count as "cards". One
+    # cheap aggregate on the already-built filter query; matches the grid's
+    # matching set exactly (no facet drift). ``COALESCE(...,0)`` for an empty match.
+    total_cards_matching = (
+        build_collection_filter_query(
+            session,
+            current_user.id,
+            search=search,
+            facet_colors=colors,
+            facet_types=types,
+            facet_status=status,
+            facet_finishes=finishes,
+            facet_price_min=facet_price_min,
+            facet_price_max=facet_price_max,
+            finish=finish,
+            location_id=scope_location_id,
+            drawer=drawer,
+        )
+        .with_entities(func.coalesce(func.sum(InventoryRow.quantity), 0))
+        .scalar()
+    )
+
     # v3.28.8 — facet counts for the sidebar. Single aggregate query;
     # reflects the active search (boolean parser) but ignores active
     # facet state for v1 simplicity. See get_collection_facet_counts
@@ -516,6 +541,7 @@ def collection_page(
             "page": page,
             "per_page": per_page,
             "total_count": total_count,
+            "total_cards_matching": total_cards_matching,
             "total_pages": total_pages,
             "total_value": stats["total_value"],
             "total_cards": stats["total_cards"],
@@ -666,15 +692,10 @@ async def inventory_row_move(
     return RedirectResponse(url=safe_redirect_url(request), status_code=303)
 
 
-@router.post("/collection/delete")
-async def collection_delete(
-    row_id: int = Form(...),
-    session: Session = Depends(get_db_session),
-    current_user: User = Depends(get_current_user),
-    _: None = CsrfRequired,
-):
-    delete_inventory_row(session, row_id=row_id, user_id=current_user.id)
-    return RedirectResponse(url="/collection", status_code=303)
+# NB: a dead ``POST /collection/delete`` single-row route lived here — removed
+# v3.39.x. It had no UI caller (grep-confirmed) and duplicated
+# ``POST /inventory/rows/{id}/delete`` (the real "Delete Row" button). See
+# collection-delete-investigation.md.
 
 
 @router.post("/collection/resort")

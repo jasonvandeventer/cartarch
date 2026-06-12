@@ -1,5 +1,17 @@
 [
   {
+    "version": "3.39.6",
+    "date": "2026-06-12",
+    "added": [],
+    "refined": [
+      "The Collection bulk-actions panel now reads \"N rows (M cards)\" — it had been labeling a count of inventory rows as \"cards,\" which never matched the dashboard's card total."
+    ],
+    "resolved": [
+      "Fixed a bug where moving a card between locations, or undoing an import, could silently drop that card out of a Showcase you'd shared or a trade you'd proposed — the reference was left dangling and the card just vanished from the other person's view with no warning. Those paths now clean up the references the same way an ordinary delete already did. A one-time maintenance sweep also cleared the small number of already-dangling references the old behavior had left behind (dev came back clean)."
+    ],
+    "archivist_note": "Plumbing more than features. Those dangling references looked harmless under the current database but would have hard-failed the move to the new one — so this is a real bug fix and a brick laid for the v4 cutover at once. The reference cleanup now lives in a single place that every delete path shares."
+  },
+  {
     "version": "3.39.5",
     "date": "2026-06-12",
     "added": [
