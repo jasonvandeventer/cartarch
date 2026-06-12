@@ -1,4 +1,4 @@
-{% from "_macros.html" import editorial_eyebrow %}
+{% from "_macros.html" import editorial_eyebrow, loc_type_label %}
 {% extends "base.html" %}
 {% block content %}
   <section class="panel page-hero">
@@ -20,7 +20,7 @@
         <div class="locations-create-field">
           <label>Type</label>
           <select name="type">
-            {% for t in location_types %}<option value="{{ t }}">{{ t.capitalize() }}</option>{% endfor %}
+            {% for t in location_types %}<option value="{{ t }}">{{ loc_type_label(t) }}</option>{% endfor %}
           </select>
         </div>
         <div class="locations-create-field">
@@ -100,7 +100,7 @@
                   <a href="/locations/{{ loc.id }}" class="locations-name-link">{{ loc.name }}</a>
                   {% if loc.note %}<div class="locations-note">{{ loc.note }}</div>{% endif %}
                 </td>
-                <td data-label="Type">{{ loc.type.capitalize() }}</td>
+                <td data-label="Type">{{ loc_type_label(loc.type) }}</td>
                 <td class="col-priority-low" data-label="Mode">
                   <span class="location-mode-badge location-mode-{{ loc.mode }}">{{ loc.mode }}</span>
                 </td>
@@ -140,7 +140,7 @@
                           <label>Type</label>
                           <select name="type">
                             {% for t in location_types %}
-                              <option value="{{ t }}" {% if t == loc.type %}selected{% endif %}>{{ t.capitalize() }}</option>
+                              <option value="{{ t }}" {% if t == loc.type %}selected{% endif %}>{{ loc_type_label(t) }}</option>
                             {% endfor %}
                           </select>
                           <label>Parent</label>

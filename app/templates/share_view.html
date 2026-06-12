@@ -38,6 +38,12 @@
     </p>
   </section>
 
+  {# Read-only notice directly under the header (design pass). A slim
+     restatement stays at the foot of the page. #}
+  <section class="panel share-view-readonly-notice">
+    <p class="muted"><em>You're viewing a read-only share.</em> No edit, audit, or action affordances are available — this is a glance-only window into another collector's curated list.</p>
+  </section>
+
   <section class="panel">
     <h3 class="panel-title">Showcase</h3>
     {% if items or search %}
@@ -85,6 +91,6 @@
   </section>
 
   <section class="panel">
-    <p class="muted"><em>You're viewing a read-only share.</em> No edit, audit, or action affordances are available — this is a glance-only window into another collector's curated list.</p>
+    <p class="muted"><em>Read-only share</em> — glance-only; no edit or action affordances.</p>
   </section>
 {% endblock %}

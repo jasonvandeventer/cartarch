@@ -13,7 +13,10 @@
      Adjust-quantity affordances. #}
   <section class="panel pagehead trades-hero">
     {{ editorial_eyebrow("Play · Trades") }}
-    <h1 class="pagehead-title">Trades</h1>
+    <div class="pagehead-title-row" style="display:flex; align-items:center; justify-content:space-between; gap:1rem; flex-wrap:wrap">
+      <h1 class="pagehead-title">Trades</h1>
+      <a class="btn-like" href="/trades/new">Propose a trade</a>
+    </div>
     <p class="pagehead-tagline">
       <em>Pairwise card trades with your playgroups.</em> Propose what you'd offer for cards on a co-member's Showcase; the other party accepts, declines, or you cancel. A trade is the agreement &mdash; physical exchange happens off-app, on your own time.
     </p>
@@ -39,10 +42,7 @@
   {% endif %}
 
   <section class="panel">
-    <div class="trades-section-head">
-      <h3 class="panel-title">Awaiting your action</h3>
-      <a class="btn-like" href="/trades/new">Propose a trade</a>
-    </div>
+    <h3 class="panel-title">Awaiting your action</h3>
     {% if incoming %}
       <ul class="trades-list">
         {% for t in incoming %}
@@ -66,7 +66,7 @@
         {% endfor %}
       </ul>
     {% else %}
-      <p class="trades-empty">No trades awaiting your action.</p>
+      <p class="trades-empty">No trades awaiting your action. To trade with a member, one of you needs to share a <a href="/showcases">Showcase</a> to a playgroup you both belong to.</p>
     {% endif %}
   </section>
 

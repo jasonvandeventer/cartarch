@@ -96,9 +96,12 @@
       <form method="post" action="/shares" class="stack-form share-create-form">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
         <label for="share-showcase">Showcase</label>
+        {# ?showcase=<id> preselect — set by the "Share with a playgroup"
+           button on a Showcase manage page (form-layer only; no route change). #}
+        {% set preselect_showcase = request.query_params.get('showcase') %}
         <select id="share-showcase" name="showcase_id" required>
           {% for sc in showcases %}
-            <option value="{{ sc.id }}">{{ sc.name }}</option>
+            <option value="{{ sc.id }}" {% if preselect_showcase == sc.id|string %}selected{% endif %}>{{ sc.name }}</option>
           {% endfor %}
         </select>
         <label for="share-playgroup">Playgroup</label>

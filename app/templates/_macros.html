@@ -17,6 +17,14 @@
 <div class="eyebrow"><span class="ln" aria-hidden="true"></span><span>{{ crumb }}</span></div>
 {%- endmacro %}
 
+{# Display label for a StorageLocation type. Disambiguates the physical
+   "binder" storage type from a Showcase / "trade binder" (a Moxfield-term
+   collision — see ux findings 3a). Display string ONLY; the stored enum
+   value stays "binder". #}
+{% macro loc_type_label(t) -%}
+{% if t == 'binder' %}Binder (physical){% else %}{{ t.capitalize() }}{% endif %}
+{%- endmacro %}
+
 {% macro mana_pips(colors) %}
   {% if colors %}
     {% for letter in ['W', 'U', 'B', 'R', 'G'] %}

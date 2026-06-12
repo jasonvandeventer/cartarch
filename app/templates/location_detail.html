@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import inventory_card, editorial_eyebrow %}
+{% from "_macros.html" import inventory_card, editorial_eyebrow, loc_type_label %}
 {% block content %}
   <section class="panel hero-panel compact-hero">
     <div class="hero-row">
@@ -7,7 +7,7 @@
         {{ editorial_eyebrow("Storage · Locations · " ~ location.name) }}
         <h2 class="panel-title">{{ location.name }}</h2>
         <p class="muted">
-          {{ location.type|capitalize }}
+          {{ loc_type_label(location.type) }}
           {% if location.parent %}· Parent: {{ location.parent.name }}{% endif %}
         </p>
       </div>

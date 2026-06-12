@@ -10,7 +10,10 @@
      Showcases (by id); the index lives at /showcases. #}
   <section class="panel pagehead showcase-hero">
     {{ editorial_eyebrow("Play · Showcases · " + showcase.name) }}
-    <h1 class="pagehead-title">{{ showcase.name }}</h1>
+    <div class="pagehead-title-row" style="display:flex; align-items:center; justify-content:space-between; gap:1rem; flex-wrap:wrap">
+      <h1 class="pagehead-title">{{ showcase.name }}</h1>
+      <a class="btn-like" href="/shares?showcase={{ showcase.id }}">Share with a playgroup</a>
+    </div>
     <p class="pagehead-tagline">
       <em>A curated list.</em> Pick cards from your collection that you want to show off, trade, or simply highlight. Then share it, read-only, with a playgroup on the <a href="/shares">Shares</a> page.
     </p>
