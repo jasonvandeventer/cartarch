@@ -33,3 +33,6 @@ resend.txt
 .env.cfaccess
 .playwright-mcp.config.json
 .playwright-mcp/
+
+# UX walkthrough docs (findings + screenshots) live in the vault, not this public repo
+ux-walkthrough/
