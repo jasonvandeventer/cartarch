@@ -3182,6 +3182,26 @@ td {
   margin-left: 0.2rem;
 }
 
+/* Stronger warning-accent proxy badge for trust-sensitive surfaces —
+   shared Showcase views, trade construction, and trade detail. A proxy
+   in a shared/traded list must read clearly, not as muted neutral.
+   (ADR proxy-valuation-2026-06-12.) */
+.proxy-badge.proxy-badge-warn {
+  background: rgba(180, 83, 9, 0.18);
+  border-color: rgba(180, 83, 9, 0.75);
+  color: #f59e0b;
+}
+
+.proxy-price-note {
+  color: #f59e0b;
+  font-weight: 600;
+}
+
+.trade-proxy-notice {
+  color: #b45309;
+  font-weight: 600;
+}
+
 .warning-text {
   color: #b45309;
   font-size: 0.9rem;

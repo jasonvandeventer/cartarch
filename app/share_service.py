@@ -142,6 +142,7 @@ def add_rows_to_showcase(
     showcase_id: int,
     location_id: int | None = None,
     row_ids: list[int] | None = None,
+    include_proxies: bool = False,
 ) -> dict | None:
     """Bulk-add the user's inventory rows to one of their Showcases.
 
@@ -180,6 +181,12 @@ def add_rows_to_showcase(
         InventoryRow.user_id == user_id,
         InventoryRow.is_pending == False,  # noqa: E712
     )
+    # Proxies are skipped from bulk-add by default — a proxy carries $0 and a
+    # whole-collection sweep shouldn't quietly seed a shared binder with them.
+    # Opt in via ``include_proxies`` (the Showcase page's checkbox). Per-card
+    # add is an explicit choice and is unaffected (ADR proxy-valuation-2026-06-12).
+    if not include_proxies:
+        query = query.filter(InventoryRow.is_proxy == False)  # noqa: E712
     if row_ids is not None:
         query = query.filter(InventoryRow.id.in_(row_ids))
     elif location_id is not None:
@@ -315,7 +322,10 @@ def get_showcase_with_items(
             # Dangling FK — defense in depth; §9 cleanup should have caught it.
             continue
         available = min(it.quantity_offered, inv.quantity)
-        price = effective_price(inv.card, inv.finish) or 0.0
+        # Proxies carry $0 market value in Showcases/shares/trades (a shared
+        # proxy must never read as the real card's price — trust decision,
+        # ADR proxy-valuation-2026-06-12). is_proxy stays True for the badge.
+        price = 0.0 if inv.is_proxy else (effective_price(inv.card, inv.finish) or 0.0)
         value = price * available
         total_value += value
         items.append(
@@ -817,7 +827,8 @@ def build_share_display_items(
         card_proj = _ReadOnlyCardProjection(card)
         # Available — the only InventoryRow quantity surfaced.
         available = max(0, min(it.quantity_offered, inv.quantity))
-        price = effective_price(card, inv.finish) or 0.0
+        # Proxies carry $0 in the shared view (ADR proxy-valuation-2026-06-12).
+        price = 0.0 if inv.is_proxy else (effective_price(card, inv.finish) or 0.0)
         total = price * available
         display.append(
             {

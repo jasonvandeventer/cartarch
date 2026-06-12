@@ -50,7 +50,12 @@
   decks=none,
   locations=none,
   showcases=none,
-  use_drawer_sorter=false) %}
+  use_drawer_sorter=false,
+  proxy_warn=false) %}
+  {# proxy_warn (ADR proxy-valuation-2026-06-12): on shared/trade surfaces a
+     proxy is rendered with the warning-accent badge and a "$0.00 (proxy)"
+     price (the service already zeroes its value). Off everywhere else
+     (Collection / Locations / Decks keep the neutral badge + market price). #}
   <article class="inventory-card inventory-card-compact">
     <div class="inventory-card-media">
       {% if item.card.image_url %}
@@ -78,10 +83,12 @@
         {% if item.language and item.language != 'en' %}
           <span class="language-badge" title="Physical language">{{ item.language|upper }}</span>
         {% endif %}
-        {% if item.is_proxy %}<span class="proxy-badge" title="Marked as proxy">PROXY</span>{% endif %}
+        {% if item.is_proxy %}<span class="proxy-badge{% if proxy_warn %} proxy-badge-warn{% endif %}" title="{% if proxy_warn %}Proxy — carries no market value{% else %}Marked as proxy{% endif %}">PROXY</span>{% endif %}
         {% if item.card.mana_cost %}· {{ item.card.mana_cost }}{% endif %}
         · Qty {{ item.quantity }} ·
-        {% if item.price_status is defined and item.price_status %}
+        {% if proxy_warn and item.is_proxy %}
+          $0.00 <span class="proxy-price-note">(proxy)</span> each
+        {% elif item.price_status is defined and item.price_status %}
           {% if item.price_status == "current" %}
             ${{ '%.2f'|format(item.effective_price) }} each
           {% elif item.price_status == "stale" %}
@@ -104,7 +111,9 @@
       {% endif %}
       <div class="inventory-total">
         Total:
-        {% if item.price_status is defined and item.price_status %}
+        {% if proxy_warn and item.is_proxy %}
+          $0.00 <span class="proxy-price-note">(proxy)</span>
+        {% elif item.price_status is defined and item.price_status %}
           {% if item.price_status == "current" %}
             ${{ '%.2f'|format(item.total_value) }}
           {% elif item.price_status == "stale" %}

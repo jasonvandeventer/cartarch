@@ -1,5 +1,17 @@
 [
   {
+    "version": "3.39.4",
+    "date": "2026-06-12",
+    "added": [],
+    "refined": [
+      "Proxies in a shared binder or a trade now carry $0.00 and a clear amber PROXY flag instead of the real card's market price. They're still allowed — list a proxy to give away or trade it as a proxy — but a shared list's total and a trade's value no longer count it. Bulk-adding a whole collection or location to a showcase (and the Collection \"add matching\" action) now skips proxies unless you tick \"Include proxies (listed at $0)\"."
+    ],
+    "resolved": [
+      "Trades never actually flagged proxies. A proxy offered or requested in a trade showed no PROXY badge and was priced at full market value — so a $34 \"proxy\" read just like the real card on a proposal. Trades now flag proxies, value them at $0, and show a one-line notice when a trade includes any."
+    ],
+    "archivist_note": "A trust fix more than a feature. At a real table, a proxy listed at the genuine card's price is a way to be misread — honestly or not. Showcases and trades now say the quiet part out loud: a proxy is a proxy, and it's worth $0 to the person across the table."
+  },
+  {
     "version": "3.39.3",
     "date": "2026-06-12",
     "added": [

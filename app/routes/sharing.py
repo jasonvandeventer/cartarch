@@ -245,12 +245,16 @@ def showcase_item_remove(
 def showcase_add_collection(
     showcase_id: int,
     request: Request,
+    include_proxies: bool = Form(False),
     session: Session = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
     _: None = CsrfRequired,
 ):
-    """v3.31.0 — bulk-add the user's entire (placed) collection."""
-    result = share_service.add_rows_to_showcase(session, current_user.id, showcase_id)
+    """v3.31.0 — bulk-add the user's entire (placed) collection. Proxies are
+    skipped unless ``include_proxies`` is ticked (ADR proxy-valuation-2026-06-12)."""
+    result = share_service.add_rows_to_showcase(
+        session, current_user.id, showcase_id, include_proxies=include_proxies
+    )
     if result is None:
         return RedirectResponse(url="/showcases?error=not_found", status_code=303)
     return RedirectResponse(
@@ -264,13 +268,19 @@ def showcase_add_location(
     showcase_id: int,
     request: Request,
     location_id: int = Form(...),
+    include_proxies: bool = Form(False),
     session: Session = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
     _: None = CsrfRequired,
 ):
-    """v3.31.0 — bulk-add every placed row in one StorageLocation."""
+    """v3.31.0 — bulk-add every placed row in one StorageLocation. Proxies
+    skipped unless ``include_proxies`` is ticked (ADR proxy-valuation-2026-06-12)."""
     result = share_service.add_rows_to_showcase(
-        session, current_user.id, showcase_id, location_id=location_id
+        session,
+        current_user.id,
+        showcase_id,
+        location_id=location_id,
+        include_proxies=include_proxies,
     )
     if result is None:
         return RedirectResponse(url="/showcases?error=not_found", status_code=303)

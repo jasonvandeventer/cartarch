@@ -75,7 +75,8 @@
             {{ inventory_card(item, csrf_token,
                               show_collection_actions=false,
                               show_location_label=false,
-                              show_deck_actions=false) }}
+                              show_deck_actions=false,
+                              proxy_warn=true) }}
             {% if current_user.id != sharer.id %}
               <a class="btn-like share-view-propose-link"
                  href="/trades/new?from_showcase_item={{ item.id }}">Propose trade for this</a>

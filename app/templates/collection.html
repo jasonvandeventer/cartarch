@@ -218,6 +218,7 @@
                   {% endfor %}
                 </select>
               </label>
+              <label class="muted" style="font-size:0.85rem"><input type="checkbox" name="include_proxies" value="1"> Include proxies (listed at $0)</label>
               <button type="submit">Add {{ total_count }} →</button>
             </form>
           {% else %}
@@ -247,7 +248,7 @@
             </label>
             <button type="submit">Move {{ total_count }} →</button>
           </form>
-          <p class="collection-bulk-note muted">Acts on placed cards matching the filter — across every page, not just this one. Pending cards are excluded.</p>
+          <p class="collection-bulk-note muted">Acts on placed cards matching the filter — across every page, not just this one. Pending cards and proxies are excluded unless opted in.</p>
 
           <hr class="collection-bulk-divider">
           <form action="/collection/cull-preview" method="post" class="collection-bulk-form inline-form">

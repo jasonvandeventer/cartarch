@@ -129,6 +129,7 @@ def trades_new_page(
                         "card": inv.card,  # raw access only inside the prefill summary
                         "finish": inv.finish,
                         "available": available,
+                        "is_proxy": bool(inv.is_proxy),
                     }
                 )
 
@@ -269,6 +270,9 @@ def trades_detail(
             "trade": detail["trade"],
             "offered_items": detail["offered_items"],
             "requested_items": detail["requested_items"],
+            "offered_total": detail["offered_total"],
+            "requested_total": detail["requested_total"],
+            "has_proxy": detail["has_proxy"],
             "viewer_is_proposer": detail["viewer_is_proposer"],
             "viewer_is_recipient": detail["viewer_is_recipient"],
             "error": request.query_params.get("error"),

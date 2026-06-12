@@ -75,6 +75,10 @@
       <input type="hidden" name="offered_json" id="offered-json" value="[]">
       <input type="hidden" name="requested_json" id="requested-json" value="[]">
 
+      <section class="panel" id="trade-proxy-notice-panel" style="display:none">
+        <p class="trade-proxy-notice">⚠ This trade includes proxies — they carry no market value.</p>
+      </section>
+
       <section class="panel">
         <h3 class="panel-title">Their cards (requested)</h3>
         <p class="muted">Pick items from <strong>{{ pre_recipient.display_name or pre_recipient.username }}</strong>'s Showcase that's shared with <em>{{ pre_playgroup.name }}</em>. Toggle to add &mdash; quantities default to available, click to override.</p>
@@ -83,13 +87,14 @@
           {% for it in prefilled_requested %}
             <div class="trade-pick-item trade-pick-prefilled"
                  data-showcase-item-id="{{ it.showcase_item_id }}"
-                 data-available="{{ it.available }}">
+                 data-available="{{ it.available }}"
+                 data-proxy="{{ '1' if it.is_proxy else '0' }}">
               <div class="trade-pick-card">
-                <div class="trade-pick-name">{{ it.card.name }}</div>
+                <div class="trade-pick-name">{{ it.card.name }}{% if it.is_proxy %} <span class="proxy-badge proxy-badge-warn" title="Proxy — carries no market value">PROXY</span>{% endif %}</div>
                 <div class="trade-pick-meta">
                   {{ it.card.set_code | upper }} #{{ it.card.collector_number }} &middot;
                   {{ it.finish | capitalize }} &middot;
-                  available {{ it.available }}
+                  available {{ it.available }}{% if it.is_proxy %} &middot; <span class="proxy-price-note">$0 (proxy)</span>{% endif %}
                 </div>
               </div>
               <div class="trade-pick-controls">
@@ -108,13 +113,14 @@
             {% if share_item.showcase_item_id not in seen_pre %}
               <div class="trade-pick-item"
                    data-showcase-item-id="{{ share_item.showcase_item_id }}"
-                   data-available="{{ share_item.available }}">
+                   data-available="{{ share_item.available }}"
+                   data-proxy="{{ '1' if share_item.is_proxy else '0' }}">
                 <div class="trade-pick-card">
-                  <div class="trade-pick-name">{{ share_item.card.name }}</div>
+                  <div class="trade-pick-name">{{ share_item.card.name }}{% if share_item.is_proxy %} <span class="proxy-badge proxy-badge-warn" title="Proxy — carries no market value">PROXY</span>{% endif %}</div>
                   <div class="trade-pick-meta">
                     {{ share_item.card.set_code | upper }} #{{ share_item.card.collector_number }} &middot;
                     {{ share_item.finish | capitalize }} &middot;
-                    available {{ share_item.available }}
+                    available {{ share_item.available }}{% if share_item.is_proxy %} &middot; <span class="proxy-price-note">$0 (proxy)</span>{% endif %}
                   </div>
                 </div>
                 <button type="button" class="btn-like trade-pick-add"
@@ -137,13 +143,14 @@
             {% for inv in options.proposer_inventory %}
               <div class="trade-pick-item"
                    data-inventory-row-id="{{ inv.inventory_row_id }}"
-                   data-available="{{ inv.quantity }}">
+                   data-available="{{ inv.quantity }}"
+                   data-proxy="{{ '1' if inv.is_proxy else '0' }}">
                 <div class="trade-pick-card">
-                  <div class="trade-pick-name">{{ inv.card.name }}</div>
+                  <div class="trade-pick-name">{{ inv.card.name }}{% if inv.is_proxy %} <span class="proxy-badge proxy-badge-warn" title="Proxy — carries no market value">PROXY</span>{% endif %}</div>
                   <div class="trade-pick-meta">
                     {{ inv.card.set_code | upper }} #{{ inv.card.collector_number }} &middot;
                     {{ inv.finish | capitalize }} &middot;
-                    you own {{ inv.quantity }}
+                    you own {{ inv.quantity }}{% if inv.is_proxy %} &middot; <span class="proxy-price-note">$0 (proxy)</span>{% endif %}
                   </div>
                 </div>
                 <button type="button" class="btn-like trade-pick-add"
@@ -183,12 +190,32 @@
       var offered = new Map(); // inventory_row_id -> {quantity}
       var requested = new Map(); // showcase_item_id -> {quantity}
 
+      // Proxy notice: shown whenever any SELECTED item (either side) is a
+      // proxy. Proxy pick items carry data-proxy="1" (ADR proxy-valuation).
+      function anyProxySelected() {
+        var hit = false;
+        requested.forEach(function (_v, id) {
+          var el = document.querySelector('#requested-grid .trade-pick-item[data-showcase-item-id="' + id + '"]');
+          if (el && el.getAttribute('data-proxy') === '1') hit = true;
+        });
+        offered.forEach(function (_v, id) {
+          var el = document.querySelector('#offered-grid .trade-pick-item[data-inventory-row-id="' + id + '"]');
+          if (el && el.getAttribute('data-proxy') === '1') hit = true;
+        });
+        return hit;
+      }
+      function updateProxyNotice() {
+        var panel = document.getElementById('trade-proxy-notice-panel');
+        if (panel) panel.style.display = anyProxySelected() ? '' : 'none';
+      }
+
       // Pre-fill requested from server-rendered prefilled rows.
       document.querySelectorAll('#requested-grid .trade-pick-prefilled').forEach(function (el) {
         var id = parseInt(el.getAttribute('data-showcase-item-id'), 10);
         var available = parseInt(el.getAttribute('data-available'), 10) || 1;
         if (id) requested.set(id, { quantity: Math.min(1, available) });
       });
+      updateProxyNotice();
 
       function serialize() {
         document.getElementById('offered-json').value = JSON.stringify(
@@ -212,6 +239,7 @@
           requested.set(id, { quantity: Math.min(1, available) });
           btn.disabled = true;
           btn.textContent = 'Added';
+          updateProxyNotice();
         });
       });
       document.querySelectorAll('#offered-grid .trade-pick-add').forEach(function (btn) {
@@ -222,6 +250,7 @@
           offered.set(id, { quantity: Math.min(1, available) });
           btn.disabled = true;
           btn.textContent = 'Added';
+          updateProxyNotice();
         });
       });
       // Prefilled-item Remove + qty change handlers.
@@ -231,6 +260,7 @@
           requested.delete(id);
           var row = btn.closest('.trade-pick-item');
           if (row) row.style.display = 'none';
+          updateProxyNotice();
         });
       });
       document.querySelectorAll('#requested-grid .trade-pick-qty').forEach(function (input) {

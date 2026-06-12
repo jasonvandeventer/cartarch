@@ -796,6 +796,7 @@ def collection_bulk_add_showcase(
     price_max: str = Form(""),
     finish: str = Form(""),
     location_id: int = Form(0),
+    include_proxies: bool = Form(False),
     session: Session = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
     _: None = CsrfRequired,
@@ -826,8 +827,15 @@ def collection_bulk_add_showcase(
         finish=finish,
         location_id=location_id,
     )
+    # Proxies are skipped by default here too — same rule as the Showcase-page
+    # bulk-adds (two bulk paths must not have opposite proxy defaults). Opt in
+    # with the panel's "Include proxies" checkbox (ADR proxy-valuation-2026-06-12).
     result = share_service.add_rows_to_showcase(
-        session, current_user.id, showcase_id, row_ids=placed_ids
+        session,
+        current_user.id,
+        showcase_id,
+        row_ids=placed_ids,
+        include_proxies=include_proxies,
     )
     if result is None:
         return _collection_filter_redirect(

@@ -71,6 +71,12 @@
     </section>
   {% endif %}
 
+  {% if has_proxy %}
+    <section class="panel">
+      <p class="trade-proxy-notice">⚠ This trade includes proxies — they carry no market value.</p>
+    </section>
+  {% endif %}
+
   <section class="panel">
     <h3 class="panel-title">{{ proposer_label }} offers</h3>
     {% if offered_items %}
@@ -79,9 +85,11 @@
           {{ inventory_card(item, csrf_token,
                             show_collection_actions=false,
                             show_location_label=false,
-                            show_deck_actions=false) }}
+                            show_deck_actions=false,
+                            proxy_warn=true) }}
         {% endfor %}
       </div>
+      <p class="muted trade-side-total">Side total: <strong>${{ '%.2f'|format(offered_total) }}</strong>{% if offered_items | selectattr('is_proxy') | list %} <span class="proxy-price-note">(proxies count as $0)</span>{% endif %}</p>
     {% else %}
       <p class="trades-empty">No offered items.</p>
     {% endif %}
@@ -95,9 +103,11 @@
           {{ inventory_card(item, csrf_token,
                             show_collection_actions=false,
                             show_location_label=false,
-                            show_deck_actions=false) }}
+                            show_deck_actions=false,
+                            proxy_warn=true) }}
         {% endfor %}
       </div>
+      <p class="muted trade-side-total">Side total: <strong>${{ '%.2f'|format(requested_total) }}</strong>{% if requested_items | selectattr('is_proxy') | list %} <span class="proxy-price-note">(proxies count as $0)</span>{% endif %}</p>
     {% else %}
       <p class="trades-empty">No requested items.</p>
     {% endif %}

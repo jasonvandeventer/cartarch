@@ -509,10 +509,18 @@ def get_trade_detail(
     requested_items = [
         _build_trade_item_projection(it, trade) for it in _items_by_side(trade, "requested")
     ]
+    # Side totals (proxies already contribute $0 per item — ADR
+    # proxy-valuation-2026-06-12). ``*_has_proxy`` drives the one-line notice.
+    offered_total = sum(it["total_value"] for it in offered_items)
+    requested_total = sum(it["total_value"] for it in requested_items)
+    has_proxy = any(it["is_proxy"] for it in offered_items + requested_items)
     return {
         "trade": trade,
         "offered_items": offered_items,
         "requested_items": requested_items,
+        "offered_total": offered_total,
+        "requested_total": requested_total,
+        "has_proxy": has_proxy,
         "viewer_is_proposer": viewer_user_id == trade.proposer_user_id,
         "viewer_is_recipient": viewer_user_id == trade.recipient_user_id,
     }
@@ -600,13 +608,17 @@ def _build_trade_item_projection(item: TradeItem, trade: Trade) -> dict:
     inv = item.inventory_row
     finish = item.finish or (inv.finish if inv is not None else "normal")
     qty = item.quantity or 1
-    price = effective_price(card, finish) or 0.0
+    # Proxies carry $0 market value on a live trade (ADR proxy-valuation-2026-06-12).
+    # Terminal/snapshot trades can't know (no is_proxy_at_trade snapshot) — those
+    # paths keep is_proxy=False; this matters only for the live trust surface.
+    is_proxy = bool(inv.is_proxy) if inv is not None else False
+    price = 0.0 if is_proxy else (effective_price(card, finish) or 0.0)
     return {
         "id": item.id,
         "card": _ReadOnlyCardProjection(card),
         "finish": finish,
         "language": "en",
-        "is_proxy": False,
+        "is_proxy": is_proxy,
         # ``quantity`` is the trade quantity, NOT the underlying
         # InventoryRow.quantity (which is private to that user).
         "quantity": qty,
@@ -951,6 +963,7 @@ def get_construction_options(
                             "card": _ReadOnlyCardProjection(inv.card),
                             "finish": inv.finish,
                             "available": available,
+                            "is_proxy": bool(inv.is_proxy),
                         }
                     )
                 break
@@ -977,6 +990,7 @@ def get_construction_options(
                 "card": _ReadOnlyCardProjection(row.card),
                 "finish": row.finish,
                 "quantity": row.quantity,
+                "is_proxy": bool(row.is_proxy),
             }
         )
     return {

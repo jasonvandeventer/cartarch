@@ -68,22 +68,24 @@
   {# ── Bulk add (v3.31.0): whole collection or a whole location ── #}
   <section class="panel">
     <h3 class="panel-title">Add cards in bulk</h3>
-    <p class="muted">Fill this Showcase without picking cards one at a time. Already-included cards are skipped, and pending (unconfirmed) cards are left out. You can fine-tune offered quantities afterward.</p>
+    <p class="muted">Fill this Showcase without picking cards one at a time. Already-included cards are skipped, and pending (unconfirmed) cards are left out. <strong>Proxies are skipped by default</strong> — tick "Include proxies" to list them (at $0). You can fine-tune offered quantities afterward.</p>
     <div class="inline-create-row" style="display:flex; gap:0.75rem; flex-wrap:wrap; align-items:flex-end">
-      <form method="post" action="/showcase/{{ showcase.id }}/add-collection" class="inline-form"
+      <form method="post" action="/showcase/{{ showcase.id }}/add-collection" class="inline-form" style="flex-direction:column; align-items:flex-start; gap:0.4rem"
             onsubmit="return confirm('Add every card in your collection to this Showcase?')">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <label class="muted" style="font-size:0.85rem"><input type="checkbox" name="include_proxies" value="1"> Include proxies (listed at $0)</label>
         <button type="submit" class="btn-like">Add my whole collection</button>
       </form>
       {% set bulk_locations = locations | selectattr("type", "ne", "root") | selectattr("type", "ne", "deck") | list %}
       {% if bulk_locations %}
-        <form method="post" action="/showcase/{{ showcase.id }}/add-location" class="inline-form" style="flex-wrap:wrap; gap:0.5rem">
+        <form method="post" action="/showcase/{{ showcase.id }}/add-location" class="inline-form" style="flex-direction:column; align-items:flex-start; gap:0.4rem">
           <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
           <select name="location_id" required>
             {% for loc in bulk_locations %}
               <option value="{{ loc.id }}">{{ loc.name }} ({{ loc.type }})</option>
             {% endfor %}
           </select>
+          <label class="muted" style="font-size:0.85rem"><input type="checkbox" name="include_proxies" value="1"> Include proxies (listed at $0)</label>
           <button type="submit" class="btn-like">Add everything from this location</button>
         </form>
       {% endif %}
