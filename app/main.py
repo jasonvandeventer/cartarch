@@ -13,6 +13,7 @@ import os
 import threading
 from contextlib import asynccontextmanager
 from datetime import timedelta
+from urllib.parse import quote
 
 from fastapi import Depends, FastAPI, Form, Request
 from fastapi.responses import (
@@ -813,6 +814,8 @@ def watchlist_page(
     current_user: User = Depends(get_current_user),
 ):
     items = list_watchlist(session, current_user.id)
+    # Inline add-by-search outcome (?wl=added|dup&name=...) set by the
+    # from_search branch of /watchlist/add — surfaces a one-line notice.
     return render(
         request,
         "watchlist.html",
@@ -820,6 +823,8 @@ def watchlist_page(
             "title": "Wishlist",
             "items": items,
             "current_user": current_user,
+            "wl_outcome": request.query_params.get("wl", ""),
+            "wl_name": request.query_params.get("name", ""),
         },
     )
 
@@ -914,6 +919,7 @@ def watchlist_add(
     card_id: str = Form(""),
     card_name: str = Form(""),
     note: str = Form(""),
+    from_search: str = Form(""),
     session: Session = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
     _: None = CsrfRequired,
@@ -925,6 +931,13 @@ def watchlist_add(
     (IntegrityError from the partial-unique indexes) is caught and
     converted to a quiet redirect — the user has already expressed
     the intent to watch this card; no need to surface an error.
+
+    ``from_search`` marks an add originating from the Wishlist page's
+    add-by-search box (v3.39.x) — an **any-printing** add by name, the same
+    identity mode as the card-detail "Watch any printing" button. That path
+    redirects back to /watchlist with a ``?wl=added|dup&name=...`` outcome so
+    the page can show an inline notice (empty selection → quiet no-op). The
+    card-detail path below is unchanged.
     """
     cid_int: int | None = None
     if card_id.strip():
@@ -934,6 +947,22 @@ def watchlist_add(
             cid_int = None
     name_str: str | None = card_name.strip() or None
     note_str: str | None = note.strip() or None
+
+    if from_search.strip():
+        if not name_str:
+            # Nothing selected (empty/blank query submit) — no-op.
+            return RedirectResponse(url="/watchlist", status_code=303)
+        outcome = "added"
+        try:
+            add_to_watchlist(session, current_user.id, card_name=name_str, note=note_str)
+            session.commit()
+        except IntegrityError:
+            session.rollback()
+            outcome = "dup"
+        return RedirectResponse(
+            url=f"/watchlist?wl={outcome}&name={quote(name_str)}", status_code=303
+        )
+
     try:
         add_to_watchlist(
             session,

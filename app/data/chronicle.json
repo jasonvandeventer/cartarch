@@ -1,5 +1,17 @@
 [
   {
+    "version": "3.39.5",
+    "date": "2026-06-12",
+    "added": [
+      "You can now add a card to your Wishlist by searching for it. Type any card name — owned or not — in the new \"Add a card\" box on the Wishlist page, pick it from the dropdown, and it's added as an any-printing Wishlist row. Adding the same card twice just tells you it's already there."
+    ],
+    "refined": [],
+    "resolved": [
+      "Fixed a gap that left a brand-new account with no way to add its first Wishlist card. The empty-Wishlist hint pointed only at browsing Sets — but the Sets page is empty until you own cards, so a fresh account had no path in at all. The search box is now the front door; Sets browsing stays as a secondary route."
+    ],
+    "archivist_note": "The kind of gap you only see from an empty account. Every test we'd run used a collection full of cards, which quietly hid the fact that a first-day user had nowhere to start. Now the Wishlist works the moment you arrive — before you've imported a thing."
+  },
+  {
     "version": "3.39.4",
     "date": "2026-06-12",
     "added": [],

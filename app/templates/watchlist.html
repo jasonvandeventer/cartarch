@@ -13,6 +13,30 @@
       Cards you're hunting — for upgrades, brews, or someday. <em>Set a target price</em> on any row and Cartarch flags it the moment the price meets it.
     </p>
   </section>
+
+  {# Add-by-search (v3.39.x): the PRIMARY way to add a Wishlist card — works for
+     a brand-new account that owns nothing (Sets is empty then, so card-detail
+     was unreachable). Reuses the deck-builder autocomplete
+     (/decks/api/card-autocomplete — resolves cards the user does NOT own) and
+     the any-printing watchlist add path (from_search branch of /watchlist/add). #}
+  <section class="panel watchlist-add-panel">
+    <h3 class="panel-title">Add a card</h3>
+    {% if wl_outcome == 'added' %}
+      <p class="watchlist-add-flash" style="color:#34d399;font-weight:600;margin:0 0 0.5rem">Added <strong>{{ wl_name }}</strong> to your Wishlist.</p>
+    {% elif wl_outcome == 'dup' %}
+      <p class="watchlist-add-flash muted" style="margin:0 0 0.5rem"><strong>{{ wl_name }}</strong> is already on your Wishlist.</p>
+    {% endif %}
+    <form id="wishlist-add-form" method="post" action="/watchlist/add" autocomplete="off">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <input type="hidden" name="card_name" id="wishlist-add-name" value="">
+      <input type="hidden" name="from_search" value="1">
+      <label for="wishlist-search" class="add-card-label">Search any card — owned or not — and add it as an any-printing Wishlist row</label>
+      <input type="text" id="wishlist-search" placeholder="e.g. Black Lotus" autocomplete="off">
+      <div id="wishlist-search-results" class="add-card-results" role="listbox" aria-live="polite"></div>
+      <div id="wishlist-search-status" class="muted small-text" aria-live="polite"></div>
+    </form>
+  </section>
+
   {% if items %}
     <section class="panel">
       <div class="table-wrap">
@@ -144,8 +168,78 @@
     <section class="panel">
       <h3 class="panel-title">Your wishlist is empty</h3>
       <p class="muted">
-        Browse <a href="/sets">Sets</a> to open any card's detail page — whether you own it or not — then click <strong>Add to Wishlist (this printing)</strong> or <strong>(any printing)</strong>. Set a target price and Cartarch flags it the moment the price meets it.
+        <strong>Search for any card — owned or not — and add it straight to your Wishlist</strong> using the <em>Add a card</em> box above. You can also browse <a href="/sets">Sets</a> for cards you own and add them from a card's detail page. Set a target price and Cartarch flags it the moment the price meets it.
       </p>
     </section>
   {% endif %}
+{% endblock %}
+{% block extra_scripts %}
+  <script>
+    // Wishlist add-by-search (v3.39.x). Type-ahead against the deck-builder
+    // autocomplete (/decks/api/card-autocomplete — resolves UNOWNED cards via
+    // Scryfall). Results are deduped by NAME (an any-printing Wishlist add keys
+    // on card name, so showing one row per name is what the user picks). Picking
+    // a result submits the form (card_name + from_search=1) → the handler adds an
+    // any-printing row and redirects back with a ?wl= outcome notice.
+    (function () {
+      var form = document.getElementById('wishlist-add-form');
+      if (!form) return;
+      var input = document.getElementById('wishlist-search');
+      var hiddenName = document.getElementById('wishlist-add-name');
+      var resultsEl = document.getElementById('wishlist-search-results');
+      var statusEl = document.getElementById('wishlist-search-status');
+      var acTimer = null, lastQuery = '';
+
+      function dedupeByName(items) {
+        var seen = {}, out = [];
+        (items || []).forEach(function (c) {
+          var key = (c.name || '').toLowerCase();
+          if (key && !seen[key]) { seen[key] = 1; out.push(c); }
+        });
+        return out;
+      }
+
+      function renderResults(items) {
+        if (!items.length) {
+          resultsEl.innerHTML = '<p class="muted small-text" style="margin:0.4rem 0 0">No cards matched on Scryfall.</p>';
+          return;
+        }
+        resultsEl.innerHTML = items.map(function (c, i) {
+          var img = c.image_uri_small
+            ? '<img src="' + c.image_uri_small + '" alt="" loading="lazy">'
+            : '<div class="add-card-result-noimg"></div>';
+          return '<button type="button" class="add-card-result" data-idx="' + i + '" role="option">' +
+            img + '<div class="add-card-result-meta"><strong>' + (c.name || '') +
+            '</strong><span class="muted">add any printing</span></div></button>';
+        }).join('');
+        resultsEl.querySelectorAll('.add-card-result').forEach(function (btn) {
+          btn.addEventListener('click', function () {
+            var c = items[parseInt(btn.dataset.idx, 10)];
+            hiddenName.value = c.name || '';
+            if (hiddenName.value) { statusEl.textContent = 'Adding…'; form.requestSubmit(); }
+          });
+        });
+      }
+
+      input.addEventListener('input', function () {
+        var q = input.value.trim();
+        if (q.length < 2) { resultsEl.innerHTML = ''; lastQuery = ''; return; }
+        if (q === lastQuery) return;
+        lastQuery = q;
+        clearTimeout(acTimer);
+        acTimer = setTimeout(function () {
+          statusEl.textContent = 'Searching…';
+          fetch('/decks/api/card-autocomplete?q=' + encodeURIComponent(q))
+            .then(function (r) { return r.ok ? r.json() : []; })
+            .then(function (data) { statusEl.textContent = ''; renderResults(dedupeByName(data)); })
+            .catch(function () { statusEl.textContent = ''; });
+        }, 200);
+      });
+
+      // Enter must not submit an empty card_name (a result must be clicked).
+      input.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') e.preventDefault();
+      });
+    })();
+  </script>
 {% endblock %}
