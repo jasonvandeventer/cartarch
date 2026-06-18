@@ -85,7 +85,6 @@ from app.watchlist_service import (
     update_note,
     update_target_price,
 )
-from scripts.run_migrations import run as run_migrations
 
 _daemon_threads: list[threading.Thread] = []
 
@@ -120,7 +119,19 @@ async def lifespan(app: FastAPI):
             "mana-archive-platform deployment.yaml for the SESSION_SECRET_KEY "
             "pattern this mirrors."
         )
-    run_migrations()
+    # Schema is owned by Alembic (``alembic upgrade head``, run as a pre-sync Job at
+    # deploy — NOT per-pod). The legacy run_migrations() self-migration was retired in
+    # the Gate #4 baseline work; the app no longer creates/migrates schema at boot.
+    #
+    # IMPORTANT — this is NOT a full self-bootstrap. ``init_db()`` calls
+    # ``Base.metadata.create_all``, which creates only the 21 ORM-mapped tables. The 7
+    # raw-SQL tables (scryfall_cards, scryfall_bulk_meta, game_changer_cards, card_tags,
+    # commander_bracket_rules, deck_bracket_estimates, deck_bracket_findings) live in
+    # ``app/legacy_tables.py``, which is imported ONLY by ``alembic/env.py`` — never by
+    # the app — so ``create_all`` cannot create them. A fresh database therefore REQUIRES
+    # ``alembic upgrade head`` to have run first; booting the app against a never-migrated
+    # DB leaves those 7 tables missing (a documented deploy-order contract, not a latent
+    # bug). On existing/prod DBs every table already exists, so ``init_db`` is a no-op.
     init_db()
     for _target, _name in (
         (_price_refresh_loop, "price-refresh"),

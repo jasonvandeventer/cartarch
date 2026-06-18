@@ -1,10 +1,13 @@
 """Seed game_changer_cards from Scryfall's `is:gamechanger` query.
 
-Falls back to a hardcoded conservative list if Scryfall is unreachable during
-the migration (e.g., on offline dev machines or during a Scryfall outage).
-Admins can re-seed by clearing the schema_migrations row for
-v3_15_0_seed_game_changers and restarting; the upsert is non-destructive
-(existing rows are skipped, only new names are added).
+Falls back to a hardcoded conservative list if Scryfall is unreachable
+(e.g., on offline dev machines or during a Scryfall outage).
+
+Post Gate #4 this runs via ``scripts/seed_reference_data.py`` (after
+``alembic upgrade head``), no longer the retired ``run_migrations`` runner. To
+re-seed, just run it again — it is idempotent (check-then-insert by
+``(card_name, rules_version)``: existing rows are skipped, only new names added);
+it no longer depends on the ``schema_migrations`` ledger.
 """
 
 from __future__ import annotations
@@ -69,7 +72,7 @@ def main() -> None:
                         active, rules_version
                     ) VALUES (
                         :card_id, :card_name, :source, CURRENT_DATE,
-                        1, :rules_version
+                        TRUE, :rules_version
                     )
                     """
                 ),

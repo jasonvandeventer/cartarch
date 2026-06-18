@@ -16,8 +16,9 @@ of the baseline: ``scryfall_cards`` (the cache-type-anchoring seam) and
 
 **Runtime-neutral:** this module is imported ONLY by ``alembic/env.py``, never by
 the app. The running app's ``Base.metadata`` therefore stays exactly as before
-(21 ORM tables); the 7 raw tables continue to be created by the legacy
-``run_migrations()`` runner until that is retired (Phase D, not yet).
+(21 ORM tables). With the legacy ``run_migrations()`` runner now retired (Gate #4,
+Phase D), these 7 raw tables are created exclusively by ``alembic upgrade head`` —
+the app no longer creates them, so a fresh DB must be migrated before boot.
 
 **Transcription rule (Gate #4):** every column below is transcribed
 column-for-column from the PROD SNAPSHOT (``/tmp/v3.39.7-schema.sql``, i.e. what
