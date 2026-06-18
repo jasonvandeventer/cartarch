@@ -17,7 +17,7 @@ DATA_DIR = Path(os.getenv("DATA_DIR", "/data"))
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 DB_PATH = DATA_DIR / "mana_archive.db"
-DATABASE_URL = f"sqlite:///{DB_PATH}"
+DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite:///{DB_PATH}")
 
 # ``check_same_thread`` is a SQLite-only DBAPI argument. Passing it to any other
 # driver (psycopg/asyncpg at the v4 Postgres cutover) raises at connect time, so

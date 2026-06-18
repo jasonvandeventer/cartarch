@@ -13,6 +13,7 @@ from sqlalchemy import (
     DateTime,
     Float,
     ForeignKey,
+    Index,
     Integer,
     String,
     Text,
@@ -175,6 +176,14 @@ class InventoryRow(Base):
 
 class Deck(Base):
     __tablename__ = "decks"
+    # DELIBERATE DOCUMENTED DELTA (Gate #4): prod's schema carries a legacy
+    # ``CREATE UNIQUE INDEX ix_decks_name ON decks(name)`` — global-unique deck
+    # name, a single-user-era artifact. The correct multi-user scope is per-user
+    # unique, which this constraint encodes; prod's globally-unique data trivially
+    # satisfies the looser predicate (zero migration risk). This is the roadmap's
+    # "v4 table rebuild drops the legacy decks.name auto-index" cleanup landing —
+    # post-cutover it lets the v3.30.18/v3.30.20 cross_user_deck_conflict
+    # workarounds be removed.
     __table_args__ = (UniqueConstraint("user_id", "name", name="uq_decks_user_name"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -337,7 +346,12 @@ class GameSeat(Base):
     game_id: Mapped[int] = mapped_column(ForeignKey("games.id"), nullable=False, index=True)
     seat_number: Mapped[int] = mapped_column(Integer, nullable=False)
     player_name: Mapped[str] = mapped_column(String(128), nullable=False)
-    deck_id: Mapped[int | None] = mapped_column(ForeignKey("decks.id"), nullable=True)
+    # ``ondelete="SET NULL"`` documents v4 Postgres intent: a seat (game history)
+    # outlives a later-deleted deck — the deck ref nulls, the seat persists. SQLite
+    # doesn't enforce it (PRAGMA foreign_keys OFF). Gate #4 orphan audit (id 40).
+    deck_id: Mapped[int | None] = mapped_column(
+        ForeignKey("decks.id", ondelete="SET NULL"), nullable=True
+    )
     placement: Mapped[int | None] = mapped_column(Integer, nullable=True)
     starting_life: Mapped[int] = mapped_column(Integer, default=40, nullable=False)
     final_life: Mapped[int | None] = mapped_column(Integer, nullable=True)
@@ -387,7 +401,13 @@ class TokenInventory(Base):
     __tablename__ = "token_inventory"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    # ``ondelete="CASCADE"`` recovers a prod raw-SQL invariant the ORM omitted
+    # (the v3.x token_inventory migration created this FK with ON DELETE CASCADE).
+    # Matches the explicit admin user-deletion cleanup. SQLite doesn't enforce it
+    # (foreign_keys OFF). gate-#5 pending verification.
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
     name: Mapped[str] = mapped_column(String(255), index=True)
     type_line: Mapped[str | None] = mapped_column(String(255), nullable=True)
     subtype: Mapped[str | None] = mapped_column(String(64), nullable=True)
@@ -401,8 +421,12 @@ class TokenInventory(Base):
     back_image_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     back_set_code: Mapped[str | None] = mapped_column(String(32), nullable=True)
     back_collector_number: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    # ``ondelete="SET NULL"`` recovers a prod raw-SQL invariant the ORM omitted
+    # (the migration created this FK with ON DELETE SET NULL — a deleted location
+    # nulls the token's placement, keeps the token). SQLite doesn't enforce it
+    # (foreign_keys OFF). gate-#5 pending verification.
     storage_location_id: Mapped[int | None] = mapped_column(
-        ForeignKey("storage_locations.id"), nullable=True, index=True
+        ForeignKey("storage_locations.id", ondelete="SET NULL"), nullable=True, index=True
     )
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
@@ -421,9 +445,19 @@ class DeckTokenRequirement(Base):
     __tablename__ = "deck_token_requirements"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    deck_id: Mapped[int] = mapped_column(ForeignKey("decks.id"), nullable=False, index=True)
+    # ``ondelete="CASCADE"`` documents v4 Postgres intent: a token requirement is
+    # meaningless without its deck and dies with it. nullable=False rules out SET
+    # NULL; CASCADE also fixes the latent delete_deck bug (deck_service.py) where
+    # these rows are not cleaned up. SQLite doesn't enforce it (foreign_keys OFF).
+    deck_id: Mapped[int] = mapped_column(
+        ForeignKey("decks.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    # ``ondelete="SET NULL"`` recovers a prod raw-SQL invariant the ORM omitted
+    # (the migration created this FK with ON DELETE SET NULL — deleting the owned
+    # token leaves the requirement as a loose name-only need). SQLite doesn't
+    # enforce it (foreign_keys OFF). gate-#5 pending verification.
     token_inventory_id: Mapped[int | None] = mapped_column(
-        ForeignKey("token_inventory.id"), nullable=True
+        ForeignKey("token_inventory.id", ondelete="SET NULL"), nullable=True
     )
     token_name: Mapped[str] = mapped_column(String(255), nullable=False)
     quantity_needed: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
@@ -465,9 +499,42 @@ class WatchlistItem(Base):
 
     __tablename__ = "watchlist"
 
+    # Two PARTIAL unique indexes recovered from the prod schema (the v3.27.12
+    # migration's ``uq_watchlist_user_card_*`` indexes the ORM never declared):
+    # one-row-per-identity per user, enforced only on the populated side of the
+    # card_id/card_name XOR (WHERE … IS NOT NULL). Both sqlite_where +
+    # postgresql_where so the partial predicate emits on BOTH dialects. These are
+    # correctness invariants (block duplicate watch entries), not niceties.
+    # gate-#5 pending verification.
+    __table_args__ = (
+        Index(
+            "uq_watchlist_user_card_id",
+            "user_id",
+            "card_id",
+            unique=True,
+            sqlite_where=text("card_id IS NOT NULL"),
+            postgresql_where=text("card_id IS NOT NULL"),
+        ),
+        Index(
+            "uq_watchlist_user_card_name",
+            "user_id",
+            "card_name",
+            unique=True,
+            sqlite_where=text("card_name IS NOT NULL"),
+            postgresql_where=text("card_name IS NOT NULL"),
+        ),
+    )
+
     id: Mapped[int] = mapped_column(primary_key=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
-    card_id: Mapped[int | None] = mapped_column(ForeignKey("cards.id"), nullable=True)
+    # ``ondelete=CASCADE`` on both FKs recovers prod raw-SQL invariants the ORM
+    # omitted (delete user / card → drop their watch rows). Matches the explicit
+    # admin user-deletion cleanup. SQLite doesn't enforce it. gate-#5 pending verification.
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    card_id: Mapped[int | None] = mapped_column(
+        ForeignKey("cards.id", ondelete="CASCADE"), nullable=True
+    )
     card_name: Mapped[str | None] = mapped_column(Text, nullable=True)
     added_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -521,7 +588,13 @@ class PasswordResetToken(Base):
     __tablename__ = "password_reset_tokens"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    # ``ondelete="CASCADE"`` recovers a prod raw-SQL invariant the ORM omitted
+    # (the v3.27.14 migration created this FK with ON DELETE CASCADE — a deleted
+    # user's reset tokens die with them, no retention value). Matches the explicit
+    # admin user-deletion cleanup. SQLite doesn't enforce it. gate-#5 pending verification.
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
     token_hash: Mapped[str] = mapped_column(Text, nullable=False)
     expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     used_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
@@ -560,6 +633,22 @@ class Playgroup(Base):
     """
 
     __tablename__ = "playgroups"
+
+    # PARTIAL unique index recovered from the prod schema (the v3.29.0
+    # ``uq_playgroups_join_code`` index the ORM never declared): join codes are
+    # globally unique among ENABLED codes (WHERE join_code IS NOT NULL); NULL =
+    # disabled and may repeat. Both sqlite_where + postgresql_where so the partial
+    # predicate emits on BOTH dialects. Correctness invariant — without it, two
+    # playgroups could share a code and a join would be ambiguous. gate-#5 pending verification.
+    __table_args__ = (
+        Index(
+            "uq_playgroups_join_code",
+            "join_code",
+            unique=True,
+            sqlite_where=text("join_code IS NOT NULL"),
+            postgresql_where=text("join_code IS NOT NULL"),
+        ),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
@@ -654,8 +743,12 @@ class ShowcaseItem(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     showcase_id: Mapped[int] = mapped_column(ForeignKey("showcases.id"), nullable=False, index=True)
+    # ``ondelete="CASCADE"`` documents v4 Postgres intent: matches v3.39.6
+    # clean_inventory_row_references (deletes the showcase_item when its row goes).
+    # nullable=False rules out SET NULL. SQLite doesn't enforce it (foreign_keys
+    # OFF). gate-#5 pending verification (parent-delete intent re-confirm).
     inventory_row_id: Mapped[int] = mapped_column(
-        ForeignKey("inventory_rows.id"), nullable=False, index=True
+        ForeignKey("inventory_rows.id", ondelete="CASCADE"), nullable=False, index=True
     )
     quantity_offered: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -876,8 +969,12 @@ class TradeItem(Base):
     # for the composite (trade_id, side) per-side render query.
     side: Mapped[str] = mapped_column(String(16), nullable=False, index=True)
     # Live FK — nulled by §10 inventory-row-delete cleanup.
+    # ``ondelete="SET NULL"`` documents v4 Postgres intent: matches v3.39.6
+    # clean_inventory_row_references (NULLs the ref, preserves the trade record —
+    # decision A4); nullable=True permits it. SQLite doesn't enforce it
+    # (foreign_keys OFF). gate-#5 pending verification (parent-delete intent re-confirm).
     inventory_row_id: Mapped[int | None] = mapped_column(
-        ForeignKey("inventory_rows.id"), nullable=True, index=True
+        ForeignKey("inventory_rows.id", ondelete="SET NULL"), nullable=True, index=True
     )
     # Live FK — redundant with InventoryRow.card_id but saves the join hop
     # on hot render paths. Documentary only (PRAGMA foreign_keys OFF).
