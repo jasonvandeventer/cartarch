@@ -196,12 +196,20 @@ def update_token(
     return token
 
 
-def delete_token(session: Session, token_id: int, user_id: int) -> bool:
+def delete_token(session: Session, token_id: int, user_id: int, *, commit: bool = True) -> bool:
     token = get_token(session, token_id, user_id)
     if not token:
         return False
+    # gate-#5 (Phase 2): deck_token_requirements.token_inventory_id is SET NULL
+    # intent — a requirement that linked this token survives, its link nulled
+    # (the token_name free-text on the requirement is the durable identity).
+    # Explicit for FK-off (prod SQLite); the DB SET NULL is defense-in-depth.
+    session.query(DeckTokenRequirement).filter(
+        DeckTokenRequirement.token_inventory_id == token_id
+    ).update({DeckTokenRequirement.token_inventory_id: None}, synchronize_session=False)
     session.delete(token)
-    session.commit()
+    if commit:
+        session.commit()
     return True
 
 

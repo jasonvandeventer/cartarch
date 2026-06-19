@@ -9,6 +9,7 @@ from app.auth import hash_password
 from app.dependencies import CsrfRequired, get_db_session, render, require_admin
 from app.models import (
     Deck,
+    Game,
     GameSeat,
     ImportBatch,
     InventoryRow,
@@ -17,6 +18,7 @@ from app.models import (
     Share,
     Showcase,
     StorageLocation,
+    TokenInventory,
     Trade,
     TransactionLog,
     User,
@@ -236,13 +238,64 @@ def delete_user(
         session.delete(user_showcase)
     session.flush()
 
-    # Cascade in FK-safe order
+    # gate-#5 (Phase 2) — COMPOSE the per-entity delete helpers instead of bulk-
+    # deleting around them. The old bulk deletes here (query(Deck).delete() /
+    # query(InventoryRow).delete()) bypassed delete_deck and
+    # clean_inventory_row_references, so they (a) orphaned the RAW deck_bracket_*
+    # tables and never nulled game_seats.deck_id, (b) orphaned terminal cross-user
+    # trade_items pointing at this user's rows, and (c) never deleted token_inventory
+    # at all (orphaning token_inventory.user_id + .storage_location_id). The gate-#5
+    # harness proved all three (plus the games.user_id crash, handled in step 1).
+    # Composing the helpers also future-proofs the cascade: a child added to
+    # decks/inventory/tokens later is cleaned by its own delete path, never re-leaked
+    # here. All helpers run with commit=False — this stays a single transaction.
+    from app import deck_service, token_service
+    from app.inventory_service import clean_inventory_row_references
+
+    # (1) Games this user RECORDED → SET NULL user_id, but SNAPSHOT the recorder's
+    # name FIRST (gate-#5 amendment: games.user_id is now SET NULL — without the
+    # snapshot the read-only banner degrades to "another player"). The game survives
+    # as shared history for its seat-attributed players / linked playgroup. Explicit
+    # (not relying on the DB SET NULL) so it is correct on prod SQLite (FK off) too.
+    recorder_name = target.display_name or target.username
+    for game in session.query(Game).filter(Game.user_id == user_id).all():
+        if game.user_name_at_game is None:
+            game.user_name_at_game = recorder_name
+        game.user_id = None
+    session.flush()
+
+    # (2) Decks → delete_deck each: cleans the raw bracket tables +
+    # deck_token_requirements + nulls game_seats.deck_id (gate-#5 fix) and disbands
+    # the deck's inventory to pending (deleted in step 4).
+    for (deck_id_,) in session.query(Deck.id).filter(Deck.user_id == user_id).all():
+        deck_service.delete_deck(session, deck_id_, user_id, commit=False)
+
+    # (3) Token inventory → delete_token each (nulls deck_token_requirements.
+    # token_inventory_id; the decks' own requirements are already gone). BEFORE the
+    # StorageLocation delete so token_inventory.storage_location_id never dangles.
+    for (token_id_,) in (
+        session.query(TokenInventory.id).filter(TokenInventory.user_id == user_id).all()
+    ):
+        token_service.delete_token(session, token_id_, user_id, commit=False)
+
+    # (4) Remaining inventory (collection rows + rows just disbanded to pending by
+    # delete_deck) → the shared clean-path: deletes referencing ShowcaseItems and
+    # NULLs trade_items.inventory_row_id on ALL referencing trades (incl. terminal
+    # cross-user trades — the *_at_trade snapshot is the durable record). Bulk for
+    # large collections.
+    inv_ids = [r for (r,) in session.query(InventoryRow.id).filter(InventoryRow.user_id == user_id)]
+    if inv_ids:
+        clean_inventory_row_references(session, inv_ids)
+        session.query(InventoryRow).filter(InventoryRow.id.in_(inv_ids)).delete(
+            synchronize_session=False
+        )
+
+    # (5) Now FK-safe to bulk-delete the user's remaining leaf rows. transaction_logs
+    # BEFORE import_batches (transaction_logs.batch_id → import_batches). variant
+    # groups: their only referencers (decks) are gone, nothing to null first. storage
+    # locations last: inventory, decks, and tokens that referenced them are all gone.
     session.query(TransactionLog).filter(TransactionLog.user_id == user_id).delete()
-    session.query(InventoryRow).filter(InventoryRow.user_id == user_id).delete()
     session.query(ImportBatch).filter(ImportBatch.user_id == user_id).delete()
-    session.query(Deck).filter(Deck.user_id == user_id).delete()
-    # v3.33.0 — variant groups are user-owned; decks (the only referencers) are
-    # already deleted above, so there's nothing left to null first.
     session.query(VariantGroup).filter(VariantGroup.user_id == user_id).delete()
     session.query(StorageLocation).filter(StorageLocation.user_id == user_id).delete()
     # v3.27.5 — null seat→user FK on this user's historical seats. The

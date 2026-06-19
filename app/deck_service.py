@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import re
 
-from sqlalchemy import func
+from sqlalchemy import func, text
 from sqlalchemy.orm import Session, joinedload
 
 from app.audit_service import log_transaction
@@ -3034,10 +3034,33 @@ def return_card_from_deck(
     return True
 
 
-def delete_deck(session: Session, deck_id: int, user_id: int) -> bool:
+def delete_deck(session: Session, deck_id: int, user_id: int, *, commit: bool = True) -> bool:
     deck = get_deck(session, deck_id=deck_id, user_id=user_id)
     if not deck:
         return False
+
+    # gate-#5 (Phase 2): clean the deck's children the ORM never cascaded — these
+    # leaked under prod SQLite (FK off) and only the v4 DB CASCADE would have saved
+    # them. Clean explicitly here so the app is correct on BOTH backends (the DB
+    # CASCADE/SET NULL clauses are then defense-in-depth, not the sole mechanism).
+    #   - deck_bracket_estimates / deck_bracket_findings are RAW (non-ORM) tables
+    #     not mapped to Deck, so session.delete(deck) never touched them. Raw-SQL
+    #     delete, findings first (child of estimates via estimate_id CASCADE), then
+    #     estimates; both keyed by deck_id.
+    #   - deck_token_requirements.deck_id is CASCADE intent (ORM, but no Deck
+    #     relationship) — delete the rows.
+    #   - game_seats.deck_id is SET NULL intent; deck_name_at_game (snapshotted at
+    #     game creation) preserves the historical deck identity, so just null the FK.
+    from app.models import DeckTokenRequirement
+
+    session.execute(text("DELETE FROM deck_bracket_findings WHERE deck_id = :d"), {"d": deck.id})
+    session.execute(text("DELETE FROM deck_bracket_estimates WHERE deck_id = :d"), {"d": deck.id})
+    session.query(DeckTokenRequirement).filter(DeckTokenRequirement.deck_id == deck.id).delete(
+        synchronize_session=False
+    )
+    session.query(GameSeat).filter(GameSeat.deck_id == deck.id).update(
+        {GameSeat.deck_id: None}, synchronize_session=False
+    )
 
     if deck.storage_location_id:
         deck_rows = (
@@ -3048,6 +3071,17 @@ def delete_deck(session: Session, deck_id: int, user_id: int) -> bool:
             )
             .all()
         )
+
+        # gate-#5 (Phase 2): the proxy-row branch below session.delete()s rows
+        # WITHOUT the FK-safe cleanup, orphaning any showcase_items / trade_items
+        # that referenced them (a proxy row CAN be showcased/traded). Route the
+        # proxy ids through the shared clean-path FIRST (deletes ShowcaseItems,
+        # abandons pending trades → writes the *_at_trade snapshot → NULLs the ref).
+        from app.inventory_service import clean_inventory_row_references
+
+        proxy_ids = [r.id for r in deck_rows if r.is_proxy]
+        if proxy_ids:
+            clean_inventory_row_references(session, proxy_ids)
 
         # Disband, not destroy (decision 2026-06-12). A PROXY row represents a
         # card the user does not own — discard it outright. A REAL (claimed)
@@ -3096,5 +3130,6 @@ def delete_deck(session: Session, deck_id: int, user_id: int) -> bool:
 
     # Delete the deck
     session.delete(deck)
-    session.commit()
+    if commit:
+        session.commit()
     return True
