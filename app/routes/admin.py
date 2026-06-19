@@ -297,7 +297,37 @@ def delete_user(
     session.query(TransactionLog).filter(TransactionLog.user_id == user_id).delete()
     session.query(ImportBatch).filter(ImportBatch.user_id == user_id).delete()
     session.query(VariantGroup).filter(VariantGroup.user_id == user_id).delete()
-    session.query(StorageLocation).filter(StorageLocation.user_id == user_id).delete()
+    # storage_locations LEAF-FIRST (Gate #7, v3.39.x — PG-readiness hardening). A user
+    # can NEST locations (``StorageLocation.parent_id`` → ``storage_locations``, a
+    # self-ref FK declared NO ACTION). Account deletion legitimately takes the WHOLE
+    # tree (unlike single ``delete_location``, which refuses while children exist).
+    # NOTE: the prior single bulk ``query(...).delete()`` was NOT an active crash —
+    # verified directly on PG18: a NO ACTION FK is checked at STATEMENT END, so deleting
+    # the whole tree in one statement leaves no dangling reference at the check point and
+    # passes (it differs from the gate-#5 ``games.user_id`` crash, where the child row
+    # was left BEHIND referencing the deleted parent). This deletes leaf-first anyway as
+    # defensive hardening that doesn't lean on that statement-end subtlety: repeatedly
+    # remove the user's locations that are nobody's parent until none remain, so children
+    # always go before parents regardless of FK deferral, ordering, or a future
+    # RESTRICT/split. Terminating: each pass clears the current leaves; a (non-existent)
+    # cycle falls through to a single delete rather than hang.
+    remaining = {
+        lid
+        for (lid,) in session.query(StorageLocation.id).filter(StorageLocation.user_id == user_id)
+    }
+    while remaining:
+        parent_ids = {
+            pid
+            for (pid,) in session.query(StorageLocation.parent_id).filter(
+                StorageLocation.id.in_(remaining),
+                StorageLocation.parent_id.isnot(None),
+            )
+        }
+        leaves = remaining - parent_ids or remaining  # cycle-safety fallback
+        session.query(StorageLocation).filter(StorageLocation.id.in_(leaves)).delete(
+            synchronize_session=False
+        )
+        remaining -= leaves
     # v3.27.5 — null seat→user FK on this user's historical seats. The
     # ``ondelete="SET NULL"`` clause on ``GameSeat.user_id`` is declared on
     # the model for documentation + v4 Postgres forward-compat but SQLite

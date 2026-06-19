@@ -202,6 +202,28 @@ def _game_snapshot_check(game_id: int):
     return _check
 
 
+def _nested_locations_cleared_check(*location_ids: int):
+    """post_check for the leaf-first storage_locations delete (Gate #7): assert EVERY
+    seeded location in the nested tree is actually gone, AND that the delete completed
+    without raising on the self-ref FK (a crash surfaces as app_error → all cells fail).
+    NOTE: this cell does not go RED against the *prior* single-statement bulk delete —
+    a NO ACTION self-ref FK is checked at STATEMENT END (verified on PG18), so deleting
+    the whole tree in one statement was already safe. The leaf-first code is defensive
+    hardening; this cell positively asserts the tree fully clears and never raises on
+    any backend/posture, and guards against a future regression to a per-statement /
+    parent-before-child delete (which WOULD crash, like gate-#5 games.user_id)."""
+
+    def _check(session) -> str | None:
+        t = Base.metadata.tables["storage_locations"]
+        for lid in location_ids:
+            row = session.execute(sa.select(t.c.id).where(t.c.id == lid)).first()
+            if row is not None:
+                return f"nested location {lid} NOT deleted (leaf-first delete incomplete)"
+        return None
+
+    return _check
+
+
 # ---------------------------------------------------------------------------
 # Tiny seed helpers (valid rows — required NOT NULL columns supplied).
 # ---------------------------------------------------------------------------
@@ -443,6 +465,24 @@ def seed_delete_user(s) -> Seeded:
     deck = _deck(s, owner.id, deck_loc.id)
     row = _row(s, owner.id, card.id, loc.id)
 
+    # NESTED locations (Gate #7): a parent → child StorageLocation tree via the self-ref
+    # ``parent_id`` FK (NO ACTION). The old bulk delete in delete_user dropped all of a
+    # user's locations in ONE statement — under PG enforcement that could delete the
+    # parent before the child and trip the self-ref FK. The leaf-first fix must clear the
+    # whole tree on both backends/postures. (Without this seed the harness was blind to
+    # the leaf ordering — every prior location it seeded was flat/parentless.)
+    nest_parent = _loc(s, owner.id, "NestParent")
+    nest_child = StorageLocation(
+        user_id=owner.id,
+        name="NestChild",
+        type="box",
+        mode="manual",
+        sort_order=0,
+        parent_id=nest_parent.id,
+    )
+    s.add(nest_child)
+    s.flush()
+
     # the user's own showcase referencing their row
     _sc, si = _showcase_item_on(s, owner, row)
     # a CROSS-USER TERMINAL trade referencing this user's row: status="accepted" so
@@ -496,6 +536,16 @@ def seed_delete_user(s) -> Seeded:
     children = [
         ChildFK(
             "storage_locations.user_id->users", "storage_locations", "user_id", "NO ACTION", loc.id
+        ),
+        ChildFK(
+            "storage_locations.parent_id->storage_locations",
+            "storage_locations",
+            "parent_id",
+            "NO ACTION",
+            nest_child.id,
+            "nested-location LEAF-FIRST delete (Gate #7): the user's whole location tree "
+            "must clear without tripping the self-ref FK under PG enforcement",
+            post_check=_nested_locations_cleared_check(nest_parent.id, nest_child.id),
         ),
         ChildFK("inventory_rows.user_id->users", "inventory_rows", "user_id", "NO ACTION", row.id),
         ChildFK("decks.user_id->users", "decks", "user_id", "NO ACTION", deck.id),

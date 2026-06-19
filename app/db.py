@@ -14,8 +14,6 @@ from sqlalchemy import create_engine, event
 from sqlalchemy.orm import Session, declarative_base, sessionmaker
 
 DATA_DIR = Path(os.getenv("DATA_DIR", "/data"))
-DATA_DIR.mkdir(parents=True, exist_ok=True)
-
 DB_PATH = DATA_DIR / "mana_archive.db"
 DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite:///{DB_PATH}")
 
@@ -25,11 +23,34 @@ DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite:///{DB_PATH}")
 # is created exactly as before; on any other dialect ``connect_args`` is empty.
 _is_sqlite = DATABASE_URL.startswith("sqlite")
 _connect_args = {"check_same_thread": False} if _is_sqlite else {}
+
+# Creating the data directory is a SQLite-only concern (it's where the .db file
+# lives). On a Postgres boot (v4) there is no local DB file, so making /data is
+# pointless — guard it to the SQLite branch. This was the last unconditional
+# SQLite-ism that fired at import time regardless of backend.
+if _is_sqlite:
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+
 # ``pool_pre_ping`` validates a pooled connection (and transparently reconnects) before
 # use — important on Postgres (v4) behind transaction-mode PgBouncer / across a network
 # that can drop idle connections. Not applied to the single-file SQLite engine, whose
 # connection never goes stale, so SQLite behavior is unchanged.
-engine = create_engine(DATABASE_URL, connect_args=_connect_args, pool_pre_ping=not _is_sqlite)
+#
+# Pool sizing (Postgres/non-SQLite only — these QueuePool params must NOT be passed to
+# the SQLite engine, whose create_engine call therefore stays byte-identical):
+#   - ``pool_size=10``      steady pooled connections for the single replica (request
+#                           path + the 3 background writer daemons; comfortably under a
+#                           default PG ``max_connections`` even with max_overflow).
+#   - ``max_overflow=5``    burst headroom above pool_size under transient load.
+#   - ``pool_recycle=1800`` recycle a connection after 30 min idle — PG (and any proxy
+#                           in front of it) drops idle connections server-side, so a
+#                           connection older than this is proactively replaced rather
+#                           than handed out stale. pre_ping catches the rest.
+# Single-replica scope (Gate #7); PgBouncer + worker-split tuning is deferred to v4.0.x.
+_engine_kwargs: dict = {"connect_args": _connect_args, "pool_pre_ping": not _is_sqlite}
+if not _is_sqlite:
+    _engine_kwargs.update(pool_size=10, max_overflow=5, pool_recycle=1800)
+engine = create_engine(DATABASE_URL, **_engine_kwargs)
 
 
 @event.listens_for(engine, "connect")
