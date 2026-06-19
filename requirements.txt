@@ -1,9 +1,17 @@
-fastapi>=0.115,<1.0
-uvicorn[standard]>=0.30,<1.0
+# Web/ASGI stack — EXACT-pinned to the v3.39.7-working set after the v3.39.8 prod
+# incident (2026-06-19): an unpinned rebuild drifted fastapi 0.136.3 -> 0.137.2,
+# whose new `_IncludedRouter` route wrapper crashed prometheus-fastapi-instrumentator
+# 7.1.0's get_route_name -> 500 on every include_router route. starlette was unpinned
+# (floated transitively via fastapi) — now declared directly (it's imported in
+# app/main.py) and pinned. Do NOT loosen these without re-running the built-image
+# route smoke (see the incident note). Bump them deliberately, together, tested.
+fastapi==0.136.3
+starlette==0.52.1
+uvicorn[standard]==0.49.0
 jinja2>=3.1,<4.0
 python-multipart>=0.0.9,<1.0
 sqlalchemy>=2.0,<3.0
-prometheus-fastapi-instrumentator>=7.0,<8.0
+prometheus-fastapi-instrumentator==7.1.0
 requests>=2.31,<3.0
 ijson>=3.0
 pwdlib[argon2]>=0.2,<1.0
