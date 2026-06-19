@@ -101,7 +101,14 @@ def _reference_row(s, user, card, row):
 
 def test_fk_enforcement_is_actually_on(fk_db):
     """Negative control: an UNCLEAN delete of a referenced row must raise under FK
-    enforcement — proves the fixture really enforces (else the tests below false-green)."""
+    enforcement — proves the fixture really enforces (else the tests below false-green).
+
+    Deletes a ``Showcase`` that still has a child ``ShowcaseItem``: the
+    ``showcase_items.showcase_id`` FK is plain NO ACTION, so the parent delete must
+    raise. (The earlier control deleted the *inventory row*, but as of the Gate-#4
+    baseline ``showcase_items.inventory_row_id`` is ``ondelete=CASCADE`` and
+    ``trade_items.inventory_row_id`` is ``SET NULL`` — neither raises now; the merge/
+    undo tests below still assert the app-side cleanup produces the right end state.)"""
     s = fk_db
     u = _seed_user(s, "owner@example.com")
     c = _seed_card(s)
@@ -114,7 +121,7 @@ def test_fk_enforcement_is_actually_on(fk_db):
     s.commit()
 
     with pytest.raises(IntegrityError):
-        s.query(InventoryRow).filter(InventoryRow.id == row.id).delete(synchronize_session=False)
+        s.query(Showcase).filter(Showcase.id == sc.id).delete(synchronize_session=False)
         s.flush()
     s.rollback()
 

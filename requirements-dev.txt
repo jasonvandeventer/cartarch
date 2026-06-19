@@ -5,3 +5,5 @@ pytest==9.0.3
 # Required by fastapi.testclient.TestClient (route->template render tests +
 # the conftest `client` fixture). Dev/CI only.
 httpx==0.28.1
+alembic>=1.14,<2.0
+

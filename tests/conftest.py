@@ -30,20 +30,46 @@ from sqlalchemy.orm import sessionmaker  # noqa: E402
 
 from app.db import Base  # noqa: E402
 
+# Set TEST_DATABASE_URL to a Postgres URL to run the WHOLE suite against Postgres
+# (the v4 dual-backend equivalence gate). Unset → the temp-FILE SQLite behaviour
+# below, byte-identical to before. On Postgres the suite shares one database, so
+# each engine fixture drops+recreates the schema for a clean per-test slate.
+TEST_DATABASE_URL = os.getenv("TEST_DATABASE_URL")
+
+
+def _make_test_engine(tmp_path, filename, *, fk_on):
+    """Build a per-test engine: Postgres if TEST_DATABASE_URL is set, else temp SQLite.
+
+    ``fk_on`` requests FK enforcement — a SQLite-only PRAGMA; Postgres always
+    enforces FKs, so the flag is a no-op there (which is exactly the cutover posture).
+    """
+    if TEST_DATABASE_URL:
+        engine = create_engine(TEST_DATABASE_URL, pool_pre_ping=True)
+        Base.metadata.drop_all(engine)  # clean slate (shared PG database)
+        Base.metadata.create_all(engine)
+        return engine
+
+    engine = create_engine(
+        f"sqlite:///{tmp_path / filename}",
+        connect_args={"check_same_thread": False},
+    )
+    if fk_on:
+        from sqlalchemy import event
+
+        @event.listens_for(engine, "connect")
+        def _enable_fk(dbapi_connection, _record):  # noqa: ANN001
+            cur = dbapi_connection.cursor()
+            cur.execute("PRAGMA foreign_keys=ON")
+            cur.close()
+
+    Base.metadata.create_all(engine)
+    return engine
+
 
 @pytest.fixture
 def db_engine(tmp_path):
-    """A temp-FILE SQLite engine with the full schema created.
-
-    Temp *file* (not ``:memory:``) so behaviour is closest to prod — real file
-    I/O, the same pragmas, real connection lifecycle. This is the single line
-    the v4 work repoints at a Postgres URL.
-    """
-    engine = create_engine(
-        f"sqlite:///{tmp_path / 'test.db'}",
-        connect_args={"check_same_thread": False},
-    )
-    Base.metadata.create_all(engine)
+    """A temp-FILE SQLite engine (or Postgres via TEST_DATABASE_URL) with the full schema."""
+    engine = _make_test_engine(tmp_path, "test.db", fk_on=False)
     try:
         yield engine
     finally:
@@ -105,26 +131,12 @@ def client(db_engine, user):
 
 @pytest.fixture
 def fk_db_engine(tmp_path):
-    """Temp-file SQLite engine with **PRAGMA foreign_keys=ON** — the Postgres
-    cutover posture (production SQLite runs with FKs OFF). For tests that must
-    verify delete/merge/undo paths are FK-safe *under enforcement*: an unclean
-    delete that orphans a referencing row raises ``IntegrityError`` here, exactly
-    as Postgres will. Kept in conftest so FK-on tests share one seam going forward.
+    """FK-enforcing engine — the Postgres cutover posture (production SQLite runs FKs
+    OFF). On SQLite this sets ``PRAGMA foreign_keys=ON``; on Postgres (TEST_DATABASE_URL)
+    FKs are always enforced, so the same tests run under real PG enforcement. An unclean
+    delete that orphans a referencing row raises ``IntegrityError`` either way.
     """
-    from sqlalchemy import event
-
-    engine = create_engine(
-        f"sqlite:///{tmp_path / 'fk_test.db'}",
-        connect_args={"check_same_thread": False},
-    )
-
-    @event.listens_for(engine, "connect")
-    def _enable_fk(dbapi_connection, _record):  # noqa: ANN001
-        cur = dbapi_connection.cursor()
-        cur.execute("PRAGMA foreign_keys=ON")
-        cur.close()
-
-    Base.metadata.create_all(engine)
+    engine = _make_test_engine(tmp_path, "fk_test.db", fk_on=True)
     try:
         yield engine
     finally:

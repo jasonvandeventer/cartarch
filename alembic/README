@@ -1,0 +1,61 @@
+Cartarch — Alembic migration environment (introduced in the Gate #4 baseline).
+
+Single-database config. The DB URL is env-driven via DATABASE_URL (the same seam
+as app/db.py): unset → the app's SQLite file; set → Postgres
+(postgresql+psycopg://...). env.py points target_metadata at app's Base.metadata
+and also imports app/legacy_tables.py so autogenerate sees the 7 raw-SQL tables.
+
+================================================================================
+SCHEMA OWNERSHIP (post Gate #4)
+================================================================================
+The legacy scripts/run_migrations.py self-migration runner is RETIRED — the app
+no longer creates or migrates schema at boot. Schema is owned by Alembic:
+
+  Fresh database (CI, disaster recovery, an empty sandbox), in order:
+      alembic upgrade head            # creates all 28 tables (21 ORM + 7 raw)
+      python scripts/seed_reference_data.py   # idempotent reference-data seed
+
+  At deploy this runs as a single PRE-SYNC JOB, not per-pod. The app pods boot
+  AFTER it; booting against a never-migrated DB leaves the 7 raw tables missing
+  (init_db()'s create_all only builds the 21 ORM tables — see app/main.py).
+
+The per-version scripts/migrate_v3_*.py + run_migrations.py + app/migrations.py
+are DEAD post-baseline and kept on disk only as history (unwired — nothing
+imports the runner). EXCEPTION: the 3 seed scripts
+(migrate_v3_15_0_seed_{bracket_rules,game_changers,card_tags}.py) are still LIVE
+— scripts/seed_reference_data.py imports them.
+
+The schema_migrations ledger table is orphaned at runtime (only the retired
+runner machinery ever read it) and is NOT part of the baseline. Leave it in the
+existing SQLite DB (harmless, unread; that DB is replaced at cutover). At the
+Postgres cutover, pgloader must EXCLUDE schema_migrations — the PG baseline schema
+has no such table.
+
+================================================================================
+POSTGRES CUTOVER — `alembic stamp head` (DOCUMENTATION ONLY — DO NOT RUN NOW)
+================================================================================
+This is the cutover-time procedure (gate #8 rehearsal / the real cutover). It is
+recorded here for reference; nothing in this gate executes it.
+
+The migrated Postgres database arrives with its DDL ALREADY matching the baseline
+and its data ALREADY loaded by pgloader. You therefore STAMP, never upgrade:
+
+  1. Create the empty baseline schema on the target PG with the PG-correct types
+     (native boolean, naive timestamp, SERIAL PKs, FK ondelete, partial uniques):
+         alembic upgrade head        # against the empty target PG
+  2. pgloader copies prod DATA into that schema (data-only; schema already exists).
+     pgloader config must: NO global boolean→integer cast (would break
+     game_changer_cards.active WHERE active), EXCLUDE schema_migrations, and reset
+     sequences via setval after load.
+  3. The DDL now matches the baseline and data is present, so mark the baseline as
+     applied WITHOUT re-running it:
+         alembic stamp head
+     (Step 1's `upgrade head` already wrote alembic_version; `stamp head` is the
+     operation to use if instead the schema was created by some other means — e.g.
+     pgloader-created — so Alembic records the baseline as applied without trying
+     to CREATE already-existing tables. Use exactly one of upgrade-then-load or
+     load-into-stamped; never `upgrade head` against a schema that already exists.)
+
+After cutover, `alembic upgrade head` applies only revisions AFTER the baseline.
+Run scripts/seed_reference_data.py is NOT needed at cutover (pgloader brought the
+seed rows); it is idempotent if run anyway.

@@ -9,6 +9,8 @@ immediate second run remediates ZERO.
 
 from __future__ import annotations
 
+from sqlalchemy import text
+
 from app.models import (
     Card,
     InventoryRow,
@@ -65,23 +67,39 @@ def test_sweep_remediates_and_is_idempotent(db):
     s.commit()
     si_id, ti_id, row_id = si.id, ti.id, row.id
 
-    # Orphan them: the default ``db`` fixture runs FK OFF, so a raw delete of the
-    # inventory row leaves the references dangling (the pre-fix failure mode).
+    # Orphan them: simulate the pre-fix FK-OFF failure mode. SQLite's default ``db``
+    # fixture runs FK OFF, so a raw delete leaves the references dangling. Postgres
+    # ALWAYS enforces FKs (the same delete would cascade/null per the baseline ondelete
+    # rules and create no orphan), so disable enforcement for this session first —
+    # ``session_replication_role=replica``, the exact mechanism the cutover load uses.
+    is_pg = s.bind.dialect.name == "postgresql"
+    if is_pg:
+        s.execute(text("SET session_replication_role = replica"))
     s.query(InventoryRow).filter(InventoryRow.id == row_id).delete(synchronize_session=False)
     s.commit()
+    if is_pg:
+        s.execute(text("SET session_replication_role = origin"))
+        s.commit()
+
+    # The sweep is FK-driven; orphan keys are "child.col->parent".
+    SI_KEY = "showcase_items.inventory_row_id->inventory_rows"
+    TI_KEY = "trade_items.inventory_row_id->inventory_rows"
 
     orphans = find_orphans(s)
-    assert orphans["showcase_items"] == [si_id]
-    assert orphans["trade_items"] == [ti_id]
+    assert orphans[SI_KEY] == [si_id]
+    assert orphans[TI_KEY] == [ti_id]
 
-    # First sweep remediates: showcase_item deleted, trade_item NULLed.
+    # First sweep remediates per baseline ondelete intent: showcase_items is CASCADE
+    # (deleted), trade_items is SET NULL (ref nulled, trade row kept).
     res1 = sweep_fk_orphans(s, apply=True)
-    assert res1 == {"showcase_items_deleted": 1, "trade_items_nulled": 1}
+    assert res1["deleted"] == {SI_KEY: 1}
+    assert res1["nulled"] == {TI_KEY: 1}
+    assert res1["unhandled"] == {}
     s.expire_all()
     assert s.query(ShowcaseItem).filter(ShowcaseItem.id == si_id).first() is None
     ti_after = s.query(TradeItem).filter(TradeItem.id == ti_id).first()
     assert ti_after is not None and ti_after.inventory_row_id is None  # trade kept, ref NULLed
 
-    # Second sweep: zero deletions (idempotent).
+    # Second sweep: zero remediations (idempotent).
     res2 = sweep_fk_orphans(s, apply=True)
-    assert res2 == {"showcase_items_deleted": 0, "trade_items_nulled": 0}
+    assert res2 == {"deleted": {}, "nulled": {}, "unhandled": {}}

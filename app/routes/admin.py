@@ -17,6 +17,7 @@ from app.models import (
     Share,
     Showcase,
     StorageLocation,
+    TokenInventory,
     Trade,
     TransactionLog,
     User,
@@ -236,15 +237,93 @@ def delete_user(
         session.delete(user_showcase)
     session.flush()
 
-    # Cascade in FK-safe order
+    # gate-#5 (Phase 2) — COMPOSE the per-entity delete helpers instead of bulk-
+    # deleting around them. The old bulk deletes here (query(Deck).delete() /
+    # query(InventoryRow).delete()) bypassed delete_deck and
+    # clean_inventory_row_references, so they (a) orphaned the RAW deck_bracket_*
+    # tables and never nulled game_seats.deck_id, (b) orphaned terminal cross-user
+    # trade_items pointing at this user's rows, and (c) never deleted token_inventory
+    # at all (orphaning token_inventory.user_id + .storage_location_id). The gate-#5
+    # harness proved all three (plus the games.user_id crash, handled in step 1).
+    # Composing the helpers also future-proofs the cascade: a child added to
+    # decks/inventory/tokens later is cleaned by its own delete path, never re-leaked
+    # here. All helpers run with commit=False — this stays a single transaction.
+    from app import deck_service, token_service
+    from app.inventory_service import clean_inventory_row_references
+
+    # (1) Games this user RECORDED — DEFERRED to v4 (v3.39.8 split). The gate-#5
+    # amendment (snapshot the recorder's name to ``games.user_name_at_game``, then SET
+    # NULL ``games.user_id``) requires the new column + nullable ``user_id``, both held
+    # back for the v4 cutover (see app/models.py Game). Until then this matches main /
+    # prod behaviour: games recorded by the deleted user are left untouched — their
+    # ``user_id`` orphans silently under FK-off SQLite (the read-side falls back through
+    # the ``game.user`` relationship). Restore the snapshot+null step here together with
+    # the Game model amendment when v4 lands.
+
+    # (2) Decks → delete_deck each: cleans the raw bracket tables +
+    # deck_token_requirements + nulls game_seats.deck_id (gate-#5 fix) and disbands
+    # the deck's inventory to pending (deleted in step 4).
+    for (deck_id_,) in session.query(Deck.id).filter(Deck.user_id == user_id).all():
+        deck_service.delete_deck(session, deck_id_, user_id, commit=False)
+
+    # (3) Token inventory → delete_token each (nulls deck_token_requirements.
+    # token_inventory_id; the decks' own requirements are already gone). BEFORE the
+    # StorageLocation delete so token_inventory.storage_location_id never dangles.
+    for (token_id_,) in (
+        session.query(TokenInventory.id).filter(TokenInventory.user_id == user_id).all()
+    ):
+        token_service.delete_token(session, token_id_, user_id, commit=False)
+
+    # (4) Remaining inventory (collection rows + rows just disbanded to pending by
+    # delete_deck) → the shared clean-path: deletes referencing ShowcaseItems and
+    # NULLs trade_items.inventory_row_id on ALL referencing trades (incl. terminal
+    # cross-user trades — the *_at_trade snapshot is the durable record). Bulk for
+    # large collections.
+    inv_ids = [r for (r,) in session.query(InventoryRow.id).filter(InventoryRow.user_id == user_id)]
+    if inv_ids:
+        clean_inventory_row_references(session, inv_ids)
+        session.query(InventoryRow).filter(InventoryRow.id.in_(inv_ids)).delete(
+            synchronize_session=False
+        )
+
+    # (5) Now FK-safe to bulk-delete the user's remaining leaf rows. transaction_logs
+    # BEFORE import_batches (transaction_logs.batch_id → import_batches). variant
+    # groups: their only referencers (decks) are gone, nothing to null first. storage
+    # locations last: inventory, decks, and tokens that referenced them are all gone.
     session.query(TransactionLog).filter(TransactionLog.user_id == user_id).delete()
-    session.query(InventoryRow).filter(InventoryRow.user_id == user_id).delete()
     session.query(ImportBatch).filter(ImportBatch.user_id == user_id).delete()
-    session.query(Deck).filter(Deck.user_id == user_id).delete()
-    # v3.33.0 — variant groups are user-owned; decks (the only referencers) are
-    # already deleted above, so there's nothing left to null first.
     session.query(VariantGroup).filter(VariantGroup.user_id == user_id).delete()
-    session.query(StorageLocation).filter(StorageLocation.user_id == user_id).delete()
+    # storage_locations LEAF-FIRST (Gate #7, v3.39.x — PG-readiness hardening). A user
+    # can NEST locations (``StorageLocation.parent_id`` → ``storage_locations``, a
+    # self-ref FK declared NO ACTION). Account deletion legitimately takes the WHOLE
+    # tree (unlike single ``delete_location``, which refuses while children exist).
+    # NOTE: the prior single bulk ``query(...).delete()`` was NOT an active crash —
+    # verified directly on PG18: a NO ACTION FK is checked at STATEMENT END, so deleting
+    # the whole tree in one statement leaves no dangling reference at the check point and
+    # passes (it differs from the gate-#5 ``games.user_id`` crash, where the child row
+    # was left BEHIND referencing the deleted parent). This deletes leaf-first anyway as
+    # defensive hardening that doesn't lean on that statement-end subtlety: repeatedly
+    # remove the user's locations that are nobody's parent until none remain, so children
+    # always go before parents regardless of FK deferral, ordering, or a future
+    # RESTRICT/split. Terminating: each pass clears the current leaves; a (non-existent)
+    # cycle falls through to a single delete rather than hang.
+    remaining = {
+        lid
+        for (lid,) in session.query(StorageLocation.id).filter(StorageLocation.user_id == user_id)
+    }
+    while remaining:
+        parent_ids = {
+            pid
+            for (pid,) in session.query(StorageLocation.parent_id).filter(
+                StorageLocation.id.in_(remaining),
+                StorageLocation.parent_id.isnot(None),
+            )
+        }
+        leaves = remaining - parent_ids or remaining  # cycle-safety fallback
+        session.query(StorageLocation).filter(StorageLocation.id.in_(leaves)).delete(
+            synchronize_session=False
+        )
+        remaining -= leaves
     # v3.27.5 — null seat→user FK on this user's historical seats. The
     # ``ondelete="SET NULL"`` clause on ``GameSeat.user_id`` is declared on
     # the model for documentation + v4 Postgres forward-compat but SQLite
