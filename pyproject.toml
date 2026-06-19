@@ -41,5 +41,5 @@ ignore_decorators = ["@app.*", "@router.*", "@*.get", "@*.post", "@*.put", "@*.d
 ignore = []
 
 [tool.deptry.per_rule_ignores]
-DEP002 = ["uvicorn", "jinja2", "python-multipart", "itsdangerous"]
+DEP002 = ["uvicorn", "jinja2", "python-multipart", "itsdangerous", "psycopg"]
 DEP003 = ["starlette", "urllib3"]
