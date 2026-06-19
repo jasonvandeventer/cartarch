@@ -9,6 +9,8 @@ immediate second run remediates ZERO.
 
 from __future__ import annotations
 
+from sqlalchemy import text
+
 from app.models import (
     Card,
     InventoryRow,
@@ -65,10 +67,19 @@ def test_sweep_remediates_and_is_idempotent(db):
     s.commit()
     si_id, ti_id, row_id = si.id, ti.id, row.id
 
-    # Orphan them: the default ``db`` fixture runs FK OFF, so a raw delete of the
-    # inventory row leaves the references dangling (the pre-fix failure mode).
+    # Orphan them: simulate the pre-fix FK-OFF failure mode. SQLite's default ``db``
+    # fixture runs FK OFF, so a raw delete leaves the references dangling. Postgres
+    # ALWAYS enforces FKs (the same delete would cascade/null per the baseline ondelete
+    # rules and create no orphan), so disable enforcement for this session first —
+    # ``session_replication_role=replica``, the exact mechanism the cutover load uses.
+    is_pg = s.bind.dialect.name == "postgresql"
+    if is_pg:
+        s.execute(text("SET session_replication_role = replica"))
     s.query(InventoryRow).filter(InventoryRow.id == row_id).delete(synchronize_session=False)
     s.commit()
+    if is_pg:
+        s.execute(text("SET session_replication_role = origin"))
+        s.commit()
 
     # The sweep is FK-driven; orphan keys are "child.col->parent".
     SI_KEY = "showcase_items.inventory_row_id->inventory_rows"
