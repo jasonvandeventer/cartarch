@@ -33,6 +33,14 @@ token_inventory + watchlist + deck_token_requirements.token_inventory_id, and 3
 PARTIAL unique indexes (uq_playgroups_join_code, uq_watchlist_user_card_id/_name).
 AMENDMENT 2026-06-18 (rehearsal): trade_items.showcase_item_id → SET NULL added
 (was NO ACTION, blocked the orphan sweep's showcase_items CASCADE delete).
+AMENDMENT 2026-06-19 (gate #5): games.user_id NO ACTION + NOT NULL → SET NULL +
+nullable, and new games.user_name_at_game (Text, nullable) snapshot column. The
+gate-#5 parent-delete harness proved the NO-ACTION user_id BLOCKED `DELETE FROM
+users` under FK enforcement (deleting any user who recorded a game crashed the
+whole deletion). SET NULL mirrors game_seats.user_id; the snapshot keeps the game
+attributed (banner shows the name, not "another player"). Surgical edit to the
+games create_table (not a full regen) — verified by empty autogenerate diff on
+SQLite AND Postgres.
 ================================================================================
 """
 
@@ -414,7 +422,12 @@ def upgrade() -> None:
     op.create_table(
         "games",
         sa.Column("id", sa.Integer(), nullable=False),
-        sa.Column("user_id", sa.Integer(), nullable=False),
+        # gate-#5 AMENDMENT: user_id now nullable + ondelete=SET NULL (was NOT NULL,
+        # NO ACTION — a NO-ACTION user_id BLOCKED DELETE FROM users under FK
+        # enforcement). user_name_at_game snapshots the recorder so SET NULL keeps
+        # the game attributed. See header AMENDMENT 2026-06-19.
+        sa.Column("user_id", sa.Integer(), nullable=True),
+        sa.Column("user_name_at_game", sa.Text(), nullable=True),
         sa.Column("played_at", sa.DateTime(), nullable=False),
         sa.Column("format", sa.String(length=64), nullable=True),
         sa.Column("status", sa.String(length=32), nullable=True),
@@ -426,10 +439,7 @@ def upgrade() -> None:
         sa.Column("ended_at", sa.DateTime(), nullable=True),
         sa.Column("playgroup_id", sa.Integer(), nullable=True),
         sa.ForeignKeyConstraint(["playgroup_id"], ["playgroups.id"], ondelete="SET NULL"),
-        sa.ForeignKeyConstraint(
-            ["user_id"],
-            ["users.id"],
-        ),
+        sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="SET NULL"),
         sa.PrimaryKeyConstraint("id"),
     )
     with op.batch_alter_table("games", schema=None) as batch_op:
