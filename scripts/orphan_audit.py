@@ -31,7 +31,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from sqlalchemy import text  # noqa: E402
 
-import app.models  # noqa: E402,F401  — registers every table on Base.metadata
+import app.legacy_tables  # noqa: E402,F401  — registers the 7 raw-SQL tables (their FKs too)
+import app.models  # noqa: E402,F401  — registers every ORM table on Base.metadata
 from app.db import Base, engine  # noqa: E402
 
 
