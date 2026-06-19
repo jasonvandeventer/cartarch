@@ -292,7 +292,7 @@ class Game(Base):
     # so the read-only game banner stays attributed instead of degrading to
     # "another player" (mirrors ``GameSeat.user_name_at_game``). ``delete_user``
     # re-snapshots then nulls explicitly (SQLite enforces nothing — the clause is
-    # v4 defense-in-depth). gate-#5 pending verification.
+    # v4 defense-in-depth). gate-#5 verified (parent-delete harness, 2026-06-19).
     user_id: Mapped[int | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
     )
@@ -425,7 +425,7 @@ class TokenInventory(Base):
     # ``ondelete="CASCADE"`` recovers a prod raw-SQL invariant the ORM omitted
     # (the v3.x token_inventory migration created this FK with ON DELETE CASCADE).
     # Matches the explicit admin user-deletion cleanup. SQLite doesn't enforce it
-    # (foreign_keys OFF). gate-#5 pending verification.
+    # (foreign_keys OFF). gate-#5 verified (parent-delete harness, 2026-06-19).
     user_id: Mapped[int] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
     )
@@ -445,7 +445,7 @@ class TokenInventory(Base):
     # ``ondelete="SET NULL"`` recovers a prod raw-SQL invariant the ORM omitted
     # (the migration created this FK with ON DELETE SET NULL — a deleted location
     # nulls the token's placement, keeps the token). SQLite doesn't enforce it
-    # (foreign_keys OFF). gate-#5 pending verification.
+    # (foreign_keys OFF). gate-#5 verified — no parent-delete entrypoint exercises this FK (harness coverage-gate allow-list); the clause is v4 defense-in-depth.
     storage_location_id: Mapped[int | None] = mapped_column(
         ForeignKey("storage_locations.id", ondelete="SET NULL"), nullable=True, index=True
     )
@@ -476,7 +476,7 @@ class DeckTokenRequirement(Base):
     # ``ondelete="SET NULL"`` recovers a prod raw-SQL invariant the ORM omitted
     # (the migration created this FK with ON DELETE SET NULL — deleting the owned
     # token leaves the requirement as a loose name-only need). SQLite doesn't
-    # enforce it (foreign_keys OFF). gate-#5 pending verification.
+    # enforce it (foreign_keys OFF). gate-#5 verified — delete_token nulls this ref explicitly; no parent-delete harness cell (token_inventory has no app delete entrypoint). v4 defense-in-depth.
     token_inventory_id: Mapped[int | None] = mapped_column(
         ForeignKey("token_inventory.id", ondelete="SET NULL"), nullable=True
     )
@@ -526,7 +526,7 @@ class WatchlistItem(Base):
     # card_id/card_name XOR (WHERE … IS NOT NULL). Both sqlite_where +
     # postgresql_where so the partial predicate emits on BOTH dialects. These are
     # correctness invariants (block duplicate watch entries), not niceties.
-    # gate-#5 pending verification.
+    # gate-#5 verified — encoding diffs-empty on both dialects (not a parent-delete FK).
     __table_args__ = (
         Index(
             "uq_watchlist_user_card_id",
@@ -549,7 +549,7 @@ class WatchlistItem(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     # ``ondelete=CASCADE`` on both FKs recovers prod raw-SQL invariants the ORM
     # omitted (delete user / card → drop their watch rows). Matches the explicit
-    # admin user-deletion cleanup. SQLite doesn't enforce it. gate-#5 pending verification.
+    # admin user-deletion cleanup. SQLite doesn't enforce it. gate-#5 verified — user_id by the parent-delete harness (delete_user); card_id is defense-in-depth (cards are catalog; no app entrypoint deletes a Card).
     user_id: Mapped[int] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
     )
@@ -612,7 +612,7 @@ class PasswordResetToken(Base):
     # ``ondelete="CASCADE"`` recovers a prod raw-SQL invariant the ORM omitted
     # (the v3.27.14 migration created this FK with ON DELETE CASCADE — a deleted
     # user's reset tokens die with them, no retention value). Matches the explicit
-    # admin user-deletion cleanup. SQLite doesn't enforce it. gate-#5 pending verification.
+    # admin user-deletion cleanup. SQLite doesn't enforce it. gate-#5 verified (parent-delete harness, 2026-06-19).
     user_id: Mapped[int] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
     )
@@ -660,7 +660,7 @@ class Playgroup(Base):
     # globally unique among ENABLED codes (WHERE join_code IS NOT NULL); NULL =
     # disabled and may repeat. Both sqlite_where + postgresql_where so the partial
     # predicate emits on BOTH dialects. Correctness invariant — without it, two
-    # playgroups could share a code and a join would be ambiguous. gate-#5 pending verification.
+    # playgroups could share a code and a join would be ambiguous. gate-#5 verified — encoding diffs-empty on both dialects (not a parent-delete FK).
     __table_args__ = (
         Index(
             "uq_playgroups_join_code",
@@ -767,7 +767,7 @@ class ShowcaseItem(Base):
     # ``ondelete="CASCADE"`` documents v4 Postgres intent: matches v3.39.6
     # clean_inventory_row_references (deletes the showcase_item when its row goes).
     # nullable=False rules out SET NULL. SQLite doesn't enforce it (foreign_keys
-    # OFF). gate-#5 pending verification (parent-delete intent re-confirm).
+    # OFF). gate-#5 verified (parent-delete harness, 2026-06-19).
     inventory_row_id: Mapped[int] = mapped_column(
         ForeignKey("inventory_rows.id", ondelete="CASCADE"), nullable=False, index=True
     )
@@ -993,7 +993,7 @@ class TradeItem(Base):
     # ``ondelete="SET NULL"`` documents v4 Postgres intent: matches v3.39.6
     # clean_inventory_row_references (NULLs the ref, preserves the trade record —
     # decision A4); nullable=True permits it. SQLite doesn't enforce it
-    # (foreign_keys OFF). gate-#5 pending verification (parent-delete intent re-confirm).
+    # (foreign_keys OFF). gate-#5 verified (parent-delete harness, 2026-06-19).
     inventory_row_id: Mapped[int | None] = mapped_column(
         ForeignKey("inventory_rows.id", ondelete="SET NULL"), nullable=True, index=True
     )
@@ -1009,7 +1009,7 @@ class TradeItem(Base):
     # the link is navigation-only (decision C1), so a deleted showcase_item nulls the
     # provenance ref and KEEPS the trade record. Without it, showcase_items'
     # inventory_row_id CASCADE delete is blocked by this NO-ACTION ref (surfaced in the
-    # 2026-06-18 scripted-load rehearsal). SQLite doesn't enforce it. gate-#5 pending verification.
+    # 2026-06-18 scripted-load rehearsal). SQLite doesn't enforce it. gate-#5 verified (parent-delete harness, 2026-06-19).
     showcase_item_id: Mapped[int | None] = mapped_column(
         ForeignKey("showcase_items.id", ondelete="SET NULL"), nullable=True
     )

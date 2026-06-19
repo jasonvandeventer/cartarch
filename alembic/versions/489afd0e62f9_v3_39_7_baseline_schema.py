@@ -28,9 +28,12 @@ DELIBERATE / DOCUMENTED DELTAS from the frozen prod schema (intentional, not bug
   - ORM-contract FKs added that prod's drifted tables lacked — 0 orphans, safe.
 
 RECOVERED prod raw-SQL invariants the ORM had omitted (encoded in models.py, each
-`# gate-#5 pending verification`): FK ondelete on password_reset_tokens +
-token_inventory + watchlist + deck_token_requirements.token_inventory_id, and 3
-PARTIAL unique indexes (uq_playgroups_join_code, uq_watchlist_user_card_id/_name).
+now `# gate-#5 verified` — see Phase-2 harness tests/test_fk_parent_delete.py,
+2026-06-19): FK ondelete on password_reset_tokens + token_inventory + watchlist +
+deck_token_requirements.token_inventory_id, and 3 PARTIAL unique indexes
+(uq_playgroups_join_code, uq_watchlist_user_card_id/_name). The harness proved the
+parent-delete FK intents directly; the partial unique indexes and the FKs on
+allow-listed no-entrypoint parents are verified by the empty-diff encoding check.
 AMENDMENT 2026-06-18 (rehearsal): trade_items.showcase_item_id → SET NULL added
 (was NO ACTION, blocked the orphan sweep's showcase_items CASCADE delete).
 AMENDMENT 2026-06-19 (gate #5): games.user_id NO ACTION + NOT NULL → SET NULL +
