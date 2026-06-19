@@ -23,8 +23,13 @@ DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite:///{DB_PATH}")
 # driver (psycopg/asyncpg at the v4 Postgres cutover) raises at connect time, so
 # it is applied only when the configured backend is SQLite. On SQLite the engine
 # is created exactly as before; on any other dialect ``connect_args`` is empty.
-_connect_args = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
-engine = create_engine(DATABASE_URL, connect_args=_connect_args)
+_is_sqlite = DATABASE_URL.startswith("sqlite")
+_connect_args = {"check_same_thread": False} if _is_sqlite else {}
+# ``pool_pre_ping`` validates a pooled connection (and transparently reconnects) before
+# use — important on Postgres (v4) behind transaction-mode PgBouncer / across a network
+# that can drop idle connections. Not applied to the single-file SQLite engine, whose
+# connection never goes stale, so SQLite behavior is unchanged.
+engine = create_engine(DATABASE_URL, connect_args=_connect_args, pool_pre_ping=not _is_sqlite)
 
 
 @event.listens_for(engine, "connect")
@@ -72,8 +77,11 @@ def checkpoint_and_dispose() -> None:
     on disk before the volume is unmounted. Best-effort — never raises.
     """
     try:
-        with engine.connect() as conn:
-            conn.exec_driver_sql("PRAGMA wal_checkpoint(TRUNCATE)")
+        # WAL checkpoint is SQLite-only (the Longhorn clean-detach story). On Postgres
+        # there is no WAL file to collapse; skip it and just dispose the pool.
+        if engine.dialect.name == "sqlite":
+            with engine.connect() as conn:
+                conn.exec_driver_sql("PRAGMA wal_checkpoint(TRUNCATE)")
     except Exception as exc:  # noqa: BLE001 — shutdown path must not raise
         print(f"[shutdown] wal_checkpoint failed: {exc}", flush=True)
     finally:
@@ -91,7 +99,10 @@ Base = declarative_base()
 
 def init_db() -> None:
     """Create missing tables and validate that at least one user exists."""
-    if not DB_PATH.exists():
+    # The missing-file guard is a SQLite-only dev safety (don't boot against a fresh
+    # empty file). On Postgres (v4) there is no DB file; the schema is owned by Alembic
+    # and existence is proven by the user-count check below + a live connection.
+    if DATABASE_URL.startswith("sqlite") and not DB_PATH.exists():
         raise RuntimeError(f"Database not found at {DB_PATH}")
 
     from app import models  # noqa: F401
