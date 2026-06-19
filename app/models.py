@@ -18,6 +18,7 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    false,
     text,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -380,11 +381,12 @@ class GameSeat(Base):
     deck_name_at_game: Mapped[str | None] = mapped_column(Text, nullable=True)
     commander_name_at_game: Mapped[str | None] = mapped_column(Text, nullable=True)
     # v3.26.6 — per-seat opt-out for the v3.26.1 commander art panel background.
-    # Stored as INTEGER 0/1 (SQLite's idiomatic boolean shape); SQLAlchemy
-    # exposes it as bool via the Boolean type. server_default="0" matches the
-    # ALTER TABLE DEFAULT 0 the migration applied.
+    # ``server_default=false()`` is portable: renders ``DEFAULT 0`` on SQLite (matching
+    # the ALTER TABLE DEFAULT 0 the migration applied) and ``DEFAULT false`` on Postgres.
+    # A literal ``text("0")`` breaks ``CREATE TABLE`` on PG (boolean column can't default
+    # to integer 0) — caught by the Phase-E dual-backend suite run, 2026-06-18.
     art_background_hidden: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, default=False, server_default=text("0")
+        Boolean, nullable=False, default=False, server_default=false()
     )
 
     game: Mapped[Game] = relationship(back_populates="seats")
