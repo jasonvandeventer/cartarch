@@ -984,8 +984,13 @@ class TradeItem(Base):
     # proposal time (C2); ``side='offered'`` rows leave it NULL. Nulled by
     # §10 showcase-item-remove cleanup; trade continues against
     # inventory_row_id (the showcase link is navigation only).
+    # ``ondelete="SET NULL"`` — sibling of inventory_row_id's SET NULL (decision A4):
+    # the link is navigation-only (decision C1), so a deleted showcase_item nulls the
+    # provenance ref and KEEPS the trade record. Without it, showcase_items'
+    # inventory_row_id CASCADE delete is blocked by this NO-ACTION ref (surfaced in the
+    # 2026-06-18 scripted-load rehearsal). SQLite doesn't enforce it. gate-#5 pending verification.
     showcase_item_id: Mapped[int | None] = mapped_column(
-        ForeignKey("showcase_items.id"), nullable=True
+        ForeignKey("showcase_items.id", ondelete="SET NULL"), nullable=True
     )
     finish: Mapped[str | None] = mapped_column(String(32), nullable=True)
     quantity: Mapped[int] = mapped_column(Integer, default=1, nullable=False)

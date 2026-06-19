@@ -1,15 +1,15 @@
 """v3.39.7 baseline schema
 
-Revision ID: 8cf93e284126
+Revision ID: 489afd0e62f9
 Revises:
-Create Date: 2026-06-18 15:04:14.638736
+Create Date: 2026-06-18 20:59:05.653302
 
 ================================================================================
 GATE #4 BASELINE — MANUAL POST-AUTOGENERATE FIXUPS (re-apply if regenerated!)
 ================================================================================
-This revision was produced by `alembic revision --autogenerate` against an empty
-SQLite DB, then hand-adjusted. Autogenerate will NOT reproduce these on a regen —
-re-apply them every time this file is regenerated:
+Produced by `alembic revision --autogenerate` against an empty SQLite DB, then
+hand-adjusted. Autogenerate will NOT reproduce these on a regen — re-apply every
+time this file is regenerated:
 
   #1  Boolean server_defaults → sa.false() / sa.true() (NOT sa.text('0'/'1')).
       Autogenerate renders boolean defaults as integer literals, which break
@@ -24,15 +24,15 @@ DELIBERATE / DOCUMENTED DELTAS from the frozen prod schema (intentional, not bug
   - scryfall_cards.full_art stays Integer (cache reads `= 1`); prices Text; cmc Float.
   - decks UNIQUE(user_id, name) replaces prod's legacy global UNIQUE(name).
   - Timestamps are NAIVE `TIMESTAMP` (sa.DateTime) on purpose — matches the naive-UTC
-    data pgloader copies and v3.36.13's single-flip-point design. Do NOT add
-    timezone=True here; tz-aware is a deferred, coordinated app+DB flip.
-  - ORM-contract FKs added that prod's drifted tables lacked (decks/inventory_rows/
-    import_batches/transaction_logs user_id/storage_location_id) — 0 orphans, safe.
+    data and v3.36.13's single-flip-point. Do NOT add timezone=True here.
+  - ORM-contract FKs added that prod's drifted tables lacked — 0 orphans, safe.
 
-RECOVERED prod raw-SQL invariants the ORM had omitted (now encoded in models.py,
-each marked `# gate-#5 pending verification`): 6 FK ondelete (password_reset_tokens
-+ token_inventory + watchlist + deck_token_requirements.token_inventory_id) and 3
+RECOVERED prod raw-SQL invariants the ORM had omitted (encoded in models.py, each
+`# gate-#5 pending verification`): FK ondelete on password_reset_tokens +
+token_inventory + watchlist + deck_token_requirements.token_inventory_id, and 3
 PARTIAL unique indexes (uq_playgroups_join_code, uq_watchlist_user_card_id/_name).
+AMENDMENT 2026-06-18 (rehearsal): trade_items.showcase_item_id → SET NULL added
+(was NO ACTION, blocked the orphan sweep's showcase_items CASCADE delete).
 ================================================================================
 """
 
@@ -43,7 +43,7 @@ import sqlalchemy as sa
 from alembic import op
 
 # revision identifiers, used by Alembic.
-revision: str = "8cf93e284126"
+revision: str = "489afd0e62f9"
 down_revision: str | Sequence[str] | None = None
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
@@ -798,10 +798,7 @@ def upgrade() -> None:
             ["cards.id"],
         ),
         sa.ForeignKeyConstraint(["inventory_row_id"], ["inventory_rows.id"], ondelete="SET NULL"),
-        sa.ForeignKeyConstraint(
-            ["showcase_item_id"],
-            ["showcase_items.id"],
-        ),
+        sa.ForeignKeyConstraint(["showcase_item_id"], ["showcase_items.id"], ondelete="SET NULL"),
         sa.ForeignKeyConstraint(
             ["trade_id"],
             ["trades.id"],
