@@ -282,26 +282,17 @@ class Game(Base):
     __tablename__ = "games"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    # v3.39.x (gate #5) — was NO ACTION + NOT NULL. The gate-#5 parent-delete
-    # harness proved a NO-ACTION ``user_id`` BLOCKS ``DELETE FROM users`` under FK
-    # enforcement: deleting any user who recorded a game crashed the whole
-    # deletion (v4 cutover) and orphaned ``games.user_id`` under SQLite (prod
-    # today). Now ``ondelete="SET NULL"`` (column made nullable) — consistent with
-    # ``GameSeat.user_id``: the game survives as shared history, its recorder ref
-    # nulled. ``user_name_at_game`` (below) snapshots the recorder's display name
-    # so the read-only game banner stays attributed instead of degrading to
-    # "another player" (mirrors ``GameSeat.user_name_at_game``). ``delete_user``
-    # re-snapshots then nulls explicitly (SQLite enforces nothing — the clause is
-    # v4 defense-in-depth). gate-#5 verified (parent-delete harness, 2026-06-19).
-    user_id: Mapped[int | None] = mapped_column(
-        ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
-    )
-    # v3.39.x (gate #5) — durable snapshot of the recording user's display name,
-    # populated by ``delete_user`` right before it nulls ``user_id`` (and re-snapshot
-    # safe to set at create time too). NULL = recorder still live (read through the
-    # ``game.user`` relationship) OR a legacy game predating this column. Mirrors
-    # ``GameSeat.user_name_at_game`` exactly.
-    user_name_at_game: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # NOTE (v3.39.8 split): the gate-#5 games amendment — ``user_id`` NO ACTION+NOT
+    # NULL → SET NULL+nullable, plus a new ``user_name_at_game`` snapshot column — is
+    # DEFERRED to the v4 cutover. It is a SCHEMA change (new column + nullability) with
+    # no delivery vehicle onto the live SQLite prod DB (boot-time ``run_migrations()``
+    # was retired in gate #4; Alembic targets the PG cutover, not the live file). So
+    # this column stays NO ACTION + NOT NULL here — byte-identical to v3.39.7 prod —
+    # and ``delete_user`` does NOT touch games (silent orphan on FK-off SQLite, exactly
+    # what prod runs today). The amendment IS already in the Alembic baseline (the v4
+    # target schema) and applies by construction at cutover; restore this column + the
+    # ``delete_user`` games step together when v4 lands. See the gate-#4 closure note.
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
     played_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
     # v3.27.2 — service-layer enum (CANONICAL_GAME_FORMATS in game_service.py).
     # Column stays nullable=True at the DB level because SQLite can't alter
