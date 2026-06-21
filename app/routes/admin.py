@@ -9,6 +9,7 @@ from app.auth import hash_password
 from app.dependencies import CsrfRequired, get_db_session, render, require_admin
 from app.models import (
     Deck,
+    Game,
     GameSeat,
     ImportBatch,
     InventoryRow,
@@ -251,14 +252,17 @@ def delete_user(
     from app import deck_service, token_service
     from app.inventory_service import clean_inventory_row_references
 
-    # (1) Games this user RECORDED — DEFERRED to v4 (v3.39.8 split). The gate-#5
-    # amendment (snapshot the recorder's name to ``games.user_name_at_game``, then SET
-    # NULL ``games.user_id``) requires the new column + nullable ``user_id``, both held
-    # back for the v4 cutover (see app/models.py Game). Until then this matches main /
-    # prod behaviour: games recorded by the deleted user are left untouched — their
-    # ``user_id`` orphans silently under FK-off SQLite (the read-side falls back through
-    # the ``game.user`` relationship). Restore the snapshot+null step here together with
-    # the Game model amendment when v4 lands.
+    # (1) Games this user RECORDED → SET NULL user_id, but SNAPSHOT the recorder's
+    # name FIRST (gate-#5 amendment: games.user_id is now SET NULL — without the
+    # snapshot the read-only banner degrades to "another player"). The game survives
+    # as shared history for its seat-attributed players / linked playgroup. Explicit
+    # (not relying on the DB SET NULL) so it is correct on prod SQLite (FK off) too.
+    recorder_name = target.display_name or target.username
+    for game in session.query(Game).filter(Game.user_id == user_id).all():
+        if game.user_name_at_game is None:
+            game.user_name_at_game = recorder_name
+        game.user_id = None
+    session.flush()
 
     # (2) Decks → delete_deck each: cleans the raw bracket tables +
     # deck_token_requirements + nulls game_seats.deck_id (gate-#5 fix) and disbands

@@ -503,14 +503,7 @@ def seed_delete_user(s) -> Seeded:
     s.add(tlog)
     s.flush()
 
-    # DEFERRED to v4 (v3.39.8 split): the gate-#5 ``games.user_id`` SET NULL amendment
-    # (+ ``games.user_name_at_game`` snapshot) is held back, so ``delete_user`` does NOT
-    # touch games. To exercise the SHIPPING ``game_seats.user_id`` SET NULL cell without
-    # orphaning/crashing on ``games.user_id``, seed the game under a SURVIVING user
-    # (``other``) and attribute only the SEAT to the deleted user. When the amendment
-    # lands at v4: own the game by ``owner`` again and restore the ``games.user_id``
-    # ChildFK + ``_game_snapshot_check`` + the ``_EXPECTED_ONDELETE`` entry below.
-    game = Game(user_id=other.id)
+    game = Game(user_id=owner.id)
     s.add(game)
     s.flush()
     seat = GameSeat(game_id=game.id, seat_number=1, player_name="P1", user_id=owner.id)
@@ -563,10 +556,15 @@ def seed_delete_user(s) -> Seeded:
         ChildFK(
             "transaction_logs.user_id->users", "transaction_logs", "user_id", "NO ACTION", tlog.id
         ),
-        # games.user_id->users cell DEFERRED to v4 (v3.39.8 split): the SET NULL
-        # amendment is held back, so games.user_id is NO ACTION here and delete_user
-        # doesn't touch games (the game is seeded under a surviving user above).
-        # Restore this ChildFK (+ _game_snapshot_check) with the Game model amendment.
+        ChildFK(
+            "games.user_id->users",
+            "games",
+            "user_id",
+            "SET NULL",
+            game.id,
+            "gate-#5 amendment: was NO ACTION (crash); now SET NULL + name snapshot",
+            post_check=_game_snapshot_check(game.id),
+        ),
         ChildFK("game_seats.user_id->users", "game_seats", "user_id", "SET NULL", seat.id),
         ChildFK("token_inventory.user_id->users", "token_inventory", "user_id", "CASCADE", tok.id),
         ChildFK("watchlist.user_id->users", "watchlist", "user_id", "CASCADE", wl.id),
@@ -875,8 +873,7 @@ _EXPECTED_ONDELETE = {
     "game_seats.deck_id->decks": "SET NULL",
     "showcase_items.inventory_row_id->inventory_rows": "CASCADE",
     "trade_items.inventory_row_id->inventory_rows": "SET NULL",
-    # "games.user_id->users": SET NULL — DEFERRED to v4 (v3.39.8 split). NO ACTION
-    # here; restore this entry with the Game model amendment at cutover.
+    "games.user_id->users": "SET NULL",  # gate-#5 amendment (was NO ACTION)
     "game_seats.user_id->users": "SET NULL",
     "token_inventory.user_id->users": "CASCADE",
     "watchlist.user_id->users": "CASCADE",
