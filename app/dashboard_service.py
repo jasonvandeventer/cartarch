@@ -219,10 +219,19 @@ def get_dashboard_data(session: Session, user_id: int, now: datetime | None = No
     # Highest InventoryRow.id placed-and-not-pending — proxy for "most recent
     # add" since rows are append-only. Card.image_url comes from the v3.25.0
     # bulk cache so this is request-path-safe — no live Scryfall call.
+    # Proxies are EXCLUDED (v4.0.1): a proxy carries no market value, so
+    # featuring one at full price (e.g. a PROXY headlining at $7.72) is wrong.
+    # ``is_proxy.isnot(True)`` keeps False and NULL rows, dropping only proxies,
+    # so Spotlight falls to the most-recent NON-proxy placement (the empty case
+    # is covered by the .dashboard-spot-art-placeholder fallback in the template).
     spot_row = (
         session.query(InventoryRow, Card)
         .join(Card, InventoryRow.card_id == Card.id)
-        .filter(InventoryRow.user_id == user_id, InventoryRow.is_pending.is_(False))
+        .filter(
+            InventoryRow.user_id == user_id,
+            InventoryRow.is_pending.is_(False),
+            InventoryRow.is_proxy.isnot(True),
+        )
         .order_by(InventoryRow.id.desc())
         .first()
     )

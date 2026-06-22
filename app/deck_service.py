@@ -2016,11 +2016,20 @@ def compute_deck_game_stats(session: Session, user_id: int, deck_ids: list[int])
     with placement set (`GameSeat.placement IS NOT NULL`) count toward
     games and wins. ``placement == 1`` is a win. Mirrors the dashboard
     deck-performance contract for cross-page reconciliation.
+
+    Visibility (v4.0.1): a game counts if the viewer CREATED it
+    (``Game.user_id``) OR was a player at the table (``GameSeat.user_id``) —
+    matching the hybrid read-visibility added in v3.32.0. Previously only
+    games the viewer created were counted, so a participant who logged no game
+    saw 0 on a deck they actually played. No double-count: the query counts
+    distinct ``GameSeat`` rows grouped by deck, and a deck has exactly one seat
+    per game, so a viewer who is both creator and seat-holder still counts it
+    once.
     """
     if not deck_ids:
         return {}
 
-    from sqlalchemy import case, desc, func
+    from sqlalchemy import case, desc, func, or_
 
     rows = (
         session.query(
@@ -2032,7 +2041,7 @@ def compute_deck_game_stats(session: Session, user_id: int, deck_ids: list[int])
         .join(Game, GameSeat.game_id == Game.id)
         .filter(
             GameSeat.deck_id.in_(deck_ids),
-            Game.user_id == user_id,
+            or_(Game.user_id == user_id, GameSeat.user_id == user_id),
             Game.status == "finalized",
             GameSeat.placement.is_not(None),
         )

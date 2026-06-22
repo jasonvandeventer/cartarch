@@ -585,6 +585,20 @@ def collection_page(
     )
 
 
+def _csv_formula_safe(value: str) -> str:
+    """Neutralize CSV formula injection (v4.0.1, security S3).
+
+    ``csv.writer`` quotes structure but does NOT defuse a leading ``= + - @``,
+    which Excel / Google Sheets execute as a formula. Prefix any such value with
+    a single quote so the spreadsheet treats the cell as literal text. Applied to
+    the user-entered free-text columns (location name, tags) in both CSV export
+    writers. No-op for normal values (and for non-strings / empty cells).
+    """
+    if isinstance(value, str) and value[:1] in ("=", "+", "-", "@"):
+        return "'" + value
+    return value
+
+
 @router.get("/collection/export")
 def collection_export(
     filters: CollectionFilter = Depends(collection_filter),
@@ -647,11 +661,11 @@ def collection_export(
                 card.collector_number or "",
                 row.finish or "normal",
                 row.quantity,
-                loc.name if loc else "",
+                _csv_formula_safe(loc.name if loc else ""),
                 loc.type if loc else "",
                 row.language or "en",
                 row.role or "",
-                row.tags or "",
+                _csv_formula_safe(row.tags or ""),
                 "true" if row.is_proxy else "false",
                 card.scryfall_id or "",
                 f"{price:.2f}" if price else "",
@@ -2051,11 +2065,11 @@ def location_export(
                 card.collector_number or "",
                 row.finish or "normal",
                 row.quantity,
-                location.name,
+                _csv_formula_safe(location.name),
                 location.type or "",
                 row.language or "en",
                 row.role or "",
-                row.tags or "",
+                _csv_formula_safe(row.tags or ""),
                 "true" if row.is_proxy else "false",
             ]
         )
