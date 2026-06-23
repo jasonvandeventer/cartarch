@@ -1006,6 +1006,13 @@ def decks_export(
         set_code = (card.set_code or "???").upper()
         collector = card.collector_number or "0"
         line = f"{row.quantity} {card.name} ({set_code}) {collector}"
+        # Preserve foil status so an export→re-import round-trip matches the
+        # foil copy back to its inventory row. The MTGA-style ``*F*`` marker is
+        # the importer's own grammar (`_parse_list_line` detects it anywhere on
+        # the line and sets finish="foil"); a line without it parses as normal,
+        # so older exports lacking the marker remain backward compatible.
+        if (row.finish or "normal").lower() == "foil":
+            line += " *F*"
         if row.role == "commander":
             commander_lines.append(line)
         else:
