@@ -521,3 +521,68 @@
     </section>
   </div>
 {% endblock %}
+
+{% block extra_scripts %}
+  <script>
+    // v4.0.2 — preserve scroll position across full-page Collection reloads.
+    // The Collection page is plain GET/POST navigation (search/filter is a GET
+    // form, card mutations are POST→303 back to /collection), so every action
+    // reloads the document and the browser drops the user back at the top.
+    // Capture the scroll offset on any submit from this page and reapply it on
+    // the next load, then consume it so a fresh (non-submit) visit starts at the
+    // top as normal.
+    (function () {
+      var KEY = "cartarch:collection:scroll";
+      try {
+        if ("scrollRestoration" in history) history.scrollRestoration = "manual";
+      } catch (e) {
+        /* history API unavailable — restore below still runs */
+      }
+
+      // This script only loads on the Collection page, so any form submit here
+      // is a Collection action that will reload the page.
+      document.addEventListener(
+        "submit",
+        function () {
+          try {
+            sessionStorage.setItem(
+              KEY,
+              String(window.scrollY || window.pageYOffset || 0)
+            );
+          } catch (e) {
+            /* sessionStorage blocked (private mode) — scroll just resets */
+          }
+        },
+        true
+      );
+
+      function restore() {
+        var saved;
+        try {
+          saved = sessionStorage.getItem(KEY);
+        } catch (e) {
+          return;
+        }
+        if (saved === null) return;
+        var y = parseInt(saved, 10);
+        if (!isNaN(y)) window.scrollTo(0, y);
+      }
+
+      if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", restore);
+      } else {
+        restore();
+      }
+      // Reapply once images/fonts settle (they change document height), then
+      // clear the key so the position is restored exactly once.
+      window.addEventListener("load", function () {
+        restore();
+        try {
+          sessionStorage.removeItem(KEY);
+        } catch (e) {
+          /* nothing to clear */
+        }
+      });
+    })();
+  </script>
+{% endblock %}

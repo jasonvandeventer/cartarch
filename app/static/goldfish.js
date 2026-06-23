@@ -543,7 +543,14 @@
   function lookAtTopN(n) {
     // Order preserved — scry/surveil-style. No shuffle.
     const taken = state.library.slice(0, n);
-    state.modalContext = { kind: "look" };
+    // Track the revealed window (count + the specific instance ids) so the
+    // modal can re-render reactively when a card is moved out of it without
+    // ever surfacing a card the user wasn't allowed to see (v4.0.2).
+    state.modalContext = {
+      kind: "look",
+      n: taken.length,
+      ids: taken.map((inst) => inst.id),
+    };
     openModal("Top " + taken.length + " of library", taken);
   }
 
@@ -2295,8 +2302,11 @@
   /**
    * Re-render the modal body from the current zone state. Called after
    * every moveTo so a card moved via a menu action visually leaves the
-   * modal. The look-at-top-N modal is a deliberate snapshot and is NOT
-   * refreshed.
+   * modal. The look-at-top-N modal re-renders its revealed window: the
+   * originally-revealed instances that are still within the top N of the
+   * library (v4.0.2). Intersecting the revealed ids with the live top-N
+   * slice means a moved/scried-to-bottom card drops out, while a card
+   * underneath the original window is never surfaced.
    */
   function refreshModalIfOpen() {
     if (modal.hidden) return;
@@ -2307,6 +2317,11 @@
       instances = libraryBrowseInstances();
     } else if (kind === "browse" && zone) {
       instances = ZONE_LISTS[zone]();
+    } else if (kind === "look") {
+      const revealed = new Set(state.modalContext.ids || []);
+      instances = state.library
+        .slice(0, state.modalContext.n)
+        .filter((inst) => revealed.has(inst.id));
     } else {
       return;
     }

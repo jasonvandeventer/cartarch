@@ -1,5 +1,16 @@
 [
   {
+    "version": "4.0.2",
+    "date": "2026-06-22",
+    "added": [],
+    "refined": [],
+    "resolved": [
+      "Goldfish: when you move a card out of the \"look at the top of your library\" list, it now leaves that list right away instead of lingering until you close and reopen it.",
+      "Collection: searching, filtering, or adding a card no longer snaps you back to the top of the page — your scroll position stays where you left it."
+    ],
+    "archivist_note": "Two small frictions smoothed — one at the goldfishing table, one on the collection shelf. We're also chasing a rarer one: a few Firefox players have been quietly logged out mid-session. We haven't pinned it down yet, but the investigation is underway, and the early evidence points at the in-progress move between homes rather than anything in the app itself."
+  },
+  {
     "version": "4.0.1",
     "date": "2026-06-22",
     "added": [],
@@ -21,6 +32,28 @@
     ],
     "resolved": [],
     "archivist_note": "Cartarch IV. No new buttons, nothing to relearn — by design. This release is the move itself: the database changed underneath, the application stayed exactly as you left it, and the whole thing now runs on a new home cluster. The kind of release you only notice by the quiet that follows it."
+  },
+  {
+    "version": "3.39.9",
+    "date": "2026-06-19",
+    "added": [],
+    "refined": [
+      "Locked down the web-framework dependencies so a routine rebuild can no longer pull in a newer-but-incompatible version and quietly break the site."
+    ],
+    "resolved": [
+      "Re-landed the data-integrity fixes from earlier in the day, for real this time — the small reference-cleanup gaps that had been slowly accruing stop here."
+    ],
+    "archivist_note": "The fix for the morning's stumble, and the last release before the big move. The lesson banked: pin the whole stack, because the thing that breaks you is rarely the dependency you changed — it's the one underneath it that moved on its own. With this, the foundation was finally still enough to migrate."
+  },
+  {
+    "version": "3.39.8",
+    "date": "2026-06-19",
+    "added": [],
+    "refined": [],
+    "resolved": [
+      "More of the behind-the-scenes cleanup that keeps a card from leaving a ghost behind when it's moved or an import is undone — continuing the reference-tidying from the previous releases so the collection stays consistent on the way to its new home."
+    ],
+    "archivist_note": "Pure groundwork for the database move, no new buttons. Honest footnote: the build that carried it tripped over an unrelated dependency that had quietly drifted to a newer, incompatible version, so it was pulled back within the hour and re-shipped — properly pinned — as v3.39.9 the same day. A stumble caught fast."
   },
   {
     "version": "3.39.7",
