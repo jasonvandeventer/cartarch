@@ -182,10 +182,10 @@ See [docs/screenshots/](docs/screenshots/) for capture guidelines and additional
 | Layer         | Technology                                    |
 | ------------- | --------------------------------------------- |
 | Web framework | FastAPI + Jinja2                              |
-| Database      | SQLite (via SQLAlchemy)                       |
+| Database      | PostgreSQL (CloudNativePG, via SQLAlchemy)    |
 | Styling       | Custom CSS (no framework)                     |
 | Card data     | [Scryfall API](https://scryfall.com/docs/api) |
-| Runtime       | Docker / Kubernetes (K3s)                     |
+| Runtime       | Docker / Kubernetes (Talos)                   |
 | GitOps        | ArgoCD + ArgoCD Image Updater                 |
 
 ---
@@ -221,13 +221,13 @@ The post-commit hook tags HEAD automatically whenever the commit message starts 
 
 ### Migrations
 
-Migrations run automatically on startup via `run_migrations()` in `on_startup()`. To add a migration, drop an idempotent script in `scripts/` and register it in `scripts/run_migrations.py`.
+The PostgreSQL schema is owned by **Alembic** (`alembic/versions/`) as of the v4.0.0 cutover — the boot-time SQLite migrator (`run_migrations()`) was retired then. For local SQLite dev the legacy scripts in `scripts/` still apply.
 
 ---
 
 ## Data Storage
 
-- **Local**: SQLite file in `/data`
-- **Kubernetes**: Longhorn persistent volume mounted at `/data`
+- **Production**: PostgreSQL (CloudNativePG on the Talos cluster), via `DATABASE_URL`
+- **Local dev**: SQLite file in `/data` (the default when `DATABASE_URL` is unset)
 
 No database files are stored in this repository.

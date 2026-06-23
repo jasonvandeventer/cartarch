@@ -1,5 +1,28 @@
 [
   {
+    "version": "4.0.1",
+    "date": "2026-06-22",
+    "added": [],
+    "refined": [
+      "CSV exports are hardened against spreadsheet formula injection: a cell that starts with =, +, -, or @ in your own text (a location name or tag) is quoted so the spreadsheet opens it as plain text, not a live formula."
+    ],
+    "resolved": [
+      "The dashboard Spotlight no longer features a proxy at full market price — it features your most recent real card instead.",
+      "Games now appear on the Decks page for everyone who played, not just the person who logged the game."
+    ],
+    "archivist_note": "The first patch after the big move — a few sharp edges smoothed now that the collection sits on its new foundation. Nothing flashy: a proxy that shouldn't have been bragging about its price, a games tally that only counted the scorekeeper, and a quiet hardening of the export so a clever card name can't run as a spreadsheet formula."
+  },
+  {
+    "version": "4.0.0",
+    "date": "2026-06-22",
+    "added": [],
+    "refined": [
+      "Cartarch's collection now lives in PostgreSQL instead of a single SQLite file — the same app and the same data, on a sturdier foundation built for what comes next."
+    ],
+    "resolved": [],
+    "archivist_note": "Cartarch IV. No new buttons, nothing to relearn — by design. This release is the move itself: the database changed underneath, the application stayed exactly as you left it, and the whole thing now runs on a new home cluster. The kind of release you only notice by the quiet that follows it."
+  },
+  {
     "version": "3.39.7",
     "date": "2026-06-12",
     "added": [
