@@ -1339,6 +1339,28 @@ _SHORT_SET_RE = re.compile(r"^(?=[A-Za-z0-9]*[A-Za-z])[A-Za-z0-9]{2,6}$")
 _SHORT_COLL_RE = re.compile(r"^[0-9★][0-9A-Za-z★-]*$")
 _SHORT_QTY_RE = re.compile(r"^[0-9]{1,3}$")
 
+# Single-letter finish markers, MTGA-style. *F* = foil (the MTGA standard),
+# *E* = etched (our own round-trip marker so the deck export never silently
+# downgrades an etched card to normal). Both are 1 letter so they can't be
+# swallowed by the 2-3 letter *XX* language marker.
+_FINISH_MARKER_RES = (
+    ("foil", re.compile(r"\s*\*F\*\s*", re.IGNORECASE)),
+    ("etched", re.compile(r"\s*\*E\*\s*", re.IGNORECASE)),
+)
+
+
+def _extract_finish_marker(rest: str) -> tuple[str, str]:
+    """Detect and strip a *F*/*E* finish marker. Returns (finish, cleaned_rest).
+
+    Defaults to ``"normal"`` when no marker is present, so a legacy export line
+    (or any plain Moxfield list) round-trips as normal — backward compatible.
+    """
+    for name, pattern in _FINISH_MARKER_RES:
+        if pattern.search(rest):
+            rest = re.sub(r"\s+", " ", pattern.sub(" ", rest).strip())
+            return name, rest
+    return "normal", rest
+
 
 def _parse_short_list_line(line: str) -> dict[str, Any] | None:
     """Parse a bare 'SET COLLECTOR [qty]' or 'qty SET COLLECTOR' line.
@@ -1350,11 +1372,11 @@ def _parse_short_list_line(line: str) -> dict[str, Any] | None:
     if not rest:
         return None
 
-    # Detect *F* foil marker anywhere on the line and strip it.
-    finish = "normal"
-    if re.search(r"(?i)\*F\*", rest):
-        finish = "foil"
-        rest = re.sub(r"(?i)\s*\*F\*\s*", " ", rest).strip()
+    # Detect the *F* foil / *E* etched finish marker anywhere on the line and
+    # strip it. Single-letter codes so they can't collide with the 2-3 letter
+    # *XX* language marker below; *F* is the MTGA standard, *E* is our own
+    # round-trip marker for etched (the deck export emits both).
+    finish, rest = _extract_finish_marker(rest)
 
     # Detect *XX* / *XXX* language marker (e.g. *JP* → ja, *DE* → de).
     # 2-3 letter codes so it can't collide with the 1-letter *F* foil marker.
@@ -1442,14 +1464,10 @@ def _parse_list_line(line: str) -> dict[str, Any] | None:
         rest = (rest[: lang_match.start()] + rest[lang_match.end() :]).strip()
         rest = re.sub(r"\s+", " ", rest)
 
-    # Detect MTGA foil marker (*F*) anywhere on the line and strip it.
-    # Search-anywhere (not just endswith) so it works when combined with
-    # a language marker like `*F* *DE*` in any order.
-    finish = "normal"
-    if re.search(r"(?i)\*F\*", rest):
-        finish = "foil"
-        rest = re.sub(r"(?i)\s*\*F\*\s*", " ", rest).strip()
-        rest = re.sub(r"\s+", " ", rest)
+    # Detect the *F* foil / *E* etched finish marker anywhere on the line and
+    # strip it. Search-anywhere (not just endswith) so it works when combined
+    # with a language marker like `*F* *DE*` in any order.
+    finish, rest = _extract_finish_marker(rest)
 
     # Extract trailing (SET) and optional collector number
     set_code = ""
