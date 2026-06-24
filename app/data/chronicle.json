@@ -10,6 +10,36 @@
     "archivist_note": null
   },
   {
+    "version": "4.0.8",
+    "date": "2026-06-23",
+    "added": [],
+    "refined": [],
+    "resolved": [
+      "On phones, the Edit Deck pop-up is back to its proper card look — bordered, rounded, and neatly padded — while keeping the brightness improvements. This closes the Edit Deck pop-up readability issue across phone and desktop."
+    ],
+    "archivist_note": "The Edit Deck pop-up took a few passes to get fully right: brightness first, then a fix so it stopped dimming itself behind its own shaded background, and finally restoring the card framing that fix had briefly stripped away. It now reads cleanly everywhere."
+  },
+  {
+    "version": "4.0.7",
+    "date": "2026-06-23",
+    "added": [],
+    "refined": [],
+    "resolved": [
+      "On phones, the Edit Deck pop-up no longer appears washed out by its own shaded background — it now opens as a clean, centered card above the dimmed page."
+    ],
+    "archivist_note": null
+  },
+  {
+    "version": "4.0.6",
+    "date": "2026-06-23",
+    "added": [],
+    "refined": [
+      "The Edit Deck pop-up on desktop now uses the same brightened, easy-to-read panel the phone version received — the earlier contrast fix had only reached mobile."
+    ],
+    "resolved": [],
+    "archivist_note": null
+  },
+  {
     "version": "4.0.5",
     "date": "2026-06-23",
     "added": [],
