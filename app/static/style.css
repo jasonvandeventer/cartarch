@@ -6594,13 +6594,15 @@ table.dmtx .dmtx-rowhead {
 @media (max-width: 768px) {
   .mobile-popover {
     position: fixed !important;
-    inset: 0 !important;
-    margin: auto !important;
-    width: min(92vw, 480px) !important;
-    max-width: min(92vw, 480px) !important;
-    max-height: 90dvh !important;
-    height: max-content !important;
-    overflow-y: auto !important;
+    top: 50% !important;
+    left: 50% !important;
+    right: auto !important;
+    bottom: auto !important;
+    transform: translate(-50%, -50%) !important;
+    width: min(90vw, 400px) !important;
+    max-width: min(90vw, 400px) !important;
+    max-height: 80vh !important;
+    overflow: auto !important;
     z-index: 1100 !important;
     /* Elevated-surface override (#32). As a desktop popout `.edit-popout` is
        `var(--panel)`, the SAME token the form inputs use (input/select/textarea
@@ -6612,6 +6614,18 @@ table.dmtx .dmtx-rowhead {
        modal renders at full brightness above the backdrop. */
     background: var(--panel-3) !important;
     box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6) !important;
+    /* Card skin restored after the portal fix (#32). At v4.0.1 the modal's
+       border / radius / padding / min-width came from `.inline-details
+       .edit-popout` while `.mobile-popover` supplied only geometry. The portal
+       fix (a33e4cb) moves the open panel to `body`, so `.inline-details
+       .edit-popout` no longer matches it and the panel lost its whole skin
+       (border, 8px radius, 1rem padding). Re-declare that v4.0.1 skin here so
+       the portaled panel keeps the exact v4.0.1 look — only the surface token
+       is lifted (--panel → --panel-3) for the brightness fix above. */
+    border: 1px solid var(--border) !important;
+    border-radius: 8px !important;
+    padding: 1rem !important;
+    min-width: 260px !important;
   }
   /* Label legibility on the #32 lifted surface. Form labels default to
      `--muted` (#A99772), which was legible against the old `--panel` modal
