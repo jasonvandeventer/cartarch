@@ -54,6 +54,24 @@ def safe_redirect_url(request: Request, default: str = "/collection") -> str:
     return referer
 
 
+def client_ip_for(request: Request) -> str | None:
+    """Best-effort client IP for rate-limiting.
+
+    Prefers X-Forwarded-For (Cloudflare Tunnel sets it) → falls back
+    to request.client.host. Used only for rate-limit keying — not for
+    auth, not surfaced anywhere user-facing.
+
+    Lives here (shared) rather than in main.py so every route module can
+    reach it without a circular import (same precedent as
+    ``safe_redirect_url``). Used by the password-reset throttle and the
+    login brute-force throttle.
+    """
+    xff = request.headers.get("x-forwarded-for")
+    if xff:
+        return xff.split(",")[0].strip()
+    return request.client.host if request.client else None
+
+
 def _git(*args: str) -> str | None:
     """Run a git command, returning stripped stdout or None on any failure
     (non-zero exit, or git missing in the runtime image)."""
