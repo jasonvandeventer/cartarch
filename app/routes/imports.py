@@ -76,6 +76,23 @@ MAX_IMPORT_BYTES = 2 * 1024 * 1024  # 2 MB
 MAX_IMPORT_LINES = 5_000
 
 
+def _count_lines(text: bytes | str) -> int:
+    """Line count that does NOT over-count a trailing newline.
+
+    A file ending in a final newline has the same line count as one without it
+    (the naive ``count("\\n") + 1`` reads a valid 5,000-line file that ends in
+    "\\n" as 5,001 and wrongly rejects it). Works on bytes or str so both the
+    CSV-byte and paste-text paths share one definition.
+    """
+    if not text:
+        return 0
+    newline = b"\n" if isinstance(text, bytes) else "\n"
+    count = text.count(newline)
+    if not text.endswith(newline):
+        count += 1
+    return count
+
+
 def _enforce_import_size_limits(num_bytes: int, num_lines: int) -> None:
     """Raise ValueError (→ global handler → clean 400) if an import exceeds the
     byte or line cap. Called before parsing on both the paste-text and CSV
@@ -125,10 +142,18 @@ async def import_preview(
     # [import-preview] diagnostic instrumentation (no logic changes) — splits
     # parser time from render/serialization time to localize the 524 timeout.
     _t0 = time.perf_counter()
+    # S4 — reject by the DECLARED size BEFORE reading the body into RAM, so a
+    # gigabyte upload can't OOM the pod via file.read(). Starlette populates
+    # file.size from the multipart parse (spooled to disk above its threshold),
+    # so this is the pre-read guard; len(file_bytes) below is the belt-and-braces
+    # re-check for the rare case where size is unset.
+    if file.size is not None:
+        _enforce_import_size_limits(file.size, 0)
     file_bytes = await file.read()
     _t_read = time.perf_counter()
-    # S4 — cap size before any parsing begins (both byte- and line-count).
-    _enforce_import_size_limits(len(file_bytes), file_bytes.count(b"\n") + 1)
+    # Now safely capped at MAX_IMPORT_BYTES — re-check the actual bytes and the
+    # line count before any parsing begins.
+    _enforce_import_size_limits(len(file_bytes), _count_lines(file_bytes))
     result = parse_scanner_csv(file_bytes)
     _t_parsed = time.perf_counter()
 
@@ -177,8 +202,11 @@ async def import_list_preview(
     current_user: User = Depends(get_current_user),
     _: None = CsrfRequired,
 ):
-    # S4 — cap size before any parsing begins (both byte- and line-count).
-    _enforce_import_size_limits(len(card_list.encode("utf-8")), card_list.count("\n") + 1)
+    # S4 — cap size before any parsing begins. Use len(card_list) (the character
+    # count) as a fast, allocation-free proxy for the byte size rather than
+    # encoding a whole second copy of the payload just to measure it; UTF-8 is
+    # >= 1 byte/char, so this never UNDER-rejects an oversized paste.
+    _enforce_import_size_limits(len(card_list), _count_lines(card_list))
     result = parse_text_list(card_list)
     # v3.30.15 — paste-list flow won't typically carry Location values, but
     # the template branches on the resolution context keys, so they must be

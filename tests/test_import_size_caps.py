@@ -13,8 +13,35 @@ from app.routes import imports as imports_routes
 from app.routes.imports import (
     MAX_IMPORT_BYTES,
     MAX_IMPORT_LINES,
+    _count_lines,
     _enforce_import_size_limits,
 )
+
+# --- line counting (off-by-one on trailing newline) -----------------------------
+
+
+def test_count_lines_no_trailing_newline():
+    assert _count_lines("a\nb\nc") == 3
+    assert _count_lines(b"a\nb\nc") == 3
+
+
+def test_count_lines_trailing_newline_not_over_counted():
+    # The bug the revision fixed: "a\nb\nc\n" is 3 lines, NOT 4. A valid file at
+    # exactly the line cap that ends in "\n" must not be read as cap+1.
+    assert _count_lines("a\nb\nc\n") == 3
+    assert _count_lines(b"a\nb\nc\n") == 3
+
+
+def test_count_lines_empty_is_zero():
+    assert _count_lines("") == 0
+    assert _count_lines(b"") == 0
+
+
+def test_capped_file_with_trailing_newline_is_accepted():
+    # Exactly MAX_IMPORT_LINES lines, terminated by a newline → still allowed.
+    text = "".join(f"row{i}\n" for i in range(MAX_IMPORT_LINES))
+    _enforce_import_size_limits(0, _count_lines(text))  # must not raise
+
 
 # --- the predicate in isolation -------------------------------------------------
 
@@ -113,6 +140,31 @@ def test_csv_too_many_lines_returns_400_before_parsing(client, monkeypatch):
     )
     assert r.status_code == 400
     assert "lines exceeds" in r.text
+
+
+def test_csv_oversized_rejected_before_read(client, monkeypatch):
+    # The DECLARED size (file.size) must trip the cap so .read() never loads the
+    # whole body into RAM. Make .read() itself blow up to prove it isn't reached.
+    async def _boom_read(*_a, **_k):
+        raise AssertionError("file.read() must not run on an oversized upload")
+
+    from starlette.datastructures import UploadFile as _UF
+
+    monkeypatch.setattr(_UF, "read", _boom_read)
+    monkeypatch.setattr(
+        imports_routes,
+        "parse_scanner_csv",
+        lambda _b: (_ for _ in ()).throw(AssertionError("parser must not run")),
+    )
+
+    big = b"x" * (MAX_IMPORT_BYTES + 1)
+    r = client.post(
+        "/import/preview",
+        data={"csrf_token": "x"},
+        files={"file": ("big.csv", big, "text/csv")},
+    )
+    assert r.status_code == 400
+    assert "bytes exceeds" in r.text
 
 
 def test_csv_within_limits_still_parses(client, monkeypatch):
