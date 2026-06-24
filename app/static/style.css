@@ -1570,7 +1570,7 @@ textarea {
 }
 .stack-form label {
   font-size: 0.875rem;
-  color: var(--muted);
+  color: var(--text);
   margin-bottom: -0.2rem;
 }
 .inline-form {
@@ -2298,11 +2298,11 @@ td {
   right: 0;
   top: calc(100% + 4px);
   z-index: 200;
-  /* var(--surface) was undefined since v3.10.6 — popout has been
-     functionally transparent. Same Known-Problem class as --bg-card /
-     --text-muted (current-status.md). Swapped to the defined --panel
-     token (matches v3.25.2 .fp-modal-inner, v3.26.0 .notes-modal-inner). */
-  background: var(--panel);
+  /* Lifted to --panel-3 (#32, 2026-06-23) so the desktop popout reads as
+     elevated above the page and its --panel inputs recede. Was --panel
+     (undefined --surface since v3.10.6); the #32 surface fix was
+     mobile-only until this edit extended it to desktop. */
+  background: var(--panel-3);
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 1rem;
