@@ -66,6 +66,35 @@ from app.timeutil import utc_now
 
 router = APIRouter()
 
+# Import size caps (S4) — reject oversized paste/CSV uploads BEFORE any parsing
+# so a malicious or accidental large blob can't consume excessive memory or
+# processing time. Applies to the two raw-input entry points only (the CSV
+# upload preview and the paste-text preview); the downstream commit /
+# reconcile routes receive already-parsed parallel-array form fields, never a
+# raw blob, so the cap belongs at the preview seam.
+MAX_IMPORT_BYTES = 2 * 1024 * 1024  # 2 MB
+MAX_IMPORT_LINES = 5_000
+
+
+def _enforce_import_size_limits(num_bytes: int, num_lines: int) -> None:
+    """Raise ValueError (→ global handler → clean 400) if an import exceeds the
+    byte or line cap. Called before parsing on both the paste-text and CSV
+    upload paths; the message is reader-facing so the user knows to split the
+    import into smaller pieces.
+    """
+    if num_bytes > MAX_IMPORT_BYTES:
+        raise ValueError(
+            f"Import too large: {num_bytes:,} bytes exceeds the "
+            f"{MAX_IMPORT_BYTES // (1024 * 1024)} MB limit. "
+            "Split it into smaller imports and try again."
+        )
+    if num_lines > MAX_IMPORT_LINES:
+        raise ValueError(
+            f"Import too large: {num_lines:,} lines exceeds the "
+            f"{MAX_IMPORT_LINES:,}-line limit. "
+            "Split it into smaller imports and try again."
+        )
+
 
 @router.get("/import")
 def import_page(
@@ -98,6 +127,8 @@ async def import_preview(
     _t0 = time.perf_counter()
     file_bytes = await file.read()
     _t_read = time.perf_counter()
+    # S4 — cap size before any parsing begins (both byte- and line-count).
+    _enforce_import_size_limits(len(file_bytes), file_bytes.count(b"\n") + 1)
     result = parse_scanner_csv(file_bytes)
     _t_parsed = time.perf_counter()
 
@@ -146,6 +177,8 @@ async def import_list_preview(
     current_user: User = Depends(get_current_user),
     _: None = CsrfRequired,
 ):
+    # S4 — cap size before any parsing begins (both byte- and line-count).
+    _enforce_import_size_limits(len(card_list.encode("utf-8")), card_list.count("\n") + 1)
     result = parse_text_list(card_list)
     # v3.30.15 — paste-list flow won't typically carry Location values, but
     # the template branches on the resolution context keys, so they must be
