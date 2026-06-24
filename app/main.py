@@ -39,6 +39,7 @@ from app.decklist_service import (
 from app.dependencies import (
     DRAWER_SORTER_USERNAMES,
     CsrfRequired,
+    client_ip_for,
     get_current_user,
     get_db_session,
     get_optional_current_user,
@@ -1063,19 +1064,6 @@ def watchlist_update_target_price(
 #    POST.
 
 
-def _client_ip_for(request: Request) -> str | None:
-    """Best-effort client IP for rate-limiting.
-
-    Prefers X-Forwarded-For (Cloudflare Tunnel sets it) → falls back
-    to request.client.host. Used only for rate-limit keying — not for
-    auth, not surfaced anywhere user-facing.
-    """
-    xff = request.headers.get("x-forwarded-for")
-    if xff:
-        return xff.split(",")[0].strip()
-    return request.client.host if request.client else None
-
-
 @app.get("/forgot-password")
 def forgot_password_page(request: Request):
     return render(request, "forgot_password.html", {"title": "Forgot password"})
@@ -1104,7 +1092,7 @@ def forgot_password_submit(
         return reissue
 
     email_clean = (email or "").strip().lower()
-    client_ip = _client_ip_for(request)
+    client_ip = client_ip_for(request)
     neutral_response = render(
         request,
         "forgot_password.html",

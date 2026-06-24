@@ -54,6 +54,41 @@ def safe_redirect_url(request: Request, default: str = "/collection") -> str:
     return referer
 
 
+def client_ip_for(request: Request) -> str | None:
+    """Best-effort client IP for rate-limiting.
+
+    **Spoof-resistant order:**
+
+    1. ``CF-Connecting-IP`` — Cloudflare's canonical real-client-IP header.
+       Cloudflare OVERWRITES it on every request at the edge, so a client
+       cannot forge it; this is the production path (the app sits behind a
+       Cloudflare Tunnel). This is the only fully trustworthy source here.
+    2. The **rightmost** entry of ``X-Forwarded-For`` — NOT the leftmost.
+       A trusted proxy APPENDS the address it actually received the
+       connection from, so the rightmost hop is the least attacker-
+       controllable. Taking the leftmost (``xff.split(",")[0]``) reads a
+       value the client can fully forge, trivially bypassing the per-IP
+       limit — that was the bug this fixes.
+    3. ``request.client.host`` — the raw socket peer, when no proxy
+       headers are present (e.g. local dev / direct hits).
+
+    Used only for rate-limit keying — not for auth, not surfaced anywhere
+    user-facing. Lives here (shared) rather than in main.py so every route
+    module can reach it without a circular import (same precedent as
+    ``safe_redirect_url``). Used by the password-reset throttle and the
+    login brute-force throttle.
+    """
+    cf_ip = request.headers.get("cf-connecting-ip")
+    if cf_ip and cf_ip.strip():
+        return cf_ip.strip()
+    xff = request.headers.get("x-forwarded-for")
+    if xff:
+        hops = [h.strip() for h in xff.split(",") if h.strip()]
+        if hops:
+            return hops[-1]
+    return request.client.host if request.client else None
+
+
 def _git(*args: str) -> str | None:
     """Run a git command, returning stripped stdout or None on any failure
     (non-zero exit, or git missing in the runtime image)."""
