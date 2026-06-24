@@ -1,5 +1,15 @@
 [
   {
+    "version": "4.0.14",
+    "date": "2026-06-24",
+    "added": [],
+    "refined": [
+      "Added a version indicator to the mobile UI so the running release is identifiable on-device."
+    ],
+    "resolved": [],
+    "archivist_note": null
+  },
+  {
     "version": "4.0.13",
     "date": "2026-06-24",
     "added": [],
