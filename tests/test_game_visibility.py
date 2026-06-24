@@ -156,6 +156,45 @@ def test_list_games_hybrid_and_flag():
     assert failed == 0
 
 
+def test_list_games_excludes_playgroup_only_games():
+    """issue #39: a playgroup co-member who did NOT play in a game must not see
+    it on the Recent Games list, even though it's linked to a shared playgroup
+    — but they can still VIEW it by URL (get_viewable_game)."""
+    failed = 0
+    s = _fresh_session()
+    owner = _make_user(s, "owner")
+    pg_member = _make_user(s, "pgmember")
+    pg = _make_playgroup(s, owner, "pod", members=[pg_member])
+
+    # Game owned by `owner`; `pg_member` is NOT seated.
+    game = _make_game(s, owner, [{"player_name": "Owner"}, {"player_name": "P2"}])
+    game_service.set_game_playgroup(s, game.id, owner.id, pg.id)
+
+    # Recent Games list for the co-member must be empty (not a participant).
+    if game_service.list_games(s, pg_member.id):
+        print("  [FAIL] playgroup-only game leaked into co-member's list")
+        failed += 1
+    else:
+        print("  [OK] playgroup-only game excluded from co-member's list")
+
+    # ...but the game is still viewable by URL for the co-member.
+    if game_service.get_viewable_game(s, game.id, pg_member.id) is None:
+        print("  [FAIL] co-member lost URL view access to shared game")
+        failed += 1
+    else:
+        print("  [OK] co-member still views shared game by URL")
+
+    # Owner still sees their own game in the list.
+    owner_list = game_service.list_games(s, owner.id)
+    if len(owner_list) != 1 or owner_list[0].id != game.id:
+        print("  [FAIL] owner lost their own game from the list")
+        failed += 1
+    else:
+        print("  [OK] owner still lists own game")
+
+    assert failed == 0
+
+
 def test_reassign_seat_user_owner_only():
     """Owner renames/attributes/clears a seat; non-owner rejected; unknown clears."""
     failed = 0

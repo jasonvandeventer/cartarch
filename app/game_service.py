@@ -283,6 +283,23 @@ def _viewable_games_predicate(viewer_user_id: int):
     )
 
 
+def _participant_games_predicate(viewer_user_id: int):
+    """SQLAlchemy predicate for "games ``viewer_user_id`` was a PART OF".
+
+    Narrower than :func:`_viewable_games_predicate`: a game qualifies only if
+    the viewer (a) owns it OR (b) is attributed to one of its seats
+    (``GameSeat.user_id``). It deliberately OMITS the playgroup-link clause (c)
+    — a playgroup link makes a game *viewable* (openable by URL / detail page),
+    but the Recent Games *list* should show only the viewer's own games, not
+    every game any co-member happened to link to a shared playgroup (issue #39).
+    """
+    seat_subq = select(GameSeat.game_id).where(GameSeat.user_id == viewer_user_id)
+    return or_(
+        Game.user_id == viewer_user_id,
+        Game.id.in_(seat_subq),
+    )
+
+
 def get_viewable_game(session: Session, game_id: int, viewer_user_id: int) -> Game | None:
     """Viewer-scoped fetch — returns the game if the viewer may *view* it.
 
@@ -300,18 +317,22 @@ def get_viewable_game(session: Session, game_id: int, viewer_user_id: int) -> Ga
 
 
 def list_games(session: Session, user_id: int) -> list[Game]:
-    """Games visible to ``user_id`` — owned + played-in + playgroup (v3.32.0).
+    """Games ``user_id`` was a part of — owned + played-in (issue #39).
 
-    Widened from owner-only to the hybrid visibility set
-    (:func:`_viewable_games_predicate`). Each returned game carries a transient
+    Originally owner-only; v3.32.0 widened it to the full hybrid visibility set
+    (owned + played-in + playgroup-linked). That over-widened the Recent Games
+    *list*: a game merely linked to a shared playgroup showed up for every
+    co-member even if they never played in it. Narrowed back to participant-only
+    (:func:`_participant_games_predicate`) so the list shows only the viewer's
+    own games; playgroup-shared games remain *viewable* by URL via
+    :func:`get_viewable_game`. Each returned game still carries the transient
     ``is_owned_by_viewer`` attribute (not a column) so the list template can
-    badge "played in" games and hide the owner-only Delete control on games the
-    viewer doesn't own.
+    badge "played in" games and hide the owner-only Delete control.
     """
     games = (
         session.query(Game)
         .options(joinedload(Game.seats).joinedload(GameSeat.deck))
-        .filter(_viewable_games_predicate(user_id))
+        .filter(_participant_games_predicate(user_id))
         .order_by(Game.played_at.desc())
         .all()
     )
