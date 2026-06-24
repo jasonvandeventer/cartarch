@@ -1,5 +1,15 @@
 [
   {
+    "version": "4.0.9",
+    "date": "2026-06-24",
+    "added": [],
+    "refined": [
+      "Cards on the Cull page now sort by collector number in the correct numeric order (1, 2, 10 instead of 1, 10, 2)."
+    ],
+    "resolved": [],
+    "archivist_note": null
+  },
+  {
     "version": "4.0.5",
     "date": "2026-06-23",
     "added": [],
