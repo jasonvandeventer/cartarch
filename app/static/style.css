@@ -6604,13 +6604,26 @@ table.dmtx .dmtx-rowhead {
     max-height: 80vh !important;
     overflow: auto !important;
     z-index: 1100 !important;
+    /* Elevated-surface override (#32). As a desktop popout `.edit-popout` is
+       `var(--panel)`, the SAME token the form inputs use (input/select/textarea
+       base = var(--panel)) — fine there because the popout floats on the page
+       with a shadow. But once it becomes a centered modal over the backdrop,
+       a `--panel` surface holding `--panel` inputs merges into one flat dark
+       block that barely separates from the dimmed page. Lift the modal to the
+       lighter `--panel-3` so the inputs read as recessed fields and the whole
+       modal renders at full brightness above the backdrop. */
+    background: var(--panel-3) !important;
     box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6) !important;
   }
   .mobile-popover-backdrop {
     display: block;
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.4);
+    /* Stronger dim (#32) — at 0.4 the warm-charcoal page barely receded, so the
+       dark modal didn't read as lifted. 0.6 pushes the page back behind the
+       now-lighter modal surface; only the page behind is dimmed (z-index 1090
+       sits below the modal's 1100). */
+    background: rgba(0, 0, 0, 0.6);
     z-index: 1090;
   }
   body.mobile-popover-open {
