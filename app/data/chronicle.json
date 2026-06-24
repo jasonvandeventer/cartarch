@@ -1,5 +1,15 @@
 [
   {
+    "version": "4.0.10",
+    "date": "2026-06-24",
+    "added": [],
+    "refined": [],
+    "resolved": [
+      "Game statistics no longer count every game as a win — only the games you actually won are tallied as wins, and other outcomes are categorized correctly."
+    ],
+    "archivist_note": null
+  },
+  {
     "version": "4.0.9",
     "date": "2026-06-24",
     "added": [],
