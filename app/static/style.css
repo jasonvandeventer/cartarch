@@ -6615,6 +6615,18 @@ table.dmtx .dmtx-rowhead {
     background: var(--panel-3) !important;
     box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6) !important;
   }
+  /* Label legibility on the #32 lifted surface. Form labels default to
+     `--muted` (#A99772), which was legible against the old `--panel` modal
+     but is too dim against the lighter `--panel-3` surface #32 introduced
+     above. Promote labels to `--text` so they read at full contrast; keep the
+     `.decks-edit-hint` captions one tier down at `--text-dim` (they set their
+     own `--muted`, so the label rule won't cascade) — secondary but legible. */
+  .mobile-popover label {
+    color: var(--text) !important;
+  }
+  .mobile-popover .decks-edit-hint {
+    color: var(--text-dim) !important;
+  }
   .mobile-popover-backdrop {
     display: block;
     position: fixed;
