@@ -77,20 +77,16 @@ MAX_IMPORT_LINES = 5_000
 
 
 def _count_lines(text: bytes | str) -> int:
-    """Line count that does NOT over-count a trailing newline.
+    """Line count over every separator kind (\\n, \\r, \\r\\n), trailing-aware.
 
-    A file ending in a final newline has the same line count as one without it
-    (the naive ``count("\\n") + 1`` reads a valid 5,000-line file that ends in
-    "\\n" as 5,001 and wrongly rejects it). Works on bytes or str so both the
-    CSV-byte and paste-text paths share one definition.
+    ``str.splitlines()`` / ``bytes.splitlines()`` split on every line-boundary
+    kind — so a \\r-only (classic-Mac) or \\r\\n (Windows) file counts correctly
+    instead of reading as one giant line — and do NOT emit a phantom final
+    element for a trailing separator (a valid 5,000-line file ending in a newline
+    counts as 5,000, not 5,001, so it isn't wrongly rejected). Works on bytes or
+    str so both the CSV-byte and paste-text paths share one definition.
     """
-    if not text:
-        return 0
-    newline = b"\n" if isinstance(text, bytes) else "\n"
-    count = text.count(newline)
-    if not text.endswith(newline):
-        count += 1
-    return count
+    return len(text.splitlines())
 
 
 def _enforce_import_size_limits(num_bytes: int, num_lines: int) -> None:
