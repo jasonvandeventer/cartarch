@@ -22,6 +22,14 @@ Design notes:
   this is the effective limit; a multi-replica deployment would need
   shared state (Redis or a table). Acceptable for current scale — no
   Redis dependency introduced.
+- **Bounded against memory-exhaustion.** The tracking store is a bounded
+  LRU (an ``OrderedDict`` capped at ``LOGIN_RATE_LIMIT_MAX_KEYS``), and
+  empty windows are dropped on prune. An attacker spraying millions of
+  randomized usernames or spoofed IPs can therefore only ever cost a
+  fixed amount of memory: the oldest-touched key is evicted once the cap
+  is reached. Crucially, ``is_login_throttled`` (the read path) NEVER
+  inserts a key — only a confirmed failure does — so merely *probing*
+  with fresh keys can't grow the store at all.
 - **No CAPTCHA, no account lockout.** Purely throttling — a throttled
   attacker is told to wait; the account is never disabled.
 """
@@ -29,7 +37,7 @@ Design notes:
 from __future__ import annotations
 
 import threading
-from collections import defaultdict
+from collections import OrderedDict
 from datetime import UTC, datetime, timedelta
 
 # Policy — change here if it changes. 5 failures per 15 minutes per key;
@@ -37,7 +45,17 @@ from datetime import UTC, datetime, timedelta
 LOGIN_RATE_LIMIT_WINDOW = timedelta(minutes=15)
 LOGIN_RATE_LIMIT_MAX = 5
 
-_fail_log: dict[str, list[datetime]] = defaultdict(list)
+# Hard cap on the number of distinct (ip:/user:) keys tracked at once. The
+# store is an LRU: once full, recording a new key evicts the least-recently-
+# touched one. This bounds memory regardless of how many unique usernames /
+# spoofed IPs an attacker throws at the endpoint. 50k keys × a handful of
+# small datetimes each is a trivial footprint, well above any legitimate
+# concurrent-failure population.
+LOGIN_RATE_LIMIT_MAX_KEYS = 50_000
+
+# LRU: most-recently-touched key at the end. Plain OrderedDict (NOT a
+# defaultdict) so a read can never auto-insert an empty entry.
+_fail_log: OrderedDict[str, list[datetime]] = OrderedDict()
 _fail_lock = threading.Lock()
 
 
@@ -52,11 +70,21 @@ def _ip_key(client_ip: str | None) -> str:
 
 
 def _pruned_count(key: str, now: datetime) -> int:
-    """Prune timestamps older than the window (in place) and return the
-    surviving count. Caller must hold ``_fail_lock``."""
-    log = _fail_log[key]
+    """Return the count of failures still inside the window for ``key``,
+    pruning expired timestamps. Caller must hold ``_fail_lock``.
+
+    READ-ONLY w.r.t. key creation: a missing key returns 0 WITHOUT being
+    inserted (this is what keeps the read path from leaking memory). A key
+    whose window has fully expired is DELETED so empty entries don't linger.
+    """
+    log = _fail_log.get(key)
+    if log is None:
+        return 0
     cutoff = now - LOGIN_RATE_LIMIT_WINDOW
     log[:] = [ts for ts in log if ts > cutoff]
+    if not log:
+        del _fail_log[key]
+        return 0
     return len(log)
 
 
@@ -65,8 +93,8 @@ def is_login_throttled(username: str, client_ip: str | None) -> bool:
 
     Throttled when EITHER the username OR the IP has already accumulated
     ``LOGIN_RATE_LIMIT_MAX`` failures in the window. Does NOT record
-    anything — only a confirmed failure (``record_failed_login``) counts.
-    Prunes on every check so the dicts don't grow unbounded.
+    anything — only a confirmed failure (``record_failed_login``) counts —
+    and never inserts a tracking key, so probing can't exhaust memory.
     """
     now = datetime.now(UTC)
     with _fail_lock:
@@ -75,14 +103,23 @@ def is_login_throttled(username: str, client_ip: str | None) -> bool:
     return user_count >= LOGIN_RATE_LIMIT_MAX or ip_count >= LOGIN_RATE_LIMIT_MAX
 
 
+def _record_one(key: str, now: datetime) -> None:
+    """Append a failure timestamp to ``key`` and mark it most-recently-used,
+    evicting the oldest key if the store is at capacity. Caller holds lock."""
+    _pruned_count(key, now)  # prune (and possibly drop) before touching
+    _fail_log.setdefault(key, []).append(now)
+    _fail_log.move_to_end(key)  # most-recently-touched → end of the LRU
+    # Enforce the cap: evict least-recently-touched keys until under it.
+    while len(_fail_log) > LOGIN_RATE_LIMIT_MAX_KEYS:
+        _fail_log.popitem(last=False)
+
+
 def record_failed_login(username: str, client_ip: str | None) -> None:
     """Record a failed login against both the username and IP counters."""
     now = datetime.now(UTC)
     with _fail_lock:
-        _pruned_count(_username_key(username), now)
-        _fail_log[_username_key(username)].append(now)
-        _pruned_count(_ip_key(client_ip), now)
-        _fail_log[_ip_key(client_ip)].append(now)
+        _record_one(_username_key(username), now)
+        _record_one(_ip_key(client_ip), now)
 
 
 def reset_login_attempts(username: str) -> None:
