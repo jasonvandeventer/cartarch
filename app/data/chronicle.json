@@ -1,5 +1,15 @@
 [
   {
+    "version": "4.0.15",
+    "date": "2026-06-24",
+    "added": [],
+    "refined": [],
+    "resolved": [
+      "Card imports now enforce size limits (2 MB / 5,000 lines) to prevent oversized uploads."
+    ],
+    "archivist_note": null
+  },
+  {
     "version": "4.0.14",
     "date": "2026-06-24",
     "added": [],
