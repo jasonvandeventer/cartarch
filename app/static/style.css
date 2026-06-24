@@ -6307,6 +6307,18 @@ table.dmtx .dmtx-rowhead {
     font-weight: 600;
     cursor: pointer;
   }
+  /* Issue #40 — muted build stamp at the foot of the More menu. The
+     topbar version pill is hidden ≤480px, so this is the on-device
+     "what version am I running?" readout. Deliberately subdued so it
+     reads as metadata, not a nav action. */
+  .more-menu-version {
+    margin: 1rem 0 0;
+    text-align: center;
+    font-size: 0.75rem;
+    letter-spacing: 0.04em;
+    color: var(--muted);
+    user-select: text;
+  }
 }
 
 /* ============================================================================

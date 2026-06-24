@@ -5,6 +5,13 @@
     <meta name="viewport"
           content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>{{ title or "Cartarch" }}</title>
+    {# Issue #40 — build/version stamp. Carries the same build-time
+       APP_VERSION the topbar pill renders, but as a meta tag so the
+       running release is inspectable via devtools on ANY surface
+       (incl. mobile, where the topbar pill is hidden ≤480px, and anon
+       pages) without navigating to Chronicle. Raw vX.Y.Z (or dev-<sha>),
+       not the Folio form. #}
+    <meta name="app-version" content="{{ app_version }}">
     {# v3.27.17 — Cartarch favicon set. The v3.x app/static/icons/* pack
        (Mana Archive era) is retired; the new bundle lives under
        app/static/brand/. The vector favicon.svg variant gives modern
@@ -566,6 +573,13 @@
               <span class="logout-display-name">({{ current_user.display_name or current_user.username }})</span>
             </button>
           </form>
+          {# Issue #40 — visible build stamp in the mobile More menu. The
+             topbar version pill is hidden at ≤480px (phone widths), so the
+             running release was otherwise only legible via Chronicle (which
+             does not update on manual releases). This shows the build-time
+             APP_VERSION as a muted footer line so the deployed version is
+             identifiable on-device. Raw vX.Y.Z (or dev-<sha>), not Folio. #}
+          <p class="more-menu-version">{{ app_version }}</p>
         </div>
       </div>
       <script>
