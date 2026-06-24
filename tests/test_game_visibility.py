@@ -285,6 +285,80 @@ def test_set_game_playgroup():
     assert failed == 0
 
 
+def test_games_list_total_wins_counts_only_viewer_wins():
+    """The /games "Wins" stat counts only the viewer's own winning seats, not
+    every game that has a winner (issue #38). Previously every finished game in
+    the hybrid visibility set was counted as a win regardless of who won."""
+    import re
+
+    from fastapi.testclient import TestClient
+
+    from app import main
+    from app.dependencies import get_current_user, get_db_session, require_csrf_token
+
+    engine = create_engine(
+        "sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool
+    )
+    Base.metadata.create_all(engine)
+    sm = sessionmaker(bind=engine, expire_on_commit=False)
+    s = sm()
+    owner = _make_user(s, "owner")
+    rival = _make_user(s, "rival")
+
+    # Game A: owner's seat won (placement 1).
+    game_a = _make_game(
+        s,
+        owner,
+        [
+            {"player_name": "Owner", "user_id": owner.id},
+            {"player_name": "Rival", "user_id": rival.id},
+        ],
+    )
+    game_a.seats[0].placement = 1
+    game_a.seats[1].placement = 2
+    # Game B: owner played but the rival won.
+    game_b = _make_game(
+        s,
+        owner,
+        [
+            {"player_name": "Owner", "user_id": owner.id},
+            {"player_name": "Rival", "user_id": rival.id},
+        ],
+    )
+    game_b.seats[0].placement = 2
+    game_b.seats[1].placement = 1
+    # Game C: owner played, an unattributed seat won (not the owner).
+    game_c = _make_game(
+        s, owner, [{"player_name": "Owner", "user_id": owner.id}, {"player_name": "Guest"}]
+    )
+    game_c.seats[0].placement = 2
+    game_c.seats[1].placement = 1
+    s.commit()
+
+    def _override_db():
+        db = sm()
+        try:
+            yield db
+        finally:
+            db.close()
+
+    main.app.dependency_overrides[get_db_session] = _override_db
+    main.app.dependency_overrides[get_current_user] = lambda: owner
+    main.app.dependency_overrides[require_csrf_token] = lambda: None
+    try:
+        c = TestClient(main.app)
+        r = c.get("/games")
+        assert r.status_code == 200
+        # The "Wins" stat-card value: owner won exactly 1 of the 3 games.
+        m = re.search(r'stat-value">\s*(\d+)\s*</div>\s*<div class="stat-label">Wins</div>', r.text)
+        assert m is not None, "could not find the Wins stat-card in the rendered page"
+        assert m.group(1) == "1", f"expected 1 win for the viewer, got {m.group(1)}"
+    finally:
+        main.app.dependency_overrides.pop(get_db_session, None)
+        main.app.dependency_overrides.pop(get_current_user, None)
+        main.app.dependency_overrides.pop(require_csrf_token, None)
+
+
 def test_routes_access_and_owner_only_mutations():
     """Route layer: participant 200 (read-only), stranger 404; owner-only
     mutations 404 for non-owners."""

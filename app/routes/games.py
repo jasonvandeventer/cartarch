@@ -51,7 +51,17 @@ def games_list_page(
     current_user: User = Depends(get_current_user),
 ):
     games = list_games(session, current_user.id)
-    total_wins = sum(1 for g in games for s in g.seats if s.placement == 1)
+    # "Wins" is the VIEWER's win count, not "every game that has a winner".
+    # ``list_games`` returns the hybrid visibility set (owned + played-in +
+    # playgroup-shared), and each finished game has exactly one ``placement==1``
+    # seat — so the old unconditional ``placement == 1`` sum counted one win per
+    # finished game regardless of who won, making every logged game look like a
+    # win (issue #38). A seat counts as the viewer's win only when it is BOTH the
+    # winning seat AND attributed to the viewer (``user_id``); the new-game picker
+    # pre-selects the creator's own seat, so owner-logged wins carry that link.
+    total_wins = sum(
+        1 for g in games for s in g.seats if s.placement == 1 and s.user_id == current_user.id
+    )
     return render(
         request,
         "games.html",
