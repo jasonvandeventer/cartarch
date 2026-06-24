@@ -345,15 +345,31 @@
         }
 
         function attachPopover(popover) {
-          ensureCloseBtn(popover);
-          openSet.add(popover);
-          if (openSet.size === 1) {
-            document.body.classList.add('mobile-popover-open');
-            document.body.appendChild(ensureBackdrop());
-          }
-        }
+         ensureCloseBtn(popover);
+         openSet.add(popover);
+         if (openSet.size === 1) {
+           document.body.classList.add('mobile-popover-open');
+           document.body.appendChild(ensureBackdrop());
+         }
+         // Portal panel to body AFTER backdrop so panel z-1100 beats backdrop z-1090
+         // in the same stacking context (#32: backdrop was painting over the trapped panel).
+         if (!popover.__portaled) {
+           popover.__origParent = popover.parentNode;
+           popover.__origNext = popover.nextSibling;
+           popover.__origDetails = popover.closest('details');  // cache BEFORE moving
+           popover.__portaled = true;
+           document.body.appendChild(popover);
+         }
+       }
 
         function detachPopover(popover) {
+          if (popover.__portaled) {
+            popover.__origParent.insertBefore(popover, popover.__origNext);
+            popover.__portaled = false;
+            popover.__origParent = null;
+            popover.__origNext = null;
+            popover.__origDetails = null;
+          }
           openSet.delete(popover);
           if (openSet.size === 0) {
             document.body.classList.remove('mobile-popover-open');
@@ -363,7 +379,7 @@
 
         function closePopover(popover) {
           // <details>-based popover: closing the popover collapses the parent details
-          var details = popover.closest('details');
+          var details = popover.__origDetails || popover.closest('details');  // cached ref when portaled
           if (details && details.open) {
             details.open = false; // triggers our toggle listener which detaches
             return;
