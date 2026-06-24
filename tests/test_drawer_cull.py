@@ -52,13 +52,21 @@ def _user(s, username="u1") -> User:
     return u
 
 
-def _card(s, name="Bulk Common", *, type_line="Creature — Goblin", price="0.10") -> Card:
+def _card(
+    s,
+    name="Bulk Common",
+    *,
+    type_line="Creature — Goblin",
+    price="0.10",
+    set_code="tst",
+    collector_number=None,
+) -> Card:
     c = Card(
         scryfall_id=f"sid-{next(_seq)}",
         name=name,
-        set_code="tst",
+        set_code=set_code,
         set_name="Test",
-        collector_number=str(next(_seq)),
+        collector_number=str(next(_seq)) if collector_number is None else collector_number,
         rarity="common",
         type_line=type_line,
         oracle_text="x",
@@ -369,6 +377,55 @@ def test_cull_route_does_not_resort_on_success():
         assert called["resort"] is False
     finally:
         collections_routes.resort_collection = orig
+        for dep in list(app.dependency_overrides):
+            app.dependency_overrides.pop(dep, None)
+
+
+def test_cull_preview_natural_collector_sort():
+    """Cards sort by set then NATURAL collector number (1,2,10,11,100), grouped
+    by set — not string sort (1,10,100,11,2) nor row-id order."""
+    _engine, sm = _engine_sm()
+    s = sm()
+    u = _user(s)
+    drawer = _loc(s, u.id, "Drawer 2", type_="drawer", mode="managed")
+    bulk = _loc(s, u.id, "Bulk", type_="box")
+    # Insert out of order, across two sets, so neither row-id nor string sort
+    # would yield the expected numeric-within-set order.
+    for set_code, num in [
+        ("zzz", "2"),
+        ("aaa", "100"),
+        ("aaa", "2"),
+        ("zzz", "10"),
+        ("aaa", "10"),
+        ("aaa", "1"),
+    ]:
+        _row(
+            s,
+            u.id,
+            _card(s, f"{set_code}-{num}", price="0.10", set_code=set_code, collector_number=num),
+            drawer.id,
+            qty=3,
+        )
+    s.commit()
+
+    client, app = _client(sm, u)
+    try:
+        r = client.post("/collection/cull-preview", data=_form(bulk.id))
+        assert r.status_code == 200
+        # Positions of each rendered "SET #N" cell, in document order.
+        order = [
+            r.text.index(f"{sc.upper()} #{num}</td>")
+            for sc, num in [
+                ("aaa", "1"),
+                ("aaa", "2"),
+                ("aaa", "10"),
+                ("aaa", "100"),
+                ("zzz", "2"),
+                ("zzz", "10"),
+            ]
+        ]
+        assert order == sorted(order), order
+    finally:
         for dep in list(app.dependency_overrides):
             app.dependency_overrides.pop(dep, None)
 
