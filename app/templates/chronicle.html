@@ -125,6 +125,17 @@
         {% endfor %}
       </div>
       {% endfor %}
+      {% if older_folios %}
+      <div class="chronicle-folio chronicle-archived">
+        <div class="chronicle-folio-h">Earlier Folios</div>
+        <p class="chronicle-archived-note">
+          Folio{{ "s" if older_folios | length > 1 else "" }}
+          {% for f in older_folios %}{{ to_roman(f) }}{% if not loop.last %}, {% endif %}{% endfor %}
+          {{ "are" if older_folios | length > 1 else "is" }} archived — every entry stays
+          reachable by direct link.
+        </p>
+      </div>
+      {% endif %}
     </aside>
   </div>
 </div>

@@ -248,6 +248,24 @@ except (FileNotFoundError, json.JSONDecodeError):
     CHRONICLE_ENTRIES = []
 CHRONICLE_BY_VERSION: dict[str, dict] = {e["version"]: e for e in CHRONICLE_ENTRIES}
 
+# Release-sync guard. If the deployed image advertises a version with no
+# matching Chronicle entry, the release shipped without its Chronicle update
+# (e.g. the harness doc-sync step silently no-op'd, as v4.0.12 did). Warn at
+# boot so a best-effort miss is visible instead of silent. APP_VERSION is unset
+# in dev (the dev-<git> fallback in dependencies.py), so this only fires on real
+# deployed builds — no dev-noise. Pure log line; no behavior change.
+_deployed_version = os.getenv("APP_VERSION")
+if _deployed_version and CHRONICLE_ENTRIES:
+    _dep = _deployed_version.lstrip("v")
+    _top = CHRONICLE_ENTRIES[0]["version"].lstrip("v")
+    if _dep != _top:
+        print(
+            f"[chronicle] WARNING: deployed version {_deployed_version} has no "
+            f"Chronicle entry (newest entry is {_top}). The release shipped "
+            f"without its Chronicle update.",
+            flush=True,
+        )
+
 
 _PRICE_REFRESH_INTERVAL_SECONDS = 600  # 10 minutes
 _PRICE_REFRESH_BATCH = 75
@@ -671,6 +689,7 @@ def _render_chronicle(
 ):
     """Shared Chronicle render path — used by both the latest-entry route
     and the per-version route's not-found state."""
+    groups = _chronicle_archive_groups()
     return render(
         request,
         "chronicle.html",
@@ -678,7 +697,11 @@ def _render_chronicle(
             "title": "Chronicle — Cartarch",
             "current_user": current_user,
             "entry": entry,
-            "archive": _chronicle_archive_groups(),
+            # Sidebar shows the current Folio only; older folios stay reachable
+            # by direct link (CHRONICLE_BY_VERSION is untouched). groups is
+            # folios newest-first, so groups[0] is the current Folio.
+            "archive": groups[:1],
+            "older_folios": [g["folio"] for g in groups[1:]],
             "not_found_version": not_found_version,
         },
         status_code=status_code,
