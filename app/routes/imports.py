@@ -66,6 +66,48 @@ from app.timeutil import utc_now
 
 router = APIRouter()
 
+# Import size caps (S4) — reject oversized paste/CSV uploads BEFORE any parsing
+# so a malicious or accidental large blob can't consume excessive memory or
+# processing time. Applies to the two raw-input entry points only (the CSV
+# upload preview and the paste-text preview); the downstream commit /
+# reconcile routes receive already-parsed parallel-array form fields, never a
+# raw blob, so the cap belongs at the preview seam.
+MAX_IMPORT_BYTES = 2 * 1024 * 1024  # 2 MB
+MAX_IMPORT_LINES = 5_000
+
+
+def _count_lines(text: bytes | str) -> int:
+    """Line count over every separator kind (\\n, \\r, \\r\\n), trailing-aware.
+
+    ``str.splitlines()`` / ``bytes.splitlines()`` split on every line-boundary
+    kind — so a \\r-only (classic-Mac) or \\r\\n (Windows) file counts correctly
+    instead of reading as one giant line — and do NOT emit a phantom final
+    element for a trailing separator (a valid 5,000-line file ending in a newline
+    counts as 5,000, not 5,001, so it isn't wrongly rejected). Works on bytes or
+    str so both the CSV-byte and paste-text paths share one definition.
+    """
+    return len(text.splitlines())
+
+
+def _enforce_import_size_limits(num_bytes: int, num_lines: int) -> None:
+    """Raise ValueError (→ global handler → clean 400) if an import exceeds the
+    byte or line cap. Called before parsing on both the paste-text and CSV
+    upload paths; the message is reader-facing so the user knows to split the
+    import into smaller pieces.
+    """
+    if num_bytes > MAX_IMPORT_BYTES:
+        raise ValueError(
+            f"Import too large: {num_bytes:,} bytes exceeds the "
+            f"{MAX_IMPORT_BYTES // (1024 * 1024)} MB limit. "
+            "Split it into smaller imports and try again."
+        )
+    if num_lines > MAX_IMPORT_LINES:
+        raise ValueError(
+            f"Import too large: {num_lines:,} lines exceeds the "
+            f"{MAX_IMPORT_LINES:,}-line limit. "
+            "Split it into smaller imports and try again."
+        )
+
 
 @router.get("/import")
 def import_page(
@@ -96,8 +138,18 @@ async def import_preview(
     # [import-preview] diagnostic instrumentation (no logic changes) — splits
     # parser time from render/serialization time to localize the 524 timeout.
     _t0 = time.perf_counter()
+    # S4 — reject by the DECLARED size BEFORE reading the body into RAM, so a
+    # gigabyte upload can't OOM the pod via file.read(). Starlette populates
+    # file.size from the multipart parse (spooled to disk above its threshold),
+    # so this is the pre-read guard; len(file_bytes) below is the belt-and-braces
+    # re-check for the rare case where size is unset.
+    if file.size is not None:
+        _enforce_import_size_limits(file.size, 0)
     file_bytes = await file.read()
     _t_read = time.perf_counter()
+    # Now safely capped at MAX_IMPORT_BYTES — re-check the actual bytes and the
+    # line count before any parsing begins.
+    _enforce_import_size_limits(len(file_bytes), _count_lines(file_bytes))
     result = parse_scanner_csv(file_bytes)
     _t_parsed = time.perf_counter()
 
@@ -146,6 +198,14 @@ async def import_list_preview(
     current_user: User = Depends(get_current_user),
     _: None = CsrfRequired,
 ):
+    # S4 — cap size before any parsing begins. Measure the ACTUAL UTF-8 byte
+    # size, NOT len(card_list): a character can be up to 4 bytes in UTF-8, so the
+    # character count under-rejects (a 2M-char paste of multi-byte chars is up to
+    # 8 MB yet len() reads it as < the 2 MB byte cap). Encode once and reuse the
+    # bytes for both the byte cap and the line count so the parser, not this
+    # check, is the only place the payload is materialized twice.
+    card_bytes = card_list.encode("utf-8")
+    _enforce_import_size_limits(len(card_bytes), _count_lines(card_bytes))
     result = parse_text_list(card_list)
     # v3.30.15 — paste-list flow won't typically carry Location values, but
     # the template branches on the resolution context keys, so they must be
