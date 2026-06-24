@@ -1,5 +1,15 @@
 [
   {
+    "version": "4.0.5",
+    "date": "2026-06-23",
+    "added": [],
+    "refined": [
+      "On phones, the form labels in pop-up edit windows (like Edit Deck) are now bright and easy to read against the lightened panel introduced in the last update."
+    ],
+    "resolved": [],
+    "archivist_note": null
+  },
+  {
     "version": "4.0.4",
     "date": "2026-06-24",
     "added": [],
@@ -7,6 +17,16 @@
       "Fixed the Edit Deck modal rendering too dark and hard to read."
     ],
     "resolved": [],
+    "archivist_note": null
+  },
+  {
+    "version": "4.0.3",
+    "date": "2026-06-22",
+    "added": [],
+    "refined": [],
+    "resolved": [
+      "Deck list export now records whether each card is foil or etched, so exporting a deck and importing it back keeps the right finish instead of resetting every card to non-foil."
+    ],
     "archivist_note": null
   },
   {
