@@ -1,5 +1,15 @@
 [
   {
+    "version": "4.0.11",
+    "date": "2026-06-24",
+    "added": [],
+    "refined": [
+      "Fixed recent games screen to only show games the user was part of."
+    ],
+    "resolved": [],
+    "archivist_note": null
+  },
+  {
     "version": "4.0.10",
     "date": "2026-06-24",
     "added": [],
