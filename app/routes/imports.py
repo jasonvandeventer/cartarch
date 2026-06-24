@@ -202,11 +202,14 @@ async def import_list_preview(
     current_user: User = Depends(get_current_user),
     _: None = CsrfRequired,
 ):
-    # S4 — cap size before any parsing begins. Use len(card_list) (the character
-    # count) as a fast, allocation-free proxy for the byte size rather than
-    # encoding a whole second copy of the payload just to measure it; UTF-8 is
-    # >= 1 byte/char, so this never UNDER-rejects an oversized paste.
-    _enforce_import_size_limits(len(card_list), _count_lines(card_list))
+    # S4 — cap size before any parsing begins. Measure the ACTUAL UTF-8 byte
+    # size, NOT len(card_list): a character can be up to 4 bytes in UTF-8, so the
+    # character count under-rejects (a 2M-char paste of multi-byte chars is up to
+    # 8 MB yet len() reads it as < the 2 MB byte cap). Encode once and reuse the
+    # bytes for both the byte cap and the line count so the parser, not this
+    # check, is the only place the payload is materialized twice.
+    card_bytes = card_list.encode("utf-8")
+    _enforce_import_size_limits(len(card_bytes), _count_lines(card_bytes))
     result = parse_text_list(card_list)
     # v3.30.15 — paste-list flow won't typically carry Location values, but
     # the template branches on the resolution context keys, so they must be

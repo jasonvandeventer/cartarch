@@ -90,6 +90,28 @@ def test_paste_too_many_bytes_returns_400_before_parsing(client, monkeypatch):
     assert "bytes exceeds" in r.text
 
 
+def test_paste_multibyte_counts_actual_bytes_not_chars(client, monkeypatch):
+    """A multi-byte UTF-8 paste must be measured by its true byte size, not its
+    character count — a char can be up to 4 bytes, so a payload under the 2 MB
+    CHARACTER count can still blow past the 2 MB BYTE cap. Guards the v4.0.x fix
+    of the len(card_list)-as-byte-proxy bug."""
+
+    def _boom(_text):
+        raise AssertionError("parser must not run on an oversized import")
+
+    monkeypatch.setattr(imports_routes, "parse_text_list", _boom)
+
+    # '€' is 3 bytes in UTF-8. This string is well under MAX_IMPORT_BYTES *chars*
+    # but ~3x over in bytes — the old len()-proxy would have wrongly accepted it.
+    char_count = (MAX_IMPORT_BYTES // 3) + 1
+    assert char_count < MAX_IMPORT_BYTES  # under the cap if measured as chars
+    card_list = "€" * char_count
+    assert len(card_list.encode("utf-8")) > MAX_IMPORT_BYTES  # over the cap in bytes
+    r = client.post("/import/list/preview", data={"card_list": card_list, "csrf_token": "x"})
+    assert r.status_code == 400
+    assert "bytes exceeds" in r.text
+
+
 def test_paste_within_limits_still_parses(client, monkeypatch):
     seen = {}
 
