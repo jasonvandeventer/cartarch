@@ -1,0 +1,1199 @@
+diff --git a/Dockerfile.migrate b/Dockerfile.migrate
+new file mode 100644
+index 0000000..3e9848a
+--- /dev/null
++++ b/Dockerfile.migrate
+@@ -0,0 +1,31 @@
++# v4 cutover TOOLING image — NOT the app runtime image.
++#
++# The app runtime image (Dockerfile -> ghcr.io/.../mana-archive:v4.0.0) deliberately
++# omits alembic: it is migration/dev tooling (requirements-dev.txt), not something the
++# running app needs, and the prod image must stay lean. But the cutover's Stage 1
++# (`alembic upgrade head`) needs the alembic package PLUS the migration env
++# (alembic.ini + alembic/versions). And the Stage 4 gate (scripts/validate_cutover.py)
++# ships here too so it travels in lockstep with the app internals it imports
++# (_gather_deck_signals / _cached_row_to_payload).
++#
++# This thin overlay adds exactly those, on top of the proven v4.0.0 image, so all four
++# cutover stages run from ONE image. Build + push BEFORE the Phase C dry-run:
++#
++#   docker build -f Dockerfile.migrate \
++#     --build-arg BASE=ghcr.io/jasonvandeventer/mana-archive:v4.0.0 \
++#     -t ghcr.io/jasonvandeventer/mana-archive:v4.0.0-migrate .
++#   docker push ghcr.io/jasonvandeventer/mana-archive:v4.0.0-migrate
++#
++# (The :v4.0.0-migrate tag is NOT a deployable app tag — ArgoCD's image-updater is
++#  semver and ignores the -migrate suffix as a pre-release, so it can never auto-deploy.)
++ARG BASE=ghcr.io/jasonvandeventer/mana-archive:v4.0.0
++FROM ${BASE}
++
++# alembic is the v4 schema owner (gate #4). Pin to the dev range it was authored against.
++RUN pip install --no-cache-dir "alembic>=1.14,<2.0"
++
++# The migration env: alembic.ini + alembic/ (env.py imports app.db / app.legacy_tables,
++# both already present in the base image) + the cutover gate script.
++COPY alembic.ini ./
++COPY alembic ./alembic
++COPY scripts/validate_cutover.py ./scripts/validate_cutover.py
+diff --git a/README.md b/README.md
+index a1d998c..94a4ffa 100644
+--- a/README.md
++++ b/README.md
+@@ -2,7 +2,7 @@
+ 
+ Self-hosted web application for managing a physical Magic: The Gathering collection. (Identifies as **Cartarch** in user-facing UI as of v3.27.6; the in-repo project identifier is still `mana-archive` pending the full infrastructure rename near actual public launch.)
+ 
+-**Current version: v3.38.0** · [Platform repo](https://github.com/jasonvandeventer/vanfreckle-platform)
++**Current version: v4.0.1** · [Platform repo](https://github.com/jasonvandeventer/vanfreckle-platform)
+ 
+ ---
+ 
+@@ -182,10 +182,10 @@ See [docs/screenshots/](docs/screenshots/) for capture guidelines and additional
+ | Layer         | Technology                                    |
+ | ------------- | --------------------------------------------- |
+ | Web framework | FastAPI + Jinja2                              |
+-| Database      | SQLite (via SQLAlchemy)                       |
++| Database      | PostgreSQL (CloudNativePG, via SQLAlchemy)    |
+ | Styling       | Custom CSS (no framework)                     |
+ | Card data     | [Scryfall API](https://scryfall.com/docs/api) |
+-| Runtime       | Docker / Kubernetes (K3s)                     |
++| Runtime       | Docker / Kubernetes (Talos)                   |
+ | GitOps        | ArgoCD + ArgoCD Image Updater                 |
+ 
+ ---
+@@ -221,13 +221,13 @@ The post-commit hook tags HEAD automatically whenever the commit message starts
+ 
+ ### Migrations
+ 
+-Migrations run automatically on startup via `run_migrations()` in `on_startup()`. To add a migration, drop an idempotent script in `scripts/` and register it in `scripts/run_migrations.py`.
++The PostgreSQL schema is owned by **Alembic** (`alembic/versions/`) as of the v4.0.0 cutover — the boot-time SQLite migrator (`run_migrations()`) was retired then. For local SQLite dev the legacy scripts in `scripts/` still apply.
+ 
+ ---
+ 
+ ## Data Storage
+ 
+-- **Local**: SQLite file in `/data`
+-- **Kubernetes**: Longhorn persistent volume mounted at `/data`
++- **Production**: PostgreSQL (CloudNativePG on the Talos cluster), via `DATABASE_URL`
++- **Local dev**: SQLite file in `/data` (the default when `DATABASE_URL` is unset)
+ 
+ No database files are stored in this repository.
+diff --git a/app/dashboard_service.py b/app/dashboard_service.py
+index fbbe959..7b22567 100644
+--- a/app/dashboard_service.py
++++ b/app/dashboard_service.py
+@@ -219,10 +219,19 @@ def get_dashboard_data(session: Session, user_id: int, now: datetime | None = No
+     # Highest InventoryRow.id placed-and-not-pending — proxy for "most recent
+     # add" since rows are append-only. Card.image_url comes from the v3.25.0
+     # bulk cache so this is request-path-safe — no live Scryfall call.
++    # Proxies are EXCLUDED (v4.0.1): a proxy carries no market value, so
++    # featuring one at full price (e.g. a PROXY headlining at $7.72) is wrong.
++    # ``is_proxy.isnot(True)`` keeps False and NULL rows, dropping only proxies,
++    # so Spotlight falls to the most-recent NON-proxy placement (the empty case
++    # is covered by the .dashboard-spot-art-placeholder fallback in the template).
+     spot_row = (
+         session.query(InventoryRow, Card)
+         .join(Card, InventoryRow.card_id == Card.id)
+-        .filter(InventoryRow.user_id == user_id, InventoryRow.is_pending.is_(False))
++        .filter(
++            InventoryRow.user_id == user_id,
++            InventoryRow.is_pending.is_(False),
++            InventoryRow.is_proxy.isnot(True),
++        )
+         .order_by(InventoryRow.id.desc())
+         .first()
+     )
+diff --git a/app/data/chronicle.json b/app/data/chronicle.json
+index 870aabd..3416dda 100644
+--- a/app/data/chronicle.json
++++ b/app/data/chronicle.json
+@@ -1,4 +1,60 @@
+ [
++  {
++    "version": "4.0.2",
++    "date": "2026-06-22",
++    "added": [],
++    "refined": [],
++    "resolved": [
++      "Goldfish: when you move a card out of the \"look at the top of your library\" list, it now leaves that list right away instead of lingering until you close and reopen it.",
++      "Collection: searching, filtering, or adding a card no longer snaps you back to the top of the page — your scroll position stays where you left it."
++    ],
++    "archivist_note": "Two small frictions smoothed — one at the goldfishing table, one on the collection shelf. We're also chasing a rarer one: a few Firefox players have been quietly logged out mid-session. We haven't pinned it down yet, but the investigation is underway, and the early evidence points at the in-progress move between homes rather than anything in the app itself."
++  },
++  {
++    "version": "4.0.1",
++    "date": "2026-06-22",
++    "added": [],
++    "refined": [
++      "CSV exports are hardened against spreadsheet formula injection: a cell that starts with =, +, -, or @ in your own text (a location name or tag) is quoted so the spreadsheet opens it as plain text, not a live formula."
++    ],
++    "resolved": [
++      "The dashboard Spotlight no longer features a proxy at full market price — it features your most recent real card instead.",
++      "Games now appear on the Decks page for everyone who played, not just the person who logged the game."
++    ],
++    "archivist_note": "The first patch after the big move — a few sharp edges smoothed now that the collection sits on its new foundation. Nothing flashy: a proxy that shouldn't have been bragging about its price, a games tally that only counted the scorekeeper, and a quiet hardening of the export so a clever card name can't run as a spreadsheet formula."
++  },
++  {
++    "version": "4.0.0",
++    "date": "2026-06-22",
++    "added": [],
++    "refined": [
++      "Cartarch's collection now lives in PostgreSQL instead of a single SQLite file — the same app and the same data, on a sturdier foundation built for what comes next."
++    ],
++    "resolved": [],
++    "archivist_note": "Cartarch IV. No new buttons, nothing to relearn — by design. This release is the move itself: the database changed underneath, the application stayed exactly as you left it, and the whole thing now runs on a new home cluster. The kind of release you only notice by the quiet that follows it."
++  },
++  {
++    "version": "3.39.9",
++    "date": "2026-06-19",
++    "added": [],
++    "refined": [
++      "Locked down the web-framework dependencies so a routine rebuild can no longer pull in a newer-but-incompatible version and quietly break the site."
++    ],
++    "resolved": [
++      "Re-landed the data-integrity fixes from earlier in the day, for real this time — the small reference-cleanup gaps that had been slowly accruing stop here."
++    ],
++    "archivist_note": "The fix for the morning's stumble, and the last release before the big move. The lesson banked: pin the whole stack, because the thing that breaks you is rarely the dependency you changed — it's the one underneath it that moved on its own. With this, the foundation was finally still enough to migrate."
++  },
++  {
++    "version": "3.39.8",
++    "date": "2026-06-19",
++    "added": [],
++    "refined": [],
++    "resolved": [
++      "More of the behind-the-scenes cleanup that keeps a card from leaving a ghost behind when it's moved or an import is undone — continuing the reference-tidying from the previous releases so the collection stays consistent on the way to its new home."
++    ],
++    "archivist_note": "Pure groundwork for the database move, no new buttons. Honest footnote: the build that carried it tripped over an unrelated dependency that had quietly drifted to a newer, incompatible version, so it was pulled back within the hour and re-shipped — properly pinned — as v3.39.9 the same day. A stumble caught fast."
++  },
+   {
+     "version": "3.39.7",
+     "date": "2026-06-12",
+diff --git a/app/deck_service.py b/app/deck_service.py
+index 18826cb..95b91fb 100644
+--- a/app/deck_service.py
++++ b/app/deck_service.py
+@@ -2016,11 +2016,20 @@ def compute_deck_game_stats(session: Session, user_id: int, deck_ids: list[int])
+     with placement set (`GameSeat.placement IS NOT NULL`) count toward
+     games and wins. ``placement == 1`` is a win. Mirrors the dashboard
+     deck-performance contract for cross-page reconciliation.
++
++    Visibility (v4.0.1): a game counts if the viewer CREATED it
++    (``Game.user_id``) OR was a player at the table (``GameSeat.user_id``) —
++    matching the hybrid read-visibility added in v3.32.0. Previously only
++    games the viewer created were counted, so a participant who logged no game
++    saw 0 on a deck they actually played. No double-count: the query counts
++    distinct ``GameSeat`` rows grouped by deck, and a deck has exactly one seat
++    per game, so a viewer who is both creator and seat-holder still counts it
++    once.
+     """
+     if not deck_ids:
+         return {}
+ 
+-    from sqlalchemy import case, desc, func
++    from sqlalchemy import case, desc, func, or_
+ 
+     rows = (
+         session.query(
+@@ -2032,7 +2041,7 @@ def compute_deck_game_stats(session: Session, user_id: int, deck_ids: list[int])
+         .join(Game, GameSeat.game_id == Game.id)
+         .filter(
+             GameSeat.deck_id.in_(deck_ids),
+-            Game.user_id == user_id,
++            or_(Game.user_id == user_id, GameSeat.user_id == user_id),
+             Game.status == "finalized",
+             GameSeat.placement.is_not(None),
+         )
+diff --git a/app/import_service.py b/app/import_service.py
+index 9f1343a..5f25500 100644
+--- a/app/import_service.py
++++ b/app/import_service.py
+@@ -1339,6 +1339,28 @@ _SHORT_SET_RE = re.compile(r"^(?=[A-Za-z0-9]*[A-Za-z])[A-Za-z0-9]{2,6}$")
+ _SHORT_COLL_RE = re.compile(r"^[0-9★][0-9A-Za-z★-]*$")
+ _SHORT_QTY_RE = re.compile(r"^[0-9]{1,3}$")
+ 
++# Single-letter finish markers, MTGA-style. *F* = foil (the MTGA standard),
++# *E* = etched (our own round-trip marker so the deck export never silently
++# downgrades an etched card to normal). Both are 1 letter so they can't be
++# swallowed by the 2-3 letter *XX* language marker.
++_FINISH_MARKER_RES = (
++    ("foil", re.compile(r"\s*\*F\*\s*", re.IGNORECASE)),
++    ("etched", re.compile(r"\s*\*E\*\s*", re.IGNORECASE)),
++)
++
++
++def _extract_finish_marker(rest: str) -> tuple[str, str]:
++    """Detect and strip a *F*/*E* finish marker. Returns (finish, cleaned_rest).
++
++    Defaults to ``"normal"`` when no marker is present, so a legacy export line
++    (or any plain Moxfield list) round-trips as normal — backward compatible.
++    """
++    for name, pattern in _FINISH_MARKER_RES:
++        if pattern.search(rest):
++            rest = re.sub(r"\s+", " ", pattern.sub(" ", rest).strip())
++            return name, rest
++    return "normal", rest
++
+ 
+ def _parse_short_list_line(line: str) -> dict[str, Any] | None:
+     """Parse a bare 'SET COLLECTOR [qty]' or 'qty SET COLLECTOR' line.
+@@ -1350,11 +1372,11 @@ def _parse_short_list_line(line: str) -> dict[str, Any] | None:
+     if not rest:
+         return None
+ 
+-    # Detect *F* foil marker anywhere on the line and strip it.
+-    finish = "normal"
+-    if re.search(r"(?i)\*F\*", rest):
+-        finish = "foil"
+-        rest = re.sub(r"(?i)\s*\*F\*\s*", " ", rest).strip()
++    # Detect the *F* foil / *E* etched finish marker anywhere on the line and
++    # strip it. Single-letter codes so they can't collide with the 2-3 letter
++    # *XX* language marker below; *F* is the MTGA standard, *E* is our own
++    # round-trip marker for etched (the deck export emits both).
++    finish, rest = _extract_finish_marker(rest)
+ 
+     # Detect *XX* / *XXX* language marker (e.g. *JP* → ja, *DE* → de).
+     # 2-3 letter codes so it can't collide with the 1-letter *F* foil marker.
+@@ -1442,14 +1464,10 @@ def _parse_list_line(line: str) -> dict[str, Any] | None:
+         rest = (rest[: lang_match.start()] + rest[lang_match.end() :]).strip()
+         rest = re.sub(r"\s+", " ", rest)
+ 
+-    # Detect MTGA foil marker (*F*) anywhere on the line and strip it.
+-    # Search-anywhere (not just endswith) so it works when combined with
+-    # a language marker like `*F* *DE*` in any order.
+-    finish = "normal"
+-    if re.search(r"(?i)\*F\*", rest):
+-        finish = "foil"
+-        rest = re.sub(r"(?i)\s*\*F\*\s*", " ", rest).strip()
+-        rest = re.sub(r"\s+", " ", rest)
++    # Detect the *F* foil / *E* etched finish marker anywhere on the line and
++    # strip it. Search-anywhere (not just endswith) so it works when combined
++    # with a language marker like `*F* *DE*` in any order.
++    finish, rest = _extract_finish_marker(rest)
+ 
+     # Extract trailing (SET) and optional collector number
+     set_code = ""
+diff --git a/app/models.py b/app/models.py
+index 874a6b0..91d1e9f 100644
+--- a/app/models.py
++++ b/app/models.py
+@@ -282,17 +282,26 @@ class Game(Base):
+     __tablename__ = "games"
+ 
+     id: Mapped[int] = mapped_column(primary_key=True)
+-    # NOTE (v3.39.8 split): the gate-#5 games amendment — ``user_id`` NO ACTION+NOT
+-    # NULL → SET NULL+nullable, plus a new ``user_name_at_game`` snapshot column — is
+-    # DEFERRED to the v4 cutover. It is a SCHEMA change (new column + nullability) with
+-    # no delivery vehicle onto the live SQLite prod DB (boot-time ``run_migrations()``
+-    # was retired in gate #4; Alembic targets the PG cutover, not the live file). So
+-    # this column stays NO ACTION + NOT NULL here — byte-identical to v3.39.7 prod —
+-    # and ``delete_user`` does NOT touch games (silent orphan on FK-off SQLite, exactly
+-    # what prod runs today). The amendment IS already in the Alembic baseline (the v4
+-    # target schema) and applies by construction at cutover; restore this column + the
+-    # ``delete_user`` games step together when v4 lands. See the gate-#4 closure note.
+-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
++    # v3.39.x (gate #5) — was NO ACTION + NOT NULL. The gate-#5 parent-delete
++    # harness proved a NO-ACTION ``user_id`` BLOCKS ``DELETE FROM users`` under FK
++    # enforcement: deleting any user who recorded a game crashed the whole
++    # deletion (v4 cutover) and orphaned ``games.user_id`` under SQLite (prod
++    # today). Now ``ondelete="SET NULL"`` (column made nullable) — consistent with
++    # ``GameSeat.user_id``: the game survives as shared history, its recorder ref
++    # nulled. ``user_name_at_game`` (below) snapshots the recorder's display name
++    # so the read-only game banner stays attributed instead of degrading to
++    # "another player" (mirrors ``GameSeat.user_name_at_game``). ``delete_user``
++    # re-snapshots then nulls explicitly (SQLite enforces nothing — the clause is
++    # v4 defense-in-depth). gate-#5 verified (parent-delete harness, 2026-06-19).
++    user_id: Mapped[int | None] = mapped_column(
++        ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
++    )
++    # v3.39.x (gate #5) — durable snapshot of the recording user's display name,
++    # populated by ``delete_user`` right before it nulls ``user_id`` (and re-snapshot
++    # safe to set at create time too). NULL = recorder still live (read through the
++    # ``game.user`` relationship) OR a legacy game predating this column. Mirrors
++    # ``GameSeat.user_name_at_game`` exactly.
++    user_name_at_game: Mapped[str | None] = mapped_column(Text, nullable=True)
+     played_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
+     # v3.27.2 — service-layer enum (CANONICAL_GAME_FORMATS in game_service.py).
+     # Column stays nullable=True at the DB level because SQLite can't alter
+diff --git a/app/routes/admin.py b/app/routes/admin.py
+index 19d9cc3..ef535a2 100644
+--- a/app/routes/admin.py
++++ b/app/routes/admin.py
+@@ -9,6 +9,7 @@ from app.auth import hash_password
+ from app.dependencies import CsrfRequired, get_db_session, render, require_admin
+ from app.models import (
+     Deck,
++    Game,
+     GameSeat,
+     ImportBatch,
+     InventoryRow,
+@@ -251,14 +252,17 @@ def delete_user(
+     from app import deck_service, token_service
+     from app.inventory_service import clean_inventory_row_references
+ 
+-    # (1) Games this user RECORDED — DEFERRED to v4 (v3.39.8 split). The gate-#5
+-    # amendment (snapshot the recorder's name to ``games.user_name_at_game``, then SET
+-    # NULL ``games.user_id``) requires the new column + nullable ``user_id``, both held
+-    # back for the v4 cutover (see app/models.py Game). Until then this matches main /
+-    # prod behaviour: games recorded by the deleted user are left untouched — their
+-    # ``user_id`` orphans silently under FK-off SQLite (the read-side falls back through
+-    # the ``game.user`` relationship). Restore the snapshot+null step here together with
+-    # the Game model amendment when v4 lands.
++    # (1) Games this user RECORDED → SET NULL user_id, but SNAPSHOT the recorder's
++    # name FIRST (gate-#5 amendment: games.user_id is now SET NULL — without the
++    # snapshot the read-only banner degrades to "another player"). The game survives
++    # as shared history for its seat-attributed players / linked playgroup. Explicit
++    # (not relying on the DB SET NULL) so it is correct on prod SQLite (FK off) too.
++    recorder_name = target.display_name or target.username
++    for game in session.query(Game).filter(Game.user_id == user_id).all():
++        if game.user_name_at_game is None:
++            game.user_name_at_game = recorder_name
++        game.user_id = None
++    session.flush()
+ 
+     # (2) Decks → delete_deck each: cleans the raw bracket tables +
+     # deck_token_requirements + nulls game_seats.deck_id (gate-#5 fix) and disbands
+diff --git a/app/routes/collections.py b/app/routes/collections.py
+index d634e97..2921da1 100644
+--- a/app/routes/collections.py
++++ b/app/routes/collections.py
+@@ -585,6 +585,20 @@ def collection_page(
+     )
+ 
+ 
++def _csv_formula_safe(value: str) -> str:
++    """Neutralize CSV formula injection (v4.0.1, security S3).
++
++    ``csv.writer`` quotes structure but does NOT defuse a leading ``= + - @``,
++    which Excel / Google Sheets execute as a formula. Prefix any such value with
++    a single quote so the spreadsheet treats the cell as literal text. Applied to
++    the user-entered free-text columns (location name, tags) in both CSV export
++    writers. No-op for normal values (and for non-strings / empty cells).
++    """
++    if isinstance(value, str) and value[:1] in ("=", "+", "-", "@"):
++        return "'" + value
++    return value
++
++
+ @router.get("/collection/export")
+ def collection_export(
+     filters: CollectionFilter = Depends(collection_filter),
+@@ -647,11 +661,11 @@ def collection_export(
+                 card.collector_number or "",
+                 row.finish or "normal",
+                 row.quantity,
+-                loc.name if loc else "",
++                _csv_formula_safe(loc.name if loc else ""),
+                 loc.type if loc else "",
+                 row.language or "en",
+                 row.role or "",
+-                row.tags or "",
++                _csv_formula_safe(row.tags or ""),
+                 "true" if row.is_proxy else "false",
+                 card.scryfall_id or "",
+                 f"{price:.2f}" if price else "",
+@@ -2051,11 +2065,11 @@ def location_export(
+                 card.collector_number or "",
+                 row.finish or "normal",
+                 row.quantity,
+-                location.name,
++                _csv_formula_safe(location.name),
+                 location.type or "",
+                 row.language or "en",
+                 row.role or "",
+-                row.tags or "",
++                _csv_formula_safe(row.tags or ""),
+                 "true" if row.is_proxy else "false",
+             ]
+         )
+diff --git a/app/routes/decks.py b/app/routes/decks.py
+index 85b6443..b6b1291 100644
+--- a/app/routes/decks.py
++++ b/app/routes/decks.py
+@@ -1006,6 +1006,16 @@ def decks_export(
+         set_code = (card.set_code or "???").upper()
+         collector = card.collector_number or "0"
+         line = f"{row.quantity} {card.name} ({set_code}) {collector}"
++        # Preserve finish so an export→re-import round-trip matches the copy
++        # back to its ``(card_id, finish)`` inventory row instead of treating
++        # it as a brand-new card. The MTGA-style ``*F*`` (foil) / ``*E*``
++        # (etched) markers are the importer's own grammar (`_parse_list_line`
++        # detects them anywhere on the line); a line without a marker parses as
++        # normal, so older exports remain backward compatible and non-foil/
++        # etched rows are unchanged.
++        finish_marker = {"foil": " *F*", "etched": " *E*"}.get((row.finish or "normal").lower())
++        if finish_marker:
++            line += finish_marker
+         if row.role == "commander":
+             commander_lines.append(line)
+         else:
+diff --git a/app/static/goldfish.js b/app/static/goldfish.js
+index c677ebc..7cca42d 100644
+--- a/app/static/goldfish.js
++++ b/app/static/goldfish.js
+@@ -543,7 +543,14 @@
+   function lookAtTopN(n) {
+     // Order preserved — scry/surveil-style. No shuffle.
+     const taken = state.library.slice(0, n);
+-    state.modalContext = { kind: "look" };
++    // Track the revealed window (count + the specific instance ids) so the
++    // modal can re-render reactively when a card is moved out of it without
++    // ever surfacing a card the user wasn't allowed to see (v4.0.2).
++    state.modalContext = {
++      kind: "look",
++      n: taken.length,
++      ids: taken.map((inst) => inst.id),
++    };
+     openModal("Top " + taken.length + " of library", taken);
+   }
+ 
+@@ -2295,8 +2302,11 @@
+   /**
+    * Re-render the modal body from the current zone state. Called after
+    * every moveTo so a card moved via a menu action visually leaves the
+-   * modal. The look-at-top-N modal is a deliberate snapshot and is NOT
+-   * refreshed.
++   * modal. The look-at-top-N modal re-renders its revealed window: the
++   * originally-revealed instances that are still within the top N of the
++   * library (v4.0.2). Intersecting the revealed ids with the live top-N
++   * slice means a moved/scried-to-bottom card drops out, while a card
++   * underneath the original window is never surfaced.
+    */
+   function refreshModalIfOpen() {
+     if (modal.hidden) return;
+@@ -2307,6 +2317,11 @@
+       instances = libraryBrowseInstances();
+     } else if (kind === "browse" && zone) {
+       instances = ZONE_LISTS[zone]();
++    } else if (kind === "look") {
++      const revealed = new Set(state.modalContext.ids || []);
++      instances = state.library
++        .slice(0, state.modalContext.n)
++        .filter((inst) => revealed.has(inst.id));
+     } else {
+       return;
+     }
+diff --git a/app/templates/collection.html b/app/templates/collection.html
+index 61ced4b..a9d07d0 100644
+--- a/app/templates/collection.html
++++ b/app/templates/collection.html
+@@ -521,3 +521,68 @@
+     </section>
+   </div>
+ {% endblock %}
++
++{% block extra_scripts %}
++  <script>
++    // v4.0.2 — preserve scroll position across full-page Collection reloads.
++    // The Collection page is plain GET/POST navigation (search/filter is a GET
++    // form, card mutations are POST→303 back to /collection), so every action
++    // reloads the document and the browser drops the user back at the top.
++    // Capture the scroll offset on any submit from this page and reapply it on
++    // the next load, then consume it so a fresh (non-submit) visit starts at the
++    // top as normal.
++    (function () {
++      var KEY = "cartarch:collection:scroll";
++      try {
++        if ("scrollRestoration" in history) history.scrollRestoration = "manual";
++      } catch (e) {
++        /* history API unavailable — restore below still runs */
++      }
++
++      // This script only loads on the Collection page, so any form submit here
++      // is a Collection action that will reload the page.
++      document.addEventListener(
++        "submit",
++        function () {
++          try {
++            sessionStorage.setItem(
++              KEY,
++              String(window.scrollY || window.pageYOffset || 0)
++            );
++          } catch (e) {
++            /* sessionStorage blocked (private mode) — scroll just resets */
++          }
++        },
++        true
++      );
++
++      function restore() {
++        var saved;
++        try {
++          saved = sessionStorage.getItem(KEY);
++        } catch (e) {
++          return;
++        }
++        if (saved === null) return;
++        var y = parseInt(saved, 10);
++        if (!isNaN(y)) window.scrollTo(0, y);
++      }
++
++      if (document.readyState === "loading") {
++        document.addEventListener("DOMContentLoaded", restore);
++      } else {
++        restore();
++      }
++      // Reapply once images/fonts settle (they change document height), then
++      // clear the key so the position is restored exactly once.
++      window.addEventListener("load", function () {
++        restore();
++        try {
++          sessionStorage.removeItem(KEY);
++        } catch (e) {
++          /* nothing to clear */
++        }
++      });
++    })();
++  </script>
++{% endblock %}
+diff --git a/docs/firefox-session-logout-investigation-2026-06-22.md b/docs/firefox-session-logout-investigation-2026-06-22.md
+new file mode 100644
+index 0000000..11225fa
+--- /dev/null
++++ b/docs/firefox-session-logout-investigation-2026-06-22.md
+@@ -0,0 +1,70 @@
++# Firefox Intermittent Session-Logout — Investigation
++
++**Date:** 2026-06-22
++**Status:** 🔎 **OPEN — root cause NOT confirmed; no code fix applied (would be a guess).** This note records what the code review found and the diagnostic steps needed to confirm a cause before changing anything.
++**Symptom:** Users on Firefox occasionally get bounced to `/login` mid-session — they navigate to a page and are suddenly logged out. Intermittent. Not reproduced on Chrome.
++
++## How the logout actually fires
++
++The session is a **stateless, signed cookie** (Starlette `SessionMiddleware`). The whole session dict (`user_id` + `csrf_token`) lives in the cookie; the server holds no session store. `get_current_user` (`app/dependencies.py`) redirects `303 -> /login` whenever `request.session.get("user_id")` is falsy. So the logout is produced by **anything that makes the session read as empty** — the cookie itself is never explicitly deleted mid-session by the app. A cookie reads as empty when:
++
++1. its itsdangerous signature fails to verify (wrong / mismatched `SESSION_SECRET_KEY`), or
++2. the signature timestamp is older than `max_age` (14-day Starlette default), or
++3. the cookie isn't sent for the host being navigated (host-only cookie, no `Domain`).
++
++## Current session/cookie configuration (`app/main.py`)
++
++```python
++app.add_middleware(
++    SessionMiddleware,
++    secret_key=os.getenv("SESSION_SECRET_KEY", "dev-only-change-me"),
++    same_site="lax",
++    https_only=os.getenv("DEV_MODE", "false").lower() != "true",
++)
++```
++
++Resolved attributes (Starlette defaults fill the rest): name `session`, `Max-Age` 14 days (default — not set here), `SameSite=Lax`, `Secure=True` in prod, `HttpOnly` (hard-coded), **no `Domain`** (host-only), `Path=/`.
++
++## What was RULED OUT
++
++- **CSRF rotation — NOT the cause.** `get_csrf_token` (`app/dependencies.py`) mints the token once (`if "csrf_token" not in request.session`) and **never rotates** it — not per-request, not per-POST, not on login. The premise that "Firefox handles CSRF rotation differently" does not apply; there is no rotation. (Note: rendering a page *does* write `csrf_token` into the session on first contact, so a fresh `Set-Cookie` is re-emitted each render — this slides the 14-day window forward on every page view, so item (2) above is unlikely to be the mid-session trigger for active users.)
++- **Cookie size / chunking** — session holds only `user_id` + a 64-char token; far under the 4 KB limit.
++- **14-day expiry** — slides forward on every render; an *active* user won't hit it mid-session.
++
++## Leading hypotheses (ranked)
++
++### H1 — `SESSION_SECRET_KEY` mismatch across the two clusters (MOST LIKELY)
++
++The platform is mid blue-green migration. Both clusters run the app, each with its own **per-cluster sealed secret**:
++- blue/k3s: `vanfreckle-platform/k8s/apps/mana-archive/base/deployment.yaml`
++- green/Talos: `vanfreckle-platform/clusters/talos/manifests/mana-archive/deployment.yaml`
++
++A signed cookie minted by cluster A is **garbage to cluster B unless both share the exact same `SESSION_SECRET_KEY` plaintext**. SealedSecret ciphertext differs per cluster by design (different sealing cert), so you **cannot** compare the sealed YAML — you must compare the decrypted values. If the Cloudflare tunnel fans some requests to blue and some to green during cutover, a user oscillates between "valid" and "empty" sessions → exactly this intermittent logout. **"Firefox-only" is most plausibly observation bias** (connection-reuse / happy-eyeballs differences sending Firefox to a different backend), not a cookie-attribute bug.
++
++**This is deployment-level, NOT a cartarch code bug** — hence no app change here.
++
++**Confirm:** decrypt both clusters' `SESSION_SECRET_KEY` and diff them; and check whether the tunnel currently serves both clusters concurrently (recent platform commits: "Phase D prep: NodePort 30080 for tunnel re-route"). If they differ and both take traffic, that is the bug. Fix = seal the *same* plaintext key into both clusters (or route 100% to one).
++
++### H2 — Split-brain with the legacy Unraid Docker container
++
++Project memory records a stale legacy Mana Archive container on Unraid (`:8501`) as a "split-brain foot-gun," and that `cloudflared` runs on Unraid. If any fraction of traffic still lands on the legacy container (different/no `SESSION_SECRET_KEY`, possibly different cookie name/attrs), the same oscillating-empty-session logout results. **Confirm:** verify the tunnel ingress maps `cartarch.com` to exactly one live backend and the legacy container is not in rotation.
++
++### H3 — Multiple replicas with a per-pod default secret
++
++If `SESSION_SECRET_KEY` were ever unset on a replica, the app would (in prod) refuse to boot — but confirm no path injects the `dev-only-change-me` default and that all pods of a Deployment mount the *same* Secret. Single-worker per pod is confirmed (no `--workers` in the Dockerfile), so within one correctly-configured Deployment this is unlikely; it matters only across clusters/containers (H1/H2).
++
++## Latent hardening found (correct, but NOT the confirmed fix — do separately, not under a guess)
++
++These are genuine gaps surfaced during the review. None is proven to cause the logout, so they are **not** being applied as part of this bugfix:
++
++- **uvicorn lacks `--proxy-headers` / `--forwarded-allow-ips`** (`Dockerfile`). The app is blind to the real request scheme; `Secure` is set from `DEV_MODE`, not `X-Forwarded-Proto`. Works today by luck of the env var. Worth adding for correctness, but it does not change cookie validity, so it won't fix the logout.
++- **No explicit `Domain` on the session cookie** (host-only). Fine as long as users only ever hit one exact host; becomes a bug if `www.` vs apex or a subdomain is ever introduced. Setting a `Domain` is itself risky (can strand existing cookies) — do not change blind.
++
++## Recommended next step
++
++Do **not** ship a cookie-attribute change speculatively. First capture evidence:
++1. In Firefox DevTools (a user who can reproduce): watch Network → the request that 303s to `/login`. Inspect the `Cookie` sent and any `Set-Cookie` on the prior response. Empty/garbled `session` cookie → signature/host problem (H1–H3). Missing cookie entirely → host/`Domain`/Secure problem.
++2. Decrypt and diff `SESSION_SECRET_KEY` across blue + green (+ legacy Unraid). This single check most likely settles it.
++3. Confirm the Cloudflare tunnel's current backend(s) for `cartarch.com` during the cutover window.
++
++Once a cause is confirmed, the fix is almost certainly **platform-side** (key parity / single backend), not a cartarch app change.
+diff --git a/scripts/validate_cutover.py b/scripts/validate_cutover.py
+new file mode 100644
+index 0000000..a684042
+--- /dev/null
++++ b/scripts/validate_cutover.py
+@@ -0,0 +1,277 @@
++"""v4 cutover GATE — the step-11 GO/NO-GO validation (read-only, decision-surfacing).
++
++Runs AFTER the load (migrate_sqlite_to_pg.py) AND the sweep (sweep_fk_orphans.py),
++against the loaded green Postgres, with the source SQLite snapshot mounted read-only
++for parity. This is the runbook's step-11 gate: it PRINTS a clearly-inspectable
++report and exits 0 (all hard checks pass — human may GO) or 1 (a hard check failed —
++ABORT). It writes NOTHING (the one probe insert is rolled back). The final GO/NO-GO
++is the operator's: the row-count reconciliation is surfaced for a human to confirm
++against the Stage-3 sweep counts; everything else hard-passes or hard-fails.
++
++The four checks (mirrors the rehearsal / v4-cutover-runbook step 11):
++  1. ZERO FK orphans on PG          — confirms the sweep took (belt-and-suspenders).
++  2. Row-count parity per table     — source SQLite vs green PG; pg must never exceed
++                                       source; any deficit must be in a CASCADE-FK
++                                       table (a swept table) and the TOTAL deficit is
++                                       printed for the operator to reconcile against
++                                       the Stage-3 deleted count.
++  3. Boolean landmine               — game_changer_cards.active round-trips (WHERE
++                                       active == WHERE active = true, > 0) AND the
++                                       REAL app path `_gather_deck_signals` executes
++                                       that WHERE against PG's native boolean without
++                                       error on a representative deck.
++  4. Sequence sanity                — a real insert into cards gets MAX+1 (no
++                                       collision), then rolled back.
++  5. Cache round-trip               — the scryfall_cards seam is byte-identical across
++                                       the backend swap: the SAME row read from SQLite
++                                       and from PG, each through `_cached_row_to_payload`,
++                                       yields equal payloads (full_art int->bool, cmc
++                                       REAL, JSON/text passthrough, NULL->None).
++
++Usage (in-cluster Job; DATABASE_URL -> green PG via the CNPG secret):
++    DATABASE_URL=postgresql+psycopg://... \
++        python -m scripts.validate_cutover --source /snapshot/mana_archive.db
++"""
++
++from __future__ import annotations
++
++import argparse
++import os
++import sqlite3
++import sys
++
++sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
++
++from sqlalchemy import create_engine, func, select, text  # noqa: E402
++from sqlalchemy.engine import Engine  # noqa: E402
++from sqlalchemy.orm import Session  # noqa: E402
++
++import app.legacy_tables  # noqa: E402,F401 — registers the 7 raw tables on Base.metadata
++import app.models  # noqa: E402,F401 — registers the ORM tables on Base.metadata
++from app.bracket_v2_service import _gather_deck_signals  # noqa: E402
++from app.db import Base, engine  # noqa: E402 — engine binds DATABASE_URL (green PG)
++from app.scryfall import _CACHE_COLUMNS, _cached_row_to_payload  # noqa: E402
++from scripts.sweep_fk_orphans import find_orphans  # noqa: E402
++
++EXPECTED_SKIP = {"schema_migrations", "alembic_version", "sqlite_sequence"}
++CACHE_SAMPLE = 200  # scryfall_cards rows compared byte-for-byte (full table would be fine but slow)
++
++
++def _load_tables():
++    return [t for t in Base.metadata.sorted_tables if t.name not in EXPECTED_SKIP]
++
++
++def make_source_engine(path: str) -> Engine:
++    """Open the SQLite source strictly READ-ONLY (mode=ro URI) — never writes it."""
++    abspath = os.path.abspath(path)
++    if not os.path.exists(abspath):
++        sys.exit(f"FATAL: source SQLite snapshot not found: {abspath}")
++
++    def _connect() -> sqlite3.Connection:
++        return sqlite3.connect(f"file:{abspath}?mode=ro", uri=True)
++
++    return create_engine("sqlite://", creator=_connect)
++
++
++# --------------------------------------------------------------------------- #
++def check_zero_orphans(tables) -> bool:
++    print("\n[1] FK ORPHANS ON PG (expect ZERO — confirms the sweep took)")
++    with Session(engine) as s:
++        orphans = find_orphans(s)
++    if orphans:
++        for key, ids in orphans.items():
++            print(f"    *** {key}: {len(ids)} orphan(s) REMAIN ***")
++        print(f"    RESULT: FAIL — {sum(len(v) for v in orphans.values())} orphan(s) on PG")
++        return False
++    print("    0 orphans — the loaded schema is FK-clean. OK")
++    return True
++
++
++def check_row_parity(src_engine, tables) -> bool:
++    """pg must never exceed source; a deficit is only legitimate in a CASCADE-FK table
++    (one the sweep deletes from). Prints sqlite/pg/delta per table + the total deficit
++    for the operator to reconcile against the Stage-3 deleted count."""
++    print("\n[2] ROW-COUNT PARITY (source SQLite vs green PG)")
++    cascade_tables = {
++        t.name
++        for t in tables
++        for col in t.columns
++        for fk in col.foreign_keys
++        if (fk.ondelete or "").upper() == "CASCADE"
++    }
++    ok = True
++    total_deficit = 0
++    with src_engine.connect() as s:
++        with engine.connect() as p:
++            for t in tables:
++                sc = s.execute(select(func.count()).select_from(t)).scalar()
++                pc = p.execute(select(func.count()).select_from(t)).scalar()
++                delta = sc - pc
++                if pc > sc:
++                    flag = "*** PG > SOURCE (phantom rows!) ***"
++                    ok = False
++                elif delta == 0:
++                    flag = "OK"
++                elif t.name in cascade_tables:
++                    flag = f"-{delta} swept (verify vs Stage-3)"
++                    total_deficit += delta
++                else:
++                    flag = f"*** -{delta} deficit in a NON-CASCADE table ***"
++                    ok = False
++                print(f"    {t.name:<28} sqlite={sc:<8} pg={pc:<8} {flag}")
++    print(
++        f"    total swept deficit = {total_deficit} "
++        f"(OPERATOR: confirm this equals the Stage-3 'deleted' total before GO)"
++    )
++    print(f"    RESULT: {'OK' if ok else 'FAIL'}")
++    return ok
++
++
++def check_boolean_landmine() -> bool:
++    print("\n[3] BOOLEAN LANDMINE — game_changer_cards.active via the real app path")
++    ok = True
++    with engine.connect() as p:
++        total = p.execute(text("SELECT count(*) FROM game_changer_cards")).scalar()
++        active = p.execute(text("SELECT count(*) FROM game_changer_cards WHERE active")).scalar()
++        manual = p.execute(
++            text("SELECT count(*) FROM game_changer_cards WHERE active = true")
++        ).scalar()
++        if active != manual or active == 0:
++            ok = False
++        print(
++            f"    total={total}  WHERE active={active}  (active = true)={manual}  "
++            f"{'OK' if (active == manual and active) else '*** boolean did not round-trip ***'}"
++        )
++        # Exercise the REAL code path that issues `WHERE active` against PG's boolean.
++        deck = p.execute(
++            text(
++                "SELECT ir.storage_location_id AS loc, ir.user_id AS uid, count(*) AS c "
++                "FROM inventory_rows ir JOIN storage_locations sl "
++                "ON sl.id = ir.storage_location_id "
++                "WHERE sl.type = 'deck' GROUP BY ir.storage_location_id, ir.user_id "
++                "ORDER BY c DESC LIMIT 1"
++            )
++        ).first()
++    if deck is None:
++        print(
++            "    (no deck with inventory rows in the snapshot — _gather_deck_signals path SKIPPED)"
++        )
++        return ok
++    with Session(engine) as s:
++        try:
++            signals = _gather_deck_signals(s, deck.loc, deck.uid)
++        except Exception as e:  # noqa: BLE001 — any error here is a hard gate failure
++            print(f"    *** _gather_deck_signals RAISED on PG: {e!r} ***")
++            return False
++    gc = signals.get("game_changers", [])
++    print(
++        f"    _gather_deck_signals(deck_loc={deck.loc}, user={deck.uid}) ran OK — "
++        f"{len(gc)} game-changer(s) on that deck (WHERE active executed on native boolean)"
++    )
++    return ok
++
++
++def check_sequence_sanity() -> bool:
++    print("\n[4] SEQUENCE SANITY — insert+rollback probe on cards (MAX+1, no collision)")
++    from datetime import datetime
++
++    cards = Base.metadata.tables["cards"]
++    with engine.connect() as p:
++        trans = p.begin()
++        try:
++            before = p.execute(select(func.max(cards.c.id))).scalar() or 0
++            new_id = p.execute(
++                cards.insert()
++                .values(
++                    scryfall_id="__cutover_seqprobe__",
++                    name="__cutover_seqprobe__",
++                    set_code="XXX",
++                    collector_number="0",
++                    updated_at=datetime(2026, 1, 1),
++                )
++                .returning(cards.c.id)
++            ).scalar()
++            good = new_id > before
++            print(
++                f"    prev max id={before}, probe insert id={new_id} "
++                f"{'OK (no collision) — rolled back' if good else '*** COLLISION ***'}"
++            )
++            return good
++        finally:
++            trans.rollback()
++
++
++def check_cache_roundtrip(src_engine) -> bool:
++    print(f"\n[5] CACHE ROUND-TRIP — scryfall_cards seam byte-identical (sample {CACHE_SAMPLE})")
++    sample_sql = text(
++        f"SELECT {_CACHE_COLUMNS} FROM scryfall_cards "
++        f"WHERE scryfall_id IS NOT NULL ORDER BY scryfall_id LIMIT :n"
++    )
++    one_sql = text(f"SELECT {_CACHE_COLUMNS} FROM scryfall_cards WHERE scryfall_id = :sid")
++    with src_engine.connect() as s:
++        src_rows = s.execute(sample_sql, {"n": CACHE_SAMPLE}).mappings().all()
++    if not src_rows:
++        print("    (no scryfall_cards rows in snapshot — SKIPPED)")
++        return True
++    mismatches = 0
++    with engine.connect() as p:
++        for sm in src_rows:
++            sid = sm["scryfall_id"]
++            pm = p.execute(one_sql, {"sid": sid}).mappings().first()
++            if pm is None:
++                print(f"    *** {sid}: present in SQLite, MISSING on PG ***")
++                mismatches += 1
++                continue
++            if _cached_row_to_payload(sm) != _cached_row_to_payload(pm):
++                print(f"    *** {sid}: cache payload differs SQLite vs PG ***")
++                mismatches += 1
++    if mismatches:
++        print(f"    RESULT: FAIL — {mismatches}/{len(src_rows)} row(s) not byte-identical")
++        return False
++    print(f"    {len(src_rows)} rows byte-identical SQLite<->PG. OK")
++    return True
++
++
++# --------------------------------------------------------------------------- #
++def main() -> None:
++    ap = argparse.ArgumentParser(description="v4 cutover GO/NO-GO validation gate (read-only).")
++    ap.add_argument(
++        "--source", required=True, help="path to the source SQLite snapshot (read-only)"
++    )
++    args = ap.parse_args()
++
++    if engine.dialect.name != "postgresql":
++        sys.exit(f"FATAL: DATABASE_URL must point at Postgres, got dialect {engine.dialect.name!r}")
++
++    src = make_source_engine(args.source)
++    tables = _load_tables()
++
++    print("=== v4 CUTOVER VALIDATION GATE (step 11) ===")
++    print(f"source : {os.path.abspath(args.source)} (read-only)")
++    print(f"target : {engine.url.host}/{engine.url.database} (green PG)")
++    print(f"tables : {len(tables)} (Base.metadata minus {sorted(EXPECTED_SKIP)})")
++
++    results = {
++        "zero-orphans": check_zero_orphans(tables),
++        "row-parity": check_row_parity(src, tables),
++        "boolean-landmine": check_boolean_landmine(),
++        "sequence-sanity": check_sequence_sanity(),
++        "cache-roundtrip": check_cache_roundtrip(src),
++    }
++
++    print("\n=== GATE SUMMARY ===")
++    for name, ok in results.items():
++        print(f"    {name:<20} {'PASS' if ok else '*** FAIL ***'}")
++    overall = all(results.values())
++    print(
++        f"\n=== GATE RESULT: {'PASS — hard checks green; OPERATOR makes GO/NO-GO' if overall else 'FAIL — ABORT (Phase R)'} ==="
++    )
++    print(
++        "    (A PASS clears the automated checks only. Reconcile the row-parity deficit "
++        "against the Stage-3 sweep counts, then decide GO/NO-GO. A FAIL means ABORT.)"
++    )
++    sys.exit(0 if overall else 1)
++
++
++if __name__ == "__main__":
++    main()
+diff --git a/tests/test_deck_export.py b/tests/test_deck_export.py
+new file mode 100644
+index 0000000..8253fcd
+--- /dev/null
++++ b/tests/test_deck_export.py
+@@ -0,0 +1,237 @@
++"""Deck export round-trips foil/finish status (issue: exporter omits finish).
++
++The deck text-list export (`GET /decks/{id}/export`) must emit the importer's
++MTGA-style finish markers — ``*F*`` for foil, ``*E*`` for etched — so an
++export→re-import round-trip matches the copy back to its ``(card_id, finish)``
++inventory row instead of treating it as a brand-new card. Non-foil/etched rows
++carry no marker, and older exports without any marker still parse as normal
++finish (backward compatible).
++
++Invoke via:
++
++    DATA_DIR=dev-data DEV_MODE=true pytest tests/test_deck_export.py
++"""
++
++from __future__ import annotations
++
++import itertools
++
++from fastapi.testclient import TestClient
++from sqlalchemy import create_engine
++from sqlalchemy.orm import sessionmaker
++from sqlalchemy.pool import StaticPool
++
++from app import deck_service
++from app.db import Base
++from app.import_service import _parse_list_line
++from app.models import Card, InventoryRow, StorageLocation, User
++
++_seq = itertools.count(1)
++
++
++def _fresh():
++    engine = create_engine(
++        "sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool
++    )
++    Base.metadata.create_all(engine)
++    return sessionmaker(bind=engine, expire_on_commit=False)
++
++
++def _user(s, username="u1") -> User:
++    u = User(username=username, password_hash="x")
++    s.add(u)
++    s.flush()
++    return u
++
++
++def _card(s, name="Sol Ring") -> Card:
++    c = Card(
++        scryfall_id=f"sid-{next(_seq)}",
++        name=name,
++        set_code="tst",
++        set_name="Test",
++        collector_number=str(next(_seq)),
++        rarity="rare",
++        type_line="Artifact",
++        oracle_text="x",
++        image_url="http://x/img.png",
++        color_identity="",
++        set_type="expansion",
++    )
++    s.add(c)
++    s.flush()
++    return c
++
++
++def _drawer(s, user_id, name="Drawer 1") -> StorageLocation:
++    loc = StorageLocation(user_id=user_id, name=name, type="drawer", mode="managed")
++    s.add(loc)
++    s.flush()
++    return loc
++
++
++def _place(s, user_id, card, loc_id, qty=1, finish="normal", role=None) -> InventoryRow:
++    row = InventoryRow(
++        user_id=user_id,
++        card_id=card.id,
++        quantity=qty,
++        finish=finish,
++        is_proxy=False,
++        storage_location_id=loc_id,
++        is_pending=False,
++        role=role,
++    )
++    s.add(row)
++    s.flush()
++    return row
++
++
++def _client(sm, user):
++    from app import main
++    from app.dependencies import get_current_user, get_db_session, require_csrf_token
++
++    def _db():
++        db = sm()
++        try:
++            yield db
++        finally:
++            db.close()
++
++    main.app.dependency_overrides[get_db_session] = _db
++    main.app.dependency_overrides[get_current_user] = lambda: user
++    main.app.dependency_overrides[require_csrf_token] = lambda: None
++    return TestClient(main.app, follow_redirects=False)
++
++
++def _clear_overrides():
++    from app import main
++    from app.dependencies import get_current_user, get_db_session, require_csrf_token
++
++    for dep in (get_db_session, get_current_user, require_csrf_token):
++        main.app.dependency_overrides.pop(dep, None)
++
++
++def test_export_marks_foil_rows_and_omits_marker_for_normal():
++    sm = _fresh()
++    s = sm()
++    u = _user(s)
++    deck = deck_service.create_deck(s, u.id, "Stash")
++    loc_id = deck.storage_location_id
++    normal_card = _card(s, "Sol Ring")
++    foil_card = _card(s, "Mana Crypt")
++    _place(s, u.id, normal_card, loc_id, finish="normal")
++    _place(s, u.id, foil_card, loc_id, finish="foil")
++    s.commit()
++
++    c = _client(sm, u)
++    try:
++        r = c.get(f"/decks/{deck.id}/export")
++        assert r.status_code == 200
++    finally:
++        _clear_overrides()
++
++    lines = {ln.split(" ", 1)[1].split(" (")[0]: ln for ln in r.text.splitlines() if " (" in ln}
++    # The foil row carries the *F* marker; the normal row does not.
++    assert lines["Mana Crypt"].endswith("*F*")
++    assert "*F*" not in lines["Sol Ring"]
++
++
++def test_exported_foil_line_reparses_as_foil():
++    """Round-trip: the exported foil line, fed back through the importer's own
++    line parser, resolves to finish='foil' so re-import matches (card_id, foil)."""
++    sm = _fresh()
++    s = sm()
++    u = _user(s)
++    deck = deck_service.create_deck(s, u.id, "Stash")
++    foil_card = _card(s, "Cyclonic Rift")
++    _place(s, u.id, foil_card, deck.storage_location_id, finish="foil")
++    s.commit()
++
++    c = _client(sm, u)
++    try:
++        r = c.get(f"/decks/{deck.id}/export")
++    finally:
++        _clear_overrides()
++
++    foil_line = next(ln for ln in r.text.splitlines() if "Cyclonic Rift" in ln)
++    parsed = _parse_list_line(foil_line)
++    assert parsed is not None
++    assert parsed["finish"] == "foil"
++
++
++def test_legacy_export_without_marker_parses_as_normal():
++    """A pre-fix export line (no *F* marker) still parses — defaults to normal."""
++    parsed = _parse_list_line("1 Sol Ring (TST) 1")
++    assert parsed is not None
++    assert parsed["finish"] == "normal"
++
++
++def test_export_marks_etched_rows_and_reparses_as_etched():
++    """Etched finish is not silently downgraded to normal: the export emits the
++    *E* marker and the importer parses it back to finish='etched'."""
++    sm = _fresh()
++    s = sm()
++    u = _user(s)
++    deck = deck_service.create_deck(s, u.id, "Stash")
++    etched_card = _card(s, "Command Tower")
++    _place(s, u.id, etched_card, deck.storage_location_id, finish="etched")
++    s.commit()
++
++    c = _client(sm, u)
++    try:
++        r = c.get(f"/decks/{deck.id}/export")
++    finally:
++        _clear_overrides()
++
++    etched_line = next(ln for ln in r.text.splitlines() if "Command Tower" in ln)
++    assert etched_line.endswith("*E*")
++    parsed = _parse_list_line(etched_line)
++    assert parsed is not None
++    assert parsed["finish"] == "etched"
++
++
++def test_reimport_matches_existing_foil_inventory_row():
++    """The functional round-trip: an exported foil line, re-imported, MATCHES the
++    user's foil inventory row on (card_id, finish) instead of importing new.
++    A normal-finish request against the same foil holding must NOT match."""
++    sm = _fresh()
++    s = sm()
++    u = _user(s)
++    drawer = _drawer(s, u.id)
++    target = deck_service.create_deck(s, u.id, "Target")
++    foil_card = _card(s, "Cyclonic Rift")
++    # The user owns exactly one FOIL copy, sitting in a drawer (movable).
++    _place(s, u.id, foil_card, drawer.id, finish="foil")
++    s.commit()
++
++    # Re-import line the exporter would emit, parsed by the importer's grammar.
++    parsed = _parse_list_line(
++        f"1 Cyclonic Rift ({foil_card.set_code.upper()}) {foil_card.collector_number} *F*"
++    )
++    assert parsed is not None and parsed["finish"] == "foil"
++
++    def _row(finish):
++        return [
++            {
++                "line_number": 1,
++                "scryfall_id": foil_card.scryfall_id,
++                "finish": finish,
++                "quantity": 1,
++            }
++        ]
++
++    # Foil request → the foil drawer row is a movable match.
++    foil_match = deck_service.find_inventory_matches_for_deck_import(
++        s, u.id, target.id, _row(parsed["finish"])
++    )[0]
++    assert foil_match["card_id"] == foil_card.id
++    assert foil_match["total_available"] == 1
++    assert foil_match["recommended_action"] == "move_existing"
++
++    # Normal-finish request → the foil row is a DIFFERENT (card_id, finish) key,
++    # so it must NOT match; the card is treated as a new import.
++    normal_match = deck_service.find_inventory_matches_for_deck_import(
++        s, u.id, target.id, _row("normal")
++    )[0]
++    assert normal_match["total_available"] == 0
++    assert normal_match["recommended_action"] == "import_new"
+diff --git a/tests/test_fk_parent_delete.py b/tests/test_fk_parent_delete.py
+index 49e27fd..4bfa7c7 100644
+--- a/tests/test_fk_parent_delete.py
++++ b/tests/test_fk_parent_delete.py
+@@ -503,14 +503,7 @@ def seed_delete_user(s) -> Seeded:
+     s.add(tlog)
+     s.flush()
+ 
+-    # DEFERRED to v4 (v3.39.8 split): the gate-#5 ``games.user_id`` SET NULL amendment
+-    # (+ ``games.user_name_at_game`` snapshot) is held back, so ``delete_user`` does NOT
+-    # touch games. To exercise the SHIPPING ``game_seats.user_id`` SET NULL cell without
+-    # orphaning/crashing on ``games.user_id``, seed the game under a SURVIVING user
+-    # (``other``) and attribute only the SEAT to the deleted user. When the amendment
+-    # lands at v4: own the game by ``owner`` again and restore the ``games.user_id``
+-    # ChildFK + ``_game_snapshot_check`` + the ``_EXPECTED_ONDELETE`` entry below.
+-    game = Game(user_id=other.id)
++    game = Game(user_id=owner.id)
+     s.add(game)
+     s.flush()
+     seat = GameSeat(game_id=game.id, seat_number=1, player_name="P1", user_id=owner.id)
+@@ -563,10 +556,15 @@ def seed_delete_user(s) -> Seeded:
+         ChildFK(
+             "transaction_logs.user_id->users", "transaction_logs", "user_id", "NO ACTION", tlog.id
+         ),
+-        # games.user_id->users cell DEFERRED to v4 (v3.39.8 split): the SET NULL
+-        # amendment is held back, so games.user_id is NO ACTION here and delete_user
+-        # doesn't touch games (the game is seeded under a surviving user above).
+-        # Restore this ChildFK (+ _game_snapshot_check) with the Game model amendment.
++        ChildFK(
++            "games.user_id->users",
++            "games",
++            "user_id",
++            "SET NULL",
++            game.id,
++            "gate-#5 amendment: was NO ACTION (crash); now SET NULL + name snapshot",
++            post_check=_game_snapshot_check(game.id),
++        ),
+         ChildFK("game_seats.user_id->users", "game_seats", "user_id", "SET NULL", seat.id),
+         ChildFK("token_inventory.user_id->users", "token_inventory", "user_id", "CASCADE", tok.id),
+         ChildFK("watchlist.user_id->users", "watchlist", "user_id", "CASCADE", wl.id),
+@@ -875,8 +873,7 @@ _EXPECTED_ONDELETE = {
+     "game_seats.deck_id->decks": "SET NULL",
+     "showcase_items.inventory_row_id->inventory_rows": "CASCADE",
+     "trade_items.inventory_row_id->inventory_rows": "SET NULL",
+-    # "games.user_id->users": SET NULL — DEFERRED to v4 (v3.39.8 split). NO ACTION
+-    # here; restore this entry with the Game model amendment at cutover.
++    "games.user_id->users": "SET NULL",  # gate-#5 amendment (was NO ACTION)
+     "game_seats.user_id->users": "SET NULL",
+     "token_inventory.user_id->users": "CASCADE",
+     "watchlist.user_id->users": "CASCADE",

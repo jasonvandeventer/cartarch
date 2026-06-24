@@ -43,6 +43,7 @@ from app.inventory_service import (
     apply_collection_search_filters,
     build_collection_filter_query,
     bulk_delete_inventory_rows,
+    collector_sort_key,
     confirm_all_pending,
     confirm_pending_row,
     delete_inventory_row,
@@ -1072,6 +1073,16 @@ def collection_cull_preview(
             price_max=price_max,
             finish=finish,
             location_id=location_id,
+        ),
+    )
+    # Group by set, then natural/numeric collector-number order (1, 2, 10, 11)
+    # rather than the resolver's row-id order — collector_sort_key zero-pads the
+    # numeric portion so '10' sorts after '2', not before it.
+    candidates = sorted(
+        candidates,
+        key=lambda r: (
+            (r.card.set_code or "").lower() if r.card else "",
+            collector_sort_key(r.card.collector_number if r.card else None),
         ),
     )
     items = []
