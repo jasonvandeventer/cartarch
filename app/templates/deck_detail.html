@@ -55,69 +55,23 @@
     {# v3.33.0 + issue #27 — variant group: builds that SHARE physical cards.
        The physical card lives in ONE deck (one-card-one-location preserved); a
        deck_card_share records that it is ALSO a member of a sibling's decklist.
-       This panel shows the cards shared INTO this deck (read-only — actions on
-       them belong to their source deck) and the controls to share/unshare. #}
+       The shared-in cards are folded into the unified Deck Cards grid below,
+       each badged "SHARED FROM …" with a per-card Unshare; this panel is just
+       the read-only group summary. The share/unshare MANAGEMENT controls live
+       in the deck-edit popouts on the /decks page. #}
     <section class="panel variant-group-panel">
       <p class="muted">
         <strong>Variant group:</strong> {{ variant_group.name }}
         {% if variant_siblings %}
           · Shares cards with
           {% for s in variant_siblings %}<a href="/decks/{{ s.id }}">{{ s.name }}</a>{% if not loop.last %}, {% endif %}{% endfor %}.
+          Cards shared in from a sibling appear in the deck list below, badged
+          <span class="share-badge">SHARED FROM</span>, and are counted once.
+          Manage sharing from <a href="/decks">the Decks page</a> (Edit → Share).
         {% else %}
           · No other builds in this group yet.
         {% endif %}
       </p>
-
-      {% if inbound_shares %}
-        <h4 class="brew-buylist-sub">Shared into this deck ({{ inbound_shares|length }})</h4>
-        <p class="muted" style="margin-top:0">
-          These cards physically live in a sibling build and are counted here
-          once. Manage their placement from their source deck.
-        </p>
-        <div class="inventory-card-grid">
-          {% for s in inbound_shares %}
-            <div class="variant-share-item">
-              {{ inventory_card(s, csrf_token) }}
-              <form method="post" action="/decks/{{ deck.id }}/unshare-card" style="margin-top:0.3rem">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                <input type="hidden" name="inventory_row_id" value="{{ s.inventory_row_id }}">
-                <input type="hidden" name="target_deck_id" value="{{ deck.id }}">
-                <button type="submit" class="btn btn-small btn-secondary">Unshare</button>
-              </form>
-            </div>
-          {% endfor %}
-        </div>
-      {% endif %}
-
-      {% if variant_siblings and (items or commanders) %}
-        <h4 class="brew-buylist-sub">Share a card with a sibling build</h4>
-        <form method="post" action="/decks/{{ deck.id }}/share-card" class="variant-share-form">
-          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-          <label>Card
-            <select name="inventory_row_id" required>
-              {% for c in commanders %}
-                <option value="{{ c.id }}">{{ c.card.name }} ({{ c.finish }}){% if c.role == 'commander' %} — commander{% endif %}</option>
-              {% endfor %}
-              {% for i in items %}
-                <option value="{{ i.id }}">{{ i.card.name }} ({{ i.finish }})</option>
-              {% endfor %}
-            </select>
-          </label>
-          <label>Into
-            <select name="target_deck_id" required>
-              {% for sib in variant_siblings %}
-                <option value="{{ sib.id }}">{{ sib.name }}</option>
-              {% endfor %}
-            </select>
-          </label>
-          <button type="submit" class="btn btn-small">Share</button>
-        </form>
-        <p class="muted" style="margin-top:0.3rem">
-          Sharing adds this deck's card to the sibling's list without moving the
-          physical copy. Importing a list here treats a sibling-held card as
-          already covered.
-        </p>
-      {% endif %}
     </section>
   {% endif %}
   {% if deck and brew_buylist %}
@@ -857,7 +811,9 @@
                          onclick="document.querySelectorAll('.deck-bulk-cb').forEach(cb => cb.checked = this.checked)">
                   Select all
                 </label>
-                {% for item in items %}
+                {# issue #27 — a shared-in card's physical row belongs to its
+                   source deck; bulk-move must never touch it, so exclude it. #}
+                {% for item in items if not item.is_shared_in %}
                   <label style="display: flex;
                                 align-items: center;
                                 gap: 0.4rem;
@@ -916,7 +872,9 @@
                          onclick="document.querySelectorAll('.deck-bulk-delete-cb').forEach(cb => cb.checked = this.checked)">
                   Select all
                 </label>
-                {% for item in items %}
+                {# issue #27 — exclude shared-in cards (their physical row lives
+                   in the source deck; deleting from here must be impossible). #}
+                {% for item in items if not item.is_shared_in %}
                   <label style="display: flex;
                                 align-items: center;
                                 gap: 0.4rem;

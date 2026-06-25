@@ -1,0 +1,56 @@
+{# issue #27 — variant-group deck-sharing controls for the deck-edit popouts
+   (decks.html). Included once in the per-row Edit popout and once in the
+   featured-deck Edit popout (the caller sets `d` to the deck object first), so
+   the share/unshare management lives in BOTH copies as the spec requires.
+
+   Membership ≠ location: sharing a card adds it to a SIBLING build's decklist
+   without moving the physical InventoryRow (one-card-one-location preserved);
+   unshare just drops that membership. The forms are siblings of — NOT nested
+   inside — the surrounding edit <form>, so the markup stays valid HTML.
+
+   Gated on `d.share_siblings`: a deck not in a variant group (or alone in its
+   group) renders nothing here, and the route attaches empty lists for those,
+   so non-variant decks are unaffected. #}
+{% if d.share_siblings %}
+  <div class="variant-share-controls"
+       style="margin-top: 0.6rem; border-top: 1px solid var(--hairline, #ddd); padding-top: 0.5rem">
+    <label>Share a card with a sibling build</label>
+    <p class="decks-edit-hint" style="margin-top: 0">
+      Adds the card to the sibling's decklist without moving the physical copy.
+    </p>
+    {% if d.share_own_cards %}
+      <form action="/decks/{{ d.id }}/share-card"
+            method="post"
+            class="filter-row"
+            style="gap: 0.3rem; flex-wrap: wrap">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <select name="inventory_row_id" required>
+          {% for c in d.share_own_cards %}
+            <option value="{{ c.id }}">{{ c.name }}{% if c.finish and c.finish != 'normal' %} ({{ c.finish }}){% endif %}{% if c.role == 'commander' %} — commander{% endif %}</option>
+          {% endfor %}
+        </select>
+        <select name="target_deck_id" required>
+          {% for sib in d.share_siblings %}<option value="{{ sib.id }}">{{ sib.name }}</option>{% endfor %}
+        </select>
+        <button type="submit">Share</button>
+      </form>
+    {% else %}
+      <p class="muted">No cards in this deck to share yet.</p>
+    {% endif %}
+    {% if d.outbound_shares %}
+      <p class="decks-edit-hint" style="margin-top: 0.4rem">Currently shared out:</p>
+      {% for sh in d.outbound_shares %}
+        <form action="/decks/{{ d.id }}/unshare-card"
+              method="post"
+              class="filter-row"
+              style="gap: 0.3rem; align-items: center; margin-top: 0.2rem">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <input type="hidden" name="inventory_row_id" value="{{ sh.inventory_row_id }}">
+          <input type="hidden" name="target_deck_id" value="{{ sh.target_deck_id }}">
+          <span class="muted" style="flex: 1">{{ sh.card_name }} → {{ sh.target_deck_name }}</span>
+          <button type="submit" class="btn-danger-small">Unshare</button>
+        </form>
+      {% endfor %}
+    {% endif %}
+  </div>
+{% endif %}

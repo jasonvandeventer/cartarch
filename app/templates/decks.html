@@ -202,6 +202,8 @@
                     </label>
                     <button type="submit" style="margin-top: 0.25rem">Save</button>
                   </form>
+                  {% set d = deck %}
+                  {% include "_variant_share_controls.html" %}
                 </div>
               </details>
               <form action="/decks/{{ deck.id }}/delete" method="post" style="display: inline">
@@ -256,6 +258,8 @@
               </label>
               <button type="submit" style="margin-top: 0.25rem">Save</button>
             </form>
+            {% set d = featured %}
+            {% include "_variant_share_controls.html" %}
           </div>
         </details>
         <form action="/decks/{{ featured.id }}/delete" method="post" style="display: inline">

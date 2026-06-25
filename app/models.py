@@ -267,8 +267,12 @@ class DeckCardShare(Base):
     /``assign_deck_variant_group``/``delete_variant_group`` on the deck/group
     side) — the DB CASCADE is then Postgres defense-in-depth.
 
-    ``created_at`` is a naive ``DateTime`` (ORM ``default=utc_now``), matching
-    the schema's naive-timestamp convention — NOT timestamptz.
+    ``created_at`` is a ``timestamptz DEFAULT now()`` per the issue's logical
+    schema (``DateTime(timezone=True)`` + ``server_default=text("now()")``), so
+    Postgres stamps it server-side. The ORM ``default=utc_now`` supplies the
+    value on the SQLite test path (where ``now()`` isn't a function but the
+    server_default is never invoked because the Python default always provides
+    one).
     """
 
     __tablename__ = "deck_card_shares"
@@ -291,7 +295,12 @@ class DeckCardShare(Base):
     variant_group_id: Mapped[int] = mapped_column(
         ForeignKey("variant_groups.id", ondelete="CASCADE"), nullable=False, index=True
     )
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=text("now()"),
+        default=utc_now,
+        nullable=False,
+    )
 
     inventory_row: Mapped[InventoryRow] = relationship()
 

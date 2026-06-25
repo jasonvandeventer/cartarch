@@ -2384,6 +2384,94 @@ def get_inbound_shares_for_deck(session: Session, deck: Deck) -> list[dict]:
     ]
 
 
+def inbound_shared_rows_for_deck(
+    session: Session, deck: Deck, search: str | None = None
+) -> list[tuple[InventoryRow, str]]:
+    """The physical ``InventoryRow`` objects shared INTO ``deck`` from sibling
+    builds, paired with each one's SOURCE deck name.
+
+    Returned as ``(InventoryRow, source_deck_name)`` tuples so the deck-detail
+    item builder can fold them into the SAME unified card list as the deck's own
+    rows (issue #27 query semantics: a deck's card list = own rows UNION inbound
+    shares, sorted/grouped together). The ``InventoryRow.card`` is eager-loaded.
+    When ``search`` is given the shared rows are filtered by the SAME
+    boolean/Scryfall parser as the own rows, so they filter in lock-step.
+
+    Empty list for a deck with no variant group (the short-circuit gate), so a
+    non-variant deck's grid is byte-for-byte unchanged.
+    """
+    if deck.variant_group_id is None:
+        return []
+    query = (
+        session.query(InventoryRow, Deck.name)
+        .options(joinedload(InventoryRow.card))
+        .join(DeckCardShare, DeckCardShare.inventory_row_id == InventoryRow.id)
+        .join(Deck, DeckCardShare.source_deck_id == Deck.id)
+        .join(Card, InventoryRow.card_id == Card.id)
+        .filter(DeckCardShare.target_deck_id == deck.id)
+    )
+    if search and search.strip():
+        from app.inventory_service import apply_collection_search_filters
+
+        query = apply_collection_search_filters(query, search)
+    return [(row, source_name) for row, source_name in query.all()]
+
+
+def own_deck_card_options(session: Session, user_id: int, deck: Deck) -> list[dict]:
+    """``{id, name, finish, role}`` for each of ``deck``'s own physically-held
+    rows — the picker for the "share a card with a sibling" control in the
+    deck-edit popouts (``decks.html``). Empty when the deck has no storage
+    location. Ordered by card name."""
+    if deck.storage_location_id is None:
+        return []
+    rows = (
+        session.query(InventoryRow)
+        .options(joinedload(InventoryRow.card))
+        .join(Card, InventoryRow.card_id == Card.id)
+        .filter(
+            InventoryRow.user_id == user_id,
+            InventoryRow.storage_location_id == deck.storage_location_id,
+        )
+        .order_by(Card.name.asc(), InventoryRow.id.asc())
+        .all()
+    )
+    return [
+        {
+            "id": r.id,
+            "name": r.card.name if r.card else f"#{r.id}",
+            "finish": r.finish,
+            "role": r.role,
+        }
+        for r in rows
+    ]
+
+
+def get_outbound_shares_for_deck(session: Session, deck: Deck) -> list[dict]:
+    """``{inventory_row_id, card_name, target_deck_id, target_deck_name}`` for
+    every share FROM ``deck`` — the unshare list in the deck-edit popouts.
+    Empty for a deck with no variant group. Ordered by card name."""
+    if deck.variant_group_id is None:
+        return []
+    rows = (
+        session.query(DeckCardShare, Card.name, Deck.name)
+        .join(InventoryRow, DeckCardShare.inventory_row_id == InventoryRow.id)
+        .join(Card, InventoryRow.card_id == Card.id)
+        .join(Deck, DeckCardShare.target_deck_id == Deck.id)
+        .filter(DeckCardShare.source_deck_id == deck.id)
+        .order_by(Card.name.asc())
+        .all()
+    )
+    return [
+        {
+            "inventory_row_id": share.inventory_row_id,
+            "card_name": card_name,
+            "target_deck_id": share.target_deck_id,
+            "target_deck_name": target_name,
+        }
+        for share, card_name, target_name in rows
+    ]
+
+
 def inbound_shared_row_ids_for_deck(session: Session, deck: Deck) -> set[int]:
     """The set of InventoryRow ids shared INTO ``deck``. Empty for a deck with
     no variant group. Used by reconciliation to recognize an already-shared

@@ -276,6 +276,75 @@ def test_unshare_removes_membership_only():
 
 
 # --------------------------------------------------------------------------- #
+# unified decklist + deck-edit-popout helpers (issue #27 revision)
+# --------------------------------------------------------------------------- #
+
+
+def test_inbound_shared_rows_unifies_and_filters():
+    s = _fresh_session()
+    u = _user(s)
+    _g, a, b = _group_with_two_decks(s, u)
+    shared = _card(s, "Shared Bolt")
+    row = _place(s, u.id, shared, a.storage_location_id, finish="foil")
+    deck_service.share_card_to_deck(s, u.id, inventory_row_id=row.id, target_deck_id=b.id)
+
+    pairs = deck_service.inbound_shared_rows_for_deck(s, b)
+    assert [(r.id, name) for r, name in pairs] == [(row.id, "Build A")]
+    # search filter narrows the shared-in set in lock-step with own rows.
+    assert deck_service.inbound_shared_rows_for_deck(s, b, search="Shared") != []
+    assert deck_service.inbound_shared_rows_for_deck(s, b, search="t:land") == []
+    # source deck A sees no inbound rows.
+    assert deck_service.inbound_shared_rows_for_deck(s, a) == []
+
+
+def test_build_deck_card_items_folds_shared_in():
+    from app.routes.decks import _build_deck_card_items
+
+    s = _fresh_session()
+    u = _user(s)
+    _g, a, b = _group_with_two_decks(s, u)
+    _place(s, u.id, _card(s, "B Own"), b.storage_location_id)
+    row = _place(s, u.id, _card(s, "A Shared"), a.storage_location_id)
+    deck_service.share_card_to_deck(s, u.id, inventory_row_id=row.id, target_deck_id=b.id)
+
+    items, _value, total_cards = _build_deck_card_items(s, b, u.id, "", "name", "asc")
+    by_name = {i["card"].name: i for i in items}
+    # FULL decklist: own card + shared-in card, in ONE unified list.
+    assert set(by_name) == {"B Own", "A Shared"}
+    assert by_name["A Shared"]["is_shared_in"] is True
+    assert by_name["A Shared"]["shared_from"] == "Build A"
+    assert by_name["B Own"]["is_shared_in"] is False
+    # count includes the share (the full list), and the shared-in role is cleared
+    # so it never lands in this deck's commander split.
+    assert total_cards == 2
+    assert by_name["A Shared"]["role"] is None
+
+
+def test_popout_share_helpers():
+    s = _fresh_session()
+    u = _user(s)
+    _g, a, b = _group_with_two_decks(s, u)
+    card = _card(s, "Picker Card")
+    row = _place(s, u.id, card, a.storage_location_id, finish="foil")
+
+    opts = deck_service.own_deck_card_options(s, u.id, a)
+    assert [(o["name"], o["finish"]) for o in opts] == [("Picker Card", "foil")]
+
+    deck_service.share_card_to_deck(s, u.id, inventory_row_id=row.id, target_deck_id=b.id)
+    out = deck_service.get_outbound_shares_for_deck(s, a)
+    assert out == [
+        {
+            "inventory_row_id": row.id,
+            "card_name": "Picker Card",
+            "target_deck_id": b.id,
+            "target_deck_name": "Build B",
+        }
+    ]
+    # B is the target, not a source → no outbound shares.
+    assert deck_service.get_outbound_shares_for_deck(s, b) == []
+
+
+# --------------------------------------------------------------------------- #
 # reconciliation — already-shared card recognized as covered (counted once)
 # --------------------------------------------------------------------------- #
 

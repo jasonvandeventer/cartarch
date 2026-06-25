@@ -11,13 +11,16 @@ variant group — a reference, never a copy.
 
 All four FKs are ON DELETE CASCADE NOT NULL (the share is meaningless without
 its row / its decks / its group). ``UNIQUE(inventory_row_id, target_deck_id)``
-makes a row shared to a deck at most once. ``created_at`` is a NAIVE TIMESTAMP
-(``sa.DateTime``) — matching the baseline's naive-timestamp convention; do NOT
-add ``timezone=True``.
+makes a row shared to a deck at most once. ``created_at`` is a
+``timestamptz DEFAULT now()`` (``sa.DateTime(timezone=True)`` +
+``server_default=sa.text("now()")``) per the issue's logical schema — the DB
+stamps it server-side, so a share materialized by the import-commit path or the
+share route gets a creation time even if the ORM default is bypassed.
 
-POST-AUTOGENERATE NOTE (gate #4 pattern): no boolean columns here, so the
-``sa.false()/sa.true()`` server_default fixup does not apply. Regenerating this
-revision should reproduce it cleanly.
+POST-AUTOGENERATE NOTE (gate #4 pattern): no boolean columns here, but the
+``server_default=sa.text("now()")`` on ``created_at`` IS a hand-applied fixup
+(autogenerate emits a bare column with no default) — reapply it on any regen,
+same discipline as the baseline's ``sa.false()/sa.true()`` boolean fixups.
 """
 
 from collections.abc import Sequence
@@ -41,7 +44,12 @@ def upgrade() -> None:
         sa.Column("source_deck_id", sa.Integer(), nullable=False),
         sa.Column("target_deck_id", sa.Integer(), nullable=False),
         sa.Column("variant_group_id", sa.Integer(), nullable=False),
-        sa.Column("created_at", sa.DateTime(), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
         sa.ForeignKeyConstraint(["inventory_row_id"], ["inventory_rows.id"], ondelete="CASCADE"),
         sa.ForeignKeyConstraint(["source_deck_id"], ["decks.id"], ondelete="CASCADE"),
         sa.ForeignKeyConstraint(["target_deck_id"], ["decks.id"], ondelete="CASCADE"),
