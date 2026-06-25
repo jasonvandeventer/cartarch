@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+import logging
 import os
 import re
 import secrets
 import subprocess
 from collections.abc import Generator
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from urllib.parse import urlparse
 from zoneinfo import ZoneInfo
 
@@ -16,6 +17,14 @@ from sqlalchemy.orm import Session
 from app.db import SessionLocal
 from app.deck_service import CARD_ROLE_TAGS
 from app.models import InventoryRow, User
+from app.timeutil import utc_now
+
+logger = logging.getLogger(__name__)
+
+# Throttle window for the per-user ``last_active_at`` stamp (see
+# ``_stamp_last_active``). One write at most per this interval per user —
+# named constant matching the ``LOGIN_RATE_LIMIT_WINDOW`` convention.
+LAST_ACTIVE_THROTTLE = timedelta(minutes=5)
 
 # Users who get drawer-centric features (auto-sorter, Drawers page, Audit page).
 # Update here to add or remove users — no other changes needed.
@@ -468,6 +477,51 @@ def get_db_session() -> Generator[Session, None, None]:
         session.close()
 
 
+def _stamp_last_active(user: User) -> None:
+    """Best-effort stamp of ``User.last_active_at`` on an authenticated request.
+
+    **Throttled, DB-self-throttle** — no in-memory store. The already-loaded
+    ``user.last_active_at`` is compared against ``utc_now()``: write only when
+    it is NULL or older than ``LAST_ACTIVE_THROTTLE``. This is correct across
+    restarts and multiple replicas (the throttle state IS the persisted row),
+    unlike the single-pod in-memory throttles in ``login_throttle`` /
+    ``password_reset_service``. Naive-UTC throughout — ``utc_now()`` for both
+    the comparison and the stored value (a tz-aware ``datetime.now(UTC)`` would
+    raise ``TypeError`` subtracting the naive stored value).
+
+    **Isolated transaction** — the update runs in its OWN short-lived
+    ``SessionLocal()`` (the ``_pending_count_for`` precedent), never on the
+    request's shared session: committing the timestamp there could flush
+    partial route state early, and a route that later raises would roll it back.
+    The already-loaded ``user`` instance is also left UNTOUCHED — assigning
+    ``user.last_active_at`` would mark it dirty on the shared request session, so
+    a later ``session.commit()`` in the route would redundantly re-issue (and
+    thus commit on the shared session) the very write we deliberately isolated.
+    No in-request consistency fix is needed: FastAPI caches a dependency's return
+    value per request (``use_cache=True``), so this runs at most once per request.
+
+    **Best-effort** — any exception (transient DB error, pool exhaustion) is
+    caught and logged, never propagated. ``last_active_at`` is telemetry; a
+    failed stamp must not fail the authenticated request it rides on, and an
+    unhandled exception here would fail *every* authenticated route.
+    """
+    now = utc_now()
+    last = user.last_active_at
+    if last is not None and now - last < LAST_ACTIVE_THROTTLE:
+        return
+    try:
+        session = SessionLocal()
+        try:
+            session.query(User).filter(User.id == user.id).update(
+                {User.last_active_at: now}, synchronize_session=False
+            )
+            session.commit()
+        finally:
+            session.close()
+    except Exception:
+        logger.warning("failed to stamp last_active_at for user %s", user.id, exc_info=True)
+
+
 def get_current_user(
     request: Request,
     session: Session = Depends(get_db_session),
@@ -495,6 +549,7 @@ def get_current_user(
             detail="User is inactive",
         )
 
+    _stamp_last_active(user)
     return user
 
 
@@ -520,6 +575,7 @@ def get_optional_current_user(
     user = session.query(User).filter(User.id == user_id).first()
     if not user or not user.is_active:
         return None
+    _stamp_last_active(user)
     return user
 
 

@@ -56,6 +56,11 @@ def _build_user_rows(session: Session) -> list[dict]:
             "card_count": card_counts.get(u.id, 0),
             "deck_count": deck_counts.get(u.id, 0),
             "last_signed_in_at": u.last_signed_in_at,
+            # last_active_at — last authenticated request (stamped from the auth
+            # dependency, throttled per-user). Distinct from last_signed_in_at
+            # (last login); the gap between the two is the engagement signal.
+            # NULL until a user's next authenticated request (no backfill).
+            "last_active_at": u.last_active_at,
         }
         for u in users
     ]
