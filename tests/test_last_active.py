@@ -110,9 +110,10 @@ def test_write_failure_is_swallowed(isolated_sessionmaker, clock, monkeypatch):
 
     monkeypatch.setattr(dependencies, "SessionLocal", _boom)
 
-    # Must not raise, and (since the in-memory write follows the commit) must
-    # leave the persisted value untouched.
+    # Must not raise (best-effort) and must leave the persisted value untouched
+    # — the isolated write never reached commit.
     _stamp_last_active(_load(isolated_sessionmaker, uid))
+    assert _load(isolated_sessionmaker, uid).last_active_at is None
 
 
 def test_last_signed_in_at_untouched(isolated_sessionmaker, clock):

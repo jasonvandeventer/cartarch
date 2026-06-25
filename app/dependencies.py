@@ -493,6 +493,12 @@ def _stamp_last_active(user: User) -> None:
     ``SessionLocal()`` (the ``_pending_count_for`` precedent), never on the
     request's shared session: committing the timestamp there could flush
     partial route state early, and a route that later raises would roll it back.
+    The already-loaded ``user`` instance is also left UNTOUCHED — assigning
+    ``user.last_active_at`` would mark it dirty on the shared request session, so
+    a later ``session.commit()`` in the route would redundantly re-issue (and
+    thus commit on the shared session) the very write we deliberately isolated.
+    No in-request consistency fix is needed: FastAPI caches a dependency's return
+    value per request (``use_cache=True``), so this runs at most once per request.
 
     **Best-effort** — any exception (transient DB error, pool exhaustion) is
     caught and logged, never propagated. ``last_active_at`` is telemetry; a
@@ -512,9 +518,6 @@ def _stamp_last_active(user: User) -> None:
             session.commit()
         finally:
             session.close()
-        # Keep the in-memory row consistent so the throttle holds for the rest
-        # of this request. Same value the isolated session just committed.
-        user.last_active_at = now
     except Exception:
         logger.warning("failed to stamp last_active_at for user %s", user.id, exc_info=True)
 
