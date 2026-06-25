@@ -7,6 +7,7 @@ service layer.
 
 from __future__ import annotations
 
+import hmac
 import html
 import json
 import os
@@ -15,7 +16,7 @@ from contextlib import asynccontextmanager
 from datetime import timedelta
 from urllib.parse import quote
 
-from fastapi import Depends, FastAPI, Form, Request
+from fastapi import Depends, FastAPI, Form, HTTPException, Request
 from fastapi.responses import (
     FileResponse,
     HTMLResponse,
@@ -163,11 +164,41 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Cartarch", lifespan=lifespan)
 
+
+def require_metrics_token(request: Request) -> None:
+    """Gate /metrics behind a shared-secret bearer token (issue #20).
+
+    Prometheus metrics leak internal state (request counts, error rates, active
+    users), and the route was reachable by anyone — on green/Talos it is exposed
+    via the NodePort with no restriction. This dependency requires
+    ``Authorization: Bearer <METRICS_TOKEN>`` so only the scraper (which carries
+    the secret) can read it.
+
+    Fails CLOSED: if ``METRICS_TOKEN`` is unset OR the supplied token doesn't
+    match, the route returns 403 — an unconfigured deploy keeps metrics private
+    rather than silently public. Compared with ``hmac.compare_digest`` to avoid
+    leaking the token via timing. This is the ONLY auth-gated public route — no
+    other endpoint changes (the app's per-route ``get_current_user`` auth is
+    untouched).
+    """
+    expected = os.getenv("METRICS_TOKEN", "")
+    auth = request.headers.get("Authorization", "")
+    prefix = "Bearer "
+    supplied = auth[len(prefix) :] if auth.startswith(prefix) else ""
+    if not expected or not hmac.compare_digest(supplied, expected):
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+
 # Expose Prometheus metrics at /metrics for the kube-prometheus-stack
 # ServiceMonitor (platform observability). include_in_schema=False keeps it out
-# of the public OpenAPI surface. NOTE: the route is still reachable via the
-# public ingress (cartarch.com/metrics) — restrict at Traefik if that matters.
-Instrumentator().instrument(app).expose(app, include_in_schema=False)
+# of the public OpenAPI surface. The route is token-gated via
+# require_metrics_token (issue #20) — the scraper must send the METRICS_TOKEN
+# bearer secret; the kwargs flow through expose() into the FastAPI route.
+Instrumentator().instrument(app).expose(
+    app,
+    include_in_schema=False,
+    dependencies=[Depends(require_metrics_token)],
+)
 
 app.add_middleware(
     SessionMiddleware,
