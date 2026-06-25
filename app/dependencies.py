@@ -429,6 +429,37 @@ def render(
     return response
 
 
+def render_auth_page(
+    request: Request,
+    template: str,
+    ctx: dict | None = None,
+    status_code: int = 200,
+):
+    """Render a PUBLIC pre-auth form page (login / register / forgot / reset)
+    with bfcache-hostile cache headers.
+
+    Issue #31 / hypothesis #1: Firefox can restore a pre-auth form from its
+    back/forward cache (bfcache); if the session cookie has since changed (e.g.
+    dropped/expired after a logout), the restored form submits and surfaces as
+    "session expired". ``render`` already sets ``Cache-Control: no-store`` on
+    every page (v3.31.0); this re-asserts it at the auth seam and adds the
+    HTTP/1.0 ``Pragma: no-cache`` to discourage bfcache, paired with the
+    ``pageshow`` reload in ``_auth_layout.html`` (which forces a fresh load —
+    re-establishing the session cookie + token — if a browser restores the page
+    anyway).
+
+    Deliberately does NOT rotate the CSRF token: the logged-out token is sticky
+    (``get_csrf_token`` reuses it), so a restored form still matches its
+    session. Rotating per GET would only introduce a multi-tab mismatch on the
+    same code path the v3.31.0 ``require_csrf_or_reissue`` posture hard-fails as
+    forgery (see the issue #31 discussion / ``tests/test_auth_csrf.py``).
+    """
+    response = render(request, template, ctx, status_code)
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["Pragma"] = "no-cache"
+    return response
+
+
 def get_db_session() -> Generator[Session, None, None]:
     session = SessionLocal()
     try:
