@@ -50,6 +50,15 @@ class User(Base):
     # data is semantically different and copying it under the new name
     # would import the same misleading signal).
     last_signed_in_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # last_active_at — distinct from last_signed_in_at: it records the last time
+    # the user made an *authenticated request* (not just the last login), stamped
+    # from get_current_user / get_optional_current_user, throttled to one write
+    # per LAST_ACTIVE_THROTTLE per user. A persistent session that never re-logs
+    # in leaves last_signed_in_at stale while this keeps advancing — the gap is
+    # the engagement signal. Plain DateTime / naive UTC like every other column.
+    # NULL until next authenticated request for existing users (no backfill,
+    # and explicitly NOT copied from last_signed_in_at — different semantics).
+    last_active_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     inventory_rows: Mapped[list[InventoryRow]] = relationship(back_populates="user")
     decks: Mapped[list[Deck]] = relationship(back_populates="user")

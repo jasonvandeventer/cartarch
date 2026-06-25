@@ -108,6 +108,10 @@
                next login for existing users (no backfill). Displayed in
                America/Chicago via format_local_datetime. #}
             <th class="col-priority-low">Last Signed In</th>
+            {# last_active_at — last authenticated request (throttled per-user),
+               distinct from "Last Signed In" (last login). NULL until a user's
+               next authenticated request. America/Chicago via the same filter. #}
+            <th class="col-priority-low">Last Active</th>
             <th>Actions</th>
           </tr>
         </thead>
@@ -136,6 +140,7 @@
               <td class="col-priority-mid">{{ row.card_count }}</td>
               <td class="col-priority-mid">{{ row.deck_count }}</td>
               <td class="col-priority-low muted">{{ row.last_signed_in_at | format_local_datetime or '—' }}</td>
+              <td class="col-priority-low muted">{{ row.last_active_at | format_local_datetime or '—' }}</td>
               <td>
                 {% if row.user.id != current_user.id %}
                   <div style="display: flex; flex-wrap: wrap; gap: 0.4rem;">
@@ -170,7 +175,7 @@
             </tr>
             {% if row.user.id != current_user.id %}
               <tr style="background: rgba(26,19,12,0.3);">
-                <td colspan="8" style="padding: 0.4rem 0.5rem 0.75rem;">
+                <td colspan="9" style="padding: 0.4rem 0.5rem 0.75rem;">
                   <form action="/admin/users/{{ row.user.id }}/reset-password"
                         method="post"
                         class="filter-row">
