@@ -674,6 +674,65 @@ async def import_reconcile_preview(
     )
 
 
+def _materialize_variant_shares(session, user_id: int, deck, recheck: dict) -> int:
+    """issue #27 — create ``deck_card_share`` records for the variant-group
+    coverage of ONE reconciled import row, and return the count of NEW shares
+    created.
+
+    Reconciliation reports ``variant_covered_qty`` = the number of copies of
+    this card satisfied by sibling-variant builds (already capped at the row's
+    ``quantity_needed``). This function materializes exactly that coverage as
+    shares so the sibling's physical copy becomes a visible member of THIS
+    deck's list (the physical row never moves — one-card-one-location).
+
+    Three correctness properties the previous attempt missed:
+
+    - **Respect the cap (no over-share).** Sibling decks may hold several
+      distinct rows for the card (different printings, or copies spread across
+      multiple siblings). We share rows only until ``variant_covered_qty`` copies
+      are covered, then STOP — never one-share-per-sibling-row regardless of need.
+    - **Materialize under partial coverage (no under-share).** This runs for
+      EVERY variant-group row regardless of the chosen ``action`` — so a row that
+      came out ``move_existing`` / ``move_existing_plus_new`` / ``import_new``
+      because the sibling covered only PART of the need still gets its shares
+      created for the part that IS covered.
+    - **Count already-shared copies first.** Copies already shared into this deck
+      (``is_shared_in``) count toward the coverage target WITHOUT a duplicate
+      share; only the shortfall is materialized (idempotent re-imports create
+      nothing new).
+
+    No-op (returns 0) for a deck with no variant coverage (incl. every non-
+    variant deck, where ``variant_covered_qty`` is always 0)."""
+    target = recheck.get("variant_covered_qty", 0)
+    if target <= 0:
+        return 0
+
+    other_deck_matches = recheck.get("other_deck_matches", [])
+    # Already-shared sibling copies satisfy part of the target for free.
+    covered = sum(
+        m.get("quantity_available", 0) for m in other_deck_matches if m.get("is_shared_in")
+    )
+    created = 0
+    for m in other_deck_matches:
+        if covered >= target:
+            break
+        if not m.get("is_variant_sibling") or m.get("is_shared_in"):
+            continue
+        try:
+            share_card_to_deck(
+                session,
+                user_id,
+                inventory_row_id=m["inventory_row_id"],
+                target_deck_id=deck.id,
+            )
+            created += 1
+            covered += m.get("quantity_available", 0)
+        except ValueError:
+            # ownership / same-group / not-self guard tripped — skip this row.
+            pass
+    return created
+
+
 def _commit_deck_import_with_reconciliation(
     session: Session,
     user_id: int,
@@ -734,6 +793,27 @@ def _commit_deck_import_with_reconciliation(
         move_qty = int(move_qtys[idx]) if idx < len(move_qtys) else 0
         new_qty = int(new_qtys[idx]) if idx < len(new_qtys) else int(row["quantity"])
 
+        # issue #27 — for a VARIANT-GROUP deck, re-resolve this row ONCE up front
+        # and materialize its variant coverage as shares BEFORE the action
+        # branches. This is deliberately independent of `action`: partial sibling
+        # coverage can leave the action as move_*/import_new while part of the
+        # need is covered by a sibling, and that covered part must still become a
+        # share (the previous attempt gated sharing on action=="covered_by_variant"
+        # and so under-shared partial coverage AND over-shared full coverage).
+        # The recheck is REUSED by the move branch below. Non-variant decks skip
+        # this entirely (variant_group_id is None) — zero regression, no recheck.
+        recheck = None
+        variant_covered = 0
+        if deck.variant_group_id is not None:
+            recheck = find_inventory_matches_for_deck_import(session, user_id, deck.id, [row])[0]
+            variant_covered = recheck.get("variant_covered_qty", 0)
+            shared_count += _materialize_variant_shares(session, user_id, deck, recheck)
+
+        if action == "covered_by_variant":
+            # Fully covered by sibling builds — the shares were materialized
+            # above; nothing to move or import.
+            continue
+
         if action == "import_new":
             # v3.37.x Brew Mode: a card owned NOWHERE (import_new) added to a
             # brew becomes a PROXY row so it shows in the deck but never counts
@@ -741,36 +821,28 @@ def _commit_deck_import_with_reconciliation(
             # the row's "is_proxy" key. This is the single source for the brew
             # proxy rule — both the paste/CSV deck import AND the single-card
             # add-card route funnel through here, so add-card no longer sets it.
+            #
+            # issue #27 — under PARTIAL sibling coverage the action can still be
+            # import_new while `variant_covered` copies were just turned into
+            # shares above. Import only the UNCOVERED remainder so we don't
+            # over-import (variant_covered is always 0 for non-variant decks, so
+            # this is byte-for-byte unchanged there).
+            if variant_covered > 0:
+                remaining = int(row["quantity"]) - variant_covered
+                if remaining <= 0:
+                    continue
+                row = dict(row)
+                row["quantity"] = remaining
             if deck.is_brew:
                 row["is_proxy"] = "true"
             new_import_rows.append(row)
             new_import_indices.append(idx)
             continue
 
-        if action == "covered_by_variant":
-            # issue #27 — the card is covered by a sibling build in this deck's
-            # variant group. Instead of a silent no-op, MATERIALIZE the coverage
-            # as a share so the sibling's physical copy becomes a visible member
-            # of THIS deck's list (idempotent — re-import never duplicates; the
-            # physical row never moves). Skip rows already shared in.
+        # Re-resolve matches at commit time (preview state may be stale). Reuse
+        # the variant-group recheck computed above when present.
+        if recheck is None:
             recheck = find_inventory_matches_for_deck_import(session, user_id, deck.id, [row])[0]
-            for match in recheck.get("other_deck_matches", []):
-                if not match.get("is_variant_sibling") or match.get("is_shared_in"):
-                    continue
-                try:
-                    share_card_to_deck(
-                        session,
-                        user_id,
-                        inventory_row_id=match["inventory_row_id"],
-                        target_deck_id=deck.id,
-                    )
-                    shared_count += 1
-                except ValueError:
-                    pass
-            continue
-
-        # Re-resolve matches at commit time (preview state may be stale).
-        recheck = find_inventory_matches_for_deck_import(session, user_id, deck.id, [row])[0]
         available = recheck["total_available"]
 
         # How many can we actually move now, capped by the user's

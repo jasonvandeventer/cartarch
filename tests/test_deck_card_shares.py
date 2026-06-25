@@ -446,6 +446,204 @@ def test_delete_source_deck_drops_shares():
 
 
 # --------------------------------------------------------------------------- #
+# dangling-share defense — a MOVED physical card invalidates its share
+# (issue #27 revision, red-team Flaw 1)
+# --------------------------------------------------------------------------- #
+
+
+def _other_location(s, user_id, name, type_="binder"):
+    loc = StorageLocation(user_id=user_id, name=name, type=type_, mode="managed")
+    s.add(loc)
+    s.flush()
+    return loc
+
+
+def test_moving_physical_row_out_invalidates_and_prunes_share():
+    from app.inventory_service import move_inventory_row_to_location
+
+    s = _fresh_session()
+    u = _user(s)
+    _g, a, b = _group_with_two_decks(s, u)
+    card = _card(s, "Mover")
+    row = _place(s, u.id, card, a.storage_location_id)
+    deck_service.share_card_to_deck(s, u.id, inventory_row_id=row.id, target_deck_id=b.id)
+    assert deck_service.inbound_share_count_for_deck(s, b) == 1
+
+    # Move the physical card OUT of deck A into a binder (NOT deleted).
+    binder = _other_location(s, u.id, "Binder")
+    move_inventory_row_to_location(s, row.id, u.id, binder.id)
+
+    # The share is now stale — it no longer renders, counts, or is recognized by
+    # reconciliation, AND it was pruned from the table (one-card-one-location: a
+    # card living in a binder is not a member of any deck).
+    assert deck_service.get_inbound_shares_for_deck(s, b) == []
+    assert deck_service.inbound_share_count_for_deck(s, b) == 0
+    assert deck_service.inbound_shared_row_ids_for_deck(s, b) == set()
+    assert deck_service.outbound_share_map(s, a) == {}
+    assert s.query(DeckCardShare).count() == 0
+    decks = {d.name: d for d in deck_service.list_decks(s, u.id)}
+    assert decks["Build B"].card_count == 0
+    # the physical row itself is intact, just relocated.
+    s.refresh(row)
+    assert row.storage_location_id == binder.id
+
+
+def test_read_guard_hides_stale_share_even_without_prune():
+    # Bypass the move primitives entirely: mutate the row's location directly so
+    # NO prune fires. The read-side validity guard must STILL hide the now-stale
+    # share — correctness can't depend on every mover remembering to prune.
+    s = _fresh_session()
+    u = _user(s)
+    _g, a, b = _group_with_two_decks(s, u)
+    row = _place(s, u.id, _card(s), a.storage_location_id)
+    deck_service.share_card_to_deck(s, u.id, inventory_row_id=row.id, target_deck_id=b.id)
+
+    binder = _other_location(s, u.id, "Binder")
+    row.storage_location_id = binder.id  # raw move, no pruning
+    s.flush()
+
+    # The DB row still exists (un-pruned) ...
+    assert s.query(DeckCardShare).count() == 1
+    # ... but every read helper treats it as invalid.
+    assert deck_service.get_inbound_shares_for_deck(s, b) == []
+    assert deck_service.inbound_share_count_for_deck(s, b) == 0
+    assert deck_service.inbound_shared_row_ids_for_deck(s, b) == set()
+    assert deck_service.outbound_share_map(s, a) == {}
+
+
+def test_returning_shared_card_from_deck_drops_share():
+    s = _fresh_session()
+    u = _user(s)
+    _g, a, b = _group_with_two_decks(s, u)
+    row = _place(s, u.id, _card(s), a.storage_location_id)
+    deck_service.share_card_to_deck(s, u.id, inventory_row_id=row.id, target_deck_id=b.id)
+
+    # Return the physical card from deck A back to the collection (pending).
+    assert deck_service.return_card_from_deck(s, u.id, row.id)
+    assert s.query(DeckCardShare).count() == 0
+    assert deck_service.inbound_share_count_for_deck(s, b) == 0
+
+
+# --------------------------------------------------------------------------- #
+# import share-materialization — exactly the covered quantity, no more/less
+# (issue #27 revision, red-team Flaws 2 & 3)
+# --------------------------------------------------------------------------- #
+
+
+def _run_deck_import(s, user_id, deck, parsed_rows):
+    """Reconcile + commit a deck import the way the routes do, using the
+    recommended actions/quantities."""
+    from app.routes.imports import _commit_deck_import_with_reconciliation
+
+    recon = deck_service.find_inventory_matches_for_deck_import(s, user_id, deck.id, parsed_rows)
+    actions = [r["recommended_action"] for r in recon]
+    move_qtys = [r["recommended_move_qty"] for r in recon]
+    new_qtys = [r["recommended_new_qty"] for r in recon]
+    return _commit_deck_import_with_reconciliation(
+        s, user_id, deck, parsed_rows, actions, move_qtys, new_qtys, "test.txt"
+    )
+
+
+def test_import_does_not_over_share_across_multiple_siblings():
+    # Flaw 2: two sibling decks each hold one copy of the SAME printing. Importing
+    # ONE copy into a third sibling must create EXACTLY one share — not one per
+    # sibling row.
+    s = _fresh_session()
+    u = _user(s)
+    g = deck_service.create_variant_group(s, u.id, "G")
+    a = _deck(s, u.id, "A", group_id=g.id)
+    b = _deck(s, u.id, "B", group_id=g.id)
+    c = _deck(s, u.id, "C", group_id=g.id)
+    card = _card(s)
+    _place(s, u.id, card, a.storage_location_id, qty=1)
+    _place(s, u.id, card, b.storage_location_id, qty=1)
+
+    res = _run_deck_import(s, u.id, c, [_row_input(card, qty=1)])
+
+    assert res["shared_count"] == 1
+    assert s.query(DeckCardShare).count() == 1
+    assert deck_service.inbound_share_count_for_deck(s, c) == 1
+    # no physical row was created/moved into C (covered entirely by the share).
+    c_own = (
+        s.query(InventoryRow)
+        .filter(InventoryRow.storage_location_id == c.storage_location_id)
+        .count()
+    )
+    assert c_own == 0
+
+
+def test_import_materializes_share_on_partial_coverage():
+    # Flaw 3: a sibling covers only PART of the imported quantity. The covered
+    # part must still become a share even though the row's action is move_existing
+    # (not covered_by_variant). need=2: sibling covers 1, a drawer covers 1.
+    s = _fresh_session()
+    u = _user(s)
+    _g, a, b = _group_with_two_decks(s, u)
+    card = _card(s)
+    _place(s, u.id, card, a.storage_location_id, qty=1)  # sibling-covered copy
+    drawer = _other_location(s, u.id, "Drawer", type_="drawer")
+    _place(s, u.id, card, drawer.id, qty=1)  # movable copy
+
+    res = _run_deck_import(s, u.id, b, [_row_input(card, qty=2)])
+
+    # one copy materialized as a share, one copy physically moved from the drawer.
+    assert res["shared_count"] == 1
+    assert res["moved_count"] == 1
+    assert s.query(DeckCardShare).count() == 1
+    assert deck_service.inbound_share_count_for_deck(s, b) == 1
+    # B physically holds exactly the moved copy.
+    b_own = (
+        s.query(InventoryRow)
+        .filter(
+            InventoryRow.storage_location_id == b.storage_location_id,
+            InventoryRow.is_pending.is_(False),
+        )
+        .all()
+    )
+    assert sum(r.quantity for r in b_own) == 1
+    # the drawer copy is gone (fully pulled).
+    drawer_left = (
+        s.query(InventoryRow).filter(InventoryRow.storage_location_id == drawer.id).count()
+    )
+    assert drawer_left == 0
+
+
+def test_import_full_coverage_creates_one_share_and_is_idempotent():
+    # Full sibling coverage → covered_by_variant → exactly one share; re-import
+    # creates nothing new (idempotent on the unique pair).
+    s = _fresh_session()
+    u = _user(s)
+    _g, a, b = _group_with_two_decks(s, u)
+    card = _card(s)
+    _place(s, u.id, card, a.storage_location_id, qty=1)
+
+    res1 = _run_deck_import(s, u.id, b, [_row_input(card, qty=1)])
+    assert res1["shared_count"] == 1
+    assert s.query(DeckCardShare).count() == 1
+
+    res2 = _run_deck_import(s, u.id, b, [_row_input(card, qty=1)])
+    assert res2["shared_count"] == 0
+    assert s.query(DeckCardShare).count() == 1
+
+
+def test_import_into_non_variant_deck_creates_no_shares():
+    # Regression: a deck with no variant group never materializes shares and
+    # pays no recheck for import_new rows.
+    s = _fresh_session()
+    u = _user(s)
+    a = _deck(s, u.id, "Solo A")
+    b = _deck(s, u.id, "Solo B")
+    card = _card(s)
+    _place(s, u.id, card, a.storage_location_id, qty=1)
+    # Importing the card B already-elsewhere into B: no variant group → no share.
+    drawer = _other_location(s, u.id, "Drawer", type_="drawer")
+    _place(s, u.id, card, drawer.id, qty=1)
+    res = _run_deck_import(s, u.id, b, [_row_input(card, qty=1)])
+    assert res["shared_count"] == 0
+    assert s.query(DeckCardShare).count() == 0
+
+
+# --------------------------------------------------------------------------- #
 # regression guards — non-variant decks unaffected
 # --------------------------------------------------------------------------- #
 

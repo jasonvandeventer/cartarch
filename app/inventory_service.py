@@ -1947,6 +1947,14 @@ def move_inventory_row_to_location(
     row.is_pending = False
     row.updated_at = now
 
+    # issue #27 — the row just changed location, so any deck_card_share that
+    # referenced it as "shared from <old deck>" is now stale (the card no longer
+    # lives in its source deck). Drop the stale shares; a deck where this card
+    # was shared in stops listing it. No-op unless the row was a shared source.
+    from app.deck_service import prune_shares_for_relocated_row
+
+    prune_shares_for_relocated_row(session, row.id)
+
     log_transaction(
         session=session,
         user_id=user_id,
