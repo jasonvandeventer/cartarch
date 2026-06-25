@@ -13194,6 +13194,13 @@ table.dmtx .dmtx-rowhead {
   z-index: 1100;
 }
 .gf-modal[hidden] { display: none; }
+/* The side preview pane (.gf-preview) sits in normal flow with no z-index, so
+   the modal's full-viewport backdrop (z-index 1100, inset:0) renders OVER it and
+   it appears dimmed/obscured while a modal is open. Hide it for the duration the
+   modal is shown — it reappears unchanged once the modal closes (the [hidden]
+   attribute is toggled by goldfish.js). visibility (not display:none) keeps the
+   grid layout stable so nothing reflows behind the backdrop. */
+.gf-app:has(#gf-modal:not([hidden])) .gf-preview { visibility: hidden; }
 .gf-modal-card {
   background: var(--panel);
   border: 1px solid var(--brand-gold-soft);
