@@ -1,5 +1,15 @@
 [
   {
+    "version": "4.0.21",
+    "date": "2026-06-25",
+    "added": [],
+    "refined": [
+      "Fixed the import destination dropdown showing an incorrect label for binder locations."
+    ],
+    "resolved": [],
+    "archivist_note": null
+  },
+  {
     "version": "4.0.20",
     "date": "2026-06-25",
     "added": [],
