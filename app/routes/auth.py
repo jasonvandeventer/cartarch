@@ -10,6 +10,7 @@ from app.dependencies import (
     client_ip_for,
     get_db_session,
     render,
+    render_auth_page,
     require_csrf_or_reissue,
 )
 from app.login_throttle import (
@@ -26,7 +27,8 @@ router = APIRouter()
 
 @router.get("/login")
 def login_page(request: Request):
-    return render(request, "login.html", {"error": None})
+    # render_auth_page: bfcache-hostile headers (no-store + Pragma) — issue #31.
+    return render_auth_page(request, "login.html", {"error": None})
 
 
 @router.post("/login")

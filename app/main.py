@@ -44,6 +44,7 @@ from app.dependencies import (
     get_db_session,
     get_optional_current_user,
     render,
+    render_auth_page,
     require_csrf_or_reissue,
     safe_redirect_url,
 )
@@ -833,7 +834,8 @@ def register(
 
 @app.get("/register")
 def register_page(request: Request):
-    return render(request, "register.html", {"title": "Register"})
+    # render_auth_page: bfcache-hostile headers (no-store + Pragma) — issue #31.
+    return render_auth_page(request, "register.html", {"title": "Register"})
 
 
 # v3.27.12 — Watchlist. A per-user list of cards the user wants to track.
@@ -1089,7 +1091,8 @@ def watchlist_update_target_price(
 
 @app.get("/forgot-password")
 def forgot_password_page(request: Request):
-    return render(request, "forgot_password.html", {"title": "Forgot password"})
+    # render_auth_page: bfcache-hostile headers (no-store + Pragma) — issue #31.
+    return render_auth_page(request, "forgot_password.html", {"title": "Forgot password"})
 
 
 @app.post("/forgot-password")
@@ -1174,7 +1177,8 @@ def reset_password_page(
     """
     token_row = find_valid_token(session, token)
     if token_row is None:
-        return render(
+        # render_auth_page: bfcache-hostile headers (no-store + Pragma) — issue #31.
+        return render_auth_page(
             request,
             "reset_password.html",
             {
@@ -1182,7 +1186,7 @@ def reset_password_page(
                 "invalid": True,
             },
         )
-    return render(
+    return render_auth_page(
         request,
         "reset_password.html",
         {

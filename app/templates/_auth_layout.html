@@ -91,5 +91,20 @@
   </section>
 
 </div>
+<script>
+  // Issue #31 (hypothesis #1): if a browser (notably Firefox) restores this
+  // pre-auth page from its back/forward cache (bfcache), the form can submit
+  // against a session cookie that has since changed, surfacing as "session
+  // expired". A bfcache restore fires `pageshow` with `event.persisted === true`;
+  // force a fresh load so the page — and its session cookie + CSRF token — are
+  // re-fetched from the server. Pairs with the no-store/Pragma headers set by
+  // render_auth_page(); covers login, register, forgot- and reset-password,
+  // which all share this layout.
+  window.addEventListener("pageshow", function (event) {
+    if (event.persisted) {
+      window.location.reload();
+    }
+  });
+</script>
 </body>
 </html>
