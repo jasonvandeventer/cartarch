@@ -38,6 +38,15 @@ def test_metrics_correct_token_ok(client, monkeypatch):
     assert "# HELP" in resp.text
 
 
+def test_metrics_scheme_is_case_insensitive(client, monkeypatch):
+    """RFC 7235: the 'Bearer' scheme token is case-insensitive — a scraper
+    sending lowercase still authenticates (the credential stays exact)."""
+    monkeypatch.setenv("METRICS_TOKEN", "s3cret")
+    resp = client.get("/metrics", headers={"Authorization": "bearer s3cret"})
+    assert resp.status_code == 200
+    assert "# HELP" in resp.text
+
+
 def test_metrics_unconfigured_fails_closed(client, monkeypatch):
     """No METRICS_TOKEN set → metrics stay private (403), never silently public."""
     monkeypatch.delenv("METRICS_TOKEN", raising=False)

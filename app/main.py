@@ -183,8 +183,12 @@ def require_metrics_token(request: Request) -> None:
     """
     expected = os.getenv("METRICS_TOKEN", "")
     auth = request.headers.get("Authorization", "")
-    prefix = "Bearer "
-    supplied = auth[len(prefix) :] if auth.startswith(prefix) else ""
+    # RFC 7235: the auth-scheme token ("Bearer") is case-INSENSITIVE — split off
+    # the scheme leniently so a scraper sending "bearer"/"BEARER" still works,
+    # while the credential itself stays exact. Only a single space is consumed.
+    scheme, _, supplied = auth.partition(" ")
+    if scheme.lower() != "bearer":
+        supplied = ""
     if not expected or not hmac.compare_digest(supplied, expected):
         raise HTTPException(status_code=403, detail="Forbidden")
 
