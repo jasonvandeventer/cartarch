@@ -51,6 +51,14 @@
   const submitBtn = document.getElementById('import-submit-btn');
   if (!selectEl) return;
 
+  // Mirror the Jinja loc_type_label macro (_macros.html) so an inline-created
+  // location reads identically to the server-rendered options in the SAME
+  // destination dropdown — "binder" is disambiguated as "Binder (physical)".
+  function locTypeLabel(t) {
+    if (t === 'binder') return 'Binder (physical)';
+    return t ? t.charAt(0).toUpperCase() + t.slice(1) : t;
+  }
+
   function ensureOptgroup(id, label) {
     let og = document.getElementById(id);
     if (!og) {
@@ -135,7 +143,7 @@
         const og = ensureOptgroup('opt-locations', 'Storage Locations');
         const opt = document.createElement('option');
         opt.value = loc.id;
-        opt.textContent = loc.name + ' (' + loc.type + ')';
+        opt.textContent = loc.name + ' (' + locTypeLabel(loc.type) + ')';
         og.appendChild(opt);
         selectEl.value = String(loc.id);
         if (submitBtn) submitBtn.disabled = false;
