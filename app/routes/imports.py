@@ -26,6 +26,7 @@ from app.deck_service import (
     find_inventory_matches_for_deck_import,
     list_decks_basic,
     pull_card_to_deck,
+    share_card_to_deck,
 )
 from app.dependencies import (
     DRAWER_SORTER_USERNAMES,
@@ -723,6 +724,7 @@ def _commit_deck_import_with_reconciliation(
                              rows (merged-then-deleted rows are excluded)
     """
     moved_count = 0
+    shared_count = 0  # issue #27 — copies materialized as variant-group shares
     stale_match_rows: list[dict] = []
     new_import_rows: list[dict] = []
     new_import_indices: list[int] = []  # position in parsed_rows for the new portion
@@ -743,6 +745,28 @@ def _commit_deck_import_with_reconciliation(
                 row["is_proxy"] = "true"
             new_import_rows.append(row)
             new_import_indices.append(idx)
+            continue
+
+        if action == "covered_by_variant":
+            # issue #27 — the card is covered by a sibling build in this deck's
+            # variant group. Instead of a silent no-op, MATERIALIZE the coverage
+            # as a share so the sibling's physical copy becomes a visible member
+            # of THIS deck's list (idempotent — re-import never duplicates; the
+            # physical row never moves). Skip rows already shared in.
+            recheck = find_inventory_matches_for_deck_import(session, user_id, deck.id, [row])[0]
+            for match in recheck.get("other_deck_matches", []):
+                if not match.get("is_variant_sibling") or match.get("is_shared_in"):
+                    continue
+                try:
+                    share_card_to_deck(
+                        session,
+                        user_id,
+                        inventory_row_id=match["inventory_row_id"],
+                        target_deck_id=deck.id,
+                    )
+                    shared_count += 1
+                except ValueError:
+                    pass
             continue
 
         # Re-resolve matches at commit time (preview state may be stale).
@@ -888,6 +912,7 @@ def _commit_deck_import_with_reconciliation(
         "imported_count": new_imported_count,
         "total_quantity": new_total_quantity,
         "moved_count": moved_count,
+        "shared_count": shared_count,
         "merged_count": merged_count,
         "failed_rows": failed_rows,
         "stale_match_rows": stale_match_rows,
@@ -1376,6 +1401,7 @@ async def import_commit(
             "total_quantity": result.get("total_quantity", result["imported_count"]),
             "moved_count": moved_count,
             "merged_count": merged_count,
+            "shared_count": result.get("shared_count", 0),
             "skipped_count": skipped_count,
             "stale_match_rows": stale_match_rows,
             "failed_rows": result["failed_rows"],
@@ -1700,6 +1726,7 @@ async def manual_import_commit(
             "total_quantity": result.get("total_quantity", result["imported_count"]),
             "moved_count": moved_count,
             "merged_count": merged_count,
+            "shared_count": result.get("shared_count", 0),
             "skipped_count": skipped_count,
             "stale_match_rows": stale_match_rows,
             "failed_rows": result["failed_rows"],

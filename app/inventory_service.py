@@ -2734,6 +2734,14 @@ def clean_inventory_row_references(session: Session, row_ids: list[int]) -> None
     session.query(ShowcaseItem).filter(ShowcaseItem.inventory_row_id.in_(row_ids)).delete(
         synchronize_session=False
     )
+    # issue #27 — a physical row sold/deleted drops any deck_card_share that
+    # references it (the row is no longer a member of any sibling decklist).
+    # ON DELETE CASCADE NOT NULL on PG; explicit here for SQLite (FK off).
+    from app.models import DeckCardShare
+
+    session.query(DeckCardShare).filter(DeckCardShare.inventory_row_id.in_(row_ids)).delete(
+        synchronize_session=False
+    )
     from app import trade_service
 
     trade_service.abandon_pending_trades_for_inventory_rows(session, row_ids)

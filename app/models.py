@@ -241,6 +241,61 @@ class VariantGroup(Base):
     decks: Mapped[list[Deck]] = relationship(back_populates="variant_group")
 
 
+class DeckCardShare(Base):
+    """Issue #27 — variant-group deck sharing (membership ≠ location).
+
+    Records that a physical :class:`InventoryRow` (still stored in its
+    *source* deck's ``storage_location_id`` — the one-card-one-location
+    invariant is PRESERVED, no row duplication) is ALSO a member of a
+    sibling build's decklist (``target_deck_id``). It is a **reference, never
+    a copy**: the row stays where it physically lives; the share only adds it
+    to another deck in the SAME variant group.
+
+    Query semantics (deck_service.py):
+      - A deck's full card list = its own ``InventoryRow``s UNION its inbound
+        shares (rows where ``target_deck_id == this deck``).
+      - The deck card count includes inbound shares.
+      - The *collection* count counts ``InventoryRow``s ONLY — a share is
+        NEVER counted (the user owns one physical copy; no double-count).
+
+    ``UNIQUE(inventory_row_id, target_deck_id)`` makes a row shared to a deck
+    at most once (``share_card_to_deck`` is idempotent on it). All four FKs are
+    ``ON DELETE CASCADE NOT NULL``: the share is meaningless without its row,
+    its decks, or its group, and dies with any of them. SQLite enforces no FKs
+    (PRAGMA foreign_keys OFF), so the cascades are also performed explicitly
+    (``clean_inventory_row_references`` on row delete; ``delete_shares_for_deck``
+    /``assign_deck_variant_group``/``delete_variant_group`` on the deck/group
+    side) — the DB CASCADE is then Postgres defense-in-depth.
+
+    ``created_at`` is a naive ``DateTime`` (ORM ``default=utc_now``), matching
+    the schema's naive-timestamp convention — NOT timestamptz.
+    """
+
+    __tablename__ = "deck_card_shares"
+    __table_args__ = (
+        UniqueConstraint(
+            "inventory_row_id", "target_deck_id", name="uq_deck_card_shares_row_target"
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    inventory_row_id: Mapped[int] = mapped_column(
+        ForeignKey("inventory_rows.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    source_deck_id: Mapped[int] = mapped_column(
+        ForeignKey("decks.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    target_deck_id: Mapped[int] = mapped_column(
+        ForeignKey("decks.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    variant_group_id: Mapped[int] = mapped_column(
+        ForeignKey("variant_groups.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)
+
+    inventory_row: Mapped[InventoryRow] = relationship()
+
+
 class ImportBatch(Base):
     __tablename__ = "import_batches"
 

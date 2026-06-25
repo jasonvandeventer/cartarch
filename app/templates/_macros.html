@@ -84,6 +84,11 @@
           <span class="language-badge" title="Physical language">{{ item.language|upper }}</span>
         {% endif %}
         {% if item.is_proxy %}<span class="proxy-badge{% if proxy_warn %} proxy-badge-warn{% endif %}" title="{% if proxy_warn %}Proxy — carries no market value{% else %}Marked as proxy{% endif %}">PROXY</span>{% endif %}
+        {# issue #27 — variant-group sharing. Own rows shared OUT to sibling
+           builds badge "SHARED WITH …"; rows shared INTO this deck (rendered in
+           the read-only variant-group panel) badge "SHARED FROM …". #}
+        {% if item.shared_with %}<span class="share-badge" title="Shared into: {{ item.shared_with|join(', ') }}">SHARED WITH {{ item.shared_with|join(', ') }}</span>{% endif %}
+        {% if item.shared_from %}<span class="share-badge" title="Physically lives in {{ item.shared_from }}">SHARED FROM {{ item.shared_from }}</span>{% endif %}
         {% if item.card.mana_cost %}· {{ item.card.mana_cost }}{% endif %}
         · Qty {{ item.quantity }} ·
         {% if proxy_warn and item.is_proxy %}

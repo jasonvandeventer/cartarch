@@ -39,6 +39,16 @@
           <div class="muted small-text">into existing deck rows</div>
         </div>
       {% endif %}
+      {% set _shared = shared_count if shared_count is defined else 0 %}
+      {% if _shared > 0 %}
+        {# issue #27 — copies covered by (and materialized as a share from) a
+           sibling build in this deck's variant group. #}
+        <div class="stat-card compact">
+          <div class="stat-label">Cards shared</div>
+          <div class="stat-number">{{ _shared }}</div>
+          <div class="muted small-text">from a sibling variant build</div>
+        </div>
+      {% endif %}
       {% if _skipped > 0 %}
         <div class="stat-card compact">
           <div class="stat-label">Cards skipped</div>
