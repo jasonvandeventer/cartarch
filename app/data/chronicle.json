@@ -1,5 +1,15 @@
 [
   {
+    "version": "4.0.16",
+    "date": "2026-06-24",
+    "added": [],
+    "refined": [],
+    "resolved": [
+      "Fixed an intermittent \"session expired\" error when signing in on Firefox after using the back button or returning to a left-open login page."
+    ],
+    "archivist_note": null
+  },
+  {
     "version": "4.0.15",
     "date": "2026-06-24",
     "added": [],
