@@ -1,5 +1,15 @@
 [
   {
+    "version": "4.0.22",
+    "date": "2026-06-25",
+    "added": [],
+    "refined": [
+      "The internal metrics endpoint is now access-restricted and no longer publicly visible."
+    ],
+    "resolved": [],
+    "archivist_note": null
+  },
+  {
     "version": "4.0.21",
     "date": "2026-06-25",
     "added": [],
