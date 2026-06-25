@@ -1,5 +1,15 @@
 [
   {
+    "version": "4.0.17",
+    "date": "2026-06-25",
+    "added": [],
+    "refined": [
+      "Decks in a variant group now show the full shared decklist. Shared cards appear in both decks with a badge indicating they're shared from a sibling deck. Your collection count stays accurate — shared cards are only counted once."
+    ],
+    "resolved": [],
+    "archivist_note": null
+  },
+  {
     "version": "4.0.16",
     "date": "2026-06-24",
     "added": [],
