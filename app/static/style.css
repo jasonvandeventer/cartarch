@@ -14648,6 +14648,9 @@ body.gf-mode { overflow: hidden; }
 }
 .brew-toggle input {
   margin: 0;
+  /* Defeat the `.filter-row input { min-width: 140px }` rule that otherwise
+     stretches the New-Deck checkbox to 140px, leaving a big gap before "Brew". */
+  min-width: 0;
 }
 .brew-buylist-sub {
   margin: 0.7rem 0 0.3rem;
