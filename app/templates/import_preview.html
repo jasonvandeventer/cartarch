@@ -1,4 +1,4 @@
-{% from "_macros.html" import editorial_eyebrow %}
+{% from "_macros.html" import editorial_eyebrow, loc_type_label %}
 {% extends "base.html" %}
 {% block content %}
   {# v3.28.10 — Folio editorial polish on the Preview step of the Imports
@@ -357,7 +357,7 @@
                   hx-trigger="load, change">
             {% if use_drawer_sorter %}<option value="0">Auto-sort to drawers</option>{% endif %}
             <optgroup label="Storage Locations" id="opt-locations">
-              {% for loc in placeable %}<option value="{{ loc.id }}">{{ loc.name }} ({{ loc.type }})</option>{% endfor %}
+              {% for loc in placeable %}<option value="{{ loc.id }}">{{ loc.name }} ({{ loc_type_label(loc.type) }})</option>{% endfor %}
             </optgroup>
             <optgroup label="Decks" id="opt-decks">
               {% for deck in decks %}
