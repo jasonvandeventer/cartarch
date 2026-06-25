@@ -7,7 +7,16 @@ from sqlalchemy import func, text
 from sqlalchemy.orm import Session, joinedload
 
 from app.audit_service import log_transaction
-from app.models import Card, Deck, Game, GameSeat, InventoryRow, StorageLocation, VariantGroup
+from app.models import (
+    Card,
+    Deck,
+    DeckCardShare,
+    Game,
+    GameSeat,
+    InventoryRow,
+    StorageLocation,
+    VariantGroup,
+)
 from app.scryfall import _cache_get_by_ids, extract_token_stubs, fetch_deck_tokens
 from app.timeutil import utc_now
 
@@ -1961,6 +1970,11 @@ def list_decks(session: Session, user_id: int) -> list[Deck]:
             .scalar()
             or 0
         )
+        # issue #27 — the deck card count includes inbound variant-group shares
+        # (the FULL decklist). Gated on variant_group_id, so non-variant decks
+        # run zero extra queries. Collection count is unaffected — shares are
+        # never InventoryRows of this deck.
+        deck.card_count += inbound_share_count_for_deck(session, deck)
 
         commander_rows = (
             session.query(InventoryRow)
@@ -2160,6 +2174,11 @@ def delete_variant_group(session: Session, user_id: int, group_id: int) -> bool:
     group = get_variant_group(session, user_id, group_id)
     if group is None:
         return False
+    # issue #27 — drop every share belonging to this group first (SQLite
+    # enforces no FK CASCADE; the DB CASCADE is Postgres defense-in-depth).
+    session.query(DeckCardShare).filter(DeckCardShare.variant_group_id == group_id).delete(
+        synchronize_session=False
+    )
     session.query(Deck).filter(Deck.variant_group_id == group_id, Deck.user_id == user_id).update(
         {Deck.variant_group_id: None}, synchronize_session=False
     )
@@ -2179,12 +2198,18 @@ def assign_deck_variant_group(
     deck = get_deck(session, deck_id=deck_id, user_id=user_id)
     if deck is None:
         return None
+    old_group_id = deck.variant_group_id
     if group_id is not None:
         if get_variant_group(session, user_id, group_id) is None:
             raise ValueError("Variant group not found.")
         deck.variant_group_id = group_id
     else:
         deck.variant_group_id = None
+    # issue #27 — a deck LEAVING or SWITCHING its variant group can no longer
+    # legitimately share with (or be shared by) its old siblings, so drop every
+    # share touching this deck. No-op when the group is unchanged.
+    if old_group_id != deck.variant_group_id:
+        delete_shares_for_deck(session, deck.id)
     session.commit()
     return deck
 
@@ -2207,6 +2232,401 @@ def sibling_variant_deck_location_ids(session: Session, deck: Deck) -> list[int]
         )
         .all()
     ]
+
+
+# ----------------------------------------------------------------------------
+# Variant-group deck sharing — deck_card_shares (issue #27)
+#
+# A DeckCardShare records that a physical InventoryRow (still stored in its
+# SOURCE deck's storage location — one-card-one-location PRESERVED) is ALSO a
+# member of a SIBLING build's decklist within the same variant group. A
+# reference, never a copy: sharing does NOT move ``storage_location_id``.
+#
+# Every helper short-circuits when the deck has no variant group, so decks NOT
+# in a variant group run zero extra queries and are byte-for-byte unchanged.
+# ----------------------------------------------------------------------------
+
+
+def _deck_for_inventory_row(session: Session, user_id: int, row: InventoryRow) -> Deck | None:
+    """The deck whose storage location physically holds ``row`` (or None)."""
+    if row.storage_location_id is None:
+        return None
+    return (
+        session.query(Deck)
+        .filter(
+            Deck.user_id == user_id,
+            Deck.storage_location_id == row.storage_location_id,
+        )
+        .first()
+    )
+
+
+def share_card_to_deck(
+    session: Session,
+    user_id: int,
+    inventory_row_id: int,
+    target_deck_id: int,
+) -> DeckCardShare:
+    """Share an owned card (a physical InventoryRow in one deck) into a SIBLING
+    build of the same variant group.
+
+    Creates a :class:`DeckCardShare` reference — it does NOT move the row's
+    ``storage_location_id`` (the source deck keeps the physical card; the
+    target deck gains membership). Idempotent on ``(inventory_row_id,
+    target_deck_id)`` — re-sharing returns the existing record.
+
+    Validation (all raise ValueError):
+      - the row and both decks must be owned by ``user_id``;
+      - the row must physically live in one of the user's decks (its SOURCE);
+      - source and target must differ (not-self);
+      - source and target must be in the SAME, non-null variant group.
+    """
+    target_deck = get_deck(session, deck_id=target_deck_id, user_id=user_id)
+    if target_deck is None:
+        raise ValueError("Target deck not found.")
+    row = (
+        session.query(InventoryRow)
+        .filter(InventoryRow.id == inventory_row_id, InventoryRow.user_id == user_id)
+        .first()
+    )
+    if row is None:
+        raise ValueError("Inventory row not found.")
+    source_deck = _deck_for_inventory_row(session, user_id, row)
+    if source_deck is None:
+        raise ValueError("That card is not in a deck.")
+    if source_deck.id == target_deck.id:
+        raise ValueError("A card cannot be shared to its own deck.")
+    if (
+        source_deck.variant_group_id is None
+        or source_deck.variant_group_id != target_deck.variant_group_id
+    ):
+        raise ValueError("Both decks must be in the same variant group.")
+
+    existing = (
+        session.query(DeckCardShare)
+        .filter(
+            DeckCardShare.inventory_row_id == inventory_row_id,
+            DeckCardShare.target_deck_id == target_deck_id,
+        )
+        .first()
+    )
+    if existing is not None:
+        return existing
+
+    share = DeckCardShare(
+        inventory_row_id=inventory_row_id,
+        source_deck_id=source_deck.id,
+        target_deck_id=target_deck.id,
+        variant_group_id=target_deck.variant_group_id,
+    )
+    session.add(share)
+    session.commit()
+    return share
+
+
+def unshare_card_from_deck(
+    session: Session,
+    user_id: int,
+    inventory_row_id: int,
+    target_deck_id: int,
+) -> bool:
+    """Remove a share (the row reverts to membership in its source deck only).
+
+    Ownership-checked via the target deck. Idempotent: returns False when no
+    matching share exists. Never touches the physical row.
+    """
+    target_deck = get_deck(session, deck_id=target_deck_id, user_id=user_id)
+    if target_deck is None:
+        return False
+    deleted = (
+        session.query(DeckCardShare)
+        .filter(
+            DeckCardShare.inventory_row_id == inventory_row_id,
+            DeckCardShare.target_deck_id == target_deck_id,
+        )
+        .delete(synchronize_session=False)
+    )
+    session.commit()
+    return bool(deleted)
+
+
+# --------------------------------------------------------------------------- #
+# Share VALIDITY guard (issue #27 revision — dangling-share defense)
+#
+# A DeckCardShare records that a physical InventoryRow shared from its SOURCE
+# deck is a member of a sibling's decklist. The share captures ``source_deck_id``
+# at creation time, but the physical row can later be MOVED elsewhere (to a
+# binder, to pending, or into a different deck) WITHOUT being deleted — leaving
+# the share pointing at a card that no longer lives in its source deck. Such a
+# share is STALE and must never render/count/export (it would wrongly show the
+# card as "SHARED FROM <old deck>").
+#
+# Every read-side helper below therefore enforces the invariant
+# ``InventoryRow.storage_location_id == <source deck>.storage_location_id`` — a
+# share is valid ONLY while its physical row still lives in its source deck.
+# This is the AUTHORITATIVE correctness mechanism: it holds regardless of which
+# move path relocated the row, so correctness never depends on every mover
+# remembering to prune. ``prune_shares_for_relocated_row`` /
+# ``delete_shares_for_inventory_row`` additionally DROP stale shares at the move
+# primitives so the table stays tidy (and the Postgres FK CASCADE is a third
+# line of defense on row deletion).
+# --------------------------------------------------------------------------- #
+
+
+def get_inbound_shares_for_deck(session: Session, deck: Deck) -> list[dict]:
+    """Cards shared INTO ``deck`` from sibling builds (read-only render data).
+
+    Returns one dict per inbound share with the physical InventoryRow, its
+    Card, and the source deck's name. Empty list for a deck with no variant
+    group (the short-circuit gate). Order: card name, then row id. Stale shares
+    (physical row no longer in its source deck) are filtered out by the validity
+    guard above.
+    """
+    if deck.variant_group_id is None:
+        return []
+    rows = (
+        session.query(DeckCardShare, InventoryRow, Card, Deck.name)
+        .join(InventoryRow, DeckCardShare.inventory_row_id == InventoryRow.id)
+        .join(Card, InventoryRow.card_id == Card.id)
+        .join(Deck, DeckCardShare.source_deck_id == Deck.id)
+        .filter(
+            DeckCardShare.target_deck_id == deck.id,
+            InventoryRow.storage_location_id == Deck.storage_location_id,
+        )
+        .order_by(Card.name.asc(), InventoryRow.id.asc())
+        .all()
+    )
+    return [
+        {
+            "share_id": share.id,
+            "inventory_row": inv,
+            "inventory_row_id": inv.id,
+            "card": card,
+            "finish": inv.finish,
+            "quantity": inv.quantity,
+            "is_proxy": bool(inv.is_proxy),
+            "source_deck_id": share.source_deck_id,
+            "source_deck_name": source_name,
+        }
+        for share, inv, card, source_name in rows
+    ]
+
+
+def inbound_shared_rows_for_deck(
+    session: Session, deck: Deck, search: str | None = None
+) -> list[tuple[InventoryRow, str]]:
+    """The physical ``InventoryRow`` objects shared INTO ``deck`` from sibling
+    builds, paired with each one's SOURCE deck name.
+
+    Returned as ``(InventoryRow, source_deck_name)`` tuples so the deck-detail
+    item builder can fold them into the SAME unified card list as the deck's own
+    rows (issue #27 query semantics: a deck's card list = own rows UNION inbound
+    shares, sorted/grouped together). The ``InventoryRow.card`` is eager-loaded.
+    When ``search`` is given the shared rows are filtered by the SAME
+    boolean/Scryfall parser as the own rows, so they filter in lock-step.
+
+    Empty list for a deck with no variant group (the short-circuit gate), so a
+    non-variant deck's grid is byte-for-byte unchanged.
+    """
+    if deck.variant_group_id is None:
+        return []
+    query = (
+        session.query(InventoryRow, Deck.name)
+        .options(joinedload(InventoryRow.card))
+        .join(DeckCardShare, DeckCardShare.inventory_row_id == InventoryRow.id)
+        .join(Deck, DeckCardShare.source_deck_id == Deck.id)
+        .join(Card, InventoryRow.card_id == Card.id)
+        .filter(
+            DeckCardShare.target_deck_id == deck.id,
+            InventoryRow.storage_location_id == Deck.storage_location_id,
+        )
+    )
+    if search and search.strip():
+        from app.inventory_service import apply_collection_search_filters
+
+        query = apply_collection_search_filters(query, search)
+    return [(row, source_name) for row, source_name in query.all()]
+
+
+def own_deck_card_options(session: Session, user_id: int, deck: Deck) -> list[dict]:
+    """``{id, name, finish, role}`` for each of ``deck``'s own physically-held
+    rows — the picker for the "share a card with a sibling" control in the
+    deck-edit popouts (``decks.html``). Empty when the deck has no storage
+    location. Ordered by card name."""
+    if deck.storage_location_id is None:
+        return []
+    rows = (
+        session.query(InventoryRow)
+        .options(joinedload(InventoryRow.card))
+        .join(Card, InventoryRow.card_id == Card.id)
+        .filter(
+            InventoryRow.user_id == user_id,
+            InventoryRow.storage_location_id == deck.storage_location_id,
+        )
+        .order_by(Card.name.asc(), InventoryRow.id.asc())
+        .all()
+    )
+    return [
+        {
+            "id": r.id,
+            "name": r.card.name if r.card else f"#{r.id}",
+            "finish": r.finish,
+            "role": r.role,
+        }
+        for r in rows
+    ]
+
+
+def get_outbound_shares_for_deck(session: Session, deck: Deck) -> list[dict]:
+    """``{inventory_row_id, card_name, target_deck_id, target_deck_name}`` for
+    every share FROM ``deck`` — the unshare list in the deck-edit popouts.
+    Empty for a deck with no variant group. Ordered by card name."""
+    if deck.variant_group_id is None:
+        return []
+    rows = (
+        session.query(DeckCardShare, Card.name, Deck.name)
+        .join(InventoryRow, DeckCardShare.inventory_row_id == InventoryRow.id)
+        .join(Card, InventoryRow.card_id == Card.id)
+        .join(Deck, DeckCardShare.target_deck_id == Deck.id)
+        .filter(
+            DeckCardShare.source_deck_id == deck.id,
+            # validity guard: the row must still physically live in THIS (source) deck
+            InventoryRow.storage_location_id == deck.storage_location_id,
+        )
+        .order_by(Card.name.asc())
+        .all()
+    )
+    return [
+        {
+            "inventory_row_id": share.inventory_row_id,
+            "card_name": card_name,
+            "target_deck_id": share.target_deck_id,
+            "target_deck_name": target_name,
+        }
+        for share, card_name, target_name in rows
+    ]
+
+
+def inbound_shared_row_ids_for_deck(session: Session, deck: Deck) -> set[int]:
+    """The set of InventoryRow ids shared INTO ``deck``. Empty for a deck with
+    no variant group. Used by reconciliation to recognize an already-shared
+    card as covered (counted ONCE alongside the sibling-location tally)."""
+    if deck.variant_group_id is None:
+        return set()
+    return {
+        rid
+        for (rid,) in session.query(DeckCardShare.inventory_row_id)
+        .join(InventoryRow, DeckCardShare.inventory_row_id == InventoryRow.id)
+        .join(Deck, DeckCardShare.source_deck_id == Deck.id)
+        .filter(
+            DeckCardShare.target_deck_id == deck.id,
+            InventoryRow.storage_location_id == Deck.storage_location_id,
+        )
+        .all()
+    }
+
+
+def outbound_share_map(session: Session, deck: Deck) -> dict[int, list[str]]:
+    """Map each of ``deck``'s own rows that is shared OUT to the list of target
+    deck names it is shared with (for the "SHARED WITH …" badge). Empty for a
+    deck with no variant group."""
+    if deck.variant_group_id is None:
+        return {}
+    rows = (
+        session.query(DeckCardShare.inventory_row_id, Deck.name)
+        .join(InventoryRow, DeckCardShare.inventory_row_id == InventoryRow.id)
+        .join(Deck, DeckCardShare.target_deck_id == Deck.id)
+        .filter(
+            DeckCardShare.source_deck_id == deck.id,
+            # validity guard: the row must still physically live in THIS (source) deck
+            InventoryRow.storage_location_id == deck.storage_location_id,
+        )
+        .order_by(Deck.name.asc())
+        .all()
+    )
+    out: dict[int, list[str]] = {}
+    for row_id, target_name in rows:
+        out.setdefault(row_id, []).append(target_name)
+    return out
+
+
+def inbound_share_count_for_deck(session: Session, deck: Deck) -> int:
+    """Total copies shared INTO ``deck`` (sum of the shared rows' quantities).
+
+    Added to a deck's own-row count to report the FULL decklist size. The
+    collection count NEVER includes this — a shared card is one physical copy.
+    Zero for a deck with no variant group."""
+    if deck.variant_group_id is None:
+        return 0
+    return (
+        session.query(func.sum(InventoryRow.quantity))
+        .join(DeckCardShare, DeckCardShare.inventory_row_id == InventoryRow.id)
+        .join(Deck, DeckCardShare.source_deck_id == Deck.id)
+        .filter(
+            DeckCardShare.target_deck_id == deck.id,
+            InventoryRow.storage_location_id == Deck.storage_location_id,
+        )
+        .scalar()
+        or 0
+    )
+
+
+def delete_shares_for_deck(session: Session, deck_id: int) -> int:
+    """Drop every share where ``deck_id`` is the source OR the target.
+
+    Called when a deck is deleted or leaves/switches its variant group. SQLite
+    enforces no FK CASCADE, so this is the explicit cleanup (the DB CASCADE is
+    Postgres defense-in-depth). Does NOT commit — the caller owns the txn."""
+    return (
+        session.query(DeckCardShare)
+        .filter(
+            (DeckCardShare.source_deck_id == deck_id) | (DeckCardShare.target_deck_id == deck_id)
+        )
+        .delete(synchronize_session=False)
+    )
+
+
+def delete_shares_for_inventory_row(session: Session, row_id: int) -> int:
+    """Drop every share referencing ``row_id`` — the physical copy is gone or
+    has LEFT its deck (e.g. returned to the collection, or fully pulled into a
+    different deck). Called from the row-delete/return seams. Does NOT commit.
+
+    Distinct from :func:`prune_shares_for_relocated_row`: this is unconditional
+    (the row is leaving its deck outright), whereas prune is conditional on a
+    source-location mismatch (the row survives a generic move)."""
+    return (
+        session.query(DeckCardShare)
+        .filter(DeckCardShare.inventory_row_id == row_id)
+        .delete(synchronize_session=False)
+    )
+
+
+def prune_shares_for_relocated_row(session: Session, row_id: int) -> int:
+    """Drop every share whose physical ``InventoryRow`` no longer lives in its
+    recorded SOURCE deck — i.e. the card was MOVED (to a binder, to pending, or
+    into a different deck) rather than deleted, so the share would otherwise keep
+    rendering it as "shared from" the old deck (the dangling-share defect).
+
+    Conditional: a share is kept iff the row's current ``storage_location_id``
+    still equals its source deck's location. Idempotent; a no-op when the row
+    has no shares (the common case — only a deck-resident shared card has any).
+    Does NOT commit — the caller (a move primitive) owns the txn.
+
+    The read-side helpers ALSO enforce this validity, so correctness never
+    depends on every move path calling this; this just keeps the table tidy."""
+    shares = session.query(DeckCardShare).filter(DeckCardShare.inventory_row_id == row_id).all()
+    if not shares:
+        return 0
+    row = session.query(InventoryRow).filter(InventoryRow.id == row_id).first()
+    current_loc = row.storage_location_id if row is not None else None
+    source_locs = {
+        d.id: d.storage_location_id
+        for d in session.query(Deck).filter(Deck.id.in_({sh.source_deck_id for sh in shares})).all()
+    }
+    stale = [sh for sh in shares if source_locs.get(sh.source_deck_id) != current_loc]
+    for sh in stale:
+        session.delete(sh)
+    return len(stale)
 
 
 # Tier priority for ordering reconciliation matches. Lower number = preferred
@@ -2419,6 +2839,11 @@ def find_inventory_matches_for_deck_import(
     # group, which is the gate that keeps every branch below byte-for-byte
     # identical to the pre-feature logic (variant_covered_qty stays 0).
     sibling_location_ids = set(sibling_variant_deck_location_ids(session, deck))
+    # issue #27 — physical rows already shared INTO this deck. Such a row is
+    # ALSO a sibling-held row, so it would be double-counted by the sibling
+    # tally below; it is counted under the share path instead (each physical
+    # row counted ONCE). Empty for a deck with no variant group.
+    inbound_shared_row_ids = inbound_shared_row_ids_for_deck(session, deck)
 
     if not parsed_rows:
         return []
@@ -2450,6 +2875,10 @@ def find_inventory_matches_for_deck_import(
     # v3.33.0 — per-key quantity held by sibling variant decks (subset of
     # other_deck_by_key). Always all-zero for a deck with no variant group.
     variant_covered_by_key: dict[tuple[int, str], int] = {}
+    # issue #27 — per-key copies whose physical row is shared INTO this deck.
+    # Disjoint from variant_covered_by_key (a row is counted in exactly one)
+    # so the two together count each physical row once.
+    shared_covered_by_key: dict[tuple[int, str], int] = {}
     for row, loc in rows:
         if loc is None:
             location_name = "Pending"
@@ -2471,9 +2900,16 @@ def find_inventory_matches_for_deck_import(
             else:
                 # v3.33.0 — flag + tally copies held by a sibling variant
                 # deck so the recommendation can treat them as "covered".
+                # issue #27 — a row already shared INTO this deck is counted on
+                # the share path instead (NOT the sibling tally) so each
+                # physical row is counted exactly once.
                 is_sibling = row.storage_location_id in sibling_location_ids
+                is_shared_in = row.id in inbound_shared_row_ids
                 entry["is_variant_sibling"] = is_sibling
-                if is_sibling:
+                entry["is_shared_in"] = is_shared_in
+                if is_shared_in:
+                    shared_covered_by_key[key] = shared_covered_by_key.get(key, 0) + row.quantity
+                elif is_sibling:
                     variant_covered_by_key[key] = variant_covered_by_key.get(key, 0) + row.quantity
                 other_deck_by_key[key].append(entry)
         else:
@@ -2620,7 +3056,14 @@ def find_inventory_matches_for_deck_import(
         # non-deck move/import logic UNCHANGED. With no variant group,
         # variant_covered_qty is 0 and this reduces byte-for-byte to the prior
         # three-way recommendation.
-        variant_covered_qty = min(variant_covered_by_key.get(key, 0), quantity_needed)
+        # issue #27 — sibling-held copies AND copies already shared into this
+        # deck both count as covered (each physical row once — the two tallies
+        # are disjoint). An already-shared card is therefore recognized, not
+        # treated as "missing".
+        variant_covered_qty = min(
+            variant_covered_by_key.get(key, 0) + shared_covered_by_key.get(key, 0),
+            quantity_needed,
+        )
         remaining_needed = quantity_needed - variant_covered_qty
 
         # recommended_action / move_qty / new_qty are driven by `matches`
@@ -2932,6 +3375,11 @@ def pull_card_to_deck(
     row.updated_at = utc_now()
 
     if row.quantity <= 0:
+        # issue #27 — the source row is gone (fully pulled). Drop any share that
+        # referenced it before it disappears (rare: the source was itself a
+        # deck-resident shared card). A partial pull leaves the row in place, so
+        # its shares stay valid. No-op for the common non-deck source row.
+        delete_shares_for_inventory_row(session, row.id)
         session.delete(row)
 
     log_transaction(
@@ -3038,6 +3486,10 @@ def return_card_from_deck(
         note=f"Returned from deck {deck.name}",
     )
 
+    # issue #27 — the card has LEFT this deck (back to the collection as
+    # pending), so any share that referenced this deck row is now stale. Drop it
+    # before the row is deleted. No-op unless this card was a shared source.
+    delete_shares_for_inventory_row(session, deck_row.id)
     session.delete(deck_row)
     session.commit()
     return True
@@ -3061,6 +3513,10 @@ def delete_deck(session: Session, deck_id: int, user_id: int, *, commit: bool = 
     #   - game_seats.deck_id is SET NULL intent; deck_name_at_game (snapshotted at
     #     game creation) preserves the historical deck identity, so just null the FK.
     from app.models import DeckTokenRequirement
+
+    # issue #27 — drop every deck_card_share where this deck is the source OR
+    # the target before its rows/location go (SQLite enforces no FK CASCADE).
+    delete_shares_for_deck(session, deck.id)
 
     session.execute(text("DELETE FROM deck_bracket_findings WHERE deck_id = :d"), {"d": deck.id})
     session.execute(text("DELETE FROM deck_bracket_estimates WHERE deck_id = :d"), {"d": deck.id})

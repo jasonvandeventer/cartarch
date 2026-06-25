@@ -46,6 +46,7 @@
             {% if (item.finish and item.finish != 'normal')
               or (item.language and item.language != 'en')
               or item.is_proxy
+              or item.is_shared_in
               or item.get('legality_status') in ('banned', 'restricted', 'not_legal') %}
               <span class="dlr-meta">
                 {% if item.finish and item.finish != 'normal' %}
@@ -53,6 +54,7 @@
                 {% endif %}
                 {% if item.language and item.language != 'en' %}<span class="dlr-tag lang">{{ item.language|upper }}</span>{% endif %}
                 {% if item.is_proxy %}<span class="dlr-tag proxy">P</span>{% endif %}
+                {% if item.is_shared_in %}<span class="dlr-tag share" title="Shared from {{ item.shared_from }}">SHARED</span>{% endif %}
                 {% set leg = item.get('legality_status') %}
                 {% if leg == 'banned' %}
                   <span class="dlr-tag bad">!</span>
@@ -64,6 +66,19 @@
               </span>
             {% endif %}
             <span class="dlr-actions">
+              {% if item.is_shared_in %}
+                {# issue #27 — shared-in card: read-only, no qty/printing edits
+                   (its physical row belongs to the source deck). Drop the share
+                   only. #}
+                <form method="post"
+                      action="/decks/{{ deck.id }}/unshare-card"
+                      class="dlr-qty-form">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                  <input type="hidden" name="inventory_row_id" value="{{ item.id }}">
+                  <input type="hidden" name="target_deck_id" value="{{ deck.id }}">
+                  <button type="submit" class="dlr-switch-btn" title="Unshare">Unshare</button>
+                </form>
+              {% else %}
               {% if is_basic %}
                 {# Basic land +/- controls. Hits the bump-qty route; HTMX swaps
                    the whole card list so the row count updates in place. #}
@@ -96,6 +111,7 @@
                       hx-get="/decks/{{ deck.id }}/rows/{{ item.id }}/printings-modal"
                       hx-target="#switch-printing-modal-host"
                       hx-swap="innerHTML">⇄</button>
+              {% endif %}
             </span>
           </li>
         {% endfor %}

@@ -43,18 +43,25 @@ from app.deck_service import (
     find_inventory_matches_for_deck_import,
     get_card_legality,
     get_deck,
+    get_inbound_shares_for_deck,
+    get_outbound_shares_for_deck,
     get_row_tag_details,
     get_row_tags,
     group_deck_items,
+    inbound_shared_rows_for_deck,
     list_decks,
     list_user_printings_for_card,
     list_variant_groups,
+    outbound_share_map,
+    own_deck_card_options,
     pull_card_to_deck,
     return_card_from_deck,
     set_row_tags,
+    share_card_to_deck,
     suggest_card_roles,
     suggest_card_roles_with_confidence,
     switch_deck_row_printing,
+    unshare_card_from_deck,
     update_deck,
 )
 from app.decklist_service import build_brew_buylist
@@ -109,6 +116,30 @@ def decks_page(
         deck.losses = stats.get("losses", 0)
         deck.win_rate = stats.get("win_rate", 0.0)
         deck.last_played = stats.get("last_played")
+
+    # issue #27 — variant-group share management surfaced in the deck-edit
+    # popouts (decks.html, both the featured and per-row Edit forms). Gated on
+    # variant_group_id so non-variant decks pay nothing. Each variant-group deck
+    # gets: its sibling decks (share targets), its own placeable cards (the
+    # share picker), and its existing outbound shares (the unshare list). The
+    # siblings come from the already-loaded `decks` list (no extra query).
+    decks_by_group: dict[int, list] = {}
+    for d in decks:
+        if d.variant_group_id is not None:
+            decks_by_group.setdefault(d.variant_group_id, []).append(d)
+    for d in decks:
+        if d.variant_group_id is None:
+            d.share_siblings = []
+            d.share_own_cards = []
+            d.outbound_shares = []
+            continue
+        d.share_siblings = [
+            {"id": s.id, "name": s.name}
+            for s in decks_by_group.get(d.variant_group_id, [])
+            if s.id != d.id
+        ]
+        d.share_own_cards = own_deck_card_options(session, current_user.id, d)
+        d.outbound_shares = get_outbound_shares_for_deck(session, d)
 
     # Featured deck = most active by game count (ties broken by name).
     # Editorial-row layout: featured renders with full panel; rest as
@@ -319,9 +350,27 @@ def _build_deck_card_items(
     # In list view the result is then bucketed by group_deck_items, which
     # preserves this order WITHIN each group (sort acts within groups). Default
     # "name"; unknown keys fall back to name via the sorter's tiebreaker.
-    deck_rows = sort_spec.sort_inventory_rows(deck_query.all(), sort or "name", direction)
+    own_rows = deck_query.all()
+
+    # issue #27 — variant-group sharing. The deck's card list is its own rows
+    # UNION the rows shared INTO it from sibling builds (a reference, never a
+    # copy — the physical row still lives in its source deck). Both sets are
+    # sorted/grouped TOGETHER into one unified decklist; the shared-in rows are
+    # flagged ``is_shared_in`` so the macro renders them read-only (badge +
+    # Unshare only — deck/bulk actions never touch a sibling's physical row).
+    # ``outbound_share_map`` badges this deck's own rows that are shared OUT.
+    # All three helpers short-circuit to empty for a deck with no variant group,
+    # so a non-variant deck's grid is byte-for-byte unchanged.
+    shared_out = outbound_share_map(session, deck)
+    inbound_pairs = inbound_shared_rows_for_deck(session, deck, search)
+    shared_from_by_row = {row.id: source_name for row, source_name in inbound_pairs}
+
+    deck_rows = sort_spec.sort_inventory_rows(
+        own_rows + [row for row, _ in inbound_pairs], sort or "name", direction
+    )
 
     for row in deck_rows:
+        is_shared_in = row.id in shared_from_by_row
         price = effective_price(row.card, row.finish) or 0.0
         row_total = price * row.quantity
         total_value += row_total
@@ -336,11 +385,17 @@ def _build_deck_card_items(
                 "quantity": row.quantity,
                 "effective_price": price,
                 "total_value": row_total,
-                "role": row.role,
+                # A shared-in row keeps its source-deck role out of THIS deck's
+                # commander split (a card that's a commander elsewhere isn't this
+                # deck's commander), so force role to None for the unified list.
+                "role": None if is_shared_in else row.role,
                 "tags": get_row_tags(row),
                 "tag_details": get_row_tag_details(row),
                 "suggested_tags": suggest_card_roles(row.card, themes=themes),
                 "legality_status": get_card_legality(row.card, deck.format),
+                "shared_with": [] if is_shared_in else shared_out.get(row.id, []),
+                "is_shared_in": is_shared_in,
+                "shared_from": shared_from_by_row.get(row.id),
             }
         )
 
@@ -577,6 +632,15 @@ def deck_detail_page(
         if deck and deck.variant_group_id
         else []
     )
+
+    # issue #27 — cards shared INTO this deck from sibling builds are folded
+    # directly into the unified `items` list by `_build_deck_card_items` (sorted
+    # and grouped alongside the deck's own cards, each flagged `is_shared_in` so
+    # the macro renders it read-only). `total_cards` therefore ALREADY includes
+    # them (the FULL decklist) — no separate addition here. The share/unshare
+    # MANAGEMENT controls live in the deck-edit popouts on /decks (decks.html);
+    # this page just renders the unified list + per-card Unshare. Export still
+    # reads `get_inbound_shares_for_deck` directly (a separate seam).
 
     return render(
         request,
@@ -999,13 +1063,10 @@ def decks_export(
         .all()
     )
 
-    commander_lines: list[str] = []
-    deck_lines: list[str] = []
-    for row in rows:
-        card = row.card
+    def _export_line(card, quantity, finish, role):
         set_code = (card.set_code or "???").upper()
         collector = card.collector_number or "0"
-        line = f"{row.quantity} {card.name} ({set_code}) {collector}"
+        line = f"{quantity} {card.name} ({set_code}) {collector}"
         # Preserve finish so an export→re-import round-trip matches the copy
         # back to its ``(card_id, finish)`` inventory row instead of treating
         # it as a brand-new card. The MTGA-style ``*F*`` (foil) / ``*E*``
@@ -1013,13 +1074,26 @@ def decks_export(
         # detects them anywhere on the line); a line without a marker parses as
         # normal, so older exports remain backward compatible and non-foil/
         # etched rows are unchanged.
-        finish_marker = {"foil": " *F*", "etched": " *E*"}.get((row.finish or "normal").lower())
+        finish_marker = {"foil": " *F*", "etched": " *E*"}.get((finish or "normal").lower())
         if finish_marker:
             line += finish_marker
+        return line
+
+    commander_lines: list[str] = []
+    deck_lines: list[str] = []
+    for row in rows:
+        line = _export_line(row.card, row.quantity, row.finish, row.role)
         if row.role == "commander":
             commander_lines.append(line)
         else:
             deck_lines.append(line)
+
+    # issue #27 — append cards shared INTO this deck from sibling variant
+    # builds so the export is the COMPLETE decklist (own cards + inbound
+    # shares). Each shared row carries its own finish marker, so foil survives
+    # export → re-import. No-op for a deck with no variant group.
+    for share in get_inbound_shares_for_deck(session, deck):
+        deck_lines.append(_export_line(share["card"], share["quantity"], share["finish"], None))
 
     parts: list[str] = []
     if commander_lines:
@@ -1035,6 +1109,51 @@ def decks_export(
         content=content,
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
+
+
+@router.post("/decks/{deck_id}/share-card")
+def decks_share_card(
+    deck_id: int,
+    inventory_row_id: int = Form(...),
+    target_deck_id: int = Form(...),
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+    _: None = CsrfRequired,
+):
+    # issue #27 — share one of THIS deck's own cards into a sibling variant
+    # build. Creates a deck_card_share reference; the physical row never moves
+    # (one-card-one-location preserved). Ownership + same-group + not-self are
+    # validated in share_card_to_deck (ValueError → ignored, redirect back).
+    try:
+        share_card_to_deck(
+            session,
+            current_user.id,
+            inventory_row_id=inventory_row_id,
+            target_deck_id=target_deck_id,
+        )
+    except ValueError:
+        pass
+    return RedirectResponse(url=f"/decks/{deck_id}", status_code=303)
+
+
+@router.post("/decks/{deck_id}/unshare-card")
+def decks_unshare_card(
+    deck_id: int,
+    inventory_row_id: int = Form(...),
+    target_deck_id: int = Form(...),
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+    _: None = CsrfRequired,
+):
+    # issue #27 — drop a share (the row reverts to membership in its source
+    # deck only). Never touches the physical row.
+    unshare_card_from_deck(
+        session,
+        current_user.id,
+        inventory_row_id=inventory_row_id,
+        target_deck_id=target_deck_id,
+    )
+    return RedirectResponse(url=f"/decks/{deck_id}", status_code=303)
 
 
 @router.post("/decks/pull")

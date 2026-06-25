@@ -84,6 +84,11 @@
           <span class="language-badge" title="Physical language">{{ item.language|upper }}</span>
         {% endif %}
         {% if item.is_proxy %}<span class="proxy-badge{% if proxy_warn %} proxy-badge-warn{% endif %}" title="{% if proxy_warn %}Proxy — carries no market value{% else %}Marked as proxy{% endif %}">PROXY</span>{% endif %}
+        {# issue #27 — variant-group sharing. Own rows shared OUT to sibling
+           builds badge "SHARED WITH …"; rows shared INTO this deck (rendered in
+           the read-only variant-group panel) badge "SHARED FROM …". #}
+        {% if item.shared_with %}<span class="share-badge" title="Shared into: {{ item.shared_with|join(', ') }}">SHARED WITH {{ item.shared_with|join(', ') }}</span>{% endif %}
+        {% if item.shared_from %}<span class="share-badge" title="Physically lives in {{ item.shared_from }}">SHARED FROM {{ item.shared_from }}</span>{% endif %}
         {% if item.card.mana_cost %}· {{ item.card.mana_cost }}{% endif %}
         · Qty {{ item.quantity }} ·
         {% if proxy_warn and item.is_proxy %}
@@ -248,7 +253,22 @@
           </div>
         </details>
       {% endif %}
-      {% if show_deck_actions and deck %}
+      {% if show_deck_actions and deck and item.is_shared_in %}
+        {# issue #27 — a card shared INTO this deck from a sibling build. It is
+           read-only here: its physical InventoryRow belongs to the SOURCE deck
+           (one-card-one-location), so none of the deck/move/return/delete
+           actions are offered — only dropping the share (Unshare), which never
+           touches the physical row. The "SHARED FROM …" badge renders above. #}
+        <form action="/decks/{{ deck.id }}/unshare-card"
+              method="post"
+              class="inline-form"
+              style="margin-top: 0.35rem">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <input type="hidden" name="inventory_row_id" value="{{ item.id }}">
+          <input type="hidden" name="target_deck_id" value="{{ deck.id }}">
+          <button type="submit">Unshare</button>
+        </form>
+      {% elif show_deck_actions and deck %}
         {% set leg = item.get('legality_status') %}
         {% if leg and leg != 'legal' %}
           <div style="margin-top: 0.25rem">

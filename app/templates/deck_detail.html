@@ -52,17 +52,22 @@
     {% endif %}
   </section>
   {% if deck and variant_group %}
-    {# v3.33.0 — variant group: builds that share physical cards. Read-only;
-       shared cards live in one deck only and are NOT listed here (one-card-
-       one-location). Importing a list into this deck treats cards a sibling
-       already holds as "covered" rather than "buy another". #}
+    {# v3.33.0 + issue #27 — variant group: builds that SHARE physical cards.
+       The physical card lives in ONE deck (one-card-one-location preserved); a
+       deck_card_share records that it is ALSO a member of a sibling's decklist.
+       The shared-in cards are folded into the unified Deck Cards grid below,
+       each badged "SHARED FROM …" with a per-card Unshare; this panel is just
+       the read-only group summary. The share/unshare MANAGEMENT controls live
+       in the deck-edit popouts on the /decks page. #}
     <section class="panel variant-group-panel">
       <p class="muted">
         <strong>Variant group:</strong> {{ variant_group.name }}
         {% if variant_siblings %}
           · Shares cards with
           {% for s in variant_siblings %}<a href="/decks/{{ s.id }}">{{ s.name }}</a>{% if not loop.last %}, {% endif %}{% endfor %}.
-          A card held by a sibling build is treated as already covered when you import a list here.
+          Cards shared in from a sibling appear in the deck list below, badged
+          <span class="share-badge">SHARED FROM</span>, and are counted once.
+          Manage sharing from <a href="/decks">the Decks page</a> (Edit → Share).
         {% else %}
           · No other builds in this group yet.
         {% endif %}
@@ -806,7 +811,9 @@
                          onclick="document.querySelectorAll('.deck-bulk-cb').forEach(cb => cb.checked = this.checked)">
                   Select all
                 </label>
-                {% for item in items %}
+                {# issue #27 — a shared-in card's physical row belongs to its
+                   source deck; bulk-move must never touch it, so exclude it. #}
+                {% for item in items if not item.is_shared_in %}
                   <label style="display: flex;
                                 align-items: center;
                                 gap: 0.4rem;
@@ -865,7 +872,9 @@
                          onclick="document.querySelectorAll('.deck-bulk-delete-cb').forEach(cb => cb.checked = this.checked)">
                   Select all
                 </label>
-                {% for item in items %}
+                {# issue #27 — exclude shared-in cards (their physical row lives
+                   in the source deck; deleting from here must be impossible). #}
+                {% for item in items if not item.is_shared_in %}
                   <label style="display: flex;
                                 align-items: center;
                                 gap: 0.4rem;
