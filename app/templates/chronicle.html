@@ -36,7 +36,7 @@
           <span>Folio
             <b>{{ to_roman(parts[0] | int) }}</b>
             · Issue <b>{{ to_roman(parts[1] | int) }}</b>
-            · Entry <b>{{ to_roman(parts[2] | int) }}</b>
+            · Entry <b>{{ to_roman(entry_num) }}</b>
           </span>
         </div>
         <div class="chronicle-raw">
@@ -115,7 +115,7 @@
             {% for e in issue.entries %}
             <a class="chronicle-entry-row{% if e.version == current_version %} current{% endif %}"
                href="/chronicle/v{{ e.version }}">
-              <span class="ent">Entry {{ to_roman(e.patch) }}</span>
+              <span class="ent">Entry {{ to_roman(e.entry_num) }}</span>
               <span class="nm">{{ e.summary }}</span>
               <span class="dt">{{ e.date | editorial_date }}</span>
             </a>

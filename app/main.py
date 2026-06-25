@@ -646,6 +646,14 @@ def _chronicle_archive_groups() -> list[dict]:
     ``summary`` is the first non-empty bullet from added → refined → resolved,
     so the archive sidebar can show a short label per entry without needing
     a separate field in chronicle.json.
+
+    Each entry also carries ``entry_num`` — a 1-based sequential number within
+    its Issue (oldest entry = 1), used to render the Roman-numeral "Entry N"
+    label. This is computed by POSITION, not from the patch number directly:
+    ``to_roman()`` maps both patch 0 and patch 1 to "I" (the design's 0→I
+    convention), so numbering off the raw patch collided "Entry I" for any
+    Issue's ``.0`` and ``.1`` releases. Position-based numbering is also robust
+    to Issues that don't start at .0 (e.g. 3.27 starts at .6) or skip a patch.
     """
     by_folio: dict[int, dict[int, list[dict]]] = {}
     for entry in CHRONICLE_ENTRIES:
@@ -668,6 +676,13 @@ def _chronicle_archive_groups() -> list[dict]:
                 "summary": summary or "—",
             }
         )
+    # Assign a unique, sequential Entry number within each Issue, oldest = 1
+    # (ascending patch). Mutates the dicts in place — the display order below
+    # is unaffected (it stays newest-first as appended).
+    for issues in by_folio.values():
+        for entry_list in issues.values():
+            for num, e in enumerate(sorted(entry_list, key=lambda x: x["patch"]), start=1):
+                e["entry_num"] = num
     # Folios newest-first; Issues newest-first within folio.
     return [
         {
@@ -691,6 +706,22 @@ def _render_chronicle(
     """Shared Chronicle render path — used by both the latest-entry route
     and the per-version route's not-found state."""
     groups = _chronicle_archive_groups()
+    # The focused entry's Roman "Entry N" must match its sidebar number, so
+    # resolve it from the same position-based numbering (across ALL folios —
+    # an older-folio entry is reachable by direct link). None for a not-found
+    # render (no focused entry).
+    entry_num = None
+    if entry is not None:
+        entry_num = next(
+            (
+                e["entry_num"]
+                for folio in groups
+                for issue in folio["issues"]
+                for e in issue["entries"]
+                if e["version"] == entry["version"]
+            ),
+            None,
+        )
     return render(
         request,
         "chronicle.html",
@@ -698,6 +729,7 @@ def _render_chronicle(
             "title": "Chronicle — Cartarch",
             "current_user": current_user,
             "entry": entry,
+            "entry_num": entry_num,
             # Sidebar shows the current Folio only; older folios stay reachable
             # by direct link (CHRONICLE_BY_VERSION is untouched). groups is
             # folios newest-first, so groups[0] is the current Folio.
