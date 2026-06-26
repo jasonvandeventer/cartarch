@@ -425,7 +425,7 @@ def assemble_deck(
 
 
 def _name_key(cand: CandidateCard) -> int:
-    """Stable deterministic tiebreaker from the card name."""
+    """Stable deterministic tiebreaker (the card id)."""
     return cand.card.id
 
 
@@ -436,7 +436,16 @@ def _pick_basics(commander: Card, basics: list[CandidateCard], count: int) -> li
     if count <= 0:
         return []
     commander_colors = commander_color_identity(commander) or set()
-    owned_by_name = {c.card.name: c for c in basics}
+    # A real collection fragments basics across many sets/printings — each
+    # printing is a distinct card_id and thus a distinct CandidateCard. Sum the
+    # owned copies across ALL printings of each basic type (keeping one
+    # representative card), else collapsing by name would discard every printing
+    # but one and under-fill the deck.
+    totals: dict[str, int] = {}
+    reps: dict[str, CandidateCard] = {}
+    for c in basics:
+        totals[c.card.name] = totals.get(c.card.name, 0) + c.owned_quantity
+        reps.setdefault(c.card.name, c)
     # Basic types matching the commander's colors that the user owns. A
     # colorless commander (empty identity) fills with Wastes.
     if commander_colors:
@@ -447,30 +456,34 @@ def _pick_basics(commander: Card, basics: list[CandidateCard], count: int) -> li
         ]
     else:
         names = [COLORLESS_BASIC]
-    wanted = [owned_by_name[name] for name in names if name in owned_by_name]
-    if not wanted:
+    names = [n for n in names if n in reps]
+    if not names:
         return []
     # Round-robin distribute, but NEVER assign more copies of a basic than the
-    # user actually owns — an "impossible owned-card count" must not pass
-    # silently. The deck may fall short of LAND_TARGET (the 100-card validation
-    # surfaces that as a warning) rather than fabricate basics nobody owns.
-    per = {c.card.name: 0 for c in wanted}
+    # user actually owns (across all printings) — an "impossible owned-card
+    # count" must not pass silently. The deck may fall short of LAND_TARGET (the
+    # 100-card validation surfaces that as a warning) rather than fabricate
+    # basics nobody owns.
+    per = {name: 0 for name in names}
     placed = 0
     progressed = True
     while placed < count and progressed:
         progressed = False
-        for cand in wanted:
+        for name in names:
             if placed >= count:
                 break
-            if per[cand.card.name] < cand.owned_quantity:
-                per[cand.card.name] += 1
+            if per[name] < totals[name]:
+                per[name] += 1
                 placed += 1
                 progressed = True
     out = []
-    for cand in wanted:
-        qty = per[cand.card.name]
+    for name in names:
+        qty = per[name]
         if qty:
+            cand = reps[name]
             cand.deck_quantity = qty
+            cand.owned_quantity = totals[name]  # credit the full owned total so
+            # the line-100-validation owned-count cap reflects all printings
             cand.reasons = [f"Basic land ({qty})"]
             out.append(cand)
     return out

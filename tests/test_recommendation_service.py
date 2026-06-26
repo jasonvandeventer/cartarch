@@ -254,6 +254,32 @@ def test_basic_land_duplicates_allowed(db, user):
     assert forest.deck_quantity > 1  # duplicates permitted for basics
 
 
+def test_basics_summed_across_printings(db, user):
+    # 30 Forests spread across many printings (distinct card_ids) must all count
+    # toward the land fill — collapsing by name would credit only one printing
+    # and under-fill the 100-card deck (red-team flaw).
+    cmd = commander_card(db)
+    own(db, user, cmd)
+    for i in range(65):
+        own(db, user, make_card(db, f"Creature {i:02d}"))
+    for _i in range(40):
+        printing = make_card(
+            db,
+            "Forest",
+            color_identity="G",
+            type_line="Basic Land — Forest",
+            mana_cost="",
+        )
+        own(db, user, printing, qty=1)  # 1 copy of each of 40 printings
+    out = rec.generate_recommendation(db, user.id, _intent(cmd))
+    # Reaching 100 here is only possible if all 40 single-copy printings count;
+    # the pre-fix code credited one printing (1 copy) and fell ~33 lands short.
+    assert out.total_cards == 100, out.warnings
+    forest = next(c for c in out.lands if c.card.name == "Forest")
+    assert forest.deck_quantity > 1  # drew from multiple printings, not just one
+    assert forest.deck_quantity <= 40  # never more than owned across printings
+
+
 def test_loose_copy_not_penalized_for_owned_duplicate(db, user):
     # owns 1 loose copy AND 1 committed to another deck → the loose copy must
     # NOT be penalized (red-team defect 4).
