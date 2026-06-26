@@ -190,6 +190,39 @@ def test_export_marks_etched_rows_and_reparses_as_etched():
     assert parsed["finish"] == "etched"
 
 
+def test_json_export_has_metadata_and_rollup():
+    sm = _fresh()
+    s = sm()
+    u = _user(s)
+    deck = deck_service.create_deck(s, u.id, "Brew")
+    loc_id = deck.storage_location_id
+    ring = _card(s, "Sol Ring")
+    ring.cmc = 1.0
+    bolt = _card(s, "Lightning Bolt")
+    bolt.cmc = 1.0
+    bolt.type_line = "Instant"
+    bolt.color_identity = "R"
+    _place(s, u.id, ring, loc_id, qty=1)
+    _place(s, u.id, bolt, loc_id, qty=2)
+    s.commit()
+
+    c = _client(sm, u)
+    try:
+        r = c.get(f"/decks/{deck.id}/export?format=json")
+        assert r.status_code == 200
+        assert "application/json" in r.headers["content-type"]
+        data = r.json()
+    finally:
+        _clear_overrides()
+
+    assert data["deck"]["name"] == "Brew"
+    assert len(data["cards"]) == 2
+    roll = data["rollup"]
+    assert roll["color_identity"] == ["R"]  # union, sorted
+    assert roll["type_counts"] == {"Artifact": 1, "Instant": 2}
+    assert roll["mana_value_histogram"] == {"1": 3}  # qty-weighted
+
+
 def test_reimport_matches_existing_foil_inventory_row():
     """The functional round-trip: an exported foil line, re-imported, MATCHES the
     user's foil inventory row on (card_id, finish) instead of importing new.
