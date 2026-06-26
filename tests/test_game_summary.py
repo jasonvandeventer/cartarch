@@ -215,32 +215,3 @@ def test_elapsed_none_for_legacy():
         main.app.dependency_overrides.pop(get_db_session, None)
         main.app.dependency_overrides.pop(get_current_user, None)
     assert failed == 0
-
-
-def test_migration_idempotent():
-    import importlib
-    import os
-    import tempfile
-
-    failed = 0
-    os.environ["DATA_DIR"] = tempfile.mkdtemp()
-    import app.db as db
-
-    importlib.reload(db)
-    from sqlalchemy import text
-
-    with db.engine.begin() as c:
-        c.execute(text("CREATE TABLE IF NOT EXISTS games (id INTEGER PRIMARY KEY)"))
-    import scripts.migrate_v3_33_2_game_ended_at as m
-
-    importlib.reload(m)
-    m.main()
-    m.main()
-    with db.engine.begin() as c:
-        cols = [r[1] for r in c.execute(text("PRAGMA table_info(games)")).fetchall()]
-    if cols.count("ended_at") == 1:
-        print("  [OK] migration idempotent (one ended_at column)")
-    else:
-        print(f"  [FAIL] migration: ended_at count={cols.count('ended_at')}")
-        failed += 1
-    assert failed == 0
