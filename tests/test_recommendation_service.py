@@ -169,9 +169,7 @@ def test_use_cards_in_other_decks_removes_penalty(db, user):
     in_deck = make_card(db, "Committed Bear")
     own(db, user, cmd)
     own(db, user, in_deck, location=loc)
-    [cand] = rec.build_candidate_pool(
-        db, user.id, cmd, _intent(cmd, use_cards_in_other_decks=True)
-    )
+    [cand] = rec.build_candidate_pool(db, user.id, cmd, _intent(cmd, use_cards_in_other_decks=True))
     assert not any("another deck" in r for r in cand.reasons)
 
 
@@ -217,7 +215,9 @@ def _seed_full_collection(db, user, cmd):
     own(db, user, cmd)
     for i in range(65):
         own(db, user, make_card(db, f"Creature {i:02d}"))
-    forest = make_card(db, "Forest", color_identity="G", type_line="Basic Land — Forest", mana_cost="")
+    forest = make_card(
+        db, "Forest", color_identity="G", type_line="Basic Land — Forest", mana_cost=""
+    )
     own(db, user, forest, qty=60)
 
 
@@ -252,6 +252,72 @@ def test_basic_land_duplicates_allowed(db, user):
     out = rec.generate_recommendation(db, user.id, _intent(cmd))
     forest = next(c for c in out.lands if c.card.name == "Forest")
     assert forest.deck_quantity > 1  # duplicates permitted for basics
+
+
+def test_loose_copy_not_penalized_for_owned_duplicate(db, user):
+    # owns 1 loose copy AND 1 committed to another deck → the loose copy must
+    # NOT be penalized (red-team defect 4).
+    cmd = commander_card(db)
+    loc = deck_loc(db, user, "Existing Deck")
+    bear = make_card(db, "Dual Bear")
+    own(db, user, cmd)
+    own(db, user, bear)  # loose
+    own(db, user, bear, location=loc)  # committed
+    [cand] = rec.build_candidate_pool(db, user.id, cmd, _intent(cmd))
+    assert cand.available_quantity == 1
+    assert not any("penalty" in r for r in cand.reasons)
+    assert any("Loose copy available" in r for r in cand.reasons)
+
+
+def test_need_reason_persisted_on_chosen_card(db, user):
+    # a Ramp card the deck needs should carry the need-aware reason after
+    # assembly (red-team defect 2 — the reason was being discarded).
+    cmd = commander_card(db)
+    _seed_full_collection(db, user, cmd)
+    ramp = make_card(
+        db, "Cultivate", type_line="Sorcery", oracle="Search your library for a basic land"
+    )
+    own(db, user, ramp)
+    out = rec.generate_recommendation(db, user.id, _intent(cmd))
+    picked = next((c for c in out.mainboard if c.card.name == "Cultivate"), None)
+    assert picked is not None
+    assert any(r.startswith("Helps deck need:") for r in picked.reasons)
+
+
+def test_colorless_commander_uses_wastes(db, user):
+    cmd = make_card(
+        db,
+        "Colorless Cmdr",
+        color_identity="",
+        type_line="Legendary Creature — Eldrazi",
+        oracle="Annihilator 2",
+        mana_cost="{10}",
+    )
+    own(db, user, cmd)
+    wastes = make_card(
+        db, "Wastes", color_identity="", type_line="Basic Land — Wastes", mana_cost=""
+    )
+    own(db, user, wastes, qty=40)
+    out = rec.generate_recommendation(db, user.id, _intent(cmd))
+    assert any(c.card.name == "Wastes" for c in out.lands)
+
+
+def test_basics_capped_at_owned_quantity(db, user):
+    # only 5 Forests owned → the deck must not assign more than 5, and must NOT
+    # warn about impossible counts (red-team defect 1).
+    cmd = commander_card(db)
+    own(db, user, cmd)
+    for i in range(65):
+        own(db, user, make_card(db, f"Creature {i:02d}"))
+    forest = make_card(
+        db, "Forest", color_identity="G", type_line="Basic Land — Forest", mana_cost=""
+    )
+    own(db, user, forest, qty=5)
+    out = rec.generate_recommendation(db, user.id, _intent(cmd))
+    forest_cand = next((c for c in out.lands if c.card.name == "Forest"), None)
+    if forest_cand:
+        assert forest_cand.deck_quantity <= 5
+    assert not any("copies of" in w for w in out.warnings)
 
 
 # --- Brew creation ------------------------------------------------------------
@@ -292,12 +358,9 @@ def test_create_brew_does_not_move_physical_inventory(db, user):
     )
     assert deck_rows
     assert all(r.is_proxy for r in deck_rows)
-    assert (
-        db.query(InventoryRow)
-        .filter(InventoryRow.user_id == user.id, InventoryRow.is_proxy.is_(True))
-        .count()
-        == before_proxy_count + len(deck_rows)
-    )
+    assert db.query(InventoryRow).filter(
+        InventoryRow.user_id == user.id, InventoryRow.is_proxy.is_(True)
+    ).count() == before_proxy_count + len(deck_rows)
     # exactly one commander row
     assert sum(1 for r in deck_rows if r.role == "commander") == 1
 
@@ -311,9 +374,7 @@ def test_routes_smoke(client, db, user):
     db.commit()
 
     assert client.get("/recommendations/commander").status_code == 200
-    assert (
-        client.get(f"/recommendations/commander/{cmd.id}/preview").status_code == 200
-    )
+    assert client.get(f"/recommendations/commander/{cmd.id}/preview").status_code == 200
     resp = client.post(
         f"/recommendations/commander/{cmd.id}/create-brew",
         data={"deck_name": "Routed Brew"},

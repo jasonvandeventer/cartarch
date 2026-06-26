@@ -65,6 +65,9 @@ BASIC_LAND_BY_COLOR = {
     "G": "Forest",
 }
 
+# Colorless commanders fill with Wastes (the only colorless basic).
+COLORLESS_BASIC = "Wastes"
+
 # Legality strings that disqualify a card from Commander.
 _ILLEGAL = {"banned", "not_legal", "restricted"}
 
@@ -314,8 +317,15 @@ def score_candidate(
         score += 1.0
         reasons.append("Loose copy available")
 
-    # Already in another deck — penalize unless the user opted in.
-    if cand.already_in_deck_names and not intent.use_cards_in_other_decks:
+    # Already committed to another deck — penalize ONLY when there's no loose
+    # copy to draw from (all owned copies are in decks). A user who owns a loose
+    # copy AND a committed one must not be penalized for the duplicate; the loose
+    # copy is what the brew would use.
+    if (
+        cand.already_in_deck_names
+        and cand.available_quantity == 0
+        and not intent.use_cards_in_other_decks
+    ):
         score -= 2.0
         reasons.append("In another deck (penalty)")
 
@@ -395,8 +405,17 @@ def assemble_deck(
         chosen_spells.append(best)
         # drop any other printing of the same name (nonbasic singleton rule)
         remaining = [c for c in remaining if c.card.name not in used_names]
+        # Persist the need-aware reason on the card that filled the need (the
+        # static reasons were recorded at pool build; this is additive), reading
+        # `needs` BEFORE decrementing so the role it actually filled is recorded.
+        reason_recorded = False
         for role in best.tags:
             if role in needs and needs[role] > 0:
+                if not reason_recorded:
+                    reason = f"Helps deck need: {role}"
+                    if reason not in best.reasons:
+                        best.reasons.append(reason)
+                    reason_recorded = True
                 needs[role] -= 1
 
     # leftover high-scorers become explainable "cuts"
@@ -418,21 +437,38 @@ def _pick_basics(commander: Card, basics: list[CandidateCard], count: int) -> li
         return []
     commander_colors = commander_color_identity(commander) or set()
     owned_by_name = {c.card.name: c for c in basics}
-    # basic types matching the commander's colors that the user owns
-    wanted = [
-        owned_by_name[name]
-        for color in sorted(commander_colors)
-        for name in (BASIC_LAND_BY_COLOR.get(color),)
-        if name and name in owned_by_name
-    ]
+    # Basic types matching the commander's colors that the user owns. A
+    # colorless commander (empty identity) fills with Wastes.
+    if commander_colors:
+        names = [
+            BASIC_LAND_BY_COLOR[color]
+            for color in sorted(commander_colors)
+            if color in BASIC_LAND_BY_COLOR
+        ]
+    else:
+        names = [COLORLESS_BASIC]
+    wanted = [owned_by_name[name] for name in names if name in owned_by_name]
     if not wanted:
         return []
-    # round-robin distribute
-    per = [0] * len(wanted)
-    for i in range(count):
-        per[i % len(wanted)] += 1
+    # Round-robin distribute, but NEVER assign more copies of a basic than the
+    # user actually owns — an "impossible owned-card count" must not pass
+    # silently. The deck may fall short of LAND_TARGET (the 100-card validation
+    # surfaces that as a warning) rather than fabricate basics nobody owns.
+    per = {c.card.name: 0 for c in wanted}
+    placed = 0
+    progressed = True
+    while placed < count and progressed:
+        progressed = False
+        for cand in wanted:
+            if placed >= count:
+                break
+            if per[cand.card.name] < cand.owned_quantity:
+                per[cand.card.name] += 1
+                placed += 1
+                progressed = True
     out = []
-    for cand, qty in zip(wanted, per, strict=False):
+    for cand in wanted:
+        qty = per[cand.card.name]
         if qty:
             cand.deck_quantity = qty
             cand.reasons = [f"Basic land ({qty})"]
@@ -554,6 +590,18 @@ def _validate_and_annotate(
             rec.warnings.append(f"Illegal in Commander: {cand.card.name}")
         if not card_in_color_identity(cand.card, commander_colors):
             rec.warnings.append(f"Outside color identity: {cand.card.name}")
+
+    # impossible owned-card count — the deck must never use more copies of a
+    # card than the user owns (basics are capped at owned in _pick_basics; this
+    # is the validation backstop the acceptance criteria require).
+    for cand in all_cands:
+        if cand.card.id == commander.id:
+            continue
+        if cand.deck_quantity > cand.owned_quantity:
+            rec.warnings.append(
+                f"Needs {cand.deck_quantity} copies of {cand.card.name} "
+                f"but you own {cand.owned_quantity}."
+            )
 
     # proxy guard
     if not intent.allow_proxies:
