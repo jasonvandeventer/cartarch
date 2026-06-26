@@ -172,40 +172,44 @@
     </section>
   {% endif %}
 
-  {# § III · Prices — static USD by finish. 1d/7d/30d deltas DEFERRED per
-     the v3.28.7 opening-task triage (needs price-history schema; same
-     posture as v3.28.5 Holdings chart and v3.28.9 Watchlist delta). #}
-  {% if prices.regular or prices.foil or prices.etched %}
-    <section class="panel card-detail-panel">
-      <h3 class="card-detail-panel-h">
-        <span>§ III · Prices</span>
-        <span class="card-detail-panel-aux">USD · Scryfall</span>
-      </h3>
-      <div class="card-detail-prices">
-        {% if prices.regular %}
-          <div class="card-detail-prices-row">
-            <span class="card-detail-prices-l">Regular</span>
-            <span class="card-detail-prices-v">${{ prices.regular }}</span>
-          </div>
-        {% endif %}
-        {% if prices.foil %}
-          <div class="card-detail-prices-row">
-            <span class="card-detail-prices-l">Foil</span>
-            <span class="card-detail-prices-v">${{ prices.foil }}</span>
-          </div>
-        {% endif %}
-        {% if prices.etched %}
-          <div class="card-detail-prices-row">
-            <span class="card-detail-prices-l">Etched</span>
-            <span class="card-detail-prices-v">${{ prices.etched }}</span>
-          </div>
-        {% endif %}
-      </div>
-      <p class="card-detail-prices-deferred">
-        Price-over-time deltas will appear here once daily price tracking lands. That's a separate future release.
-      </p>
-    </section>
-  {% endif %}
+  {# § III · Prices — daily MTGJSON ingest (tcgplayer → cardkingdom → cardsphere,
+     USD only), with a manual per-printing override that always wins. Always
+     rendered so an override can be set even when no price is known. #}
+  <section class="panel card-detail-panel">
+    <h3 class="card-detail-panel-h">
+      <span>§ III · Prices</span>
+      <span class="card-detail-panel-aux">USD · MTGJSON</span>
+    </h3>
+    <div class="card-detail-prices">
+      {% for label, finish, value in [
+           ("Regular", "normal", prices.regular),
+           ("Foil", "foil", prices.foil),
+           ("Etched", "etched", prices.etched)] %}
+        <div class="card-detail-prices-row">
+          <span class="card-detail-prices-l">{{ label }}</span>
+          <span class="card-detail-prices-v">
+            {% if value %}${{ value }}{% else %}no price{% endif %}
+            {% if price_overrides.get(finish) %}
+              <span class="badge" title="Manual override">override</span>
+            {% endif %}
+          </span>
+          <form method="post" action="/cards/{{ card.id }}/price-override"
+                class="inline-form card-detail-price-override">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <input type="hidden" name="finish" value="{{ finish }}">
+            <input type="text" name="value" inputmode="decimal"
+                   placeholder="override"
+                   value="{{ price_overrides.get(finish) or '' }}"
+                   aria-label="{{ label }} price override (USD)">
+            <button type="submit">Save</button>
+          </form>
+        </div>
+      {% endfor %}
+    </div>
+    <p class="card-detail-prices-deferred">
+      Prices come from the daily MTGJSON ingest. A manual override always wins and survives re-ingest; clear it by saving a blank value.
+    </p>
+  </section>
 
   {# § IV · Legality — parsed from Card.legalities JSON. Shown for the
      formats the player cares about. #}

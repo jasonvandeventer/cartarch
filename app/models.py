@@ -130,6 +130,42 @@ class Card(Base):
     transaction_logs: Mapped[list[TransactionLog]] = relationship(back_populates="card")
 
 
+class CardPrice(Base):
+    """MTGJSON-sourced price for one printing + finish (MTGJSON ingest issue).
+
+    The source of truth for displayed price, replacing Scryfall. One row per
+    ``(scryfall_id, finish)``. Holds the per-provider USD retail values from the
+    daily MTGJSON ingest plus a manual override that always wins. The resolved
+    display value — override, then tcgplayer/cardkingdom/cardsphere first-non-null
+    (see :func:`app.pricing.resolve_price_value`) — is denormalized back onto
+    ``Card.price_usd*`` by the ingest, so every existing read surface
+    (``effective_price`` + the SQL price expressions) keeps working unchanged and
+    card_prices stays the authoritative upstream.
+
+    ``cardmarket`` is deliberately absent: it is EUR while the three kept
+    providers are USD, and mixing currencies silently corrupts a USD valuation.
+    Prices are stored as strings to match ``Card.price_usd*`` (parsed via
+    :func:`app.pricing.parse_price`). ``price_updated_at`` advances only when a
+    fresh provider value actually arrives, so a transient miss keeps the
+    last-known value while surfacing staleness instead of looking fresh.
+    """
+
+    __tablename__ = "card_prices"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    scryfall_id: Mapped[str] = mapped_column(String(64), index=True, nullable=False)
+    finish: Mapped[str] = mapped_column(String(16), nullable=False)
+    tcgplayer_retail: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    cardkingdom_retail: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    cardsphere_retail: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    manual_override: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    price_updated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    __table_args__ = (
+        UniqueConstraint("scryfall_id", "finish", name="uq_card_prices_printing_finish"),
+    )
+
+
 class StorageLocation(Base):
     __tablename__ = "storage_locations"
 

@@ -673,9 +673,8 @@ def persist_import_rows(
             card.image_url = prefetched["image_url"]
             card.type_line = prefetched["type_line"]
             card.oracle_text = prefetched["oracle_text"]
-            card.price_usd = prefetched["price_usd"]
-            card.price_usd_foil = prefetched["price_usd_foil"]
-            card.price_usd_etched = prefetched["price_usd_etched"]
+            # Price now owned by the MTGJSON ingest (app.jobs.price_ingest) —
+            # not refreshed from Scryfall here, so the import can't clobber it.
             card.colors = prefetched.get("colors")
             card.mana_cost = prefetched.get("mana_cost")
             card.cmc = prefetched.get("cmc")

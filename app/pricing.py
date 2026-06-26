@@ -41,6 +41,31 @@ def card_metadata(card: Card) -> dict:
     }
 
 
+# Provider priority for the displayed USD price (MTGJSON ingest issue).
+# cardmarket is excluded — it is EUR, and mixing it into a USD-displayed price
+# corrupts valuation. A manual override always wins over every provider. This
+# is the ONE resolution function; the ingest uses it to denormalize the result
+# onto Card.price_usd*, so there is no second copy of the chain to drift.
+PRICE_PROVIDER_ORDER = ("tcgplayer", "cardkingdom", "cardsphere")
+
+
+def resolve_price_value(price) -> str | None:
+    """Resolved display price for a CardPrice row.
+
+    Manual override first, then tcgplayer/cardkingdom/cardsphere retail in
+    priority order, first non-null. ``None`` (no provider value, no override)
+    → the UI renders "no price". Never falls back to Scryfall.
+    """
+    if price is None:
+        return None
+    if price.manual_override:
+        return price.manual_override
+    for value in (price.tcgplayer_retail, price.cardkingdom_retail, price.cardsphere_retail):
+        if value:
+            return value
+    return None
+
+
 def parse_price(value: str | None) -> float:
     """Parse a nullable price string into a safe float."""
     try:
