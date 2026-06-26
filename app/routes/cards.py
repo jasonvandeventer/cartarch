@@ -26,8 +26,9 @@ from app.dependencies import (
     safe_redirect_url,
 )
 from app.inventory_service import get_location_label, list_owned_sets
+from app.jobs.price_ingest import set_price_override
 from app.location_service import list_locations
-from app.models import Card, Deck, InventoryRow, TransactionLog, User
+from app.models import Card, CardPrice, Deck, InventoryRow, TransactionLog, User
 from app.pricing import effective_price
 from app.scryfall import (
     autocomplete_token_names,
@@ -211,11 +212,18 @@ def card_detail_page(
         for r in in_decks_rows
     ]
 
-    # § III — Prices (static; 1d/7d/30d deltas DEFERRED).
+    # § III — Prices. The displayed value is the MTGJSON-resolved price the
+    # ingest denormalized onto Card.price_usd*; ``overrides`` carries the manual
+    # per-finish override (if any) so the form pre-fills and the badge shows.
     prices = {
         "regular": target_card.price_usd,
         "foil": target_card.price_usd_foil,
         "etched": target_card.price_usd_etched,
+    }
+    overrides = {
+        row.finish: row.manual_override
+        for row in session.query(CardPrice).filter(CardPrice.scryfall_id == target_card.scryfall_id)
+        if row.manual_override
     }
 
     # § IV — Legality. Card.legalities is a JSON-encoded dict from Scryfall;
@@ -261,10 +269,30 @@ def card_detail_page(
             "printings": printings,
             "in_decks": in_decks,
             "prices": prices,
+            "price_overrides": overrides,
             "legality_map": legality_map,
             "history_rows": history_rows,
         },
     )
+
+
+@router.post("/cards/{card_id}/price-override")
+def card_price_override(
+    card_id: int,
+    finish: str = Form("normal"),
+    value: str = Form(""),
+    _csrf: None = CsrfRequired,
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+):
+    """Set or clear the manual per-printing+finish price override. A blank value
+    clears it. The override wins over every MTGJSON provider and survives
+    re-ingest (see app.jobs.price_ingest.set_price_override)."""
+    target_card = session.query(Card).filter(Card.id == card_id).first()
+    if target_card is None:
+        return RedirectResponse(url="/collection", status_code=303)
+    set_price_override(session, target_card.scryfall_id, finish, value)
+    return RedirectResponse(url=f"/cards/{card_id}", status_code=303)
 
 
 @router.get("/tokens")

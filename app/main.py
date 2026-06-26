@@ -351,9 +351,9 @@ def _run_price_refresh_batch() -> None:
         for card in stale:
             fresh = fresh_by_id.get(card.scryfall_id)
             if fresh:
-                card.price_usd = fresh["price_usd"]
-                card.price_usd_foil = fresh["price_usd_foil"]
-                card.price_usd_etched = fresh["price_usd_etched"]
+                # Price columns are NOT written here — price comes from the
+                # MTGJSON ingest (app.jobs.price_ingest); this loop now only
+                # refreshes metadata/traits so it can't clobber MTGJSON prices.
                 card.colors = fresh.get("colors")
                 card.color_identity = fresh.get("color_identity")
                 card.mana_cost = fresh.get("mana_cost")
@@ -431,9 +431,9 @@ def _run_trait_backfill_batch() -> int:
         for card in pending:
             fresh = fresh_by_id.get(card.scryfall_id)
             if fresh:
-                card.price_usd = fresh["price_usd"]
-                card.price_usd_foil = fresh["price_usd_foil"]
-                card.price_usd_etched = fresh["price_usd_etched"]
+                # Price columns are NOT written here — price comes from the
+                # MTGJSON ingest (app.jobs.price_ingest); this backfill only
+                # populates traits/metadata.
                 card.colors = fresh.get("colors")
                 card.color_identity = fresh.get("color_identity")
                 card.mana_cost = fresh.get("mana_cost")

@@ -1043,9 +1043,9 @@ def refresh_card_from_scryfall(session: Session, card_id: int) -> bool:
     card.image_url = fresh["image_url"]
     card.type_line = fresh["type_line"]
     card.oracle_text = fresh["oracle_text"]
-    card.price_usd = fresh["price_usd"]
-    card.price_usd_foil = fresh["price_usd_foil"]
-    card.price_usd_etched = fresh["price_usd_etched"]
+    # Price now comes from the MTGJSON ingest (app.jobs.price_ingest), NOT
+    # Scryfall — the price columns are deliberately left untouched here so a
+    # metadata refresh can't clobber the MTGJSON-resolved value.
     card.colors = fresh["colors"]
     card.color_identity = fresh["color_identity"]
     card.mana_cost = fresh["mana_cost"]
