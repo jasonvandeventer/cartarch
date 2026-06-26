@@ -85,7 +85,7 @@ from app.inventory_service import (
 )
 from app.location_service import list_locations
 from app.models import Card, Deck, InventoryRow, User
-from app.pricing import effective_price
+from app.pricing import card_metadata, effective_price
 from app.scryfall import autocomplete_cards_for_add, fetch_card_printings
 from app.timeutil import utc_now
 from app.token_service import deck_token_status, list_tokens
@@ -1045,6 +1045,7 @@ async def decks_delete(
 @router.get("/decks/{deck_id}/export")
 def decks_export(
     deck_id: int,
+    format: str = "txt",
     session: Session = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
 ):
@@ -1055,6 +1056,7 @@ def decks_export(
     rows = (
         session.query(InventoryRow)
         .join(Card)
+        .options(joinedload(InventoryRow.card))
         .filter(
             InventoryRow.user_id == current_user.id,
             InventoryRow.storage_location_id == deck.storage_location_id,
@@ -1062,6 +1064,69 @@ def decks_export(
         .order_by(Card.name.asc())
         .all()
     )
+    # issue #27 — the same inbound variant-group shares the text export folds in,
+    # so both formats cover the identical row set.
+    inbound = get_inbound_shares_for_deck(session, deck)
+
+    if format == "json":
+        # LLM-parseable variant — per-card gameplay metadata (persisted columns,
+        # no Scryfall call) + inventory context, plus a server-computed deck
+        # rollup. Covers own rows UNION inbound shares.
+        cards = []
+        for row in rows:
+            price = effective_price(row.card, row.finish)
+            cards.append(
+                {
+                    **card_metadata(row.card),
+                    "quantity": row.quantity,
+                    "finish": row.finish or "normal",
+                    "role": row.role or None,
+                    "tags": row.tags or None,
+                    "is_proxy": bool(row.is_proxy),
+                    "price": round(price, 2) if price else None,
+                    "shared_from": None,
+                }
+            )
+        for share in inbound:
+            card = share["card"]
+            price = effective_price(card, share["finish"])
+            cards.append(
+                {
+                    **card_metadata(card),
+                    "quantity": share["quantity"],
+                    "finish": share["finish"] or "normal",
+                    "role": None,
+                    "tags": None,
+                    "is_proxy": share["is_proxy"],
+                    "price": round(price, 2) if price else None,
+                    "shared_from": share["source_deck_name"],
+                }
+            )
+        # Deck-level rollups computed server-side over the full card set.
+        color_union: set[str] = set()
+        type_counts: dict[str, int] = {}
+        mv_histogram: dict[str, int] = {}
+        for c in cards:
+            color_union.update(c["color_identity"])
+            qty = c["quantity"]
+            # Type bucket = the type word(s) before the em-dash, normalized.
+            type_head = (c["type_line"] or "").split("—")[0].strip()
+            for word in type_head.split():
+                type_counts[word] = type_counts.get(word, 0) + qty
+            mv = c["mana_value"]
+            mv_key = "unknown" if mv is None else f"{mv:g}"
+            mv_histogram[mv_key] = mv_histogram.get(mv_key, 0) + qty
+        return JSONResponse(
+            {
+                "deck": {"id": deck.id, "name": deck.name},
+                "rollup": {
+                    "color_identity": sorted(color_union),
+                    "type_counts": type_counts,
+                    "mana_value_histogram": mv_histogram,
+                },
+                "cards": cards,
+            }
+        )
 
     def _export_line(card, quantity, finish, role):
         set_code = (card.set_code or "???").upper()
@@ -1092,7 +1157,7 @@ def decks_export(
     # builds so the export is the COMPLETE decklist (own cards + inbound
     # shares). Each shared row carries its own finish marker, so foil survives
     # export → re-import. No-op for a deck with no variant group.
-    for share in get_inbound_shares_for_deck(session, deck):
+    for share in inbound:
         deck_lines.append(_export_line(share["card"], share["quantity"], share["finish"], None))
 
     parts: list[str] = []

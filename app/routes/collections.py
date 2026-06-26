@@ -83,7 +83,7 @@ from app.presentation_service import (
     build_pending_batch_groups,
     build_pending_view_model,
 )
-from app.pricing import effective_price
+from app.pricing import card_metadata, effective_price
 
 router = APIRouter()
 
@@ -603,6 +603,7 @@ def _csv_formula_safe(value: str) -> str:
 @router.get("/collection/export")
 def collection_export(
     filters: CollectionFilter = Depends(collection_filter),
+    format: str = Query("csv"),
     session: Session = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
 ):
@@ -615,7 +616,32 @@ def collection_export(
     base_query, _selected_location, _drawer = _filtered_collection_query(
         session, current_user.id, filters
     )
+    # build_collection_filter_query already joinedload's card + storage_location,
+    # so the per-row card reads below are request-path-safe (no N+1, no network).
     rows = base_query.order_by(Card.name.asc()).all()
+
+    if format == "json":
+        # LLM-parseable variant — per-card gameplay metadata (persisted columns,
+        # no Scryfall call) plus inventory context. Honors the same filter.
+        items = []
+        for row in rows:
+            loc = row.storage_location
+            price = effective_price(row.card, row.finish)
+            items.append(
+                {
+                    **card_metadata(row.card),
+                    "quantity": row.quantity,
+                    "finish": row.finish or "normal",
+                    "location": loc.name if loc else None,
+                    "location_type": loc.type if loc else None,
+                    "language": row.language or "en",
+                    "role": row.role or None,
+                    "tags": row.tags or None,
+                    "is_proxy": bool(row.is_proxy),
+                    "price": round(price, 2) if price else None,
+                }
+            )
+        return JSONResponse({"cards": items})
 
     buf = io.StringIO()
     writer = csv.writer(buf)
@@ -647,6 +673,16 @@ def collection_export(
             "Is Proxy",
             "Scryfall ID",
             "Price",
+            # v3.x — read-only gameplay enrichment appended at the END (existing
+            # columns byte-identical). NOT importer HEADER_ALIASES — precedent:
+            # the Price column. oracle_text/legalities stay OUT of CSV
+            # (newlines/commas/quotes); they live in the JSON variant.
+            "Color Identity",
+            "Colors",
+            "Type Line",
+            "Mana Cost",
+            "Mana Value",
+            "Rarity",
         ]
     )
     for row in rows:
@@ -670,6 +706,12 @@ def collection_export(
                 "true" if row.is_proxy else "false",
                 card.scryfall_id or "",
                 f"{price:.2f}" if price else "",
+                card.color_identity or "",
+                card.colors or "",
+                card.type_line or "",
+                card.mana_cost or "",
+                "" if card.cmc is None else f"{card.cmc:g}",
+                card.rarity or "",
             ]
         )
 

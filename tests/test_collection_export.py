@@ -192,6 +192,66 @@ def test_collection_page_export_link_carries_filters():
             app.dependency_overrides.pop(dep, None)
 
 
+def test_csv_appends_gameplay_columns():
+    """The 6 scalar enrichment columns are appended; the prefix is unchanged."""
+    from app.dependencies import get_current_user, get_db_session
+
+    _engine, sm = _engine_sm()
+    s = sm()
+    u = _user(s)
+    loc = _loc(s, u.id, "Binder")
+    _row(s, u.id, _card(s, "Forest"), loc.id)
+    s.commit()
+
+    client, app = _client(sm, u)
+    try:
+        r = client.get("/collection/export")
+        rows = _parse(r)
+        (only,) = rows
+        # First column still Name (prefix byte-identical with prior shape).
+        assert list(only)[0] == "Name"
+        assert only["Color Identity"] == "G"
+        assert only["Colors"] == "G"
+        assert only["Type Line"] == "Creature"
+        assert only["Rarity"] == ""
+    finally:
+        for dep in (get_db_session, get_current_user):
+            app.dependency_overrides.pop(dep, None)
+
+
+def test_json_export_has_arrays_and_legalities():
+    from app.dependencies import get_current_user, get_db_session
+
+    _engine, sm = _engine_sm()
+    s = sm()
+    u = _user(s)
+    loc = _loc(s, u.id, "Binder")
+    colorless = _card(s, "Sol Ring")
+    colorless.color_identity = ""  # colorless after a fetch
+    colorless.colors = None
+    colorless.cmc = 1.0
+    colorless.legalities = '{"commander": "legal"}'
+    _row(s, u.id, colorless, loc.id, qty=2)
+    s.commit()
+
+    client, app = _client(sm, u)
+    try:
+        r = client.get("/collection/export?format=json")
+        assert r.status_code == 200
+        assert "application/json" in r.headers["content-type"]
+        (card,) = r.json()["cards"]
+        assert card["color_identity"] == []  # [] not "" for colorless
+        assert card["colors"] == []
+        assert card["mana_value"] == 1.0
+        assert card["legalities"] == {"commander": "legal"}  # nested object
+        assert card["quantity"] == 2
+        assert card["location"] == "Binder"
+        assert "oracle_text" in card and "scryfall_id" in card
+    finally:
+        for dep in (get_db_session, get_current_user):
+            app.dependency_overrides.pop(dep, None)
+
+
 def test_export_no_filter_is_full_dump():
     from app.dependencies import get_current_user, get_db_session
 
