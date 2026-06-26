@@ -1,5 +1,15 @@
 [
   {
+    "version": "4.0.26",
+    "date": "2026-06-26",
+    "added": [],
+    "refined": [
+      "Cartarch can now generate a legal Commander Brew from your owned collection: choose a commander, preview the recommended decklist with reasons and warnings, then save it as a Brew Mode deck without moving any physical cards.\n\n---\n\n**Labels:** `feature` (add `recommendations` and `deckbuilding` only if those labels already exist or you want to start using them consistently)"
+    ],
+    "resolved": [],
+    "archivist_note": null
+  },
+  {
     "version": "4.0.25",
     "date": "2026-06-26",
     "added": [],
