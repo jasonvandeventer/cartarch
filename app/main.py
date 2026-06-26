@@ -72,6 +72,7 @@ from app.routes import (
     goldfish,
     imports,
     playgroups,
+    recommendations,
     sharing,
     trades,
 )
@@ -216,6 +217,7 @@ app.include_router(admin.router)
 app.include_router(account.router)
 app.include_router(drawers.router)
 app.include_router(playgroups.router)
+app.include_router(recommendations.router)
 app.include_router(sharing.router)
 app.include_router(trades.router)
 app.include_router(goldfish.router)
