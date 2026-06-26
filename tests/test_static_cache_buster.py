@@ -1,0 +1,55 @@
+"""Content-hash static-asset cache buster (issue #29).
+
+`static_v()` keys the `?v=` query string on a static file's CONTENT hash, not
+its mtime — so a backend-only deploy (new container = new mtime, identical
+content) keeps the browser/CDN cache, while an actual edit busts it. Pins the
+issue's acceptance criteria: hash not timestamp, same content → same hash,
+changed content → different hash, missing file → version fallback.
+"""
+
+from __future__ import annotations
+
+import app.dependencies as deps
+
+
+def test_value_is_content_hash_not_timestamp(tmp_path, monkeypatch):
+    # static_v reads app/static/<path> relative to cwd.
+    static_dir = tmp_path / "app" / "static"
+    static_dir.mkdir(parents=True)
+    (static_dir / "x.css").write_bytes(b"body{}")
+    monkeypatch.chdir(tmp_path)
+    deps._static_hash_cache.clear()
+
+    v = deps.static_v("x.css")
+    # A truncated md5 hex digest — not a 10-digit unix mtime.
+    assert len(v) == 12 and all(c in "0123456789abcdef" for c in v)
+
+
+def test_same_content_same_hash_changed_content_differs(tmp_path, monkeypatch):
+    static_dir = tmp_path / "app" / "static"
+    static_dir.mkdir(parents=True)
+    target = static_dir / "style.css"
+    monkeypatch.chdir(tmp_path)
+
+    target.write_bytes(b"a{color:red}")
+    deps._static_hash_cache.clear()
+    h1 = deps.static_v("style.css")
+
+    # Identical content (fresh deploy, new mtime) → identical hash.
+    target.write_bytes(b"a{color:red}")
+    deps._static_hash_cache.clear()
+    h2 = deps.static_v("style.css")
+    assert h1 == h2
+
+    # Real edit → different hash.
+    target.write_bytes(b"a{color:blue}")
+    deps._static_hash_cache.clear()
+    h3 = deps.static_v("style.css")
+    assert h3 != h1
+
+
+def test_missing_file_falls_back_to_version(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("APP_VERSION", "v9.9.9")
+    deps._static_hash_cache.clear()
+    assert deps.static_v("nope.css") == "v9.9.9"
