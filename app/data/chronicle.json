@@ -1,5 +1,15 @@
 [
   {
+    "version": "4.0.27",
+    "date": "2026-06-26",
+    "added": [],
+    "refined": [
+      "Card prices now come from a daily MTGJSON ingest with a tcgplayer, cardkingdom, cardsphere fallback (USD providers only) and per-printing manual overrides, replacing Scryfall pricing for more accurate valuations."
+    ],
+    "resolved": [],
+    "archivist_note": null
+  },
+  {
     "version": "4.0.26",
     "date": "2026-06-26",
     "added": [],
