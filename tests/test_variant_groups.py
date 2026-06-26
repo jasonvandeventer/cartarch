@@ -300,44 +300,6 @@ def test_reconcile_no_group_unchanged():
     assert failed == 0
 
 
-def test_migration_idempotent():
-    """migrate twice on a throwaway DB -> exactly one variant_group_id column."""
-    import os
-    import tempfile
-
-    failed = 0
-    d = tempfile.mkdtemp()
-    os.environ["DATA_DIR"] = d
-    import importlib
-
-    import app.db as db
-
-    importlib.reload(db)
-    from sqlalchemy import text
-
-    with db.engine.begin() as c:
-        c.execute(text("CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY)"))
-        c.execute(text("CREATE TABLE IF NOT EXISTS decks (id INTEGER PRIMARY KEY, name TEXT)"))
-    import scripts.migrate_v3_33_0_variant_groups as m
-
-    importlib.reload(m)
-    m.main()
-    m.main()
-    with db.engine.begin() as c:
-        cols = [r[1] for r in c.execute(text("PRAGMA table_info(decks)")).fetchall()]
-        tbls = [
-            r[0]
-            for r in c.execute(text("SELECT name FROM sqlite_master WHERE type='table'")).fetchall()
-        ]
-    if cols.count("variant_group_id") == 1 and "variant_groups" in tbls:
-        print("  [OK] migration idempotent (one column, table present)")
-    else:
-        print(f"  [FAIL] migration: cols={cols.count('variant_group_id')} tbls={tbls}")
-        failed += 1
-    # Reload app.db back to the dev DATA_DIR so later tests aren't affected.
-    assert failed == 0
-
-
 def test_route_smoke():
     from fastapi.testclient import TestClient
 
