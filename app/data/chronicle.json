@@ -24,7 +24,7 @@
     "date": "2026-06-26",
     "added": [],
     "refined": [
-      "Collection and deck exports can now emit JSON with full card details (colors,\ntypes, mana value, legality, rules text), so external tools and assistants can\nread your cards directly without looking each one up. The collection CSV also\ngains color, type, and mana-value columns."
+      "Internal housekeeping — removed the old database-migration machinery left\nover from before the v4 database upgrade. No change to how Cartarch behaves;\nthis just clears out dead code."
     ],
     "resolved": [],
     "archivist_note": null

@@ -35,8 +35,8 @@
           {% set parts = entry.version.split('.') %}
           <span>Folio
             <b>{{ to_roman(parts[0] | int) }}</b>
-            · Issue <b>{{ to_roman(parts[1] | int) }}</b>
-            · Entry <b>{{ to_roman(entry_num) }}</b>
+            · Issue <b>{{ parts[1] }}</b>
+            · Entry <b>{{ parts[2] }}</b>
           </span>
         </div>
         <div class="chronicle-raw">
@@ -108,14 +108,14 @@
         {% for issue in folio.issues %}
         <div class="chronicle-issue">
           <div class="chronicle-issue-h">
-            <span>Issue {{ to_roman(issue.issue) }}</span>
+            <span>Issue {{ issue.issue }}</span>
             <span class="raw">{{ issue.entries | length }} {{ "entry" if issue.entries | length == 1 else "entries" }}</span>
           </div>
           <div class="chronicle-entries">
             {% for e in issue.entries %}
             <a class="chronicle-entry-row{% if e.version == current_version %} current{% endif %}"
                href="/chronicle/v{{ e.version }}">
-              <span class="ent">Entry {{ to_roman(e.entry_num) }}</span>
+              <span class="ent">Entry {{ e.patch }}</span>
               <span class="nm">{{ e.summary }}</span>
               <span class="dt">{{ e.date | editorial_date }}</span>
             </a>

@@ -260,17 +260,21 @@ def to_roman(n: int) -> str:
 
 
 def version_to_folio(version: str | None) -> str:
-    """Render a semantic version as 'Folio X · Issue Y · Entry Z' (Roman).
-    Falls back to the raw input for non-semantic inputs (dev-builds,
-    empty strings). Roman is presentation-only — never use this value
-    in URLs or internal references."""
+    """Render a semantic version as 'Folio X · Issue Y · Entry Z'.
+    Folio (major) stays Roman — it's the masthead flourish and is never 0.
+    Issue (minor) and Entry (patch) are plain numbers matching the version:
+    Roman has no zero, so Roman'ing them collided '.0'/'.1' on "I" (the
+    duplicate-Issue / off-by-one bug). They now read straight off the version,
+    so 'Entry Z' always equals the patch number. Falls back to the raw input
+    for non-semantic inputs (dev-builds, empty strings). Presentation-only —
+    never use this value in URLs or internal references."""
     if not version:
         return ""
     match = _VERSION_RE.match(version)
     if not match:
         return version  # dev-build identity, pass through unchanged
     folio, issue, entry = (int(g) for g in match.groups())
-    return f"Folio {to_roman(folio)} · Issue {to_roman(issue)} · Entry {to_roman(entry)}"
+    return f"Folio {to_roman(folio)} · Issue {issue} · Entry {entry}"
 
 
 templates.env.filters["folio"] = version_to_folio
