@@ -170,8 +170,12 @@
       <input type="hidden" name="view" value="{{ view_mode }}">
       <button type="submit">Apply</button>
       <a href="/collection"><button type="button">Clear all</button></a>
-      <a href="/collection/export?search={{ search|urlencode }}&finish={{ finish_filter }}&location_id={{ location_id }}&sort={{ sort }}&direction={{ direction }}&colors={{ facet_colors_set | sort | join('') }}&types={{ facet_types_set | sort | join(',') | urlencode }}&status={{ facet_status_set | sort | join(',') }}&finishes={{ facet_finishes_set | sort | join(',') }}&price_min={{ facet_price_min_raw }}&price_max={{ facet_price_max_raw }}">
+      {% set export_qs %}search={{ search|urlencode }}&finish={{ finish_filter }}&location_id={{ location_id }}&sort={{ sort }}&direction={{ direction }}&colors={{ facet_colors_set | sort | join('') }}&types={{ facet_types_set | sort | join(',') | urlencode }}&status={{ facet_status_set | sort | join(',') }}&finishes={{ facet_finishes_set | sort | join(',') }}&price_min={{ facet_price_min_raw }}&price_max={{ facet_price_max_raw }}{% endset %}
+      <a href="/collection/export?{{ export_qs }}">
         <button type="button">Export CSV</button>
+      </a>
+      <a href="/collection/export?{{ export_qs }}&format=json">
+        <button type="button">Export JSON</button>
       </a>
       {# v3.28.8 — Grid/Rows view toggle. Submits the form with view=rows
          (or back to grid). The toggle's hidden input is overridden by the
