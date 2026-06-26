@@ -1,0 +1,81 @@
+{% from "_macros.html" import editorial_eyebrow %}
+{% extends "base.html" %}
+{% block content %}
+  <section class="panel pagehead">
+    {{ editorial_eyebrow("Play · Brew preview") }}
+    <h1 class="pagehead-title">{{ rec.commander.name if rec.commander else "Brew" }}</h1>
+    <p class="pagehead-tagline">
+      <strong>This is a generated recommendation, not a physical move.</strong>
+      Saving it creates a Brew Mode deck of planning (proxy) rows — your owned
+      cards stay exactly where they are.
+    </p>
+  </section>
+
+  {% if rec.warnings %}
+    <section class="panel" style="border-left:3px solid #c0392b">
+      <h3 class="panel-title">Warnings</h3>
+      <ul>{% for w in rec.warnings %}<li>{{ w }}</li>{% endfor %}</ul>
+    </section>
+  {% endif %}
+
+  {% if rec.mainboard %}
+    <section class="panel">
+      <h3 class="panel-title">Summary</h3>
+      <p>
+        {{ rec.total_cards }} cards total ·
+        {% for k, v in rec.role_counts.items() %}{{ v }} {{ k }}{% if not loop.last %} · {% endif %}{% endfor %}
+      </p>
+      <form method="post"
+            action="/recommendations/commander/{{ card_id }}/create-brew"
+            style="margin-top:0.75rem;display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <input type="hidden" name="allow_proxies" value="{{ 'true' if intent.allow_proxies else 'false' }}">
+        <input type="hidden" name="use_cards_in_other_decks" value="{{ 'true' if intent.use_cards_in_other_decks else 'false' }}">
+        <input type="hidden" name="primary_theme" value="{{ intent.primary_theme or '' }}">
+        <input type="hidden" name="avoid_themes" value="{{ intent.avoid_themes | join(',') }}">
+        <input type="text" name="deck_name" placeholder="{{ rec.commander.name }} (Brew)"
+               style="max-width:280px">
+        <button type="submit">Save as Brew Mode deck</button>
+      </form>
+    </section>
+
+    <section class="panel">
+      <h3 class="panel-title">Mainboard ({{ rec.mainboard | length }})</h3>
+      <ul style="list-style:none;padding:0;margin:0;display:grid;gap:0.3rem">
+        {% for c in rec.mainboard %}
+          <li>
+            <strong>{{ c.deck_quantity }}× {{ c.card.name }}</strong>
+            {% if c.reasons %}<span style="opacity:0.65"> — {{ c.reasons | join(", ") }}</span>{% endif %}
+          </li>
+        {% endfor %}
+      </ul>
+    </section>
+
+    <section class="panel">
+      <h3 class="panel-title">Lands ({{ rec.lands | length }})</h3>
+      <ul style="list-style:none;padding:0;margin:0;display:grid;gap:0.3rem">
+        {% for c in rec.lands %}
+          <li>{{ c.deck_quantity }}× {{ c.card.name }}</li>
+        {% endfor %}
+      </ul>
+    </section>
+
+    {% if rec.cuts %}
+      <section class="panel">
+        <h3 class="panel-title">Skipped (next best / already in other decks)</h3>
+        <ul style="list-style:none;padding:0;margin:0;display:grid;gap:0.3rem">
+          {% for c in rec.cuts %}
+            <li style="opacity:0.7">{{ c.card.name }}
+              {% if c.already_in_deck_names %}— in {{ c.already_in_deck_names | join(", ") }}{% endif %}
+            </li>
+          {% endfor %}
+        </ul>
+      </section>
+    {% endif %}
+  {% else %}
+    <section class="panel">
+      <p>Couldn't generate a deck for this commander. See warnings above.</p>
+      <p><a href="/recommendations/commander">← Pick a different commander</a></p>
+    </section>
+  {% endif %}
+{% endblock %}

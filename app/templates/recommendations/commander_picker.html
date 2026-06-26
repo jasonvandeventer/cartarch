@@ -1,0 +1,36 @@
+{% from "_macros.html" import editorial_eyebrow %}
+{% extends "base.html" %}
+{% block content %}
+  <section class="panel pagehead">
+    {{ editorial_eyebrow("Play · Brew") }}
+    <h1 class="pagehead-title">Brew a deck from your collection</h1>
+    <p class="pagehead-tagline">
+      Pick a commander you own and Cartarch will generate a legal 100-card
+      Commander <em>brew</em> from cards in your collection — with reasons for
+      each pick. Nothing is moved; the result is saved as a Brew Mode deck.
+    </p>
+  </section>
+
+  <section class="panel">
+    {% if candidates %}
+      <input type="search"
+             placeholder="Filter commanders…"
+             data-list-filter
+             data-list-filter-target="#commander-list li"
+             style="max-width: 360px; margin-bottom: 0.75rem">
+      <ul id="commander-list" style="list-style:none;padding:0;margin:0;display:grid;gap:0.35rem">
+        {% for card in candidates %}
+          <li data-filter-text="{{ card.name }} {{ card.type_line }}">
+            <a href="/recommendations/commander/{{ card.id }}/preview">
+              {{ card.name }}
+            </a>
+            <span style="opacity:0.6">— {{ card.type_line }}</span>
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p>You don't own any Commander-legal legendary creatures yet. Import some
+         cards, then come back to brew.</p>
+    {% endif %}
+  </section>
+{% endblock %}
