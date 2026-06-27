@@ -20,6 +20,15 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY app ./app
 COPY scripts ./scripts
 
+# v4 schema is Alembic-owned. The runtime image now carries alembic + the migration
+# env so the PreSync migrate Job (vanfreckle-platform) runs `alembic upgrade head`
+# from this same image — no separate -migrate overlay, so the Job's tag tracks the
+# app tag via the kustomize image rewrite. Folded in from the retired Dockerfile.migrate
+# after the v4.0.30 ledger-drift incident (create_all was masking unrun migrations).
+RUN pip install --no-cache-dir "alembic>=1.14,<2.0"
+COPY alembic.ini ./
+COPY alembic ./alembic
+
 RUN mkdir -p /data
 
 EXPOSE 8000
