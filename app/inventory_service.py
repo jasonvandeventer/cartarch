@@ -2815,8 +2815,18 @@ def adjust_inventory_row_quantity(
 
 # The three canonical finish tokens — match inventory_rows.finish AND
 # card_prices.finish (what the MTGJSON ingest keys on), so a corrected row
-# resolves to the priced finish.
-VALID_FINISHES = frozenset({"normal", "foil", "etched"})
+# resolves to the priced finish. Single source of truth: the route validates
+# against this set and the collection-row template renders the options from it
+# (injected as a Jinja global in app/dependencies.py). Tuple drives display
+# order; the set is membership.
+FINISH_OPTIONS = ("normal", "foil", "etched")
+VALID_FINISHES = frozenset(FINISH_OPTIONS)
+
+
+class InventoryRowNotFound(ValueError):
+    """Raised when a row id isn't owned by the requesting user (or doesn't
+    exist). Subclasses ValueError so an uncaught one still degrades to the
+    global 400 handler, while routes can catch the type for a 404."""
 
 
 def correct_inventory_row_finish(
@@ -2842,7 +2852,7 @@ def correct_inventory_row_finish(
         .first()
     )
     if not row:
-        raise ValueError("Inventory row not found.")
+        raise InventoryRowNotFound("Inventory row not found.")
 
     old_finish = row.finish
     if old_finish == new_finish:

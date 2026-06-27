@@ -38,6 +38,7 @@ from app.dependencies import (
 )
 from app.inventory_service import (
     DRAWER_KEEP_PRICE_THRESHOLD,
+    InventoryRowNotFound,
     add_card_to_location,
     adjust_inventory_row_quantity,
     apply_collection_search_filters,
@@ -146,7 +147,8 @@ def correct_inventory_row_finish_action(
     _: None = CsrfRequired,
 ):
     # In-place finish correction (issue #52). Owner-only; 404 on someone else's
-    # row. Invalid finish token → ValueError → global 400 handler.
+    # row (typed InventoryRowNotFound). Invalid finish token → bare ValueError →
+    # global 400 handler.
     try:
         correct_inventory_row_finish(
             session=session,
@@ -154,10 +156,8 @@ def correct_inventory_row_finish_action(
             user_id=current_user.id,
             new_finish=finish.strip().lower(),
         )
-    except ValueError as exc:
-        if "not found" in str(exc).lower():
-            raise HTTPException(status_code=404, detail="Inventory row not found") from exc
-        raise
+    except InventoryRowNotFound as exc:
+        raise HTTPException(status_code=404, detail="Inventory row not found") from exc
     return RedirectResponse(url=safe_redirect_url(request), status_code=303)
 
 

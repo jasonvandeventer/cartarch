@@ -232,7 +232,7 @@
                     title="Correct this row's finish in place">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                 <select name="finish">
-                  {% for f in ["normal", "foil", "etched"] %}
+                  {% for f in finish_options %}
                     <option value="{{ f }}" {% if item.finish == f %}selected{% endif %}>{{ f|capitalize }}</option>
                   {% endfor %}
                 </select>
