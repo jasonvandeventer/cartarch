@@ -34,6 +34,7 @@ from app.game_service import (
     get_viewable_game,
     list_games,
     normalize_game_format,
+    record_goal_results,
     set_game_playgroup,
     toggle_seat_art_background,
     update_game_notes,
@@ -319,6 +320,23 @@ async def game_end(
         tc = None
 
     end_game(session, game_id, current_user.id, placements, final_lives, tc, notes)
+
+    # issue #47 — per-seat goal completion. Checkbox name is goal_{seat}_{goal};
+    # presence = achieved. record_goal_results re-validates ownership (only the
+    # recorder's own decks' active goals are written), so forged keys are inert.
+    checked: set[tuple[int, int]] = set()
+    for key in form_data:
+        if not key.startswith("goal_"):
+            continue
+        parts = key.split("_")
+        if len(parts) != 3:
+            continue
+        try:
+            checked.add((int(parts[1]), int(parts[2])))
+        except ValueError:
+            continue
+    record_goal_results(session, game_id, current_user.id, checked)
+
     return RedirectResponse(f"/games/{game_id}", status_code=303)
 
 

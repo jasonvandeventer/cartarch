@@ -13,6 +13,7 @@ from app.models import (
     DeckCardShare,
     DeckGoal,
     Game,
+    GameGoalResult,
     GameSeat,
     InventoryRow,
     StorageLocation,
@@ -2370,9 +2371,63 @@ def delete_deck_goal(session: Session, user_id: int, goal_id: int) -> bool:
     goal = _owned_deck_goal(session, user_id, goal_id)
     if goal is None:
         return False
+    # issue #47 — drop this goal's per-game result rows FIRST (game_goal_results.
+    # deck_goal_id is CASCADE intent; SQLite enforces no FK). Done explicitly here
+    # — NOT via a second delete-orphan on DeckGoal (dual delete-orphan on the same
+    # child is ambiguous; the seat side already owns the ORM cascade).
+    session.query(GameGoalResult).filter(GameGoalResult.deck_goal_id == goal.id).delete(
+        synchronize_session=False
+    )
     session.delete(goal)
     session.commit()
     return True
+
+
+def deck_goal_stats(session: Session, user_id: int, deck_id: int) -> list[dict]:
+    """Per-goal completion stats for a deck the user owns (issue #47).
+
+    Returns the goals that should render: every ACTIVE goal (even with 0 games)
+    PLUS any deactivated goal that still has history. Each entry is
+    ``{"goal": DeckGoal, "total": int, "achieved": int, "pct": int}``. Rates are
+    non-retroactive — ``total`` counts only the result rows recorded since the
+    goal existed (no backfill). Empty list if the deck isn't owned.
+    """
+    from sqlalchemy import case
+
+    if get_deck(session, deck_id=deck_id, user_id=user_id) is None:
+        return []
+    goals = (
+        session.query(DeckGoal)
+        .filter(DeckGoal.deck_id == deck_id)
+        .order_by(DeckGoal.position.asc(), DeckGoal.id.asc())
+        .all()
+    )
+    rows = (
+        session.query(
+            GameGoalResult.deck_goal_id,
+            func.count(GameGoalResult.id),
+            func.sum(case((GameGoalResult.achieved.is_(True), 1), else_=0)),
+        )
+        .join(DeckGoal, GameGoalResult.deck_goal_id == DeckGoal.id)
+        .filter(DeckGoal.deck_id == deck_id)
+        .group_by(GameGoalResult.deck_goal_id)
+        .all()
+    )
+    counts = {gid: (total, achieved or 0) for gid, total, achieved in rows}
+    out: list[dict] = []
+    for g in goals:
+        total, achieved = counts.get(g.id, (0, 0))
+        if not g.is_active and total == 0:
+            continue  # deactivated goal with no history — don't render
+        out.append(
+            {
+                "goal": g,
+                "total": total,
+                "achieved": achieved,
+                "pct": round(100 * achieved / total) if total else 0,
+            }
+        )
+    return out
 
 
 # ----------------------------------------------------------------------------
@@ -3659,11 +3714,25 @@ def delete_deck(session: Session, deck_id: int, user_id: int, *, commit: bool = 
     # the target before its rows/location go (SQLite enforces no FK CASCADE).
     delete_shares_for_deck(session, deck.id)
 
-    # issue #46 — delete this deck's goals explicitly (deck_goals.deck_id is
+    # issue #46/#47 — delete this deck's goals explicitly (deck_goals.deck_id is
     # CASCADE intent; SQLite enforces no FK, so the DB CASCADE is PG-only
     # defense-in-depth). The Deck.goals relationship is passive_deletes, so the
-    # ORM won't do this for us — same pattern as deck_card_shares above.
+    # ORM won't do this for us — same pattern as deck_card_shares above. The
+    # goals' per-game result rows (game_goal_results) go FIRST — explicit, not a
+    # second delete-orphan on DeckGoal (the seat side owns that cascade).
+    _goal_ids = [gid for (gid,) in session.query(DeckGoal.id).filter(DeckGoal.deck_id == deck.id)]
+    if _goal_ids:
+        session.query(GameGoalResult).filter(GameGoalResult.deck_goal_id.in_(_goal_ids)).delete(
+            synchronize_session=False
+        )
     session.query(DeckGoal).filter(DeckGoal.deck_id == deck.id).delete(synchronize_session=False)
+    # Drop the in-memory Deck.goals collection if a caller loaded it (the deck
+    # page template + record_goal_results both do). Otherwise the later
+    # session.delete(deck) cascade would re-issue an ORM DELETE for goals the bulk
+    # delete above already removed → a benign "0 rows matched" SAWarning. expire +
+    # passive_deletes means the cascade won't reload it. (Pre-existing since #46;
+    # #47 just makes the load-then-delete path the common one.)
+    session.expire(deck, ["goals"])
 
     session.execute(text("DELETE FROM deck_bracket_findings WHERE deck_id = :d"), {"d": deck.id})
     session.execute(text("DELETE FROM deck_bracket_estimates WHERE deck_id = :d"), {"d": deck.id})

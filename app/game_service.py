@@ -11,6 +11,7 @@ from app.models import (
     Card,
     Deck,
     Game,
+    GameGoalResult,
     GameSeat,
     InventoryRow,
     PlaygroupMember,
@@ -461,6 +462,55 @@ def end_game(
         game.ended_at = utc_now()
     session.commit()
     return True
+
+
+def record_goal_results(
+    session: Session,
+    game_id: int,
+    user_id: int,
+    checked: set[tuple[int, int]],
+) -> None:
+    """Idempotent upsert of per-seat deck-goal completion at finalize (issue #47).
+
+    ``checked`` is the set of ``(seat_id, goal_id)`` pairs the recorder ticked.
+    For every seat whose deck the recorder OWNS (``deck.user_id == user_id`` —
+    the multiplayer rule: only the deck owner's goals apply to that seat), every
+    ACTIVE goal of that deck gets a result row, ``achieved`` = whether the pair
+    is in ``checked``. Goals only become rows once they exist (non-retroactive).
+    ``UNIQUE(game_seat_id, deck_goal_id)`` makes re-finalize safe — an existing
+    row is updated in place. Forged form keys can't write rows: only real active
+    goals of an owned seat's deck are ever iterated.
+    """
+    game = session.query(Game).filter(Game.id == game_id, Game.user_id == user_id).first()
+    if not game:
+        return
+    for seat in game.seats:
+        deck = seat.deck
+        if deck is None or deck.user_id != user_id:
+            continue
+        for goal in deck.goals:
+            if not goal.is_active:
+                continue
+            achieved = (seat.id, goal.id) in checked
+            existing = (
+                session.query(GameGoalResult)
+                .filter(
+                    GameGoalResult.game_seat_id == seat.id,
+                    GameGoalResult.deck_goal_id == goal.id,
+                )
+                .first()
+            )
+            if existing is not None:
+                existing.achieved = achieved
+            else:
+                session.add(
+                    GameGoalResult(
+                        game_seat_id=seat.id,
+                        deck_goal_id=goal.id,
+                        achieved=achieved,
+                    )
+                )
+    session.commit()
 
 
 def update_game_notes(
