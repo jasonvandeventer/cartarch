@@ -100,6 +100,40 @@ def test_reorder_swaps_with_neighbour():
     assert deck_service.move_deck_goal(s, u.id, a.id, "sideways") is False
 
 
+def test_reorder_breaks_tied_positions():
+    # Simulate a concurrent-create race: two goals end up sharing a position.
+    # The move must still reorder (a naive value-swap of equal numbers is a no-op).
+    s = _fresh_session()
+    u = _user(s)
+    d = _deck(s, u.id)
+    a = deck_service.create_deck_goal(s, u.id, d.id, "A")
+    b = deck_service.create_deck_goal(s, u.id, d.id, "B")
+    b.position = a.position  # force the tie
+    s.commit()
+    assert deck_service.move_deck_goal(s, u.id, b.id, "up") is True
+    assert [g.label for g in deck_service.list_deck_goals(s, u.id, d.id)] == ["B", "A"]
+
+
+def test_position_has_db_server_default():
+    # The spec requires position NOT NULL default 0 at the DB level (non-ORM
+    # inserts). Insert via raw SQL omitting position and confirm it lands as 0.
+    from sqlalchemy import text
+
+    s = _fresh_session()
+    u = _user(s)
+    d = _deck(s, u.id)
+    s.execute(
+        text(
+            "INSERT INTO deck_goals (deck_id, label, is_active, created_at) "
+            "VALUES (:d, 'raw', 1, '2026-01-01')"
+        ),
+        {"d": d.id},
+    )
+    s.commit()
+    row = s.query(DeckGoal).filter_by(label="raw").one()
+    assert row.position == 0
+
+
 def test_soft_delete_hides_from_active_but_row_survives():
     s = _fresh_session()
     u = _user(s)

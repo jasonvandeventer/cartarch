@@ -2274,6 +2274,13 @@ def create_deck_goal(
     label = (label or "").strip()
     if not label:
         raise ValueError("Goal label is required.")
+    # position is best-effort "append at the end" = max + 1. Two concurrent
+    # adds to the same deck could read the same max and tie — harmless: every
+    # query and the swap in move_deck_goal order by (position, id), so id is a
+    # total tiebreaker and order stays deterministic. ponytail: NO UNIQUE(deck_id,
+    # position) constraint — it would break move_deck_goal's two-row position
+    # swap (the flush momentarily collides) and conflicts with soft-deleted rows
+    # retaining their position. The id tiebreaker is the cheaper, correct fix.
     max_pos = (
         session.query(func.max(DeckGoal.position)).filter(DeckGoal.deck_id == deck_id).scalar()
     )
@@ -2313,8 +2320,9 @@ def move_deck_goal(session: Session, user_id: int, goal_id: int, direction: str)
 
     ``direction`` is "up" or "down". Returns False if not owned, an invalid
     direction, or already at the edge. Operates within the ACTIVE goals (the
-    visible managed list); create assigns distinct positions so the swap always
-    reorders.
+    visible managed list), ordered by (position, id). Swaps the two rows'
+    position values; if a concurrent-create race left them tied, breaks the tie
+    in the move direction so the reorder still takes effect.
     """
     goal = _owned_deck_goal(session, user_id, goal_id)
     if goal is None or direction not in ("up", "down"):
@@ -2332,7 +2340,17 @@ def move_deck_goal(session: Session, user_id: int, goal_id: int, direction: str)
     if swap < 0 or swap >= len(siblings):
         return False
     other = siblings[swap]
-    goal.position, other.position = other.position, goal.position
+    # Swap the two neighbours' position values. If a concurrent-create race left
+    # them tied (same position), break the tie deterministically in the move
+    # direction so the swap still reorders instead of being a visual no-op.
+    if goal.position == other.position:
+        goal.position, other.position = (
+            (goal.position - 1, other.position)
+            if direction == "up"
+            else (goal.position + 1, other.position)
+        )
+    else:
+        goal.position, other.position = other.position, goal.position
     session.commit()
     return True
 

@@ -210,10 +210,13 @@ async def decks_add_goal(
     current_user: User = Depends(get_current_user),
     _: None = CsrfRequired,
 ):
+    # The label inputs carry `required` (native browser guard), so an empty
+    # label only reaches here from a non-browser client; surface it via the
+    # one-shot ?goal_error banner rather than failing silently.
     try:
         create_deck_goal(session, current_user.id, deck_id, label, description)
     except ValueError:
-        pass
+        return RedirectResponse(url="/decks?goal_error=label", status_code=303)
     return RedirectResponse(url="/decks", status_code=303)
 
 
@@ -229,7 +232,7 @@ async def decks_edit_goal(
     try:
         edit_deck_goal(session, current_user.id, goal_id, label, description)
     except ValueError:
-        pass
+        return RedirectResponse(url="/decks?goal_error=label", status_code=303)
     return RedirectResponse(url="/decks", status_code=303)
 
 

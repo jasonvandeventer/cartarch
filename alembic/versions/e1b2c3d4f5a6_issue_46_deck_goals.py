@@ -18,7 +18,10 @@ defense-in-depth.
 POST-AUTOGENERATE NOTE (gate #4 pattern): ``is_active`` carries
 ``server_default=sa.true()`` — a hand-applied fixup (NEVER an integer literal,
 which breaks CREATE TABLE on Postgres). Reapply it on any regen, same discipline
-as the baseline's ``sa.false()/sa.true()`` boolean fixups. ``created_at`` is
+as the baseline's ``sa.false()/sa.true()`` boolean fixups. ``position`` carries
+``server_default=sa.text("0")`` so the DB enforces the spec's ``default 0`` for
+non-ORM inserts (an Integer literal default is fine here — only BOOLEAN breaks on
+PG). ``created_at`` is
 NOT NULL (the ORM ``Mapped[datetime]`` + ``default=utc_now`` always supplies a
 value) — ``alembic check`` is clean against the model. Applies cleanly on
 Postgres AND SQLite (plain CREATE TABLE; no SQLite-only types).
@@ -44,7 +47,7 @@ def upgrade() -> None:
         sa.Column("deck_id", sa.Integer(), nullable=False),
         sa.Column("label", sa.String(length=255), nullable=False),
         sa.Column("description", sa.Text(), nullable=True),
-        sa.Column("position", sa.Integer(), nullable=False),
+        sa.Column("position", sa.Integer(), server_default=sa.text("0"), nullable=False),
         sa.Column("is_active", sa.Boolean(), server_default=sa.true(), nullable=False),
         sa.Column("created_at", sa.DateTime(), nullable=False),
         sa.ForeignKeyConstraint(["deck_id"], ["decks.id"], ondelete="CASCADE"),
