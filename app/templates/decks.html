@@ -1,6 +1,14 @@
 {% extends "base.html" %}
 {% from "_macros.html" import mana_pips, editorial_eyebrow %}
 {% block content %}
+  {# issue #46 — one-shot goal validation banner. Set by the add/edit goal
+     routes when the service rejects an empty label (only reachable from a
+     non-browser client — the forms carry `required`). #}
+  {% if request.query_params.get('goal_error') %}
+    <section class="panel collection-bulk-flash collection-bulk-flash-error">
+      That goal needs a label.
+    </section>
+  {% endif %}
   {# v3.28.7 — editorial-row Decks page. The pre-v3.28.7 table is replaced by
      a featured-deck panel + compact editorial rows. Per the cluster's
      page-fork decision (#2), this is the bundle's one real layout change.
@@ -205,6 +213,7 @@
                   </form>
                   {% set d = deck %}
                   {% include "_variant_share_controls.html" %}
+                  {% include "_deck_goal_controls.html" %}
                 </div>
               </details>
               <form action="/decks/{{ deck.id }}/delete" method="post" style="display: inline">
@@ -261,6 +270,7 @@
             </form>
             {% set d = featured %}
             {% include "_variant_share_controls.html" %}
+            {% include "_deck_goal_controls.html" %}
           </div>
         </details>
         <form action="/decks/{{ featured.id }}/delete" method="post" style="display: inline">

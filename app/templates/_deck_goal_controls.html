@@ -1,0 +1,55 @@
+{# issue #46 — per-deck goal management. Included in BOTH decks.html edit
+   popouts (the per-row and featured copies) with `d` set to the deck. The
+   read-only active list lives on deck_detail.html. Goal mutations are separate
+   <form>s (siblings of, never nested inside, the surrounding edit form). #}
+{% set active_goals = d.goals | selectattr('is_active') | list %}
+<div class="deck-goals-controls" style="margin-top: 0.5rem; border-top: 1px solid var(--border, #333); padding-top: 0.5rem">
+  <label>Goals <span class="decks-edit-hint">— what this deck is trying to do (separate from win rate)</span></label>
+  {% if active_goals %}
+    <ul class="deck-goals-list" style="list-style: none; padding: 0; margin: 0 0 0.4rem">
+      {% for g in active_goals %}
+        <li class="deck-goal-item" style="margin-bottom: 0.3rem">
+          <div style="display: flex; gap: 0.25rem; align-items: baseline; flex-wrap: wrap">
+            <form action="/decks/goals/{{ g.id }}/move" method="post" style="display: inline">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+              <input type="hidden" name="direction" value="up">
+              <button type="submit" class="btn-like" title="Move up"{% if loop.first %} disabled{% endif %}>▲</button>
+            </form>
+            <form action="/decks/goals/{{ g.id }}/move" method="post" style="display: inline">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+              <input type="hidden" name="direction" value="down">
+              <button type="submit" class="btn-like" title="Move down"{% if loop.last %} disabled{% endif %}>▼</button>
+            </form>
+            <span class="deck-goal-label"><strong>{{ g.label }}</strong>{% if g.description %} — <span class="muted">{{ g.description }}</span>{% endif %}</span>
+            <form action="/decks/goals/{{ g.id }}/remove" method="post" style="display: inline">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+              <button type="submit" class="btn-like" title="Remove this goal">Remove</button>
+            </form>
+            <form action="/decks/goals/{{ g.id }}/delete" method="post" style="display: inline">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+              <button type="submit" class="btn-danger-small" title="Delete permanently"
+                      onclick="return confirm('Permanently delete this goal?');">✕</button>
+            </form>
+          </div>
+          <details class="inline-details">
+            <summary class="btn-like">Edit</summary>
+            <form action="/decks/goals/{{ g.id }}/edit" method="post" class="stack-form" style="margin-top: 0.25rem">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+              <input type="text" name="label" value="{{ g.label }}" maxlength="255" required>
+              <input type="text" name="description" value="{{ g.description or '' }}" placeholder="Optional description">
+              <button type="submit">Save goal</button>
+            </form>
+          </details>
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p class="muted" style="margin: 0 0 0.4rem">No goals yet.</p>
+  {% endif %}
+  <form action="/decks/{{ d.id }}/goals" method="post" class="stack-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <input type="text" name="label" maxlength="255" placeholder="Add a goal (e.g. Win by combo)" required>
+    <input type="text" name="description" placeholder="Optional description">
+    <button type="submit">Add goal</button>
+  </form>
+</div>

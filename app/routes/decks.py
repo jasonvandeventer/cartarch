@@ -37,8 +37,12 @@ from app.deck_service import (
     compute_deck_synergy,
     compute_deck_tokens,
     create_deck,
+    create_deck_goal,
     create_variant_group,
+    deactivate_deck_goal,
     delete_deck,
+    delete_deck_goal,
+    edit_deck_goal,
     extract_commander_themes,
     find_inventory_matches_for_deck_import,
     get_card_legality,
@@ -52,6 +56,7 @@ from app.deck_service import (
     list_decks,
     list_user_printings_for_card,
     list_variant_groups,
+    move_deck_goal,
     outbound_share_map,
     own_deck_card_options,
     pull_card_to_deck,
@@ -184,6 +189,85 @@ async def decks_create(
         is_brew=is_brew,
     )
 
+    return RedirectResponse(url="/decks", status_code=303)
+
+
+# ── Per-deck goals (issue #46) ──────────────────────────────────
+# Managed from the /decks edit popouts; read-only list on deck_detail. The
+# goal-scoped routes (/decks/goals/{goal_id}/...) are registered BEFORE the
+# /decks/{deck_id}/... routes so the literal "goals" segment matches first
+# (FastAPI matches in registration order; a typed-int {deck_id} would 422 on
+# "goals" rather than fall through). All are CSRF-guarded + owner-scoped via the
+# service layer (a non-owned goal/deck is a silent no-op → redirect to /decks).
+
+
+@router.post("/decks/{deck_id}/goals")
+async def decks_add_goal(
+    deck_id: int,
+    label: str = Form(...),
+    description: str = Form(""),
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+    _: None = CsrfRequired,
+):
+    # The label inputs carry `required` (native browser guard), so an empty
+    # label only reaches here from a non-browser client; surface it via the
+    # one-shot ?goal_error banner rather than failing silently.
+    try:
+        create_deck_goal(session, current_user.id, deck_id, label, description)
+    except ValueError:
+        return RedirectResponse(url="/decks?goal_error=label", status_code=303)
+    return RedirectResponse(url="/decks", status_code=303)
+
+
+@router.post("/decks/goals/{goal_id}/edit")
+async def decks_edit_goal(
+    goal_id: int,
+    label: str = Form(...),
+    description: str = Form(""),
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+    _: None = CsrfRequired,
+):
+    try:
+        edit_deck_goal(session, current_user.id, goal_id, label, description)
+    except ValueError:
+        return RedirectResponse(url="/decks?goal_error=label", status_code=303)
+    return RedirectResponse(url="/decks", status_code=303)
+
+
+@router.post("/decks/goals/{goal_id}/move")
+async def decks_move_goal(
+    goal_id: int,
+    direction: str = Form(...),
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+    _: None = CsrfRequired,
+):
+    move_deck_goal(session, current_user.id, goal_id, direction)
+    return RedirectResponse(url="/decks", status_code=303)
+
+
+@router.post("/decks/goals/{goal_id}/remove")
+async def decks_remove_goal(
+    goal_id: int,
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+    _: None = CsrfRequired,
+):
+    # Soft-delete (the primary "remove"). Hard delete is the separate route below.
+    deactivate_deck_goal(session, current_user.id, goal_id)
+    return RedirectResponse(url="/decks", status_code=303)
+
+
+@router.post("/decks/goals/{goal_id}/delete")
+async def decks_delete_goal(
+    goal_id: int,
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+    _: None = CsrfRequired,
+):
+    delete_deck_goal(session, current_user.id, goal_id)
     return RedirectResponse(url="/decks", status_code=303)
 
 

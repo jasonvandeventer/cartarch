@@ -20,6 +20,7 @@ from sqlalchemy import (
     UniqueConstraint,
     false,
     text,
+    true,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -271,6 +272,54 @@ class Deck(Base):
     storage_location: Mapped[StorageLocation | None] = relationship()
     user: Mapped[User] = relationship(back_populates="decks")
     variant_group: Mapped[VariantGroup | None] = relationship(back_populates="decks")
+    # issue #46 — per-deck goals (custom ordered "what this deck is trying to
+    # do" list, separate from win rate AND distinct from intent_*). Ordered by
+    # position. ``passive_deletes`` keeps the ORM out of the delete path — the
+    # NOT NULL FK means a parent delete must DELETE (never NULL) children; on
+    # SQLite (FK off) ``delete_deck`` removes the goals explicitly, on Postgres
+    # the DB CASCADE does it — same discipline as deck_card_shares.
+    goals: Mapped[list[DeckGoal]] = relationship(
+        back_populates="deck",
+        order_by="DeckGoal.position, DeckGoal.id",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+
+
+class DeckGoal(Base):
+    """Issue #46 — per-deck goals (Feature 1 of 2).
+
+    A custom, ordered list of what a deck is trying to do (e.g. "Win by combo",
+    "Cast my commander 3+ times"), SEPARATE from win rate and DISTINCT from the
+    ``decks.intent_*`` columns. Removal is a soft-delete (``is_active=False``)
+    as the primary action; a hard delete is a separate explicit action.
+    Feature 2 (#47) FKs this table for per-game completion tracking, so this
+    ships first.
+
+    ``deck_id`` is ON DELETE CASCADE NOT NULL (a goal is meaningless without its
+    deck). SQLite enforces no FKs (PRAGMA foreign_keys OFF), so ``delete_deck``
+    deletes goals explicitly; the DB CASCADE is Postgres defense-in-depth.
+    ``is_active`` uses ``server_default=true()`` (never an integer literal — a
+    bare ``1`` breaks CREATE TABLE on Postgres).
+    """
+
+    __tablename__ = "deck_goals"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    deck_id: Mapped[int] = mapped_column(
+        ForeignKey("decks.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    label: Mapped[str] = mapped_column(String(255), nullable=False)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    position: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default=text("0")
+    )
+    is_active: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default=true()
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
+
+    deck: Mapped[Deck] = relationship(back_populates="goals")
 
 
 class VariantGroup(Base):
