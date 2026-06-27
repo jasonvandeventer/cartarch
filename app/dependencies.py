@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import logging
 import os
 import re
@@ -141,15 +142,43 @@ templates.env.globals["drawer_sorter_usernames"] = DRAWER_SORTER_USERNAMES
 templates.env.globals["card_role_tags"] = CARD_ROLE_TAGS
 
 
+# Resolved relative to this module, NOT the process cwd — so the hash is found
+# no matter where the app is launched from (a missing file silently falls back
+# to app_version, which would mask a real asset edit).
+_STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
+_static_hash_cache: dict[str, str] = {}
+
+
+def _hash_static_file(full: str) -> str:
+    """SHA256 (truncated) of a file's content, streamed in chunks so a large
+    asset never loads whole into memory."""
+    h = hashlib.sha256()
+    with open(full, "rb") as f:
+        for chunk in iter(lambda: f.read(65536), b""):
+            h.update(chunk)
+    return h.hexdigest()[:12]
+
+
 def static_v(path: str) -> str:
-    """Cache-buster keyed on the static file's mtime so working-tree edits
-    invalidate browser caches without needing a git commit. Falls back to
-    app_version if the file is missing."""
-    full = os.path.join("app", "static", path.lstrip("/"))
+    """Cache-buster keyed on the static file's *content* hash, so a backend-only
+    deploy (new container = new mtime, same content) keeps the browser/CDN cache,
+    while an actual edit busts it. Falls back to app_version if the file is missing.
+
+    Cached per-process ONLY in production (``APP_VERSION`` set) where static files
+    are immutable for the container's lifetime. In dev (no ``APP_VERSION``) the hash
+    is recomputed every call so working-tree edits to CSS/JS bust the cache live,
+    same as the old mtime behaviour."""
+    in_prod = bool(os.getenv("APP_VERSION"))
+    if in_prod and path in _static_hash_cache:
+        return _static_hash_cache[path]
+    full = os.path.join(_STATIC_DIR, path.lstrip("/"))
     try:
-        return str(int(os.path.getmtime(full)))
+        digest = _hash_static_file(full)
     except OSError:
         return os.getenv("APP_VERSION") or _dev_version()
+    if in_prod:
+        _static_hash_cache[path] = digest
+    return digest
 
 
 templates.env.globals["static_v"] = static_v
@@ -435,7 +464,7 @@ def render(
     # an earlier visit) renders a STALE cached page instead of the fresh
     # server response — surfaced as "the color filter doesn't refresh after I
     # deselect a pip" even though the URL and server result were correct.
-    # Static assets keep their own caching (StaticFiles + the ?v= mtime
+    # Static assets keep their own caching (StaticFiles + the ?v= content-hash
     # buster); JSON/redirect responses don't go through render() and are
     # unaffected.
     response.headers["Cache-Control"] = "no-store"

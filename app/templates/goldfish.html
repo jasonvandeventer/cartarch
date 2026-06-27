@@ -213,5 +213,5 @@
   </div>
 
   <script id="gf-deck-data" type="application/json">{{ deck_payload | tojson }}</script>
-  <script src="/static/goldfish.js?v={{ app_version }}" defer></script>
+  <script src="/static/goldfish.js?v={{ static_v('goldfish.js') }}" defer></script>
 {% endblock %}
