@@ -205,6 +205,7 @@
                   </form>
                   {% set d = deck %}
                   {% include "_variant_share_controls.html" %}
+                  {% include "_deck_goal_controls.html" %}
                 </div>
               </details>
               <form action="/decks/{{ deck.id }}/delete" method="post" style="display: inline">
@@ -261,6 +262,7 @@
             </form>
             {% set d = featured %}
             {% include "_variant_share_controls.html" %}
+            {% include "_deck_goal_controls.html" %}
           </div>
         </details>
         <form action="/decks/{{ featured.id }}/delete" method="post" style="display: inline">

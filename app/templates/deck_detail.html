@@ -75,6 +75,21 @@
       </p>
     </section>
   {% endif %}
+  {% if deck %}
+    {# issue #46 — read-only active goals (managed from the Decks-page edit
+       popout). Hidden when the deck has no active goals. #}
+    {% set active_goals = deck.goals | selectattr('is_active') | list %}
+    {% if active_goals %}
+      <section class="panel deck-goals-panel">
+        <h3 class="panel-title" style="margin-bottom: 0.3rem"><span class="deck-detail-section-mark">§</span> Goals</h3>
+        <ul class="deck-goals-list" style="margin: 0; padding-left: 1.1rem">
+          {% for g in active_goals %}
+            <li><strong>{{ g.label }}</strong>{% if g.description %} — <span class="muted">{{ g.description }}</span>{% endif %}</li>
+          {% endfor %}
+        </ul>
+      </section>
+    {% endif %}
+  {% endif %}
   {% if deck and brew_buylist %}
     {# Brew Mode buy-list (semantics revised 2026-06-11). The brew's own rows
        are self-describing: a real (non-proxy) row = a card you own; a proxy

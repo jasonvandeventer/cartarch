@@ -11,6 +11,7 @@ from app.models import (
     Card,
     Deck,
     DeckCardShare,
+    DeckGoal,
     Game,
     GameSeat,
     InventoryRow,
@@ -2234,6 +2235,128 @@ def sibling_variant_deck_location_ids(session: Session, deck: Deck) -> list[int]
     ]
 
 
+# ── Per-deck goals (issue #46, Feature 1 of 2) ──────────────────
+# A custom, ordered list of what a deck is trying to do — separate from win
+# rate and distinct from intent_*. Removal is a soft-delete (is_active=False);
+# hard-delete is a separate explicit action. All functions are user-scoped:
+# goal mutations resolve ownership by joining DeckGoal -> Deck.user_id.
+
+
+def _owned_deck_goal(session: Session, user_id: int, goal_id: int) -> DeckGoal | None:
+    """Fetch a goal only if its deck belongs to ``user_id`` (else None)."""
+    return (
+        session.query(DeckGoal)
+        .join(Deck, DeckGoal.deck_id == Deck.id)
+        .filter(DeckGoal.id == goal_id, Deck.user_id == user_id)
+        .first()
+    )
+
+
+def list_deck_goals(
+    session: Session, user_id: int, deck_id: int, *, active_only: bool = True
+) -> list[DeckGoal]:
+    """Ordered goals for a deck the user owns (empty if not owned)."""
+    if get_deck(session, deck_id=deck_id, user_id=user_id) is None:
+        return []
+    q = session.query(DeckGoal).filter(DeckGoal.deck_id == deck_id)
+    if active_only:
+        q = q.filter(DeckGoal.is_active.is_(True))
+    return q.order_by(DeckGoal.position.asc(), DeckGoal.id.asc()).all()
+
+
+def create_deck_goal(
+    session: Session, user_id: int, deck_id: int, label: str, description: str = ""
+) -> DeckGoal | None:
+    """Append a goal to a deck (position = current max + 1). None if not owned;
+    ValueError on empty label."""
+    if get_deck(session, deck_id=deck_id, user_id=user_id) is None:
+        return None
+    label = (label or "").strip()
+    if not label:
+        raise ValueError("Goal label is required.")
+    max_pos = (
+        session.query(func.max(DeckGoal.position)).filter(DeckGoal.deck_id == deck_id).scalar()
+    )
+    goal = DeckGoal(
+        deck_id=deck_id,
+        label=label[:255],
+        description=(description or "").strip() or None,
+        position=(max_pos + 1) if max_pos is not None else 0,
+    )
+    session.add(goal)
+    session.commit()
+    return goal
+
+
+def edit_deck_goal(
+    session: Session,
+    user_id: int,
+    goal_id: int,
+    label: str,
+    description: str = "",
+) -> DeckGoal | None:
+    """Update a goal's label/description. None if not owned; ValueError on empty label."""
+    goal = _owned_deck_goal(session, user_id, goal_id)
+    if goal is None:
+        return None
+    label = (label or "").strip()
+    if not label:
+        raise ValueError("Goal label is required.")
+    goal.label = label[:255]
+    goal.description = (description or "").strip() or None
+    session.commit()
+    return goal
+
+
+def move_deck_goal(session: Session, user_id: int, goal_id: int, direction: str) -> bool:
+    """Reorder a goal by swapping ``position`` with its active neighbour.
+
+    ``direction`` is "up" or "down". Returns False if not owned, an invalid
+    direction, or already at the edge. Operates within the ACTIVE goals (the
+    visible managed list); create assigns distinct positions so the swap always
+    reorders.
+    """
+    goal = _owned_deck_goal(session, user_id, goal_id)
+    if goal is None or direction not in ("up", "down"):
+        return False
+    siblings = (
+        session.query(DeckGoal)
+        .filter(DeckGoal.deck_id == goal.deck_id, DeckGoal.is_active.is_(True))
+        .order_by(DeckGoal.position.asc(), DeckGoal.id.asc())
+        .all()
+    )
+    idx = next((i for i, g in enumerate(siblings) if g.id == goal.id), None)
+    if idx is None:
+        return False
+    swap = idx - 1 if direction == "up" else idx + 1
+    if swap < 0 or swap >= len(siblings):
+        return False
+    other = siblings[swap]
+    goal.position, other.position = other.position, goal.position
+    session.commit()
+    return True
+
+
+def deactivate_deck_goal(session: Session, user_id: int, goal_id: int) -> bool:
+    """Soft-delete (the primary 'remove') — keep the row, set is_active=False."""
+    goal = _owned_deck_goal(session, user_id, goal_id)
+    if goal is None:
+        return False
+    goal.is_active = False
+    session.commit()
+    return True
+
+
+def delete_deck_goal(session: Session, user_id: int, goal_id: int) -> bool:
+    """Hard-delete — remove the row entirely (a separate explicit action)."""
+    goal = _owned_deck_goal(session, user_id, goal_id)
+    if goal is None:
+        return False
+    session.delete(goal)
+    session.commit()
+    return True
+
+
 # ----------------------------------------------------------------------------
 # Variant-group deck sharing — deck_card_shares (issue #27)
 #
@@ -3517,6 +3640,12 @@ def delete_deck(session: Session, deck_id: int, user_id: int, *, commit: bool = 
     # issue #27 — drop every deck_card_share where this deck is the source OR
     # the target before its rows/location go (SQLite enforces no FK CASCADE).
     delete_shares_for_deck(session, deck.id)
+
+    # issue #46 — delete this deck's goals explicitly (deck_goals.deck_id is
+    # CASCADE intent; SQLite enforces no FK, so the DB CASCADE is PG-only
+    # defense-in-depth). The Deck.goals relationship is passive_deletes, so the
+    # ORM won't do this for us — same pattern as deck_card_shares above.
+    session.query(DeckGoal).filter(DeckGoal.deck_id == deck.id).delete(synchronize_session=False)
 
     session.execute(text("DELETE FROM deck_bracket_findings WHERE deck_id = :d"), {"d": deck.id})
     session.execute(text("DELETE FROM deck_bracket_estimates WHERE deck_id = :d"), {"d": deck.id})
