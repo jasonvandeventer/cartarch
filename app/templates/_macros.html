@@ -223,6 +223,21 @@
                   {% endif %}
                 </button>
               </form>
+              {# issue #52 — in-place finish correction (Normal/Foil/Etched).
+                 UPDATEs the row, preserving id + location + tags + deck links
+                 + history, instead of delete-and-readd. #}
+              <form action="/inventory/rows/{{ item.id }}/correct-finish"
+                    method="post"
+                    class="inline-form"
+                    title="Correct this row's finish in place">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <select name="finish">
+                  {% for f in finish_options %}
+                    <option value="{{ f }}" {% if item.finish == f %}selected{% endif %}>{{ f|capitalize }}</option>
+                  {% endfor %}
+                </select>
+                <button type="submit">Fix Finish</button>
+              </form>
               {# v3.29.1 — Add to Showcase. The add-to-Showcase entry
                  point; the management page lists/edits but does not
                  search for inventory rows. ``add_showcase_item`` is

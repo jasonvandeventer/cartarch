@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 
 from app.db import SessionLocal
 from app.deck_service import CARD_ROLE_TAGS
+from app.inventory_service import FINISH_OPTIONS
 from app.models import InventoryRow, User
 from app.timeutil import utc_now
 
@@ -140,6 +141,9 @@ def _dev_version() -> str:
 templates.env.globals["app_version"] = os.getenv("APP_VERSION") or _dev_version()
 templates.env.globals["drawer_sorter_usernames"] = DRAWER_SORTER_USERNAMES
 templates.env.globals["card_role_tags"] = CARD_ROLE_TAGS
+# issue #52 — single source of truth for the finish-correction control's options
+# (the service validates membership against the same FINISH_OPTIONS).
+templates.env.globals["finish_options"] = FINISH_OPTIONS
 
 
 # Resolved relative to this module, NOT the process cwd — so the hash is found

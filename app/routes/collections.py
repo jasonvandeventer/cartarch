@@ -38,6 +38,7 @@ from app.dependencies import (
 )
 from app.inventory_service import (
     DRAWER_KEEP_PRICE_THRESHOLD,
+    InventoryRowNotFound,
     add_card_to_location,
     adjust_inventory_row_quantity,
     apply_collection_search_filters,
@@ -46,6 +47,7 @@ from app.inventory_service import (
     collector_sort_key,
     confirm_all_pending,
     confirm_pending_row,
+    correct_inventory_row_finish,
     delete_inventory_row,
     get_collection_facet_counts,
     get_inventory_row_stats,
@@ -132,6 +134,30 @@ def toggle_inventory_row_proxy(
         raise HTTPException(status_code=404, detail="Inventory row not found")
     row.is_proxy = not bool(row.is_proxy)
     session.commit()
+    return RedirectResponse(url=safe_redirect_url(request), status_code=303)
+
+
+@router.post("/inventory/rows/{row_id}/correct-finish")
+def correct_inventory_row_finish_action(
+    request: Request,
+    row_id: int,
+    finish: str = Form(...),
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+    _: None = CsrfRequired,
+):
+    # In-place finish correction (issue #52). Owner-only; 404 on someone else's
+    # row (typed InventoryRowNotFound). Invalid finish token → bare ValueError →
+    # global 400 handler.
+    try:
+        correct_inventory_row_finish(
+            session=session,
+            row_id=row_id,
+            user_id=current_user.id,
+            new_finish=finish.strip().lower(),
+        )
+    except InventoryRowNotFound as exc:
+        raise HTTPException(status_code=404, detail="Inventory row not found") from exc
     return RedirectResponse(url=safe_redirect_url(request), status_code=303)
 
 
