@@ -446,7 +446,7 @@ def render(
     # an earlier visit) renders a STALE cached page instead of the fresh
     # server response — surfaced as "the color filter doesn't refresh after I
     # deselect a pip" even though the URL and server result were correct.
-    # Static assets keep their own caching (StaticFiles + the ?v= mtime
+    # Static assets keep their own caching (StaticFiles + the ?v= content-hash
     # buster); JSON/redirect responses don't go through render() and are
     # unaffected.
     response.headers["Cache-Control"] = "no-store"
