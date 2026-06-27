@@ -2813,6 +2813,60 @@ def adjust_inventory_row_quantity(
     return row
 
 
+# The three canonical finish tokens — match inventory_rows.finish AND
+# card_prices.finish (what the MTGJSON ingest keys on), so a corrected row
+# resolves to the priced finish.
+VALID_FINISHES = frozenset({"normal", "foil", "etched"})
+
+
+def correct_inventory_row_finish(
+    session: Session, row_id: int, user_id: int, new_finish: str
+) -> InventoryRow:
+    """In-place finish correction (issue #52).
+
+    UPDATEs ``inventory_rows.finish`` on the existing row — does NOT delete and
+    re-create — so row id, location/drawer/slot, tags, role, notes, created_at,
+    is_pending and every FK reference (DeckCardShare / ShowcaseItem / TradeItem)
+    are preserved. Advances ``updated_at`` and writes ONE ``correct_finish``
+    TransactionLog (not a remove+add pair). Owner-scoped.
+
+    v1 does NOT auto-merge a row that becomes a logical duplicate of an existing
+    one (deliberate cut — see issue #52).
+    """
+    if new_finish not in VALID_FINISHES:
+        raise ValueError(f"Invalid finish: {new_finish!r}")
+
+    row = (
+        session.query(InventoryRow)
+        .filter(InventoryRow.id == row_id, InventoryRow.user_id == user_id)
+        .first()
+    )
+    if not row:
+        raise ValueError("Inventory row not found.")
+
+    old_finish = row.finish
+    if old_finish == new_finish:
+        return row  # no-op
+
+    row.finish = new_finish
+    row.updated_at = utc_now()
+
+    log_transaction(
+        session=session,
+        user_id=user_id,
+        event_type="correct_finish",
+        card_id=row.card_id,
+        finish=new_finish,
+        quantity_delta=0,
+        inventory_row_id=row.id,
+        note=f"Finish corrected {old_finish} → {new_finish}",
+        flush=False,
+    )
+
+    session.commit()
+    return row
+
+
 def delete_inventory_row(session: Session, row_id: int, user_id: int) -> bool:
     row = (
         session.query(InventoryRow)
