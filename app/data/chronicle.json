@@ -1,5 +1,15 @@
 [
   {
+    "version": "4.0.29",
+    "date": "2026-06-27",
+    "added": [],
+    "refined": [
+      "You can now correct a collection card's finish (Normal, Foil, or Etched) in place from the collection page, keeping its location, tags, deck links, and history intact instead of deleting and re-adding it."
+    ],
+    "resolved": [],
+    "archivist_note": null
+  },
+  {
     "version": "4.0.27",
     "date": "2026-06-26",
     "added": [],
