@@ -123,19 +123,16 @@ async def lifespan(app: FastAPI):
             "mana-archive-platform deployment.yaml for the SESSION_SECRET_KEY "
             "pattern this mirrors."
         )
-    # Schema is owned by Alembic (``alembic upgrade head``, run as a pre-sync Job at
-    # deploy — NOT per-pod). The legacy run_migrations() self-migration was retired in
-    # the Gate #4 baseline work; the app no longer creates/migrates schema at boot.
-    #
-    # IMPORTANT — this is NOT a full self-bootstrap. ``init_db()`` calls
-    # ``Base.metadata.create_all``, which creates only the 21 ORM-mapped tables. The 7
-    # raw-SQL tables (scryfall_cards, scryfall_bulk_meta, game_changer_cards, card_tags,
-    # commander_bracket_rules, deck_bracket_estimates, deck_bracket_findings) live in
-    # ``app/legacy_tables.py``, which is imported ONLY by ``alembic/env.py`` — never by
-    # the app — so ``create_all`` cannot create them. A fresh database therefore REQUIRES
-    # ``alembic upgrade head`` to have run first; booting the app against a never-migrated
-    # DB leaves those 7 tables missing (a documented deploy-order contract, not a latent
-    # bug). On existing/prod DBs every table already exists, so ``init_db`` is a no-op.
+    # Schema is owned by Alembic (``alembic upgrade head``), applied by the ArgoCD
+    # PreSync migration hook in vanfreckle-platform BEFORE the app rolls. The hook
+    # is live and proven (v4.0.36 applied game_goal_results through it). ``init_db``
+    # no longer creates schema in prod: ``Base.metadata.create_all`` is gated to the
+    # SQLite (dev) branch (see app/db.py). On Postgres a fresh/never-migrated DB
+    # boots into a missing-table error by design — fail loud rather than silently
+    # half-build via create_all (the v4.0.30 ledger-drift incident). The 7 raw-SQL
+    # tables in app/legacy_tables.py were never created by create_all anyway
+    # (imported only by alembic/env.py), so the hook is now their sole creator too.
+    # ``init_db`` still validates that at least one user exists.
     init_db()
     for _target, _name in (
         (_price_refresh_loop, "price-refresh"),

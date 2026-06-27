@@ -119,7 +119,7 @@ Base = declarative_base()
 
 
 def init_db() -> None:
-    """Create missing tables and validate that at least one user exists."""
+    """Validate the schema is present (create missing tables on SQLite/dev only) and that at least one user exists."""
     # The missing-file guard is a SQLite-only dev safety (don't boot against a fresh
     # empty file). On Postgres (v4) there is no DB file; the schema is owned by Alembic
     # and existence is proven by the user-count check below + a live connection.
@@ -129,7 +129,15 @@ def init_db() -> None:
     from app import models  # noqa: F401
     from app.models import User
 
-    Base.metadata.create_all(bind=engine)
+    # create_all is gated to the SQLite (dev) branch only. On Postgres (v4/prod)
+    # the schema is owned exclusively by Alembic, applied by the ArgoCD PreSync
+    # migration hook before the app rolls. create_all against prod silently
+    # created ORM tables without stamping alembic_version, masking unrun
+    # migrations until the first ALTER-bearing migration would crashloop — the
+    # v4.0.30 ledger-drift incident (2026-06-27). Dev SQLite keeps auto-create
+    # for local convenience; the user-count check below still validates the boot.
+    if _is_sqlite:
+        Base.metadata.create_all(bind=engine)
 
     with SessionLocal() as session:
         user_count = session.query(User).count()
