@@ -853,9 +853,9 @@ def test_coverage_every_consequential_parent_is_accounted_for():
         print(f"  {parent:<24} [{cover}]  <- {kids}")
 
     unaccounted = set(consequential) - accounted
-    assert (
-        not unaccounted
-    ), f"Consequential parents with no entrypoint and not allow-listed: {sorted(unaccounted)}"
+    assert not unaccounted, (
+        f"Consequential parents with no entrypoint and not allow-listed: {sorted(unaccounted)}"
+    )
 
 
 def test_seeded_ondelete_matches_declared_topology():
