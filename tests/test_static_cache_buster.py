@@ -4,7 +4,8 @@
 its mtime — so a backend-only deploy (new container = new mtime, identical
 content) keeps the browser/CDN cache, while an actual edit busts it. Pins the
 issue's acceptance criteria: hash not timestamp, same content → same hash,
-changed content → different hash, missing file → version fallback.
+changed content → different hash, missing file → version fallback. The static
+dir is resolved module-relative (NOT cwd-relative), so these patch ``_STATIC_DIR``.
 """
 
 from __future__ import annotations
@@ -12,12 +13,17 @@ from __future__ import annotations
 import app.dependencies as deps
 
 
-def test_value_is_content_hash_not_timestamp(tmp_path, monkeypatch):
-    # static_v reads app/static/<path> relative to cwd.
-    static_dir = tmp_path / "app" / "static"
+def _use_static_dir(tmp_path, monkeypatch):
+    """Point static_v at a throwaway dir, module-relative (NOT cwd-relative)."""
+    static_dir = tmp_path / "static"
     static_dir.mkdir(parents=True)
+    monkeypatch.setattr(deps, "_STATIC_DIR", str(static_dir))
+    return static_dir
+
+
+def test_value_is_content_hash_not_timestamp(tmp_path, monkeypatch):
+    static_dir = _use_static_dir(tmp_path, monkeypatch)
     (static_dir / "x.css").write_bytes(b"body{}")
-    monkeypatch.chdir(tmp_path)
     deps._static_hash_cache.clear()
 
     v = deps.static_v("x.css")
@@ -26,10 +32,8 @@ def test_value_is_content_hash_not_timestamp(tmp_path, monkeypatch):
 
 
 def test_same_content_same_hash_changed_content_differs(tmp_path, monkeypatch):
-    static_dir = tmp_path / "app" / "static"
-    static_dir.mkdir(parents=True)
+    static_dir = _use_static_dir(tmp_path, monkeypatch)
     target = static_dir / "style.css"
-    monkeypatch.chdir(tmp_path)
 
     target.write_bytes(b"a{color:red}")
     deps._static_hash_cache.clear()
@@ -49,10 +53,8 @@ def test_same_content_same_hash_changed_content_differs(tmp_path, monkeypatch):
 
 
 def test_dev_recomputes_live_prod_caches(tmp_path, monkeypatch):
-    static_dir = tmp_path / "app" / "static"
-    static_dir.mkdir(parents=True)
+    static_dir = _use_static_dir(tmp_path, monkeypatch)
     target = static_dir / "style.css"
-    monkeypatch.chdir(tmp_path)
 
     # Dev (no APP_VERSION): an edit is picked up live, no restart needed.
     monkeypatch.delenv("APP_VERSION", raising=False)
@@ -75,7 +77,7 @@ def test_dev_recomputes_live_prod_caches(tmp_path, monkeypatch):
 
 
 def test_missing_file_falls_back_to_version(tmp_path, monkeypatch):
-    monkeypatch.chdir(tmp_path)
+    _use_static_dir(tmp_path, monkeypatch)
     monkeypatch.setenv("APP_VERSION", "v9.9.9")
     deps._static_hash_cache.clear()
     assert deps.static_v("nope.css") == "v9.9.9"

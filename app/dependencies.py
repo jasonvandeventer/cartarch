@@ -142,6 +142,10 @@ templates.env.globals["drawer_sorter_usernames"] = DRAWER_SORTER_USERNAMES
 templates.env.globals["card_role_tags"] = CARD_ROLE_TAGS
 
 
+# Resolved relative to this module, NOT the process cwd — so the hash is found
+# no matter where the app is launched from (a missing file silently falls back
+# to app_version, which would mask a real asset edit).
+_STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
 _static_hash_cache: dict[str, str] = {}
 
 
@@ -167,7 +171,7 @@ def static_v(path: str) -> str:
     in_prod = bool(os.getenv("APP_VERSION"))
     if in_prod and path in _static_hash_cache:
         return _static_hash_cache[path]
-    full = os.path.join("app", "static", path.lstrip("/"))
+    full = os.path.join(_STATIC_DIR, path.lstrip("/"))
     try:
         digest = _hash_static_file(full)
     except OSError:
