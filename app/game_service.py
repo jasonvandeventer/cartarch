@@ -484,6 +484,19 @@ def record_goal_results(
     game = session.query(Game).filter(Game.id == game_id, Game.user_id == user_id).first()
     if not game:
         return
+    seat_ids = [seat.id for seat in game.seats]
+    # Bulk-fetch every existing result for this game's seats once, keyed by
+    # (seat_id, goal_id), so the upsert loop does no per-pair SELECT (no N+1).
+    existing_by_pair = (
+        {
+            (r.game_seat_id, r.deck_goal_id): r
+            for r in session.query(GameGoalResult)
+            .filter(GameGoalResult.game_seat_id.in_(seat_ids))
+            .all()
+        }
+        if seat_ids
+        else {}
+    )
     for seat in game.seats:
         deck = seat.deck
         if deck is None or deck.user_id != user_id:
@@ -492,14 +505,7 @@ def record_goal_results(
             if not goal.is_active:
                 continue
             achieved = (seat.id, goal.id) in checked
-            existing = (
-                session.query(GameGoalResult)
-                .filter(
-                    GameGoalResult.game_seat_id == seat.id,
-                    GameGoalResult.deck_goal_id == goal.id,
-                )
-                .first()
-            )
+            existing = existing_by_pair.get((seat.id, goal.id))
             if existing is not None:
                 existing.achieved = achieved
             else:
