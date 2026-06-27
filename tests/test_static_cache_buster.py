@@ -21,7 +21,7 @@ def test_value_is_content_hash_not_timestamp(tmp_path, monkeypatch):
     deps._static_hash_cache.clear()
 
     v = deps.static_v("x.css")
-    # A truncated md5 hex digest — not a 10-digit unix mtime.
+    # A truncated sha256 hex digest — not a 10-digit unix mtime.
     assert len(v) == 12 and all(c in "0123456789abcdef" for c in v)
 
 
@@ -46,6 +46,32 @@ def test_same_content_same_hash_changed_content_differs(tmp_path, monkeypatch):
     deps._static_hash_cache.clear()
     h3 = deps.static_v("style.css")
     assert h3 != h1
+
+
+def test_dev_recomputes_live_prod_caches(tmp_path, monkeypatch):
+    static_dir = tmp_path / "app" / "static"
+    static_dir.mkdir(parents=True)
+    target = static_dir / "style.css"
+    monkeypatch.chdir(tmp_path)
+
+    # Dev (no APP_VERSION): an edit is picked up live, no restart needed.
+    monkeypatch.delenv("APP_VERSION", raising=False)
+    deps._static_hash_cache.clear()
+    target.write_bytes(b"a{}")
+    dev1 = deps.static_v("style.css")
+    target.write_bytes(b"b{}")
+    dev2 = deps.static_v("style.css")
+    assert dev1 != dev2
+    assert not deps._static_hash_cache  # dev never populates the cache
+
+    # Prod (APP_VERSION set): hash is frozen per-process even if the file changes.
+    monkeypatch.setenv("APP_VERSION", "v1.0.0")
+    deps._static_hash_cache.clear()
+    target.write_bytes(b"c{}")
+    prod1 = deps.static_v("style.css")
+    target.write_bytes(b"d{}")
+    prod2 = deps.static_v("style.css")
+    assert prod1 == prod2
 
 
 def test_missing_file_falls_back_to_version(tmp_path, monkeypatch):
