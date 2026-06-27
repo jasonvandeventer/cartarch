@@ -45,9 +45,9 @@ def test_auth_get_sets_bfcache_hostile_headers(client, path):
     """Each pre-auth GET carries no-store + Pragma: no-cache (defense #1)."""
     r = client.get(path)
     assert r.status_code == 200, f"{path} -> {r.status_code}"
-    assert r.headers.get("cache-control") == "no-store", (
-        f"{path} cache-control={r.headers.get('cache-control')!r}"
-    )
+    assert (
+        r.headers.get("cache-control") == "no-store"
+    ), f"{path} cache-control={r.headers.get('cache-control')!r}"
     assert r.headers.get("pragma") == "no-cache", f"{path} pragma={r.headers.get('pragma')!r}"
 
 
@@ -69,6 +69,6 @@ def test_pragma_is_auth_scoped_not_global(client):
     r = client.get("/collection")
     assert r.status_code == 200, f"/collection -> {r.status_code}"
     assert r.headers.get("cache-control") == "no-store"
-    assert r.headers.get("pragma") is None, (
-        f"/collection unexpectedly carries Pragma={r.headers.get('pragma')!r}"
-    )
+    assert (
+        r.headers.get("pragma") is None
+    ), f"/collection unexpectedly carries Pragma={r.headers.get('pragma')!r}"
