@@ -358,6 +358,22 @@
                          placeholder="Final life"
                          style="width:100px">
                 </div>
+                {# issue #47 — goal completion checkboxes, only for seats whose
+                   deck the recorder owns (multiplayer: the deck owner's goals
+                   apply to that seat). Active goals only. #}
+                {% if seat.deck and seat.deck.user_id == current_user.id %}
+                  {% set seat_goals = seat.deck.goals | selectattr('is_active') | list %}
+                  {% if seat_goals %}
+                    <div class="end-game-goals" style="margin:-0.25rem 0 0.5rem 0;padding-left:0.25rem">
+                      {% for g in seat_goals %}
+                        <label style="display:block;font-size:0.85rem">
+                          <input type="checkbox" name="goal_{{ seat.id }}_{{ g.id }}" value="1">
+                          {{ g.label }}
+                        </label>
+                      {% endfor %}
+                    </div>
+                  {% endif %}
+                {% endif %}
               {% endfor %}
               <label>Turns played</label>
               <input type="number"

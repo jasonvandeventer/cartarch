@@ -568,6 +568,61 @@ class GameSeat(Base):
 
     game: Mapped[Game] = relationship(back_populates="seats")
     deck: Mapped[Deck | None] = relationship()
+    # issue #47 — per-game goal completion (Feature 2 of 2). delete-orphan so a
+    # seat (or its game, via Game.seats' delete-orphan) drops its result rows.
+    # NO passive_deletes here (unlike Deck.goals / deck_card_shares): SQLite runs
+    # PRAGMA foreign_keys OFF, so the ORM must actively load + delete the children
+    # in Python — the game/seat delete path relies on this cascade, not the DB
+    # CASCADE (which is Postgres-only defense-in-depth). Deliberately the ONLY
+    # delete-orphan on these rows — DeckGoal does NOT also declare one (dual
+    # delete-orphan on the same child is ambiguous); the goal/deck-delete side is
+    # cleaned explicitly in deck_service.
+    goal_results: Mapped[list[GameGoalResult]] = relationship(
+        back_populates="game_seat",
+        cascade="all, delete-orphan",
+    )
+
+
+class GameGoalResult(Base):
+    """Issue #47 — per-game completion of a deck goal (Feature 2 of 2).
+
+    Records whether a seat's deck achieved one of its :class:`DeckGoal`s in one
+    game. The grain is the SEAT (one deck in one game), not the game or the deck.
+    Rows are written at finalize for the goals ACTIVE at that time — no
+    retroactive backfill — so the deck's completion rate is over games tracked
+    after each goal existed. There is NO goal-label snapshot: these are deck-
+    private analytics that may die with the deck (deliberately unlike the
+    seat-level ``deck_name_at_game`` snapshots that preserve shared game history).
+
+    Both FKs are ON DELETE CASCADE NOT NULL + indexed. SQLite enforces no FKs
+    (PRAGMA foreign_keys OFF), so the game/seat side is handled by the ORM
+    delete-orphan cascade (``GameSeat.goal_results`` / ``Game.seats``) and the
+    goal/deck side by explicit cleanup in ``deck_service`` (``delete_deck_goal``
+    + ``delete_deck``); the DB CASCADE is Postgres defense-in-depth.
+    ``UNIQUE(game_seat_id, deck_goal_id)`` makes the finalize upsert idempotent —
+    re-finalizing a game updates the existing row in place. ``achieved`` uses
+    ``server_default=false()`` (never an integer literal, which breaks CREATE
+    TABLE on Postgres).
+    """
+
+    __tablename__ = "game_goal_results"
+    __table_args__ = (
+        UniqueConstraint("game_seat_id", "deck_goal_id", name="uq_game_goal_results_seat_goal"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    game_seat_id: Mapped[int] = mapped_column(
+        ForeignKey("game_seats.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    deck_goal_id: Mapped[int] = mapped_column(
+        ForeignKey("deck_goals.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    achieved: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=false()
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
+
+    game_seat: Mapped[GameSeat] = relationship(back_populates="goal_results")
 
 
 class TokenInventory(Base):

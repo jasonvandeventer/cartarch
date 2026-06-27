@@ -813,6 +813,14 @@ KNOWN_NO_ENTRYPOINT = {
     "exercised via the delete_user case.",
     "token_inventory": "deleted via token_service; deck_token_requirements."
     "token_inventory_id (SET NULL) — not yet a dedicated entrypoint.",
+    "deck_goals": "issue #47 — child game_goal_results.deck_goal_id (CASCADE) is "
+    "cleaned explicitly by delete_deck_goal + delete_deck before the goal is "
+    "deleted; no dedicated parent-delete entrypoint here (verified in "
+    "tests/test_game_goal_results.py).",
+    "game_seats": "issue #47 — child game_goal_results.game_seat_id (CASCADE) is "
+    "dropped by the ORM delete-orphan cascade (GameSeat.goal_results) on game/seat "
+    "delete; no dedicated entrypoint here (verified in "
+    "tests/test_game_goal_results.py).",
 }
 # Parents covered transitively by an existing entrypoint (not a direct parent here).
 TRANSITIVELY_COVERED = {
@@ -845,9 +853,9 @@ def test_coverage_every_consequential_parent_is_accounted_for():
         print(f"  {parent:<24} [{cover}]  <- {kids}")
 
     unaccounted = set(consequential) - accounted
-    assert not unaccounted, (
-        f"Consequential parents with no entrypoint and not allow-listed: {sorted(unaccounted)}"
-    )
+    assert (
+        not unaccounted
+    ), f"Consequential parents with no entrypoint and not allow-listed: {sorted(unaccounted)}"
 
 
 def test_seeded_ondelete_matches_declared_topology():

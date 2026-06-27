@@ -76,15 +76,21 @@
     </section>
   {% endif %}
   {% if deck %}
-    {# issue #46 — read-only active goals (managed from the Decks-page edit
-       popout). Hidden when the deck has no active goals. #}
-    {% set active_goals = deck.goals | selectattr('is_active') | list %}
-    {% if active_goals %}
+    {# issue #46/#47 — active goals (managed from the Decks-page edit popout)
+       with per-goal completion stats (issue #47). goal_stats includes every
+       active goal PLUS any deactivated goal that still has history. Hidden when
+       there's nothing to show. #}
+    {% if goal_stats %}
       <section class="panel deck-goals-panel">
         <h3 class="panel-title" style="margin-bottom: 0.3rem"><span class="deck-detail-section-mark">§</span> Goals</h3>
         <ul class="deck-goals-list" style="margin: 0; padding-left: 1.1rem">
-          {% for g in active_goals %}
-            <li><strong>{{ g.label }}</strong>{% if g.description %} — <span class="muted">{{ g.description }}</span>{% endif %}</li>
+          {% for s in goal_stats %}
+            <li>
+              <strong>{{ s.goal.label }}</strong>{% if not s.goal.is_active %} <span class="muted">(retired)</span>{% endif %}{% if s.goal.description %} — <span class="muted">{{ s.goal.description }}</span>{% endif %}
+              <span class="muted" style="display:block;font-size:0.85rem">
+                {% if s.total %}{{ s.achieved }}/{{ s.total }} games ({{ s.pct }}%){% else %}no games yet{% endif %}
+              </span>
+            </li>
           {% endfor %}
         </ul>
       </section>
