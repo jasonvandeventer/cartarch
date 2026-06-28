@@ -2022,7 +2022,7 @@ def list_decks(session: Session, user_id: int) -> list[Deck]:
         # sibling builds). Proxies excluded — a buy-list copy isn't held value.
         # effective_price reads only persisted Card columns (no network).
         deck.total_value = sum(
-            effective_price(r.card, r.finish) * r.quantity
+            (effective_price(r.card, r.finish) or 0.0) * r.quantity
             for r in all_rows
             if r.card and not r.is_proxy
         )

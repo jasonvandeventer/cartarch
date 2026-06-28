@@ -78,6 +78,18 @@ def test_total_value_excludes_inbound_shares():
     assert decks["Build B"].total_value == 0.0
 
 
+def test_total_value_uncached_price_contributes_zero():
+    # A card with no price_usd* must contribute $0 and never crash the listing.
+    s = _fresh_session()
+    u = _user(s)
+    deck = _deck(s, u.id, "Mixed")
+    _place(s, u.id, _priced_card(s, "Priced", "4.00"), deck.storage_location_id, qty=2)
+    _place(s, u.id, _card(s, name="NoPrice"), deck.storage_location_id, qty=5)
+
+    d = {x.name: x for x in deck_service.list_decks(s, u.id)}["Mixed"]
+    assert d.total_value == 8.00  # 4.00*2 + 0*5
+
+
 def test_total_value_zero_for_empty_deck():
     s = _fresh_session()
     u = _user(s)
