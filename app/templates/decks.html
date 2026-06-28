@@ -35,6 +35,10 @@
           <div class="stat-label">Total Cards in Decks</div>
         </div>
         <div class="stat-card">
+          <div class="stat-value">${{ "%.2f" | format(decks | sum(attribute='total_value')) }}</div>
+          <div class="stat-label">Total Value</div>
+        </div>
+        <div class="stat-card">
           <div class="stat-value">{{ decks | sum(attribute='games') }}</div>
           <div class="stat-label">Games Logged</div>
         </div>
@@ -88,6 +92,7 @@
               {% endif %}
               <span class="decks-featured-fmt">{{ featured.format or 'Commander' }}</span>
               <span class="decks-featured-cards">{{ featured.card_count or 0 }} cards</span>
+              <span class="decks-featured-value">· ${{ "%.2f" | format(featured.total_value or 0.0) }}</span>
               {% if featured.is_brew %}<span class="brew-badge" title="Brew deck — may contain cards you don't own">Brew</span>{% endif %}
             </div>
             {% if featured.blurb %}
@@ -138,6 +143,7 @@
                 {% endif %}
                 <span class="decks-row-fmt">{{ deck.format or 'Commander' }}</span>
                 <span class="decks-row-cards">· {{ deck.card_count or 0 }} cards</span>
+                <span class="decks-row-value">· ${{ "%.2f" | format(deck.total_value or 0.0) }}</span>
                 {% if deck.is_brew %}<span class="brew-badge" title="Brew deck — may contain cards you don't own">Brew</span>{% endif %}
               </div>
               {% if deck.blurb %}
