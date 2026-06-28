@@ -19,6 +19,7 @@ from app.models import (
     StorageLocation,
     VariantGroup,
 )
+from app.pricing import effective_price
 from app.scryfall import _cache_get_by_ids, extract_token_stubs, fetch_deck_tokens
 from app.timeutil import utc_now
 
@@ -1961,6 +1962,7 @@ def list_decks(session: Session, user_id: int) -> list[Deck]:
     for deck in decks:
         if not deck.storage_location_id:
             deck.card_count = 0
+            deck.total_value = 0.0
             continue
 
         deck.card_count = (
@@ -2015,6 +2017,15 @@ def list_decks(session: Session, user_id: int) -> list[Deck]:
             .all()
         )
         deck.consistency = compute_consistency(all_rows) if all_rows else None
+        # issue: per-deck Total Value. Reuses all_rows (own rows only — inbound
+        # variant shares are excluded, so a card is never double-counted across
+        # sibling builds). Proxies excluded — a buy-list copy isn't held value.
+        # effective_price reads only persisted Card columns (no network).
+        deck.total_value = sum(
+            effective_price(r.card, r.finish) * r.quantity
+            for r in all_rows
+            if r.card and not r.is_proxy
+        )
 
     return decks
 
