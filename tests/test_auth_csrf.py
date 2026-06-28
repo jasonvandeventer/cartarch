@@ -25,6 +25,7 @@ Pytest module (matches tests/test_share_service):
 
 from __future__ import annotations
 
+import logging
 import re
 
 from sqlalchemy import create_engine
@@ -142,3 +143,109 @@ def test_login_csrf_recovery():
     # Hard assert so pytest fails (not just warns) on a regression.
     assert failed == 0, f"{failed} CSRF-recovery check(s) failed"
     assert failed == 0
+
+
+def _no_session_warning(caplog):
+    """The single csrf_no_session WARN record emitted this test, or None."""
+    recs = [r for r in caplog.records if "csrf_no_session" in r.getMessage()]
+    return recs[-1] if recs else None
+
+
+def test_no_session_logs_absent(caplog):
+    """Issue #62: a pre-auth POST with NO session cookie logs absent."""
+    from fastapi.testclient import TestClient
+
+    client, main, get_db_session = _client_and_user()
+    try:
+        form_token = _csrf_token(TestClient(main.app).get("/login").text)
+        nocookie = TestClient(main.app)  # empty cookie jar
+        with caplog.at_level(logging.WARNING, logger="app.dependencies"):
+            r = _login(nocookie, form_token)
+        assert r.status_code == 200  # self-heals
+        msg = _no_session_warning(caplog).getMessage()
+        assert "session_cookie_present=False" in msg
+        assert "cookie_class=absent" in msg
+        assert "path=/login" in msg and "method=POST" in msg
+    finally:
+        main.app.dependency_overrides.pop(get_db_session, None)
+
+
+def test_no_session_logs_bad_signature(caplog):
+    """A garbage ``session`` cookie classifies as bad_signature."""
+    from fastapi.testclient import TestClient
+
+    client, main, get_db_session = _client_and_user()
+    try:
+        form_token = _csrf_token(TestClient(main.app).get("/login").text)
+        garbage = TestClient(main.app)
+        garbage.cookies.set("session", "garbage")
+        with caplog.at_level(logging.WARNING, logger="app.dependencies"):
+            r = _login(garbage, form_token)
+        assert r.status_code == 200
+        msg = _no_session_warning(caplog).getMessage()
+        assert "session_cookie_present=True" in msg
+        assert "cookie_class=bad_signature" in msg
+    finally:
+        main.app.dependency_overrides.pop(get_db_session, None)
+
+
+def test_no_session_logs_expired_with_skew(caplog):
+    """An expired (but validly signed) cookie logs expired + positive skew.
+
+    Sign a session payload with the middleware's own signer at a timestamp
+    older than the 14-day window, then POST it.
+    """
+    import os
+    import time
+
+    from fastapi.testclient import TestClient
+    from itsdangerous import TimestampSigner
+
+    from app import dependencies
+
+    client, main, get_db_session = _client_and_user()
+    try:
+        secret = os.getenv("SESSION_SECRET_KEY", "dev-only-change-me")
+        signer = TimestampSigner(secret)
+        # Sign now, then unsign with a 0-second max_age so it reads as expired.
+        cookie = signer.sign(b"e30=").decode()  # base64 of {} — payload is never logged
+        time.sleep(1)
+
+        # Force the classifier to use a tiny window so the 1s-old cookie is expired.
+        orig = dependencies._SESSION_MAX_AGE
+        dependencies._SESSION_MAX_AGE = 0
+        try:
+            form_token = _csrf_token(TestClient(main.app).get("/login").text)
+            expired = TestClient(main.app)
+            expired.cookies.set("session", cookie)
+            with caplog.at_level(logging.WARNING, logger="app.dependencies"):
+                r = _login(expired, form_token)
+        finally:
+            dependencies._SESSION_MAX_AGE = orig
+        assert r.status_code == 200
+        msg = _no_session_warning(caplog).getMessage()
+        assert "cookie_class=expired" in msg
+        # skew is server_now - date_signed -> positive integer.
+        skew = int(re.search(r"cookie_ts_skew_seconds=(-?\d+)", msg).group(1))
+        assert skew >= 1
+    finally:
+        main.app.dependency_overrides.pop(get_db_session, None)
+
+
+def test_no_session_silent_on_ok_and_mismatch(caplog):
+    """The WARN fires ONLY on no_session — never on ok or mismatch."""
+    from fastapi.testclient import TestClient
+
+    client, main, get_db_session = _client_and_user()
+    try:
+        with caplog.at_level(logging.WARNING, logger="app.dependencies"):
+            # ok: happy-path login on a real session.
+            page = client.get("/login")
+            _login(client, _csrf_token(page.text))
+            # mismatch: live session, wrong token -> 403, must stay silent.
+            live = TestClient(main.app)
+            live.get("/login")
+            _login(live, "deadbeef" * 8)
+        assert _no_session_warning(caplog) is None
+    finally:
+        main.app.dependency_overrides.pop(get_db_session, None)

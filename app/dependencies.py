@@ -354,6 +354,76 @@ def csrf_state(request: Request, csrf_token: str) -> str:
     return "ok" if csrf_token == expected else "mismatch"
 
 
+# Starlette's SessionMiddleware default cookie window (14 days). Reading the
+# raw cookie with this same max_age reproduces the middleware's own decode, so
+# our classification matches what Starlette would have done.
+_SESSION_MAX_AGE = 14 * 24 * 3600
+
+
+def _classify_session_cookie(request: Request) -> dict:
+    """Diagnostic-only decode of the raw ``session`` cookie.
+
+    Reconstructs the SAME ``itsdangerous.TimestampSigner`` SessionMiddleware
+    builds (``app/main.py``) and classifies the cookie WITHOUT ever logging its
+    value/signature/payload. Returns the cookie-derived log fields. Observability
+    only — never gates auth.
+    """
+    raw = request.cookies.get("session")
+    if not raw:
+        return {
+            "session_cookie_present": False,
+            "cookie_class": "absent",
+            "cookie_ts_skew_seconds": None,
+        }
+
+    # itsdangerous is imported lazily — this path only runs on the rare no_session
+    # failure, so the cost stays off the happy path.
+    from itsdangerous import BadSignature, SignatureExpired, TimestampSigner
+
+    secret = os.getenv("SESSION_SECRET_KEY", "dev-only-change-me")
+    signer = TimestampSigner(secret)
+    now = datetime.now(UTC)
+    cls = "bad_signature"
+    skew: int | None = None
+    try:
+        payload, ts = signer.unsign(raw, max_age=_SESSION_MAX_AGE, return_timestamp=True)
+        skew = int((now - ts).total_seconds())
+        cls = "decoded_ok_but_empty" if not payload else "decoded_ok"
+    except SignatureExpired as exc:  # MUST precede BadSignature (it is a subclass).
+        cls = "expired"
+        if exc.date_signed is not None:
+            skew = int((now - exc.date_signed).total_seconds())
+    except BadSignature:
+        cls = "bad_signature"
+    except Exception:  # noqa: BLE001 — diagnostics must never break the auth path.
+        cls = "bad_signature"
+    return {"session_cookie_present": True, "cookie_class": cls, "cookie_ts_skew_seconds": skew}
+
+
+def _log_no_session(request: Request) -> None:
+    """One WARN per ``no_session`` CSRF failure to capture client/network signal.
+
+    Observability only (issue #62): the affected "session expired" reports are
+    not reproducible from owner devices, so this is the single root-cause site.
+    Logs metadata + cookie classification + clock skew — NEVER the cookie value,
+    token, username, or password.
+    """
+    fields = _classify_session_cookie(request)
+    logger.warning(
+        "csrf_no_session path=%s method=%s ip=%s country=%s cf_ray=%s ua=%r "
+        "session_cookie_present=%s cookie_class=%s cookie_ts_skew_seconds=%s",
+        request.url.path,
+        request.method,
+        client_ip_for(request),
+        request.headers.get("cf-ipcountry"),
+        request.headers.get("cf-ray"),
+        request.headers.get("user-agent"),
+        fields["session_cookie_present"],
+        fields["cookie_class"],
+        fields["cookie_ts_skew_seconds"],
+    )
+
+
 def require_csrf_or_reissue(
     request: Request,
     csrf_token: str,
@@ -395,6 +465,7 @@ def require_csrf_or_reissue(
     if state == "mismatch":
         raise HTTPException(status_code=403, detail="Invalid CSRF token")
     # "no_session": re-render with a fresh token + cookie so the retry works.
+    _log_no_session(request)
     reissue_ctx = {"error": "Your session expired before you submitted. Please try again."}
     if ctx:
         reissue_ctx.update(ctx)
