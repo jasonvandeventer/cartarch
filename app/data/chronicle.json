@@ -1,5 +1,15 @@
 [
   {
+    "version": "4.1.1",
+    "date": "2026-06-28",
+    "added": [],
+    "refined": [
+      "Each deck on the Decks page now shows its Total Value — the summed market price of the cards in it."
+    ],
+    "resolved": [],
+    "archivist_note": null
+  },
+  {
     "version": "4.1.0",
     "date": "2026-06-27",
     "added": [],
