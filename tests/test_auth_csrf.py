@@ -189,6 +189,39 @@ def test_no_session_logs_bad_signature(caplog):
         main.app.dependency_overrides.pop(get_db_session, None)
 
 
+def test_no_session_logs_decoded_ok_but_empty(caplog):
+    """A validly-signed but tokenless session logs decoded_ok_but_empty + a skew.
+
+    Signing ``b"e30="`` (base64 of ``{}``) with the middleware's own signer is
+    exactly what Starlette emits for an empty session, so it decodes cleanly,
+    yields no csrf_token (-> no_session), and exercises the aware-UTC skew
+    subtraction (the path the red-team wrongly flagged as a tz TypeError).
+    """
+    import os
+
+    from fastapi.testclient import TestClient
+    from itsdangerous import TimestampSigner
+
+    client, main, get_db_session = _client_and_user()
+    try:
+        secret = os.getenv("SESSION_SECRET_KEY", "dev-only-change-me")
+        cookie = TimestampSigner(secret).sign(b"e30=").decode()
+        form_token = _csrf_token(TestClient(main.app).get("/login").text)
+        empty = TestClient(main.app)
+        empty.cookies.set("session", cookie)
+        with caplog.at_level(logging.WARNING, logger="app.dependencies"):
+            r = _login(empty, form_token)
+        assert r.status_code == 200
+        msg = _no_session_warning(caplog).getMessage()
+        assert "session_cookie_present=True" in msg
+        assert "cookie_class=decoded_ok_but_empty" in msg
+        # The skew must be a real integer (no TypeError swallowed into bad_signature).
+        skew = int(re.search(r"cookie_ts_skew_seconds=(-?\d+)", msg).group(1))
+        assert skew >= 0
+    finally:
+        main.app.dependency_overrides.pop(get_db_session, None)
+
+
 def test_no_session_logs_expired_with_skew(caplog):
     """An expired (but validly signed) cookie logs expired + positive skew.
 

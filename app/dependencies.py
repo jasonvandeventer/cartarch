@@ -386,9 +386,14 @@ def _classify_session_cookie(request: Request) -> dict:
     cls = "bad_signature"
     skew: int | None = None
     try:
-        payload, ts = signer.unsign(raw, max_age=_SESSION_MAX_AGE, return_timestamp=True)
+        # The unsigned payload is base64(JSON(session)) — never falsey, so it
+        # can't be used to test emptiness. But reaching no_session means the
+        # decoded session carried no csrf_token, so a valid signature here is by
+        # definition "decoded ok but empty of what we needed". itsdangerous 2.x
+        # returns an aware-UTC timestamp, so the skew subtraction needs no tz fixup.
+        _payload, ts = signer.unsign(raw, max_age=_SESSION_MAX_AGE, return_timestamp=True)
         skew = int((now - ts).total_seconds())
-        cls = "decoded_ok_but_empty" if not payload else "decoded_ok"
+        cls = "decoded_ok_but_empty"
     except SignatureExpired as exc:  # MUST precede BadSignature (it is a subclass).
         cls = "expired"
         if exc.date_signed is not None:
