@@ -1,5 +1,15 @@
 [
   {
+    "version": "4.1.9",
+    "date": "2026-06-29",
+    "added": [],
+    "refined": [
+      "Internal: the app now correctly detects HTTPS behind the reverse proxy (a foundation fix for the iOS sign-in investigation), and the session cookie setting reverted to its standard value. No user-facing change."
+    ],
+    "resolved": [],
+    "archivist_note": null
+  },
+  {
     "version": "4.1.8",
     "date": "2026-06-29",
     "added": [],

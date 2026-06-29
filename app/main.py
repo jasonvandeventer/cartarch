@@ -207,15 +207,12 @@ _session_https_only = os.getenv("DEV_MODE", "false").lower() != "true"
 app.add_middleware(
     SessionMiddleware,
     secret_key=os.getenv("SESSION_SECRET_KEY", "dev-only-change-me"),
-    # SameSite=None in prod (#63): Firefox-iOS / iOS WebKit treats the same-site
-    # pre-auth form POST as cross-site (it sends Origin: null — confirmed in the
-    # v4.1.7 auth_diag logs) and DROPS a SameSite=Lax session cookie, so login
-    # 303s but the session never persists → the user bounces to the splash.
-    # SameSite=None makes the cookie survive that cross-site-treated context; it
-    # REQUIRES Secure, which prod has (https_only). Dev stays Lax — None without
-    # Secure (dev serves http) is rejected by browsers. The wider cookie scope is
-    # covered by CsrfRequired's double-submit token on authenticated mutations.
-    same_site="none" if _session_https_only else "lax",
+    # SameSite=Lax (Starlette's default). v4.1.8 tried SameSite=None to fix the
+    # Firefox-iOS session-drop; it did NOT help and only widens cookie scope, so
+    # reverted (v4.1.9). Don't relax cookie policy further to chase that bug — the
+    # real lever is fixing proxy-awareness (#66) so the app sees https, not the
+    # internal http cloudflared forwards. https_only=True in prod => Secure.
+    same_site="lax",
     https_only=_session_https_only,
 )
 

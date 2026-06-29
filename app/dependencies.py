@@ -488,7 +488,8 @@ def log_auth_diagnostic(request: Request, where: str) -> None:
     xsite = _classify_cross_site(request)
     logger.warning(
         "auth_diag where=%s ip=%s ua=%r session_cookie_present=%s cookie_class=%s "
-        "user_id_present=%s origin_present=%s origin_match=%s referer_present=%s referer_match=%s",
+        "user_id_present=%s origin_present=%s origin_match=%s referer_present=%s referer_match=%s "
+        "scheme=%s xff_proto=%s host=%s url=%s",
         where,
         client_ip_for(request),
         request.headers.get("user-agent"),
@@ -499,6 +500,12 @@ def log_auth_diagnostic(request: Request, where: str) -> None:
         xsite["origin_match"],
         xsite["referer_present"],
         xsite["referer_match"],
+        # #66 proxy-awareness check: after uvicorn --proxy-headers, scheme should
+        # read https (from X-Forwarded-Proto) instead of the internal http.
+        request.url.scheme,
+        request.headers.get("x-forwarded-proto"),
+        request.headers.get("host"),
+        str(request.url),
     )
 
 
