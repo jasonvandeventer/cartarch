@@ -1,5 +1,15 @@
 [
   {
+    "version": "4.1.10",
+    "date": "2026-06-29",
+    "added": [],
+    "refined": [
+      "Internal: a temporary diagnostic probe to pinpoint why some iOS browsers don't keep the sign-in session. No user-facing change."
+    ],
+    "resolved": [],
+    "archivist_note": null
+  },
+  {
     "version": "4.1.9",
     "date": "2026-06-29",
     "added": [],

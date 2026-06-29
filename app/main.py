@@ -67,6 +67,7 @@ from app.routes import (
     auth,
     cards,
     collections,
+    cookie_probe,
     decks,
     drawers,
     games,
@@ -217,6 +218,7 @@ app.add_middleware(
 )
 
 app.include_router(auth.router)
+app.include_router(cookie_probe.router)  # TEMPORARY #63 cookie-storage probe — remove after
 app.include_router(admin.router)
 app.include_router(account.router)
 app.include_router(drawers.router)
