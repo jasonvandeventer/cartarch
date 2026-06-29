@@ -11,7 +11,7 @@ from app.dependencies import (
     get_db_session,
     render,
     render_auth_page,
-    require_csrf_or_reissue,
+    require_preauth_csrf,
 )
 from app.login_throttle import (
     is_login_throttled,
@@ -37,13 +37,12 @@ def login(
     username: str = Form(...),
     password: str = Form(...),
     db: Session = Depends(get_db_session),
-    # Graceful CSRF: a logged-out browser that reaches POST /login with no
-    # usable session cookie (no established token) is re-served the form with
-    # a fresh token+cookie instead of a hard 403, so the immediate retry
-    # works. A real token mismatch still 403s. See require_csrf_or_reissue.
+    # Stateless pre-auth CSRF (#63): validated by Origin/Referer + a server-signed
+    # token, NOT the session cookie — privacy iOS browsers (FxiOS/OPT) drop our
+    # cookie on the POST. Expired token re-renders the form; tamper/cross-site 403.
     csrf_token: str = Form(""),
 ):
-    reissue = require_csrf_or_reissue(request, csrf_token, "login.html")
+    reissue = require_preauth_csrf(request, csrf_token, "login.html")
     if reissue is not None:
         return reissue
 

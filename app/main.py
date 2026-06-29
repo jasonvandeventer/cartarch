@@ -46,7 +46,7 @@ from app.dependencies import (
     get_optional_current_user,
     render,
     render_auth_page,
-    require_csrf_or_reissue,
+    require_preauth_csrf,
     safe_redirect_url,
 )
 from app.inventory_service import (
@@ -803,12 +803,11 @@ def register(
     password: str = Form(...),
     display_name: str = Form(""),
     session: Session = Depends(get_db_session),
-    # Graceful CSRF on this public pre-auth form — see auth.login / the
-    # require_csrf_or_reissue docstring. No-session => re-serve with a fresh
-    # token+cookie; a real mismatch still 403s.
+    # Stateless pre-auth CSRF (#63) — see require_preauth_csrf. Origin/Referer +
+    # signed token, no session-cookie dependency.
     csrf_token: str = Form(""),
 ):
-    reissue = require_csrf_or_reissue(request, csrf_token, "register.html", {"title": "Register"})
+    reissue = require_preauth_csrf(request, csrf_token, "register.html", {"title": "Register"})
     if reissue is not None:
         return reissue
 
@@ -1143,8 +1142,7 @@ def forgot_password_submit(
     request: Request,
     email: str = Form(...),
     session: Session = Depends(get_db_session),
-    # Graceful CSRF on this public pre-auth form — see the
-    # require_csrf_or_reissue docstring.
+    # Stateless pre-auth CSRF (#63) — see require_preauth_csrf.
     csrf_token: str = Form(""),
 ):
     """Identical response shape for registered vs unregistered emails.
@@ -1154,7 +1152,7 @@ def forgot_password_submit(
     we find a user, queue a token, get rate-limited, or fail any
     intermediate check — only the side-effects differ.
     """
-    reissue = require_csrf_or_reissue(
+    reissue = require_preauth_csrf(
         request, csrf_token, "forgot_password.html", {"title": "Forgot password"}
     )
     if reissue is not None:
@@ -1247,9 +1245,8 @@ def reset_password_submit(
     password: str = Form(...),
     password_confirm: str = Form(...),
     session: Session = Depends(get_db_session),
-    # Graceful CSRF on this public pre-auth form — see the
-    # require_csrf_or_reissue docstring. Re-render keeps the reset token so
-    # the user can resubmit (the token is re-validated in the body anyway).
+    # Stateless pre-auth CSRF (#63) — see require_preauth_csrf. Re-render keeps
+    # the reset token so the user can resubmit (re-validated in the body anyway).
     csrf_token: str = Form(""),
 ):
     """Re-validate the token, set the new password, mark used.
@@ -1259,7 +1256,7 @@ def reset_password_submit(
     for hours, etc.). Same find_valid_token call, same invalid-state
     branch on the rendered page.
     """
-    reissue = require_csrf_or_reissue(
+    reissue = require_preauth_csrf(
         request,
         csrf_token,
         "reset_password.html",
