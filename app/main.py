@@ -14,7 +14,7 @@ import os
 import threading
 from contextlib import asynccontextmanager
 from datetime import timedelta
-from urllib.parse import quote
+from urllib.parse import quote, urlencode, urlsplit, urlunsplit
 
 from fastapi import Depends, FastAPI, Form, HTTPException, Request
 from fastapi.responses import (
@@ -93,6 +93,64 @@ from app.watchlist_service import (
 _daemon_threads: list[threading.Thread] = []
 
 
+def validate_public_base_url(value: str | None, *, is_prod: bool) -> None:
+    """Fail-loud check for PUBLIC_BASE_URL (issue #66).
+
+    Pure + unit-testable (no daemon boot), called from the lifespan startup
+    block alongside the SESSION_SECRET_KEY / RESEND_API_KEY checks and with the
+    same DEV_MODE gating. Dev (``is_prod`` False) skips entirely — the
+    public_base_url() localhost fallback is allowed there. In prod it RAISES
+    with a distinct message per failure so an operator can't config a broken /
+    non-TLS reset link into place:
+      1. unset/empty
+      2. scheme != "https" exactly (rejects http:// and any other scheme)
+      3. missing host (rejects "https:/x", "https://")
+      4. path/query/fragment beyond a single optional trailing "/"
+    Accepts a bare https origin: "https://host" or "https://host:port", with an
+    optional single trailing slash (normalized away by public_base_url()).
+    """
+    if not is_prod:
+        return
+    if not value:
+        raise RuntimeError("PUBLIC_BASE_URL must be set in production (DEV_MODE is not 'true')")
+    parts = urlsplit(value)
+    if parts.scheme != "https":
+        raise RuntimeError(
+            f"PUBLIC_BASE_URL must use https in production (got scheme {parts.scheme!r})"
+        )
+    if not parts.netloc:
+        raise RuntimeError(f"PUBLIC_BASE_URL is missing a host (got {value!r})")
+    if parts.query or parts.fragment or parts.path not in ("", "/"):
+        raise RuntimeError(
+            f"PUBLIC_BASE_URL must be a bare origin with no path/query/fragment (got {value!r})"
+        )
+
+
+def public_base_url() -> str:
+    """Canonical scheme+host for emailed/absolute links (issue #66).
+
+    Read from PUBLIC_BASE_URL, NEVER inferred from the request: behind
+    cloudflared the per-request scheme is the internal ``http``, so a
+    request-derived reset link would ship a non-TLS auth URL. Dev falls back to
+    ``http://localhost:8000`` ONLY under DEV_MODE=true. The trailing slash is
+    stripped so callers can append a path without double-slashing. In prod the
+    value is re-validated on every read via validate_public_base_url() (not just
+    at boot), so a set-but-invalid value raises here too rather than emitting a
+    non-TLS / relative link mid-request.
+    """
+    value = os.getenv("PUBLIC_BASE_URL")
+    if os.getenv("DEV_MODE", "false").lower() != "true":
+        # Validate on READ, not only at boot: a set-but-invalid value (http://,
+        # missing host, trailing path) must raise here too — never return an
+        # unvalidated / non-TLS string mid-request. Same gate as the lifespan
+        # check, so prod can only ever emit a canonical https origin.
+        validate_public_base_url(value, is_prod=True)
+        return value.rstrip("/")
+    if value:
+        return value.rstrip("/")
+    return "http://localhost:8000"
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifecycle (replaces the deprecated ``@app.on_event`` pair).
@@ -123,6 +181,15 @@ async def lifespan(app: FastAPI):
             "mana-archive-platform deployment.yaml for the SESSION_SECRET_KEY "
             "pattern this mirrors."
         )
+    # issue #66 — PUBLIC_BASE_URL startup check. Same posture as the two checks
+    # above: the password-reset email link is built from this canonical origin
+    # (see public_base_url()), never from the request scheme — so an unset or
+    # http:// value must fail the boot rather than silently ship a non-TLS auth
+    # link. DEV_MODE skips it (localhost fallback).
+    validate_public_base_url(
+        os.getenv("PUBLIC_BASE_URL"),
+        is_prod=os.getenv("DEV_MODE", "false").lower() != "true",
+    )
     # Schema is owned by Alembic (``alembic upgrade head``), applied by the ArgoCD
     # PreSync migration hook in vanfreckle-platform BEFORE the app rolls. The hook
     # is live and proven (v4.0.36 applied game_goal_results through it). ``init_db``
@@ -1194,13 +1261,25 @@ def forgot_password_submit(
         if user is not None and user.is_active:
             raw_token = create_reset_token(session, user)
             session.commit()
-            # Build the reset URL on the same base the request came in on.
-            # Use request.url_for so we work behind the Cloudflare Tunnel
-            # without hard-coding cartarch.com.
-            reset_path = request.url_for("reset_password_page").include_query_params(
-                token=raw_token
+            # Build the reset URL from the canonical PUBLIC_BASE_URL (issue #66),
+            # NOT from request.url_for: behind cloudflared the per-request scheme
+            # is the internal http, which would ship a non-TLS auth link. Scheme
+            # +host come from config; the PATH is resolved from the route NAME so
+            # a future rename of the route path can't silently 404 every reset
+            # email. url_path_for returns a relative URLPath (no scheme/host) —
+            # verified — so no request-derived scheme can leak in.
+            # urlunsplit + urlencode → no double-slash, token always encoded.
+            base = urlsplit(public_base_url())
+            reset_path = request.app.url_path_for("reset_password_page")
+            reset_url = urlunsplit(
+                (
+                    base.scheme,
+                    base.netloc,
+                    str(reset_path),
+                    urlencode({"token": raw_token}),
+                    "",
+                )
             )
-            reset_url = str(reset_path)
             queue_reset_email(
                 email=email_clean,
                 reset_url=reset_url,
