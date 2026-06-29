@@ -1,5 +1,15 @@
 [
   {
+    "version": "4.1.3",
+    "date": "2026-06-29",
+    "added": [],
+    "refined": [
+      "Extend no_session diagnostics with Origin/Referer presence and same-origin match to validate the #63 cross-site gate"
+    ],
+    "resolved": [],
+    "archivist_note": null
+  },
+  {
     "version": "4.1.2",
     "date": "2026-06-28",
     "added": [],
