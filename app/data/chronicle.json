@@ -1,5 +1,15 @@
 [
   {
+    "version": "4.1.4",
+    "date": "2026-06-29",
+    "added": [],
+    "refined": [
+      "Scryfall ingest fails every cycle: full_art boolean written to integer column (Postgres DatatypeMismatch)"
+    ],
+    "resolved": [],
+    "archivist_note": null
+  },
+  {
     "version": "4.1.3",
     "date": "2026-06-29",
     "added": [],
