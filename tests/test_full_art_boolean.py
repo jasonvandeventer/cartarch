@@ -7,13 +7,18 @@ cycle. The column is now native Boolean. This drives the REAL upsert SQL
 (``legacy_tables.scryfall_cards``) for each truth state and asserts a clean bool
 round-trip back through ``_cached_row_to_payload``.
 
-    pytest tests/test_full_art_boolean.py
+This rides the shared ``db_engine`` fixture, which is the project's dual-backend
+seam: temp SQLite by default, but a real Postgres engine when ``TEST_DATABASE_URL``
+is set. **Postgres is where this bug actually lives** — SQLite silently coerced
+bool->0/1, so only the Postgres run proves the ``DatatypeMismatch`` is gone:
+
+    TEST_DATABASE_URL=postgresql+psycopg://… pytest tests/test_full_art_boolean.py
 """
 
 from __future__ import annotations
 
 import pytest
-from sqlalchemy import Boolean, create_engine, text
+from sqlalchemy import Boolean, text
 
 from app.legacy_tables import scryfall_cards
 from app.scryfall import (
@@ -32,10 +37,7 @@ def test_column_is_boolean():
     ("raw_full_art", "expected"),
     [(True, True), (False, False), (None, False)],  # None (missing) -> False
 )
-def test_upsert_roundtrips_full_art(raw_full_art, expected):
-    engine = create_engine("sqlite://")  # in-memory, throwaway
-    scryfall_cards.create(engine)
-
+def test_upsert_roundtrips_full_art(db_engine, raw_full_art, expected):
     raw = {
         "id": "x-1",
         "name": "Test Card",
@@ -56,7 +58,9 @@ def test_upsert_roundtrips_full_art(raw_full_art, expected):
     payload = _normalize_card_payload(raw)
     assert payload["full_art"] is expected  # write path produces a Python bool
 
-    with engine.begin() as conn:
+    # db_engine already has the schema (create_all from legacy_tables, now Boolean).
+    # On Postgres this upsert is exactly the path that raised DatatypeMismatch.
+    with db_engine.begin() as conn:
         conn.execute(_BULK_UPSERT_SQL, payload)
         row = conn.execute(text(f"SELECT {_CACHE_COLUMNS} FROM scryfall_cards")).mappings().one()
 
