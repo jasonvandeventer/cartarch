@@ -524,6 +524,104 @@ def require_csrf_or_reissue(
     return render(request, template, reissue_ctx)
 
 
+# --- Stateless pre-auth CSRF (issue #63) ------------------------------------ #
+# The four PUBLIC pre-auth forms (login / register / forgot / reset) can't rely
+# on the session cookie surviving the GET->POST round trip: privacy iOS browsers
+# (Firefox for iOS, Opera Touch) drop our host-only SameSite=Lax `session` cookie
+# on the POST, so the session-bound double-submit (require_csrf_or_reissue) dead-
+# ends them on a 403. This token is server-SIGNED + timestamped instead of
+# session-bound, so it validates with NO cookie. Authenticated, state-changing
+# endpoints keep the session-bound CsrfRequired / require_csrf_token unchanged.
+_PREAUTH_CSRF_SALT = "cartarch-preauth-csrf"
+PREAUTH_CSRF_MAX_AGE = 3600  # 1h; replay within the window is accepted for pre-auth
+
+
+def _preauth_csrf_serializer():
+    """URLSafeTimedSerializer keyed on the EXISTING session secret, with a
+    distinct salt so the pre-auth token space can't be crossed with the session
+    signer. No new env var (reuses SESSION_SECRET_KEY)."""
+    from itsdangerous import URLSafeTimedSerializer
+
+    secret = os.getenv("SESSION_SECRET_KEY", "dev-only-change-me")
+    return URLSafeTimedSerializer(secret, salt=_PREAUTH_CSRF_SALT)
+
+
+def mint_preauth_csrf_token() -> str:
+    """A signed, timestamped opaque token for a pre-auth form GET. The nonce only
+    makes tokens unique; the token carries NO server state, so it survives a
+    client that never sends our session cookie back."""
+    return _preauth_csrf_serializer().dumps({"n": secrets.token_hex(16)})
+
+
+def _preauth_cross_site_ok(request: Request) -> bool:
+    """Gate (a): if Origin is present its scheme+host must equal our origin; else
+    fall back to Referer host; if BOTH headers are absent, accept (degraded — the
+    signed token in gate (b) still proves it was minted by us). Mirrors
+    _classify_cross_site (#65): the host is the forwarded Host header
+    (request.url.netloc), and the scheme is anchored to https in prod because
+    cloudflared terminates TLS and forwards plain http (comparing to
+    request.url.scheme would false-reject every real request)."""
+    host = request.url.netloc.lower()  # hostnames are case-insensitive
+    dev = os.getenv("DEV_MODE", "false").lower() == "true"
+    allowed_schemes = {"http", "https"} if dev else {"https"}
+
+    def _matches(value: str) -> bool:
+        try:
+            parsed = urlparse(value)
+        except Exception:  # noqa: BLE001 — a malformed header is a reject, not a 500.
+            return False
+        return (
+            parsed.scheme in allowed_schemes
+            and bool(parsed.netloc)
+            and parsed.netloc.lower() == host
+        )
+
+    origin = request.headers.get("origin")
+    if origin is not None:
+        return _matches(origin)
+
+    referer = request.headers.get("referer")
+    if referer is not None:
+        return _matches(referer)
+
+    return True  # both absent — degraded path; the signed token below is still required
+
+
+def require_preauth_csrf(
+    request: Request,
+    csrf_token: str,
+    template: str,
+    ctx: dict | None = None,
+):
+    """Stateless CSRF guard for the four PUBLIC pre-auth forms (issue #63),
+    replacing require_csrf_or_reissue on those paths. Two gates:
+
+      (a) cross-site — Origin/Referer must match our origin (_preauth_cross_site_ok);
+          a cross-origin POST is a 403.
+      (b) integrity/freshness — the token must be a valid signature no older than
+          PREAUTH_CSRF_MAX_AGE. An EXPIRED token re-renders the form with a
+          friendly "please try again" (NOT a 403, NOT the cookie "session expired"
+          copy); a tampered or missing token is a 403.
+
+    Returns None on pass (the caller proceeds), or a TemplateResponse the caller
+    must return as-is. Does NOT depend on the session cookie. SignatureExpired is
+    caught before BadData because it is a subclass of it."""
+    from itsdangerous import BadData, SignatureExpired
+
+    if not _preauth_cross_site_ok(request):
+        raise HTTPException(status_code=403, detail="Cross-site request blocked")
+    try:
+        _preauth_csrf_serializer().loads(csrf_token, max_age=PREAUTH_CSRF_MAX_AGE)
+    except SignatureExpired:
+        expired_ctx = {"error": "This form expired, please try again."}
+        if ctx:
+            expired_ctx.update(ctx)
+        return render(request, template, expired_ctx)
+    except BadData:
+        raise HTTPException(status_code=403, detail="Invalid CSRF token") from None
+    return None
+
+
 def _pending_count_for(user_id: int | None) -> int:
     """Count this user's pending-placement rows. Used by the mobile nav badge.
 
@@ -565,6 +663,19 @@ def _trade_pending_count_for(user_id: int | None) -> int:
         session.close()
 
 
+# The four PUBLIC pre-auth forms validate a STATELESS signed token
+# (require_preauth_csrf, #63), never the session token. So EVERY render of these
+# templates — GET, an in-handler error re-render (wrong password, weak password,
+# …), or the guard's own expired re-render — must embed a freshly-signed token,
+# not get_csrf_token's session hex. Centralising it here (not only in
+# render_auth_page) is load-bearing: the error re-renders call render() directly,
+# and a session-hex token in those forms is rejected by the stateless POST guard
+# as BadData -> 403 (e.g. one mistyped password would 403 the retry).
+_PREAUTH_TEMPLATES = frozenset(
+    {"login.html", "register.html", "forgot_password.html", "reset_password.html"}
+)
+
+
 def render(
     request: Request,
     template: str,
@@ -573,7 +684,9 @@ def render(
 ):
     user_id = request.session.get("user_id")
     context = {
-        "csrf_token": get_csrf_token(request),
+        "csrf_token": (
+            mint_preauth_csrf_token() if template in _PREAUTH_TEMPLATES else get_csrf_token(request)
+        ),
         "pending_count": _pending_count_for(user_id),
         "trade_pending_count": _trade_pending_count_for(user_id),
     }
@@ -617,11 +730,14 @@ def render_auth_page(
     re-establishing the session cookie + token — if a browser restores the page
     anyway).
 
-    Deliberately does NOT rotate the CSRF token: the logged-out token is sticky
-    (``get_csrf_token`` reuses it), so a restored form still matches its
-    session. Rotating per GET would only introduce a multi-tab mismatch on the
-    same code path the v3.31.0 ``require_csrf_or_reissue`` posture hard-fails as
-    forgery (see the issue #31 discussion / ``tests/test_auth_csrf.py``).
+    The STATELESS pre-auth CSRF token (#63) is minted by ``render`` itself for
+    these four templates (see ``_PREAUTH_TEMPLATES``), so it is present whether a
+    form is reached via this helper's GET or an error re-render that calls
+    ``render`` directly. Minting a fresh token per render is safe — unlike the old
+    session token, validation is signature + 1h-freshness based, not session-
+    equality, so independent tabs each carry their own valid token with no
+    mismatch (the multi-tab failure mode #31 worried about does not apply). The
+    matching POST guard is ``require_preauth_csrf``.
     """
     response = render(request, template, ctx, status_code)
     response.headers["Cache-Control"] = "no-store"

@@ -1,5 +1,15 @@
 [
   {
+    "version": "4.1.5",
+    "date": "2026-06-29",
+    "added": [],
+    "refined": [],
+    "resolved": [
+      "Sign-in and registration could fail on privacy-focused iOS browsers (Firefox for iOS, Opera Touch): the four public auth forms (login, register, forgot-password, reset-password) no longer depend on a session cookie those browsers drop when submitting, so they now work everywhere."
+    ],
+    "archivist_note": null
+  },
+  {
     "version": "4.1.4",
     "date": "2026-06-29",
     "added": [],
