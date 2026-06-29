@@ -28,12 +28,34 @@ _VARIANTS = [
 ]
 
 
+# A value the same SHAPE/length as the real Starlette session cookie (itsdangerous
+# `payload.timestamp.signature`, base64url), to rule out value-length/content as
+# the reason FxiOS keeps our test cookies but drops `session`.
+_CLONE_VALUE = (
+    "eyJ1c2VyX2lkIjoxfQ.aZ1bY2cX3dW4eV5."
+    "Qk9-_AbCdEfGhIjKlMnOpQrStUvWxYz0123456789AbCdEfGhIjKlMnOpQrStUvWxYz-_0123456789Qk9"
+)
+
+
 def _set(resp, method: str) -> None:
     for suffix, secure, httponly, samesite in _VARIANTS:
         kw = {"value": "1", "path": "/", "max_age": 900, "secure": secure, "httponly": httponly}
         if samesite:
             kw["samesite"] = samesite
         resp.set_cookie(f"ct_{method}_{suffix}", **kw)
+    # Session-clone: the EXACT attribute set + Max-Age the real `session` cookie
+    # uses (Secure; HttpOnly; SameSite=Lax; Max-Age=1209600), with a long dotted
+    # signed-looking value. If this is kept but `session` is dropped, the only
+    # remaining difference is the cookie NAME or Starlette's emission format.
+    resp.set_cookie(
+        f"ct_{method}_clone",
+        value=_CLONE_VALUE,
+        path="/",
+        max_age=1209600,
+        secure=True,
+        httponly=True,
+        samesite="lax",
+    )
 
 
 _PAGE = """<!doctype html><meta name=viewport content="width=device-width,initial-scale=1">

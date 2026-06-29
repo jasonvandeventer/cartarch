@@ -1,5 +1,15 @@
 [
   {
+    "version": "4.1.11",
+    "date": "2026-06-29",
+    "added": [],
+    "refined": [
+      "Internal: extended the iOS sign-in diagnostic (a login-success marker + a session-cookie-clone probe) to pinpoint the remaining cause. No user-facing change."
+    ],
+    "resolved": [],
+    "archivist_note": null
+  },
+  {
     "version": "4.1.10",
     "date": "2026-06-29",
     "added": [],

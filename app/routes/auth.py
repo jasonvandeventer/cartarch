@@ -85,6 +85,11 @@ def login(
 
     request.session["user_id"] = user.id
 
+    # v4.1.11 #63 diagnostic: confirms login REACHED success (session set) for the
+    # FxiOS client → distinguishes "cookie emitted but rejected" (this fires) from
+    # "login never succeeded" (this wouldn't fire). user_id_present reads True here.
+    log_auth_diagnostic(request, "login_success")
+
     return RedirectResponse(url="/", status_code=303)
 
 
