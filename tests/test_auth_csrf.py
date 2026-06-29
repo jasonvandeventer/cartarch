@@ -152,7 +152,12 @@ def _no_session_warning(caplog):
 
 
 def test_no_session_logs_absent(caplog):
-    """Issue #62: a pre-auth POST with NO session cookie logs absent."""
+    """Issue #62: a pre-auth POST with NO session cookie logs absent.
+
+    Also pins issue #65: with no Origin/Referer headers (the FxiOS/OPT
+    headerless case #63 must handle), all four cross-site fields read
+    present=false / match=null.
+    """
     from fastapi.testclient import TestClient
 
     client, main, get_db_session = _client_and_user()
@@ -166,6 +171,76 @@ def test_no_session_logs_absent(caplog):
         assert "session_cookie_present=False" in msg
         assert "cookie_class=absent" in msg
         assert "path=/login" in msg and "method=POST" in msg
+        # TestClient sends no Origin/Referer by default -> headerless branch.
+        assert "origin_present=False" in msg and "origin_match=None" in msg
+        assert "referer_present=False" in msg and "referer_match=None" in msg
+    finally:
+        main.app.dependency_overrides.pop(get_db_session, None)
+
+
+def test_no_session_logs_cross_site_fields(caplog):
+    """Issue #65: present same-origin -> match=True, cross-origin -> False.
+
+    Also asserts the raw header values never appear in the log line.
+    """
+    from fastapi.testclient import TestClient
+
+    client, main, get_db_session = _client_and_user()
+    try:
+        form_token = _csrf_token(TestClient(main.app).get("/login").text)
+
+        # Same-origin: TestClient's host is "testserver"; https anchors the scheme.
+        same = TestClient(main.app)
+        with caplog.at_level(logging.WARNING, logger="app.dependencies"):
+            r = _login(
+                same,
+                form_token,
+                headers={"origin": "https://testserver", "referer": "https://testserver/login"},
+            )
+        assert r.status_code == 200
+        msg = _no_session_warning(caplog).getMessage()
+        assert "origin_present=True" in msg and "origin_match=True" in msg
+        assert "referer_present=True" in msg and "referer_match=True" in msg
+        # Hard constraint: raw header values must never be logged.
+        assert "testserver/login" not in msg and "https://testserver" not in msg
+
+        caplog.clear()
+        # Cross-origin: different host -> both match False (header present).
+        cross = TestClient(main.app)
+        with caplog.at_level(logging.WARNING, logger="app.dependencies"):
+            r = _login(
+                cross,
+                form_token,
+                headers={"origin": "https://evil.example", "referer": "https://evil.example/x"},
+            )
+        assert r.status_code == 200
+        msg = _no_session_warning(caplog).getMessage()
+        assert "origin_present=True" in msg and "origin_match=False" in msg
+        assert "referer_present=True" in msg and "referer_match=False" in msg
+        assert "evil.example" not in msg
+    finally:
+        main.app.dependency_overrides.pop(get_db_session, None)
+
+
+def test_no_session_malformed_header_is_null_not_raise(caplog):
+    """Issue #65: a malformed Origin/Referer logs *_match=null and never raises."""
+    from fastapi.testclient import TestClient
+
+    client, main, get_db_session = _client_and_user()
+    try:
+        form_token = _csrf_token(TestClient(main.app).get("/login").text)
+        bad = TestClient(main.app)
+        with caplog.at_level(logging.WARNING, logger="app.dependencies"):
+            # An unterminated IPv6 bracket makes urlparse(...).netloc raise ValueError.
+            r = _login(
+                bad,
+                form_token,
+                headers={"origin": "http://[bad", "referer": "http://[bad/x"},
+            )
+        assert r.status_code == 200  # control flow unchanged
+        msg = _no_session_warning(caplog).getMessage()
+        assert "origin_present=True" in msg and "origin_match=None" in msg
+        assert "referer_present=True" in msg and "referer_match=None" in msg
     finally:
         main.app.dependency_overrides.pop(get_db_session, None)
 
