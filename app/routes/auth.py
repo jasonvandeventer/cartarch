@@ -9,6 +9,7 @@ from app.dependencies import (
     CsrfRequired,
     client_ip_for,
     get_db_session,
+    log_auth_diagnostic,
     render,
     render_auth_page,
     require_preauth_csrf,
@@ -42,6 +43,9 @@ def login(
     # cookie on the POST. Expired token re-renders the form; tamper/cross-site 403.
     csrf_token: str = Form(""),
 ):
+    # v4.1.7 #63-followup diagnostic: cookie/origin state as the POST arrives.
+    log_auth_diagnostic(request, "login_post")
+
     reissue = require_preauth_csrf(request, csrf_token, "login.html")
     if reissue is not None:
         return reissue

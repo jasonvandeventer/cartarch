@@ -1,5 +1,15 @@
 [
   {
+    "version": "4.1.7",
+    "date": "2026-06-29",
+    "added": [],
+    "refined": [
+      "Internal diagnostics to investigate a sign-in persistence issue on privacy-focused browsers (login succeeds but the session doesn't stick). No user-facing change."
+    ],
+    "resolved": [],
+    "archivist_note": null
+  },
+  {
     "version": "4.1.6",
     "date": "2026-06-29",
     "added": [],

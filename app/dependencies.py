@@ -476,6 +476,32 @@ def _log_no_session(request: Request) -> None:
     )
 
 
+def log_auth_diagnostic(request: Request, where: str) -> None:
+    """Issue #63 follow-up (v4.1.7, OBSERVABILITY-ONLY): the privacy browsers that
+    can't STAY signed in (login 303s, then bounce back to the splash) need a look
+    at what they actually send. Logs the DERIVED classification of the session
+    cookie + Origin/Referer + whether the session resolved a user — NEVER the raw
+    cookie, token, or header value (a reset Referer can carry a token in its query
+    string). Reuses the #62/#65 classifiers. Temporary; remove once the cookie-drop
+    root cause is pinned. No behavior change."""
+    cookie = _classify_session_cookie(request)
+    xsite = _classify_cross_site(request)
+    logger.warning(
+        "auth_diag where=%s ip=%s ua=%r session_cookie_present=%s cookie_class=%s "
+        "user_id_present=%s origin_present=%s origin_match=%s referer_present=%s referer_match=%s",
+        where,
+        client_ip_for(request),
+        request.headers.get("user-agent"),
+        cookie["session_cookie_present"],
+        cookie["cookie_class"],
+        request.session.get("user_id") is not None,
+        xsite["origin_present"],
+        xsite["origin_match"],
+        xsite["referer_present"],
+        xsite["referer_match"],
+    )
+
+
 def require_csrf_or_reissue(
     request: Request,
     csrf_token: str,
