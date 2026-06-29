@@ -1,5 +1,15 @@
 [
   {
+    "version": "4.1.12",
+    "date": "2026-06-29",
+    "added": [],
+    "refined": [
+      "Cleanup after the iOS sign-in investigation: removed the temporary diagnostics and restored the pre-auth cross-site protection to its strict setting. No user-facing change."
+    ],
+    "resolved": [],
+    "archivist_note": "The iOS sign-in saga resolved at the edge: privacy iOS browsers were reaching the site over HTTP, and a Secure session cookie can't persist over HTTP — Cloudflare \"Always Use HTTPS\" closed it. The detour through CSRF and cookies hardened the pre-auth path on the way, and the proxy-awareness fix that finally exposed the real cause is keeping it honest."
+  },
+  {
     "version": "4.1.11",
     "date": "2026-06-29",
     "added": [],

@@ -44,7 +44,6 @@ from app.dependencies import (
     get_current_user,
     get_db_session,
     get_optional_current_user,
-    log_auth_diagnostic,
     render,
     render_auth_page,
     require_preauth_csrf,
@@ -67,7 +66,6 @@ from app.routes import (
     auth,
     cards,
     collections,
-    cookie_probe,
     decks,
     drawers,
     games,
@@ -218,7 +216,6 @@ app.add_middleware(
 )
 
 app.include_router(auth.router)
-app.include_router(cookie_probe.router)  # TEMPORARY #63 cookie-storage probe — remove after
 app.include_router(admin.router)
 app.include_router(account.router)
 app.include_router(drawers.router)
@@ -594,9 +591,6 @@ def home(
     # a separate marketing surface). The authenticated branch below is the
     # pre-v3.27.17 behavior unchanged.
     if current_user is None:
-        # v4.1.7 #63-followup diagnostic: did the session cookie come back? (Are
-        # we bouncing a just-logged-in privacy browser to the splash?) Log-only.
-        log_auth_diagnostic(request, "home_unauth")
         return render(
             request,
             "landing.html",

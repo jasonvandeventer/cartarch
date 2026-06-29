@@ -126,20 +126,17 @@ def test_expired_token_friendly_refresh_not_403():
         main.app.dependency_overrides.pop(get_db_session, None)
 
 
-def test_cross_origin_advisory_accepts():
-    """v4.1.6 INCIDENT HOTFIX: the cross-site gate is now ADVISORY — it fail-opens
-    and logs rather than 403, because `request.url.netloc` is unreliable behind
-    cloudflared (it false-rejected every real login in v4.1.5). A cross-origin
-    Origin therefore no longer 403s; the SIGNED TOKEN remains the enforced gate.
-    Re-tighten to a strict host allowlist once the canonical host is confirmed
-    from the logs (follow-up to #63)."""
+def test_cross_origin_rejected():
+    """AC4: a valid token with a cross-origin Origin header -> 403 (login CSRF).
+    The gate is strict again (v4.1.12) after the v4.1.6 advisory hotfix — the
+    FxiOS incident's root cause was http-vs-https, not this gate."""
     from fastapi.testclient import TestClient
 
     client, main, get_db_session = _client_and_user()
     try:
         token = _csrf_token(TestClient(main.app).get("/login").text)
         r = _login(TestClient(main.app), token, headers={"Origin": "https://evil.example"})
-        assert r.status_code == 303, f"advisory gate should accept -> {r.status_code} (want 303)"
+        assert r.status_code == 403, f"cross-origin Origin -> {r.status_code} (want 403)"
     finally:
         main.app.dependency_overrides.pop(get_db_session, None)
 
@@ -340,9 +337,9 @@ def test_all_four_forms_reach_past_guard_cookieless():
 
 
 def test_referer_only_branch():
-    """Gate (a) third case: Origin absent, Referer present. v4.1.6 advisory gate
-    accepts a same-host Referer; a foreign Referer is now also accepted (fail-open
-    + log) rather than 403 — the signed token is the enforced gate."""
+    """Gate (a) third case (strict again, v4.1.12): Origin absent, Referer present.
+    Same-host Referer -> accept; foreign Referer -> 403. FxiOS over https sends a
+    valid Referer, so strict works for it."""
     from fastapi.testclient import TestClient
 
     client, main, get_db_session = _client_and_user()
@@ -351,31 +348,35 @@ def test_referer_only_branch():
         # Same-host Referer, no Origin -> accepted (303). DEV_MODE=true allows http.
         r_ok = _login(TestClient(main.app), token, headers={"Referer": "http://testserver/login"})
         assert r_ok.status_code == 303, f"same-host Referer -> {r_ok.status_code} (want 303)"
-        # Foreign Referer, no Origin -> advisory accept (303), was 403 in v4.1.5.
+        # Foreign Referer, no Origin -> rejected (403).
         token2 = _csrf_token(TestClient(main.app).get("/login").text)
-        r_adv = _login(TestClient(main.app), token2, headers={"Referer": "http://evil.example/x"})
-        assert r_adv.status_code == 303, (
-            f"foreign Referer advisory -> {r_adv.status_code} (want 303)"
-        )
+        r_bad = _login(TestClient(main.app), token2, headers={"Referer": "http://evil.example/x"})
+        assert r_bad.status_code == 403, f"foreign Referer -> {r_bad.status_code} (want 403)"
     finally:
         main.app.dependency_overrides.pop(get_db_session, None)
 
 
-def test_cross_site_gate_is_advisory(monkeypatch):
-    """v4.1.6 INCIDENT HOTFIX: `request.url.netloc` is unreliable behind
-    cloudflared, so the gate no longer hard-rejects — it accepts allowlisted
-    public hosts AND fail-opens (returns True + logs) on anything it can't
-    confirm. It never returns False now; the signed token is the enforced gate.
-    Re-tighten to a strict allowlist once the canonical host is confirmed."""
+def test_cross_site_gate_strict(monkeypatch):
+    """v4.1.12: the gate is strict again — accept iff Origin OR Referer matches a
+    trusted host (https in prod); a present-but-foreign host is rejected; both
+    headers absent is the degraded accept (signed token still gates)."""
     from app.dependencies import _preauth_cross_site_ok
 
     monkeypatch.setenv("DEV_MODE", "false")
     ok = _preauth_cross_site_ok
     assert ok(_fake_request({"origin": "https://cartarch.com"})) is True  # allowlisted public host
     assert ok(_fake_request({"origin": "https://CARTARCH.com"})) is True  # case-insensitive
-    assert ok(_fake_request({"origin": "https://evil.com"})) is True  # advisory fail-open (logged)
-    assert ok(_fake_request({"origin": "http://cartarch.com"})) is True  # advisory fail-open
-    assert ok(_fake_request({})) is True  # degraded path
+    assert ok(_fake_request({"origin": "https://evil.com"})) is False  # foreign -> reject
+    assert ok(_fake_request({"origin": "http://cartarch.com"})) is False  # http in prod -> reject
+    # Origin foreign but Referer same-host -> accept (the FxiOS-shaped case).
+    assert (
+        ok(_fake_request({"origin": "https://evil.com", "referer": "https://cartarch.com/x"}))
+        is True
+    )
+    assert (
+        ok(_fake_request({"referer": "https://evil.com/x"})) is False
+    )  # foreign Referer -> reject
+    assert ok(_fake_request({})) is True  # both absent -> degraded accept
 
 
 def test_authenticated_csrf_unchanged():

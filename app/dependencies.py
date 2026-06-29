@@ -476,39 +476,6 @@ def _log_no_session(request: Request) -> None:
     )
 
 
-def log_auth_diagnostic(request: Request, where: str) -> None:
-    """Issue #63 follow-up (v4.1.7, OBSERVABILITY-ONLY): the privacy browsers that
-    can't STAY signed in (login 303s, then bounce back to the splash) need a look
-    at what they actually send. Logs the DERIVED classification of the session
-    cookie + Origin/Referer + whether the session resolved a user — NEVER the raw
-    cookie, token, or header value (a reset Referer can carry a token in its query
-    string). Reuses the #62/#65 classifiers. Temporary; remove once the cookie-drop
-    root cause is pinned. No behavior change."""
-    cookie = _classify_session_cookie(request)
-    xsite = _classify_cross_site(request)
-    logger.warning(
-        "auth_diag where=%s ip=%s ua=%r session_cookie_present=%s cookie_class=%s "
-        "user_id_present=%s origin_present=%s origin_match=%s referer_present=%s referer_match=%s "
-        "scheme=%s xff_proto=%s host=%s url=%s",
-        where,
-        client_ip_for(request),
-        request.headers.get("user-agent"),
-        cookie["session_cookie_present"],
-        cookie["cookie_class"],
-        request.session.get("user_id") is not None,
-        xsite["origin_present"],
-        xsite["origin_match"],
-        xsite["referer_present"],
-        xsite["referer_match"],
-        # #66 proxy-awareness check: after uvicorn --proxy-headers, scheme should
-        # read https (from X-Forwarded-Proto) instead of the internal http.
-        request.url.scheme,
-        request.headers.get("x-forwarded-proto"),
-        request.headers.get("host"),
-        str(request.url),
-    )
-
-
 def require_csrf_or_reissue(
     request: Request,
     csrf_token: str,
@@ -587,24 +554,20 @@ def mint_preauth_csrf_token() -> str:
 
 
 def _preauth_cross_site_ok(request: Request) -> bool:
-    """Gate (a): if Origin is present its scheme+host must equal our origin; else
-    fall back to Referer host; if BOTH headers are absent, accept (degraded — the
-    signed token in gate (b) still proves it was minted by us). Mirrors
-    _classify_cross_site (#65): the host is the forwarded Host header
-    (request.url.netloc), and the scheme is anchored to https in prod because
-    cloudflared terminates TLS and forwards plain http (comparing to
-    request.url.scheme would false-reject every real request)."""
-    # INCIDENT FIX (v4.1.6): behind the Cloudflare tunnel uvicorn runs without
-    # --proxy-headers, so request.url.netloc is NOT the public host (the #66
-    # proxy issue). The strict `Origin.netloc == request.url.netloc` check from
-    # v4.1.5 therefore false-rejected EVERY real login with 403 "Cross-site
-    # request blocked". Until the canonical host is wired in (the real #66 fix)
-    # this gate is ADVISORY: accept against a known public-host allowlist (+ the
-    # request host); on any non-match, LOG the host reality and still ACCEPT so a
-    # legitimate user is never locked out. The signed-token check in
-    # require_preauth_csrf stays enforced; the residual gap is login-CSRF (the
-    # issue's accepted lower risk). Re-tighten to a strict allowlist once the
-    # logged origins confirm the host.
+    """Gate (a) of require_preauth_csrf — strict cross-site check. Accept iff the
+    Origin OR the Referer confirms our origin (host in the trusted set / the
+    request host, scheme https in prod). If BOTH headers are absent, accept
+    (degraded — gate (b)'s signed token still proves it was minted by us); a
+    present-but-foreign Origin/Referer is a cross-site POST and is rejected.
+
+    History: v4.1.6 made this ADVISORY (fail-open + log) during the FxiOS sign-in
+    incident, when Firefox-iOS appeared to send an opaque `Origin: null`. The root
+    cause turned out to be the client hitting the site over HTTP (a Secure cookie
+    can't persist over http) — fixed at the edge with Cloudflare "Always Use
+    HTTPS". Over https, FxiOS sends a valid Origin AND Referer, so this is back to
+    strict (v4.1.12). The host is the forwarded Host (request.url.netloc, now
+    correct via uvicorn --proxy-headers); the Origin-OR-Referer fallback covers
+    clients that send only one of the two."""
     trusted = {"cartarch.com", "www.cartarch.com", "mana.vanfreckle.com"}
     host = request.url.netloc.lower()
     if host:
@@ -617,7 +580,7 @@ def _preauth_cross_site_ok(request: Request) -> bool:
             return None
         try:
             parsed = urlparse(value)
-        except Exception:  # noqa: BLE001 — a malformed header is not a 500.
+        except Exception:  # noqa: BLE001 — a malformed header is a reject, not a 500.
             return None
         if parsed.scheme not in allowed_schemes or not parsed.netloc:
             return None
@@ -627,19 +590,7 @@ def _preauth_cross_site_ok(request: Request) -> bool:
     referer = request.headers.get("referer")
     if origin is None and referer is None:
         return True  # degraded path; the signed token still gates
-
-    if _host_of(origin) in trusted or _host_of(referer) in trusted:
-        return True
-
-    # Could not confirm same-origin — FAIL OPEN with a host-only log (never the
-    # raw header; a reset Referer can carry a token in its query string).
-    logger.warning(
-        "preauth_csrf cross-site UNCONFIRMED (accepted): origin_host=%r referer_host=%r req_netloc=%r",
-        _host_of(origin),
-        _host_of(referer),
-        request.url.netloc,
-    )
-    return True
+    return _host_of(origin) in trusted or _host_of(referer) in trusted
 
 
 def require_preauth_csrf(

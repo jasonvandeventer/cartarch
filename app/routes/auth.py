@@ -9,7 +9,6 @@ from app.dependencies import (
     CsrfRequired,
     client_ip_for,
     get_db_session,
-    log_auth_diagnostic,
     render,
     render_auth_page,
     require_preauth_csrf,
@@ -43,9 +42,6 @@ def login(
     # cookie on the POST. Expired token re-renders the form; tamper/cross-site 403.
     csrf_token: str = Form(""),
 ):
-    # v4.1.7 #63-followup diagnostic: cookie/origin state as the POST arrives.
-    log_auth_diagnostic(request, "login_post")
-
     reissue = require_preauth_csrf(request, csrf_token, "login.html")
     if reissue is not None:
         return reissue
@@ -84,11 +80,6 @@ def login(
     db.commit()
 
     request.session["user_id"] = user.id
-
-    # v4.1.11 #63 diagnostic: confirms login REACHED success (session set) for the
-    # FxiOS client → distinguishes "cookie emitted but rejected" (this fires) from
-    # "login never succeeded" (this wouldn't fire). user_id_present reads True here.
-    log_auth_diagnostic(request, "login_success")
 
     return RedirectResponse(url="/", status_code=303)
 
