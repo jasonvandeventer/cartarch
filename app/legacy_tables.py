@@ -27,8 +27,10 @@ Per-column type policy, applied consciously:
   - ``game_changer_cards.active`` → native ``Boolean`` (raw SQL does ``WHERE
     active``; the v3.34.5 fix). The ``commander_bracket_rules`` flags are
     likewise ``BOOLEAN`` in the snapshot → ``Boolean`` (mirror).
-  - ``scryfall_cards.full_art`` → stays ``Integer`` (the snapshot declares it
-    INTEGER; raw cache SQL compares ``= 1``). Do NOT promote it to Boolean.
+  - ``scryfall_cards.full_art`` → native ``Boolean`` (Alembic
+    ``a1d7e4f02b93``). The ingest writes a Python ``bool``; Postgres rejected it
+    into the old INTEGER column (``DatatypeMismatch``, every cycle), and every
+    reader already ``bool(...)``-wraps it.
   - ``scryfall_cards`` prices → ``Text``; ``cmc`` → ``Float`` (REAL/double).
   - Everything else mirrors the snapshot's declared type exactly.
 
@@ -195,9 +197,9 @@ scryfall_cards = Table(
     # cmc REAL/double — the one numeric cache column.
     Column("cmc", Float),
     Column("legalities", Text),
-    # full_art stays INTEGER 0/1 — raw cache SQL compares ``= 1`` (do NOT promote
-    # to boolean; this is the deliberate counterpart to game_changer_cards.active).
-    Column("full_art", Integer),
+    # full_art is native Boolean (Alembic a1d7e4f02b93) — the ingest writes a
+    # Python bool, which Postgres rejected into the old INTEGER column.
+    Column("full_art", Boolean),
     Column("frame_effects", Text),
     Column("set_type", Text),
     Column("layout", Text),
