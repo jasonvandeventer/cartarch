@@ -405,18 +405,61 @@ def _classify_session_cookie(request: Request) -> dict:
     return {"session_cookie_present": True, "cookie_class": cls, "cookie_ts_skew_seconds": skew}
 
 
+def _classify_cross_site(request: Request) -> dict:
+    """Diagnostic-only Origin/Referer presence + same-origin match (issue #65).
+
+    Measures which cross-site-gate branch a failing pre-auth client lands in,
+    to validate #63's planned headerless fallback. NEVER logs the raw header
+    values (a reset-password Referer can carry a token in the query string) —
+    only the four derived booleans/nulls. Fully exception-safe: a malformed
+    header yields ``*_match = None``, never raises, never alters control flow.
+
+    Scheme caveat: cloudflared terminates TLS and forwards plain HTTP, so
+    ``request.url.scheme`` is ``http`` internally while a browser's Origin is
+    ``https``. Comparing Origin's scheme to ``request.url.scheme`` would false-
+    negative every same-site request, so ``origin_match`` anchors the scheme to
+    ``https`` and compares host only (``request.url.netloc`` is the Host header,
+    which cloudflared forwards unchanged — same passthrough ``safe_redirect_url``
+    relies on). ``referer_match`` mirrors ``safe_redirect_url``'s host compare.
+    """
+    origin = request.headers.get("origin")
+    referer = request.headers.get("referer")
+    host = request.url.netloc
+
+    def _match(value: str | None, *, require_https: bool) -> bool | None:
+        if not value:
+            return None
+        try:
+            parsed = urlparse(value)
+            if require_https and parsed.scheme != "https":
+                return False
+            return parsed.netloc == host
+        except Exception:  # noqa: BLE001 — diagnostics must never break the auth path.
+            return None
+
+    return {
+        "origin_present": origin is not None,
+        "referer_present": referer is not None,
+        "origin_match": _match(origin, require_https=True),
+        "referer_match": _match(referer, require_https=False),
+    }
+
+
 def _log_no_session(request: Request) -> None:
     """One WARN per ``no_session`` CSRF failure to capture client/network signal.
 
     Observability only (issue #62): the affected "session expired" reports are
     not reproducible from owner devices, so this is the single root-cause site.
     Logs metadata + cookie classification + clock skew — NEVER the cookie value,
-    token, username, or password.
+    token, username, password, or raw Origin/Referer. Issue #65 appended the
+    four cross-site fields.
     """
     fields = _classify_session_cookie(request)
+    xsite = _classify_cross_site(request)
     logger.warning(
         "csrf_no_session path=%s method=%s ip=%s country=%s cf_ray=%s ua=%r "
-        "session_cookie_present=%s cookie_class=%s cookie_ts_skew_seconds=%s",
+        "session_cookie_present=%s cookie_class=%s cookie_ts_skew_seconds=%s "
+        "origin_present=%s referer_present=%s origin_match=%s referer_match=%s",
         request.url.path,
         request.method,
         client_ip_for(request),
@@ -426,6 +469,10 @@ def _log_no_session(request: Request) -> None:
         fields["session_cookie_present"],
         fields["cookie_class"],
         fields["cookie_ts_skew_seconds"],
+        xsite["origin_present"],
+        xsite["referer_present"],
+        xsite["origin_match"],
+        xsite["referer_match"],
     )
 
 
