@@ -561,30 +561,52 @@ def _preauth_cross_site_ok(request: Request) -> bool:
     (request.url.netloc), and the scheme is anchored to https in prod because
     cloudflared terminates TLS and forwards plain http (comparing to
     request.url.scheme would false-reject every real request)."""
-    host = request.url.netloc.lower()  # hostnames are case-insensitive
+    # INCIDENT FIX (v4.1.6): behind the Cloudflare tunnel uvicorn runs without
+    # --proxy-headers, so request.url.netloc is NOT the public host (the #66
+    # proxy issue). The strict `Origin.netloc == request.url.netloc` check from
+    # v4.1.5 therefore false-rejected EVERY real login with 403 "Cross-site
+    # request blocked". Until the canonical host is wired in (the real #66 fix)
+    # this gate is ADVISORY: accept against a known public-host allowlist (+ the
+    # request host); on any non-match, LOG the host reality and still ACCEPT so a
+    # legitimate user is never locked out. The signed-token check in
+    # require_preauth_csrf stays enforced; the residual gap is login-CSRF (the
+    # issue's accepted lower risk). Re-tighten to a strict allowlist once the
+    # logged origins confirm the host.
+    trusted = {"cartarch.com", "www.cartarch.com", "mana.vanfreckle.com"}
+    host = request.url.netloc.lower()
+    if host:
+        trusted.add(host)
     dev = os.getenv("DEV_MODE", "false").lower() == "true"
     allowed_schemes = {"http", "https"} if dev else {"https"}
 
-    def _matches(value: str) -> bool:
+    def _host_of(value: str | None) -> str | None:
+        if not value:
+            return None
         try:
             parsed = urlparse(value)
-        except Exception:  # noqa: BLE001 — a malformed header is a reject, not a 500.
-            return False
-        return (
-            parsed.scheme in allowed_schemes
-            and bool(parsed.netloc)
-            and parsed.netloc.lower() == host
-        )
+        except Exception:  # noqa: BLE001 — a malformed header is not a 500.
+            return None
+        if parsed.scheme not in allowed_schemes or not parsed.netloc:
+            return None
+        return parsed.netloc.lower()
 
     origin = request.headers.get("origin")
-    if origin is not None:
-        return _matches(origin)
-
     referer = request.headers.get("referer")
-    if referer is not None:
-        return _matches(referer)
+    if origin is None and referer is None:
+        return True  # degraded path; the signed token still gates
 
-    return True  # both absent — degraded path; the signed token below is still required
+    if _host_of(origin) in trusted or _host_of(referer) in trusted:
+        return True
+
+    # Could not confirm same-origin — FAIL OPEN with a host-only log (never the
+    # raw header; a reset Referer can carry a token in its query string).
+    logger.warning(
+        "preauth_csrf cross-site UNCONFIRMED (accepted): origin_host=%r referer_host=%r req_netloc=%r",
+        _host_of(origin),
+        _host_of(referer),
+        request.url.netloc,
+    )
+    return True
 
 
 def require_preauth_csrf(
