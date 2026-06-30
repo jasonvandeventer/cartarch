@@ -1,5 +1,15 @@
 [
   {
+    "version": "4.1.14",
+    "date": "2026-06-30",
+    "added": [
+      "Each card in your Showcase now shows its price, matched to that card's exact printing and finish — a foil shows the foil price, a normal shows the normal price. Cards with no known price show a neutral dash instead of a misleading $0.00."
+    ],
+    "refined": [],
+    "resolved": [],
+    "archivist_note": "The price was already being calculated for every Showcase card — the running total at the top of the page depended on it — it just wasn't shown on the cards themselves. This is the smallest kind of change: surfacing a number the page already knew, taking care that a foil never quietly wears a non-foil's price."
+  },
+  {
     "version": "4.1.13",
     "date": "2026-06-29",
     "added": [],

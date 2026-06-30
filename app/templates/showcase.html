@@ -139,6 +139,19 @@
                   <span class="muted">(you offered {{ item.quantity_offered }}; inventory only has {{ item.available }} now)</span>
                 {% endif %}
               </div>
+              {# Per-card price (issue #68). item.effective_price is already
+                 finish-correct (foil/etched/normal) and pre-computed in
+                 get_showcase_with_items — no extra query. Proxies carry $0;
+                 an uncached printing/finish reads 0.0 → neutral "—". #}
+              <div class="showcase-item-price">
+                {% if item.is_proxy %}
+                  $0.00 <span class="proxy-price-note">(proxy)</span>
+                {% elif item.effective_price %}
+                  ${{ '%.2f'|format(item.effective_price) }} each
+                {% else %}
+                  — <span class="muted">(no price)</span>
+                {% endif %}
+              </div>
               <div class="showcase-item-actions">
                 <form method="post" action="/showcase/items/{{ item.id }}/quantity" class="inline-form">
                   <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
