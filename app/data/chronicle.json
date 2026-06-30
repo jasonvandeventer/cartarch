@@ -1,5 +1,15 @@
 [
   {
+    "version": "4.1.13",
+    "date": "2026-06-29",
+    "added": [],
+    "refined": [],
+    "resolved": [
+      "Password-reset emails now always link to the secure https:// address. The link is built from Cartarch's configured canonical web address rather than inferred from the incoming request, so it can no longer fall back to a non-TLS http:// link on the account-recovery path."
+    ],
+    "archivist_note": "A reset link is the one place Cartarch's address leaves the building and lands in something a person clicks, so it has to be right by construction, not by luck. This pins it to a single configured truth and refuses to start if that truth is missing or insecure — the safe failure is a loud one, never a quietly downgraded link."
+  },
+  {
     "version": "4.1.12",
     "date": "2026-06-29",
     "added": [],
