@@ -995,11 +995,15 @@
         var statusEl = document.getElementById('deck-add-status');
         var acTimer = null;
         var lastQuery = '';
+        // #53: monotonic generation guard for the autocomplete fetch. Duplicated
+        // near-verbatim in _quick_add_modal.html's script — keep both in sync.
+        var searchToken = 0;
 
         function resetSelection() {
           hiddenId.value = '';
           submitBtn.disabled = true;
           form.dataset.selectedPrinting = '';
+          searchToken++;  // #53: discard any in-flight autocomplete response
         }
 
         function selectPrinting(card) {
@@ -1012,6 +1016,7 @@
           form.dataset.selectedPrinting = '1';
           resultsEl.innerHTML = '';
           statusEl.textContent = '';
+          searchToken++;  // #53: a pre-selection fetch must not repopulate results
         }
 
         function renderResults(items) {
@@ -1050,6 +1055,8 @@
           }
           var q = nameInput.value.trim();
           if (q.length < 2) {
+            clearTimeout(acTimer);  // #53: cancel a pending fetch for a longer query
+            searchToken++;          // #53: and discard one already in flight
             resultsEl.innerHTML = '';
             lastQuery = '';
             return;
@@ -1057,15 +1064,22 @@
           if (q === lastQuery) return;
           lastQuery = q;
           clearTimeout(acTimer);
+          var myToken = ++searchToken;  // #53: this request's generation
+          var sentQuery = q;
           acTimer = setTimeout(function () {
             statusEl.textContent = 'Searching…';
             fetch('/decks/api/card-autocomplete?q=' + encodeURIComponent(q))
               .then(function (r) { return r.ok ? r.json() : []; })
               .then(function (data) {
+                // #53: drop superseded/stale responses (out-of-order or post-edit).
+                if (myToken !== searchToken || nameInput.value.trim() !== sentQuery) return;
                 statusEl.textContent = '';
                 renderResults(data);
               })
-              .catch(function () { statusEl.textContent = ''; });
+              .catch(function () {
+                if (myToken !== searchToken) return;
+                statusEl.textContent = '';
+              });
           }, 200);
         });
 
