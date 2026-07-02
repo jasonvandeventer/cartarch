@@ -2016,7 +2016,12 @@ def list_decks(session: Session, user_id: int) -> list[Deck]:
             )
             .all()
         )
-        deck.consistency = compute_consistency(all_rows) if all_rows else None
+        # issue #57 — consistency describes the full played decklist, so it
+        # includes inbound variant-group shares (short-circuits to own rows for
+        # a non-variant deck). Total Value below stays own-rows-only to avoid
+        # double-counting a shared card's value across sibling builds.
+        _analytics_rows = resolved_deck_rows(session, deck, user_id)
+        deck.consistency = compute_consistency(_analytics_rows) if _analytics_rows else None
         # issue: per-deck Total Value. Reuses all_rows (own rows only — inbound
         # variant shares are excluded, so a card is never double-counted across
         # sibling builds). Proxies excluded — a buy-list copy isn't held value.
@@ -2653,6 +2658,36 @@ def inbound_shared_rows_for_deck(
 
         query = apply_collection_search_filters(query, search)
     return [(row, source_name) for row, source_name in query.all()]
+
+
+def resolved_deck_rows(session: Session, deck: Deck, user_id: int) -> list[InventoryRow]:
+    """Playable deck rows: own rows UNION rows shared INTO this deck (issue #57).
+
+    The single shared-inclusive membership set for deck-level analytics (types,
+    pips, mana curve, health, consistency, synergy, tokens, dead-cards) — so they
+    describe the FULL decklist the header counts, not just the physically-owned
+    subset. Search-independent by contract (analytics don't filter). NOT for
+    mutation flows, which stay own-rows-only.
+
+    Own rows and inbound-shared rows are DISJOINT by construction (a share's
+    source deck can't be its target — ``share_card_to_deck`` rejects self-shares),
+    so we concatenate without dedup. Sorted by ``InventoryRow.id`` for a
+    deterministic order (keeps the panels cache key stable across calls).
+    ``inbound_shared_rows_for_deck`` short-circuits to ``[]`` for a non-variant
+    deck, so those decks get exactly their own rows — byte-identical to before.
+    """
+    own_rows = (
+        session.query(InventoryRow)
+        .options(joinedload(InventoryRow.card))
+        .join(Card)
+        .filter(
+            InventoryRow.user_id == user_id,
+            InventoryRow.storage_location_id == deck.storage_location_id,
+        )
+        .all()
+    )
+    inbound = [row for row, _source_name in inbound_shared_rows_for_deck(session, deck)]
+    return sorted(own_rows + inbound, key=lambda r: r.id)
 
 
 def own_deck_card_options(session: Session, user_id: int, deck: Deck) -> list[dict]:
