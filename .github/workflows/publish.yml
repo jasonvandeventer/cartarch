@@ -75,3 +75,158 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
             APP_VERSION=${{ steps.tag.outputs.image_tag }}
+
+  # ===========================================================================
+  # Post-ship reporting (Sprint 5, Component 1). Downstream of build-and-push,
+  # so it fires only AFTER the image publishes — and never for a release that
+  # didn't. It REPORTS a release a human already tagged/built/deployed: Discord
+  # patch notes, a GitHub Release (the repo's changelog record), and issue
+  # close/flag. It never tags, builds, deploys, or decides anything about the
+  # ship. All summaries are deterministic (reviewed chronicle entry or commit
+  # log) — no LLM writes any durable record here.
+  #
+  # The `ac-verified` label gate (issue step below):
+  #   `ac-verified` means "a human confirmed this issue's acceptance criteria
+  #   match what actually shipped." It is applied ONLY AFTER the fix is
+  #   verified — never at triage or creation. Auto-close depends entirely on
+  #   the label meaning exactly that: an issue whose ACs describe the wrong
+  #   thing (e.g. a mechanism that was never the bug) must NOT carry it, so it
+  #   gets flagged for human review instead of closed against stale criteria.
+  #   See docs/labels.md.
+  # ===========================================================================
+  post-ship:
+    runs-on: ubuntu-latest
+    needs: build-and-push          # downstream → runs only after image publish
+    permissions:
+      contents: write              # create the GitHub Release (changelog record)
+      issues: write                # close / comment on referenced issues
+
+    steps:
+      - name: Check out repo (full history + tags)
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0           # need previous tag, commit range, and diff stat
+
+      - name: Gather release facts (deterministic — no AI)
+        id: facts
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME}"
+          # Previous release tag = newest tag reachable from this tag's parent.
+          PREV_TAG="$(git describe --tags --abbrev=0 "${VERSION}^" 2>/dev/null || true)"
+          RANGE="${PREV_TAG:+${PREV_TAG}..}${VERSION}"
+          echo "version=${VERSION}"   >> "$GITHUB_OUTPUT"
+          echo "prev_tag=${PREV_TAG}" >> "$GITHUB_OUTPUT"
+          # Real diff numbers, quoted verbatim in the issue comment (no prose).
+          DIFFSTAT="$(git diff --shortstat ${PREV_TAG:+${PREV_TAG}..}${VERSION} | sed 's/^ *//')"
+          echo "diffstat=${DIFFSTAT:-no file changes}" >> "$GITHUB_OUTPUT"
+          # Referenced issues: #N from commit subjects+bodies in range, unique.
+          git log --format='%s%n%b' ${RANGE} \
+            | grep -oiE '#[0-9]+' | tr -d '#' | sort -un > issues.txt || true
+          # Commit subjects: the fallback changelog source.
+          git log --format='- %s' ${RANGE} > commits.txt
+          echo "issues: $(paste -sd, issues.txt || true)"
+
+      - name: Build release notes (reviewed chronicle entry, else commit log)
+        run: |
+          set -euo pipefail
+          python3 - "${{ steps.facts.outputs.version }}" <<'PY'
+          import json, pathlib, sys
+          version = sys.argv[1].lstrip("v")
+          entry = None
+          try:
+              data = json.loads(pathlib.Path("app/data/chronicle.json").read_text())
+              entry = next((e for e in data if e.get("version") == version), None)
+          except Exception:
+              pass
+          lines = []
+          if entry:                       # prefer the human-reviewed changelog entry
+              for label, key in (("Added", "added"), ("Refined", "refined"), ("Resolved", "resolved")):
+                  items = entry.get(key) or []
+                  if items:
+                      lines.append(f"**{label}**")
+                      lines += [f"- {i}" for i in items]
+              if entry.get("archivist_note"):
+                  lines += ["", entry["archivist_note"]]
+              source = "chronicle.json (reviewed)"
+          else:                           # deterministic fallback: commit log, no LLM
+              lines = pathlib.Path("commits.txt").read_text().strip().splitlines()
+              source = "commit log (no reviewed chronicle entry for this version)"
+          notes = "\n".join(lines).strip() or "(no notes)"
+          pathlib.Path("release_notes.md").write_text(notes + "\n")
+          summary = next((l.lstrip("- ").strip() for l in lines
+                          if l and not l.startswith("**")), notes.splitlines()[0])
+          pathlib.Path("discord_summary.txt").write_text(summary)
+          print(f"::notice::release-notes source = {source}")
+          PY
+
+      - name: Discord patch notes (best-effort — never blocks the rest)
+        continue-on-error: true
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: |
+          set -euo pipefail
+          if [ -z "${DISCORD_WEBHOOK_URL:-}" ]; then
+            echo "::warning::DISCORD_WEBHOOK_URL secret not set — skipping Discord post"
+            exit 0
+          fi
+          VERSION="${{ steps.facts.outputs.version }}"
+          CONTENT="$(printf '**Cartarch %s shipped**\n%s' "${VERSION}" "$(cat discord_summary.txt)")"
+          jq -n --arg c "${CONTENT}" '{content: $c}' > discord_payload.json
+          curl -sS -X POST -H "Content-Type: application/json" \
+               -d @discord_payload.json "${DISCORD_WEBHOOK_URL}" \
+            && echo "Discord posted" || echo "::warning::Discord POST failed"
+
+      - name: Publish GitHub Release notes (repo changelog record — idempotent)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          VERSION="${{ steps.facts.outputs.version }}"
+          if gh release view "${VERSION}" >/dev/null 2>&1; then
+            gh release edit   "${VERSION}" --notes-file release_notes.md
+          else
+            gh release create "${VERSION}" --verify-tag --title "${VERSION}" --notes-file release_notes.md
+          fi
+
+      - name: Close or FLAG referenced issues (AC-gated — idempotent)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          VERSION="${{ steps.facts.outputs.version }}"
+          DIFFSTAT="${{ steps.facts.outputs.diffstat }}"
+          # Per-version hidden marker so a re-run/retry never double-flags an issue.
+          MARKER="<!-- post-ship:flag:${VERSION} -->"
+          [ -s issues.txt ] || { echo "no referenced issues"; exit 0; }
+          while read -r N; do
+            [ -n "$N" ] || continue
+            state="$(gh issue view "$N" --json state --jq .state 2>/dev/null || echo MISSING)"
+            case "$state" in
+              MISSING) echo "::warning::#$N referenced but not found — skipping"; continue ;;
+              CLOSED)  echo "#$N already closed — skipping"; continue ;;
+            esac
+            # AC gate: only auto-close an issue a human marked `ac-verified`
+            # (acceptance criteria confirmed to match what actually shipped).
+            if gh issue view "$N" --json labels --jq '.labels[].name' | grep -Fxq 'ac-verified'; then
+              gh issue close "$N" --reason completed \
+                --comment "Shipped in **${VERSION}**. Verified change: ${DIFFSTAT}. (Auto-closed by post-ship automation — issue carried the \`ac-verified\` label.)"
+              echo "closed #$N"
+              continue
+            fi
+            # Not verified → flag, don't close. Idempotent: skip if already flagged
+            # for this version, and only add the label if it isn't already present.
+            if gh issue view "$N" --json comments --jq '.comments[].body' | grep -Fq "${MARKER}"; then
+              echo "#$N already flagged for ${VERSION} — skipping comment"
+            else
+              BODY="$(printf '%s\nReferenced by release **%s** (change: %s) but **not auto-closed**: this issue is not labeled `ac-verified`, so its acceptance criteria have not been confirmed to match the shipped change. Review the criteria against what shipped, then close manually. (Sprint-5 guard against phantom-fix closes — cf. #66.)' "${MARKER}" "${VERSION}" "${DIFFSTAT}")"
+              gh issue comment "$N" --body "${BODY}"
+              echo "flagged #$N"
+            fi
+            if gh issue view "$N" --json labels --jq '.labels[].name' | grep -Fxq 'needs-ac-review'; then
+              echo "#$N already has needs-ac-review — skipping label"
+            else
+              gh issue edit "$N" --add-label needs-ac-review >/dev/null 2>&1 \
+                || echo "::warning::could not add needs-ac-review to #$N (does the label exist?)"
+            fi
+          done < issues.txt
