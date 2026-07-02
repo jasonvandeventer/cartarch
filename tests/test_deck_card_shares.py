@@ -705,3 +705,172 @@ def test_non_variant_decks_unaffected():
     # And the deck count is just its own physical cards.
     decks = {d.name: d for d in deck_service.list_decks(s, u.id)}
     assert decks["Standalone"].card_count == 1
+
+
+# --------------------------------------------------------------------------- #
+# resolved_deck_rows — shared-inclusive analytics membership (issue #57)
+# --------------------------------------------------------------------------- #
+
+
+def _ccard(s, name, *, type_line, mana_cost="", cmc=0.0, color_identity=""):
+    """A card with the gameplay columns compute_deck_analytics reads."""
+    c = _card(s, name)
+    c.type_line = type_line
+    c.mana_cost = mana_cost
+    c.cmc = cmc
+    c.color_identity = color_identity
+    s.flush()
+    return c
+
+
+def _total_copies(rows):
+    return sum(r.quantity for r in rows)
+
+
+def test_57_analytics_include_shared_rows():
+    """Types sum, pips, and curve all reflect the shared-in card."""
+    s = _fresh_session()
+    u = _user(s)
+    _g, a, b = _group_with_two_decks(s, u)
+    # B owns a red creature; A shares in a blue instant B does not physically hold.
+    _place(
+        s,
+        u.id,
+        _ccard(s, "B Bolt", type_line="Creature", mana_cost="{R}", cmc=1, color_identity="R"),
+        b.storage_location_id,
+        qty=2,
+    )
+    shared = _ccard(
+        s, "A Counter", type_line="Instant", mana_cost="{U}{U}", cmc=2, color_identity="U"
+    )
+    row = _place(s, u.id, shared, a.storage_location_id)
+    deck_service.share_card_to_deck(s, u.id, inventory_row_id=row.id, target_deck_id=b.id)
+
+    rows = deck_service.resolved_deck_rows(s, b, u.id)
+    analytics = deck_service.compute_deck_analytics(rows)
+
+    # Type-category sum equals total copies INCLUDING the shared card (2 + 1 = 3).
+    assert sum(analytics["types"].values()) == _total_copies(rows) == 3
+    # "U" pips come ONLY from the shared instant — proves shared rows feed pips.
+    assert analytics["pips"].get("U") == 2
+    # The shared instant's CMC-2 nonland copy lands in the curve.
+    assert analytics["curve"][2] >= 1
+
+
+def test_57_types_sum_equals_total_cards_invariant():
+    """Structural guard: sum(types) == total copies (own + shared) for any deck."""
+    s = _fresh_session()
+    u = _user(s)
+    _g, a, b = _group_with_two_decks(s, u)
+    _place(s, u.id, _ccard(s, "Own A", type_line="Sorcery"), b.storage_location_id, qty=3)
+    r1 = _place(s, u.id, _ccard(s, "Sh1", type_line="Creature"), a.storage_location_id, qty=1)
+    r2 = _place(s, u.id, _ccard(s, "Sh2", type_line="Land"), a.storage_location_id, qty=2)
+    deck_service.share_card_to_deck(s, u.id, inventory_row_id=r1.id, target_deck_id=b.id)
+    deck_service.share_card_to_deck(s, u.id, inventory_row_id=r2.id, target_deck_id=b.id)
+
+    rows = deck_service.resolved_deck_rows(s, b, u.id)
+    analytics = deck_service.compute_deck_analytics(rows)
+    assert sum(analytics["types"].values()) == _total_copies(rows) == 6
+
+
+def test_57_no_share_deck_analytics_unchanged():
+    """A non-variant deck resolves to own rows only — byte-identical analytics."""
+    s = _fresh_session()
+    u = _user(s)
+    a = _deck(s, u.id, "Standalone")
+    own = [
+        _place(
+            s,
+            u.id,
+            _ccard(s, "X", type_line="Creature", mana_cost="{G}", cmc=1, color_identity="G"),
+            a.storage_location_id,
+            qty=4,
+        ),
+        _place(s, u.id, _ccard(s, "Y", type_line="Land"), a.storage_location_id, qty=1),
+    ]
+    resolved = deck_service.resolved_deck_rows(s, a, u.id)
+    assert {r.id for r in resolved} == {r.id for r in own}
+    assert deck_service.compute_deck_analytics(resolved) == deck_service.compute_deck_analytics(own)
+
+
+def test_57_cache_key_coherent_and_deterministic():
+    """The panels cache key is stable across calls and reflects shared membership.
+
+    All three cache sites (detail render, panels fragment, toggle warm-up) now
+    compute `_panels_cache_key(resolved_deck_rows(...))`, so an identical resolver
+    result yields an identical key — and it must differ from the own-only key, or
+    the fragment would write under a key the detail read never matches.
+    """
+    from app.routes.decks import _panels_cache_key
+
+    s = _fresh_session()
+    u = _user(s)
+    _g, a, b = _group_with_two_decks(s, u)
+    _place(s, u.id, _card(s, "Own"), b.storage_location_id)
+    row = _place(s, u.id, _card(s, "Shared"), a.storage_location_id)
+    deck_service.share_card_to_deck(s, u.id, inventory_row_id=row.id, target_deck_id=b.id)
+
+    r1 = deck_service.resolved_deck_rows(s, b, u.id)
+    r2 = deck_service.resolved_deck_rows(s, b, u.id)
+    # determinism: same id sequence every call, not merely equal set.
+    assert [r.id for r in r1] == [r.id for r in r2] == sorted(r.id for r in r1)
+    # coherence: identical resolver output → identical key.
+    assert _panels_cache_key(r1) == _panels_cache_key(r2)
+    # the shared-inclusive key differs from the own-only key (regression sentinel).
+    own_only = [r for r in r1 if r.storage_location_id == b.storage_location_id]
+    assert _panels_cache_key(r1) != _panels_cache_key(own_only)
+
+
+def test_57_resolver_is_search_independent():
+    """Analytics never filter — the resolver takes no search and returns the full set."""
+    s = _fresh_session()
+    u = _user(s)
+    _g, a, b = _group_with_two_decks(s, u)
+    _place(s, u.id, _ccard(s, "Own Creature", type_line="Creature"), b.storage_location_id)
+    row = _place(s, u.id, _ccard(s, "Shared Land", type_line="Land"), a.storage_location_id)
+    deck_service.share_card_to_deck(s, u.id, inventory_row_id=row.id, target_deck_id=b.id)
+
+    rows = deck_service.resolved_deck_rows(s, b, u.id)
+    # The full set is present regardless of any header search; the
+    # sum(types)==total_cards invariant is asserted ONLY on this unfiltered set.
+    assert {r.card.name for r in rows} == {"Own Creature", "Shared Land"}
+    a2 = deck_service.compute_deck_analytics(rows)
+    assert sum(a2["types"].values()) == _total_copies(rows) == 2
+
+
+def test_57_stale_share_excluded_from_analytics():
+    """A shared row physically moved out of its source deck drops from analytics."""
+    s = _fresh_session()
+    u = _user(s)
+    _g, a, b = _group_with_two_decks(s, u)
+    _place(s, u.id, _card(s, "Own"), b.storage_location_id)
+    row = _place(s, u.id, _card(s, "Shared"), a.storage_location_id)
+    deck_service.share_card_to_deck(s, u.id, inventory_row_id=row.id, target_deck_id=b.id)
+    assert len(deck_service.resolved_deck_rows(s, b, u.id)) == 2
+
+    # Move the physical row out of source deck A (e.g. to a binder). The
+    # validity guard now excludes the now-stale share.
+    binder = StorageLocation(user_id=u.id, name="Binder", type="box", mode="managed")
+    s.add(binder)
+    s.flush()
+    row.storage_location_id = binder.id
+    s.flush()
+    resolved = deck_service.resolved_deck_rows(s, b, u.id)
+    assert {r.card.name for r in resolved} == {"Own"}
+
+
+def test_57_resolver_never_crosses_users():
+    """resolved_deck_rows only returns rows owned by the requesting user."""
+    s = _fresh_session()
+    u1 = _user(s, "owner")
+    u2 = _user(s, "stranger")
+    _g, a, b = _group_with_two_decks(s, u1)
+    _place(s, u1.id, _card(s, "Own"), b.storage_location_id)
+    row = _place(s, u1.id, _card(s, "Shared"), a.storage_location_id)
+    deck_service.share_card_to_deck(s, u1.id, inventory_row_id=row.id, target_deck_id=b.id)
+    # A foreign user's row sitting in some location must never appear.
+    _place(s, u2.id, _card(s, "Foreign"), b.storage_location_id)
+
+    rows = deck_service.resolved_deck_rows(s, b, u1.id)
+    assert all(r.user_id == u1.id for r in rows)
+    assert "Foreign" not in {r.card.name for r in rows}

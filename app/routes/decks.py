@@ -61,6 +61,7 @@ from app.deck_service import (
     outbound_share_map,
     own_deck_card_options,
     pull_card_to_deck,
+    resolved_deck_rows,
     return_card_from_deck,
     set_row_tags,
     share_card_to_deck,
@@ -631,16 +632,10 @@ def deck_detail_page(
     health = None
     consistency = None
     if deck and deck.storage_location_id:
-        all_deck_rows = (
-            session.query(InventoryRow)
-            .options(joinedload(InventoryRow.card))
-            .join(Card)
-            .filter(
-                InventoryRow.user_id == current_user.id,
-                InventoryRow.storage_location_id == deck.storage_location_id,
-            )
-            .all()
-        )
+        # issue #57 — analytics run over the FULL decklist (own rows UNION rows
+        # shared in from sibling decks), so Card Types / Color Pips / mana curve
+        # match the header's shared-inclusive total instead of the own-only set.
+        all_deck_rows = resolved_deck_rows(session, deck, current_user.id)
         if all_deck_rows:
             analytics = compute_deck_analytics(all_deck_rows)
             health = compute_deck_health(all_deck_rows)
@@ -927,16 +922,10 @@ def deck_panels_fragment(
     if not deck:
         raise HTTPException(status_code=404)
 
-    all_deck_rows = (
-        session.query(InventoryRow)
-        .options(joinedload(InventoryRow.card))
-        .join(Card)
-        .filter(
-            InventoryRow.user_id == current_user.id,
-            InventoryRow.storage_location_id == deck.storage_location_id,
-        )
-        .all()
-    )
+    # issue #57 — panels analytics (tokens/synergy/dead-cards) and the panels
+    # cache key must consume the SAME shared-inclusive row set the detail render
+    # uses, or the fragment writes under a key the detail read never matches.
+    all_deck_rows = resolved_deck_rows(session, deck, current_user.id)
 
     # v3.27.9: combos + bracket no longer compute on the panels endpoint.
     # compute_deck_combos issued a Spellbook /find-my-combos POST per deck
@@ -1707,16 +1696,10 @@ async def toggle_commander(
         try:
             deck = get_deck(session, deck_id=deck_id, user_id=current_user.id)
             if deck and deck.storage_location_id:
-                all_rows = (
-                    session.query(InventoryRow)
-                    .options(joinedload(InventoryRow.card))
-                    .join(Card)
-                    .filter(
-                        InventoryRow.user_id == current_user.id,
-                        InventoryRow.storage_location_id == deck.storage_location_id,
-                    )
-                    .all()
-                )
+                # issue #57 — warm the cache under the same shared-inclusive key
+                # the panels fragment + detail render compute, or the warm-up
+                # writes a key they never read.
+                all_rows = resolved_deck_rows(session, deck, current_user.id)
                 if all_rows:
                     ck = _panels_cache_key(all_rows)
                     if not _read_panels_cache(deck_id, ck):
