@@ -1,4 +1,24 @@
-[
+[ 
+  {
+  "version": "4.1.16",
+  "date": "2026-07-02",
+  "added": [],
+  "refined": [],
+  "resolved": [
+    "A deck's Card Types, Color Pips, and Mana Curve panels now count the cards shared into it from sibling decks in the same variant group. Before, those panels only counted the deck's own physical cards, so a deck showing 97 unique cards in its header could show a type breakdown summing to just 44. The analytics now match the full decklist the header describes."
+  ],
+  "archivist_note": "The header always knew the real total; the breakdown panels were quietly reading a smaller set. This did not lose any data, it just under-described decks that borrow cards from their siblings. The fix routes every deck-level panel through one shared definition of what is in the deck, so they can no longer drift apart."
+},
+{
+  "version": "4.1.15",
+  "date": "2026-07-01",
+  "added": [],
+  "refined": [],
+  "resolved": [
+    "Card search in the Quick Add and deck builder no longer flashes stale results. If you typed quickly, or picked a printing while a search was still in flight, an older slower response could overwrite what you were looking at with unrelated cards. Searches now discard any response that a newer keystroke or selection has already superseded."
+  ],
+  "archivist_note": "A timing bug, and the frustrating kind: it depended on how fast you typed and how fast the network answered, so it never reproduced on demand. The reporter suspected a timing issue and was right. The searches now carry a token that lets a late answer recognize it is no longer wanted and step aside."
+  },
   {
     "version": "4.1.14",
     "date": "2026-06-30",
