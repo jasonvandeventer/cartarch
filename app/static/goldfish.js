@@ -2423,7 +2423,11 @@
   }
 
   // ── Controls wiring ───────────────────────────────────────────
-  document.getElementById("gf-btn-new-game").addEventListener("click", newGame);
+  document.getElementById("gf-btn-new-game").addEventListener("click", () => {
+    if (confirm("Start a new game? Your hand, battlefield, graveyard, life totals, mana pool, and turn count will be reset.")) {
+      newGame();
+    }
+  });
   document.getElementById("gf-btn-new-turn").addEventListener("click", newTurn);
   document.getElementById("gf-btn-draw").addEventListener("click", () => drawN(1));
   document.getElementById("gf-btn-untap-all").addEventListener("click", untapAll);
