@@ -1,5 +1,15 @@
 [ 
   {
+  "version": "4.1.17",
+  "date": "2026-07-04",
+  "added": [],
+  "refined": [
+    "New game in playtest mode now asks for confirmation before resetting. A stray click can no longer wipe your board, hand, graveyard, life totals, mana pool, and turn count mid-session; cancel the prompt and everything stays exactly where it was. The New game and New turn buttons also sit a little further apart, so the misclick is less likely to happen in the first place."
+  ],
+  "resolved": [],
+  "archivist_note": "Reported by a player who reached for New turn and hit New game instead, losing the game state they were tracking. The reset itself was always working as designed; the problem was that one pixel of aim separated a routine action from a destructive one. The fix guards the click, not the reset, so the page still opens straight into a fresh game without nagging."
+},
+{
   "version": "4.1.16",
   "date": "2026-07-02",
   "added": [],
