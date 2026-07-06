@@ -1,4 +1,4 @@
-"""FastAPI route entrypoint for Mana Archive.
+"""FastAPI route entrypoint for Cartarch.
 
 Routes are grouped by feature flow rather than alphabetically. User-owned
 operations receive `current_user.id` at the route boundary and pass it into the
@@ -166,7 +166,11 @@ async def lifespan(app: FastAPI):
         os.getenv("DEV_MODE", "false").lower() != "true"
         and os.getenv("SESSION_SECRET_KEY", "dev-only-change-me") == "dev-only-change-me"
     ):
-        raise RuntimeError("SESSION_SECRET_KEY must be set in production (DEV_MODE is not 'true')")
+        raise RuntimeError(
+            "SESSION_SECRET_KEY must be set in production (DEV_MODE is not 'true'). "
+            "Wire it via Kubernetes Secret + secretKeyRef — see "
+            "vanfreckle-platform clusters/talos/manifests/cartarch/deployment.yaml."
+        )
     # v3.27.14 — Resend API key startup check. Same shape as the
     # SESSION_SECRET_KEY check above: refuse to boot in production
     # without it. The key is consumed by app/password_reset_service.py
@@ -177,9 +181,9 @@ async def lifespan(app: FastAPI):
     if os.getenv("DEV_MODE", "false").lower() != "true" and not os.getenv("RESEND_API_KEY"):
         raise RuntimeError(
             "RESEND_API_KEY must be set in production (DEV_MODE is not 'true'). "
-            "Wire it via Kubernetes Secret + secretKeyRef — see the "
-            "mana-archive-platform deployment.yaml for the SESSION_SECRET_KEY "
-            "pattern this mirrors."
+            "Wire it via Kubernetes Secret + secretKeyRef — see "
+            "vanfreckle-platform clusters/talos/manifests/cartarch/deployment.yaml "
+            "for the SESSION_SECRET_KEY pattern this mirrors."
         )
     # issue #66 — PUBLIC_BASE_URL startup check. Same posture as the two checks
     # above: the password-reset email link is built from this canonical origin

@@ -1,4 +1,4 @@
-# Mana Archive Repo Map
+# Cartarch Repo Map
 
 This file explains **where changes belong** so you stop guessing and start debugging with intent.
 

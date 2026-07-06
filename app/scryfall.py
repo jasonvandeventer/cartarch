@@ -24,7 +24,7 @@ from app.models import Card
 from app.timeutil import utc_now
 
 SCRYFALL_CARD_URL = "https://api.scryfall.com/cards"
-HEADERS = {"User-Agent": "ManaArchive/1.0", "Accept": "application/json"}
+HEADERS = {"User-Agent": "Cartarch/1.0", "Accept": "application/json"}
 REQUEST_DELAY_SECONDS = 0.08
 
 _session = requests.Session()

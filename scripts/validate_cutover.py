@@ -30,7 +30,7 @@ The four checks (mirrors the rehearsal / v4-cutover-runbook step 11):
 
 Usage (in-cluster Job; DATABASE_URL -> green PG via the CNPG secret):
     DATABASE_URL=postgresql+psycopg://... \
-        python -m scripts.validate_cutover --source /snapshot/mana_archive.db
+        python -m scripts.validate_cutover --source /snapshot/cartarch.db
 """
 
 from __future__ import annotations
