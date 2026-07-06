@@ -1,5 +1,15 @@
 [ 
   {
+    "version": "4.1.18",
+    "date": "2026-07-05",
+    "added": [],
+    "refined": [
+      "You can now create a Brew directly from the import preview’s “+ Create new deck” widget, so pasted decklists and Destination-based CSV imports land in the new brew in one pass with unowned cards added as proxies."
+    ],
+    "resolved": [],
+    "archivist_note": "Importing a decklist used to end where brewing began: the preview could only target decks that already existed, so building around a fresh list meant a detour through deck creation first. The import preview now closes that gap itself, and cards you don't own arrive as proxies, which is what a brew means. Deliberately narrow: only the Destination-dropdown path learned this; per-row CSV Location handling is a different problem and waits for its own issue (#70)."
+  },
+  {
   "version": "4.1.17",
   "date": "2026-07-04",
   "added": [],
