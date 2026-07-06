@@ -14,7 +14,9 @@ from sqlalchemy import create_engine, event
 from sqlalchemy.orm import Session, declarative_base, sessionmaker
 
 DATA_DIR = Path(os.getenv("DATA_DIR", "/data"))
-DB_PATH = DATA_DIR / "mana_archive.db"
+# Renamed 2026-07-06 (mana_archive -> cartarch). Existing local dev DBs need:
+#   mv data/mana_archive.db data/cartarch.db
+DB_PATH = DATA_DIR / "cartarch.db"
 DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite:///{DB_PATH}")
 
 # ``check_same_thread`` is a SQLite-only DBAPI argument. Passing it to any other

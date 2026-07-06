@@ -23,12 +23,12 @@ Run from the project root with the same Python env the app uses:
 
 Against prod (read-only — the script never writes to the DB):
 
-    kubectl exec -n mana-archive deploy/mana-archive -- \\
+    kubectl exec -n cnpg-system deploy/cartarch -- \\
         python -m scripts.audit_tag_suggestions \\
         --user jason@vanfreckle.com \\
         --output /tmp/tag_audit.md
-    kubectl cp -n mana-archive \\
-        $(kubectl get pods -n mana-archive -l app=mana-archive \\
+    kubectl cp -n cnpg-system \\
+        $(kubectl get pods -n cnpg-system -l app=cartarch \\
             -o jsonpath='{.items[0].metadata.name}'):/tmp/tag_audit.md \\
         docs/tag_audit.md
 

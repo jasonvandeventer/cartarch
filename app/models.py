@@ -1,4 +1,4 @@
-"""SQLAlchemy models for Mana Archive.
+"""SQLAlchemy models for Cartarch.
 
 Cards are global reference data. Inventory, decks, imports, audit logs, and
 storage locations are user-owned and must be queried through user_id.

@@ -1,7 +1,7 @@
 services:
-  mana-archive:
+  cartarch:
     build: .
-    container_name: mana-archive
+    container_name: cartarch
     ports:
       - "8000:8000"
     volumes:

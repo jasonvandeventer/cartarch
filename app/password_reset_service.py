@@ -48,7 +48,7 @@ v3.27.14 spec calls these out by name):
   requests are logged.
 
 The Resend API key is read from ``RESEND_API_KEY`` env var (wired in
-``mana-archive-platform`` via Kubernetes Secret + secretKeyRef).
+``vanfreckle-platform`` via Kubernetes Secret + secretKeyRef).
 ``app/main.py``'s startup check refuses to boot in production
 without it. In DEV_MODE the absence is tolerated; emails simply
 log instead of being sent (preserves the local-dev story without

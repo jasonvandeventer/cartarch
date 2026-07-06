@@ -1,6 +1,6 @@
 ![Cartarch](app/static/brand/logo/cartarch-horizontal.svg)
 
-Self-hosted web application for managing a physical Magic: The Gathering collection. (Identifies as **Cartarch** in user-facing UI as of v3.27.6; the in-repo project identifier is still `mana-archive` pending the full infrastructure rename near actual public launch.)
+Self-hosted web application for managing a physical Magic: The Gathering collection. (Identifies as **Cartarch** in user-facing UI as of v3.27.6; the in-repo project identifier was aligned to `cartarch` app-side on 2026-07-06. Some infrastructure names may still carry the old identifier pending the full rename near actual public launch.)
 
 **Current version: v4.1.18** · [Platform repo](https://github.com/jasonvandeventer/vanfreckle-platform)
 
@@ -8,14 +8,14 @@ Self-hosted web application for managing a physical Magic: The Gathering collect
 
 ## North Star
 
-Mana Archive is the source of truth for the playgroup. Authoritative data about who owns what, what's in which deck, and how decks have performed in our games lives here. External services (Scryfall, Commander Spellbook, EDHREC) are integrated as enrichment for that data, not as replacements.
+Cartarch is the source of truth for the playgroup. Authoritative data about who owns what, what's in which deck, and how decks have performed in our games lives here. External services (Scryfall, Commander Spellbook, EDHREC) are integrated as enrichment for that data, not as replacements.
 
 Practical implications:
 
 - Recommendation features ground their suggestions in the user's collection first, the playgroup's data second, and external aggregators last.
 - Analytics compare a deck against the user's other decks and the playgroup's game history, not against community averages.
 - External service data appears as inline enrichment (per-card hover, combo detection, inclusion percentages) rather than as primary navigation surfaces.
-- Features that would route users away from Mana Archive's data toward an aggregator's data are scrutinized closely. Enrichment is welcome; replacement is not.
+- Features that would route users away from Cartarch's data toward an aggregator's data are scrutinized closely. Enrichment is welcome; replacement is not.
 
 See [roadmap.md](roadmap.md) for the prioritized backlog.
 
@@ -229,5 +229,7 @@ The PostgreSQL schema is owned by **Alembic** (`alembic/versions/`) as of the v4
 
 - **Production**: PostgreSQL (CloudNativePG on the Talos cluster), via `DATABASE_URL`
 - **Local dev**: SQLite file in `/data` (the default when `DATABASE_URL` is unset)
+
+> Renamed 2026-07-06 (`mana_archive` → `cartarch`). Existing local dev DBs need: `mv data/mana_archive.db data/cartarch.db`
 
 No database files are stored in this repository.

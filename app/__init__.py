@@ -1,1 +1,1 @@
-"""Mana Archive application package."""
+"""Cartarch application package."""
