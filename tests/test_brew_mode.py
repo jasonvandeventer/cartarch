@@ -744,3 +744,162 @@ def test_brew_import_delete_round_trip_is_idempotent():
     resort_collection(s, user_id=u.id)
 
     assert _export_tuples(s, u.id) == baseline
+
+
+# --------------------------------------------------------------------------- #
+# Issue #59 — inline "+ Create new deck" widget carries the Brew flag, so a
+# pasted/CSV decklist imported via the Destination dropdown lands in a fresh
+# brew in one pass (unowned -> proxy). The route persists is_brew; the existing
+# reconciliation commit path (tested above) supplies the proxy rule.
+# --------------------------------------------------------------------------- #
+
+
+def _deck_by_location(s, storage_location_id):
+    from app.models import Deck
+
+    return s.query(Deck).filter(Deck.storage_location_id == storage_location_id).one()
+
+
+def test_create_inline_is_brew_true_false_omitted():
+    """Route unit, three-way coercion. JSON keys are exactly the four fields in
+    all cases — the omitted case (c) is the guard for the JS FormData risk:
+    if the field is ever not appended, the route must degrade to a normal deck,
+    not error."""
+    sm = _fresh()
+    s = sm()
+    u = _user(s)
+    s.commit()
+
+    c = _client(sm, u)
+    try:
+        cases = [
+            ({"name": "Brew A", "is_brew": "true"}, True),
+            ({"name": "Brew B", "is_brew": "false"}, False),
+            ({"name": "Brew C"}, False),  # field omitted entirely
+        ]
+        for data, expected in cases:
+            r = c.post("/decks/create-inline", data=data)
+            assert r.status_code == 200, r.text
+            payload = r.json()
+            assert set(payload) == {"id", "storage_location_id", "name", "format"}
+            deck = _deck_by_location(s, payload["storage_location_id"])
+            assert deck.is_brew is expected
+    finally:
+        _clear_overrides()
+
+
+def _commit_form(deck_loc_id, owned_card, unowned_card):
+    """Two parallel-array rows for POST /import/commit: owned -> move_existing,
+    unowned -> import_new, both targeting the deck's storage location. Repeated
+    fields are dict-of-list values (httpx form-encodes those as repeated keys)."""
+    return {
+        "filename": "paste",
+        "target_location_id": str(deck_loc_id),
+        "line_number": ["1", "2"],
+        "scryfall_id": [owned_card.scryfall_id, unowned_card.scryfall_id],
+        "name": ["", ""],
+        "set_code": ["", ""],
+        "collector_number": ["", ""],
+        "finish": ["normal", "normal"],
+        "quantity": ["1", "1"],
+        "location": ["", ""],
+        "reconcile_action": ["move_existing", "import_new"],
+        "reconcile_move_qty": ["1", "0"],
+        "reconcile_new_qty": ["0", "1"],
+    }
+
+
+def test_inline_brew_import_commit_end_to_end():
+    """Gating test for the composed sequence (§1/§4.2): inline-create a brew via
+    the HTTP route, then POST /import/commit into its storage location. Unowned
+    import_new row -> proxy; owned move_existing row -> real."""
+    sm = _fresh()
+    s = sm()
+    u = _user(s)
+    box = _loc(s, u.id, "Box", mode="managed")
+    owned = _card(s, "Smothering Tithe")
+    unowned = _card(s, "Rhystic Study")
+    _place(s, u.id, owned, box.id, qty=1, proxy=False)
+    s.commit()
+
+    c = _client(sm, u)
+    try:
+        r = c.post("/decks/create-inline", data={"name": "Fresh Brew", "is_brew": "true"})
+        assert r.status_code == 200, r.text
+        deck_loc_id = r.json()["storage_location_id"]
+
+        r2 = c.post("/import/commit", data=_commit_form(deck_loc_id, owned, unowned))
+        assert r2.status_code == 200, r2.text
+    finally:
+        _clear_overrides()
+
+    deck = _deck_by_location(s, deck_loc_id)
+    rows = {row.card_id: row for row in _deck_rows_for(s, deck)}
+    assert rows[owned.id].is_proxy is False  # pulled real copy
+    assert rows[unowned.id].is_proxy is True  # unowned -> proxy
+
+
+def test_inline_non_brew_import_commit_not_proxied():
+    """Non-brew regression: same flow with is_brew='false' -> import_new row is a
+    real (non-proxy) row, byte-identical to pre-#59 behavior."""
+    sm = _fresh()
+    s = sm()
+    u = _user(s)
+    box = _loc(s, u.id, "Box", mode="managed")
+    owned = _card(s, "Smothering Tithe")
+    unowned = _card(s, "Rhystic Study")
+    _place(s, u.id, owned, box.id, qty=1, proxy=False)
+    s.commit()
+
+    c = _client(sm, u)
+    try:
+        r = c.post("/decks/create-inline", data={"name": "Normal Deck", "is_brew": "false"})
+        assert r.status_code == 200, r.text
+        deck_loc_id = r.json()["storage_location_id"]
+
+        r2 = c.post("/import/commit", data=_commit_form(deck_loc_id, owned, unowned))
+        assert r2.status_code == 200, r2.text
+    finally:
+        _clear_overrides()
+
+    deck = _deck_by_location(s, deck_loc_id)
+    rows = {row.card_id: row for row in _deck_rows_for(s, deck)}
+    assert rows[unowned.id].is_proxy is False  # normal deck -> real row
+
+
+def test_inline_brew_manual_commit_proxies_unowned():
+    """Manual-flow smoke (§4.4): the widget is shared with manual_preview.html,
+    so /import/manual/commit into an inline-created brew must also proxy an
+    unowned import_new row."""
+    sm = _fresh()
+    s = sm()
+    u = _user(s)
+    unowned = _card(s, "Cyclonic Rift")  # owned nowhere
+    s.commit()
+
+    c = _client(sm, u)
+    try:
+        r = c.post("/decks/create-inline", data={"name": "Manual Brew", "is_brew": "true"})
+        assert r.status_code == 200, r.text
+        deck_loc_id = r.json()["storage_location_id"]
+
+        r2 = c.post(
+            "/import/manual/commit",
+            data={
+                "scryfall_id": unowned.scryfall_id,
+                "finish": "normal",
+                "quantity": "1",
+                "target_location_id": str(deck_loc_id),
+                "reconcile_action": "import_new",
+                "reconcile_move_qty": "0",
+                "reconcile_new_qty": "1",
+            },
+        )
+        assert r2.status_code == 200, r2.text
+    finally:
+        _clear_overrides()
+
+    deck = _deck_by_location(s, deck_loc_id)
+    rows = _deck_rows_for(s, deck)
+    assert len(rows) == 1
+    assert rows[0].is_proxy is True

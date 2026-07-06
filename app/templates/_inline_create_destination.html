@@ -20,6 +20,10 @@
           <option value="Cube">Cube</option>
           <option value="">(none)</option>
         </select>
+        <label style="display: flex; gap: 0.4rem; align-items: baseline;">
+          <input type="checkbox" id="inline-deck-brew" style="width: auto;">
+          <span>Create as brew (cards you don't own are added as proxies)</span>
+        </label>
         <button type="button" id="inline-deck-submit">Create &amp; select</button>
         <div class="muted small-text" id="inline-deck-status"></div>
       </div>
@@ -101,6 +105,7 @@
     deckBtn.addEventListener('click', async () => {
       const nameEl = document.getElementById('inline-deck-name');
       const fmtEl = document.getElementById('inline-deck-format');
+      const brewEl = document.getElementById('inline-deck-brew');
       const statusEl = document.getElementById('inline-deck-status');
       const name = (nameEl.value || '').trim();
       if (!name) { statusEl.textContent = 'Name required.'; return; }
@@ -109,6 +114,7 @@
         const deck = await postForm('/decks/create-inline', {
           name: name,
           format_name: fmtEl.value,
+          is_brew: brewEl && brewEl.checked ? 'true' : 'false',
         });
         const og = ensureOptgroup('opt-decks', 'Decks');
         const opt = document.createElement('option');
@@ -119,6 +125,7 @@
         if (submitBtn) submitBtn.disabled = false;
         statusEl.textContent = 'Created and selected.';
         nameEl.value = '';
+        if (brewEl) brewEl.checked = false;
         finishSelection(deckBtn);
       } catch (err) {
         statusEl.textContent = 'Failed: ' + err.message;

@@ -1693,13 +1693,16 @@ def create_deck_from_locations(
 def decks_create_inline(
     name: str = Form(...),
     format_name: str = Form(""),
+    is_brew: bool = Form(False),
     session: Session = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
     _: None = CsrfRequired,
 ):
     """JSON variant of /decks/create for inline use in the import wizard."""
     try:
-        deck = create_deck(session, user_id=current_user.id, name=name, format_name=format_name)
+        deck = create_deck(
+            session, user_id=current_user.id, name=name, format_name=format_name, is_brew=is_brew
+        )
     except (ValueError, IntegrityError) as exc:
         session.rollback()
         return JSONResponse({"error": str(exc) or "could_not_create"}, status_code=400)
