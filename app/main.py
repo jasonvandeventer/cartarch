@@ -20,6 +20,7 @@ from fastapi import Depends, FastAPI, Form, HTTPException, Request
 from fastapi.responses import (
     FileResponse,
     HTMLResponse,
+    JSONResponse,
     RedirectResponse,
 )
 from fastapi.staticfiles import StaticFiles
@@ -342,6 +343,25 @@ def health(session: Session = Depends(get_db_session)):
     """
     session.execute(text("SELECT 1"))
     return {"status": "ok"}
+
+
+@app.get("/version", include_in_schema=False)
+def version():
+    """Unauthenticated deploy-verification probe: ``{"version": "vX.Y.Z"}``.
+
+    Sourced from the newest Chronicle entry (``CHRONICLE_ENTRIES[0]``) — the same
+    guard-enforced release record the login footer's Entry number derives from,
+    so there is no separate version constant a release could forget to bump. Like
+    /health, this is public by omission (no ``get_current_user``); it is a GET so
+    CSRF never applies. ``no-store`` because a deploy watcher must read the *live*
+    version, never a cached one. Empty Chronicle → 503 (mirrors the degrade-don't-
+    500 stance the CHRONICLE_ENTRIES load takes below).
+    """
+    headers = {"Cache-Control": "no-store"}
+    if not CHRONICLE_ENTRIES:
+        return JSONResponse({"version": None}, status_code=503, headers=headers)
+    version = "v" + CHRONICLE_ENTRIES[0]["version"].lstrip("v")
+    return JSONResponse({"version": version}, headers=headers)
 
 
 # v3.28.2 — Chronicle content artifact. Loaded ONCE at module import.

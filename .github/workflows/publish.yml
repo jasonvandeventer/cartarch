@@ -279,3 +279,100 @@ jobs:
                 || echo "::warning::could not add needs-ac-review to #$N (does the label exist?)"
             fi
           done < issues.txt
+
+  # ===========================================================================
+  # Deploy verification (Phase D v1, item 2). DETECTION ONLY — no cluster
+  # credentials; it polls the PUBLIC URL and a human undoes a bad release (see
+  # docs/runbooks/release-retraction.md in the platform repo). Downstream of
+  # post-ship so it fires only for a release whose image published, but its `if`
+  # runs it even when post-ship's best-effort (Discord) step soft-failed, and
+  # even if post-ship hard-failed on a reporting step — a reporting hiccup must
+  # not blind deploy verification. It never retroactively affects those
+  # release/close steps (jobs are independent; they already succeeded upstream).
+  # The job's OWN exit status reflects verification TRUTH: red = NOT confirmed
+  # live, even though the Discord post itself is best-effort like post-ship's.
+  # ===========================================================================
+  verify-deploy:
+    runs-on: ubuntu-latest
+    needs: post-ship
+    # Run whenever post-ship actually ran (success OR a reporting-step failure);
+    # skip only if it was skipped (build/publish never happened) or cancelled.
+    if: ${{ !cancelled() && needs.post-ship.result != 'skipped' }}
+    steps:
+      - name: Poll /version, soak, alert (exit status = verification truth)
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: |
+          set -uo pipefail   # deliberately NOT -e: failures are handled so we
+                             # control the exit code and always fire the alert.
+          URL="https://cartarch.com/version"
+          LOGIN="https://cartarch.com/login"
+          EXPECTED="${GITHUB_REF_NAME}"          # vX.Y.Z
+          ENTRY="${EXPECTED##*.}"                # patch == login footer "Entry N"
+          RETRACTION_DOC="vanfreckle-platform/docs/runbooks/release-retraction.md"
+          DEADLINE=$(( $(date +%s) + 15*60 ))    # phase-1 budget from job start
+          MODE="PRIMARY"
+          ALERT="⚠ ${EXPECTED} NOT CONFIRMED live after 15m — old version still serving or endpoint unreachable; check ArgoCD/updater; retraction runbook: ${RETRACTION_DOC}"
+
+          # Best-effort Discord — same posture as post-ship: never fails the job,
+          # so the job's exit code stays a pure verification signal.
+          discord() {
+            if [ -z "${DISCORD_WEBHOOK_URL:-}" ]; then
+              echo "::warning::DISCORD_WEBHOOK_URL not set — skipping Discord post"
+              return 0
+            fi
+            jq -n --arg c "$1" '{content: $c}' \
+              | curl -sS -m 15 -X POST -H 'Content-Type: application/json' -d @- "${DISCORD_WEBHOOK_URL}" \
+              && echo "Discord posted" || echo "::warning::Discord POST failed"
+          }
+
+          # One probe. Returns 0 on pass; sets $MODE to PRIMARY, or to
+          # BOOTSTRAP-FALLBACK when an image predating /version (404) is confirmed
+          # via the login footer's "Entry N" (N = patch), the same chronicle-
+          # derived number /version reports.
+          check() {
+            local out code ver
+            out=$(curl -sS -m 10 -w $'\n%{http_code}' "$URL" 2>/dev/null) || return 1
+            code="${out##*$'\n'}"; out="${out%$'\n'*}"
+            if [ "$code" = "200" ]; then
+              ver=$(printf '%s' "$out" | jq -r '.version // empty' 2>/dev/null || true)
+              [ "$ver" = "$EXPECTED" ] && { MODE="PRIMARY"; return 0; }
+              return 1
+            fi
+            if [ "$code" = "404" ] \
+               && curl -sS -m 10 "$LOGIN" 2>/dev/null | grep -qE "Entry ${ENTRY}([^0-9]|$)"; then
+              MODE="BOOTSTRAP-FALLBACK"; return 0
+            fi
+            return 1
+          }
+
+          # Phase 1: version must flip to EXPECTED within 15 min (poll every 30s).
+          echo "Phase 1: waiting up to 15 min for ${URL} == ${EXPECTED}"
+          until check; do
+            if [ "$(date +%s)" -ge "$DEADLINE" ]; then
+              echo "::error::${EXPECTED} did not go live within 15 min"
+              discord "${ALERT}"
+              exit 1
+            fi
+            sleep 30
+          done
+          echo "Phase 1 passed via ${MODE}."
+
+          # Phase 2: soak — 3 consecutive passes, 60s apart (HTTP 200 + expected
+          # version, or the same bootstrap check). Any miss = not confirmed stable.
+          echo "Phase 2: soak (3 checks, 60s apart)"
+          for i in 1 2 3; do
+            sleep 60
+            if check; then
+              echo "soak ${i}/3 ok (${MODE})"
+            else
+              echo "::error::soak check ${i} failed — deploy flipped but is not holding"
+              discord "${ALERT}"
+              exit 1
+            fi
+          done
+
+          SUFFIX=""
+          [ "${MODE}" = "BOOTSTRAP-FALLBACK" ] && SUFFIX=" (BOOTSTRAP-FALLBACK: verified via /login Entry ${ENTRY}, /version 404)"
+          echo "VERIFIED: ${EXPECTED} live and stable via ${MODE}"
+          discord "✓ ${EXPECTED} deployed and verified live${SUFFIX}"

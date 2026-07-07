@@ -1,5 +1,15 @@
 [ 
   {
+    "version": "4.1.20",
+    "date": "2026-07-07",
+    "added": [
+      "Cartarch now reports its running version at a small public /version endpoint, and every release is checked against the live site automatically after it ships, so a deploy that never actually rolled out raises an alert instead of passing unnoticed."
+    ],
+    "refined": [],
+    "resolved": [],
+    "archivist_note": "A release used to be tagged and handed to the cluster's auto-deployer with nothing confirming the new version actually reached the live site: a deploy that quietly failed to roll out (a stuck image updater, a pod that crash-looped and never went ready) looked exactly like success from the outside. The new /version endpoint answers 'what is actually running right now' without auth and without caching, and a post-release job polls it until the expected version appears and holds, or raises a loud alert pointing at the retraction runbook. It only detects; a human still decides whether to undo. This is the first half of making a bad release cheap to catch and cheap to reverse."
+  },
+  {
     "version": "4.1.19",
     "date": "2026-07-07",
     "added": [],
