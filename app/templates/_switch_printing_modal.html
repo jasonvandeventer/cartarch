@@ -60,11 +60,13 @@
                 <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                 <input type="hidden" name="scryfall_id" value="{{ entry.scryfall_id }}">
                 <input type="hidden" name="finish" value="{{ entry.finish }}">
+                {% set is_current = entry.set_code == current_set_code
+                  and entry.collector_number == current_collector_number
+                  and entry.finish == current_finish %}
                 <button type="submit" class="switch-printing-pick"
-                  {% if entry.set_code == current_set_code
-                    and entry.collector_number == current_collector_number
-                    and entry.finish == current_finish %}disabled{% endif %}>
-                    {{ entry.finish|capitalize }} · Qty {{ entry.quantity }}
+                  {% if is_current or entry.loose_quantity == 0 %}disabled{% endif %}
+                  {% if entry.loose_quantity == 0 and not is_current %}title="No loose copies available — all copies are in decks"{% endif %}>
+                    {{ entry.finish|capitalize }} · {{ entry.loose_quantity }} available
                   </button>
                 </form>
               </li>
@@ -111,15 +113,19 @@
                       <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                       <input type="hidden" name="scryfall_id" value="{{ p.scryfall_id }}">
                       <input type="hidden" name="finish" value="{{ finish }}">
-                      {% set owned_count = p.owned_finishes.get(finish, 0) %}
+                      {% set owned = p.owned_finishes.get(finish) %}
+                      {% set owned_total = owned.total if owned else 0 %}
+                      {% set owned_loose = owned.loose if owned else 0 %}
+                      {% set is_current = p.set_code == current_set_code
+                        and p.collector_number == current_collector_number
+                        and finish == current_finish %}
                       <button type="submit"
                         class="switch-printing-finish-btn finish-{{ finish }}
-                        {% if owned_count %}owned{% endif %}"
-                        {% if p.set_code == current_set_code
-                          and p.collector_number == current_collector_number
-                          and finish == current_finish %}disabled{% endif %}>
+                        {% if owned_loose %}owned{% endif %}"
+                        {% if is_current or owned_loose == 0 %}disabled{% endif %}
+                        {% if owned_loose == 0 and not is_current %}title="{% if owned_total %}All copies are in other decks{% else %}You don't own this printing{% endif %}"{% endif %}>
                           {{ finish|capitalize }}
-                          {% if owned_count %}<span class="switch-printing-owned-count">({{ owned_count }})</span>{% endif %}
+                          {% if owned_loose %}<span class="switch-printing-owned-count">({{ owned_loose }})</span>{% endif %}
                         </button>
                       </form>
                     {% endfor %}

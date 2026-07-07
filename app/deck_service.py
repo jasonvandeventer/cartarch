@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import re
 
-from sqlalchemy import func, text
+from sqlalchemy import func, or_, text
 from sqlalchemy.orm import Session, joinedload
 
 from app.audit_service import log_transaction
@@ -3408,12 +3408,19 @@ def list_user_printings_for_card(session: Session, user_id: int, card_name: str)
                 "scryfall_id": r.card.scryfall_id,
                 "image_url": r.card.image_url,
                 "quantity": 0,
+                "loose_quantity": 0,
                 "locations": [],
                 "in_deck": False,
             }
             buckets[key] = entry
         entry["quantity"] += int(r.quantity or 0)
         loc = r.storage_location
+        # A copy is "loose" (swap-consumable) if it's pending (no location) or
+        # sits in a non-deck location. Deck-resident copies are excluded — they
+        # can't be pulled out from under another deck. Advisory: the modal uses
+        # it to gate buttons; the authoritative check is in switch_deck_row_printing.
+        if loc is None or loc.type != "deck":
+            entry["loose_quantity"] += int(r.quantity or 0)
         if loc is not None:
             label = loc.name
             if loc.type == "deck":
@@ -3437,6 +3444,45 @@ def list_user_printings_for_card(session: Session, user_id: int, card_name: str)
     return sorted(buckets.values(), key=_sort_key)
 
 
+def _get_loose_source_rows(
+    session: Session, user_id: int, card_id: int, finish: str
+) -> list[InventoryRow]:
+    """The user's swap-consumable ("loose") rows for a printing+finish.
+
+    Loose = pending (no location) OR a non-deck location — deck-resident copies
+    can't be pulled out from under another deck. Locked with ``with_for_update``
+    (Postgres row lock; no-op on SQLite) restricted to ``inventory_rows`` via
+    ``of=`` so the outer join to the nullable ``storage_locations`` side is safe.
+    Returned in consume-priority order: ``_RECONCILE_TIER_PRIORITY`` on the
+    location type (NULL/pending = 4), then lowest id first for determinism.
+    """
+    rows = (
+        session.query(InventoryRow)
+        .options(joinedload(InventoryRow.storage_location))
+        .outerjoin(StorageLocation, InventoryRow.storage_location_id == StorageLocation.id)
+        .filter(
+            InventoryRow.user_id == user_id,
+            InventoryRow.card_id == card_id,
+            InventoryRow.finish == finish,
+            InventoryRow.quantity > 0,
+            or_(
+                InventoryRow.storage_location_id.is_(None),
+                StorageLocation.type != "deck",
+            ),
+        )
+        .with_for_update(of=InventoryRow)
+        .all()
+    )
+
+    def _tier(r: InventoryRow) -> int:
+        loc = r.storage_location
+        if loc is None:
+            return _RECONCILE_TIER_PRIORITY["pending"]
+        return _RECONCILE_TIER_PRIORITY.get(loc.type, 99)
+
+    return sorted(rows, key=lambda r: (_tier(r), r.id))
+
+
 def switch_deck_row_printing(
     session: Session,
     user_id: int,
@@ -3445,21 +3491,20 @@ def switch_deck_row_printing(
     new_scryfall_id: str,
     new_finish: str,
 ) -> bool:
-    """Swap the printing on an existing deck row in place.
+    """Swap a deck row's printing as a quantity-conserving two-leg swap.
 
-    Preserves the row's id, quantity, tags, role, and notes — only the
-    `card_id` and `finish` change. The card's place in the deck stays
-    fixed and downstream analytics that key on row id (e.g. cached panel
-    fragments) continue to address the same row.
+    The old printing is returned to the collection as pending and an owned
+    LOOSE copy of the target printing is consumed from the collection — the
+    same pull/return + merge + audit-log discipline as ``pull_card_to_deck`` /
+    ``return_card_from_deck`` (issue #58; the old version rewrote ``card_id``
+    in place, bypassing all inventory accounting).
 
-    `new_scryfall_id` must already exist as a Card in the local DB. The
-    caller is responsible for fetching+upserting it from Scryfall first
-    (the route handler does this via `get_or_create_card`).
-
-    Returns True on success, False if the row, deck, or new card can't
-    be resolved or if the deck doesn't belong to this user.
+    Only the OWNED-swap intent (A). Unowned/proxy representation (intent B) is
+    deferred to #51. Returns True on success (or the no-op same-printing case),
+    False if the deck/row/target-card can't be resolved, the deck row is a
+    proxy, or the user doesn't own enough loose copies of the target.
     """
-    from app.inventory_service import get_or_create_card  # local import: avoid cycle
+    from app.inventory_service import clean_inventory_row_references  # local: avoid cycle
 
     deck = session.query(Deck).filter(Deck.id == deck_id, Deck.user_id == user_id).first()
     if not deck or not deck.storage_location_id:
@@ -3467,6 +3512,7 @@ def switch_deck_row_printing(
 
     row = (
         session.query(InventoryRow)
+        .options(joinedload(InventoryRow.card))
         .filter(
             InventoryRow.id == row_id,
             InventoryRow.user_id == user_id,
@@ -3477,7 +3523,15 @@ def switch_deck_row_printing(
     if not row:
         return False
 
-    new_card = get_or_create_card(session, new_scryfall_id)
+    # Proxy rows are unowned representations — they don't participate in owned-swap.
+    if row.is_proxy:
+        return False
+
+    # Resolve the target Card from the LOCAL catalog only. An owned card is by
+    # definition already cached, so no Scryfall upsert (get_or_create_card).
+    new_card = (
+        session.query(Card).filter(Card.scryfall_id == (new_scryfall_id or "").strip()).first()
+    )
     if not new_card:
         return False
 
@@ -3485,9 +3539,126 @@ def switch_deck_row_printing(
     if finish_clean not in {"normal", "foil", "etched"}:
         finish_clean = "normal"
 
-    row.card_id = new_card.id
-    row.finish = finish_clean
-    row.updated_at = utc_now()
+    # No-op: switching to the printing+finish the row already holds.
+    if row.card_id == new_card.id and (row.finish or "normal").lower() == finish_clean:
+        return True
+
+    old_card_id = row.card_id
+    old_finish = row.finish or "normal"
+    old_card_name = row.card.name if row.card else "?"
+    swap_qty = int(row.quantity or 0)
+
+    # Authoritative ownership check: enough loose copies of the target?
+    source_rows = _get_loose_source_rows(session, user_id, new_card.id, finish_clean)
+    if sum(int(r.quantity or 0) for r in source_rows) < swap_qty:
+        return False
+
+    # An existing deck row of the target printing → merge into it.
+    existing_target = (
+        session.query(InventoryRow)
+        .filter(
+            InventoryRow.user_id == user_id,
+            InventoryRow.card_id == new_card.id,
+            InventoryRow.finish == finish_clean,
+            InventoryRow.storage_location_id == deck.storage_location_id,
+            InventoryRow.is_pending.is_(False),
+            InventoryRow.id != row.id,
+        )
+        .with_for_update()
+        .first()
+    )
+
+    # Consume swap_qty from the loose source rows in priority order.
+    remaining = swap_qty
+    for src in source_rows:
+        if remaining <= 0:
+            break
+        take = min(int(src.quantity or 0), remaining)
+        src.quantity -= take
+        remaining -= take
+        if src.quantity <= 0:
+            clean_inventory_row_references(session, [src.id])
+            session.delete(src)
+
+    # Return the old printing to the collection as pending (merge if present).
+    pending_row = (
+        session.query(InventoryRow)
+        .filter(
+            InventoryRow.user_id == user_id,
+            InventoryRow.card_id == old_card_id,
+            InventoryRow.finish == old_finish,
+            InventoryRow.storage_location_id.is_(None),
+            InventoryRow.is_pending.is_(True),
+        )
+        .first()
+    )
+    if pending_row:
+        pending_row.quantity += swap_qty
+        pending_row.updated_at = utc_now()
+    else:
+        pending_row = InventoryRow(
+            user_id=user_id,
+            card_id=old_card_id,
+            finish=old_finish,
+            quantity=swap_qty,
+            is_pending=True,
+            storage_location_id=None,
+            created_at=utc_now(),
+            updated_at=utc_now(),
+        )
+        session.add(pending_row)
+    session.flush()
+
+    # The deck row's card identity is changing — its shares were established
+    # under the old card_id and are now stale (issue #27).
+    delete_shares_for_inventory_row(session, row.id)
+
+    if existing_target:
+        # Merge into the existing target deck row; its metadata (tags/role/notes)
+        # survives, the source row's is discarded.
+        existing_target.quantity += swap_qty
+        existing_target.updated_at = utc_now()
+        clean_inventory_row_references(session, [row.id])
+        session.delete(row)
+        deck_row_id = existing_target.id
+    else:
+        # In-place identity change — tags/role/notes/quantity untouched.
+        row.card_id = new_card.id
+        row.finish = finish_clean
+        row.updated_at = utc_now()
+        deck_row_id = row.id
+
+    note = (
+        f"Switch printing in deck {deck.name}: "
+        f"{old_card_name} ({old_finish}) → {new_card.name} ({finish_clean})"
+    )
+    # Return leg: old printing back to the collection.
+    log_transaction(
+        session=session,
+        user_id=user_id,
+        event_type="switch_printing",
+        card_id=old_card_id,
+        finish=old_finish,
+        quantity_delta=swap_qty,
+        source_location=f"deck:{deck.name}",
+        destination_location="collection",
+        inventory_row_id=pending_row.id,
+        note=note,
+    )
+    # Consume leg: target printing pulled into the deck.
+    log_transaction(
+        session=session,
+        user_id=user_id,
+        event_type="switch_printing",
+        card_id=new_card.id,
+        finish=finish_clean,
+        quantity_delta=-swap_qty,
+        source_location="collection",
+        destination_location=f"deck:{deck.name}",
+        inventory_row_id=deck_row_id,
+        note=note,
+    )
+
     session.commit()
     return True
 

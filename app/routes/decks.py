@@ -1472,12 +1472,15 @@ def deck_row_printings_modal(
     owned_printings = list_user_printings_for_card(session, current_user.id, card_name)
     # Build a lookup of owned (set, collector) → list of finish entries so
     # the template can mark which finishes the user owns of each printing.
-    owned_by_key: dict[tuple[str, str], dict[str, int]] = {}
+    owned_by_key: dict[tuple[str, str], dict[str, dict[str, int]]] = {}
     for entry in owned_printings:
         key = (entry["set_code"], entry["collector_number"])
-        owned_by_key.setdefault(key, {})[entry["finish"]] = entry["quantity"]
+        owned_by_key.setdefault(key, {})[entry["finish"]] = {
+            "total": entry["quantity"],
+            "loose": entry["loose_quantity"],
+        }
     # Annotate every printing with owned_finishes so the template renders
-    # toggle buttons with owned-count hints (e.g. "Foil (2)").
+    # toggle buttons with owned/loose hints and disables what can't be swapped.
     for p in printings:
         key = (p["set_code"], p["collector_number"])
         p["owned_finishes"] = owned_by_key.get(key, {})
@@ -1524,7 +1527,7 @@ async def deck_row_switch_printing(
         new_finish=finish,
     )
     if not ok:
-        raise HTTPException(status_code=400, detail="Could not switch printing.")
+        raise HTTPException(status_code=400, detail="You don't own a loose copy of that printing.")
 
     if request.headers.get("HX-Request"):
         return _deck_cards_partial_response(request, session, current_user, deck_id)
