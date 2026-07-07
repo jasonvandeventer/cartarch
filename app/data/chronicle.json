@@ -1,5 +1,15 @@
 [ 
   {
+    "version": "4.1.19",
+    "date": "2026-07-07",
+    "added": [],
+    "refined": [],
+    "resolved": [
+      "Fixed Switch Printing to perform a quantity-conserving swap instead of silently rewriting the card's identity. Switching a deck card's printing now consumes a copy you own from your collection and returns the old printing, with full audit logging. Unowned printings are no longer selectable."
+    ],
+    "archivist_note": "The original Switch Printing was a cosmetic control that accidentally became an inventory mutation. It rewrote `card_id` in place because the earliest version treated the printing as a display attribute, not an ownership identity. By the time the collection grew real accounting (TransactionLog, pull/return, finish correction), this path was already live and nobody noticed it bypassed all of them. The fix reframes the operation as what it always should have been: a two-leg swap (return the old, consume the new) with the same merge-and-log discipline the pull/return paths have had since v3.x. The Scryfall upsert (`get_or_create_card`) is removed from the route entirely, since an owned card is by definition already in the local catalog. Intent B (representing a printing you don't own) stays deferred to #51's proxy/Brew model, where it belongs."
+  },
+  {
     "version": "4.1.18",
     "date": "2026-07-05",
     "added": [],
