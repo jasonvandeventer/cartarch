@@ -1,5 +1,15 @@
 [ 
   {
+    "version": "4.1.24",
+    "date": "2026-07-08",
+    "added": [
+      "Games played outside of Cartarch can now be logged manually with deck, result, and opponent details from the Game History page."
+    ],
+    "refined": [],
+    "resolved": [],
+    "archivist_note": "The app's game system was built around a live-tracking lifecycle: create a lobby, play through the life-counter UI, then finalize with placements. There was no way to record a game that already happened without starting and immediately ending a fake live session. The manual log form creates a Game that is born finalized, composing `create_game` and `end_game` in one request rather than duplicating their logic. The data is indistinguishable from a normally-tracked game once recorded, so all downstream analytics (deck win-rate, dashboard performance, game history) pick it up without modification. Opponent seats carry free-text deck names instead of FK references because the logger generally doesn't have their opponents' decks registered in the system, and requiring that would defeat the \"minimal fields\" intent. The `played_at` override is the one `create_game` signature change, added as a defaulted parameter so existing callers are untouched."
+  },
+  {
     "version": "4.1.23",
     "date": "2026-07-08",
     "added": [
