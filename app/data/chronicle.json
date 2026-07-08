@@ -1,5 +1,15 @@
 [ 
   {
+    "version": "4.1.22",
+    "date": "2026-07-08",
+    "added": [],
+    "refined": [
+      "The \"Add Deck\" form on the Locations page now accepts a Brew checkbox, matching the import preview's inline deck creation."
+    ],
+    "resolved": [],
+    "archivist_note": "The import-preview deck widget learned `is_brew` in v4.1.18, but its older sibling on the Locations page never got the same parameter. Both call the same service function that already understood brews; the gap was just that one of the two front doors never asked the question. Closing it now before the asymmetry surprises someone who creates a brew from the wrong page and discovers it didn't stick."
+  },
+  {
     "version": "4.1.21",
     "changelog": "Cards in deck-type storage locations are no longer counted as Unassigned on the Collection Overview page."
   },
