@@ -1,5 +1,15 @@
 [ 
   {
+    "version": "4.1.23",
+    "date": "2026-07-08",
+    "added": [
+      "Bulk Move and Bulk Delete now open from buttons at the top of the deck page instead of sitting inline; the page is cleaner and browser find no longer hits bulk-control content. > archivist_note: The real issue was `<details>` — collapsed or not, browsers > index its content for Ctrl+F. Moving to `display:none` modals using the > existing end-game-modal pattern removes the content from find entirely when > closed and keeps it findable when open. No backend changes; the forms > POST to the same endpoints. The end-game-modal pattern was chosen over the > switch-printing-modal pattern because the content is already in the template > context (no HTMX load needed), and because the simpler display-toggle avoids > focus-trap semantics that would have re-created the Ctrl+F problem. ```"
+    ],
+    "refined": [],
+    "resolved": [],
+    "archivist_note": ""
+  },
+  {
     "version": "4.1.22",
     "date": "2026-07-08",
     "added": [],
