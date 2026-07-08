@@ -3,6 +3,10 @@
 {% block content %}
   <section class="panel hero-panel compact-hero">
     {% if deck %}
+      {# #54 — bulk-control destinations, set once here so the top-of-page modal
+         trigger buttons below and the modals at the end of the page share them. #}
+      {% set bulk_storage = locations | selectattr("type", "ne", "root") | rejectattr("type", "equalto", "deck") | list %}
+      {% set bulk_decks = locations | selectattr("type", "equalto", "deck") | rejectattr("id", "equalto", deck.storage_location_id) | list %}
       <div class="hero-row">
         <div>
           {{ editorial_eyebrow("Play · Decks · " ~ deck.name) }}
@@ -36,6 +40,12 @@
                 Delete Deck
               </button>
             </form>
+            {% if items and (bulk_storage or bulk_decks) %}
+              <button type="button" class="btn-like" onclick="toggleDeckModal('bulk-move-modal')">Bulk Move</button>
+            {% endif %}
+            {% if items %}
+              <button type="button" class="btn-like" onclick="toggleDeckModal('bulk-delete-modal')">Bulk Delete</button>
+            {% endif %}
           </div>
         </div>
         <div class="hero-stats-inline">
@@ -808,19 +818,50 @@
           </details>
         </section>
       {% endif %}
-      {% set bulk_storage = locations | selectattr("type", "ne", "root") | rejectattr("type", "equalto", "deck") | list %}
-      {% set bulk_decks = locations | selectattr("type", "equalto", "deck") | rejectattr("id", "equalto", deck.storage_location_id) | list %}
+      {# #54 — Bulk Move / Bulk Delete moved out of inline <details> into
+         top-of-page modals (see the modal markup near the end of this block).
+         <details> content stayed findable by Ctrl+F even when collapsed; the
+         display:none modals remove it from browser-find when closed. #}
+      {% include "_review_tags_panel.html" %}
+      {# #deck-card-list is the hx-target for the search form above.
+         Initial render uses the same _deck_card_list.html partial that
+         the /decks/{id}/cards-partial endpoint returns, so the markup
+         is identical and HTMX innerHTML swaps produce no visual diff.
+         When `items` is empty AND no `search` is active, we fall through
+         to the empty-deck prompt (preserved from the original template). #}
+      <div id="deck-card-list">
+        {% if items or search %}
+          {% include "_deck_card_list.html" %}
+        {% elif not commanders %}
+          <section class="panel">
+            <p>No cards in this deck yet.</p>
+            <p class="muted">Use Search Collection above to find owned cards and add them to this deck.</p>
+            <a href="/collection">
+              <button type="button">Go to Collection</button>
+            </a>
+          </section>
+        {% endif %}
+      </div>
+      <div id="deck-lazy-panels" class="lazy-loading-panels">
+        <div class="lazy-loading">Loading panels…</div>
+      </div>
+      {# Switch-printing modal host. The actual modal markup is loaded into
+         this div via HTMX when the user clicks a "Switch printing" / ⇄
+         control. The container is always present so HTMX has a stable
+         hx-target. CSS gives it position:fixed coverage of the viewport;
+         when empty there's nothing visible. #}
+      <div id="switch-printing-modal-host"></div>
+      {# #54 — Bulk Move / Bulk Delete modals. Placed here, outside
+         #deck-card-list (an HTMX swap target) and outside every other <form>,
+         so HTMX innerHTML swaps never overwrite them and the forms are valid.
+         .end-game-modal is display:none inline (toggled to flex), so the
+         content is absent from browser-find until the modal is opened. #}
       {% if items and (bulk_storage or bulk_decks) %}
-        <section class="panel">
-          <details>
-            <summary style="cursor: pointer;
-                            user-select: none;
-                            font-weight: 600;
-                            list-style: none;
-                            padding: 0.2rem 0">▸ Bulk Move</summary>
-            <form action="/decks/{{ deck.id }}/bulk-move"
-                  method="post"
-                  style="margin-top: 0.75rem">
+        <div id="bulk-move-modal" class="end-game-modal" style="display:none"
+             role="dialog" aria-labelledby="bulk-move-title" aria-hidden="true">
+          <div class="end-game-inner">
+            <h3 id="bulk-move-title" style="margin:0 0 0.75rem">Bulk Move</h3>
+            <form action="/decks/{{ deck.id }}/bulk-move" method="post">
               <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
               <div style="display: flex;
                           flex-direction: column;
@@ -866,22 +907,18 @@
                   {% endif %}
                 </select>
                 <button type="submit">Move Selected</button>
+                <button type="button" class="btn-like" onclick="toggleDeckModal('bulk-move-modal')">Cancel</button>
               </div>
             </form>
-          </details>
-        </section>
+          </div>
+        </div>
       {% endif %}
       {% if items %}
-        <section class="panel">
-          <details>
-            <summary style="cursor: pointer;
-                            user-select: none;
-                            font-weight: 600;
-                            list-style: none;
-                            padding: 0.2rem 0">▸ Bulk Delete</summary>
-            <form action="/decks/{{ deck.id }}/bulk-delete-preview"
-                  method="post"
-                  style="margin-top: 0.75rem">
+        <div id="bulk-delete-modal" class="end-game-modal" style="display:none"
+             role="dialog" aria-labelledby="bulk-delete-title" aria-hidden="true">
+          <div class="end-game-inner">
+            <h3 id="bulk-delete-title" style="margin:0 0 0.75rem">Bulk Delete</h3>
+            <form action="/decks/{{ deck.id }}/bulk-delete-preview" method="post">
               <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
               <div style="display: flex;
                           flex-direction: column;
@@ -913,44 +950,27 @@
               </div>
               <div class="filter-row">
                 <button type="submit" class="btn-danger-small">Continue to delete confirmation</button>
+                <button type="button" class="btn-like" onclick="toggleDeckModal('bulk-delete-modal')">Cancel</button>
               </div>
             </form>
-          </details>
-        </section>
+          </div>
+        </div>
       {% endif %}
-      {% include "_review_tags_panel.html" %}
-      {# #deck-card-list is the hx-target for the search form above.
-         Initial render uses the same _deck_card_list.html partial that
-         the /decks/{id}/cards-partial endpoint returns, so the markup
-         is identical and HTMX innerHTML swaps produce no visual diff.
-         When `items` is empty AND no `search` is active, we fall through
-         to the empty-deck prompt (preserved from the original template). #}
-      <div id="deck-card-list">
-        {% if items or search %}
-          {% include "_deck_card_list.html" %}
-        {% elif not commanders %}
-          <section class="panel">
-            <p>No cards in this deck yet.</p>
-            <p class="muted">Use Search Collection above to find owned cards and add them to this deck.</p>
-            <a href="/collection">
-              <button type="button">Go to Collection</button>
-            </a>
-          </section>
-        {% endif %}
-      </div>
-      <div id="deck-lazy-panels" class="lazy-loading-panels">
-        <div class="lazy-loading">Loading panels…</div>
-      </div>
-      {# Switch-printing modal host. The actual modal markup is loaded into
-         this div via HTMX when the user clicks a "Switch printing" / ⇄
-         control. The container is always present so HTMX has a stable
-         hx-target. CSS gives it position:fixed coverage of the viewport;
-         when empty there's nothing visible. #}
-      <div id="switch-printing-modal-host"></div>
     {% endif %}
   {% endblock %}
   {% block extra_scripts %}
     {% if deck %}
+      <script>
+      // #54 — show/hide the top-of-page Bulk Move / Bulk Delete modals
+      // (.end-game-modal shell, same display-toggle as toggleQuickAddModal).
+      function toggleDeckModal(id) {
+        var m = document.getElementById(id);
+        if (!m) return;
+        var opening = m.style.display !== "flex";
+        m.style.display = opening ? "flex" : "none";
+        m.setAttribute("aria-hidden", opening ? "false" : "true");
+      }
+      </script>
       <script>
       // v3.27.9: bracket-fragment swap removed (no bracket placeholder in
       // the hero anymore). Panels fetch still runs to lazy-load synergy /
