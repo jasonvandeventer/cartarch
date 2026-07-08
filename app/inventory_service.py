@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import re
 from collections.abc import Iterable
 from datetime import UTC, datetime, timedelta
@@ -17,6 +18,8 @@ from app.models import Card, InventoryRow, ShowcaseItem, StorageLocation, Transa
 from app.pricing import effective_price
 from app.scryfall import card_constructor_kwargs, fetch_card_by_scryfall_id
 from app.timeutil import utc_now
+
+logger = logging.getLogger(__name__)
 
 PRICE_STALE_DAYS = 7
 VALUE_THRESHOLD = 5.0
@@ -1731,7 +1734,7 @@ def get_inventory_row_stats(
 ) -> dict:
     query = (
         session.query(InventoryRow)
-        .options(joinedload(InventoryRow.card))
+        .options(joinedload(InventoryRow.card), joinedload(InventoryRow.storage_location))
         .join(Card)
         .filter(InventoryRow.user_id == user_id)
     )
@@ -1768,6 +1771,7 @@ def get_inventory_row_stats(
     pending_cards = 0
     seen_names: set[str] = set()
     drawer_counts = {str(i): 0 for i in range(1, 7)}
+    non_drawer_location_counts: dict[str, int] = {}
     unassigned_count = 0
 
     for row in rows:
@@ -1782,8 +1786,33 @@ def get_inventory_row_stats(
         if row.card and row.card.name:
             seen_names.add(row.card.name)
 
+        # D2 (#74): pending has its own "cards pending placement" banner, so
+        # it must not also show up in the Unassigned pill. unique_cards above
+        # stays inclusive; only the placement pills exclude pending.
+        if row.is_pending:
+            continue
+
+        # Three-bucket cascade (#74), drawer-first:
+        #   1. legacy BCW drawer number (1-6)
+        #   2. any other StorageLocation (deck, binder, box, other)
+        #   3. genuinely unassigned (no drawer, no location)
         if str(row.drawer) in drawer_counts:
             drawer_counts[str(row.drawer)] += row.quantity
+        elif row.storage_location_id is not None:
+            location = row.storage_location
+            if location is None:
+                logger.warning(
+                    "InventoryRow %s has storage_location_id=%s with no resolvable "
+                    "StorageLocation; counting under [orphaned location]",
+                    row.id,
+                    row.storage_location_id,
+                )
+                name = "[orphaned location]"
+            else:
+                name = location.name
+            non_drawer_location_counts[name] = (
+                non_drawer_location_counts.get(name, 0) + row.quantity
+            )
         else:
             unassigned_count += row.quantity
 
@@ -1796,6 +1825,7 @@ def get_inventory_row_stats(
         "pending_cards": pending_cards,
         "unique_cards": unique_cards,
         "drawer_counts": drawer_counts,
+        "non_drawer_location_counts": non_drawer_location_counts,
         "unassigned_count": unassigned_count,
     }
 

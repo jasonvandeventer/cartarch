@@ -476,10 +476,17 @@ def collection_page(
         location_id=scope_location_id,
     )
 
+    # Pill order (#74): drawers 1-6, then non-drawer locations alpha-sorted,
+    # then Unassigned last.
     location_counts = {}
     for drawer_number, count in stats["drawer_counts"].items():
         if count > 0:
             location_counts[f"Drawer {drawer_number}"] = count
+
+    for name in sorted(stats["non_drawer_location_counts"]):
+        count = stats["non_drawer_location_counts"][name]
+        if count > 0:
+            location_counts[name] = count
 
     if stats["unassigned_count"] > 0:
         location_counts["Unassigned"] = stats["unassigned_count"]

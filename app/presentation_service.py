@@ -6,52 +6,6 @@ from app.inventory_service import get_drawer_label, get_location_label
 from app.pricing import effective_price
 
 
-def build_collection_view_model(inventory_rows) -> dict:
-    """Build template payload pieces for the collection page."""
-    items = []
-    total_value = 0.0
-    total_cards = 0
-    unique_cards = 0
-    drawer_counts = {str(i): 0 for i in range(1, 7)}
-    unassigned_count = 0
-
-    for row in inventory_rows:
-        price = effective_price(row.card, row.finish) or 0.0
-        total = price * row.quantity
-        items.append(
-            {
-                "id": row.id,
-                "card": row.card,
-                "finish": row.finish,
-                "language": row.language or "en",
-                "is_proxy": bool(row.is_proxy),
-                "quantity": row.quantity,
-                "drawer": row.drawer,
-                "slot": row.slot,
-                "is_pending": row.is_pending,
-                "effective_price": price,
-                "total_value": total,
-                "drawer_label": get_location_label(row),
-            }
-        )
-        total_value += total
-        total_cards += row.quantity
-        unique_cards += 1
-        if str(row.drawer) in drawer_counts:
-            drawer_counts[str(row.drawer)] += row.quantity
-        else:
-            unassigned_count += row.quantity
-
-    return {
-        "items": items,
-        "total_value": total_value,
-        "total_cards": total_cards,
-        "unique_cards": unique_cards,
-        "drawer_counts": drawer_counts,
-        "unassigned_count": unassigned_count,
-    }
-
-
 def build_pending_view_model(rows) -> dict:
     """Build template payload pieces for the pending-placement page."""
     items = []
