@@ -1,0 +1,111 @@
+{% from "_macros.html" import editorial_eyebrow %}
+{% extends "base.html" %}
+{% block content %}
+  <section class="panel page-hero compact-hero">
+    <div>
+      {{ editorial_eyebrow("Play · Games · Log") }}
+      <h2 class="panel-title">Log a Game</h2>
+      <p class="pagehead-tagline">Record a game you played outside Cartarch — deck, result, and opponents.</p>
+    </div>
+  </section>
+  <section class="panel">
+    <form method="post" action="/games/manual-log">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <div class="stack-form">
+        <label>Date played</label>
+        <input type="date" name="played_date" value="{{ today }}" required>
+
+        <label>Format</label>
+        <select name="format">
+          {% for f in formats %}
+            <option value="{{ f }}"{% if f == 'Commander' %} selected{% endif %}>{{ f }}</option>
+          {% endfor %}
+        </select>
+
+        <label>Your deck <span class="muted">(optional)</span></label>
+        <select name="my_deck_id">
+          <option value="">— no deck —</option>
+          {% for d in decks %}
+            <option value="{{ d.id }}">{{ d.name }}</option>
+          {% endfor %}
+        </select>
+
+        <label>Result</label>
+        <select name="result" id="result-sel">
+          <option value="won">Won</option>
+          <option value="lost">Lost</option>
+          <option value="draw">Draw</option>
+        </select>
+
+        {% if user_playgroups %}
+          <label>Share with Playgroup <span class="muted">(optional)</span></label>
+          <select name="playgroup_id">
+            <option value="" selected>— Not shared —</option>
+            {% for pg in user_playgroups %}
+              <option value="{{ pg.playgroup.id }}">{{ pg.playgroup.name }}</option>
+            {% endfor %}
+          </select>
+        {% endif %}
+      </div>
+
+      <h3 class="panel-title" style="margin-top:1.5rem">Opponents</h3>
+      <p class="muted" style="margin-top:-0.5rem">At least one opponent (name required); leave extra rows blank.</p>
+      <div class="stack-form" id="opponent-rows">
+        {% for i in range(5) %}
+          <div class="opp-row" style="display:flex;gap:0.5rem;flex-wrap:wrap">
+            <input type="text" name="opp_names" placeholder="Opponent {{ i + 1 }} name"
+                   maxlength="100" style="flex:1;min-width:140px" data-opp-name>
+            <input type="text" name="opp_decks" placeholder="Their deck (optional)"
+                   maxlength="100" style="flex:1;min-width:140px">
+          </div>
+        {% endfor %}
+      </div>
+
+      <div id="winner-block" style="margin-top:1rem;display:none">
+        <label>Who won? <span class="muted">(you selected Lost)</span></label>
+        <div id="winner-options" class="stack-form"></div>
+      </div>
+
+      <label style="margin-top:1rem;display:block">Notes <span class="muted">(optional)</span></label>
+      <textarea name="notes" maxlength="500" rows="3" placeholder="Anything worth remembering…"></textarea>
+
+      <div style="margin-top:1.5rem">
+        <button type="submit">Log Game</button>
+        <a href="/games"><button type="button" style="margin-left:0.5rem">Cancel</button></a>
+      </div>
+    </form>
+  </section>
+{% endblock %}
+{% block extra_scripts %}
+  <script>
+    const resultSel = document.getElementById('result-sel');
+    const winnerBlock = document.getElementById('winner-block');
+    const winnerOptions = document.getElementById('winner-options');
+
+    function escHtml(s) {
+      return (s || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+    }
+
+    // Rebuild the winner radios from the non-blank opponent names, in DOM order.
+    // The compacted index matches the server's compacted opponents list (#42).
+    function rebuildWinner() {
+      if (resultSel.value !== 'lost') { winnerBlock.style.display = 'none'; return; }
+      winnerBlock.style.display = 'block';
+      const names = [...document.querySelectorAll('[data-opp-name]')]
+        .map(el => el.value.trim());
+      let html = '';
+      let idx = 0;
+      names.forEach(nm => {
+        if (!nm) return;
+        html += `<label><input type="radio" name="winner" value="${idx}"> ${escHtml(nm)}</label>`;
+        idx++;
+      });
+      html += `<label><input type="radio" name="winner" value="unknown" checked> Unknown winner</label>`;
+      winnerOptions.innerHTML = html;
+    }
+
+    resultSel.addEventListener('change', rebuildWinner);
+    document.querySelectorAll('[data-opp-name]').forEach(el => el.addEventListener('input', rebuildWinner));
+    rebuildWinner();
+  </script>
+{% endblock %}

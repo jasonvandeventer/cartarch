@@ -196,6 +196,7 @@ def create_game(
     seats: list[dict[str, Any]],
     first_seat_number: int | None = None,
     client_token: str | None = None,
+    played_at: Any = None,
 ) -> Game:
     """Create a game and its seats. seats is a list of {player_name, deck_id, starting_life}.
 
@@ -208,14 +209,21 @@ def create_game(
     only valid for legacy games predating v3.27.0 — new games should
     always receive a token.
 
+    ``played_at`` (#42) overrides the create-time timestamp for a manually
+    logged, already-played game; ``None`` keeps the live-tracking default of
+    "now". This is the ONLY signature change the manual-log flow needs.
+
     Per-seat deck identity (deck_name_at_game, commander_name_at_game) is
     snapshotted at creation via :func:`_capture_deck_identity` (v3.27.0b-1)
     so subsequent deck edits / deletes don't retroactively rewrite history.
+    A seat with a free-text ``deck_name`` and no ``deck_id`` (a manual-log
+    opponent — #42) has that name stored verbatim as ``deck_name_at_game``,
+    reusing the existing analytics-truth column rather than a new one.
     """
     now = utc_now()
     game = Game(
         user_id=user_id,
-        played_at=now,
+        played_at=played_at or now,
         format=format or None,
         first_seat_number=first_seat_number,
         client_token=client_token,
@@ -227,6 +235,9 @@ def create_game(
     for i, seat in enumerate(seats, start=1):
         deck_id = seat.get("deck_id") or None
         deck_name, commander_name = _capture_deck_identity(session, deck_id)
+        # #42 — free-text opponent deck name (no owned deck FK).
+        if not deck_name and seat.get("deck_name"):
+            deck_name = str(seat["deck_name"]).strip() or None
         # v3.27.5 — seat→user attribution. Returns (None, None) for unknown /
         # absent / invalid user_id, so the seat ships unattributed rather
         # than failing the whole game creation.
@@ -246,6 +257,108 @@ def create_game(
             )
         )
 
+    session.commit()
+    return game
+
+
+def log_game(
+    session: Session,
+    user_id: int,
+    result: str,
+    played_at: Any,
+    opponents: list[dict[str, Any]],
+    deck_id: int | None = None,
+    format: str = DEFAULT_GAME_FORMAT,
+    playgroup_id: int | None = None,
+    winner_index: int | None = None,
+    notes: str = "",
+) -> Game:
+    """Record an already-played external game — a Game *born finalized* (#42).
+
+    Composes :func:`create_game` + :func:`end_game` in one call so a manual log
+    is data-identical to a live-tracked, finalized game — every downstream
+    analytic (deck win-rate, history, dashboard) picks it up with no change.
+
+    Seat 1 is the logger (attributed via ``user_id`` + optional owned
+    ``deck_id``); ``opponents`` (1..6 dicts of ``{"name", "deck_name"}``) become
+    free-text seats 2..N, never FK'd to accounts or decks. ``result`` is one of
+    ``"won" | "lost" | "draw"``. For a loss, ``winner_index`` is the 0-based
+    opponent who won, or ``None`` for "unknown winner" (nobody at placement 1).
+
+    Placement encoding (there is no distinct "draw" column in v1):
+      - won: logger=1, opponents=2
+      - lost, known winner: that opponent=1, everyone else=2
+      - lost, unknown winner: everyone=2 (no seat at placement 1)
+      - draw: everyone=1 — a tie for first, nobody lost
+    # ponytail: draw counts as a win in placement-based win-rate; the upgrade
+    # path is a dedicated result column, deferred to a later version.
+
+    Raises ``ValueError`` (→ 400) on a forged deck (not owned by ``user_id``),
+    an inaccessible playgroup, a bad result/winner, or an empty/oversized
+    opponent set — so *nothing is created* unless every guard passes.
+    """
+    if result not in ("won", "lost", "draw"):
+        raise ValueError("Invalid result")
+    if not (1 <= len(opponents) <= 6):
+        raise ValueError("A logged game needs 1 to 6 opponents")
+    for opp in opponents:
+        if not (opp.get("name") or "").strip():
+            raise ValueError("Opponent names are required")
+    if result == "lost" and winner_index is not None and not (0 <= winner_index < len(opponents)):
+        raise ValueError("Invalid winner selection")
+    if deck_id is not None:
+        deck = session.query(Deck).filter(Deck.id == deck_id, Deck.user_id == user_id).first()
+        if deck is None:
+            raise ValueError("Deck must belong to you")
+    if playgroup_id is not None:
+        member = (
+            session.query(PlaygroupMember.id)
+            .filter(
+                PlaygroupMember.user_id == user_id,
+                PlaygroupMember.playgroup_id == playgroup_id,
+            )
+            .first()
+        )
+        if member is None:
+            raise ValueError("Playgroup not accessible")
+
+    _, my_name = _capture_user_attribution(session, user_id)
+    seats: list[dict[str, Any]] = [
+        {"player_name": my_name or "Me", "deck_id": deck_id, "user_id": user_id}
+    ]
+    for opp in opponents:
+        seats.append(
+            {"player_name": opp["name"].strip(), "deck_name": (opp.get("deck_name") or "")}
+        )
+
+    game = create_game(
+        session,
+        user_id=user_id,
+        format=format,
+        seats=seats,
+        played_at=played_at,
+    )
+    if playgroup_id is not None:
+        game.playgroup_id = playgroup_id
+
+    # Seats are ordered by seat_number (1..N); index 0 is the logger.
+    ordered = list(game.seats)
+    placements: dict[int, int] = {}
+    if result == "won":
+        for i, seat in enumerate(ordered):
+            placements[seat.id] = 1 if i == 0 else 2
+    elif result == "draw":
+        for seat in ordered:
+            placements[seat.id] = 1
+    else:  # lost
+        winner_seat = None if winner_index is None else ordered[winner_index + 1]
+        for seat in ordered:
+            placements[seat.id] = 1 if seat is winner_seat else 2
+
+    end_game(session, game.id, user_id, placements, {}, None, notes)
+    # A manual log has no real duration — anchor ended_at to played_at so the
+    # summary's elapsed reads "<1m" instead of days-since (end_game stamps now).
+    game.ended_at = game.played_at
     session.commit()
     return game
 

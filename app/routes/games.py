@@ -13,6 +13,7 @@ move changes wiring only, not logic. ``gameFingerprint()`` is untouched.
 from __future__ import annotations
 
 import secrets
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import RedirectResponse
@@ -26,6 +27,7 @@ from app.dependencies import (
     safe_redirect_url,
 )
 from app.game_service import (
+    NEW_GAME_FORMAT_CHOICES,
     create_game,
     delete_game,
     end_game,
@@ -33,6 +35,7 @@ from app.game_service import (
     get_seat_commander_image_urls,
     get_viewable_game,
     list_games,
+    log_game,
     normalize_game_format,
     record_goal_results,
     set_game_playgroup,
@@ -41,6 +44,7 @@ from app.game_service import (
     update_seat,
 )
 from app.models import Deck, User
+from app.timeutil import utc_now
 
 router = APIRouter()
 
@@ -207,6 +211,94 @@ def game_create(
             set_game_playgroup(session, game.id, current_user.id, int(pg_raw))
         except ValueError:
             pass
+    return RedirectResponse(f"/games/{game.id}", status_code=303)
+
+
+# NOTE: registered BEFORE /games/{game_id} so the literal path wins even though
+# "manual-log" would never satisfy the int path converter anyway (#42).
+@router.get("/games/manual-log")
+def manual_log_page(
+    request: Request,
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+):
+    from app import playgroup_service
+
+    decks = session.query(Deck).filter(Deck.user_id == current_user.id).order_by(Deck.name).all()
+    user_playgroups = playgroup_service.list_playgroups_for_user(session, current_user.id)
+    return render(
+        request,
+        "manual_log.html",
+        {
+            "title": "Log a Game",
+            "decks": decks,
+            "formats": NEW_GAME_FORMAT_CHOICES,
+            "user_playgroups": user_playgroups,
+            "today": utc_now().strftime("%Y-%m-%d"),
+            "current_user": current_user,
+        },
+    )
+
+
+@router.post("/games/manual-log")
+def manual_log_create(
+    request: Request,
+    played_date: str = Form(""),
+    format: str = Form(""),
+    my_deck_id: str = Form(""),
+    result: str = Form(""),
+    winner: str = Form(""),
+    opp_names: list[str] = Form(default=[]),
+    opp_decks: list[str] = Form(default=[]),
+    playgroup_id: str = Form(""),
+    notes: str = Form(""),
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+    _: None = CsrfRequired,
+):
+    """Log an already-played external game (#42). Composes create+end via
+    :func:`log_game`, which owns the security guards (deck ownership, playgroup
+    access, opponent bounds) — a violation raises ValueError → 400."""
+    try:
+        played_at = datetime.strptime(played_date.strip(), "%Y-%m-%d")
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid date format") from None
+
+    opponents = []
+    for i, name in enumerate(opp_names):
+        nm = name.strip()
+        if not nm:
+            continue
+        dk = opp_decks[i].strip() if i < len(opp_decks) else ""
+        opponents.append({"name": nm[:100], "deck_name": dk[:100]})
+
+    winner_index = None
+    if result == "lost":
+        w = winner.strip()
+        if w == "unknown":
+            winner_index = None
+        elif w.isdigit():
+            winner_index = int(w)
+        else:
+            raise HTTPException(
+                status_code=400, detail="You must identify the winner when selecting 'Lost'"
+            )
+
+    deck_id = int(my_deck_id) if my_deck_id.strip().isdigit() else None
+    pg_id = int(playgroup_id) if playgroup_id.strip().isdigit() else None
+
+    game = log_game(
+        session,
+        user_id=current_user.id,
+        result=result,
+        played_at=played_at,
+        opponents=opponents,
+        deck_id=deck_id,
+        format=normalize_game_format(format),
+        playgroup_id=pg_id,
+        winner_index=winner_index,
+        notes=notes[:500],
+    )
     return RedirectResponse(f"/games/{game.id}", status_code=303)
 
 
