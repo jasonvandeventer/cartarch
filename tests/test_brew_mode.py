@@ -903,3 +903,33 @@ def test_inline_brew_manual_commit_proxies_unowned():
     rows = _deck_rows_for(s, deck)
     assert len(rows) == 1
     assert rows[0].is_proxy is True
+
+
+def test_locations_create_deck_is_brew():
+    """The Locations "Add Deck" form must pass is_brew, matching /decks/create-inline."""
+    from app.models import Deck
+
+    sm = _fresh()
+    s = sm()
+    u = _user(s)
+    s.commit()
+
+    c = _client(sm, u)
+    try:
+        # GET renders the checkbox.
+        g = c.get("/locations")
+        assert g.status_code == 200
+        assert 'name="is_brew"' in g.text
+
+        # is_brew=true -> brew deck.
+        r = c.post("/locations/create-deck", data={"name": "Brew Deck", "is_brew": "true"})
+        assert r.status_code == 303
+
+        # is_brew omitted -> normal deck (Form(False) default, backwards compatible).
+        r = c.post("/locations/create-deck", data={"name": "Normal Deck"})
+        assert r.status_code == 303
+    finally:
+        _clear_overrides()
+
+    assert s.query(Deck).filter_by(user_id=u.id, name="Brew Deck").one().is_brew is True
+    assert s.query(Deck).filter_by(user_id=u.id, name="Normal Deck").one().is_brew is False
