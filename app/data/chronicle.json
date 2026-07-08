@@ -1,5 +1,9 @@
 [ 
   {
+  "version": "4.1.21",
+  "changelog": "Cards in deck-type storage locations are no longer counted as Unassigned on the Collection Overview page."
+}
+  {
     "version": "4.1.20",
     "date": "2026-07-07",
     "added": [
