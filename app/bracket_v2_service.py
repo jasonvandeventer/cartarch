@@ -979,3 +979,51 @@ def persist_estimate(session: Session, deck_id: int, estimate: BracketEstimate) 
         )
     session.commit()
     return estimate_id
+
+
+def load_persisted_estimate(session: Session, deck_id: int) -> dict | None:
+    """Read the latest persisted estimate for a deck as a template-ready dict.
+
+    Read-only (no compute, no write) — the #82 bracket page uses this on GET so
+    the request path never triggers the estimator. Returns None when no estimate
+    has been persisted yet (the page shows its empty state). Shape matches the
+    dormant `bracket_v2` panel context: `.bracket`, `.confidence.*`, `.findings`.
+    persist_estimate keeps only one row per deck, but order defensively anyway.
+    """
+    est = session.execute(
+        text(
+            "SELECT id, final_bracket, mechanics_bracket, intent_bracket, score, "
+            "rules_version, generated_at, confidence_tagging_coverage, "
+            "confidence_mechanics_clarity, confidence_intent_alignment, "
+            "confidence_combo_detection_depth "
+            "FROM deck_bracket_estimates WHERE deck_id = :d "
+            "ORDER BY generated_at DESC, id DESC LIMIT 1"
+        ),
+        {"d": deck_id},
+    ).first()
+    if est is None:
+        return None
+    findings = session.execute(
+        text(
+            "SELECT finding_type, finding_value, severity, message "
+            "FROM deck_bracket_findings WHERE estimate_id = :e ORDER BY id"
+        ),
+        {"e": est[0]},
+    ).fetchall()
+    return {
+        "bracket": est[1],
+        "mechanics_bracket": est[2],
+        "intent_bracket": est[3],
+        "score": est[4],
+        "rules_version": est[5],
+        "generated_at": est[6],
+        "confidence": {
+            "tagging_coverage": est[7],
+            "mechanics_clarity": est[8],
+            "intent_alignment": est[9],
+            "combo_detection_depth": est[10],
+        },
+        "findings": [
+            {"type": f[0], "value": f[1], "severity": f[2], "message": f[3]} for f in findings
+        ],
+    }

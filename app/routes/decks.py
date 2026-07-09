@@ -21,6 +21,11 @@ from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse, Red
 from sqlalchemy.orm import Session, joinedload
 
 from app import sort_spec
+from app.bracket_v2_service import (
+    estimate_bracket_v2,
+    load_persisted_estimate,
+    persist_estimate,
+)
 from app.db import DATA_DIR
 from app.deck_service import (
     CARD_ROLE_TAGS,
@@ -1576,11 +1581,17 @@ def decks_intent(
     intent_combo: str = Form(""),
     intent_winning: str = Form(""),
     intent_played: str = Form(""),
+    next: str = Form(""),
     session: Session = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
     _: None = CsrfRequired,
 ):
-    """Persist the bracket intent survey answers for a deck. Empty -> NULL."""
+    """Persist the bracket intent survey answers for a deck. Empty -> NULL.
+
+    The survey lives on both the deck detail page and the #82 bracket page; the
+    latter passes `next` so submitting returns to the bracket page instead of
+    bouncing to deck detail. `next` is honored only as a same-origin path.
+    """
     deck = get_deck(session, deck_id=deck_id, user_id=current_user.id)
     if not deck:
         return RedirectResponse(url="/decks", status_code=303)
@@ -1590,7 +1601,60 @@ def decks_intent(
     deck.intent_winning = intent_winning.strip() or None
     deck.intent_played = intent_played.strip() or None
     session.commit()
-    return RedirectResponse(url=f"/decks/{deck_id}", status_code=303)
+    dest = next if next.startswith("/") and not next.startswith("//") else f"/decks/{deck_id}"
+    return RedirectResponse(url=dest, status_code=303)
+
+
+@router.get("/decks/{deck_id}/bracket")
+def deck_bracket_page(
+    request: Request,
+    deck_id: int,
+    refresh_error: str = "",
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+):
+    """#82 — dedicated Bracket Evaluation page. Read-only: shows the last
+    persisted estimate (or an empty state), never computes on the request path
+    (the estimator's per-deck compute is what got it pulled off deck detail in
+    v3.27.9). Re-evaluation is an explicit POST to /bracket/refresh."""
+    deck = get_deck(session, deck_id=deck_id, user_id=current_user.id)
+    if not deck:
+        raise HTTPException(status_code=404, detail="Deck not found")
+    estimate = load_persisted_estimate(session, deck.id)
+    return render(
+        request,
+        "deck_bracket.html",
+        {
+            "title": f"Bracket · {deck.name}",
+            "deck": deck,
+            "bracket_v2": estimate,
+            "refresh_error": bool(refresh_error),
+            "current_user": current_user,
+        },
+    )
+
+
+@router.post("/decks/{deck_id}/bracket/refresh")
+def deck_bracket_refresh(
+    deck_id: int,
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+    _: None = CsrfRequired,
+):
+    """#82 — recompute + persist the bracket estimate for a deck, then 303 back
+    to the read-only page. combos stay None: the Spellbook combo compute (per-
+    deck network call) was the actual cold-load offender, so re-eval is
+    mechanics + intent only, matching "local-only and fast"."""
+    deck = get_deck(session, deck_id=deck_id, user_id=current_user.id)
+    if not deck:
+        raise HTTPException(status_code=404, detail="Deck not found")
+    try:
+        estimate = estimate_bracket_v2(session, deck, current_user.id, combos=None)
+        persist_estimate(session, deck.id, estimate)
+    except Exception as exc:  # noqa: BLE001 — surface a banner, never 500 the page
+        print(f"[bracket_v2] refresh failed deck={deck.id}: {exc}", flush=True)
+        return RedirectResponse(url=f"/decks/{deck_id}/bracket?refresh_error=1", status_code=303)
+    return RedirectResponse(url=f"/decks/{deck_id}/bracket", status_code=303)
 
 
 @router.post("/decks/{deck_id}/retag")
