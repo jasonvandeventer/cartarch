@@ -1,5 +1,15 @@
 [ 
   {
+    "version": "4.1.25",
+    "date": "2026-07-09",
+    "added": [
+      "Each deck now has a Bracket Evaluation page showing its estimated power bracket (1-5), the mechanical signals that drive it, a soft power score, confidence indicators, and every finding the evaluator flagged. A re-evaluate button recomputes the assessment after you change the deck."
+    ],
+    "refined": [],
+    "resolved": [],
+    "archivist_note": "The bracket evaluator was built in full during the v3.x era, complete with rules tables, findings persistence, confidence scoring, and an intent survey. It ran on the deck detail page until v3.27.9, when it was pulled from the request path alongside the Spellbook combos panel to fix a 14-second cold-load. The combos panel was the actual offender (external API calls per deck); the bracket compute was local-only and fast, but it was swept out in the same cut and never put back. The service, its tables, its seed data, and even its template panel have been sitting dormant in the codebase for seven weeks. This issue gives the estimator its own page instead of restoring it to the deck detail view, so viewing a bracket is opt-in and the deck page stays fast. The evaluator itself is unchanged; this is purely plumbing between existing code and the user's browser."
+  },
+  {
     "version": "4.1.24",
     "date": "2026-07-08",
     "added": [
