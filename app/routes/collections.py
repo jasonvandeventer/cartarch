@@ -57,6 +57,7 @@ from app.inventory_service import (
     list_pending_rows,
     move_inventory_row_to_location,
     move_surplus_to_location,
+    repoint_inventory_row_printing,
     resolve_drawer_cull_candidates,
     resort_collection,
     split_inventory_row,
@@ -180,6 +181,30 @@ def split_inventory_row_action(
             row_id=row_id,
             user_id=current_user.id,
             split_quantity=quantity,
+        )
+    except InventoryRowNotFound as exc:
+        raise HTTPException(status_code=404, detail="Inventory row not found") from exc
+    return RedirectResponse(url=safe_redirect_url(request), status_code=303)
+
+
+@router.post("/inventory/rows/{row_id}/repoint-printing")
+def repoint_inventory_row_printing_action(
+    request: Request,
+    row_id: int,
+    scryfall_id: str = Form(...),
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+    _: None = CsrfRequired,
+):
+    # Printing repoint (issue #78). Owner-only; 404 on someone else's row.
+    # Empty target / Scryfall lookup failure / different-card → ValueError →
+    # global 400 handler.
+    try:
+        repoint_inventory_row_printing(
+            session=session,
+            row_id=row_id,
+            user_id=current_user.id,
+            target_scryfall_id=scryfall_id,
         )
     except InventoryRowNotFound as exc:
         raise HTTPException(status_code=404, detail="Inventory row not found") from exc

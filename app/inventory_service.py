@@ -16,7 +16,7 @@ from app.import_service import coerce_language_code_strict, normalize_finish
 from app.location_service import SORTABLE_SOURCE_MODES, get_location
 from app.models import Card, InventoryRow, ShowcaseItem, StorageLocation, TransactionLog
 from app.pricing import effective_price
-from app.scryfall import card_constructor_kwargs, fetch_card_by_scryfall_id
+from app.scryfall import card_constructor_kwargs, fetch_card_by_scryfall_id, fetch_oracle_id
 from app.timeutil import utc_now
 
 logger = logging.getLogger(__name__)
@@ -2992,6 +2992,92 @@ def split_inventory_row(
 
     session.commit()
     return new_row
+
+
+def repoint_inventory_row_printing(
+    session: Session, row_id: int, user_id: int, target_scryfall_id: str
+) -> InventoryRow:
+    """Repoint a row to a DIFFERENT PRINTING of the SAME card (issue #78).
+
+    Corrects a wrong set/collector import by changing ``inventory_rows.card_id``
+    in place — the row id and every reference hanging off it (location,
+    drawer/slot, tags, role, notes, created_at, is_pending, and the
+    DeckCardShare / ShowcaseItem / TradeItem FKs on the row id) survive, exactly
+    like the finish correction (#52) and split (#77). No quantity movement, no
+    legs: the physical card in the sleeve is unchanged, only its recorded
+    printing is corrected. The target printing is upserted from Scryfall if not
+    yet in the local catalog.
+
+    Same-card is validated via Scryfall ``oracle_id`` (shared across all
+    printings of a card), NOT the local ``name`` column — so DFCs / split cards /
+    alternate names resolve correctly and a Sol Ring can't be repointed to a
+    Lightning Bolt. Writes ONE ``repoint_printing`` TransactionLog recording the
+    old → new printing. Owner-scoped; single commit.
+
+    Raises InventoryRowNotFound (unknown/foreign row) or ValueError (empty
+    target, Scryfall lookup failure, or a different card) — routes map these to
+    404 / 400.
+
+    # ponytail: Scryfall lookup failures surface as ValueError → 400 (matching
+    # every other Scryfall-dependent path here), not a distinct 503. Split that
+    # out if remote-vs-client error codes ever matter for this manual op.
+    """
+    target_scryfall_id = (target_scryfall_id or "").strip()
+    if not target_scryfall_id:
+        raise ValueError("A target printing is required.")
+
+    row = (
+        session.query(InventoryRow)
+        .filter(InventoryRow.id == row_id, InventoryRow.user_id == user_id)
+        .with_for_update()
+        .first()
+    )
+    if not row:
+        raise InventoryRowNotFound("Inventory row not found.")
+
+    current_card = session.query(Card).filter(Card.id == row.card_id).first()
+    if current_card and target_scryfall_id == current_card.scryfall_id:
+        return row  # no-op — already this printing (also the double-submit guard)
+
+    target_oracle = fetch_oracle_id(target_scryfall_id)
+    if target_oracle is None:
+        raise ValueError("Target printing not found on Scryfall.")
+
+    # Require a verifiable current oracle_id so a transient fetch failure can't
+    # silently bypass the same-card guard.
+    current_oracle = fetch_oracle_id(current_card.scryfall_id) if current_card else None
+    if current_card is not None and current_oracle is None:
+        raise ValueError("Could not verify the current printing on Scryfall; please try again.")
+    if current_oracle is not None and current_oracle != target_oracle:
+        raise ValueError("Target is a different card, not a different printing.")
+
+    new_card = get_or_create_card(
+        session, target_scryfall_id, card_data=fetch_card_by_scryfall_id(target_scryfall_id)
+    )
+    if new_card is None:
+        raise ValueError("Target printing could not be loaded from Scryfall.")
+
+    old_name = current_card.name if current_card else "?"
+    old_ref = f" [{current_card.set_code}/{current_card.collector_number}]" if current_card else ""
+    row.card_id = new_card.id
+    row.updated_at = utc_now()
+
+    log_transaction(
+        session=session,
+        user_id=user_id,
+        event_type="repoint_printing",
+        card_id=new_card.id,
+        finish=row.finish,
+        quantity_delta=0,
+        inventory_row_id=row.id,
+        note=(
+            f"Repoint printing: {old_name}{old_ref} → "
+            f"{new_card.name} [{new_card.set_code}/{new_card.collector_number}]"
+        ),
+        flush=False,
+    )
+    session.commit()
+    return row
 
 
 def delete_inventory_row(session: Session, row_id: int, user_id: int) -> bool:

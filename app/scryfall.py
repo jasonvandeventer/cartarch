@@ -1023,6 +1023,25 @@ def fetch_card_by_scryfall_id(scryfall_id: str) -> dict[str, Any] | None:
     return _fetch_by_id_cached((scryfall_id or "").strip())
 
 
+@lru_cache(maxsize=8192)
+def fetch_oracle_id(scryfall_id: str) -> str | None:
+    """Scryfall ``oracle_id`` for a printing (issue #78 printing repoint).
+
+    oracle_id is the card-identity key shared by EVERY printing of a card, so
+    it's the correct same-card guard for a repoint — stable across DFCs, split
+    cards and alternate names where the local ``name`` column is not. It is
+    deliberately NOT part of ``_normalize_card_payload`` (the scryfall_cards
+    seam is fixed at 27 keys), so this is a tiny raw fetch of just the one field,
+    LRU-cached like the sibling id fetch so repeated repoints on the same card
+    are free.
+    """
+    scryfall_id = (scryfall_id or "").strip()
+    if not scryfall_id:
+        return None
+    raw = _get_json(f"{SCRYFALL_CARD_URL}/{scryfall_id}")
+    return (raw or {}).get("oracle_id")
+
+
 def fetch_card_by_set_and_number(set_code: str, collector_number: str) -> dict[str, Any] | None:
     collector_number = (collector_number or "").strip()
     if collector_number.endswith("*"):
