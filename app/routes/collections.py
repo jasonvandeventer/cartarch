@@ -59,6 +59,7 @@ from app.inventory_service import (
     move_surplus_to_location,
     resolve_drawer_cull_candidates,
     resort_collection,
+    split_inventory_row,
     undo_last_batch,
     undo_last_import,
     update_inventory_location,
@@ -155,6 +156,30 @@ def correct_inventory_row_finish_action(
             row_id=row_id,
             user_id=current_user.id,
             new_finish=finish.strip().lower(),
+        )
+    except InventoryRowNotFound as exc:
+        raise HTTPException(status_code=404, detail="Inventory row not found") from exc
+    return RedirectResponse(url=safe_redirect_url(request), status_code=303)
+
+
+@router.post("/inventory/rows/{row_id}/split")
+def split_inventory_row_action(
+    request: Request,
+    row_id: int,
+    quantity: int = Form(...),
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+    _: None = CsrfRequired,
+):
+    # Quantity split (issue #77). Owner-only; 404 on someone else's row.
+    # Invalid quantity → ValueError → global 400 handler; non-integer form
+    # input is rejected by FastAPI before we're called.
+    try:
+        split_inventory_row(
+            session=session,
+            row_id=row_id,
+            user_id=current_user.id,
+            split_quantity=quantity,
         )
     except InventoryRowNotFound as exc:
         raise HTTPException(status_code=404, detail="Inventory row not found") from exc

@@ -2907,6 +2907,93 @@ def correct_inventory_row_finish(
     return row
 
 
+def split_inventory_row(
+    session: Session, row_id: int, user_id: int, split_quantity: int
+) -> InventoryRow:
+    """Quantity split (issue #77): peel ``split_quantity`` copies off an
+    N-quantity row into a NEW independent row.
+
+    The ORIGINAL row is only decremented — its id, location/drawer/slot, tags,
+    role, notes, created_at and every FK reference (DeckCardShare /
+    ShowcaseItem / TradeItem) stay exactly where they were. The new row copies
+    every non-quantity field verbatim (fresh timestamps, fresh id) so the two
+    rows together equal the original. Owner-scoped; one transaction (single
+    commit at the end — any failure before it rolls back both legs and the
+    logs together).
+
+    Writes TWO ``split_row`` TransactionLog entries sharing one note (the
+    switch_printing two-leg pattern): -N on the original, +N on the new row —
+    net zero, so the audit trail reads as a split, not an unexplained drop.
+    """
+    if not isinstance(split_quantity, int) or split_quantity < 1:
+        raise ValueError("Split quantity must be a positive whole number.")
+
+    row = (
+        session.query(InventoryRow)
+        .filter(InventoryRow.id == row_id, InventoryRow.user_id == user_id)
+        .with_for_update()
+        .first()
+    )
+    if not row:
+        raise InventoryRowNotFound("Inventory row not found.")
+
+    if split_quantity >= row.quantity:
+        raise ValueError(f"Split quantity must be less than the row's quantity ({row.quantity}).")
+
+    now = utc_now()
+    new_row = InventoryRow(
+        card_id=row.card_id,
+        user_id=row.user_id,
+        storage_location_id=row.storage_location_id,
+        finish=row.finish,
+        quantity=split_quantity,
+        drawer=row.drawer,
+        slot=row.slot,
+        is_pending=row.is_pending,
+        role=row.role,
+        tags=row.tags,
+        language=row.language,
+        is_proxy=row.is_proxy,
+        from_drawer=row.from_drawer,
+        from_slot=row.from_slot,
+        notes=row.notes,
+        created_at=now,
+        updated_at=now,
+    )
+    session.add(new_row)
+    session.flush()  # new_row.id for the second log leg
+
+    row.quantity -= split_quantity
+    row.updated_at = now
+
+    note = f"Split {split_quantity} of row {row.id} into new row {new_row.id}"
+    log_transaction(
+        session=session,
+        user_id=user_id,
+        event_type="split_row",
+        card_id=row.card_id,
+        finish=row.finish,
+        quantity_delta=-split_quantity,
+        inventory_row_id=row.id,
+        note=note,
+        flush=False,
+    )
+    log_transaction(
+        session=session,
+        user_id=user_id,
+        event_type="split_row",
+        card_id=row.card_id,
+        finish=row.finish,
+        quantity_delta=split_quantity,
+        inventory_row_id=new_row.id,
+        note=note,
+        flush=False,
+    )
+
+    session.commit()
+    return new_row
+
+
 def delete_inventory_row(session: Session, row_id: int, user_id: int) -> bool:
     row = (
         session.query(InventoryRow)

@@ -247,6 +247,25 @@ onerror="this.onerror=null; this.src='{{ scryfall_image_fallback(scryfall_id, si
                 </select>
                 <button type="submit">Fix Finish</button>
               </form>
+              {# issue #77 — quantity split. Peels N copies into a new
+                 independent row; the original keeps its id, placement, and
+                 every reference. Only offered when there is something to
+                 peel (quantity > 1). #}
+              {% if item.quantity > 1 %}
+                <form action="/inventory/rows/{{ item.id }}/split"
+                      method="post"
+                      class="inline-form"
+                      title="Split copies off into a new independent row">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                  <input type="number"
+                         name="quantity"
+                         min="1"
+                         max="{{ item.quantity - 1 }}"
+                         value="1"
+                         style="width: 64px">
+                  <button type="submit">Split</button>
+                </form>
+              {% endif %}
               {# v3.29.1 — Add to Showcase. The add-to-Showcase entry
                  point; the management page lists/edits but does not
                  search for inventory rows. ``add_showcase_item`` is
