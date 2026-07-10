@@ -58,6 +58,8 @@
           <input type="hidden" name="role" value="{{ row.role or '' }}">
           <input type="hidden" name="tags" value="{{ row.tags or '' }}">
           <input type="hidden" name="is_proxy" value="{{ 'true' if row.is_proxy else 'false' }}">
+          {# issue #70 — brew signal for auto-created decks on the per-row path #}
+          <input type="hidden" name="is_brew" value="{{ 'true' if row.is_brew else 'false' }}">
         {% endfor %}
         {# v3.30.15 — per-distinct-Location parallel arrays. Single-match
            "clean" resolutions emit a hidden input with the existing

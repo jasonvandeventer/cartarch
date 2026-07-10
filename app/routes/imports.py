@@ -1205,6 +1205,7 @@ async def import_commit(
     role: list[str] = Form([]),
     tags: list[str] = Form([]),
     is_proxy: list[str] = Form([]),
+    is_brew: list[str] = Form([]),
     target_location_id: int = Form(0),
     reconcile_action: list[str] = Form([]),
     reconcile_move_qty: list[str] = Form([]),
@@ -1231,6 +1232,7 @@ async def import_commit(
         role,
         tags,
         is_proxy,
+        is_brew,
     )
 
     placed_in = None
@@ -1315,13 +1317,81 @@ async def import_commit(
         )
 
     if line_to_location_id:
-        result = persist_import_rows(
-            session,
-            rows,
-            user_id=current_user.id,
-            filename=filename,
-            line_to_location_id=line_to_location_id,
-        )
+        # issue #70 — Option D selective reroute. Rows resolving to a BREW
+        # deck's storage location leave the v3.30.15 bypass and go through
+        # _commit_deck_import_with_reconciliation instead — the single home
+        # of the brew proxy rule (unowned → proxy, owned → pulled real).
+        # Everything else (drawers, boxes, non-brew decks) keeps the bypass
+        # unchanged. Brew commits run FIRST so the drawer-sorter redirect
+        # below can never skip them.
+        brew_deck_by_loc = {
+            d.storage_location_id: d
+            for d in session.query(Deck)
+            .filter(
+                Deck.user_id == current_user.id,
+                Deck.is_brew.is_(True),
+                Deck.storage_location_id.in_(set(line_to_location_id.values())),
+            )
+            .all()
+        }
+        brew_rows_by_loc: dict[int, list[dict]] = {}
+        if brew_deck_by_loc:
+            non_brew_rows = []
+            for r in rows:
+                loc_id = line_to_location_id.get(r.get("line_number"))
+                if loc_id in brew_deck_by_loc:
+                    brew_rows_by_loc.setdefault(loc_id, []).append(r)
+                    del line_to_location_id[r["line_number"]]
+                else:
+                    non_brew_rows.append(r)
+            rows = non_brew_rows
+
+        brew_imported = brew_total_qty = brew_merged = brew_shared = 0
+        brew_failed: list[dict] = []
+        brew_batch_id = None
+        for loc_id, deck_rows in brew_rows_by_loc.items():
+            deck = brew_deck_by_loc[loc_id]
+            # No reconciliation UI ran on this path, so use the recommended
+            # defaults (owned → move, unowned → import_new) — the same
+            # defaults the Destination-dropdown preview pre-selects.
+            matches = find_inventory_matches_for_deck_import(
+                session, current_user.id, deck.id, deck_rows
+            )
+            brew_result = _commit_deck_import_with_reconciliation(
+                session=session,
+                user_id=current_user.id,
+                deck=deck,
+                parsed_rows=deck_rows,
+                actions=[m["recommended_action"] for m in matches],
+                move_qtys=[m["recommended_move_qty"] for m in matches],
+                new_qtys=[m["recommended_new_qty"] for m in matches],
+                filename=filename,
+            )
+            brew_imported += brew_result["imported_count"]
+            brew_total_qty += brew_result["total_quantity"]
+            moved_count += brew_result["moved_count"]
+            brew_merged += brew_result["merged_count"]
+            brew_shared += brew_result["shared_count"]
+            brew_failed.extend(brew_result["failed_rows"])
+            stale_match_rows.extend(brew_result["stale_match_rows"])
+            brew_batch_id = brew_result["batch_id"] or brew_batch_id
+
+        if rows:
+            result = persist_import_rows(
+                session,
+                rows,
+                user_id=current_user.id,
+                filename=filename,
+                line_to_location_id=line_to_location_id,
+            )
+        else:
+            # Every row rerouted to a brew deck — nothing left for the bypass.
+            result = {
+                "imported_count": 0,
+                "total_quantity": 0,
+                "failed_rows": [],
+                "batch_id": None,
+            }
 
         # Run place_imported_rows per resolved location so newly-placed rows
         # merge with any existing placed copy at the same destination
@@ -1362,18 +1432,20 @@ async def import_commit(
             route_intake_to_bulk(session, current_user.id, pending_row_ids)
             resort_collection(session, user_id=current_user.id)
             return RedirectResponse(url="/pending", status_code=303)
-        elif placed_by_loc:
+        elif placed_by_loc or brew_rows_by_loc:
             # All rows resolved per-row; surface the first resolved location
             # as the placed_in for the result page, with a "multiple
-            # locations" hint when more than one was used.
-            first_loc_id = next(iter(placed_by_loc.keys()))
+            # locations" hint when more than one was used. Brew-deck
+            # destinations (issue #70) count as resolved locations too.
+            dest_loc_ids = set(placed_by_loc) | set(brew_rows_by_loc)
+            first_loc_id = next(iter(dest_loc_ids))
             loc = get_location(session, location_id=first_loc_id, user_id=current_user.id)
-            if len(placed_by_loc) == 1 and loc:
+            if len(dest_loc_ids) == 1 and loc:
                 placed_in = loc.name
                 placed_in_url = f"/locations/{first_loc_id}"
                 placed_in_kind = "deck" if loc.type == "deck" else "location"
             else:
-                placed_in = f"{len(placed_by_loc)} locations"
+                placed_in = f"{len(dest_loc_ids)} locations"
                 placed_in_url = "/collection"
                 placed_in_kind = "multiple"
 
@@ -1382,14 +1454,16 @@ async def import_commit(
             "import_result.html",
             {
                 "title": "Import Results",
-                "imported_count": result["imported_count"],
-                "total_quantity": result.get("total_quantity", result["imported_count"]),
+                "imported_count": result["imported_count"] + brew_imported,
+                "total_quantity": result.get("total_quantity", result["imported_count"])
+                + brew_total_qty,
                 "moved_count": moved_count,
-                "merged_count": merged_count,
+                "merged_count": merged_count + brew_merged,
+                "shared_count": brew_shared,
                 "skipped_count": 0,
                 "stale_match_rows": stale_match_rows,
-                "failed_rows": result["failed_rows"],
-                "batch_id": result["batch_id"],
+                "failed_rows": result["failed_rows"] + brew_failed,
+                "batch_id": result["batch_id"] or brew_batch_id,
                 "placed_in": placed_in,
                 "placed_in_url": placed_in_url,
                 "placed_in_kind": placed_in_kind,
