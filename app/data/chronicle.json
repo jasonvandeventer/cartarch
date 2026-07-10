@@ -1,5 +1,15 @@
 [
   {
+    "version": "4.1.29",
+    "date": "2026-07-10",
+    "added": [
+      "Inventory rows with more than one copy can now be split: peel off any number of copies into a new, independent row while the original keeps its history and all its references intact. Both rows are fully editable afterward."
+    ],
+    "refined": [],
+    "resolved": [],
+    "archivist_note": "The collection has always tracked quantity as a number on a row, and a row as the unit of identity. That works until two copies of the same card need to go different places, or one of them turns out to be foil and the other isn't. Until now the only path was to delete the row and re-add the pieces, which meant losing the row's id and every reference hanging off it: its place in a showcase, its seat in a trade, its share into a sibling deck. The split keeps the original row exactly where it was, with every reference intact, and hands the split-off copies a fresh row of their own. Two transaction log entries record what happened so the audit trail reads as one event, not an unexplained quantity drop."
+  },
+  {
     "version": "4.1.28",
     "date": "2026-07-10",
     "added": [
