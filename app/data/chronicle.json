@@ -1,5 +1,15 @@
 [
   {
+    "version": "4.1.28",
+    "date": "2026-07-10",
+    "added": [
+      "Card power, toughness, and keyword abilities are now stored from Scryfall data. The JSON collection and deck exports include all three fields. No visible UI change; this is foundation data for future search and display features."
+    ],
+    "refined": [],
+    "resolved": [],
+    "archivist_note": "The card table knew a card's mana cost, its colors, its type line, its loyalty, its defense, but not its power and toughness or the keyword abilities printed on it. That gap was invisible as long as the app only needed to display card images and sort by mana value, but it closes the door on anything that wants to reason about a creature's stats or filter by flying, trample, or ward. The three new columns follow the loyalty/defense pattern exactly: nullable strings for P/T (because power can be * or X, never safely an integer), a JSON array for keywords, extracted from Scryfall with the same face-fallback the other fields use, populated by the same bulk daemon that already walks every card nightly. Existing cards backfill from the cache; new cards arrive with the data from their first touch. The export surfaces them as parsed values, not raw strings, so a downstream tool can filter on keywords without a second lookup."
+  },
+  {
     "version": "4.1.27",
     "date": "2026-07-09",
     "added": [
