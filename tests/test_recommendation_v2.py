@@ -794,3 +794,129 @@ def test_analysis_profile_reset_route(db, user, client):
     assert resp.status_code == 303
     db.expire_all()
     assert db.query(DeckStrategyProfile).filter_by(deck_id=deck.id).first() is None
+
+
+# --- P4: upgrade-by-need suggestions -------------------------------------------------
+
+
+def _protection_card(name):
+    return c(
+        name,
+        oracle="Target creature you control gains indestructible until end of turn.",
+        tl="Artifact",
+        cmc=2.0,
+    )
+
+
+def _loose(db, user, card, location=None):
+    """Own a card outside any deck (optionally in a named non-deck location)."""
+    db.add(card)
+    db.flush()
+    row = InventoryRow(
+        user_id=user.id,
+        card_id=card.id,
+        storage_location_id=location.id if location else None,
+        quantity=1,
+        is_pending=False,
+        is_proxy=False,
+    )
+    db.add(row)
+    db.flush()
+    return row
+
+
+def _box(db, user, name="Bulk Box"):
+    from app.models import StorageLocation
+
+    loc = StorageLocation(user_id=user.id, name=name, type="other", mode="manual")
+    db.add(loc)
+    db.flush()
+    return loc
+
+
+def test_suggest_upgrades_fills_under_need(db, user):
+    cards = molecule_man_deck()
+    deck = _make_deck_with_cards(db, user, cards, cards[0])
+    box = _box(db, user)
+    _loose(db, user, _protection_card("Guardian Idol"), box)
+    off_color = c(
+        "Dive Down",
+        oracle="Target creature you control gains hexproof until end of turn.",
+        tl="Instant",
+        cmc=1.0,
+        color_identity="U",
+    )
+    _loose(db, user, off_color, box)
+    # a second loose copy of a card already IN the deck must not be suggested
+    _loose(db, user, _protection_card("Eldritch Immunity"), box)
+    db.commit()
+
+    analysis = rec.analyze_deck(db, deck, user.id)
+    db.commit()
+    assert analysis.coverage["protection"]["status"] == "under"
+    protection = analysis.upgrades_by_need["protection"]
+    names = [s.card.name for s in protection]
+    assert "Guardian Idol" in names
+    assert "Dive Down" not in names  # off color identity
+    assert "Eldritch Immunity" not in names  # already in the deck
+    (idol,) = [s for s in protection if s.card.name == "Guardian Idol"]
+    assert idol.fills_need == "protection"
+    assert idol.relevance in ("medium", "high")
+    assert idol.broad_role == "Protection"
+    assert idol.in_other_deck is False
+    assert idol.location == "Bulk Box"
+    assert idol.quantity_available == 1
+
+
+def test_suggest_upgrades_flags_cards_in_other_decks(db, user):
+    cards = molecule_man_deck()
+    deck = _make_deck_with_cards(db, user, cards, cards[0])
+    committed = _protection_card("Loyal Bodyguard")
+    other_deck = _make_deck_with_cards(db, user, [committed], None, name="Severance Package")
+    db.commit()
+
+    analysis = rec.analyze_deck(db, deck, user.id)
+    db.commit()
+    (bodyguard,) = [
+        s for s in analysis.upgrades_by_need["protection"] if s.card.name == "Loyal Bodyguard"
+    ]
+    assert bodyguard.in_other_deck is True
+    assert bodyguard.location == "Severance Package"
+    assert other_deck.id != deck.id
+
+
+def test_suggest_upgrades_caps_per_category(db, user):
+    cards = molecule_man_deck()
+    deck = _make_deck_with_cards(db, user, cards, cards[0])
+    box = _box(db, user)
+    for i in range(10):
+        _loose(db, user, _protection_card(f"Ward Sphere {i}"), box)
+    db.commit()
+
+    analysis = rec.analyze_deck(db, deck, user.id)
+    db.commit()
+    assert len(analysis.upgrades_by_need["protection"]) == 5
+
+
+def test_suggest_upgrades_empty_need_is_reported(db, user):
+    cards = molecule_man_deck()
+    deck = _make_deck_with_cards(db, user, cards, cards[0])
+    db.commit()
+
+    analysis = rec.analyze_deck(db, deck, user.id)
+    db.commit()
+    # win_conditions is under target and nothing owned fills it — empty, no error
+    assert analysis.coverage["win_conditions"]["status"] == "under"
+    assert analysis.upgrades_by_need["win_conditions"] == []
+
+
+def test_analysis_route_renders_upgrades(db, user, client):
+    cards = molecule_man_deck()
+    deck = _make_deck_with_cards(db, user, cards, cards[0])
+    _loose(db, user, _protection_card("Guardian Idol"), _box(db, user))
+    db.commit()
+    resp = client.get(f"/decks/{deck.id}/analysis")
+    assert resp.status_code == 200
+    assert "Upgrade suggestions" in resp.text
+    assert "Guardian Idol" in resp.text
+    assert "No owned cards match this need" in resp.text

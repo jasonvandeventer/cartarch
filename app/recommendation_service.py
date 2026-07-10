@@ -1000,12 +1000,34 @@ class AnalyzedCard:
 
 
 @dataclass
+class UpgradeSuggestion:
+    """An OWNED card outside this deck that fills an under-filled plan
+    category (issue #60 P4). Informational only — moving it stays the
+    existing pull-to-deck flow. Never suggests unowned cards or purchases."""
+
+    card: Card
+    inventory_row_id: int
+    quantity_available: int  # copies owned outside this deck
+    finish: str
+    location: str
+    in_other_deck: bool  # committed to another deck (shown, flagged distinctly)
+    fills_need: str  # the under-filled coverage category
+    broad_role: str | None
+    subtype: str | None
+    relevance: str
+    reason: str
+
+
+@dataclass
 class DeckAnalysis:
     commander: Card | None
     profile: dict
     cards: list[AnalyzedCard]
     coverage: dict
     summary: dict
+    upgrades: list[UpgradeSuggestion] = field(default_factory=list)
+    # keyed by under-filled category name; empty list = "no owned cards match"
+    upgrades_by_need: dict[str, list[UpgradeSuggestion]] = field(default_factory=dict)
 
 
 def get_or_seed_profile(session: Session, deck, commander: Card) -> dict:
@@ -1137,7 +1159,7 @@ def analyze_deck(session: Session, deck, user_id: int) -> DeckAnalysis:
     else:
         verdict = "Plan-complete: every category within its target range"
 
-    return DeckAnalysis(
+    analysis = DeckAnalysis(
         commander=commander,
         profile=profile,
         cards=analyzed,
@@ -1151,6 +1173,120 @@ def analyze_deck(session: Session, deck, user_id: int) -> DeckAnalysis:
             "verdict": verdict,
         },
     )
+    # P4 — owned-collection upgrade suggestions for the under-filled needs.
+    analysis.upgrades = suggest_upgrades(session, deck, user_id, analysis)
+    analysis.upgrades_by_need = {cat: [] for cat in under}
+    for suggestion in analysis.upgrades:
+        analysis.upgrades_by_need[suggestion.fills_need].append(suggestion)
+    return analysis
+
+
+# Cap per under-filled category so the UI stays scannable.
+UPGRADES_PER_NEED = 5
+
+_RELEVANCE_SORT = {"high": 0, "medium": 1}
+
+
+def suggest_upgrades(session: Session, deck, user_id: int, analysis: DeckAnalysis) -> list:
+    """Owned cards OUTSIDE this deck that fill the analysis's under-filled
+    coverage categories (issue #60 P4).
+
+    Scope is strictly the user's own collection: no unowned cards, no external
+    sources, no purchase suggestions. Loose cards (drawers/boxes/unassigned)
+    are the primary pool; cards committed to OTHER decks are still suggested
+    but flagged (``in_other_deck``) since moving them is the user's call.
+    Filters: commander-legal, inside the deck's color identity, not already in
+    the deck (by name — any printing counts), medium/high relevance only.
+    Sorted per category: high relevance first, detected-role cards before
+    role-less big drops, then cheapest first (these are owned cards the user
+    may need to free up), capped at ``UPGRADES_PER_NEED``.
+    """
+    from app.inventory_service import get_location_label
+    from app.pricing import effective_price
+
+    under = [cat for cat, entry in analysis.coverage.items() if entry["status"] == "under"]
+    if not under:
+        return []
+    profile = analysis.profile
+    deck_colors = _profile_colors(profile)
+    deck_names = {ac.card.name for ac in analysis.cards}
+    if analysis.commander:
+        deck_names.add(analysis.commander.name)
+
+    rows = (
+        session.query(InventoryRow)
+        .options(joinedload(InventoryRow.card), joinedload(InventoryRow.storage_location))
+        .filter(InventoryRow.user_id == user_id, InventoryRow.is_proxy.is_(False))
+        .all()
+    )
+
+    # Aggregate per card outside this deck; prefer a loose row over one
+    # committed to another deck.
+    by_card: dict[int, dict] = {}
+    for row in rows:
+        card = row.card
+        if not card or card.name in deck_names:
+            continue
+        loc = row.storage_location
+        if loc and deck.storage_location_id and loc.id == deck.storage_location_id:
+            continue  # this deck's own rows
+        agg = by_card.setdefault(
+            card.id, {"card": card, "qty": 0, "loose": None, "committed": None}
+        )
+        agg["qty"] += row.quantity
+        if loc and loc.type == "deck":
+            agg["committed"] = agg["committed"] or row
+        else:
+            agg["loose"] = agg["loose"] or row
+
+    suggestions: list[UpgradeSuggestion] = []
+    for agg in by_card.values():
+        card = agg["card"]
+        if not is_commander_legal(card):
+            continue
+        if not card_in_color_identity(card, deck_colors):
+            continue
+        needs = [cat for cat in _coverage_categories(card, deck_colors) if cat in under]
+        if not needs:
+            continue
+        broad, subtype, _confidence = classify_role_subtype(card, deck_colors)
+        relevance, reason = score_role_usefulness(card, broad, subtype, deck_colors, profile)
+        if relevance not in ("medium", "high"):
+            continue
+        row = agg["loose"] or agg["committed"]
+        in_other_deck = agg["loose"] is None
+        for cat in needs:
+            suggestions.append(
+                UpgradeSuggestion(
+                    card=card,
+                    inventory_row_id=row.id,
+                    quantity_available=agg["qty"],
+                    finish=row.finish or "normal",
+                    location=get_location_label(row),
+                    in_other_deck=in_other_deck,
+                    fills_need=cat,
+                    broad_role=broad,
+                    subtype=subtype,
+                    relevance=relevance,
+                    reason=reason,
+                )
+            )
+
+    def _sort_key(s: UpgradeSuggestion):
+        # ponytail: role-less big drops rank below detected-role cards — they
+        # fill large_payoffs by mana value alone, not a recognized role.
+        return (
+            _RELEVANCE_SORT[s.relevance],
+            0 if s.broad_role is not None else 1,
+            effective_price(s.card, s.finish) or 0.0,
+            s.card.name or "",
+        )
+
+    out: list[UpgradeSuggestion] = []
+    for cat in under:
+        group = sorted((s for s in suggestions if s.fills_need == cat), key=_sort_key)
+        out.extend(group[:UPGRADES_PER_NEED])
+    return out
 
 
 def list_commander_candidates(session: Session, user_id: int) -> list[Card]:

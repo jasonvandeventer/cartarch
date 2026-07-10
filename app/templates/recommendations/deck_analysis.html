@@ -67,6 +67,57 @@
   </section>
 
   {% set relevance_colors = {"very_low": "#c0392b", "low": "#d68910", "medium": "#7f8c8d", "high": "#27ae60"} %}
+
+  {% if analysis.upgrades_by_need %}
+    <section class="panel">
+      <h3 class="panel-title">Upgrade suggestions (from your collection)</h3>
+      <p style="opacity:0.75;margin-top:0">
+        Cards you already own, outside this deck, that fill the under-target
+        categories. Informational — nothing moves until you move it.
+      </p>
+      {% for cat, suggestions in analysis.upgrades_by_need.items() %}
+        {% set entry = analysis.coverage[cat] %}
+        <h4 style="margin-bottom:0.25rem">
+          {{ cat | replace("_", " ") | capitalize }}
+          <span style="color:#c0392b;font-weight:600">— {{ entry.min - entry.count }} below target</span>
+        </h4>
+        {% if suggestions %}
+          <ul style="list-style:none;padding:0;margin:0 0 0.75rem;display:grid;gap:0.4rem">
+            {% for s in suggestions %}
+              <li style="display:flex;gap:0.6rem;align-items:flex-start">
+                {% if s.card.image_url %}
+                  <img src="{{ mirror_image_url(s.card.scryfall_id) }}"
+                       {{ img_fallback(s.card.scryfall_id) }}
+                       alt="{{ s.card.name }}"
+                       loading="lazy"
+                       style="width:48px;border-radius:4px;flex-shrink:0">
+                {% endif %}
+                <div>
+                  <strong>{{ s.card.name }}</strong>
+                  {% if s.broad_role %}
+                    <span style="opacity:0.75;margin-left:0.35rem">{{ s.broad_role }}{% if s.subtype %} · {{ s.subtype | replace("_", " ") }}{% endif %}</span>
+                  {% endif %}
+                  <span style="color:{{ relevance_colors[s.relevance] }};font-weight:600;margin-left:0.35rem">{{ s.relevance }}</span>
+                  {% if s.in_other_deck %}
+                    <span style="color:#d68910;margin-left:0.35rem"
+                          title="Committed to another deck — moving it is your call.">in {{ s.location }}</span>
+                  {% else %}
+                    <span style="opacity:0.65;margin-left:0.35rem">{{ s.location }}</span>
+                  {% endif %}
+                  <span style="opacity:0.65;display:block">{{ s.reason }}</span>
+                </div>
+              </li>
+            {% endfor %}
+          </ul>
+        {% else %}
+          <p style="opacity:0.65;margin-top:0">
+            No owned cards match this need — this category is a buy-list candidate.
+          </p>
+        {% endif %}
+      {% endfor %}
+    </section>
+  {% endif %}
+
   {% for status, label, blurb in [
        ("cut", "Cuts", "Dead roles for this plan — the actionable removals."),
        ("placeholder", "Placeholders", "Acceptable filler, not ideal — upgrade when something better turns up."),
