@@ -195,7 +195,7 @@ def detect_csv_format(headers: list[str]) -> str:
         return "Helvault"
     if "edition" in lower:
         return "Moxfield"
-    return "Scanner App"
+    return "TCG Archivist"
 
 
 def normalize_finish(value: str | None) -> str:

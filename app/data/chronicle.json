@@ -1,5 +1,15 @@
 [
   {
+    "version": "4.1.35",
+    "date": "2026-07-10",
+    "added": [],
+    "refined": [
+      "The import page now lists every format it accepts — Helvault, Moxfield (collection CSV or text export), ManaBox, Archidekt, and the TCG Archivist format — and notes that the format is detected from the file automatically. The built-in format is now named TCG Archivist wherever it's shown, including the import preview's detected-format label."
+    ],
+    "resolved": [],
+    "archivist_note": "Copy + label follow-up to v4.1.34 (#81). Two touchpoints: the /import blurb (app/templates/import.html) now reflects the adapter formats added in #81 and drops the stale 'detected from the column headers' phrasing, since MTGO-text and Archidekt are content-detected, not header-detected; and detect_csv_format's fallback label changed 'Scanner App' -> 'TCG Archivist' so the preview screen's format name matches the blurb. No test pinned the old string; import + adapter suites stay green."
+  },
+  {
     "version": "4.1.34",
     "date": "2026-07-10",
     "added": [
