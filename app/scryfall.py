@@ -100,6 +100,21 @@ def _normalize_card_payload(raw: dict[str, Any]) -> dict[str, Any]:
     if defense is None and card_faces:
         defense = next((face.get("defense") for face in card_faces if face.get("defense")), None)
 
+    # #76 — power / toughness. Same faithful-raw-string + first-face fallback
+    # as loyalty/defense (DFC creatures carry P/T on the face, not top-level;
+    # a both-faces-creature DFC reports the FRONT face only — accepted, same
+    # rule as loyalty). keywords needs no fallback: Scryfall emits it
+    # top-level only, never per-face.
+    power = raw.get("power")
+    if power is None and card_faces:
+        power = next((face.get("power") for face in card_faces if face.get("power")), None)
+
+    toughness = raw.get("toughness")
+    if toughness is None and card_faces:
+        toughness = next(
+            (face.get("toughness") for face in card_faces if face.get("toughness")), None
+        )
+
     raw_colors = raw.get("colors") or []
     colors_str = " ".join(raw_colors) if raw_colors else None
 
@@ -176,6 +191,14 @@ def _normalize_card_payload(raw: dict[str, Any]) -> dict[str, Any]:
         # card_constructor_kwargs.
         "loyalty": loyalty,
         "defense": defense,
+        # #76 — 25th–27th keys, appended LAST (byte-identical ordering of the
+        # existing 24). All three ARE Card ORM columns (not stripped by
+        # card_constructor_kwargs). keywords is JSON array text, "[]" when the
+        # card has none (processed-vs-unpopulated contract, like
+        # produced_tokens); flat unsorted list, verbatim Scryfall casing.
+        "power": power,
+        "toughness": toughness,
+        "keywords": json.dumps(raw.get("keywords") or []),
     }
 
 
@@ -443,14 +466,15 @@ class BulkFetchResult:
 # _cached_row_to_payload rebuilds the dict in this order so a cache-path
 # value is indistinguishable from an API-path value. v3.30.11 added
 # produced_tokens as the 22nd column; v3.36.1 appended loyalty + defense
-# as the 23rd + 24th — all at the end, preserving byte-identical ordering
-# of the existing keys.
+# as the 23rd + 24th; #76 appended power + toughness + keywords as the
+# 25th–27th — all at the end, preserving byte-identical ordering of the
+# existing keys.
 _CACHE_COLUMNS = (
     "scryfall_id, name, set_code, set_name, collector_number, rarity, "
     "image_url, type_line, oracle_text, price_usd, price_usd_foil, "
     "price_usd_etched, colors, color_identity, mana_cost, cmc, legalities, "
     "full_art, frame_effects, set_type, layout, produced_tokens, "
-    "loyalty, defense"
+    "loyalty, defense, power, toughness, keywords"
 )
 
 
@@ -504,6 +528,13 @@ def _cached_row_to_payload(m) -> dict[str, Any]:
         # and _normalize_card_payload.
         "loyalty": m["loyalty"],
         "defense": m["defense"],
+        # #76 — 25th–27th fields. P/T pass through verbatim (NULL on
+        # non-creatures); keywords is the stored JSON array text, verbatim
+        # like legalities/frame_effects. Appended LAST, lockstep with
+        # _CACHE_COLUMNS and _normalize_card_payload.
+        "power": m["power"],
+        "toughness": m["toughness"],
+        "keywords": m["keywords"],
     }
 
 
@@ -1055,6 +1086,13 @@ def refresh_card_from_scryfall(session: Session, card_id: int) -> bool:
     card.frame_effects = fresh["frame_effects"]
     card.set_type = fresh["set_type"]
     card.layout = fresh["layout"]
+    # loyalty/defense were dropped by this refresh since v3.36.1 (pre-existing
+    # gap, fixed with #76 while adding the three new fields below).
+    card.loyalty = fresh["loyalty"]
+    card.defense = fresh["defense"]
+    card.power = fresh["power"]
+    card.toughness = fresh["toughness"]
+    card.keywords = fresh["keywords"]
     card.updated_at = utc_now()
     return True
 

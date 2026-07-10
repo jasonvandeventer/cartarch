@@ -24,6 +24,10 @@ def card_metadata(card: Card) -> dict:
         legalities = json.loads(card.legalities) if card.legalities else {}
     except (TypeError, ValueError):
         legalities = {}
+    try:
+        keywords = json.loads(card.keywords) if card.keywords else []
+    except (TypeError, ValueError):
+        keywords = []
     return {
         "name": card.name or "",
         "set_code": (card.set_code or "").upper(),
@@ -36,6 +40,12 @@ def card_metadata(card: Card) -> dict:
         "color_identity": (card.color_identity or "").split(),
         "type_line": card.type_line or "",
         "oracle_text": card.oracle_text or "",
+        # #76 — P/T are raw strings ("*"/"X" possible), None on non-creatures
+        # (a model misreads "" as an actual value); keywords is a parsed
+        # array like legalities, [] when none/unpopulated.
+        "power": card.power or None,
+        "toughness": card.toughness or None,
+        "keywords": keywords,
         "legalities": legalities,
         "scryfall_id": card.scryfall_id or "",
     }

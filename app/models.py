@@ -125,6 +125,13 @@ class Card(Base):
     # loyalty/defense auto-init (Step 4). Part of the scryfall_cards seam.
     loyalty: Mapped[str | None] = mapped_column(String(16), nullable=True)
     defense: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    # #76 — creature power/toughness (faithful raw Scryfall strings; can be
+    # non-numeric, e.g. "*", "1+*", "X") and keyword abilities (JSON array
+    # text, "[]" = processed-no-keywords vs NULL = not yet populated, same
+    # contract as produced_tokens). Part of the scryfall_cards seam.
+    power: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    toughness: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    keywords: Mapped[str | None] = mapped_column(Text, nullable=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
 
     inventory_rows: Mapped[list[InventoryRow]] = relationship(back_populates="card")

@@ -164,7 +164,7 @@ game_changer_cards = Table(
 )
 
 # ---------------------------------------------------------------------------
-# migrate_v3_25_0_scryfall_cards.py — the Scryfall bulk cache seam (24 columns,
+# migrate_v3_25_0_scryfall_cards.py — the Scryfall bulk cache seam (27 columns,
 # fixed order; see CLAUDE.md "scryfall_cards seam is byte-identical").
 # ---------------------------------------------------------------------------
 
@@ -206,6 +206,10 @@ scryfall_cards = Table(
     Column("produced_tokens", Text),
     Column("loyalty", Text),
     Column("defense", Text),
+    # #76 — power/toughness/keywords (Alembic c8d2e5f7a1b4), 25th–27th seam columns.
+    Column("power", Text),
+    Column("toughness", Text),
+    Column("keywords", Text),
     Index("ix_scryfall_cards_set_collector", "set_code", "collector_number"),
     Index("ix_scryfall_cards_name", "name"),
 )

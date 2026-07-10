@@ -63,7 +63,10 @@ CREATE TABLE scryfall_cards (
     layout           TEXT,
     produced_tokens  TEXT,
     loyalty          TEXT,
-    defense          TEXT
+    defense          TEXT,
+    power            TEXT,
+    toughness        TEXT,
+    keywords         TEXT
 )
 """
 
@@ -120,6 +123,10 @@ RAW_MULTIFACE = {
             "oracle_text": "When Valki, God of Lies enters the battlefield, each opponent exiles a creature card from their hand.",
             "type_line": "Legendary Creature — God",
             "mana_cost": "{B}{B}",
+            # #76 — DFC creature carries P/T on the face, not top-level:
+            # exercises the power/toughness face fallback.
+            "power": "2",
+            "toughness": "1",
             "image_uris": {"normal": "valki-n", "large": "valki-l"},
         },
         {
@@ -246,6 +253,33 @@ RAW_FULLART = {
     "layout": "normal",
 }
 
+# 7. Creature with non-numeric power (star) + keywords — the #76 top-level
+#    P/T case plus keyword JSON round-trip.
+RAW_CREATURE_STAR = {
+    "id": "tarmo-fut-153",
+    "name": "Tarmogoyf",
+    "set": "fut",
+    "set_name": "Future Sight",
+    "collector_number": "153",
+    "rarity": "rare",
+    "image_uris": {"normal": "goyf-n"},
+    "type_line": "Creature — Lhurgoyf",
+    "oracle_text": "Tarmogoyf's power is equal to the number of card types among cards in all graveyards and its toughness is equal to that number plus 1.",
+    "prices": {"usd": "20.00", "usd_foil": None, "usd_etched": None},
+    "colors": ["G"],
+    "color_identity": ["G"],
+    "mana_cost": "{1}{G}",
+    "cmc": 2.0,
+    "legalities": {"modern": "legal", "commander": "legal"},
+    "full_art": False,
+    "frame_effects": [],
+    "set_type": "expansion",
+    "layout": "normal",
+    "power": "*",
+    "toughness": "1+*",
+    "keywords": ["Flying", "Ward"],
+}
+
 FIXTURES = [
     ("normal single-face", RAW_NORMAL),
     ("multi-face MDFC", RAW_MULTIFACE),
@@ -253,6 +287,7 @@ FIXTURES = [
     ("full_art + frame_effects + image fallback", RAW_FULLART),
     ("single-face planeswalker (top-level loyalty)", RAW_PLANESWALKER),
     ("battle (front-face defense)", RAW_BATTLE),
+    ("star-power creature + keywords", RAW_CREATURE_STAR),
 ]
 
 
@@ -299,11 +334,11 @@ def test_columns_match_normalizer():
     else:
         print(f"  [FAIL] column/normalizer mismatch:\n    cols={_COLS}\n    norm={norm_keys}")
         failed += 1
-    if len(_COLS) == 24:
-        print("  [OK] 24 columns (v3.36.1 added loyalty + defense as the 23rd + 24th)")
+    if len(_COLS) == 27:
+        print("  [OK] 27 columns (#76 added power + toughness + keywords as the 25th-27th)")
         passed += 1
     else:
-        print(f"  [FAIL] expected 24 columns, got {len(_COLS)}")
+        print(f"  [FAIL] expected 27 columns, got {len(_COLS)}")
         failed += 1
     assert failed == 0
 
@@ -432,6 +467,8 @@ def test_card_construction_on_cache_miss():
 
     pw_payload = _normalize_card_payload(RAW_PLANESWALKER)
     battle_payload = _normalize_card_payload(RAW_BATTLE)
+    creature_payload = _normalize_card_payload(RAW_CREATURE_STAR)
+    mdfc_payload = _normalize_card_payload(RAW_MULTIFACE)
 
     # produced_tokens must be present in the payload but stripped before splat.
     if "produced_tokens" in pw_payload and "produced_tokens" not in card_constructor_kwargs(
@@ -446,6 +483,8 @@ def test_card_construction_on_cache_miss():
     try:
         pw = Card(**card_constructor_kwargs(pw_payload), updated_at=datetime.utcnow())
         battle = Card(**card_constructor_kwargs(battle_payload), updated_at=datetime.utcnow())
+        creature = Card(**card_constructor_kwargs(creature_payload), updated_at=datetime.utcnow())
+        mdfc = Card(**card_constructor_kwargs(mdfc_payload), updated_at=datetime.utcnow())
     except TypeError as exc:
         raise AssertionError(f"Card(**payload) raised TypeError: {exc}") from exc
 
@@ -455,6 +494,13 @@ def test_card_construction_on_cache_miss():
         ("battle defense set on Card (face fallback)", battle.defense == "4"),
         ("battle loyalty is None", battle.loyalty is None),
         ("Card built cleanly (no produced_tokens attr clash)", pw.name == "Liliana of the Veil"),
+        # #76 — power/toughness/keywords ARE Card columns, survive the strip.
+        ("star power set on Card", creature.power == "*"),
+        ("star toughness set on Card", creature.toughness == "1+*"),
+        ("keywords stored as JSON text", json.loads(creature.keywords) == ["Flying", "Ward"]),
+        ("non-creature power is None", pw.power is None),
+        ("non-creature keywords is '[]'", pw.keywords == "[]"),
+        ("MDFC creature P/T from front face", (mdfc.power, mdfc.toughness) == ("2", "1")),
     ]
     for label, ok in checks:
         if ok:

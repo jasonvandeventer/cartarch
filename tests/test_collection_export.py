@@ -231,6 +231,9 @@ def test_json_export_has_arrays_and_legalities():
     colorless.colors = None
     colorless.cmc = 1.0
     colorless.legalities = '{"commander": "legal"}'
+    colorless.power = "*"
+    colorless.toughness = "3"
+    colorless.keywords = '["Flying", "Ward"]'
     _row(s, u.id, colorless, loc.id, qty=2)
     s.commit()
 
@@ -244,6 +247,10 @@ def test_json_export_has_arrays_and_legalities():
         assert card["colors"] == []
         assert card["mana_value"] == 1.0
         assert card["legalities"] == {"commander": "legal"}  # nested object
+        # #76 — P/T raw strings (None on non-creatures), keywords parsed array
+        assert card["power"] == "*"
+        assert card["toughness"] == "3"
+        assert card["keywords"] == ["Flying", "Ward"]
         assert card["quantity"] == 2
         assert card["location"] == "Binder"
         assert "oracle_text" in card and "scryfall_id" in card

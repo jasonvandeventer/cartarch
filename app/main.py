@@ -463,6 +463,10 @@ def _run_price_refresh_batch() -> None:
                 # naturally re-refresh on the staleness cycle.
                 card.loyalty = fresh.get("loyalty")
                 card.defense = fresh.get("defense")
+                # #76 — power/toughness/keywords, same passive-backfill ride.
+                card.power = fresh.get("power")
+                card.toughness = fresh.get("toughness")
+                card.keywords = fresh.get("keywords")
                 card.updated_at = now
                 updated += 1
         session.commit()
@@ -540,6 +544,10 @@ def _run_trait_backfill_batch() -> int:
                 # v3.36.x — carry the v3.36.1 seam columns (see price-refresh).
                 card.loyalty = fresh.get("loyalty")
                 card.defense = fresh.get("defense")
+                # #76 — power/toughness/keywords, same passive-backfill ride.
+                card.power = fresh.get("power")
+                card.toughness = fresh.get("toughness")
+                card.keywords = fresh.get("keywords")
                 card.updated_at = now
             else:
                 # Scryfall didn't return it — mark done (non-NULL) so the
