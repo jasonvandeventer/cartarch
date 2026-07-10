@@ -1,4 +1,4 @@
-{% from "_macros.html" import editorial_eyebrow %}
+{% from "_macros.html" import editorial_eyebrow, img_fallback %}
 {% extends "base.html" %}
 {% block content %}
   <section class="panel page-hero">
@@ -107,7 +107,7 @@
                          data-pending-group="batch-{{ batch.batch_id or 'manual' }}">
                   <div class="pending-thumb-wrap">
                     {% if item.card.image_url %}
-                      <img class="pending-thumb" src="{{ item.card.image_url }}" alt="{{ item.card.name }}" loading="lazy">
+                      <img class="pending-thumb" src="{{ mirror_image_url(item.card.scryfall_id) }}" {{ img_fallback(item.card.scryfall_id) }} alt="{{ item.card.name }}" loading="lazy">
                     {% else %}
                       <div class="pending-thumb placeholder"></div>
                     {% endif %}
@@ -190,7 +190,8 @@
                 <div class="pending-thumb-wrap">
                   {% if item.card.image_url %}
                     <img class="pending-thumb"
-                         src="{{ item.card.image_url }}"
+                         src="{{ mirror_image_url(item.card.scryfall_id) }}"
+                         {{ img_fallback(item.card.scryfall_id) }}
                          alt="{{ item.card.name }}"
                          loading="lazy">
                   {% else %}

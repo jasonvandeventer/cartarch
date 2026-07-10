@@ -145,6 +145,30 @@ templates.env.globals["card_role_tags"] = CARD_ROLE_TAGS
 # (the service validates membership against the same FINISH_OPTIONS).
 templates.env.globals["finish_options"] = FINISH_OPTIONS
 
+# issue #44 — self-hosted card image mirror. Templates build image src from
+# scryfall_id via mirror_image_url; the stored Card.image_url (a Scryfall CDN
+# URL) stays in the schema untouched and remains the "card has an image" signal
+# the templates guard on. Contract: /{scryfall_id}[/back]/{size}.{ext}, ext=png
+# only for size "png"; a not-yet-mirrored printing 404s, so every <img> carries
+# a Scryfall-API onerror fallback (the img_fallback macro in _macros.html).
+IMAGE_MIRROR_BASE_URL = os.getenv("IMAGE_MIRROR_BASE_URL", "https://img.cartarch.com")
+
+
+def mirror_image_url(scryfall_id: str, size: str = "normal", face: str = "front") -> str:
+    ext = "png" if size == "png" else "jpg"
+    back = "/back" if face == "back" else ""
+    return f"{IMAGE_MIRROR_BASE_URL}/{scryfall_id}{back}/{size}.{ext}"
+
+
+def scryfall_image_fallback(scryfall_id: str, size: str = "normal", face: str = "front") -> str:
+    """Scryfall's card-image redirect endpoint — the onerror fallback target."""
+    url = f"https://api.scryfall.com/cards/{scryfall_id}?format=image&version={size}"
+    return url + "&face=back" if face == "back" else url
+
+
+templates.env.globals["mirror_image_url"] = mirror_image_url
+templates.env.globals["scryfall_image_fallback"] = scryfall_image_fallback
+
 
 # Resolved relative to this module, NOT the process cwd — so the hash is found
 # no matter where the app is launched from (a missing file silently falls back

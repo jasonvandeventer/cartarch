@@ -1,4 +1,4 @@
-{% from "_macros.html" import editorial_eyebrow, mana_pips %}
+{% from "_macros.html" import editorial_eyebrow, mana_pips, img_fallback %}
 {% extends "base.html" %}
 {% block content %}
   {# v3.28.7 — Folio Card Detail. The pre-v3.28.7 page kept its v3.28.3
@@ -20,7 +20,7 @@
     <div class="card-detail-hero-grid">
       <div class="card-detail-art">
         {% if card.image_url %}
-          <img src="{{ card.image_url }}" alt="{{ card.name }}" loading="lazy" class="card-detail-art-img">
+          <img src="{{ mirror_image_url(card.scryfall_id, 'large') }}" {{ img_fallback(card.scryfall_id, 'large') }} alt="{{ card.name }}" loading="lazy" class="card-detail-art-img">
         {% else %}
           <div class="card-detail-art-placeholder"></div>
         {% endif %}

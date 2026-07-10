@@ -513,6 +513,7 @@ def owned_inventory_for_names(
                 # checker UI; the template swaps /normal/ → /small/ in JS
                 # at render time the same way v3.26.1 commander art does.
                 "image_url": card.image_url,
+                "scryfall_id": card.scryfall_id,  # #44 — mirror image URL in the template
                 "finish": row.finish,
                 "is_proxy": bool(row.is_proxy),
                 "is_pending": bool(row.is_pending),

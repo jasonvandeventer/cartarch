@@ -1,4 +1,4 @@
-{% from "_macros.html" import editorial_eyebrow %}
+{% from "_macros.html" import editorial_eyebrow, img_fallback %}
 {% extends "base.html" %}
 {% block content %}
   {# v3.27.19 — Decklist collection check.
@@ -59,7 +59,8 @@
         <a class="decklist-printing-thumb-wrap" href="/cards/{{ p.card_id }}">
           {% if p.image_url %}
             <img class="decklist-printing-thumb"
-                 src="{{ p.image_url | replace('/normal/', '/small/') }}"
+                 src="{{ mirror_image_url(p.scryfall_id) }}"
+                 {{ img_fallback(p.scryfall_id) }}
                  alt="{{ p.name }} ({{ p.set_code | upper }} #{{ p.collector_number }})"
                  loading="lazy">
           {% else %}

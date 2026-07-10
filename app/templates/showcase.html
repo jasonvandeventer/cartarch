@@ -1,4 +1,4 @@
-{% from "_macros.html" import editorial_eyebrow %}
+{% from "_macros.html" import editorial_eyebrow, img_fallback %}
 {% extends "base.html" %}
 {% block content %}
   {# v3.29.1 — Showcase management. A curated subset of the user's
@@ -117,7 +117,7 @@
           <article class="showcase-item">
             <div class="showcase-item-art">
               {% if item.card.image_url %}
-                <img src="{{ item.card.image_url }}" alt="{{ item.card.name }}" loading="lazy">
+                <img src="{{ mirror_image_url(item.card.scryfall_id) }}" {{ img_fallback(item.card.scryfall_id) }} alt="{{ item.card.name }}" loading="lazy">
               {% else %}
                 <div class="showcase-item-placeholder"></div>
               {% endif %}

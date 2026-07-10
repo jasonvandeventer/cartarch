@@ -13,6 +13,14 @@
    Auth pages keep the existing `.eyebrow.brand-name` "Cartarch" treatment
    from v3.27.15 and stay untouched here — v3.28.4 will redo auth pages
    with the two-column brand pane. The macro is for app-shell pages. #}
+
+{# issue #44 — onerror attribute for mirror-served card <img> tags. The mirror
+   404s on a printing it hasn't ingested yet; this swaps to Scryfall's API
+   image redirect once (the this.onerror=null stops a loop if Scryfall also
+   404s). Pair with mirror_image_url() for the src; same size/face args. #}
+{% macro img_fallback(scryfall_id, size="normal", face="front") -%}
+onerror="this.onerror=null; this.src='{{ scryfall_image_fallback(scryfall_id, size, face) }}'"
+{%- endmacro %}
 {% macro editorial_eyebrow(crumb) -%}
 <div class="eyebrow"><span class="ln" aria-hidden="true"></span><span>{{ crumb }}</span></div>
 {%- endmacro %}
@@ -61,7 +69,8 @@
       {% if item.card.image_url %}
         <a href="/cards/{{ item.card.id }}">
           <img class="inventory-thumb"
-               src="{{ item.card.image_url }}"
+               src="{{ mirror_image_url(item.card.scryfall_id) }}"
+               {{ img_fallback(item.card.scryfall_id) }}
                alt="{{ item.card.name }}"
                loading="lazy">
         </a>

@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import inventory_card, mana_pips, editorial_eyebrow %}
+{% from "_macros.html" import inventory_card, mana_pips, editorial_eyebrow, img_fallback %}
 {% block content %}
   <section class="panel hero-panel compact-hero">
     {% if deck %}
@@ -570,7 +570,8 @@
                 {% if result.card.image_url %}
                   <a href="/cards/{{ result.card.id }}">
                     <img class="inventory-thumb"
-                         src="{{ result.card.image_url }}"
+                         src="{{ mirror_image_url(result.card.scryfall_id) }}"
+                         {{ img_fallback(result.card.scryfall_id) }}
                          alt="{{ result.card.name }}"
                          loading="lazy">
                   </a>
@@ -1166,6 +1167,14 @@
           if (!ensurePreview()) return;
           var src = row.getAttribute('data-card-image');
           if (!src) return;
+          // #44 — mirror-miss fallback: rows carry data-card-fallback (the
+          // Scryfall API redirect); swap once, and only to a different URL,
+          // so a Scryfall 404 can't loop.
+          previewImg.onerror = function () {
+            previewImg.onerror = null;
+            var fb = row.getAttribute('data-card-fallback');
+            if (fb && previewImg.src !== fb) previewImg.src = fb;
+          };
           previewImg.src = src;
           previewImg.alt = row.getAttribute('data-card-name') || '';
           previewEl.hidden = false;

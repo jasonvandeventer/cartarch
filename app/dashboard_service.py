@@ -242,6 +242,7 @@ def get_dashboard_data(session: Session, user_id: int, now: datetime | None = No
             "name": card.name,
             "set_code": card.set_code,
             "collector_number": card.collector_number,
+            "scryfall_id": card.scryfall_id,  # #44 — mirror image URL in the template
             "image_url": card.image_url,
             "color_identity": card.color_identity or "",
             "price_usd": card.price_usd,

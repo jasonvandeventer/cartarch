@@ -1,4 +1,4 @@
-{% from "_macros.html" import editorial_eyebrow, mana_pips %}
+{% from "_macros.html" import editorial_eyebrow, mana_pips, img_fallback %}
 {% extends "base.html" %}
 {% block content %}
   {# v3.28.5 — Folio dashboard. Replaces the v3.27.8 "Quick Actions launcher"
@@ -193,7 +193,8 @@
             <a href="/cards/{{ dashboard.spotlight.card_id }}" class="dashboard-spot">
               <div class="dashboard-spot-art">
                 {% if dashboard.spotlight.image_url %}
-                  <img src="{{ dashboard.spotlight.image_url | replace('/normal/', '/small/') }}"
+                  <img src="{{ mirror_image_url(dashboard.spotlight.scryfall_id) }}"
+                       {{ img_fallback(dashboard.spotlight.scryfall_id) }}
                        alt="{{ dashboard.spotlight.name }}"
                        loading="lazy">
                 {% else %}

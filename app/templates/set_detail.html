@@ -1,4 +1,4 @@
-{% from "_macros.html" import editorial_eyebrow %}
+{% from "_macros.html" import editorial_eyebrow, img_fallback %}
 {% extends "base.html" %}
 {% block content %}
   <section class="panel hero-panel compact-hero">
@@ -54,7 +54,7 @@
     {% for card in data.visible_cards %}
       {% if card.card_id %}
         <a class="card-tile card-tile-link" href="/cards/{{ card.card_id }}">
-          {% if card.image_url %}<img src="{{ card.image_url }}" alt="{{ card.name }}" loading="lazy">{% endif %}
+          {% if card.image_url %}<img src="{{ mirror_image_url(card.scryfall_id) }}" {{ img_fallback(card.scryfall_id) }} alt="{{ card.name }}" loading="lazy">{% endif %}
           <div class="card-name">{{ card.name }}</div>
           <div class="card-meta">
             #{{ card.collector_number }}
@@ -67,7 +67,7 @@
         </a>
       {% else %}
         <div class="card-tile">
-          {% if card.image_url %}<img src="{{ card.image_url }}" alt="{{ card.name }}" loading="lazy">{% endif %}
+          {% if card.image_url %}<img src="{{ mirror_image_url(card.scryfall_id) }}" {{ img_fallback(card.scryfall_id) }} alt="{{ card.name }}" loading="lazy">{% endif %}
           <div class="card-name">{{ card.name }}</div>
           <div class="card-meta">
             #{{ card.collector_number }}
