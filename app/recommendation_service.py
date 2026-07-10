@@ -57,6 +57,13 @@ ROLE_WEIGHT = {
 # Extra score for a role the deck still needs (drives need-aware assembly).
 NEED_BOOST = 2.5
 
+# Score adjustment per role-usefulness relevance (issue #60 P2). Supplements —
+# never replaces — the existing factors. "very_low" (dead role) additionally
+# hard-excludes the card from spell assembly; the -25 keeps it ranked last
+# everywhere scores are compared (max legit score is ~15, so a dead card can
+# never out-rank a live one).
+RELEVANCE_SCORE_ADJUST = {"very_low": -25.0, "low": -2.0, "medium": 0.0, "high": 2.0}
+
 # Basic-land card name by WUBRG color (commander-color fill).
 BASIC_LAND_BY_COLOR = {
     "W": "Plains",
@@ -96,6 +103,10 @@ class CandidateCard:
     score: float = 0.0
     reasons: list[str] = field(default_factory=list)
     deck_quantity: int = 1  # copies used in the assembled deck (>1 for basics)
+    # v2 substrate output (issue #60 P2) — set when a strategy profile is in play.
+    role_subtype: tuple[str | None, str | None] | None = None  # (broad_role, subtype)
+    role_relevance: str | None = None  # one of RELEVANCE_LEVELS
+    role_reason: str | None = None
 
 
 @dataclass
@@ -181,6 +192,7 @@ def build_candidate_pool(
     user_id: int,
     commander: Card,
     intent: DeckBuildIntent,
+    profile: dict | None = None,
 ) -> list[CandidateCard]:
     """Build the legal, in-identity, owned candidate pool from local data only.
 
@@ -254,7 +266,7 @@ def build_candidate_pool(
             tags=deck_service.suggest_card_roles(card, themes),
             theme_matches=[],
         )
-        score_candidate(cand, themes, intent)
+        score_candidate(cand, themes, intent, profile=profile)
         pool.append(cand)
 
     return pool
@@ -273,12 +285,19 @@ def score_candidate(
     themes: dict,
     intent: DeckBuildIntent,
     needs: dict[str, int] | None = None,
+    profile: dict | None = None,
 ) -> float:
     """Deterministically score a candidate and record human-readable reasons.
 
     ``needs`` (role -> remaining-needed) is supplied during assembly so role
     cards the deck still lacks get boosted ("boosts role cards when deck lacks
     ramp/draw/removal"). Without it, the static base score is computed.
+
+    ``profile`` (a strategy profile from ``seed_strategy_profile``) turns on
+    the v2 role-usefulness adjustment (issue #60 P2): the card's
+    (broad_role, subtype) classification and relevance are computed once,
+    cached on the candidate, and folded into the score via
+    ``RELEVANCE_SCORE_ADJUST``. Without a profile, scoring is unchanged.
     """
     card = cand.card
     score = 0.0
@@ -339,6 +358,21 @@ def score_candidate(
             score -= 2.0
             reasons.append(f"Avoided theme: {avoid}")
 
+    # Role-usefulness adjustment (issue #60 P2). Classification is
+    # deterministic per (card, profile), so cache it on the candidate — the
+    # assembly loop re-scores candidates O(n²) times.
+    if profile is not None:
+        if cand.role_relevance is None:
+            colors = _profile_colors(profile)
+            broad, subtype, _ = classify_role_subtype(card, colors)
+            relevance, reason = score_role_usefulness(card, broad, subtype, colors, profile)
+            cand.role_subtype = (broad, subtype)
+            cand.role_relevance = relevance
+            cand.role_reason = reason
+        score += RELEVANCE_SCORE_ADJUST[cand.role_relevance]
+        if cand.role_reason and cand.role_reason not in reasons:
+            reasons.append(cand.role_reason)
+
     # Need-aware boost (assembly phase only).
     if needs:
         for role in cand.tags:
@@ -362,16 +396,24 @@ def assemble_deck(
     pool: list[CandidateCard],
     intent: DeckBuildIntent,
     themes: dict,
+    profile: dict | None = None,
 ) -> tuple[list[CandidateCard], list[CandidateCard], list[CandidateCard]]:
     """Greedy need-aware assembly into (mainboard-spells, lands, cuts).
 
     Lands fill to ``LAND_TARGET`` (nonbasic owned first, basics for the rest);
     spells fill the remaining slots, satisfying role minimums first via a
     marginal need-aware score. No duplicate nonbasic names; exactly one of each.
+
+    Dead-role cards (``role_relevance == "very_low"``, e.g. a color-specific
+    cost reducer outside the deck's identity) are never selected as spells —
+    they go straight to cuts with their reason. The deck may come up short
+    instead (the 100-card validation surfaces that as a warning).
     """
     nonbasic_lands = [c for c in pool if _is_land(c.card) and not _is_basic_land(c.card)]
     basics = [c for c in pool if _is_basic_land(c.card)]
     spells = [c for c in pool if not _is_land(c.card)]
+    dead = [c for c in spells if c.role_relevance == "very_low"]
+    spells = [c for c in spells if c.role_relevance != "very_low"]
 
     used_names = {commander.name}
 
@@ -399,7 +441,7 @@ def assemble_deck(
     while remaining and len(chosen_spells) < spell_slots:
         best = max(
             remaining,
-            key=lambda c: (score_candidate(c, themes, intent, needs), -_name_key(c)),
+            key=lambda c: (score_candidate(c, themes, intent, needs, profile), -_name_key(c)),
         )
         remaining.remove(best)
         used_names.add(best.card.name)
@@ -419,8 +461,9 @@ def assemble_deck(
                     reason_recorded = True
                 needs[role] -= 1
 
-    # leftover high-scorers become explainable "cuts"
-    cuts = sorted(remaining, key=lambda c: (-c.score, c.card.name))[:15]
+    # leftover high-scorers become explainable "cuts"; dead-role cards always
+    # appear here (sorted last by their penalized score) so the user sees why.
+    cuts = sorted(remaining + dead, key=lambda c: (-c.score, c.card.name))[:15]
 
     return chosen_spells, chosen_lands, cuts
 
@@ -543,8 +586,9 @@ def generate_recommendation(
         )
 
     themes = extract_themes(commander)
-    pool = build_candidate_pool(session, user_id, commander, intent)
-    spells, lands, cuts = assemble_deck(commander, pool, intent, themes)
+    profile = seed_strategy_profile(commander, commander_color_identity(commander) or set())
+    pool = build_candidate_pool(session, user_id, commander, intent, profile=profile)
+    spells, lands, cuts = assemble_deck(commander, pool, intent, themes, profile=profile)
 
     # commander goes at the head of the mainboard list
     commander_cand = CandidateCard(

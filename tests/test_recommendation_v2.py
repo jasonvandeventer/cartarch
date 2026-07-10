@@ -12,10 +12,15 @@ no-role, which is the substrate's documented behavior for unknown cards.
 
 from __future__ import annotations
 
-from app.models import Card
+from app import deck_service
+from app import recommendation_service as rec
+from app.models import Card, InventoryRow
 from app.recommendation_service import (
+    CandidateCard,
+    DeckBuildIntent,
     classify_role_subtype,
     evaluate_plan_coverage,
+    score_candidate,
     score_role_usefulness,
     seed_strategy_profile,
 )
@@ -489,3 +494,119 @@ def test_balanced_deck_has_no_flags():
     ]
     report = evaluate_plan_coverage(deck, profile)
     assert all(entry["status"] == "ok" for entry in report.values())
+
+
+# --- P2: score_candidate integration ---------------------------------------------
+
+
+def _molecule_man_commander():
+    return c(
+        "Molecule Man",
+        oracle="Whenever you draw your first card during each turn, "
+        "put a charge counter on Molecule Man.",
+        tl="Legendary Creature — Human Avatar",
+        cmc=5.0,
+    )
+
+
+def _cand(card):
+    return CandidateCard(
+        card=card,
+        owned_quantity=1,
+        available_quantity=1,
+        best_inventory_row_id=None,
+        already_in_deck_names=[],
+        tags=deck_service.suggest_card_roles(card),
+        theme_matches=[],
+    )
+
+
+def _static_score(card, profile=None):
+    themes = rec.extract_themes(_molecule_man_commander())
+    intent = DeckBuildIntent(commander_card_id=0)
+    cand = _cand(card)
+    score = score_candidate(cand, themes, intent, profile=profile)
+    return score, cand
+
+
+def test_score_candidate_penalizes_dead_reducer():
+    dead_score, dead_cand = _static_score(sapphire(), MOLECULE_MAN_PROFILE)
+    live_score, live_cand = _static_score(mind_stone(), MOLECULE_MAN_PROFILE)
+    assert dead_cand.role_relevance == "very_low"
+    assert live_cand.role_relevance == "high"
+    assert dead_score < live_score
+    # the dead penalty sinks it below any live card, and the reason surfaces
+    assert dead_score < 0
+    assert any(r.startswith("Dead") for r in dead_cand.reasons)
+
+
+def test_score_candidate_boosts_priority_draw():
+    end_score, end_cand = _static_score(endbringer(), MOLECULE_MAN_PROFILE)
+    generic = c("Tome of Fables", oracle="{3}, {T}: Draw a card.", cmc=6.0)
+    gen_score, gen_cand = _static_score(generic, MOLECULE_MAN_PROFILE)
+    assert end_cand.role_relevance == "high"
+    assert gen_cand.role_relevance == "medium"
+    assert end_score > gen_score
+
+
+def test_score_candidate_medium_is_baseline():
+    disk = c("Nevinyrral's Disk", oracle="{1}, {T}: Destroy all creatures.", cmc=4.0)
+    without, _ = _static_score(disk)
+    with_profile, cand = _static_score(disk, MOLECULE_MAN_PROFILE)
+    assert cand.role_relevance == "medium"
+    assert with_profile == without
+
+
+def test_score_candidate_reducer_in_identity_not_penalized():
+    blue_cmdr = c(
+        "Azure Sage",
+        oracle="Whenever you draw a card, scry 1.",
+        tl="Legendary Creature — Merfolk Wizard",
+        cmc=3.0,
+        color_identity="U",
+    )
+    profile = seed_strategy_profile(blue_cmdr, {"U"})
+    without, _ = _static_score(sapphire())
+    with_profile, cand = _static_score(sapphire(), profile)
+    assert cand.role_subtype == ("Ramp", "cost_reduction")
+    assert cand.role_relevance == "medium"
+    assert with_profile == without
+
+
+# --- P2: Molecule Man generation regression --------------------------------------
+
+
+def _own_deck(db, user):
+    """Persist the Molecule Man fixture as the user's collection; returns the
+    commander Card."""
+    deck = molecule_man_deck()
+    for card in deck:
+        db.add(card)
+    db.flush()
+    for card in deck:
+        db.add(
+            InventoryRow(
+                user_id=user.id,
+                card_id=card.id,
+                quantity=1,
+                is_pending=False,
+                is_proxy=False,
+            )
+        )
+    db.flush()
+    return deck[0]
+
+
+def test_molecule_man_generation_excludes_dead_reducers(db, user):
+    cmdr = _own_deck(db, user)
+    result = rec.generate_recommendation(db, user.id, DeckBuildIntent(commander_card_id=cmdr.id))
+    picked = {cand.card.name for cand in result.mainboard + result.lands}
+    for name in ("Sapphire Medallion", "Hazoret's Monument", "Oketra's Monument"):
+        assert name not in picked, name
+    # functional ramp and the priority draw pieces make the list instead
+    for name in ("Endbringer", "Mind Stone", "Sol Ring"):
+        assert name in picked, name
+    # dead cards surface as explainable cuts, not silent drops
+    cuts = {cand.card.name: cand for cand in result.cuts}
+    assert "Sapphire Medallion" in cuts
+    assert cuts["Sapphire Medallion"].role_relevance == "very_low"
