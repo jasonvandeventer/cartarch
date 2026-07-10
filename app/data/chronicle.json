@@ -1,5 +1,15 @@
 [
   {
+    "version": "4.1.31",
+    "date": "2026-07-10",
+    "added": [
+      "The Deckbuilder now evaluates whether each card's role is actually useful for your commander and deck plan, not just whether it technically fills a role. It flags dead-role cards (like color-specific cost reducers in a colorless deck), grades cards as keep / cut / placeholder / upgrade with reasons, reports which strategy categories your deck over- or under-fills, and suggests owned cards from your collection that fill the gaps."
+    ],
+    "refined": [],
+    "resolved": [],
+    "archivist_note": "Issue #60 shipped as one release over four internal phases against a single deterministic substrate — the design rule was one evaluation layer, two consumers, no duplicated scoring. The load-bearing idea is the gap between role-complete and plan-complete: a Sapphire Medallion in a colorless deck is technically Ramp and utterly dead, and the flat role checklist inherited from #51 couldn't see that. The fix is a color-scoped oracle-text read (\"Blue spells you cast cost less\" compared against the deck's color identity) feeding a relevance verdict, which the generator folds into scoring to stop picking dead reducers and the analyzer surfaces as an explicit cut. The determinism boundary from #51 held throughout: every score, gate, and reason string is deterministic and pytest-covered, no LLM on the request path. The honest ceiling is the primary-role-only classification — a multi-role card is credited for one role in both status and coverage, which is fine until someone builds a deck where the second role is the one that mattered. The strategy profile persists per-deck (deck_strategy_profiles, this release's migration) so a user's edits survive; the seed is heuristic and deliberately not sold as authoritative."
+  },
+  {
     "version": "4.1.30",
     "date": "2026-07-10",
     "added": [],
