@@ -250,6 +250,7 @@ def _parsed_rows_from_form(
     role: list[str] | None = None,
     tags: list[str] | None = None,
     is_proxy: list[str] | None = None,
+    is_brew: list[str] | None = None,
 ) -> list[dict]:
     """Rebuild the parsed-row dicts from the parallel-array form fields.
 
@@ -270,6 +271,7 @@ def _parsed_rows_from_form(
     roles = role or []
     tags_list = tags or []
     is_proxy_list = is_proxy or []
+    is_brew_list = is_brew or []
     for i in range(len(line_number)):
         # v3.30.16 — is_proxy form field carries the string "true"/"false";
         # parse_proxy_bool returns (bool, valid). Form values come from
@@ -278,6 +280,9 @@ def _parsed_rows_from_form(
         # invalid_rows at parse_scanner_csv time and never reach a form.
         raw_proxy = is_proxy_list[i] if i < len(is_proxy_list) else ""
         proxy_value, _ = normalize_proxy_value_for_commit(raw_proxy)
+        # issue #70 — is_brew rides the same hidden-input grammar as is_proxy.
+        raw_brew = is_brew_list[i] if i < len(is_brew_list) else ""
+        brew_value, _ = normalize_proxy_value_for_commit(raw_brew)
         rows.append(
             {
                 "line_number": int(line_number[i]),
@@ -295,6 +300,7 @@ def _parsed_rows_from_form(
                 "role": (roles[i] if i < len(roles) else "").strip(),
                 "tags": tags_list[i] if i < len(tags_list) else "",
                 "is_proxy": proxy_value,
+                "is_brew": brew_value,
             }
         )
     return rows
@@ -428,8 +434,18 @@ def _build_line_to_location_map(
         # v3.30.15 auto-create-not-confirmed re-render pattern.
         # v3.30.17 — auto_create_locations routes type="deck" through
         # deck_service.create_deck so the paired Deck row lands atomically.
+        # issue #70 — a truthy is_brew on any row marks its Location name so an
+        # auto-created deck of that name lands as a brew. Existing locations
+        # (cid_int > 0 above) never consult this — their own flag wins.
+        name_to_is_brew = {
+            (r.get("location") or "").strip().lower(): True for r in parsed_rows if r.get("is_brew")
+        }
         created = auto_create_locations(
-            session, user_id, auto_create_names, name_to_type=auto_create_type_overrides
+            session,
+            user_id,
+            auto_create_names,
+            name_to_type=auto_create_type_overrides,
+            name_to_is_brew=name_to_is_brew,
         )
         name_to_id.update(created)
 

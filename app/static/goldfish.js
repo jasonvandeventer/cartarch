@@ -851,6 +851,50 @@
     return s.charAt(0).toUpperCase() + s.slice(1);
   }
 
+  // ── Mirror-first card art (issue #83) ─────────────────────────
+  // Same contract every server-rendered <img> uses (mirror_image_url +
+  // img_fallback in _macros.html): img.cartarch.com/{scryfall_id}/{size}.jpg,
+  // onerror → the Scryfall API image redirect, then the text card-face.
+  // Cards with no scryfall_id (custom tokens) keep the raw image_url path.
+  function cardImageChain(card, size) {
+    const chain = [];
+    if (card.scryfall_id) {
+      const base = (payload && payload.image_mirror_base) || "https://img.cartarch.com";
+      chain.push(base + "/" + card.scryfall_id + "/" + size + ".jpg");
+      chain.push(
+        "https://api.scryfall.com/cards/" + card.scryfall_id + "?format=image&version=" + size
+      );
+    } else if (card.image_url) {
+      // Pre-#83 behavior: the stored Scryfall CDN URL is "normal"-sized;
+      // derive "small" by path substitution.
+      chain.push(size === "small" ? card.image_url.replace("/normal/", "/small/") : card.image_url);
+    }
+    return chain;
+  }
+
+  /** Build an <img> that walks the URL chain on load error; returns null
+   *  when the card has no image source at all (caller paints the text
+   *  card-face via renderFallback). */
+  function buildCardImg(card, size, className, onExhausted) {
+    const chain = cardImageChain(card, size);
+    if (chain.length === 0) return null;
+    const img = document.createElement("img");
+    img.className = className;
+    img.alt = card.name || "";
+    let i = 0;
+    img.onerror = function () {
+      i += 1;
+      if (i < chain.length) {
+        img.src = chain[i];
+      } else {
+        img.remove();
+        onExhausted();
+      }
+    };
+    img.src = chain[0];
+    return img;
+  }
+
   function buildCardEl(inst, zone) {
     const el = document.createElement("div");
     el.className = "gf-card";
@@ -859,17 +903,9 @@
     if (inst.tapped) el.classList.add("gf-tapped");
     el.setAttribute("tabindex", "0");
     el.setAttribute("draggable", "true");
-    const small = (inst.card.image_url || "").replace("/normal/", "/small/");
-    if (small) {
-      const img = document.createElement("img");
-      img.className = "gf-card-img";
+    const img = buildCardImg(inst.card, "small", "gf-card-img", () => renderFallback(el, inst));
+    if (img) {
       img.loading = "lazy";
-      img.alt = inst.card.name || "";
-      img.src = small;
-      img.onerror = function () {
-        img.remove();
-        renderFallback(el, inst);
-      };
       el.appendChild(img);
     } else {
       renderFallback(el, inst);
@@ -1133,16 +1169,10 @@
   function setPreview(inst) {
     const frame = document.getElementById("gf-preview-frame");
     frame.innerHTML = "";
-    const large = inst.card.image_url || "";
-    if (large) {
-      const img = document.createElement("img");
-      img.className = "gf-preview-img";
-      img.alt = inst.card.name || "";
-      img.src = large;
-      img.onerror = function () {
-        img.remove();
-        renderFallback(frame, inst);
-      };
+    const img = buildCardImg(inst.card, "normal", "gf-preview-img", () =>
+      renderFallback(frame, inst)
+    );
+    if (img) {
       frame.appendChild(img);
     } else {
       renderFallback(frame, inst);
@@ -1839,6 +1869,10 @@
     // v3.26.1 precedent). Single construction site is preserved —
     // this is a NEW SPEC FIELD, not a new createToken variant.
     const imageUrl = (spec && spec.imageUrl) || null;
+    // issue #83 — optional scryfall_id. Quick-add tokens carry one (from
+    // the payload) and render mirror-first via cardImageChain; custom
+    // tokens leave it null and keep the image_url / text-fallback path.
+    const scryfallId = (spec && spec.scryfallId) || null;
     const card = {
       name: name,
       // type_line drives classifyRegion + isLand + renderFallback.
@@ -1858,6 +1892,7 @@
       // is fine; the existing buildCardEl image-vs-fallback
       // dispatch consumes the field uniformly.
       image_url: imageUrl,
+      scryfall_id: scryfallId,
       oracle_text: oracleText,
       colors: colors,
       // color_identity isn't read by any goldfish render path today,
@@ -1959,6 +1994,9 @@
       // pulled from the joined TokenInventory.image_url. null when
       // loose name-only requirement → renderFallback text card-face.
       imageUrl: detected.image_url || null,
+      // issue #83 — mirror-first art for quick-add tokens; null for
+      // loose name-only requirements (text card-face, as before).
+      scryfallId: detected.scryfall_id || null,
     };
     return createToken(spec);
   }

@@ -52,3 +52,51 @@ def test_card_detail_serves_mirror_src_with_fallback(client, db):
     assert "api.scryfall.com/cards/sid-mirror-1?format=image" in resp.text
     # the stored CDN URL is no longer emitted as the src
     assert 'src="https://cards.scryfall.io' not in resp.text
+
+
+def test_goldfish_payload_carries_scryfall_id_and_mirror_base(client, db, user):
+    """#83 — the goldfish JSON payload must carry scryfall_id per card plus
+    the mirror base, so goldfish.js can build mirror-first image URLs
+    browser-side (the one surface #44's template pass couldn't cover)."""
+    import json
+    import re
+
+    from app import deck_service
+    from app.models import Card, InventoryRow
+
+    card = Card(
+        scryfall_id="sid-goldfish-1",
+        name="Sol Ring",
+        set_code="tst",
+        set_name="Test",
+        collector_number="1",
+        image_url="https://cards.scryfall.io/normal/front/x.jpg",
+    )
+    db.add(card)
+    db.flush()
+    deck = deck_service.create_deck(db, user.id, "Goldfish Deck")
+    db.add(
+        InventoryRow(
+            user_id=user.id,
+            card_id=card.id,
+            quantity=1,
+            finish="normal",
+            storage_location_id=deck.storage_location_id,
+            is_pending=False,
+        )
+    )
+    db.commit()
+
+    resp = client.get(f"/decks/{deck.id}/goldfish")
+    assert resp.status_code == 200
+    m = re.search(
+        r'<script id="gf-deck-data" type="application/json">(.*?)</script>',
+        resp.text,
+        re.DOTALL,
+    )
+    assert m, "goldfish payload script tag missing"
+    payload = json.loads(m.group(1))
+    assert payload["image_mirror_base"] == "https://img.cartarch.com"
+    assert payload["cards"][0]["scryfall_id"] == "sid-goldfish-1"
+    # image_url stays in the payload — it's the no-scryfall_id fallback signal
+    assert payload["cards"][0]["image_url"] == "https://cards.scryfall.io/normal/front/x.jpg"

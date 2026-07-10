@@ -31,7 +31,7 @@ from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session, joinedload
 
 from app.deck_service import get_deck_produced_tokens_for_goldfish
-from app.dependencies import get_current_user, get_db_session, render
+from app.dependencies import IMAGE_MIRROR_BASE_URL, get_current_user, get_db_session, render
 from app.models import Card, Deck, DeckTokenRequirement, InventoryRow, TokenInventory, User
 
 router = APIRouter()
@@ -61,6 +61,8 @@ def goldfish_page(
             # v3.30.8 — tokens field present on every payload (shape
             # consistency); empty on the misconfigured-deck branch.
             "tokens": [],
+            # issue #83 — mirror base present on every payload shape.
+            "image_mirror_base": IMAGE_MIRROR_BASE_URL,
         }
         return render(
             request,
@@ -96,6 +98,11 @@ def goldfish_page(
                 "set_code": card.set_code,
                 "collector_number": card.collector_number,
                 "image_url": card.image_url,
+                # issue #83 — goldfish.js builds mirror-first image URLs
+                # from scryfall_id (same contract as mirror_image_url /
+                # img_fallback on the server-rendered surfaces); image_url
+                # stays as the no-scryfall_id fallback signal.
+                "scryfall_id": card.scryfall_id,
                 "mana_cost": card.mana_cost,
                 "cmc": float(card.cmc) if card.cmc is not None else None,
                 "type_line": card.type_line,
@@ -256,6 +263,10 @@ def goldfish_page(
         "format": deck.format,
         "cards": cards,
         "tokens": tokens,
+        # issue #83 — self-hosted image mirror base for browser-side URL
+        # construction. Injected via the payload (not hardcoded in JS) so
+        # the IMAGE_MIRROR_BASE_URL env override covers this surface too.
+        "image_mirror_base": IMAGE_MIRROR_BASE_URL,
     }
 
     return render(

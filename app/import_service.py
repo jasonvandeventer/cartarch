@@ -70,6 +70,10 @@ HEADER_ALIASES = {
     "tags": "tags",
     "isproxy": "is_proxy",
     "is_proxy": "is_proxy",
+    # issue #70 — per-row brew signal. Only consulted when the row's Location
+    # auto-creates a NEW deck (existing decks keep their own is_brew flag).
+    "isbrew": "is_brew",
+    "is_brew": "is_brew",
     # Helvault: finish is in a column called "extras"
     "extras": "finish",
     # Moxfield: set code is in "Edition", foil status is in "Foil"
@@ -319,6 +323,7 @@ def parse_scanner_csv(file_bytes: bytes) -> dict[str, Any]:
         role_raw = row.get("role", "")
         tags_raw = row.get("tags", "")
         is_proxy_raw = row.get("is_proxy", "")
+        is_brew_raw = row.get("is_brew", "")
         pre_rows.append(
             {
                 "line_number": line_number,
@@ -335,6 +340,7 @@ def parse_scanner_csv(file_bytes: bytes) -> dict[str, Any]:
                 "role_raw": role_raw,
                 "tags_raw": tags_raw,
                 "is_proxy_raw": is_proxy_raw,
+                "is_brew_raw": is_brew_raw,
             }
         )
 
@@ -406,6 +412,8 @@ def parse_scanner_csv(file_bytes: bytes) -> dict[str, Any]:
         # in the dict only on the invalid-row branch for the reason string.
         role_normalized, role_valid = parse_role(r.get("role_raw"))
         is_proxy_value, is_proxy_valid = parse_proxy_bool(r.get("is_proxy_raw"))
+        # issue #70 — is_brew shares the strict empty/'true'/'false' grammar.
+        is_brew_value, is_brew_valid = parse_proxy_bool(r.get("is_brew_raw"))
         cleaned = {
             "line_number": r["line_number"],
             "scryfall_id": r["scryfall_id"],
@@ -421,6 +429,7 @@ def parse_scanner_csv(file_bytes: bytes) -> dict[str, Any]:
             "role": role_normalized or "",
             "tags": r.get("tags_raw", ""),
             "is_proxy": is_proxy_value,
+            "is_brew": is_brew_value,
             "warnings": [],
         }
 
@@ -447,6 +456,13 @@ def parse_scanner_csv(file_bytes: bytes) -> dict[str, Any]:
         if not is_proxy_valid:
             cleaned["reason"] = (
                 f"Invalid Is Proxy value: {r.get('is_proxy_raw')!r} "
+                f"(allowed: empty, 'true', or 'false')."
+            )
+            invalid_rows.append(cleaned)
+            continue
+        if not is_brew_valid:
+            cleaned["reason"] = (
+                f"Invalid Is Brew value: {r.get('is_brew_raw')!r} "
                 f"(allowed: empty, 'true', or 'false')."
             )
             invalid_rows.append(cleaned)
@@ -1094,6 +1110,7 @@ def auto_create_locations(
     user_id: int,
     names: list[str],
     name_to_type: dict[str, str] | None = None,
+    name_to_is_brew: dict[str, bool] | None = None,
 ) -> dict[str, int]:
     """Create one StorageLocation per name and return a map of
     lowercased-name → new StorageLocation.id.
@@ -1116,6 +1133,12 @@ def auto_create_locations(
     if a Deck with the imported name already exists for this user, its
     paired ``storage_location_id`` is reused (no duplicate create).
 
+    issue #70 — optional ``name_to_is_brew`` (keyed by lowercased name, same
+    convention as ``name_to_type``) marks auto-created type="deck" names as
+    brews. Names absent from the map default to ``is_brew=False``. Ignored
+    for non-deck types and for names that resolve to an existing location
+    (the existing deck's own flag wins).
+
     Non-deck behaviour unchanged: still routes through ``create_location``
     so the same validation + one-name-per-user rule the manual /locations
     flow uses is honored. If a StorageLocation already exists by the time
@@ -1126,6 +1149,7 @@ def auto_create_locations(
     if not names:
         return out
     name_to_type = name_to_type or {}
+    name_to_is_brew = name_to_is_brew or {}
     selectable_types = VALID_LOCATION_TYPES - {"root"}
     for raw in names:
         name = raw.strip()
@@ -1194,7 +1218,12 @@ def auto_create_locations(
             # target_location_id. Self-heals when v4's table rebuild
             # drops the legacy constraint.
             try:
-                new_deck = create_deck(session, user_id=user_id, name=name)
+                new_deck = create_deck(
+                    session,
+                    user_id=user_id,
+                    name=name,
+                    is_brew=bool(name_to_is_brew.get(name.lower())),
+                )
             except IntegrityError:
                 session.rollback()
                 continue
