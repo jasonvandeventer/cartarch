@@ -1,5 +1,15 @@
 [
   {
+    "version": "4.1.30",
+    "date": "2026-07-10",
+    "added": [],
+    "refined": [],
+    "resolved": [
+      "Goldfish playtester now serves card images from the self-hosted mirror (img.cartarch.com) instead of the Scryfall CDN, completing the image migration started in #44."
+    ],
+    "archivist_note": "The mirror migration in v4.1.27 deliberately excluded the goldfish surface because its image URLs are constructed browser-side from payload data, not server-side in Jinja templates. The fix is straightforward once you see the shape: add scryfall_id to the JSON payload (it was always on the Card model, just never serialized into the goldfish dict), then build mirror URLs in JS with the same /{id}/{size}.jpg contract the templates use. The one subtlety is the token carve-out: custom-created tokens have no scryfall_id and keep their existing image_url or text-fallback path, exactly mirroring the server-side carve-out. The onerror fallback to api.scryfall.com with a null-guard loop break is the same pattern every template img tag already uses."
+  },
+  {
     "version": "4.1.29",
     "date": "2026-07-10",
     "added": [
