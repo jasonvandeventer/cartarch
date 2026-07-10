@@ -1,5 +1,19 @@
 [
   {
+    "version": "4.1.32",
+    "date": "2026-07-10",
+    "added": [],
+    "refined": [
+      "The Deckbuilder's auto-tagger recognizes far more cards. Equipment and Auras that grant indestructible or protection, damage-redirection pieces (Pariah, Stuffy Doll and the like), Voltron equipment that carries the win, exile removal, and counter-doublers are now sorted into the right role instead of being written off as 'no detected role.' On a Voltron/damage-lock deck this cut the untagged pile from 22 cards to 2 and let the analyzer finally see the deck's win conditions.",
+      "Upgrade suggestions are quality-filtered now. The Deckbuilder won't offer a bulk ten-cent common as an upgrade to a category built from constructed-quality staples, or a six-mana spell to a deck with a two-mana curve, and it sorts the rest by a quality proxy so the best options come first.",
+      "Strategy-profile priorities now shape plan-coverage targets: a role you mark High priority gets a wider healthy range, so a protection-centric deck is no longer scolded for 'stacking redundancy' when keeping the commander alive is the entire plan."
+    ],
+    "resolved": [
+      "Fixed issue #88: auto-tagger coverage gaps and upgrade-suggestion quality in the deckbuilder analyzer shipped with issue #60."
+    ],
+    "archivist_note": "Follow-up to #60. The tagger's coverage holes clustered in one place: deck_service.suggest_card_roles returns nothing for whole card families (indestructible grants, damage redirection, Voltron equipment). Rather than widen those app-wide regexes — which would re-tag every collection — the fix adds a supplemental second pass that runs ONLY when the v1 tagger is silent, mapping cards into EXISTING categories with new subtypes (keyword_grant, damage_redirection, voltron_buff, exile, counter_multiplier). Zero blast radius on the base tagger and its tests. Two of the issue's own premises were wrong and are worth recording: Flowering of the White Tree is an anthem, not a cost-reducer, so it honestly stays no-role; and there is no edhrec_rank column, so that upgrade filter is a documented skip. The quality filters gauge each candidate against the deck's own cards in that category, so the bar scales with the deck instead of a global constant. The #51/#60 determinism boundary held: no LLM, pure oracle-text reads, pytest-covered against the real DNR (Anti-Venom) decklist pulled from production."
+  },
+  {
     "version": "4.1.31",
     "date": "2026-07-10",
     "added": [

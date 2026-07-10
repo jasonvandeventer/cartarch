@@ -24,6 +24,7 @@ rather than re-implementing card analysis.
 from __future__ import annotations
 
 import json
+import math
 import re
 from dataclasses import dataclass, field
 from typing import Any
@@ -755,6 +756,102 @@ _ACTIVATED_GROUP_DRAW_RE = re.compile(r"\{[^}]+\}[^:.]*:\s*each player draws", r
 _SYMMETRICAL_DRAW_RE = re.compile(r"each player draws", re.IGNORECASE)
 _TRIBAL_SUPPORT_RE = re.compile(r"choose a creature type|of the chosen type", re.IGNORECASE)
 
+# --- issue #88 supplemental patterns -------------------------------------------
+# The v1 tagger (deck_service.suggest_card_roles) misses whole families of cards
+# that clearly belong to existing categories. Rather than widen the app-wide
+# regexes (blast radius: every collection re-tags), these read the SAME oracle
+# text one level deeper and only run when the v1 tagger returns nothing — so the
+# base tagger and its tests are untouched. New patterns map into existing broad
+# roles (Protection / Removal / Engine / Threat) with new subtypes; no new
+# top-level categories (issue #88 constraint).
+
+# Protection: grant a defensive keyword to *another* permanent, or hard "can't
+# lose". Deliberately anchored on "equipped/enchanted creature has …" and
+# "protection from" so a bare "Indestructible" keyword line on the card itself
+# (e.g. Stuffy Doll) does NOT read as protection — that card is redirection.
+_GRANT_PROTECTION_RE = re.compile(
+    r"(?:equipped|enchanted) creature (?:has|gains?)[^.]{0,40}"
+    r"\b(?:hexproof|shroud|ward|indestructible|protection from)\b"
+    r"|(?:creatures?|permanents?|other permanents?) you control (?:have|has|gain|gains?)"
+    r"[^.]{0,10}\b(?:hexproof|shroud|indestructible|protection from)\b"
+    r"|\bhas protection from\b"
+    r"|(?:can'?t|cannot) lose the game",
+    re.IGNORECASE,
+)
+# Damage redirection: the deck's player-protection lock. Three shapes —
+# "…damage…is dealt to <creature> instead" (Pariah/Pariah's Shield/Saving
+# Grace/Martyrdom), "prevent that damage…deals that much damage to" (Phyrexian
+# Vindicator), and "whenever ~ is dealt damage, it deals that much damage to"
+# (Stuffy Doll).
+_DAMAGE_REDIRECT_RE = re.compile(
+    r"damage[^.]{0,80}is dealt to [^.]{0,40}(?:creature|permanent) instead"
+    # Prevent-then-reflect (Phyrexian Vindicator) crosses a sentence boundary
+    # ("prevent that damage. When damage is prevented this way…"), so this
+    # branch spans periods where the others clamp to one sentence.
+    r"|prevent(?:s|ed)? (?:that|this) damage[\s\S]{0,90}deals? that much damage to"
+    r"|whenever [^.]{0,40}is dealt damage,? [^.]{0,20}deals? that much damage to",
+    re.IGNORECASE,
+)
+# Removal the v1 regex misses: "exile up to one target nonland permanent"
+# (Grasp of Fate — words between "exile" and "target" defeat _REMOVAL_RE), and
+# multiplayer exile edicts ("exile … each opponent").
+_EXILE_REMOVAL_RE = re.compile(
+    r"exile[^.]{0,40}\bnonland permanent\b"
+    r"|exile[^.]{0,60}\btarget\b[^.]{0,40}\beach opponent\b",
+    re.IGNORECASE,
+)
+# Engine: counter multipliers (Lae'zel, Doubling Season shape).
+_COUNTER_DOUBLER_RE = re.compile(
+    r"if [^.]{0,60}(?:would put|would be placed|put)[^.]{0,20}one or more[^.]{0,20}counters?"
+    r"|double the number of[^.]{0,30}counters?",
+    re.IGNORECASE,
+)
+# Type-scoped (non-color) cost reduction — Flowering-style "legendary spells you
+# cast cost {N} less", "Aura and Equipment spells … cost {N} less". These are
+# real ramp but must NOT read as color_specific_reducer (that fires only on WUBRG
+# color words, so this is already safe; the pattern exists to give them a
+# cost_reduction subtype instead of falling to early/expensive_ramp).
+_TYPE_SCOPED_REDUCER_RE = re.compile(
+    r"\b(?:legendary|artifact|creature|enchantment|aura|equipment|historic|"
+    r"noncreature|colorless|multicolored)\b[^.]{0,40}spells you cast cost \{?\d",
+    re.IGNORECASE,
+)
+# Voltron buffs live on Equipment/Auras only — gate on type_line so anthems and
+# board pumps don't false-positive. Power bonus, double strike / extra combat,
+# creature-copy, or the deathtouch+lifelink combo all read as "this is the kill".
+_VOLTRON_BUFF_RE = re.compile(
+    r"(?:equipped|enchanted) creature (?:gets|has|gains?)[^.]{0,40}[+][\dxX]+/[+-]?[\dxX]+"
+    r"|power and toughness [^.]{0,20}equal to"
+    r"|(?:equipped|enchanted) creature (?:has|gains?)[^.]{0,30}double strike"
+    r"|additional combat phase"
+    r"|copy of (?:equipped|that) creature"
+    r"|\b(?:deathtouch and lifelink|lifelink and deathtouch)\b",
+    re.IGNORECASE,
+)
+
+
+def _supplemental_role(card: Card) -> tuple[str, str] | None:
+    """Second-pass classification for cards the v1 tagger leaves untagged
+    (issue #88). Returns (broad_role, subtype) mapped into an EXISTING category,
+    or None. Priority order resolves overlaps: redirection (a card that is both
+    indestructible and a damage lock, e.g. Stuffy Doll, is redirection first) →
+    protection → removal → engine → ramp → voltron."""
+    oracle = card.oracle_text or ""
+    tl = (card.type_line or "").lower()
+    if _DAMAGE_REDIRECT_RE.search(oracle):
+        return ("Protection", "damage_redirection")
+    if _GRANT_PROTECTION_RE.search(oracle):
+        return ("Protection", "keyword_grant")
+    if _EXILE_REMOVAL_RE.search(oracle):
+        return ("Removal", "exile")
+    if _COUNTER_DOUBLER_RE.search(oracle):
+        return ("Engine", "counter_multiplier")
+    if _TYPE_SCOPED_REDUCER_RE.search(oracle):
+        return ("Ramp", "cost_reduction")
+    if ("equipment" in tl or "aura" in tl) and _VOLTRON_BUFF_RE.search(oracle):
+        return ("Threat", "voltron_buff")
+    return None
+
 
 def classify_role_subtype(
     card: Card, deck_color_identity: set[str]
@@ -777,6 +874,12 @@ def classify_role_subtype(
             return ("Draw", "topdeck_manipulation", "medium")
         if _TRIBAL_SUPPORT_RE.search(oracle):
             return ("Synergy", "tribal_support", "medium")
+        # issue #88: families the v1 tagger misses entirely (indestructible
+        # grants, damage redirection, Voltron equipment, exile edicts,
+        # counter-doublers) map into existing categories with new subtypes.
+        supplemental = _supplemental_role(card)
+        if supplemental is not None:
+            return (*supplemental, "medium")
         return (None, None, "low")
     broad = roles[0]
 
@@ -944,12 +1047,46 @@ def _coverage_categories(card: Card, deck_colors: set[str]) -> list[str]:
     return cats
 
 
+# A plan-coverage category maps to one or more profile priority KEYS (the
+# high/medium/low lists are keyed by role/subtype names). Most categories match
+# their own name; the two compound categories carry aliases (issue #88 P4).
+_CATEGORY_PRIORITY_KEYS = {
+    "removal_wipes": ("removal_wipes", "removal", "wipe"),
+    "win_conditions": ("win_conditions", "threat", "voltron_buff"),
+}
+
+
+def _category_priority(category: str, strategy_profile: dict) -> str:
+    """Resolve a coverage category's priority tier from the strategy profile
+    (issue #88 P4). Returns 'high' | 'medium' | 'low'; medium when the category
+    isn't listed in either the high or low tier."""
+    keys = _CATEGORY_PRIORITY_KEYS.get(category, (category,))
+    for tier in ("high", "low"):
+        listed = strategy_profile.get(tier) or []
+        if any(k in listed for k in keys):
+            return tier
+    return "medium"
+
+
+def _widen_target(lo: int, hi: int, priority: str) -> tuple[int, int]:
+    """Adjust a (min, max) target by priority (issue #88 P4). High widens the
+    ceiling ×1.5 (so a Voltron deck's Protection isn't flagged Over for doing
+    exactly what it means to); Low narrows it ×0.75. Min is untouched, and a
+    narrowed max never drops below min."""
+    if priority == "high":
+        return (lo, math.ceil(hi * 1.5))
+    if priority == "low":
+        return (lo, max(lo, math.floor(hi * 0.75)))
+    return (lo, hi)
+
+
 def evaluate_plan_coverage(cards: list[Card], strategy_profile: dict) -> dict:
     """Evaluate a card list against the profile's per-category targets.
 
     Returns {category: {"count", "min", "max", "status"}} where status is
     "under" | "ok" | "over". Categories without a target in the profile are
-    not reported.
+    not reported. Target ranges are widened/narrowed by the category's profile
+    priority (issue #88 P4) before status is judged.
     """
     targets = strategy_profile.get("targets") or {}
     deck_colors = _profile_colors(strategy_profile)
@@ -960,6 +1097,7 @@ def evaluate_plan_coverage(cards: list[Card], strategy_profile: dict) -> dict:
                 counts[cat] += 1
     report = {}
     for cat, (lo, hi) in targets.items():
+        lo, hi = _widen_target(lo, hi, _category_priority(cat, strategy_profile))
         n = counts[cat]
         status = "under" if n < lo else ("over" if n > hi else "ok")
         report[cat] = {"count": n, "min": lo, "max": hi, "status": status}
@@ -1186,6 +1324,70 @@ UPGRADES_PER_NEED = 5
 
 _RELEVANCE_SORT = {"high": 0, "medium": 1}
 
+# issue #88 P3 thresholds.
+_BULK_PRICE_FLOOR = 0.25  # below this = bulk/draft chaff
+_CONSTRUCTED_AVG_PRICE = 1.00  # deck-category avg above this = constructed quality
+_CMC_OVERSHOOT = 2.0  # a suggestion this far above the category's avg CMC is off-curve
+
+
+def _category_quality_stats(
+    analysis: DeckAnalysis, deck_colors: set[str], under: list[str], effective_price
+) -> dict:
+    """Per-under-category baselines drawn from the deck's OWN cards in that
+    category (issue #88 P3): average effective price, average CMC, whether any
+    priced card exists, and whether the deck already runs a common there. These
+    scale the quality bar to the deck instead of a fixed global threshold."""
+    prices = {cat: [] for cat in under}
+    cmcs = {cat: [] for cat in under}
+    has_common = {cat: False for cat in under}
+    for ac in analysis.cards:
+        cats = [c for c in _coverage_categories(ac.card, deck_colors) if c in under]
+        for cat in cats:
+            prices[cat].append(effective_price(ac.card, ac.finish))
+            if ac.card.cmc is not None:
+                cmcs[cat].append(ac.card.cmc)
+            if (ac.card.rarity or "").lower() == "common":
+                has_common[cat] = True
+
+    def _avg(xs):
+        return sum(xs) / len(xs) if xs else 0.0
+
+    return {
+        cat: {
+            "avg_price": _avg(prices[cat]),
+            "avg_cmc": _avg(cmcs[cat]) if cmcs[cat] else None,
+            "has_price_data": any(p > 0 for p in prices[cat]),
+            "runs_common": has_common[cat],
+        }
+        for cat in under
+    }
+
+
+def _passes_quality(card: Card, finish: str, stats: dict, effective_price) -> bool:
+    """True if ``card`` clears the category's quality bar (issue #88 P3).
+
+    Price floor (4b): drop sub-$0.25 cards only when the deck's category average
+    is constructed-quality (>$1); budget categories skip it. CMC (4c): drop
+    suggestions more than 2 above the category's average CMC. Rarity fallback
+    (4e): when the category has no price signal at all, exclude commons unless
+    the deck already runs a common in that role."""
+    price = effective_price(card, finish) or 0.0
+
+    # 4c — CMC off-curve.
+    avg_cmc = stats["avg_cmc"]
+    if avg_cmc is not None and card.cmc is not None and card.cmc > avg_cmc + _CMC_OVERSHOOT:
+        return False
+
+    if stats["has_price_data"]:
+        # 4b — price floor, only for constructed-quality categories.
+        if stats["avg_price"] > _CONSTRUCTED_AVG_PRICE and price < _BULK_PRICE_FLOOR:
+            return False
+    else:
+        # 4e — no prices to judge by: fall back to rarity.
+        if (card.rarity or "").lower() == "common" and not stats["runs_common"]:
+            return False
+    return True
+
 
 def suggest_upgrades(session: Session, deck, user_id: int, analysis: DeckAnalysis) -> list:
     """Owned cards OUTSIDE this deck that fill the analysis's under-filled
@@ -1197,9 +1399,14 @@ def suggest_upgrades(session: Session, deck, user_id: int, analysis: DeckAnalysi
     but flagged (``in_other_deck``) since moving them is the user's call.
     Filters: commander-legal, inside the deck's color identity, not already in
     the deck (by name — any printing counts), medium/high relevance only.
-    Sorted per category: high relevance first, detected-role cards before
-    role-less big drops, then cheapest first (these are owned cards the user
-    may need to free up), capped at ``UPGRADES_PER_NEED``.
+
+    Quality filtering (issue #88 P3) runs per under-filled category, gauged
+    against the deck's OWN cards in that category so the bar scales with the
+    deck: a $0.10 common isn't an upgrade for a category of $5 staples, and a
+    6-mana spell isn't an upgrade for a 2-mana curve. ``edhrec_rank`` isn't in
+    the Card model, so that filter is skipped; price/CMC/rarity are used.
+    Sorted per category: high relevance first, then price high→low (a proxy for
+    quality among owned cards), then name. Capped at ``UPGRADES_PER_NEED``.
     """
     from app.inventory_service import get_location_label
     from app.pricing import effective_price
@@ -1212,6 +1419,9 @@ def suggest_upgrades(session: Session, deck, user_id: int, analysis: DeckAnalysi
     deck_names = {ac.card.name for ac in analysis.cards}
     if analysis.commander:
         deck_names.add(analysis.commander.name)
+
+    # Per-category quality baselines from the deck's own cards in that category.
+    cat_stats = _category_quality_stats(analysis, deck_colors, under, effective_price)
 
     rows = (
         session.query(InventoryRow)
@@ -1254,14 +1464,17 @@ def suggest_upgrades(session: Session, deck, user_id: int, analysis: DeckAnalysi
         if relevance not in ("medium", "high"):
             continue
         row = agg["loose"] or agg["committed"]
+        finish = row.finish or "normal"
         in_other_deck = agg["loose"] is None
         for cat in needs:
+            if not _passes_quality(card, finish, cat_stats[cat], effective_price):
+                continue  # bulk/off-curve chaff for a constructed-quality slot
             suggestions.append(
                 UpgradeSuggestion(
                     card=card,
                     inventory_row_id=row.id,
                     quantity_available=agg["qty"],
-                    finish=row.finish or "normal",
+                    finish=finish,
                     location=get_location_label(row),
                     in_other_deck=in_other_deck,
                     fills_need=cat,
@@ -1273,12 +1486,13 @@ def suggest_upgrades(session: Session, deck, user_id: int, analysis: DeckAnalysi
             )
 
     def _sort_key(s: UpgradeSuggestion):
-        # ponytail: role-less big drops rank below detected-role cards — they
-        # fill large_payoffs by mana value alone, not a recognized role.
+        # issue #88 P3 4d: relevance, then price high→low (quality proxy among
+        # owned cards; edhrec_rank unavailable), then name. Role-presence stays
+        # a tiebreak so role-less big drops don't jump detected-role answers.
         return (
             _RELEVANCE_SORT[s.relevance],
             0 if s.broad_role is not None else 1,
-            effective_price(s.card, s.finish) or 0.0,
+            -(effective_price(s.card, s.finish) or 0.0),
             s.card.name or "",
         )
 
