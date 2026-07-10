@@ -1,5 +1,15 @@
 [
   {
+    "version": "4.1.33",
+    "date": "2026-07-10",
+    "added": [
+      "You can now correct an inventory row's printing without deleting and re-adding it. Pick a different printing of the same card and the row keeps its place in your showcases, trades, decks, and history."
+    ],
+    "refined": [],
+    "resolved": [],
+    "archivist_note": "The collection has always identified a card by its printing: this set, this collector number, this specific piece of cardboard. When the wrong printing was recorded, the only fix was to destroy the row and rebuild it, which meant losing every reference that had accumulated around it: its seat in a showcase, its place in a trade, its history in the audit log. The repoint changes the row's card identity in place, the way correcting a filing label works in the real world: the card in the sleeve stays in the sleeve, it just says the right thing now. Same-card validation runs through Scryfall's oracle_id rather than the local name column, so split cards, DFCs, and alternate-art printings all resolve correctly, and you can't accidentally turn a Sol Ring into a Lightning Bolt. The audit trail records both the old and the new printing, so the correction itself becomes part of the row's history rather than an erasure of it."
+  },
+  {
     "version": "4.1.32",
     "date": "2026-07-10",
     "added": [],
