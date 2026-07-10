@@ -12,6 +12,8 @@ no-role, which is the substrate's documented behavior for unknown cards.
 
 from __future__ import annotations
 
+import json
+
 from app import deck_service
 from app import recommendation_service as rec
 from app.models import Card, InventoryRow
@@ -610,3 +612,185 @@ def test_molecule_man_generation_excludes_dead_reducers(db, user):
     cuts = {cand.card.name: cand for cand in result.cuts}
     assert "Sapphire Medallion" in cuts
     assert cuts["Sapphire Medallion"].role_relevance == "very_low"
+
+
+# --- P3: deck analyzer -------------------------------------------------------------
+
+
+def _make_deck_with_cards(db, user, cards, commander_card, name="Molecule Man EDH"):
+    deck = deck_service.create_deck(db, user.id, name, format_name="commander")
+    for card in cards:
+        db.add(card)
+    db.flush()
+    for card in cards:
+        db.add(
+            InventoryRow(
+                user_id=user.id,
+                card_id=card.id,
+                storage_location_id=deck.storage_location_id,
+                quantity=1,
+                is_pending=False,
+                is_proxy=False,
+                role="commander" if card is commander_card else None,
+            )
+        )
+    db.commit()
+    return deck
+
+
+def _analyze_molecule_man(db, user):
+    cards = molecule_man_deck()
+    deck = _make_deck_with_cards(db, user, cards, cards[0])
+    analysis = rec.analyze_deck(db, deck, user.id)
+    db.commit()
+    return deck, analysis
+
+
+def test_analyze_deck_molecule_man(db, user):
+    _, analysis = _analyze_molecule_man(db, user)
+    statuses = {ac.card.name: ac.status for ac in analysis.cards}
+    for name in ("Sapphire Medallion", "Hazoret's Monument", "Oketra's Monument"):
+        assert statuses[name] == "cut", name
+    for name in ("Endbringer", "Mind Stone", "Mikokoro, Center of the Sea"):
+        assert statuses[name] == "keep", name
+    # the commander isn't a gradable slot
+    assert "Molecule Man" not in statuses
+    under = {cat for cat, e in analysis.coverage.items() if e["status"] == "under"}
+    assert {"large_payoffs", "protection", "win_conditions"} <= under
+    assert analysis.coverage["ramp"]["status"] == "over"
+    assert analysis.summary["cuts"] >= 3
+    assert analysis.summary["total_cards"] == 100
+    assert "not plan-complete" in analysis.summary["verdict"]
+
+
+def test_analyze_deck_reducer_in_identity_is_keep(db, user):
+    cmdr = c(
+        "Azure Sage",
+        oracle="Whenever you draw a card, scry 1.",
+        tl="Legendary Creature — Merfolk Wizard",
+        cmc=3.0,
+        color_identity="U",
+    )
+    deck = _make_deck_with_cards(db, user, [cmdr, sapphire()], cmdr, name="Blue Deck")
+    analysis = rec.analyze_deck(db, deck, user.id)
+    (medallion,) = [ac for ac in analysis.cards if ac.card.name == "Sapphire Medallion"]
+    assert medallion.status == "keep"
+    assert medallion.subtype == "cost_reduction"
+
+
+# --- P3: profile persistence -------------------------------------------------------
+
+
+def test_get_or_seed_profile_persists_once(db, user):
+    from app.models import DeckStrategyProfile
+
+    cards = molecule_man_deck()
+    deck = _make_deck_with_cards(db, user, cards, cards[0])
+    first = rec.get_or_seed_profile(db, deck, cards[0])
+    db.commit()
+    rows = db.query(DeckStrategyProfile).filter_by(deck_id=deck.id).all()
+    assert len(rows) == 1
+    assert rows[0].is_custom is False
+    second = rec.get_or_seed_profile(db, deck, cards[0])
+    assert second == json.loads(rows[0].profile_data)
+    assert first["high"] == second["high"]
+    assert len(db.query(DeckStrategyProfile).filter_by(deck_id=deck.id).all()) == 1
+
+
+def test_save_profile_sets_custom_and_reset_reseeds(db, user):
+    from app.models import DeckStrategyProfile
+
+    cards = molecule_man_deck()
+    deck = _make_deck_with_cards(db, user, cards, cards[0])
+    profile = rec.get_or_seed_profile(db, deck, cards[0])
+    profile["high"] = ["opponent_turn_draw"]
+    row = rec.save_profile(db, deck.id, profile)
+    db.commit()
+    assert row.is_custom is True
+    assert json.loads(row.profile_data)["high"] == ["opponent_turn_draw"]
+
+    rec.reset_profile(db, deck.id)
+    db.commit()
+    db.expire_all()  # the bulk delete bypasses the identity map (same session re-seeds below)
+    assert db.query(DeckStrategyProfile).filter_by(deck_id=deck.id).first() is None
+    rec.get_or_seed_profile(db, deck, cards[0])
+    db.commit()
+    fresh = db.query(DeckStrategyProfile).filter_by(deck_id=deck.id).first()
+    assert fresh is not None
+    assert fresh.is_custom is False
+
+
+def test_delete_deck_removes_profile(db, user):
+    import app.legacy_tables  # noqa: F401 — registers deck_bracket_* tables on Base.metadata
+    from app.db import Base
+    from app.models import DeckStrategyProfile
+
+    Base.metadata.create_all(db.get_bind())  # raw deck_bracket_* tables delete_deck touches
+    cards = molecule_man_deck()
+    deck = _make_deck_with_cards(db, user, cards, cards[0])
+    rec.get_or_seed_profile(db, deck, cards[0])
+    db.commit()
+    deck_id = deck.id
+    assert deck_service.delete_deck(db, deck_id, user.id)
+    assert db.query(DeckStrategyProfile).filter_by(deck_id=deck_id).first() is None
+
+
+# --- P3: analyzer routes -----------------------------------------------------------
+
+
+def test_analysis_route_owner_ok(db, user, client):
+    cards = molecule_man_deck()
+    deck = _make_deck_with_cards(db, user, cards, cards[0])
+    resp = client.get(f"/decks/{deck.id}/analysis")
+    assert resp.status_code == 200
+    assert "Sapphire Medallion" in resp.text
+    assert "not plan-complete" in resp.text
+
+
+def test_analysis_route_non_owner_404(db, user, client):
+    from app.models import User
+
+    other = User(username="other@example.com", password_hash="x")
+    db.add(other)
+    db.commit()
+    other_deck = deck_service.create_deck(db, other.id, "Not Yours")
+    resp = client.get(f"/decks/{other_deck.id}/analysis")
+    assert resp.status_code == 404
+
+
+def test_analysis_profile_save_route(db, user, client):
+    from app.models import DeckStrategyProfile
+
+    cards = molecule_man_deck()
+    deck = _make_deck_with_cards(db, user, cards, cards[0])
+    resp = client.post(
+        f"/decks/{deck.id}/analysis/profile",
+        data={
+            "high": "topdeck manipulation, opponent_turn_draw",
+            "medium": "ramp, removal",
+            "low": "color_fixer",
+        },
+        follow_redirects=False,
+    )
+    assert resp.status_code == 303
+    assert resp.headers["location"] == f"/decks/{deck.id}/analysis"
+    db.expire_all()
+    row = db.query(DeckStrategyProfile).filter_by(deck_id=deck.id).first()
+    assert row is not None
+    assert row.is_custom is True
+    saved = json.loads(row.profile_data)
+    assert saved["high"] == ["topdeck_manipulation", "opponent_turn_draw"]
+    assert saved["low"] == ["color_fixer"]
+
+
+def test_analysis_profile_reset_route(db, user, client):
+    from app.models import DeckStrategyProfile
+
+    cards = molecule_man_deck()
+    deck = _make_deck_with_cards(db, user, cards, cards[0])
+    rec.get_or_seed_profile(db, deck, cards[0])
+    db.commit()
+    resp = client.post(f"/decks/{deck.id}/analysis/profile/reset", follow_redirects=False)
+    assert resp.status_code == 303
+    db.expire_all()
+    assert db.query(DeckStrategyProfile).filter_by(deck_id=deck.id).first() is None

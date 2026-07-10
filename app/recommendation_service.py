@@ -23,6 +23,7 @@ rather than re-implementing card analysis.
 
 from __future__ import annotations
 
+import json
 import re
 from dataclasses import dataclass, field
 from typing import Any
@@ -30,7 +31,8 @@ from typing import Any
 from sqlalchemy.orm import Session, joinedload
 
 from app import deck_service
-from app.models import Card, InventoryRow
+from app.models import Card, DeckStrategyProfile, InventoryRow
+from app.timeutil import utc_now
 
 # --- Skeleton + scoring constants ---------------------------------------------
 
@@ -962,6 +964,193 @@ def evaluate_plan_coverage(cards: list[Card], strategy_profile: dict) -> dict:
         status = "under" if n < lo else ("over" if n > hi else "ok")
         report[cat] = {"count": n, "min": lo, "max": hi, "status": status}
     return report
+
+
+# --- Deck analyzer (issue #60, P3) ----------------------------------------------
+#
+# Grades an EXISTING deck against its strategy profile: per-card keep / cut /
+# placeholder / upgrade-target statuses with the P1 substrate's deterministic
+# reasons, plus the plan-coverage report. Profiles persist per-deck
+# (deck_strategy_profiles): auto-seeded on first analysis, user-editable after.
+
+# Default status per relevance. very_low = dead role → cut; low = acceptable
+# filler → placeholder; medium/high → keep. Role-less cards are upgrade
+# targets (unknown contribution to the plan) — except lands, which are mana
+# base, not plan slots.
+_STATUS_BY_RELEVANCE = {
+    "very_low": "cut",
+    "low": "placeholder",
+    "medium": "keep",
+    "high": "keep",
+}
+
+ANALYSIS_STATUSES = ("cut", "placeholder", "upgrade_target", "keep")
+
+
+@dataclass
+class AnalyzedCard:
+    card: Card
+    quantity: int
+    finish: str
+    broad_role: str | None
+    subtype: str | None
+    relevance: str
+    reason: str
+    status: str
+
+
+@dataclass
+class DeckAnalysis:
+    commander: Card | None
+    profile: dict
+    cards: list[AnalyzedCard]
+    coverage: dict
+    summary: dict
+
+
+def get_or_seed_profile(session: Session, deck, commander: Card) -> dict:
+    """Load the deck's persisted strategy profile, seeding (and persisting,
+    ``is_custom=False``) one from the commander on first use. Caller commits."""
+    row = session.query(DeckStrategyProfile).filter(DeckStrategyProfile.deck_id == deck.id).first()
+    if row:
+        return json.loads(row.profile_data)
+    profile = seed_strategy_profile(commander, commander_color_identity(commander) or set())
+    session.add(
+        DeckStrategyProfile(deck_id=deck.id, profile_data=json.dumps(profile), is_custom=False)
+    )
+    session.flush()
+    return profile
+
+
+def save_profile(session: Session, deck_id: int, profile_data: dict | str) -> DeckStrategyProfile:
+    """Upsert the deck's strategy profile as user-edited (``is_custom=True``)."""
+    payload = profile_data if isinstance(profile_data, str) else json.dumps(profile_data)
+    row = session.query(DeckStrategyProfile).filter(DeckStrategyProfile.deck_id == deck_id).first()
+    if row:
+        row.profile_data = payload
+        row.is_custom = True
+        row.updated_at = utc_now()
+    else:
+        row = DeckStrategyProfile(deck_id=deck_id, profile_data=payload, is_custom=True)
+        session.add(row)
+    session.flush()
+    return row
+
+
+def reset_profile(session: Session, deck_id: int) -> None:
+    """Delete the persisted profile; the next analysis re-seeds from the commander.
+
+    ``synchronize_session="fetch"`` evicts the deleted row from the session's
+    identity map so a same-session re-seed doesn't collide on the recycled PK.
+    """
+    session.query(DeckStrategyProfile).filter(DeckStrategyProfile.deck_id == deck_id).delete(
+        synchronize_session="fetch"
+    )
+
+
+def analyze_deck(session: Session, deck, user_id: int) -> DeckAnalysis:
+    """Grade an existing deck against its strategy profile.
+
+    Uses the shared-inclusive decklist (``resolved_deck_rows``, same set the
+    deck analytics read). The commander row is classified into coverage but not
+    graded — it isn't a cuttable slot. First analysis auto-seeds and persists
+    the profile (caller commits); a commander-less deck gets an in-memory
+    generic profile and nothing is persisted.
+
+    Note: the P1 substrate classifies by PRIMARY role only, so multi-role
+    cards are under-credited in both status and coverage. Acceptable for P3.
+    """
+    rows = deck_service.resolved_deck_rows(session, deck, user_id)
+    commander_row = next((r for r in rows if (r.role or "") == "commander" and r.card), None)
+    commander = commander_row.card if commander_row else None
+
+    if commander is not None:
+        profile = get_or_seed_profile(session, deck, commander)
+    else:
+        # No commander to seed from: analyze against a neutral profile scoped
+        # to the union of the deck's card identities (so in-identity reducers
+        # aren't falsely flagged dead). Not persisted.
+        colors: set[str] = set()
+        for r in rows:
+            if r.card and r.card.color_identity:
+                colors |= set(r.card.color_identity)
+        profile = {
+            "color_identity": "".join(sorted(colors)) if colors else "colorless",
+            "high": [],
+            "medium": ["early_ramp", "ramp", "draw", "removal", "wipe", "protection", "engine"],
+            "low": ["symmetrical_draw"]
+            + ([] if colors else ["color_fixer", "color_specific_reducer"]),
+            "targets": dict(_DEFAULT_PLAN_TARGETS),
+        }
+
+    deck_colors = _profile_colors(profile)
+    analyzed: list[AnalyzedCard] = []
+    coverage_cards: list[Card] = []
+    total_cards = 0
+
+    for row in rows:
+        card = row.card
+        if not card:
+            continue
+        qty = max(1, row.quantity)
+        total_cards += qty
+        coverage_cards.extend([card] * qty)
+        if commander_row is not None and row.id == commander_row.id:
+            continue  # the commander isn't a gradable slot
+        broad, subtype, _confidence = classify_role_subtype(card, deck_colors)
+        relevance, reason = score_role_usefulness(card, broad, subtype, deck_colors, profile)
+        if broad is None and _is_land(card):
+            # ponytail: role-less lands are mana base, not upgrade slots.
+            status, relevance, reason = "keep", "medium", "Mana base"
+        elif broad is None:
+            status = "upgrade_target"
+        else:
+            status = _STATUS_BY_RELEVANCE[relevance]
+        analyzed.append(
+            AnalyzedCard(
+                card=card,
+                quantity=qty,
+                finish=row.finish or "normal",
+                broad_role=broad,
+                subtype=subtype,
+                relevance=relevance,
+                reason=reason,
+                status=status,
+            )
+        )
+
+    coverage = evaluate_plan_coverage(coverage_cards, profile)
+
+    counts = {status: 0 for status in ANALYSIS_STATUSES}
+    for ac in analyzed:
+        counts[ac.status] += ac.quantity
+    under = [cat for cat, entry in coverage.items() if entry["status"] == "under"]
+    over = [cat for cat, entry in coverage.items() if entry["status"] == "over"]
+    if under and (counts["cut"] or over):
+        verdict = (
+            f"Role-complete but not plan-complete: {len(under)} "
+            f"{'category is' if len(under) == 1 else 'categories are'} under target "
+            "while dead or redundant roles fill slots"
+        )
+    elif under:
+        verdict = f"Under-built: {len(under)} categories under target"
+    else:
+        verdict = "Plan-complete: every category within its target range"
+
+    return DeckAnalysis(
+        commander=commander,
+        profile=profile,
+        cards=analyzed,
+        coverage=coverage,
+        summary={
+            "total_cards": total_cards,
+            "keeps": counts["keep"],
+            "cuts": counts["cut"],
+            "placeholders": counts["placeholder"],
+            "upgrade_targets": counts["upgrade_target"],
+            "verdict": verdict,
+        },
+    )
 
 
 def list_commander_candidates(session: Session, user_id: int) -> list[Card]:

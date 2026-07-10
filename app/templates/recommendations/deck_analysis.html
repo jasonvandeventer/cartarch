@@ -1,0 +1,132 @@
+{% from "_macros.html" import editorial_eyebrow, img_fallback %}
+{% extends "base.html" %}
+{% block content %}
+  <section class="panel pagehead">
+    {{ editorial_eyebrow("Decks · Analysis") }}
+    <h1 class="pagehead-title">{{ deck.name }}</h1>
+    <p class="pagehead-tagline">
+      {% if analysis.commander %}
+        Graded against <strong>{{ analysis.commander.name }}</strong>'s strategy profile —
+        does each card fill the <em>right</em> role for this plan, not just <em>a</em> role.
+      {% else %}
+        No commander set — graded against a generic profile. Mark a card's role
+        as commander on the deck page for a commander-specific plan.
+      {% endif %}
+    </p>
+    {% if analysis.commander and analysis.commander.image_url %}
+      <img src="{{ mirror_image_url(analysis.commander.scryfall_id) }}"
+           {{ img_fallback(analysis.commander.scryfall_id) }}
+           alt="{{ analysis.commander.name }}"
+           loading="lazy"
+           style="max-width:180px;border-radius:8px;margin-top:0.5rem">
+    {% endif %}
+  </section>
+
+  <section class="panel">
+    <h3 class="panel-title">Verdict</h3>
+    <p><strong>{{ analysis.summary.verdict }}</strong></p>
+    <p style="opacity:0.8">
+      {{ analysis.summary.total_cards }} cards ·
+      {{ analysis.summary.keeps }} keeps ·
+      {{ analysis.summary.cuts }} cuts ·
+      {{ analysis.summary.placeholders }} placeholders ·
+      {{ analysis.summary.upgrade_targets }} upgrade targets
+    </p>
+  </section>
+
+  <section class="panel">
+    <h3 class="panel-title">Plan coverage</h3>
+    <table style="width:100%;border-collapse:collapse">
+      <thead>
+        <tr style="text-align:left;opacity:0.7">
+          <th style="padding:0.25rem 0.5rem">Category</th>
+          <th style="padding:0.25rem 0.5rem">Count</th>
+          <th style="padding:0.25rem 0.5rem">Target</th>
+          <th style="padding:0.25rem 0.5rem">Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for cat, entry in analysis.coverage.items() %}
+          <tr {% if entry.status == "under" %}style="background:rgba(192,57,43,0.12)"{% endif %}>
+            <td style="padding:0.25rem 0.5rem">{{ cat | replace("_", " ") | capitalize }}</td>
+            <td style="padding:0.25rem 0.5rem">{{ entry.count }}</td>
+            <td style="padding:0.25rem 0.5rem">{{ entry.min }}–{{ entry.max }}</td>
+            <td style="padding:0.25rem 0.5rem">
+              {% if entry.status == "under" %}
+                <strong style="color:#c0392b">Under — needs more</strong>
+              {% elif entry.status == "over" %}
+                <span style="color:#d68910">Over — stacking redundancy</span>
+              {% else %}
+                <span style="opacity:0.7">OK</span>
+              {% endif %}
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+
+  {% set relevance_colors = {"very_low": "#c0392b", "low": "#d68910", "medium": "#7f8c8d", "high": "#27ae60"} %}
+  {% for status, label, blurb in [
+       ("cut", "Cuts", "Dead roles for this plan — the actionable removals."),
+       ("placeholder", "Placeholders", "Acceptable filler, not ideal — upgrade when something better turns up."),
+       ("upgrade_target", "Upgrade targets", "No detected role; unknown contribution to the plan."),
+       ("keep", "Keeps", "Pulling their weight for this plan."),
+     ] %}
+    {% set group = analysis.cards | selectattr("status", "equalto", status) | list %}
+    {% if group %}
+      <section class="panel">
+        <h3 class="panel-title">{{ label }} ({{ group | length }})</h3>
+        <p style="opacity:0.65;margin-top:0">{{ blurb }}</p>
+        <ul style="list-style:none;padding:0;margin:0;display:grid;gap:0.3rem">
+          {% for ac in group | sort(attribute="card.name") %}
+            <li>
+              <strong>{{ ac.quantity }}× {{ ac.card.name }}</strong>
+              {% if ac.broad_role %}
+                <span style="opacity:0.75">— {{ ac.broad_role }}{% if ac.subtype %} · {{ ac.subtype | replace("_", " ") }}{% endif %}</span>
+              {% endif %}
+              <span style="color:{{ relevance_colors[ac.relevance] }};font-weight:600;margin-left:0.35rem">
+                {{ ac.relevance | replace("_", " ") }}
+              </span>
+              <span style="opacity:0.65;display:block;margin-left:1rem">{{ ac.reason }}</span>
+            </li>
+          {% endfor %}
+        </ul>
+      </section>
+    {% endif %}
+  {% endfor %}
+
+  <section class="panel">
+    <h3 class="panel-title">Strategy profile {% if is_custom_profile %}(customized){% else %}(auto-seeded){% endif %}</h3>
+    <p style="opacity:0.75">
+      Role priorities for this deck's plan. Comma-separated role or subtype names
+      (e.g. <code>topdeck_manipulation, opponent_turn_draw, removal</code>).
+    </p>
+    <form method="post" action="/decks/{{ deck.id }}/analysis/profile"
+          style="display:grid;gap:0.5rem;max-width:640px">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <label>High priority
+        <textarea name="high" rows="2" style="width:100%">{{ analysis.profile.high | join(", ") }}</textarea>
+      </label>
+      <label>Medium priority
+        <textarea name="medium" rows="2" style="width:100%">{{ analysis.profile.medium | join(", ") }}</textarea>
+      </label>
+      <label>Low priority
+        <textarea name="low" rows="2" style="width:100%">{{ analysis.profile.low | join(", ") }}</textarea>
+      </label>
+      <div style="display:flex;gap:0.5rem;align-items:center">
+        <button type="submit">Save profile</button>
+      </div>
+    </form>
+    <form method="post" action="/decks/{{ deck.id }}/analysis/profile/reset"
+          style="margin-top:0.5rem">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <button type="submit"
+              title="Discard edits and re-seed the profile from the commander on next load.">
+        Reset to auto-seed
+      </button>
+    </form>
+  </section>
+
+  <p><a href="/decks/{{ deck.id }}">← Back to deck</a></p>
+{% endblock %}

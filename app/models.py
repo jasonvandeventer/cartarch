@@ -329,6 +329,38 @@ class DeckGoal(Base):
     deck: Mapped[Deck] = relationship(back_populates="goals")
 
 
+class DeckStrategyProfile(Base):
+    """Issue #60 P3 — persisted per-deck strategy profile for the analyzer.
+
+    One row per deck (``deck_id`` unique). ``profile_data`` is the JSON blob of
+    the full profile dict (high/medium/low role lists + coverage targets), the
+    same shape ``recommendation_service.seed_strategy_profile`` produces.
+    ``is_custom=False`` = auto-seeded (safe to regenerate); ``True`` = the user
+    edited it, so re-seeding must never silently overwrite it.
+
+    ``deck_id`` is ON DELETE CASCADE NOT NULL (a profile is meaningless without
+    its deck). SQLite enforces no FKs (PRAGMA foreign_keys OFF), so
+    ``delete_deck`` deletes the profile explicitly; the DB CASCADE is Postgres
+    defense-in-depth. ``is_custom`` uses ``server_default=false()`` (never an
+    integer literal — a bare ``0`` breaks CREATE TABLE on Postgres).
+    """
+
+    __tablename__ = "deck_strategy_profiles"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    deck_id: Mapped[int] = mapped_column(
+        ForeignKey("decks.id", ondelete="CASCADE"), nullable=False, unique=True, index=True
+    )
+    profile_data: Mapped[str] = mapped_column(Text, nullable=False)
+    is_custom: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=false()
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
+
+    deck: Mapped[Deck] = relationship()
+
+
 class VariantGroup(Base):
     __tablename__ = "variant_groups"
     __table_args__ = (UniqueConstraint("user_id", "name", name="uq_variant_groups_user_name"),)

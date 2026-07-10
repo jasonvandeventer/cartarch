@@ -4091,6 +4091,14 @@ def delete_deck(session: Session, deck_id: int, user_id: int, *, commit: bool = 
             synchronize_session=False
         )
     session.query(DeckGoal).filter(DeckGoal.deck_id == deck.id).delete(synchronize_session=False)
+
+    # issue #60 — the deck's strategy profile is CASCADE intent (PG-only
+    # defense-in-depth); delete explicitly for SQLite, same pattern as goals.
+    from app.models import DeckStrategyProfile
+
+    session.query(DeckStrategyProfile).filter(DeckStrategyProfile.deck_id == deck.id).delete(
+        synchronize_session=False
+    )
     # Drop the in-memory Deck.goals collection if a caller loaded it (the deck
     # page template + record_goal_results both do). Otherwise the later
     # session.delete(deck) cascade would re-issue an ORM DELETE for goals the bulk
