@@ -6,10 +6,11 @@ storage locations are user-owned and must be queried through user_id.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 
 from sqlalchemy import (
     Boolean,
+    Date,
     DateTime,
     Float,
     ForeignKey,
@@ -1279,3 +1280,29 @@ class TradeItem(Base):
     inventory_row: Mapped[InventoryRow | None] = relationship()
     card: Mapped[Card | None] = relationship()
     showcase_item: Mapped[ShowcaseItem | None] = relationship()
+
+
+class DailyCollectionValue(Base):
+    """One row per user per day: the placed collection value on ``snapshot_date``
+    (issue #85). Written by the daily price-ingest job after prices refresh; the
+    ``UNIQUE(user_id, snapshot_date)`` upsert makes a same-day re-run idempotent.
+
+    Day is the grain — per-printing history is deliberately NOT stored (price-only
+    trend, Option A: what today's holdings were worth on recorded past dates).
+    ``total_value`` mirrors the dashboard's placed Collection Value exactly
+    (finish-aware, pending excluded), so a snapshot reconciles with the tile.
+    Feeds the collection-value-over-time chart.
+    """
+
+    __tablename__ = "daily_collection_values"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    snapshot_date: Mapped[date] = mapped_column(Date, nullable=False)
+    total_value: Mapped[float] = mapped_column(Float, nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "snapshot_date", name="uq_daily_collection_values_user_date"),
+    )
