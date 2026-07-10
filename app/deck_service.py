@@ -3812,6 +3812,154 @@ def pull_card_to_deck(
     return True
 
 
+def materialize_brew(session: Session, user_id: int, deck_id: int) -> dict | None:
+    """Claim owned unassigned copies into a brew deck, converting proxies to
+    real cards. One transaction, one commit.
+
+    Walks the deck's proxy rows; for each, finds claimable UNASSIGNED real
+    inventory of the same card name and pulls it in — ranked exact
+    printing+finish → exact printing → finish match → tier → row id, the SAME
+    ladder ``find_inventory_matches_for_deck_import`` uses for the brew import
+    reconciliation, so the cards claimed are exactly the ones the brew buy-list
+    already points at. Deck-resident copies (in ANOTHER deck) are never claimed
+    (2026-06-11 amendment). Proxies with no owned copy stay proxies. Clears
+    ``is_brew`` when zero proxies remain (a deck with no proxies isn't a brew).
+
+    Returns ``{"claimed": N, "remaining_proxies": M}`` (copy counts), or None if
+    the deck isn't the user's brew.
+    """
+    deck = session.query(Deck).filter(Deck.id == deck_id, Deck.user_id == user_id).first()
+    if not deck or not deck.is_brew or not deck.storage_location_id:
+        return None
+
+    from app.inventory_service import clean_inventory_row_references  # local: avoid cycle
+
+    proxy_rows = (
+        session.query(InventoryRow)
+        .options(joinedload(InventoryRow.card))
+        .filter(
+            InventoryRow.user_id == user_id,
+            InventoryRow.storage_location_id == deck.storage_location_id,
+            InventoryRow.is_proxy.is_(True),
+        )
+        .all()
+    )
+
+    # One name-IN fetch of the user's REAL inventory (excludes proxies), same
+    # source pool as the brew import reconciliation. ponytail: no SELECT FOR
+    # UPDATE — single-replica app, one user-initiated action, the surrounding
+    # transaction is the atomicity boundary; add row locks if this ever races.
+    by_name = _brew_same_name_rows(session, user_id, {r.card.name for r in proxy_rows if r.card})
+
+    claimed = 0
+    for proxy in proxy_rows:
+        if not proxy.card:
+            continue
+        need = int(proxy.quantity)
+        candidates = [
+            (inv, loc)
+            for inv, loc, _set in by_name.get(proxy.card.name.lower(), [])
+            if not (loc is not None and loc.type == "deck") and inv.quantity > 0
+        ]
+        candidates.sort(
+            key=lambda il: (
+                0 if il[0].card_id == proxy.card_id else 1,
+                0 if il[0].finish == proxy.finish else 1,
+                _RECONCILE_TIER_PRIORITY.get("pending" if il[1] is None else il[1].type, 99),
+                il[0].id,
+            )
+        )
+        for src, _loc in candidates:
+            if need <= 0:
+                break
+            take = min(int(src.quantity), need)
+            if take <= 0:
+                continue
+            # Merge into / create a REAL (non-proxy) deck row of the SOURCE's
+            # printing+finish. Must exclude is_proxy so claimed copies never
+            # land back on the proxy row being replaced.
+            deck_row = (
+                session.query(InventoryRow)
+                .filter(
+                    InventoryRow.user_id == user_id,
+                    InventoryRow.card_id == src.card_id,
+                    InventoryRow.finish == src.finish,
+                    InventoryRow.storage_location_id == deck.storage_location_id,
+                    InventoryRow.is_pending.is_(False),
+                    InventoryRow.is_proxy.is_(False),
+                )
+                .first()
+            )
+            if deck_row:
+                deck_row.quantity += take
+                deck_row.updated_at = utc_now()
+            else:
+                deck_row = InventoryRow(
+                    user_id=user_id,
+                    card_id=src.card_id,
+                    storage_location_id=deck.storage_location_id,
+                    finish=src.finish,
+                    quantity=take,
+                    drawer=None,
+                    slot=None,
+                    is_pending=False,
+                    is_proxy=False,
+                    tags=src.tags,
+                    created_at=utc_now(),
+                    updated_at=utc_now(),
+                )
+                session.add(deck_row)
+                session.flush()
+
+            src.quantity -= take
+            src.updated_at = utc_now()
+            if src.quantity <= 0:
+                delete_shares_for_inventory_row(session, src.id)
+                clean_inventory_row_references(session, [src.id])
+                session.delete(src)
+
+            log_transaction(
+                session=session,
+                user_id=user_id,
+                event_type="materialize_brew",
+                card_id=deck_row.card_id,
+                finish=deck_row.finish,
+                quantity_delta=-take,
+                source_location="collection",
+                destination_location=f"deck:{deck.name}",
+                inventory_row_id=deck_row.id,
+                note=f"Materialized brew {deck.name}",
+            )
+            need -= take
+            claimed += take
+
+        # Shrink / drop the proxy by however much we claimed.
+        if need != int(proxy.quantity):
+            proxy.quantity = need
+            proxy.updated_at = utc_now()
+        if proxy.quantity <= 0:
+            delete_shares_for_inventory_row(session, proxy.id)
+            clean_inventory_row_references(session, [proxy.id])
+            session.delete(proxy)
+
+    session.flush()
+    remaining = (
+        session.query(func.count(InventoryRow.id))
+        .filter(
+            InventoryRow.user_id == user_id,
+            InventoryRow.storage_location_id == deck.storage_location_id,
+            InventoryRow.is_proxy.is_(True),
+        )
+        .scalar()
+        or 0
+    )
+    if remaining == 0:
+        deck.is_brew = False
+
+    session.commit()
+    return {"claimed": claimed, "remaining_proxies": int(remaining)}
+
+
 def return_card_from_deck(
     session: Session,
     user_id: int,

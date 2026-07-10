@@ -32,6 +32,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
+import app.legacy_tables  # noqa: F401 — registers deck_bracket_* so delete_deck cleanup has its tables standalone
 from app import deck_service
 from app.db import Base
 from app.decklist_service import build_brew_buylist, compare_entries_to_owned
@@ -933,3 +934,108 @@ def test_locations_create_deck_is_brew():
 
     assert s.query(Deck).filter_by(user_id=u.id, name="Brew Deck").one().is_brew is True
     assert s.query(Deck).filter_by(user_id=u.id, name="Normal Deck").one().is_brew is False
+
+
+# --------------------------------------------------------------------------- #
+# materialize_brew — claim owned unassigned copies, convert proxies to real
+# (issue #79). One transaction; auto-clears is_brew when zero proxies remain.
+# --------------------------------------------------------------------------- #
+
+
+def _deck_row(s, deck, card_id, proxy=None):
+    q = s.query(InventoryRow).filter(
+        InventoryRow.storage_location_id == deck.storage_location_id,
+        InventoryRow.card_id == card_id,
+    )
+    if proxy is not None:
+        q = q.filter(InventoryRow.is_proxy.is_(proxy))
+    return q.one_or_none()
+
+
+def test_materialize_claims_owned_and_leaves_unowned_proxy():
+    s = _fresh()()
+    u = _user(s)
+    brew = deck_service.create_deck(s, u.id, "Brew", is_brew=True)
+    owned = _card(s, "Sol Ring")
+    unowned = _card(s, "Mana Crypt")
+    binder = _loc(s, u.id, "Binder", type_="box")
+    # Owned copy sits loose in a binder; proxies for both live in the brew.
+    _place(s, u.id, owned, binder.id, proxy=False)
+    _place(s, u.id, owned, brew.storage_location_id, proxy=True)
+    _place(s, u.id, unowned, brew.storage_location_id, proxy=True)
+    s.commit()
+
+    res = deck_service.materialize_brew(s, u.id, brew.id)
+    assert res == {"claimed": 1, "remaining_proxies": 1}
+    # Sol Ring proxy gone, replaced by a real deck row; binder copy consumed.
+    assert _deck_row(s, brew, owned.id, proxy=True) is None
+    assert _deck_row(s, brew, owned.id, proxy=False).quantity == 1
+    assert (
+        s.query(InventoryRow).filter_by(card_id=owned.id, storage_location_id=binder.id).count()
+        == 0
+    )
+    # Mana Crypt stays a proxy; deck stays a brew (a proxy remains).
+    assert _deck_row(s, brew, unowned.id, proxy=True).quantity == 1
+    s.refresh(brew)
+    assert brew.is_brew is True
+
+
+def test_materialize_full_clears_brew_flag_and_is_idempotent():
+    s = _fresh()()
+    u = _user(s)
+    brew = deck_service.create_deck(s, u.id, "Brew", is_brew=True)
+    c = _card(s, "Sol Ring")
+    binder = _loc(s, u.id, "Binder", type_="box")
+    _place(s, u.id, c, binder.id, proxy=False)
+    _place(s, u.id, c, brew.storage_location_id, proxy=True)
+    s.commit()
+
+    assert deck_service.materialize_brew(s, u.id, brew.id) == {"claimed": 1, "remaining_proxies": 0}
+    s.refresh(brew)
+    assert brew.is_brew is False  # every proxy claimed -> regular deck
+    # is_brew cleared, so a second call is a no-op (not a brew anymore).
+    assert deck_service.materialize_brew(s, u.id, brew.id) is None
+    assert _deck_row(s, brew, c.id, proxy=False).quantity == 1
+
+
+def test_materialize_prefers_exact_printing_then_falls_back_to_same_name():
+    s = _fresh()()
+    u = _user(s)
+    brew = deck_service.create_deck(s, u.id, "Brew", is_brew=True)
+    want = _card_set(s, "Lightning Bolt", "lea", "161")
+    other_print = _card_set(s, "Lightning Bolt", "m10", "146")
+    binder = _loc(s, u.id, "Binder", type_="box")
+    # Own only a DIFFERENT printing loose -> fallback claims it (name is the oracle proxy).
+    _place(s, u.id, other_print, binder.id, proxy=False)
+    _place(s, u.id, want, brew.storage_location_id, proxy=True)
+    s.commit()
+
+    assert deck_service.materialize_brew(s, u.id, brew.id) == {"claimed": 1, "remaining_proxies": 0}
+    # The owned m10 printing is now the real deck row; the lea proxy is gone.
+    assert _deck_row(s, brew, other_print.id, proxy=False).quantity == 1
+    assert _deck_row(s, brew, want.id, proxy=True) is None
+
+
+def test_materialize_never_claims_deck_resident_copy():
+    s = _fresh()()
+    u = _user(s)
+    brew = deck_service.create_deck(s, u.id, "Brew", is_brew=True)
+    other = deck_service.create_deck(s, u.id, "Real Deck")
+    c = _card(s, "Sol Ring")
+    _place(s, u.id, c, other.storage_location_id, proxy=False)  # owned but in ANOTHER deck
+    _place(s, u.id, c, brew.storage_location_id, proxy=True)
+    s.commit()
+
+    # Deck-resident copies are never claimed -> nothing happens, still a proxy.
+    assert deck_service.materialize_brew(s, u.id, brew.id) == {"claimed": 0, "remaining_proxies": 1}
+    assert _deck_row(s, brew, c.id, proxy=True).quantity == 1
+    assert _deck_row(s, other, c.id, proxy=False).quantity == 1
+
+
+def test_materialize_owner_scoped():
+    s = _fresh()()
+    u = _user(s)
+    other = _user(s, "u2")
+    brew = deck_service.create_deck(s, u.id, "Brew", is_brew=True)
+    s.commit()
+    assert deck_service.materialize_brew(s, other.id, brew.id) is None

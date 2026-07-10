@@ -62,6 +62,7 @@ from app.deck_service import (
     list_decks,
     list_user_printings_for_card,
     list_variant_groups,
+    materialize_brew,
     move_deck_goal,
     outbound_share_map,
     own_deck_card_options,
@@ -546,6 +547,8 @@ def deck_detail_page(
     health_filter: str = "",
     view: str = "",
     group: str = "",
+    materialized: int = -1,
+    remaining: int = 0,
     session: Session = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
 ):
@@ -736,6 +739,8 @@ def deck_detail_page(
             "variant_group": deck.variant_group if deck else None,
             "variant_siblings": variant_siblings,
             "brew_buylist": brew_buylist,
+            "materialized": materialized,
+            "materialized_remaining": remaining,
             "color_identity": color_identity,
             "commanders": commanders if deck else [],
             "items": deck_cards if deck else [],
@@ -1120,6 +1125,23 @@ async def decks_delete(
         resort_collection(session, user_id=current_user.id)
 
     return RedirectResponse(url="/decks", status_code=303)
+
+
+@router.post("/decks/{deck_id}/materialize")
+async def decks_materialize(
+    deck_id: int,
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+    _: None = CsrfRequired,
+):
+    result = materialize_brew(session, user_id=current_user.id, deck_id=deck_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Brew deck not found")
+    return RedirectResponse(
+        url=f"/decks/{deck_id}?materialized={result['claimed']}"
+        f"&remaining={result['remaining_proxies']}",
+        status_code=303,
+    )
 
 
 @router.get("/decks/{deck_id}/export")

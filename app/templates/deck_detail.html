@@ -121,6 +121,21 @@
       <p class="muted" style="margin-top: 0">
         "To buy" = the proxy cards in this brew (cards you don't own). "Owned" = cards backed by a real copy.
       </p>
+      {% if materialized is defined and materialized >= 0 %}
+        <p class="muted" style="margin-top: 0">
+          Materialized: claimed {{ materialized }} card(s) from your collection.
+          {% if materialized_remaining %}{{ materialized_remaining }} proxy card(s) still unowned.{% else %}Every proxy was claimed — this is now a regular deck.{% endif %}
+        </p>
+      {% endif %}
+      {% if bl.missing or bl.partial %}
+        <form action="/decks/{{ deck.id }}/materialize" method="post" style="margin: 0 0 0.6rem">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <button type="submit"
+                  onclick="return confirm('Claim matching owned cards from your collection into this deck? Proxies with no owned copy stay as proxies.');">
+            Materialize (claim owned cards)
+          </button>
+        </form>
+      {% endif %}
       <div class="hero-stats-inline" style="margin: 0.5rem 0 0.7rem">
         <span>{{ bl.have|length }} owned</span>
         <span>{{ bl.partial|length }} partial</span>
