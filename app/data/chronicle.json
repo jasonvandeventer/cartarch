@@ -1,5 +1,15 @@
 [ 
   {
+    "version": "4.1.26",
+    "date": "2026-07-09",
+    "added": [
+      "Brew decks can now be materialized: a single action claims matching cards from your unassigned inventory into the deck, converting proxies to real cards where matches exist and leaving the rest as proxies. The summary tells you how many were claimed and how many remain. If every proxy finds a match, the deck quietly drops its Brew flag and becomes a regular deck."
+    ],
+    "refined": [],
+    "resolved": [],
+    "archivist_note": "A brew was always meant to be a sketch that becomes a deck. The proxy rows said \"I want this card\"; the drawers and boxes held the cards themselves; but nothing connected the two. Materializing is the bridge: walk the proxy list, search the owner's unassigned inventory for each card by name (the codebase has no oracle_id, so name is the oracle proxy, same as the existing brew claim display), prefer the exact printing and finish, claim what exists, leave what doesn't. The operation reuses the ranking logic the brew detail page already computes for its \"owned / to buy\" display, so the cards it claims are the same ones the page was already pointing at. One transaction, one commit, and the deck is either partly or fully real. The auto-clear of is_brew when zero proxies remain closes a state that would otherwise need explaining: a deck with no proxies that still calls itself a brew."
+  },
+  {
     "version": "4.1.25",
     "date": "2026-07-09",
     "added": [
