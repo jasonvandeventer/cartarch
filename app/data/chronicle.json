@@ -1,4 +1,14 @@
-[ 
+[
+  {
+    "version": "4.1.27",
+    "date": "2026-07-09",
+    "added": [
+      "Card images across the app now load from Cartarch's own image mirror at img.cartarch.com instead of Scryfall's CDN. If a brand-new printing hasn't been mirrored yet, the image quietly falls back to Scryfall so nothing appears broken."
+    ],
+    "refined": [],
+    "resolved": [],
+    "archivist_note": "Every thumbnail, hover preview, and hero image was a direct fetch from Scryfall's CDN — thousands of image requests riding on a third party's goodwill and cache headers. The stored image_url column was never really an address; it was a snapshot of wherever Scryfall kept the picture the day the card was ingested. The switch rebuilds every image URL at render time from the card's scryfall_id against the self-hosted mirror, so the stored URL degrades into what it always truly was: a signal that the card has a picture at all. Each image tag carries a one-shot fallback to Scryfall's API redirect, so a printing the mirror hasn't ingested yet still renders — the mirror can lag ingestion without a user ever seeing a broken card. The goldfisher still reads Scryfall directly; that seam is deliberate and tracked as its own issue."
+  },
   {
     "version": "4.1.26",
     "date": "2026-07-09",
@@ -84,34 +94,34 @@
     "archivist_note": "Importing a decklist used to end where brewing began: the preview could only target decks that already existed, so building around a fresh list meant a detour through deck creation first. The import preview now closes that gap itself, and cards you don't own arrive as proxies, which is what a brew means. Deliberately narrow: only the Destination-dropdown path learned this; per-row CSV Location handling is a different problem and waits for its own issue (#70)."
   },
   {
-  "version": "4.1.17",
-  "date": "2026-07-04",
-  "added": [],
-  "refined": [
-    "New game in playtest mode now asks for confirmation before resetting. A stray click can no longer wipe your board, hand, graveyard, life totals, mana pool, and turn count mid-session; cancel the prompt and everything stays exactly where it was. The New game and New turn buttons also sit a little further apart, so the misclick is less likely to happen in the first place."
-  ],
-  "resolved": [],
-  "archivist_note": "Reported by a player who reached for New turn and hit New game instead, losing the game state they were tracking. The reset itself was always working as designed; the problem was that one pixel of aim separated a routine action from a destructive one. The fix guards the click, not the reset, so the page still opens straight into a fresh game without nagging."
-},
-{
-  "version": "4.1.16",
-  "date": "2026-07-02",
-  "added": [],
-  "refined": [],
-  "resolved": [
-    "A deck's Card Types, Color Pips, and Mana Curve panels now count the cards shared into it from sibling decks in the same variant group. Before, those panels only counted the deck's own physical cards, so a deck showing 97 unique cards in its header could show a type breakdown summing to just 44. The analytics now match the full decklist the header describes."
-  ],
-  "archivist_note": "The header always knew the real total; the breakdown panels were quietly reading a smaller set. This did not lose any data, it just under-described decks that borrow cards from their siblings. The fix routes every deck-level panel through one shared definition of what is in the deck, so they can no longer drift apart."
-},
-{
-  "version": "4.1.15",
-  "date": "2026-07-01",
-  "added": [],
-  "refined": [],
-  "resolved": [
-    "Card search in the Quick Add and deck builder no longer flashes stale results. If you typed quickly, or picked a printing while a search was still in flight, an older slower response could overwrite what you were looking at with unrelated cards. Searches now discard any response that a newer keystroke or selection has already superseded."
-  ],
-  "archivist_note": "A timing bug, and the frustrating kind: it depended on how fast you typed and how fast the network answered, so it never reproduced on demand. The reporter suspected a timing issue and was right. The searches now carry a token that lets a late answer recognize it is no longer wanted and step aside."
+    "version": "4.1.17",
+    "date": "2026-07-04",
+    "added": [],
+    "refined": [
+      "New game in playtest mode now asks for confirmation before resetting. A stray click can no longer wipe your board, hand, graveyard, life totals, mana pool, and turn count mid-session; cancel the prompt and everything stays exactly where it was. The New game and New turn buttons also sit a little further apart, so the misclick is less likely to happen in the first place."
+    ],
+    "resolved": [],
+    "archivist_note": "Reported by a player who reached for New turn and hit New game instead, losing the game state they were tracking. The reset itself was always working as designed; the problem was that one pixel of aim separated a routine action from a destructive one. The fix guards the click, not the reset, so the page still opens straight into a fresh game without nagging."
+  },
+  {
+    "version": "4.1.16",
+    "date": "2026-07-02",
+    "added": [],
+    "refined": [],
+    "resolved": [
+      "A deck's Card Types, Color Pips, and Mana Curve panels now count the cards shared into it from sibling decks in the same variant group. Before, those panels only counted the deck's own physical cards, so a deck showing 97 unique cards in its header could show a type breakdown summing to just 44. The analytics now match the full decklist the header describes."
+    ],
+    "archivist_note": "The header always knew the real total; the breakdown panels were quietly reading a smaller set. This did not lose any data, it just under-described decks that borrow cards from their siblings. The fix routes every deck-level panel through one shared definition of what is in the deck, so they can no longer drift apart."
+  },
+  {
+    "version": "4.1.15",
+    "date": "2026-07-01",
+    "added": [],
+    "refined": [],
+    "resolved": [
+      "Card search in the Quick Add and deck builder no longer flashes stale results. If you typed quickly, or picked a printing while a search was still in flight, an older slower response could overwrite what you were looking at with unrelated cards. Searches now discard any response that a newer keystroke or selection has already superseded."
+    ],
+    "archivist_note": "A timing bug, and the frustrating kind: it depended on how fast you typed and how fast the network answered, so it never reproduced on demand. The reporter suspected a timing issue and was right. The searches now carry a token that lets a late answer recognize it is no longer wanted and step aside."
   },
   {
     "version": "4.1.14",
