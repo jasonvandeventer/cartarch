@@ -23,6 +23,7 @@ rather than re-implementing card analysis.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -680,6 +681,243 @@ def create_brew_from_recommendation(
         )
     session.commit()
     return deck
+
+
+# --- Deckbuilder v2 substrate (issue #60, P1) -----------------------------------
+#
+# Pure deterministic functions over local Card data: role-subtype classification,
+# role-usefulness scoring against a strategy profile, dead-role detection, and
+# deck-plan coverage evaluation. No LLM, no external calls, no persistence
+# (strategy profiles are in-memory seeds until P3). score_candidate integration
+# is P2 — nothing below is wired into the generator yet.
+
+RELEVANCE_LEVELS = ("very_low", "low", "medium", "high")
+
+_COLOR_WORDS = {"white": "W", "blue": "U", "black": "B", "red": "R", "green": "G"}
+
+# "Blue spells you cast cost {1} less" / "Red creature spells you cast cost..."
+_COLOR_REDUCER_RE = re.compile(
+    r"\b(white|blue|black|red|green)\b(?: creature)? spells you cast cost", re.IGNORECASE
+)
+_ANY_COLOR_FIXER_RE = re.compile(r"\badds? one mana of any color\b", re.IGNORECASE)
+_SAC_TO_DRAW_RE = re.compile(r"sacrifice [^:.]{0,40}:\s*draw a card", re.IGNORECASE)
+_TOPDECK_RE = re.compile(r"look at the top|\bscry\b|\bsurveil\b", re.IGNORECASE)
+# Repeatable, opponent-turn-capable draw: untaps on other players' turns, or an
+# activated ability that makes each player draw (Mikokoro / Geier Reach shape).
+_OPP_UNTAP_RE = re.compile(r"each other player'?s untap step", re.IGNORECASE)
+_ACTIVATED_GROUP_DRAW_RE = re.compile(r"\{[^}]+\}[^:.]*:\s*each player draws", re.IGNORECASE)
+_SYMMETRICAL_DRAW_RE = re.compile(r"each player draws", re.IGNORECASE)
+_TRIBAL_SUPPORT_RE = re.compile(r"choose a creature type|of the chosen type", re.IGNORECASE)
+
+
+def classify_role_subtype(
+    card: Card, deck_color_identity: set[str]
+) -> tuple[str | None, str | None, str]:
+    """Classify a card into (broad_role, subtype, confidence).
+
+    Broad role comes from the existing ``deck_service.suggest_card_roles``
+    heuristics (first match wins — the suggestion order is already
+    priority-ordered). Subtypes are finer-grained oracle-text reads scoped to
+    the broad role. An unrecognized card degrades to ``(broad_role, None)``
+    and MUST never be treated as dead downstream; a card with no detected
+    role at all returns ``(None, None, "low")``.
+    """
+    oracle = card.oracle_text or ""
+    roles = deck_service.suggest_card_roles(card)
+    if not roles:
+        # Pure topdeck manipulation (Scry/Surveil-only cards) has no broad
+        # role in the v1 tagger but is a first-class plan category here.
+        if _TOPDECK_RE.search(oracle):
+            return ("Draw", "topdeck_manipulation", "medium")
+        if _TRIBAL_SUPPORT_RE.search(oracle):
+            return ("Synergy", "tribal_support", "medium")
+        return (None, None, "low")
+    broad = roles[0]
+
+    if broad == "Ramp":
+        m = _COLOR_REDUCER_RE.search(oracle)
+        if m:
+            color = _COLOR_WORDS[m.group(1).lower()]
+            if color not in deck_color_identity:
+                return ("Ramp", "color_specific_reducer", "high")
+            return ("Ramp", "cost_reduction", "high")
+        if _ANY_COLOR_FIXER_RE.search(oracle):
+            return ("Ramp", "color_fixer", "high")
+        if _SAC_TO_DRAW_RE.search(oracle):
+            return ("Ramp", "sacrifice_to_draw", "high")
+        if card.cmc is not None and card.cmc <= 3:
+            return ("Ramp", "early_ramp", "medium")
+        if card.cmc is not None and card.cmc >= 5:
+            return ("Ramp", "expensive_ramp", "medium")
+        return ("Ramp", None, "medium")
+
+    if broad == "Draw":
+        if _OPP_UNTAP_RE.search(oracle) or _ACTIVATED_GROUP_DRAW_RE.search(oracle):
+            return ("Draw", "opponent_turn_draw", "high")
+        if _TOPDECK_RE.search(oracle):
+            return ("Draw", "topdeck_manipulation", "high")
+        if _SAC_TO_DRAW_RE.search(oracle):
+            return ("Draw", "sacrifice_to_draw", "high")
+        if _SYMMETRICAL_DRAW_RE.search(oracle):
+            return ("Draw", "symmetrical_draw", "medium")
+        return ("Draw", None, "medium")
+
+    return (broad, None, "medium")
+
+
+_RELEVANCE_REASON = {
+    "high": "High: {label} is a priority role in this deck's plan",
+    "medium": "Medium: {label} supports the deck plan",
+    "low": "Low value: {label} is low priority for this deck's plan",
+}
+
+
+def _role_label(broad_role: str, subtype: str | None) -> str:
+    return (subtype or broad_role).replace("_", " ").lower()
+
+
+def score_role_usefulness(
+    card: Card,
+    broad_role: str | None,
+    subtype: str | None,
+    deck_color_identity: set[str],
+    strategy_profile: dict,
+) -> tuple[str, str]:
+    """Score how useful a card's role is *in this deck*: (relevance, reason).
+
+    relevance is one of RELEVANCE_LEVELS; reason is a deterministic template
+    string (no LLM). Hard dead-role rules (issue #60 section 4) run first,
+    then the strategy profile's high/medium/low lists (subtype match wins over
+    broad-role match), then heuristic downgrades. Unknown subtypes fall
+    through to medium — never dead.
+    """
+    if broad_role is None:
+        return ("medium", "No detected role; not scored against the deck plan")
+    oracle = card.oracle_text or ""
+
+    # Hard dead-role rules.
+    if subtype == "color_specific_reducer":
+        m = _COLOR_REDUCER_RE.search(oracle)
+        color = m.group(1).lower() if m else "off-color"
+        return ("very_low", f"Dead: reduces cost of {color} spells, but deck has no {color}")
+    if subtype == "color_fixer" and not deck_color_identity:
+        # ponytail: colorless identity is the proxy for "no colored activation
+        # costs"; per-deck cost scanning can arrive with the P3 analyzer.
+        return ("low", "Low value: color fixing in a colorless deck with no colored costs")
+
+    label = _role_label(broad_role, subtype)
+    for level in ("high", "medium", "low"):
+        keys = strategy_profile.get(level) or []
+        if (subtype is not None and subtype in keys) or broad_role.lower() in keys:
+            return (level, _RELEVANCE_REASON[level].format(label=label))
+
+    # Profile is silent — heuristic downgrades for known-weak subtypes.
+    if subtype == "symmetrical_draw":
+        return ("low", "Low value: symmetrical draw the deck can't exploit better than opponents")
+    if subtype == "expensive_ramp" and "early_ramp" in (
+        (strategy_profile.get("high") or []) + (strategy_profile.get("medium") or [])
+    ):
+        return ("low", "Low value: expensive ramp in a deck that wants early acceleration")
+    if subtype == "tribal_support":
+        return ("low", "Low value: creature-type support without a matching tribal payoff")
+    return ("medium", _RELEVANCE_REASON["medium"].format(label=label))
+
+
+# Generic coverage targets used by the heuristic profile seed. Commander-specific
+# profiles (e.g. the Molecule Man test fixture) override these wholesale.
+_DEFAULT_PLAN_TARGETS = {
+    "lands": (36, 38),
+    "ramp": (10, 14),
+    "topdeck_manipulation": (0, 12),
+    "opponent_turn_draw": (0, 10),
+    "large_payoffs": (8, 14),
+    "removal_wipes": (8, 12),
+    "protection": (4, 8),
+    "win_conditions": (3, 6),
+}
+
+
+def seed_strategy_profile(commander_card: Card, deck_color_identity: set[str]) -> dict:
+    """Heuristically seed a strategy profile from color identity + commander
+    themes. This is a starting point, not an authority — profiles become
+    user-editable (and persisted) in P3.
+    """
+    themes = extract_themes(commander_card)
+    oracle = (commander_card.oracle_text or "").lower()
+    colorless = not deck_color_identity
+
+    high: list[str] = []
+    if "draw" in oracle:
+        # Commander cares about drawing — repeatable/opponent-turn draw and
+        # topdeck control feed it.
+        high += ["opponent_turn_draw", "topdeck_manipulation", "sacrifice_to_draw"]
+    low = ["symmetrical_draw"]
+    if colorless:
+        low = ["color_fixer", "color_specific_reducer"] + low
+    if themes.get("subtypes"):
+        high.append("tribal_support")
+    else:
+        low.append("tribal_support")
+
+    return {
+        "color_identity": "colorless" if colorless else "".join(sorted(deck_color_identity)),
+        "high": high,
+        "medium": ["early_ramp", "ramp", "draw", "removal", "wipe", "protection", "engine"],
+        "low": low,
+        "targets": dict(_DEFAULT_PLAN_TARGETS),
+    }
+
+
+def _profile_colors(strategy_profile: dict) -> set[str]:
+    ci = strategy_profile.get("color_identity") or ""
+    return set() if ci == "colorless" else set(ci)
+
+
+def _coverage_categories(card: Card, deck_colors: set[str]) -> list[str]:
+    """Plan-coverage categories a card counts toward. ponytail: uses the
+    primary (broad, subtype) classification only; multi-role credit can come
+    with the P3 analyzer if targets prove too coarse."""
+    cats: list[str] = []
+    if _is_land(card):
+        cats.append("lands")
+    broad, subtype, _ = classify_role_subtype(card, deck_colors)
+    if broad == "Ramp":
+        cats.append("ramp")
+    if subtype == "topdeck_manipulation":
+        cats.append("topdeck_manipulation")
+    if subtype == "opponent_turn_draw":
+        cats.append("opponent_turn_draw")
+    if broad in ("Removal", "Wipe"):
+        cats.append("removal_wipes")
+    if broad == "Protection":
+        cats.append("protection")
+    if broad == "Threat":
+        cats.append("win_conditions")
+    if not _is_land(card) and (card.cmc or 0) >= 6:
+        cats.append("large_payoffs")
+    return cats
+
+
+def evaluate_plan_coverage(cards: list[Card], strategy_profile: dict) -> dict:
+    """Evaluate a card list against the profile's per-category targets.
+
+    Returns {category: {"count", "min", "max", "status"}} where status is
+    "under" | "ok" | "over". Categories without a target in the profile are
+    not reported.
+    """
+    targets = strategy_profile.get("targets") or {}
+    deck_colors = _profile_colors(strategy_profile)
+    counts = {cat: 0 for cat in targets}
+    for card in cards:
+        for cat in _coverage_categories(card, deck_colors):
+            if cat in counts:
+                counts[cat] += 1
+    report = {}
+    for cat, (lo, hi) in targets.items():
+        n = counts[cat]
+        status = "under" if n < lo else ("over" if n > hi else "ok")
+        report[cat] = {"count": n, "min": lo, "max": hi, "status": status}
+    return report
 
 
 def list_commander_candidates(session: Session, user_id: int) -> list[Card]:
