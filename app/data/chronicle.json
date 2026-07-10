@@ -1,5 +1,17 @@
 [
   {
+    "version": "4.1.34",
+    "date": "2026-07-10",
+    "added": [
+      "CSV/file import now understands Moxfield, ManaBox, and Archidekt exports directly. Drop in a Moxfield or ManaBox text export or an Archidekt CSV and the importer recognizes the format from the file itself — no format picker, no reformatting — then runs it through the same preview, matching, and reconciliation as every other import."
+    ],
+    "refined": [],
+    "resolved": [
+      "Fixed issue #81: file uploads in those three tracker formats previously fell through the header-based CSV detector and imported as nothing useful; they now normalize into the canonical import shape and resolve like a native upload."
+    ],
+    "archivist_note": "Adapter pattern over the existing pipeline: a new import_adapters module sniffs the format from content (an MTGO-text line shape shared by Moxfield/ManaBox, or Archidekt's headerless 18-column positional CSV) and normalizes each into the canonical row shape the importer already speaks — name/set/collector/quantity/finish, plus scryfall_id from Archidekt for faster resolution. Wiring is a single branch at the top of parse_scanner_csv, before the header-based DictReader; the pre-existing pass-1 (CSV parse) and pass-2/3 (batched Scryfall resolution + invalid-row surfacing) were extracted into helpers so both the native and adapter paths share resolution verbatim. persist_import_rows and the reconciliation logic were deliberately left untouched — the adapters produce input, not behavior. The honest ceiling: the MTGO name split is non-greedy on the last '(SET) num' group, so a card whose printed name literally contained '(XYZ) 123' would mis-parse; no such card exists, noted in-code. Scope was the revised 2-adapters-for-3-trackers from the issue thread, not a generic plugin surface. Determinism held: pure text/CSV parsing, mocked-Scryfall pipeline test, real fixtures for all three trackers."
+  },
+  {
     "version": "4.1.33",
     "date": "2026-07-10",
     "added": [

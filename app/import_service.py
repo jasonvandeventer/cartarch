@@ -21,6 +21,11 @@ from sqlalchemy.orm import Session
 
 from app.audit_service import create_import_batch, log_transaction
 from app.deck_service import create_deck
+from app.import_adapters import (
+    detect_import_format,
+    normalize_archidekt_csv,
+    normalize_mtgo_text,
+)
 from app.location_service import VALID_LOCATION_TYPES, create_location
 from app.models import Card, Deck, InventoryRow, StorageLocation
 from app.scryfall import (
@@ -284,21 +289,74 @@ def build_finish_warnings(card_data: dict | None, finish: str) -> list[str]:
     return warnings
 
 
+def _adapter_rows_to_pre_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Map canonical adapter rows (issue #81) into the internal pre-row shape
+    ``parse_scanner_csv`` pass 2/3 consumes. Adapters supply identity + finish +
+    quantity only; location/role/tags/proxy columns don't exist in these
+    third-party exports, so they default empty (same as an old 6-column CSV)."""
+    pre_rows: list[dict[str, Any]] = []
+    for line_number, r in enumerate(rows, start=1):
+        pre_rows.append(
+            {
+                "line_number": line_number,
+                "scryfall_id": (r.get("scryfall_id") or "").strip(),
+                "set_code": (r.get("set_code") or "").lower(),
+                "collector_number": (r.get("collector_number") or "").strip(),
+                "finish": normalize_finish(r.get("finish", "")),
+                "quantity": r.get("quantity", 1),
+                "location": "",
+                "location_type": "",
+                "name": r.get("name", ""),
+                "type": "",
+                "language": None,
+                "role_raw": "",
+                "tags_raw": "",
+                "is_proxy_raw": "",
+                "is_brew_raw": "",
+            }
+        )
+    return pre_rows
+
+
 def parse_scanner_csv(file_bytes: bytes) -> dict[str, Any]:
     # [import-preview] diagnostic instrumentation (no logic changes) — added to
     # localize the 1,176-row Helvault CSV /import/preview 524 timeout.
     _t_start = time.perf_counter()
 
     text = file_bytes.decode("utf-8-sig", errors="replace")
-    stream = io.StringIO(text)
-    reader = csv.DictReader(stream)
-
-    format_name = detect_csv_format(reader.fieldnames or [])
     valid_rows: list[dict[str, Any]] = []
     invalid_rows: list[dict[str, Any]] = []
 
     # --- Pass 1: parse rows without touching Scryfall ---
     _t_p1 = time.perf_counter()
+    pre_rows: list[dict[str, Any]] = []
+
+    # issue #81 — universal import adapters. Sniff MTGO-text (Moxfield/ManaBox)
+    # or Archidekt-CSV exports from the content and normalize them into pre-rows
+    # BEFORE the header-based CSV reader. Pass 2/3 (resolution + validation) are
+    # shared, so these formats get the same batched lookup and invalid-row
+    # surfacing as the native CSV path. Unrecognized content (None) falls
+    # through to the existing DictReader untouched.
+    _adapter_fmt = detect_import_format(text)
+    if _adapter_fmt == "mtgo_text":
+        format_name = "Moxfield / ManaBox (text)"
+        pre_rows = _adapter_rows_to_pre_rows(normalize_mtgo_text(text))
+    elif _adapter_fmt == "archidekt_csv":
+        format_name = "Archidekt (CSV)"
+        pre_rows = _adapter_rows_to_pre_rows(normalize_archidekt_csv(text))
+    else:
+        stream = io.StringIO(text)
+        reader = csv.DictReader(stream)
+        format_name = detect_csv_format(reader.fieldnames or [])
+        pre_rows = _csv_pass1_pre_rows(reader)
+
+    return _resolve_pre_rows(pre_rows, format_name, valid_rows, invalid_rows, _t_start, _t_p1)
+
+
+def _csv_pass1_pre_rows(reader: csv.DictReader) -> list[dict[str, Any]]:
+    """Native CSV pass 1: parse DictReader rows into pre-rows without touching
+    Scryfall (issue #81 extracted this so the adapter path can share pass 2/3).
+    Behavior is byte-identical to the pre-#81 inline loop."""
     pre_rows: list[dict[str, Any]] = []
     for line_number, raw_row in enumerate(reader, start=2):
         row = {normalize_header(k): (v or "").strip() for k, v in raw_row.items()}
@@ -343,13 +401,26 @@ def parse_scanner_csv(file_bytes: bytes) -> dict[str, Any]:
                 "is_brew_raw": is_brew_raw,
             }
         )
+    return pre_rows
 
+
+def _resolve_pre_rows(
+    pre_rows: list[dict[str, Any]],
+    format_name: str,
+    valid_rows: list[dict[str, Any]],
+    invalid_rows: list[dict[str, Any]],
+    _t_start: float,
+    _t_p1: float,
+) -> dict[str, Any]:
+    """Shared pass 2 (batch Scryfall resolution) + pass 3 (build valid/invalid
+    rows) for both the native CSV path and the issue #81 adapter paths. Body is
+    the pre-#81 logic verbatim — no behavior change for CSV imports."""
     # Coerce quantity post-append so the int-conversion failure path here
     # doesn't drift the dict shape downstream.
     for r in pre_rows:
         try:
             r["quantity"] = max(1, int(r["quantity"] or "1"))
-        except ValueError:
+        except (ValueError, TypeError):
             r["quantity"] = 1
 
     print(
