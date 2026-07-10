@@ -218,6 +218,17 @@ def main() -> None:
     session = SessionLocal()
     try:
         run_ingest(session)
+        # issue #85 — record each user's placed collection value now that prices
+        # are fresh. Lazy import keeps the price job's import surface minimal;
+        # an isolated snapshot failure must not fail the price ingest.
+        try:
+            from app.dashboard_service import snapshot_collection_values
+
+            users = snapshot_collection_values(session)
+            print(f"[price-ingest] daily valuation snapshot: {users} user(s)", flush=True)
+        except Exception as exc:
+            session.rollback()
+            print(f"[price-ingest] valuation snapshot error: {exc}", flush=True)
     finally:
         session.close()
 

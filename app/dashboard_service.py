@@ -49,13 +49,14 @@ no precomputed counts table. SQLite-until-v4 constraint respected.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 
 from sqlalchemy import Float, case, cast, desc, distinct, func
 from sqlalchemy.orm import Session
 
 from app.models import (
     Card,
+    DailyCollectionValue,
     Deck,
     Game,
     GameSeat,
@@ -91,6 +92,48 @@ def _placed_value_expr() -> object:
         ),
         Float,
     )
+
+
+def snapshot_collection_values(session: Session, day: date | None = None) -> int:
+    """Upsert one placed-collection-value row per user for ``day`` (issue #85).
+
+    Called by the daily price-ingest job after prices refresh. Idempotent on
+    ``(user_id, snapshot_date)``: re-running for the same day UPDATEs the value
+    rather than inserting a duplicate. Mirrors the dashboard's placed Collection
+    Value exactly — same ``_placed_value_expr``, ``is_pending == False``, pending
+    excluded — so a day's snapshot reconciles to the cent with the tile. Returns
+    the number of users written (users with no placed inventory get no row).
+
+    ponytail: one grouped SUM over all users, not a per-user loop of queries.
+    Backfill is intentionally absent — there is no historical price store, so the
+    series accrues forward from the first run (Option A).
+    """
+    day = day or utc_now().date()
+    totals = (
+        session.query(
+            InventoryRow.user_id,
+            func.coalesce(func.sum(InventoryRow.quantity * _placed_value_expr()), 0.0),
+        )
+        .join(Card, InventoryRow.card_id == Card.id)
+        .filter(InventoryRow.is_pending.is_(False))
+        .group_by(InventoryRow.user_id)
+        .all()
+    )
+    existing = {
+        row.user_id: row
+        for row in session.query(DailyCollectionValue).filter(
+            DailyCollectionValue.snapshot_date == day
+        )
+    }
+    for user_id, total in totals:
+        value = float(total or 0.0)
+        row = existing.get(user_id)
+        if row is None:
+            session.add(DailyCollectionValue(user_id=user_id, snapshot_date=day, total_value=value))
+        else:
+            row.total_value = value
+    session.commit()
+    return len(totals)
 
 
 def _time_greeting(now: datetime) -> str:
