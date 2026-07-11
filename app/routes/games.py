@@ -16,7 +16,7 @@ import secrets
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
-from fastapi.responses import RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
 from app.dependencies import (
@@ -28,6 +28,7 @@ from app.dependencies import (
 )
 from app.game_service import (
     NEW_GAME_FORMAT_CHOICES,
+    GameLockedError,
     create_game,
     delete_game,
     end_game,
@@ -36,11 +37,13 @@ from app.game_service import (
     get_seat_commander_scryfall_ids,
     get_viewable_game,
     list_games,
+    list_user_decks_for_companion,
     log_game,
     normalize_game_format,
     record_goal_results,
     seat_commander_scryfall_id,
     set_game_playgroup,
+    set_own_seat_deck,
     toggle_seat_art_background,
     update_game_notes,
     update_seat,
@@ -402,6 +405,13 @@ def game_companion_page(
         raise HTTPException(status_code=404, detail="Game not found")
     my_seat = next((s for s in game.seats if s.user_id == current_user.id), None)
     seat_commanders = get_seat_commander_scryfall_ids(session, game)
+    # Pre-live deck self-selection: a seated player in a `created` game may pick
+    # their own deck. Only fetch the picker list when it's actually offered.
+    my_decks = (
+        list_user_decks_for_companion(session, current_user.id)
+        if (my_seat and game.status == "created")
+        else []
+    )
     return render(
         request,
         "game_companion.html",
@@ -411,8 +421,42 @@ def game_companion_page(
             "my_seat": my_seat,
             "seat_commanders": seat_commanders,
             "my_commander_id": seat_commanders.get(my_seat.id) if my_seat else None,
+            "my_decks": my_decks,
             "current_user": current_user,
         },
+    )
+
+
+@router.post("/games/{game_id}/companion/deck")
+def companion_set_deck(
+    game_id: int,
+    deck_id: int = Form(0),  # 0 / absent → clear the seat's deck
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+    _: None = CsrfRequired,
+):
+    """A seated player picks their OWN deck (only while the game is `created`).
+    No table token — personal, phones-only. Returns the re-derived seat identity
+    for in-place UI update."""
+    try:
+        seat = set_own_seat_deck(session, game_id, current_user.id, deck_id or None)
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    except GameLockedError as e:
+        raise HTTPException(status_code=409, detail=str(e)) from e
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e)) from e
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    return JSONResponse(
+        {
+            "ok": True,
+            "seat": {
+                "deck_name": seat.deck_name_at_game,
+                "commander_name": seat.commander_name_at_game,
+                "commander_scryfall_id": seat_commander_scryfall_id(session, seat),
+            },
+        }
     )
 
 

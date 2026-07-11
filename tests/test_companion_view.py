@@ -72,7 +72,10 @@ def test_non_owner_game_detail_omits_table_token(db, client, user):
 
 
 def test_companion_seated_user_gets_seat_controls(db, client, user):
+    # Live-mode seat controls appear once the game is in_progress (a `created`
+    # game shows the pre-live deck picker instead).
     game, seats = _game(db, user.id, seats=[{"user_id": user.id}, {}])
+    live_game_service.start_live_game(db, game.id, user.id)
     db.commit()
     html = client.get(f"/games/{game.id}/companion").text
     assert "(you)" in html

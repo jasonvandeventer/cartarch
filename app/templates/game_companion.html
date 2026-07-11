@@ -14,6 +14,97 @@
   <link rel="icon" type="image/svg+xml" href="/static/brand/icon/favicon.svg">
   <link rel="stylesheet" href="/static/style.css?v={{ static_v('style.css') }}">
 </head>
+{% if my_seat and game.status == 'created' %}
+<body class="cmp-body">
+  <div class="companion" id="companion">
+    {# ── Pre-live: pick your own deck (locks once the game goes live) ── #}
+    <header class="cmp-header">
+      <div class="cmp-turn">Waiting to start</div>
+      <a href="/" class="cmp-back" title="Back to Cartarch">✕</a>
+    </header>
+    <main class="cmp-me cmp-prelive{% if my_commander_id %} cmp-has-art{% endif %}"
+          id="cmp-prelive"
+          {% if my_commander_id %}style="--cmp-art: url('{{ mirror_image_url(my_commander_id, 'normal') }}')"{% endif %}>
+      <div class="cmp-my-name">{{ my_seat.player_name }} <span class="muted">(you)</span></div>
+      <div class="cmp-prelive-current">
+        <div class="cmp-prelive-label">Your deck</div>
+        <div class="cmp-prelive-deckname" id="cmp-deck-name">
+          {{ my_seat.commander_name_at_game or my_seat.deck_name_at_game or 'No deck selected' }}
+        </div>
+        <div class="cmp-prelive-sub muted" id="cmp-deck-sub">
+          {% if my_seat.commander_name_at_game and my_seat.deck_name_at_game %}{{ my_seat.deck_name_at_game }}{% endif %}
+        </div>
+      </div>
+      <button type="button" class="cmp-endturn" onclick="toggleDeckPicker()">Change deck</button>
+      <div class="cmp-scroll" id="cmp-deck-picker" style="display:none">
+        <button type="button" class="cmp-deck-opt{% if not my_seat.deck_id %} cmp-deck-current{% endif %}"
+                data-deck-id="0" onclick="pickDeck(0)">
+          <span class="cmp-deck-opt-name">No tracked deck</span>
+        </button>
+        {% for d in my_decks %}
+          <button type="button" class="cmp-deck-opt{% if d.id == my_seat.deck_id %} cmp-deck-current{% endif %}"
+                  data-deck-id="{{ d.id }}" onclick="pickDeck({{ d.id }})">
+            <span class="cmp-deck-opt-name">{{ d.name }}</span>
+            {% if d.commander_name %}<span class="cmp-deck-opt-cmd muted">{{ d.commander_name }}</span>{% endif %}
+          </button>
+        {% endfor %}
+      </div>
+      <p class="cmp-prelive-note muted">Waiting for the game to start. Your deck locks in once it goes live.</p>
+    </main>
+    <div id="cmp-toast" class="live-toast" style="display:none"></div>
+  </div>
+  <script>
+  (function () {
+    const GID = {{ game.id }};
+    const CSRF = {{ csrf_token | tojson }};
+    // Mirror URL template with a placeholder, so the client rebuilds the same
+    // URL the server would (respecting the configured mirror base).
+    const MIRROR = {{ mirror_image_url('__SID__', 'normal') | tojson }};
+    const picker = document.getElementById('cmp-deck-picker');
+    window.toggleDeckPicker = function () {
+      picker.style.display = picker.style.display === 'none' ? 'flex' : 'none';
+    };
+    function toast(msg) {
+      const el = document.getElementById('cmp-toast');
+      el.textContent = msg; el.style.display = '';
+      clearTimeout(el._t); el._t = setTimeout(() => { el.style.display = 'none'; }, 2000);
+    }
+    window.pickDeck = function (deckId) {
+      const body = new URLSearchParams({ deck_id: String(deckId), csrf_token: CSRF });
+      fetch(`/games/${GID}/companion/deck`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-CSRF-Token': CSRF },
+        body,
+      }).then(r => {
+        if (r.status === 409) { toast('Deck locked — game is live'); throw new Error('locked'); }
+        if (!r.ok) throw new Error('failed');
+        return r.json();
+      }).then(data => {
+        const s = data.seat;
+        document.getElementById('cmp-deck-name').textContent =
+          s.commander_name || s.deck_name || 'No deck selected';
+        document.getElementById('cmp-deck-sub').textContent =
+          (s.commander_name && s.deck_name) ? s.deck_name : '';
+        // Commander art background, in place.
+        const me = document.getElementById('cmp-prelive');
+        if (s.commander_scryfall_id) {
+          me.classList.add('cmp-has-art');
+          me.style.setProperty('--cmp-art', `url('${MIRROR.replace('__SID__', s.commander_scryfall_id)}')`);
+        } else {
+          me.classList.remove('cmp-has-art');
+          me.style.removeProperty('--cmp-art');
+        }
+        // Mark current selection.
+        picker.querySelectorAll('.cmp-deck-opt').forEach(b =>
+          b.classList.toggle('cmp-deck-current', b.dataset.deckId === String(deckId)));
+        picker.style.display = 'none';
+      }).catch(err => { if (err.message !== 'locked') toast('Could not change deck'); });
+    };
+  })();
+  </script>
+</body>
+{% else %}
+{# ── Live / spectator (existing tracker) ── #}
 <body class="cmp-body">
   <div class="companion" id="companion">
     <div id="cmp-reconnecting" class="live-reconnecting" style="display:none">Reconnecting…</div>
@@ -247,4 +338,5 @@
 })();
 </script>
 </body>
+{% endif %}
 </html>

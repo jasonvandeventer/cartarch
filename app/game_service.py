@@ -755,23 +755,20 @@ def get_seat_commander_image_urls(session: Session, game: Game) -> dict[int, lis
     return result
 
 
-def seat_commander_scryfall_id(session: Session, seat: GameSeat) -> str | None:
-    """The scryfall_id of a seat's PRIMARY commander (for the companion view's
-    art background), or ``None``.
-
-    Same resolution as :func:`get_seat_commander_image_urls` — seat → deck →
-    ``role='commander'`` inventory rows in the deck's location, first by id — but
-    returns just the first commander's ``scryfall_id``. Degrades to ``None`` at
-    every gap: no deck, deck without a tagged commander, or a commander card with
-    no ``scryfall_id``."""
-    if not seat.deck_id or not seat.deck or not seat.deck.storage_location_id:
+def deck_commander_scryfall_id(session: Session, deck: Deck | None) -> str | None:
+    """The scryfall_id of a deck's PRIMARY commander (for companion art), or
+    ``None``. Same resolution as :func:`get_seat_commander_image_urls` —
+    ``role='commander'`` inventory rows in the deck's location, first by id.
+    Degrades to ``None`` at every gap: no deck, no location, no tagged commander,
+    or a commander card with no ``scryfall_id``."""
+    if not deck or not deck.storage_location_id:
         return None
     row = (
         session.query(InventoryRow)
         .join(Card)
         .filter(
-            InventoryRow.user_id == seat.deck.user_id,
-            InventoryRow.storage_location_id == seat.deck.storage_location_id,
+            InventoryRow.user_id == deck.user_id,
+            InventoryRow.storage_location_id == deck.storage_location_id,
             InventoryRow.role == "commander",
         )
         .order_by(InventoryRow.id)
@@ -782,6 +779,74 @@ def seat_commander_scryfall_id(session: Session, seat: GameSeat) -> str | None:
     return None
 
 
+def seat_commander_scryfall_id(session: Session, seat: GameSeat) -> str | None:
+    """The seat's primary-commander scryfall_id (or ``None``) — see
+    :func:`deck_commander_scryfall_id`."""
+    return deck_commander_scryfall_id(session, seat.deck) if seat.deck_id else None
+
+
 def get_seat_commander_scryfall_ids(session: Session, game: Game) -> dict[int, str | None]:
     """``{seat_id: commander_scryfall_id | None}`` for every seat in ``game``."""
     return {seat.id: seat_commander_scryfall_id(session, seat) for seat in game.seats}
+
+
+class GameLockedError(Exception):
+    """A seat's deck can't be changed because the game is no longer ``created``."""
+
+
+def list_user_decks_for_companion(session: Session, user_id: int) -> list[dict]:
+    """The user's own decks for the companion pre-live deck picker: id, name,
+    commander name + art scryfall_id, sorted by name. Matches the game-creation
+    picker's filter — no brew exclusion (``game_new`` lists all decks)."""
+    decks = session.query(Deck).filter(Deck.user_id == user_id).order_by(Deck.name).all()
+    return [
+        {
+            "id": d.id,
+            "name": d.name,
+            "commander_name": _capture_deck_identity(session, d.id)[1],
+            "commander_scryfall_id": deck_commander_scryfall_id(session, d),
+        }
+        for d in decks
+    ]
+
+
+def set_own_seat_deck(
+    session: Session, game_id: int, user_id: int, deck_id: int | None
+) -> GameSeat:
+    """A seated player picks/overrides their OWN seat's deck from the companion
+    view. Personal choice — phones-only, NO table-token path (the owner still
+    edits seats through the game-edit surface).
+
+    Only while the game is ``created`` (raises :class:`GameLockedError` → 409 once
+    live/finalized). ``deck_id`` None/0 clears the deck (legal — creation allows a
+    seat with no deck). A non-None ``deck_id`` must reference a deck OWNED by the
+    caller (unknown id → ValueError/400; someone else's deck → PermissionError/403).
+
+    Re-derives EVERY deck-denormalized seat field via the same
+    :func:`_capture_deck_identity` creation uses — no forked logic."""
+    game = get_viewable_game(session, game_id, user_id)
+    if game is None:
+        raise LookupError("Game not found")
+    if game.status != "created":
+        raise GameLockedError("Deck locked once the game is live")
+    seat = next((s for s in game.seats if s.user_id == user_id), None)
+    if seat is None:
+        raise PermissionError("You don't have a seat in this game")
+
+    deck_id = int(deck_id) if deck_id else None
+    deck: Deck | None = None
+    if deck_id is not None:
+        deck = session.query(Deck).filter(Deck.id == deck_id).first()
+        if deck is None:
+            raise ValueError("Deck not found")
+        if deck.user_id != user_id:
+            raise PermissionError("That deck isn't yours")
+
+    # Re-derive the seat's deck snapshot exactly as create_game does.
+    deck_name, commander_name = _capture_deck_identity(session, deck_id)
+    seat.deck_id = deck_id
+    seat.deck = deck  # keep the relationship consistent for immediate re-reads
+    seat.deck_name_at_game = deck_name
+    seat.commander_name_at_game = commander_name
+    session.commit()
+    return seat

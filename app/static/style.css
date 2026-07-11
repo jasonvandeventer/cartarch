@@ -14927,3 +14927,22 @@ body.cmp-lobby-body { height: auto; min-height: 100dvh; overflow-y: auto; }
 .cmp-badge-live { background: var(--brand-green); color: #0e140b; }
 .cmp-badge-waiting { background: var(--brand-gold-soft); color: var(--text-dim); border: 1px solid var(--accent-2); }
 .cmp-lobby-empty { text-align: center; padding: 3rem 1rem; }
+
+/* ── Companion pre-live deck self-selection ── */
+.cmp-prelive { justify-content: flex-start; }
+.cmp-prelive-current { text-align: center; padding: 0.4rem 0; }
+.cmp-prelive-label { font-size: 0.75rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+.cmp-prelive-deckname { font-size: 1.6rem; font-weight: 800; line-height: 1.15; margin-top: 0.2rem; }
+.cmp-prelive-sub { font-size: 0.95rem; margin-top: 0.15rem; }
+.cmp-prelive-note { text-align: center; font-size: 0.85rem; margin: 0.6rem 0 0; }
+#cmp-deck-picker { gap: 0.5rem; padding-top: 0.4rem; }
+.cmp-deck-opt {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 0.1rem;
+  width: 100%; min-height: 60px; padding: 0.7rem 0.9rem; cursor: pointer; text-align: left;
+  border: 1px solid var(--brand-gold-soft); border-radius: var(--radius);
+  background: var(--brand-near-black); color: var(--text);
+}
+.cmp-deck-opt.cmp-deck-current { border-color: var(--brand-green); background: rgba(106,130,83,0.16); }
+.cmp-deck-opt.cmp-deck-current .cmp-deck-opt-name::after { content: " ✓"; color: var(--brand-green); }
+.cmp-deck-opt-name { font-weight: 700; font-size: 1.05rem; }
+.cmp-deck-opt-cmd { font-size: 0.85rem; }
