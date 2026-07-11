@@ -131,6 +131,12 @@ def test_in_progress_game_renders_live_mode(db, client, user):
     assert "/companion" in html  # share link present
     # Undo/Pause hidden in live mode.
     assert 'id="undo-btn"' not in html and 'id="pause-btn"' not in html
+    # Live turn timer wired: the SSE-driven reset hook + the elapsed element.
+    assert "syncLiveTurnEvents(state)" in html  # reset hook attached to SSE frame
+    assert 'id="mast-elapsed"' in html
+    # Optimistic turn advance rotates in clockwise (grid_position) order, matching
+    # the server — not seat_number (the rotation bug).
+    assert "const bySeat = clockwiseSeats.map(s => s.id);" in html
 
 
 def test_companion_page_renders(db, client, user):

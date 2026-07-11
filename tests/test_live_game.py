@@ -56,6 +56,7 @@ def _make_game(
             player_name=f"P{i}",
             user_id=spec.get("user_id"),
             starting_life=spec.get("starting_life", 40),
+            grid_position=spec.get("grid_position"),
         )
         db.add(s)
         seat_objs.append(s)
@@ -375,6 +376,64 @@ def test_turn_increments_on_wrap_past_first(live4):
     assert _state(live)["currentTurnId"] == s4.id and _state(live)["turn"] == 1
     live = _act(L["db"], L["gid"], L["uid"], {"type": "turn"}, TABLE)  # 4 → 1 (wrap)
     assert _state(live)["currentTurnId"] == s1.id and _state(live)["turn"] == 2
+
+
+# ── turn rotation follows PHYSICAL clockwise order (grid_position), not
+#    seat_number. Regression: a 4-seat game rotated by badge as 1,2,4,3 because
+#    the server used seat_number while the UI/badges use grid_position. ─────────
+
+# The real-world game-38 layout: the 4-player default seating is p1,p2,p6,p5, so
+# seat_number 3 sits in clockwise slot 4 and seat_number 4 in slot 3. Clockwise
+# (turn) order is therefore seat_numbers 1,2,4,3.
+_G38_POS = [
+    {"grid_position": "p1"},
+    {"grid_position": "p2"},
+    {"grid_position": "p6"},
+    {"grid_position": "p5"},
+]
+
+
+def _started(db, *, first_seat_number=1, seats=_G38_POS):
+    owner = _user(db)
+    game, seat_objs = _make_game(db, owner.id, first_seat_number=first_seat_number, seats=seats)
+    live_game_service.start_live_game(db, game.id, owner.id)
+    return db, game.id, owner.id, seat_objs
+
+
+def test_turn_rotation_follows_clockwise_not_seat_number(db):
+    d, gid, uid, (s1, s2, s3, s4) = _started(db)
+    # Seat ids ascend with seat_number (1<2<3<4); the CLOCKWISE order is 1,2,4,3,
+    # so the visited id sequence is NOT ascending — pins grid_position ordering.
+    assert _state(live_game_service.get_live_state(d, gid, uid))["currentTurnId"] == s1.id
+    clockwise = [s2.id, s4.id, s3.id, s1.id]  # after s1: 2,4,3, wrap to 1
+    seq, turns = [], []
+    for _ in range(8):  # two full laps
+        live = _act(d, gid, uid, {"type": "turn"}, TABLE)
+        st = _state(live)
+        seq.append(st["currentTurnId"])
+        turns.append(st["turn"])
+    assert seq == clockwise * 2
+    assert turns == [1, 1, 1, 2, 2, 2, 2, 3]  # turn++ on each wrap to seat1
+    assert seq != [s2.id, s3.id, s4.id, s1.id] * 2  # would be the seat_number bug
+
+
+def test_turn_first_seat_number_starts_clockwise_rotation(db):
+    # first_seat_number=3 → start at seat3, then clockwise 3→1→2→4→3 (wrap).
+    d, gid, uid, (s1, s2, s3, s4) = _started(db, first_seat_number=3)
+    assert _state(live_game_service.get_live_state(d, gid, uid))["currentTurnId"] == s3.id
+    expected = [(s1.id, 1), (s2.id, 1), (s4.id, 1), (s3.id, 2)]
+    for want_id, want_turn in expected:
+        st = _state(_act(d, gid, uid, {"type": "turn"}, TABLE))
+        assert (st["currentTurnId"], st["turn"]) == (want_id, want_turn)
+
+
+def test_turn_skips_eliminated_in_clockwise_order(db):
+    # Clockwise order 1,2,4,3; eliminate seat2 → advancing from seat1 skips to
+    # seat4 (the next clockwise), not seat3.
+    d, gid, uid, (s1, s2, s3, s4) = _started(db)
+    _act(d, gid, uid, {"type": "eliminate", "seat_id": s2.id, "eliminated": True}, TABLE)
+    live = _act(d, gid, uid, {"type": "turn"}, TABLE)
+    assert _state(live)["currentTurnId"] == s4.id
 
 
 def test_eliminate_records_turn_and_revive_clears(live4):

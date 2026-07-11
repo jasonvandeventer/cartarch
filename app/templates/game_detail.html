@@ -853,10 +853,12 @@ function flashLive(msg) {
 }
 function showReconnecting() { const el = document.getElementById('live-reconnecting'); if (el) el.style.display = ''; }
 function clearReconnecting() { const el = document.getElementById('live-reconnecting'); if (el) el.style.display = 'none'; }
-// Optimistic turn advance mirroring the server (_advance_turn): seat_number
-// order from the first seat, skip eliminated, increment turn on wrap.
+// Optimistic turn advance mirroring the server (_advance_turn): physical
+// clockwise order from the first seat, skip eliminated, increment turn on wrap.
+// clockwiseSeats is the SAME grid_position ordering the server derives, so the
+// optimistic hop and the SSE echo agree (was: seat_number order → mismatch).
 function liveAdvanceTurnOptimistic() {
-  const bySeat = seatDefs.slice().sort((a, b) => a.seatNumber - b.seatNumber).map(s => s.id);
+  const bySeat = clockwiseSeats.map(s => s.id);
   if (!bySeat.length) return;
   let start = bySeat.indexOf(firstSeatId); if (start < 0) start = 0;
   const rot = bySeat.slice(start).concat(bySeat.slice(0, start));
@@ -1484,6 +1486,23 @@ function render() {
   checkWinCondition();
 }
 
+// ── Live-mode turn timer (client-side timeline) ────────────────
+// The server blob has no per-turn timestamps, so live mode builds its own
+// turnEvents from what the SSE stream confirms: append one entry each time the
+// broadcast currentTurnId changes (the SSE echo is the truth — also correct
+// when a PHONE advances the turn). Reset is driven by the echo, never the
+// optimistic local hop. Feeds the existing turnDurations()/timer render.
+// ponytail: gameElapsed counts from when THIS device first saw the game, not
+// true game start — no server start timestamp exists; upgrade path is stamping
+// live_started's ts into the blob if cross-device wall-clock accuracy matters.
+let liveTurnEvents = [];
+function syncLiveTurnEvents(st) {
+  const cur = st.currentTurnId;
+  const last = liveTurnEvents.length ? liveTurnEvents[liveTurnEvents.length - 1].seatId : undefined;
+  if (cur != null && cur !== last) liveTurnEvents.push({ ts: Date.now(), seatId: cur });
+  st.turnEvents = liveTurnEvents;  // same ref → optimistic renders keep counting
+}
+
 // ── Live-mode boot (Session 2) ─────────────────────────────────
 if (LIVE) {
   const urlInput = document.getElementById('companion-url');
@@ -1497,6 +1516,7 @@ if (LIVE) {
       const payload = JSON.parse(e.data);
       lastSseState = payload.state;
       state = hydrateLiveState(payload.state);
+      syncLiveTurnEvents(state);  // turn-change reset hook (SSE-confirmed)
       render();
     } catch (_) { /* ignore malformed frame */ }
   };

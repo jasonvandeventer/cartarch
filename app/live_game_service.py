@@ -34,6 +34,31 @@ from app.timeutil import utc_now
 
 _MUTATING_TYPES = {"life", "counter", "cmd", "eliminate", "turn"}
 
+# Physical clockwise seating slots (mirrors game_detail.html's CLOCKWISE). Turn
+# rotation follows PHYSICAL seating order, derived from each seat's grid_position
+# — NOT seat_number, which is DB/join order and can differ from where players
+# actually sit (e.g. the 4-player default layout is p1,p2,p6,p5, so seat_number
+# 3/4 sit in clockwise slots 4/3). Seat_number rotation visited seats in the
+# wrong physical order (bug: game rotated 1,2,4,3 by badge instead of 1,2,3,4).
+_CLOCKWISE = ("p1", "p2", "p3", "p4", "p5", "p6", "p7", "p8")
+
+
+def _clockwise_index(pos: str | None) -> int:
+    """Clockwise slot index for a grid_position; unknown/blank sorts last (stable
+    → seat_number order among them)."""
+    try:
+        return _CLOCKWISE.index(pos)
+    except ValueError:
+        return len(_CLOCKWISE)
+
+
+def _clockwise_seats(game: Game) -> list[GameSeat]:
+    """Seats in physical clockwise (turn) order — the SAME order the tracker UI
+    rotates and the seat badges show. Sort by grid_position's clockwise slot,
+    with seat_number as a stable tiebreak so positionless seats keep join order."""
+    by_number = sorted(game.seats, key=lambda s: s.seat_number)
+    return sorted(by_number, key=lambda s: _clockwise_index(s.grid_position))
+
 
 def state_payload(live: GameLiveState) -> dict:
     """The wire shape for both the action response and every SSE event:
@@ -50,8 +75,8 @@ def _publish(live: GameLiveState) -> None:
 
 
 def _first_seat_id(game: Game, ordered_seats: list[GameSeat]) -> int | None:
-    """Seat id of the starting player (``first_seat_number``), else the lowest
-    seat_number. ``None`` only for a seatless game."""
+    """Seat id of the starting player (``first_seat_number``), else the first seat
+    in ``ordered_seats`` (clockwise order). ``None`` only for a seatless game."""
     if game.first_seat_number is not None:
         match = next((s for s in ordered_seats if s.seat_number == game.first_seat_number), None)
         if match is not None:
@@ -62,7 +87,7 @@ def _first_seat_id(game: Game, ordered_seats: list[GameSeat]) -> int | None:
 def _initial_state(game: Game) -> dict:
     """The live blob at start — mirrors the localStorage tracker shape. Object
     keys are seat-id STRINGS (JSON coerces them anyway; matches JS render)."""
-    seats = sorted(game.seats, key=lambda s: s.seat_number)
+    seats = _clockwise_seats(game)
     return {
         "lives": {str(s.id): s.starting_life for s in seats},
         "eliminated": {},
@@ -236,9 +261,10 @@ def _apply_mutation(atype: str, action: dict, state: dict, game: Game) -> dict:
 
 
 def _advance_turn(state: dict, game: Game) -> None:
-    """Advance ``currentTurnId`` to the next non-eliminated seat in seat_number
-    order; increment ``turn`` when the rotation wraps past the first seat."""
-    seats = sorted(game.seats, key=lambda s: s.seat_number)
+    """Advance ``currentTurnId`` to the next non-eliminated seat in physical
+    clockwise order; increment ``turn`` when the rotation wraps past the first
+    seat."""
+    seats = _clockwise_seats(game)
     if not seats:
         return
     order = [s.id for s in seats]
