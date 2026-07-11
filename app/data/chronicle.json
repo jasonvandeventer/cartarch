@@ -1,5 +1,18 @@
 [
   {
+    "version": "4.3.4",
+    "date": "2026-07-11",
+    "added": [
+      "Live games now keep a full event log — every life change, commander-damage tick, counter, elimination, and turn is recorded as it happens, bookended by 'went live' and 'finalized' entries. Nothing is shown yet; this is the groundwork for game timelines and analytics.",
+      "When you finish a game you can note how it ended — combat damage, commander damage, combo, attrition, concession, or other (skippable). It shows on the finished game's summary."
+    ],
+    "refined": [],
+    "resolved": [
+      "Game event history Phase 1 (persist the live event stream to game_events) + Phase 2 (win-condition prompt at finalize)."
+    ],
+    "archivist_note": "The persistence layer for game analytics, no UI yet. A new append-only game_events table records one row per live action inside the SAME transaction as the state mutation — there is never an event without its mutation or vice versa. Each row carries the acted-on seat (the RECEIVING seat for cmd, null for turn + bookends), the action payload as JSON (with the table/csrf tokens stripped so the token never lands in the DB), the turn at action time (the NEW turn after a turn advance), and actor_kind ('table' when the table token authorized it, incl. the live_started/finalized bookends, else 'seat' for a phone). The load-bearing detail: a cmd event also stores raw_delta AND the post-floor actual_delta the service computed, so downstream analytics never has to re-derive the commander-damage floor rule. start_live_game writes a live_started bookend (create path only — the idempotent re-entry writes nothing); end_game writes a finalized bookend with the final blob BEFORE deleting the live-state row, so a finalized game keeps its whole timeline while the working-memory row still drops. Non-live finalizes append nothing. Both FKs CASCADE (Postgres defense-in-depth; the Game.events / Game.seats delete-orphan handles SQLite). Phase 2 adds a nullable games.win_condition with a non-blocking normalize (unknown → NULL) and a skippable end-game-modal selector; the finished-game summary shows 'won by <label>'. SSE payload, auth model, and client JS are untouched beyond the modal. 773 tests green."
+  },
+  {
     "version": "4.3.3",
     "date": "2026-07-11",
     "added": [
