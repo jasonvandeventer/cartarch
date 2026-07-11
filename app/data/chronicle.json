@@ -1,5 +1,16 @@
 [
   {
+    "version": "4.3.5",
+    "date": "2026-07-11",
+    "added": [],
+    "refined": [],
+    "resolved": [
+      "Live-game turn order now follows the physical clockwise seating shown on the badges, not the internal seat number — a 4-player game was rotating 1, 2, 4, 3 on the tablet and every phone.",
+      "The turn timer now runs in live mode (elapsed and per-player clocks were stuck at 0:00); it resets on each turn hand-off, including when a player ends their turn from their phone."
+    ],
+    "archivist_note": "Two real-device live-mode bugs. (1) Turn rotation read GameSeat.seat_number, but the tracker UI, seat badges, and CSS slot order all rotate by PHYSICAL clockwise position derived from grid_position (the CLOCKWISE p1..p8 slots). On the 4-player default layout p1,p2,p6,p5, seat_number 3/4 occupy clockwise slots 4/3, so the server advanced 1→2→3→4 by seat_number which reads as badges 1,2,4,3. Fix: a _clockwise_seats(game) helper sorts by grid_position's clockwise slot (seat_number as a stable tiebreak for positionless seats) and is the single source of truth for _initial_state, the first-seat seed, and _advance_turn; the optimistic client hop already computed the identical clockwiseSeats order, so it now rotates from that instead of seat_number. Deriving server-side (rather than freezing a seat_order list in the blob at go-live) also retroactively fixes already-in-progress games — all seats in the DB carry a grid_position. (2) The timer subsystem reads state.turnEvents[].ts; the live blob ships turnEvents:[] with no timestamps, so turnDurations() returned zeros. Fix: the tablet maintains a client-side liveTurnEvents timeline and appends an entry each time the SSE-broadcast currentTurnId changes — echo-driven, not the optimistic local hop, so the reset is correct even when a phone advances the turn. Companion phones stay turn-number-only (a resetting clock there would duplicate the timeline + 1Hz tick for no real gain). SSE payload contract, auth model, and the localStorage tracker are untouched. 776 tests green (+3 rotation tests pinned to the game-38 layout)."
+  },
+  {
     "version": "4.3.4",
     "date": "2026-07-11",
     "added": [
