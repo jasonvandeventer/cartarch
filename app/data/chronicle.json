@@ -1,5 +1,20 @@
 [
   {
+    "version": "4.3.2",
+    "date": "2026-07-11",
+    "added": [
+      "A Live Games hub for your phone: open cartarch.com/companion (now a nav item too) to see every game you have a seat in — live games first, then ones waiting to start — and tap in to your seat. The companion view itself is now a proper fullscreen tool: no site chrome, no accidental pinch/double-tap zoom, and it fits on one screen without the page scrolling. Your commander's art sits behind your life total as a dimmed, blurred background."
+    ],
+    "refined": [
+      "The companion page pins End Turn to the bottom and lets only the counters/commander-damage area scroll, so your life total and the big life buttons never move.",
+      "The live-mode game page now also tells players they can just open cartarch.com/companion on their phone, alongside the existing join link."
+    ],
+    "resolved": [
+      "Companion mode polish: standalone fullscreen phone view, the /companion My-Games entry point, and commander-art backgrounds."
+    ],
+    "archivist_note": "Three polish threads on companion mode (v4.3.0). (1) game_companion.html became a standalone document — its own minimal head with the web-app + no-zoom viewport metas (maximum-scale=1, user-scalable=no, apple-mobile-web-app-capable), touch-action: manipulation to kill double-tap zoom, and a 100dvh flex column: compact header, other-players strip, a flex-grow my-seat panel whose inner counters/cmd region is the ONLY thing that scrolls, and End Turn pinned at the bottom. A small ✕ escape hatch replaces the vanished nav. (2) GET /companion lists the user's seated games (in_progress first via a stable sort, then created; most recent first, cap 20) as a standalone mobile lobby — the phone's bookmark target — reachable from a new 'Live Games' nav item. (3) Commander art: a server-side resolver (seat → deck → role='commander' card → scryfall_id, None at every gap) threads a commander image behind the my-seat panel via mirror_image_url at the 'normal' size, CSS-cropped toward the top of the card and blurred under a dark gradient so the hero number stays legible. No art_crop URL was invented (the mirror only serves small/normal/large/png); no commander resolved leaves the solid background with no broken image and no layout shift. The table token stays out of every companion/lobby context — the Sessions 1-2 invariant — and no game logic, endpoint, or auth changed. 748 tests green."
+  },
+  {
     "version": "4.3.1",
     "date": "2026-07-11",
     "added": [
