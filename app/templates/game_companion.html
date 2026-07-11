@@ -232,14 +232,52 @@
     }).join('');
 
     const iAmElim = st.eliminated && st.eliminated[K(MY_SEAT_ID)];
+    const myCause = (st.eliminationCause && st.eliminationCause[K(MY_SEAT_ID)]) || null;
     const elimBtn = document.getElementById('cmp-elim-btn');
-    elimBtn.textContent = iAmElim ? "I'm back" : 'Eliminate me';
     elimBtn.classList.toggle('cmp-elim-active', !!iAmElim);
+    if (iAmElim && myCause && myCause !== 'manual') {
+      // AUTO elimination: no manual revive — it recovers when the value is fixed.
+      elimBtn.textContent = `Eliminated — ${CAUSE_LABELS[myCause] || myCause} · recovers automatically if corrected`;
+      elimBtn.disabled = true;
+    } else {
+      elimBtn.disabled = false;
+      elimBtn.textContent = iAmElim ? "I'm back" : 'Eliminate me';
+    }
     document.getElementById('cmp-endturn').classList.toggle('cmp-endturn-mine', myTurn);
   }
 
   function escapeHtml(s) { return String(s).replace(/[&<>"']/g, c => (
     { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+
+  // Optimistic auto-eliminate/revive mirroring the server (_auto_eliminate) so
+  // my panel doesn't flash alive-then-eliminated before the SSE echo. AUTO
+  // eliminations revive when their condition un-triggers; MANUAL never does.
+  const CAUSE_LABELS = { life: 'life total', cmd: 'commander damage', poison: 'poison' };
+  function cmpLossCause(id) {
+    const life = st.lives[K(id)];
+    if (life !== undefined && life <= 0) return 'life';
+    const pc = ((st.extraCounters && st.extraCounters[K(id)]) || []).find(c => c.type === 'poison');
+    if (pc && (pc.value || 0) >= 10) return 'poison';
+    const vals = Object.values((st.cmd && st.cmd[K(id)]) || {});
+    if (vals.length && Math.max(...vals) >= 21) return 'cmd';
+    return null;
+  }
+  function cmpAutoEliminate(id) {
+    st.eliminated = st.eliminated || {};
+    st.eliminationCause = st.eliminationCause || {};
+    const currently = !!st.eliminated[K(id)];
+    if (currently && st.eliminationCause[K(id)] === 'manual') return;  // manual lock
+    const cause = cmpLossCause(id);
+    if (cause && !currently) {
+      st.eliminated[K(id)] = true;
+      st.eliminationCause[K(id)] = cause;
+    } else if (cause && currently) {
+      st.eliminationCause[K(id)] = cause;
+    } else if (!cause && currently) {
+      st.eliminated[K(id)] = false;
+      delete st.eliminationCause[K(id)];
+    }
+  }
 
   // ── mutations (seat-scoped, no table token) ──────────────────
   function snapshot() { lastSt = JSON.parse(JSON.stringify(st)); }
@@ -260,6 +298,7 @@
     if (!st || MY_SEAT_ID == null) return;
     snapshot();
     st.lives[K(MY_SEAT_ID)] = ((st.lives[K(MY_SEAT_ID)]) || 0) + delta;
+    cmpAutoEliminate(MY_SEAT_ID);
     render();
     postAction({ type: 'life', seat_id: MY_SEAT_ID, delta });
   };
@@ -272,6 +311,7 @@
     // (post-floor) cmd increase; a decrement symmetrically restores life.
     const actual = st.cmd[K(MY_SEAT_ID)][K(fromId)] - cur;
     st.lives[K(MY_SEAT_ID)] = ((st.lives[K(MY_SEAT_ID)]) || 0) - actual;
+    cmpAutoEliminate(MY_SEAT_ID);
     render();
     postAction({ type: 'cmd', receiver_seat_id: MY_SEAT_ID, attacker_seat_id: fromId, delta });
   };
@@ -290,6 +330,7 @@
     if (!c) return;
     const nv = Math.max(0, (c.value || 0) + delta); const actual = nv - (c.value || 0);
     c.value = nv;
+    cmpAutoEliminate(MY_SEAT_ID);
     render();
     if (actual !== 0) postAction({ type: 'counter', seat_id: MY_SEAT_ID, counter: c.type, delta: actual });
   };
@@ -297,6 +338,9 @@
     snapshot();
     const becoming = !(st.eliminated && st.eliminated[K(MY_SEAT_ID)]);
     st.eliminated[K(MY_SEAT_ID)] = becoming;
+    st.eliminationCause = st.eliminationCause || {};
+    if (becoming) st.eliminationCause[K(MY_SEAT_ID)] = 'manual';
+    else delete st.eliminationCause[K(MY_SEAT_ID)];
     render();
     postAction({ type: 'eliminate', seat_id: MY_SEAT_ID, eliminated: becoming });
   };

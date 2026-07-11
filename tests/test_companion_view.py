@@ -82,6 +82,9 @@ def test_companion_seated_user_gets_seat_controls(db, client, user):
     assert "End turn" in html and "adjLife" in html
     assert f"const MY_SEAT_ID = {seats[0].id}" in html
     assert TABLE not in html  # never the table token on a phone
+    # Auto-elimination UX: optimistic mirror + cause-aware revive treatment.
+    assert "cmpAutoEliminate" in html
+    assert "recovers automatically if corrected" in html
 
 
 def test_companion_unseated_playgroup_member_is_spectator(db, client, user):

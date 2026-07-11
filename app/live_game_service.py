@@ -249,10 +249,13 @@ def _apply_mutation(atype: str, action: dict, state: dict, game: Game) -> dict:
         sid = str(_coerce_int(action["seat_id"]))
         eliminated = bool(action.get("eliminated"))
         state["eliminated"][sid] = eliminated
+        causes = state.setdefault("eliminationCause", {})
         if eliminated:
             state["eliminatedAtTurn"][sid] = int(state.get("turn", 1))
+            causes[sid] = "manual"  # explicit toggle → manual, never auto-revives
         else:
             state["eliminatedAtTurn"].pop(sid, None)  # clear on revive
+            causes.pop(sid, None)
 
     elif atype == "turn":
         _advance_turn(state, game)
@@ -323,6 +326,103 @@ def _append_event(
     )
 
 
+# --- auto-elimination on loss conditions --------------------------------------
+# Mirrors game_detail.html checkElimination(): a seat is eliminated when its life
+# <= 0, any single attacker's commander damage >= 21, or its poison counter >= 10.
+# The local tracker makes elimination PERMANENT (no auto-revive) and records no
+# cause. Live mode adds two things the tracker is silent on (both additive):
+#   * eliminationCause[seat] in {"life","cmd","poison","manual"}.
+#   * AUTO eliminations auto-REVIVE when their own condition un-triggers (a live
+#     scoreboard corrects mis-taps); MANUAL eliminations never auto-revive.
+# Precedence follows the tracker's `||` order (life > poison > cmd), so a coupled
+# cmd hit that both reaches 21 AND drops life to 0 is a single "life" elimination.
+
+
+def _loss_cause(state: dict, sid: str) -> str | None:
+    """First-triggered loss cause for a seat, or None. Order mirrors the local
+    tracker's `life || poison || cmd` short-circuit."""
+    life = state.get("lives", {}).get(sid)
+    if life is not None and int(life) <= 0:
+        return "life"
+    poison = next(
+        (
+            int(c.get("value", 0))
+            for c in state.get("extraCounters", {}).get(sid, [])
+            if c.get("type") == "poison"
+        ),
+        0,
+    )
+    if poison >= 10:
+        return "poison"
+    cmd_map = state.get("cmd", {}).get(sid, {})
+    if cmd_map and max(int(v) for v in cmd_map.values()) >= 21:
+        return "cmd"
+    return None
+
+
+def _affected_seat(atype: str, action: dict) -> int | None:
+    """Seat whose loss conditions a mutation can change: the target for
+    life/counter, the RECEIVER for cmd. None for turn/eliminate (eliminate sets
+    its own cause in _apply_mutation)."""
+    if atype in ("life", "counter"):
+        return _coerce_int(action.get("seat_id"))
+    if atype == "cmd":
+        return _coerce_int(action.get("receiver_seat_id"))
+    return None
+
+
+def _auto_eliminate(
+    session: Session, game_id: int, seat_id: int, state: dict, has_table: bool
+) -> None:
+    """Re-evaluate one seat's loss conditions after a life/cmd/counter mutation,
+    flipping auto-elimination on/off and appending an eliminate GameEvent on each
+    transition (same transaction as the caller). Manual eliminations are left
+    untouched (they never auto-revive)."""
+    sid = str(seat_id)
+    causes = state.setdefault("eliminationCause", {})
+    currently = bool(state.get("eliminated", {}).get(sid))
+    if currently and causes.get(sid) == "manual":
+        return  # manual lock
+
+    cause = _loss_cause(state, sid)
+    if cause and not currently:  # alive → auto-eliminated
+        state.setdefault("eliminated", {})[sid] = True
+        state.setdefault("eliminatedAtTurn", {})[sid] = int(state.get("turn", 1))
+        causes[sid] = cause
+        _append_auto_elim_event(session, game_id, seat_id, cause, True, state, has_table)
+    elif cause and currently:
+        causes[sid] = cause  # still down (possibly a new cause) — refresh, no event
+    elif not cause and currently:  # auto-eliminated → recovered (manual excluded above)
+        prev = causes.get(sid)
+        state["eliminated"][sid] = False
+        state.get("eliminatedAtTurn", {}).pop(sid, None)
+        causes.pop(sid, None)
+        _append_auto_elim_event(session, game_id, seat_id, prev, False, state, has_table)
+
+
+def _append_auto_elim_event(
+    session: Session,
+    game_id: int,
+    seat_id: int,
+    cause: str | None,
+    eliminated: bool,
+    state: dict,
+    has_table: bool,
+) -> None:
+    """Append the eliminate event for an AUTO elimination/revive."""
+    session.add(
+        GameEvent(
+            game_id=game_id,
+            seat_id=seat_id,
+            action_type="eliminate",
+            payload=json.dumps({"auto": True, "cause": cause, "eliminated": eliminated}),
+            turn=int(state.get("turn", 1)),
+            actor_kind="table" if has_table else "seat",
+            created_at=utc_now(),
+        )
+    )
+
+
 def apply_live_action(
     session: Session,
     game_id: int,
@@ -359,11 +459,17 @@ def apply_live_action(
     state = json.loads(live.state)
     extras = _apply_mutation(atype, action, state, game)
 
+    # Event append shares this transaction — no event without its mutation. The
+    # triggering event is recorded first, then any auto-elimination/revive it
+    # caused appends its own eliminate event (state serialized AFTER both).
+    _append_event(session, game_id, atype, action, state, has_table, extras)
+    affected = _affected_seat(atype, action)
+    if affected is not None:
+        _auto_eliminate(session, game_id, affected, state, has_table)
+
     live.state = json.dumps(state)
     live.version += 1
     live.updated_at = utc_now()
-    # Event append shares this transaction — no event without its mutation.
-    _append_event(session, game_id, atype, action, state, has_table, extras)
     session.commit()
     _publish(live)
     return live

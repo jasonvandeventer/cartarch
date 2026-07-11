@@ -912,9 +912,43 @@ function checkElimination(seatId) {
   }
 }
 
+// LIVE-only optimistic mirror of the server's _auto_eliminate: reruns the loss
+// check AND auto-revives an AUTO elimination when its condition un-triggers, so
+// the UI doesn't flash alive-then-eliminated before the SSE echo. Kept separate
+// from checkElimination() so the localStorage tracker's permanent-elimination
+// behavior is untouched. Precedence life>poison>cmd matches the server.
+function liveLossCause(seatId) {
+  const life = state.lives[seatId];
+  if (life !== undefined && life <= 0) return 'life';
+  const counters = state.extraCounters[seatId] || [];
+  const pc = counters.find(c => c.type === 'poison');
+  if (pc && (pc.value || 0) >= 10) return 'poison';
+  const vals = Object.values(state.cmd[seatId] || {});
+  if (vals.length && Math.max(...vals) >= 21) return 'cmd';
+  return null;
+}
+function liveAutoEliminate(seatId) {
+  state.eliminationCause = state.eliminationCause || {};
+  const currently = !!state.eliminated[seatId];
+  if (currently && state.eliminationCause[seatId] === 'manual') return;  // manual lock
+  const cause = liveLossCause(seatId);
+  if (cause && !currently) {
+    state.eliminated[seatId] = true;
+    state.eliminatedAtTurn[seatId] = state.turn || 1;
+    state.eliminationCause[seatId] = cause;
+  } else if (cause && currently) {
+    state.eliminationCause[seatId] = cause;
+  } else if (!cause && currently) {
+    state.eliminated[seatId] = false;
+    delete state.eliminatedAtTurn[seatId];
+    delete state.eliminationCause[seatId];
+  }
+}
+
 function adjustLife(seatId, delta) {
   if (LIVE) {
     state.lives[seatId] = (state.lives[seatId] || 0) + delta;
+    liveAutoEliminate(seatId);
     render();
     postAction({ type: 'life', seat_id: seatId, delta });
     return;
@@ -966,6 +1000,7 @@ function adjustCounter(seatId, counterIdx, delta) {
   const actualDelta = newValue - (ec.value || 0);
   ec.value = newValue;
   if (LIVE) {
+    liveAutoEliminate(seatId);
     render();
     if (actualDelta !== 0) postAction({ type: 'counter', seat_id: seatId, counter: ec.type, delta: actualDelta });
     return;
@@ -1003,6 +1038,7 @@ function adjustCmd(receiverId, senderId, delta) {
     state.cmd[receiverId][senderId] = Math.max(0, p + delta);
     const ad = state.cmd[receiverId][senderId] - p;
     state.lives[receiverId] = (state.lives[receiverId] || 0) - ad;
+    liveAutoEliminate(receiverId);
     render();
     postAction({ type: 'cmd', receiver_seat_id: receiverId, attacker_seat_id: senderId, delta });
     return;
@@ -1021,6 +1057,9 @@ function toggleEliminate(seatId) {
   state.eliminated[seatId] = becoming;
   state.eliminatedAtTurn[seatId] = becoming ? (state.turn || 1) : null;
   if (LIVE) {
+    state.eliminationCause = state.eliminationCause || {};
+    if (becoming) state.eliminationCause[seatId] = 'manual';
+    else delete state.eliminationCause[seatId];
     render();
     postAction({ type: 'eliminate', seat_id: seatId, eliminated: becoming });
     return;

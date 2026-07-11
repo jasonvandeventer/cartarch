@@ -14,7 +14,7 @@ import pytest
 
 from app import live_game_events, live_game_service
 from app.game_service import end_game
-from app.models import Game, GameLiveState, GameSeat, Playgroup, PlaygroupMember, User
+from app.models import Game, GameEvent, GameLiveState, GameSeat, Playgroup, PlaygroupMember, User
 
 TABLE = "TABLETOK"
 _seq = itertools.count(1)
@@ -434,6 +434,177 @@ def test_turn_skips_eliminated_in_clockwise_order(db):
     _act(d, gid, uid, {"type": "eliminate", "seat_id": s2.id, "eliminated": True}, TABLE)
     live = _act(d, gid, uid, {"type": "turn"}, TABLE)
     assert _state(live)["currentTurnId"] == s4.id
+
+
+# ── auto-elimination on loss conditions (mirrors localStorage checkElimination,
+#    + server-only eliminationCause & auto-revive for AUTO eliminations) ─────────
+
+
+def _elim_events(db, game_id):
+    return [
+        json.loads(e.payload)
+        for e in db.query(GameEvent)
+        .filter_by(game_id=game_id, action_type="eliminate")
+        .order_by(GameEvent.id)
+        .all()
+    ]
+
+
+def test_life_to_zero_auto_eliminates_with_cause_life(live4):
+    L = live4
+    s1 = L["seats"][0]
+    live = _act(
+        L["db"], L["gid"], L["uid"], {"type": "life", "seat_id": s1.id, "delta": -40}, TABLE
+    )
+    st = _state(live)
+    assert st["lives"][str(s1.id)] == 0
+    assert st["eliminated"][str(s1.id)] is True
+    assert st["eliminationCause"][str(s1.id)] == "life"
+    assert st["eliminatedAtTurn"][str(s1.id)] == 1
+    ev = _elim_events(L["db"], L["gid"])[-1]
+    assert ev == {"auto": True, "cause": "life", "eliminated": True}
+
+
+def test_life_correction_auto_revives_and_clears(live4):
+    L = live4
+    s1 = L["seats"][0]
+    _act(L["db"], L["gid"], L["uid"], {"type": "life", "seat_id": s1.id, "delta": -40}, TABLE)  # 0
+    live = _act(L["db"], L["gid"], L["uid"], {"type": "life", "seat_id": s1.id, "delta": 5}, TABLE)
+    st = _state(live)
+    assert st["eliminated"][str(s1.id)] is False
+    assert str(s1.id) not in st["eliminationCause"]
+    assert str(s1.id) not in st["eliminatedAtTurn"]
+    assert _elim_events(L["db"], L["gid"])[-1] == {
+        "auto": True,
+        "cause": "life",
+        "eliminated": False,
+    }
+
+
+def test_manual_eliminate_is_not_auto_revived_by_life_change(live4):
+    L = live4
+    s2 = L["seats"][1]
+    _act(
+        L["db"],
+        L["gid"],
+        L["uid"],
+        {"type": "eliminate", "seat_id": s2.id, "eliminated": True},
+        TABLE,
+    )
+    live = _act(L["db"], L["gid"], L["uid"], {"type": "life", "seat_id": s2.id, "delta": 1}, TABLE)
+    st = _state(live)
+    assert st["eliminated"][str(s2.id)] is True  # manual lock holds
+    assert st["eliminationCause"][str(s2.id)] == "manual"
+
+
+def test_cmd_reaching_21_eliminates_cause_cmd_but_20_does_not(live4):
+    L = live4
+    r, a, b = L["seats"][0], L["seats"][1], L["seats"][2]
+    # 20 from attacker b → not eliminated (life 40-20=20 > 0, maxCmd 20 < 21).
+    live = _act(
+        L["db"],
+        L["gid"],
+        L["uid"],
+        {"type": "cmd", "receiver_seat_id": r.id, "attacker_seat_id": b.id, "delta": 20},
+        TABLE,
+    )
+    assert not _state(live)["eliminated"].get(str(r.id))
+    # 21 from a single other attacker (a fresh receiver so life stays > 0):
+    # coupled life 40-21=19 > 0, so cmd is the cause, not life.
+    r2 = L["seats"][3]
+    live = _act(
+        L["db"],
+        L["gid"],
+        L["uid"],
+        {"type": "cmd", "receiver_seat_id": r2.id, "attacker_seat_id": a.id, "delta": 21},
+        TABLE,
+    )
+    st = _state(live)
+    assert st["lives"][str(r2.id)] == 19
+    assert st["eliminated"][str(r2.id)] is True
+    assert st["eliminationCause"][str(r2.id)] == "cmd"
+
+
+def test_cmd_corrected_below_21_auto_revives(live4):
+    L = live4
+    r, a = L["seats"][0], L["seats"][1]
+    _act(
+        L["db"],
+        L["gid"],
+        L["uid"],
+        {"type": "cmd", "receiver_seat_id": r.id, "attacker_seat_id": a.id, "delta": 21},
+        TABLE,
+    )
+    live = _act(
+        L["db"],
+        L["gid"],
+        L["uid"],
+        {"type": "cmd", "receiver_seat_id": r.id, "attacker_seat_id": a.id, "delta": -1},
+        TABLE,
+    )
+    st = _state(live)
+    assert st["cmd"][str(r.id)][str(a.id)] == 20
+    assert st["eliminated"][str(r.id)] is False
+    assert str(r.id) not in st["eliminationCause"]
+
+
+def test_poison_threshold_eliminates_cause_poison_nonpoison_does_not(live4):
+    L = live4
+    s1, s2 = L["seats"][0], L["seats"][1]
+    # A non-poison counter at a huge value never eliminates.
+    _act(
+        L["db"],
+        L["gid"],
+        L["uid"],
+        {"type": "counter", "seat_id": s2.id, "counter": "energy", "delta": 50},
+        TABLE,
+    )
+    assert not _state(live_game_service.get_live_state(L["db"], L["gid"], L["uid"]))[
+        "eliminated"
+    ].get(str(s2.id))
+    # Poison reaching 10 eliminates.
+    live = _act(
+        L["db"],
+        L["gid"],
+        L["uid"],
+        {"type": "counter", "seat_id": s1.id, "counter": "poison", "delta": 10},
+        TABLE,
+    )
+    st = _state(live)
+    assert st["eliminated"][str(s1.id)] is True
+    assert st["eliminationCause"][str(s1.id)] == "poison"
+
+
+def test_rotation_skips_auto_eliminated_seat(live4):
+    L = live4
+    s1, s2, s3, s4 = L["seats"]
+    _act(
+        L["db"], L["gid"], L["uid"], {"type": "life", "seat_id": s2.id, "delta": -40}, TABLE
+    )  # auto-elim s2
+    live = _act(L["db"], L["gid"], L["uid"], {"type": "turn"}, TABLE)  # from s1 → skip s2 → s3
+    assert _state(live)["currentTurnId"] == s3.id
+
+
+def test_coupled_cmd_and_life_is_single_elimination_cause_life(db):
+    # Receiver starts at 21 life; a +21 cmd both reaches 21 AND (coupled) drops
+    # life to exactly 0 → ONE elimination, cause "life" (precedence: life||poison||cmd).
+    owner = _user(db)
+    game, seats = _make_game(db, owner.id, first_seat_number=1, seats=[{"starting_life": 21}, {}])
+    live_game_service.start_live_game(db, game.id, owner.id)
+    r, a = seats
+    live = _act(
+        db,
+        game.id,
+        owner.id,
+        {"type": "cmd", "receiver_seat_id": r.id, "attacker_seat_id": a.id, "delta": 21},
+        TABLE,
+    )
+    st = _state(live)
+    assert st["lives"][str(r.id)] == 0 and st["cmd"][str(r.id)][str(a.id)] == 21
+    assert st["eliminated"][str(r.id)] is True
+    assert st["eliminationCause"][str(r.id)] == "life"
+    autos = [e for e in _elim_events(db, game.id) if e["eliminated"] is True]
+    assert autos == [{"auto": True, "cause": "life", "eliminated": True}]  # exactly one
 
 
 def test_eliminate_records_turn_and_revive_clears(live4):
