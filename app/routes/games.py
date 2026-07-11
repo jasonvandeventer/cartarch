@@ -533,12 +533,13 @@ async def game_end(
 
     turn_count_raw = form_data.get("turn_count", "")
     notes = str(form_data.get("notes", ""))
+    win_condition = str(form_data.get("win_condition", "")) or None
     try:
         tc = int(turn_count_raw) if str(turn_count_raw).strip() else None
     except ValueError:
         tc = None
 
-    end_game(session, game_id, current_user.id, placements, final_lives, tc, notes)
+    end_game(session, game_id, current_user.id, placements, final_lives, tc, notes, win_condition)
 
     # issue #47 — per-seat goal completion. Checkbox name is goal_{seat}_{goal};
     # presence = achieved. record_goal_results re-validates ownership (only the

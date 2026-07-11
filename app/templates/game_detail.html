@@ -410,6 +410,16 @@
                      placeholder="e.g. 12"
                      style="width:120px"
                      min="1">
+              <label>How did the game end?</label>
+              <div class="win-condition-row">
+                <label class="win-cond-opt"><input type="radio" name="win_condition" value="" checked> Skip</label>
+                <label class="win-cond-opt"><input type="radio" name="win_condition" value="combat"> Combat damage</label>
+                <label class="win-cond-opt"><input type="radio" name="win_condition" value="commander"> Commander damage</label>
+                <label class="win-cond-opt"><input type="radio" name="win_condition" value="combo"> Combo</label>
+                <label class="win-cond-opt"><input type="radio" name="win_condition" value="attrition"> Attrition</label>
+                <label class="win-cond-opt"><input type="radio" name="win_condition" value="concession"> Concession</label>
+                <label class="win-cond-opt"><input type="radio" name="win_condition" value="other"> Other</label>
+              </div>
               <label>Notes</label>
               <textarea name="notes"
                         rows="2"

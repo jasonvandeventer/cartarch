@@ -11,11 +11,13 @@
       <div>
         {{ editorial_eyebrow("Play · Games · Record") }}
         <h2 class="panel-title">{{ game.played_at | format_local_datetime("%-d %B %Y") }}</h2>
+        {% set wc_labels = {'combat':'Combat damage','commander':'Commander damage','combo':'Combo','attrition':'Attrition','concession':'Concession','other':'Other'} %}
         <p class="muted">
           {{ game.format or 'Commander' }} pod
           {% if game.turn_count %}· {{ game.turn_count }} turns{% endif %}
           · {{ elapsed if elapsed else '—' }} playtime
           {% if winner %}· 🏆 {{ winner.player_name }}{% endif %}
+          {% if game.win_condition %}· won by {{ wc_labels.get(game.win_condition, game.win_condition) }}{% endif %}
           {% if game.playgroup %}· shared with <a href="/playgroups/{{ game.playgroup.id }}">{{ game.playgroup.name }}</a>{% endif %}
         </p>
       </div>

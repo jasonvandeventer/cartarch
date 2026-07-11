@@ -547,6 +547,10 @@ class Game(Base):
     playgroup_id: Mapped[int | None] = mapped_column(
         ForeignKey("playgroups.id", ondelete="SET NULL"), nullable=True, index=True
     )
+    # Game-event history (issue: event log + analytics). Optional operator-picked
+    # win condition captured at finalize (combat / commander / combo / attrition /
+    # concession / other). NULL = not recorded.
+    win_condition: Mapped[str | None] = mapped_column(String(32), nullable=True)
 
     seats: Mapped[list[GameSeat]] = relationship(
         back_populates="game",
@@ -561,6 +565,12 @@ class Game(Base):
     # CASCADE is Postgres defense-in-depth; end_game deletes it explicitly on finalize.
     live_state: Mapped[GameLiveState | None] = relationship(
         back_populates="game", uselist=False, cascade="all, delete-orphan"
+    )
+    # Append-only event log (life/cmd/counter/eliminate/turn + live_started /
+    # finalized bookends). delete-orphan so delete_game drops them in Python
+    # (SQLite FKs OFF); the DB CASCADE is Postgres defense-in-depth.
+    events: Mapped[list[GameEvent]] = relationship(
+        back_populates="game", cascade="all, delete-orphan", order_by="GameEvent.id"
     )
 
 
@@ -699,6 +709,39 @@ class GameLiveState(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=utc_now)
 
     game: Mapped[Game] = relationship(back_populates="live_state")
+
+
+class GameEvent(Base):
+    """Append-only log of one live-game action (issue: event history + analytics).
+
+    Written inside the SAME transaction as the state mutation it records — every
+    ``apply_live_action`` appends exactly one row, plus the ``live_started`` /
+    ``finalized`` bookends. ``seat_id`` is the acted-on seat (the RECEIVING seat
+    for cmd; NULL for turn + bookends). ``payload`` is the action JSON (minus the
+    table/csrf tokens); a cmd payload also carries ``raw_delta`` + ``actual_delta``
+    (the post-floor value the service computed) so analytics never re-derives the
+    floor rule. ``turn`` is ``state.turn`` at action time (the NEW turn after a
+    turn advance). ``actor_kind`` is ``'table'`` (table-token authorized, incl.
+    bookends) or ``'seat'`` (a phone). Both FKs CASCADE (Postgres
+    defense-in-depth; delete-orphan handles SQLite).
+    """
+
+    __tablename__ = "game_events"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    game_id: Mapped[int] = mapped_column(
+        ForeignKey("games.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    seat_id: Mapped[int | None] = mapped_column(
+        ForeignKey("game_seats.id", ondelete="CASCADE"), nullable=True
+    )
+    action_type: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
+    payload: Mapped[str] = mapped_column(Text, nullable=False)
+    turn: Mapped[int] = mapped_column(Integer, nullable=False)
+    actor_kind: Mapped[str] = mapped_column(String(16), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=utc_now)
+
+    game: Mapped[Game] = relationship(back_populates="events")
 
 
 class TokenInventory(Base):

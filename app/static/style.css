@@ -14946,3 +14946,7 @@ body.cmp-lobby-body { height: auto; min-height: 100dvh; overflow-y: auto; }
 .cmp-deck-opt.cmp-deck-current .cmp-deck-opt-name::after { content: " ✓"; color: var(--brand-green); }
 .cmp-deck-opt-name { font-weight: 700; font-size: 1.05rem; }
 .cmp-deck-opt-cmd { font-size: 0.85rem; }
+
+/* ── End-game win-condition selector ── */
+.win-condition-row { display: flex; flex-wrap: wrap; gap: 0.4rem 0.8rem; margin: 0.2rem 0 0.4rem; }
+.win-cond-opt { display: inline-flex; align-items: center; gap: 0.3rem; font-size: 0.9rem; color: var(--text-dim); }

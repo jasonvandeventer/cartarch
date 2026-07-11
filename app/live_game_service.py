@@ -29,7 +29,7 @@ from sqlalchemy.orm import Session
 
 from app import live_game_events
 from app.game_service import get_game, get_viewable_game
-from app.models import Game, GameLiveState, GameSeat
+from app.models import Game, GameEvent, GameLiveState, GameSeat
 from app.timeutil import utc_now
 
 _MUTATING_TYPES = {"life", "counter", "cmd", "eliminate", "turn"}
@@ -102,6 +102,19 @@ def start_live_game(session: Session, game_id: int, user_id: int) -> GameLiveSta
     # reflects the new row immediately on this instance — the delete-orphan
     # cascade also sets game_id.
     game.live_state = live
+    # live_started bookend (create path only — idempotent re-entry returned above,
+    # so no duplicate). payload is the initial state blob; shares this transaction.
+    session.add(
+        GameEvent(
+            game_id=game.id,
+            seat_id=None,
+            action_type="live_started",
+            payload=live.state,
+            turn=1,
+            actor_kind="table",
+            created_at=utc_now(),
+        )
+    )
     session.commit()
     _publish(live)
     return live
@@ -171,7 +184,9 @@ def _validate_action_seats(atype: str, action: dict, seats_by_id: dict[int, Game
         _require_seat(action.get("seat_id"), seats_by_id, "seat_id")
 
 
-def _apply_mutation(atype: str, action: dict, state: dict, game: Game) -> None:
+def _apply_mutation(atype: str, action: dict, state: dict, game: Game) -> dict:
+    """Mutate ``state`` in place and return event-payload EXTRAS (empty except for
+    cmd, which returns the raw + post-floor ``actual`` delta)."""
     if atype == "life":
         sid = str(_coerce_int(action["seat_id"]))
         state["lives"][sid] = int(state["lives"].get(sid, 0)) + _require_delta(action)
@@ -202,6 +217,8 @@ def _apply_mutation(atype: str, action: dict, state: dict, game: Game) -> None:
         # amount that was actually there (a -3 on a value of 2 restores 2, not 3).
         actual_delta = recv_map[atk] - prev
         state["lives"][recv] = int(state["lives"].get(recv, 0)) - actual_delta
+        # Analytics must never re-derive the floor rule — record both deltas.
+        return {"raw_delta": delta, "actual_delta": actual_delta}
 
     elif atype == "eliminate":
         sid = str(_coerce_int(action["seat_id"]))
@@ -214,6 +231,8 @@ def _apply_mutation(atype: str, action: dict, state: dict, game: Game) -> None:
 
     elif atype == "turn":
         _advance_turn(state, game)
+
+    return {}
 
 
 def _advance_turn(state: dict, game: Game) -> None:
@@ -239,6 +258,43 @@ def _advance_turn(state: dict, game: Game) -> None:
                 state["turn"] = int(state.get("turn", 1)) + 1
             return
     # everyone eliminated → leave currentTurnId as-is.
+
+
+_SENSITIVE_KEYS = ("table_token", "csrf_token")
+
+
+def _event_seat_id(atype: str, action: dict) -> int | None:
+    """The acted-on seat for an event: RECEIVING seat for cmd, None for turn."""
+    if atype == "turn":
+        return None
+    field = "receiver_seat_id" if atype == "cmd" else "seat_id"
+    return _coerce_int(action.get(field))
+
+
+def _append_event(
+    session: Session,
+    game_id: int,
+    atype: str,
+    action: dict,
+    state: dict,
+    has_table: bool,
+    extras: dict,
+) -> None:
+    """Append one GameEvent for a live action — inside the action's transaction
+    (the caller commits). The table/csrf tokens are stripped from the payload."""
+    payload = {k: v for k, v in action.items() if k not in _SENSITIVE_KEYS}
+    payload.update(extras)  # cmd's raw_delta / actual_delta
+    session.add(
+        GameEvent(
+            game_id=game_id,
+            seat_id=_event_seat_id(atype, action),
+            action_type=atype,
+            payload=json.dumps(payload),
+            turn=int(state.get("turn", 1)),  # NEW turn (post turn-advance)
+            actor_kind="table" if has_table else "seat",
+            created_at=utc_now(),
+        )
+    )
 
 
 def apply_live_action(
@@ -275,11 +331,13 @@ def apply_live_action(
         _authorize_seat_scoped(atype, action, game, user_id, seats_by_id)
 
     state = json.loads(live.state)
-    _apply_mutation(atype, action, state, game)
+    extras = _apply_mutation(atype, action, state, game)
 
     live.state = json.dumps(state)
     live.version += 1
     live.updated_at = utc_now()
+    # Event append shares this transaction — no event without its mutation.
+    _append_event(session, game_id, atype, action, state, has_table, extras)
     session.commit()
     _publish(live)
     return live

@@ -817,19 +817,21 @@ KNOWN_NO_ENTRYPOINT = {
     "cleaned explicitly by delete_deck_goal + delete_deck before the goal is "
     "deleted; no dedicated parent-delete entrypoint here (verified in "
     "tests/test_game_goal_results.py).",
-    "game_seats": "issue #47 — child game_goal_results.game_seat_id (CASCADE) is "
-    "dropped by the ORM delete-orphan cascade (GameSeat.goal_results) on game/seat "
+    "game_seats": "issue #47 / game-event history — children game_goal_results."
+    "game_seat_id and game_events.seat_id (both CASCADE) are dropped by ORM "
+    "delete-orphan cascades (GameSeat.goal_results, Game.events) on game/seat "
     "delete; no dedicated entrypoint here (verified in "
-    "tests/test_game_goal_results.py).",
+    "tests/test_game_goal_results.py + tests/test_game_events.py).",
     "audit_sessions": "issue #73 — an audit session is never row-deleted: abandon "
     "flips status to 'abandoned' and clears its audit_scans explicitly "
     "(audit_service.abandon_audit); the row persists as the audit_log linkage. "
     "Children audit_scans/audit_log (CASCADE) are Postgres defense-in-depth.",
-    "games": "companion mode — the only CASCADE child is game_live_states.game_id "
-    "(live working memory). It's deleted explicitly on finalize (game_service."
-    "end_game) and via the Game.live_state delete-orphan cascade on delete_game "
-    "(session.delete(game)); no dedicated parent-delete entrypoint in this suite. "
-    "SQLite runs FKs OFF, so the DB CASCADE is Postgres defense-in-depth.",
+    "games": "companion mode + game-event history — CASCADE children are "
+    "game_live_states.game_id (live working memory, deleted on finalize / via the "
+    "Game.live_state delete-orphan) and game_events.game_id (append-only log, via "
+    "the Game.events delete-orphan on delete_game). No dedicated parent-delete "
+    "entrypoint in this suite; SQLite runs FKs OFF, so the DB CASCADE is Postgres "
+    "defense-in-depth.",
 }
 # Parents covered transitively by an existing entrypoint (not a direct parent here).
 TRANSITIVELY_COVERED = {

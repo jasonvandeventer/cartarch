@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from typing import Any
 
 from sqlalchemy import and_, or_, select
@@ -11,6 +12,7 @@ from app.models import (
     Card,
     Deck,
     Game,
+    GameEvent,
     GameGoalResult,
     GameSeat,
     InventoryRow,
@@ -18,6 +20,20 @@ from app.models import (
     User,
 )
 from app.timeutil import utc_now
+
+# Optional operator-picked win condition captured at finalize (game-event
+# history, Phase 2). Service-layer enum, same non-blocking normalize pattern as
+# format/status: an unknown value resolves to None rather than blocking finalize.
+VALID_WIN_CONDITIONS = ("combat", "commander", "combo", "attrition", "concession", "other")
+
+
+def normalize_win_condition(raw: str | None) -> str | None:
+    """Normalize a submitted win_condition to the canonical set, else ``None``."""
+    if not raw:
+        return None
+    value = raw.strip().lower()
+    return value if value in VALID_WIN_CONDITIONS else None
+
 
 # v3.27.2 — Game.format canonical taxonomy. Service-layer enforcement
 # (matches the existing VALID_LOCATION_TYPES / VALID_LOCATION_MODES pattern
@@ -546,6 +562,7 @@ def end_game(
     final_lives: dict[int, int | None],
     turn_count: int | None,
     notes: str,
+    win_condition: str | None = None,
 ) -> bool:
     """Record final placements, life totals, and turn count for a game.
 
@@ -564,11 +581,31 @@ def end_game(
 
     game.turn_count = turn_count or None
     game.notes = notes.strip() or None
+    game.win_condition = normalize_win_condition(win_condition)
     # Companion mode: the live-state row is working memory only. On finalize the
     # final life/turn are captured on seats/game (above) exactly as before, so
     # drop the live blob. session.delete works on SQLite (FKs OFF); it's also the
     # ORM side of the Game.live_state delete-orphan cascade.
     if game.live_state is not None:
+        # `finalized` bookend BEFORE the live row is deleted — the final state blob
+        # is the event's payload. Shares this transaction. Non-live finalizes append
+        # nothing. Bookends are table-level actions.
+        blob = game.live_state.state
+        try:
+            final_turn = int(json.loads(blob).get("turn", 1))
+        except (ValueError, TypeError):
+            final_turn = game.turn_count or 1
+        session.add(
+            GameEvent(
+                game_id=game.id,
+                seat_id=None,
+                action_type="finalized",
+                payload=blob,
+                turn=final_turn,
+                actor_kind="table",
+                created_at=utc_now(),
+            )
+        )
         session.delete(game.live_state)
     # v3.27.3 — mark the game as finalized. Replaces the "any seat has
     # placement → is_ended" derivation that templates used to compute;
