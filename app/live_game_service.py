@@ -194,7 +194,14 @@ def _apply_mutation(atype: str, action: dict, state: dict, game: Game) -> None:
         atk = str(_coerce_int(action["attacker_seat_id"]))
         delta = _require_delta(action)
         recv_map = state["cmd"].setdefault(recv, {})
-        recv_map[atk] = max(0, int(recv_map.get(atk, 0)) + delta)  # floor at 0
+        prev = int(recv_map.get(atk, 0))
+        recv_map[atk] = max(0, prev + delta)  # cmd floored at 0
+        # Commander damage is coupled to life, matching the localStorage tracker
+        # (game_detail.html adjustCmd): the receiver loses the ACTUAL cmd increase
+        # (post-floor), so a decrement symmetrically restores life — but only the
+        # amount that was actually there (a -3 on a value of 2 restores 2, not 3).
+        actual_delta = recv_map[atk] - prev
+        state["lives"][recv] = int(state["lives"].get(recv, 0)) - actual_delta
 
     elif atype == "eliminate":
         sid = str(_coerce_int(action["seat_id"]))

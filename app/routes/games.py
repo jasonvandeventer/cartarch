@@ -358,6 +358,13 @@ def game_detail_page(
         "user_playgroups": user_playgroups,
         "current_user": current_user,
         "seat_commander_images": seat_commander_images,
+        # Companion mode — the table token grants ALL-seats control and must live
+        # ONLY on the creator's (tablet) view. Non-owners never receive it; their
+        # live-mode mutations go through the seat-scoped companion page instead.
+        # (It also namespaces the localStorage tracker key — non-owners fall back
+        # to the game-id-only key, which is harmless: they can't mutate a
+        # `created` game, and live-mode state is server-authoritative.)
+        "table_token": game.client_token if is_owner else None,
     }
 
     # v3.33.2 — finalized games render a read-only summary (final standings,
@@ -372,6 +379,37 @@ def game_detail_page(
         return render(request, "game_summary.html", ctx)
 
     return render(request, "game_detail.html", ctx)
+
+
+@router.get("/games/{game_id}/companion")
+def game_companion_page(
+    request: Request,
+    game_id: int,
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+):
+    """Phone companion view for a live game (companion mode, Session 2).
+
+    Viewer-scoped (owner / seat player / playgroup member). The page controls
+    only the requesting user's OWN seat (seat-scoped mutations, no table token —
+    the token NEVER reaches a phone). A viewer with no attributed seat gets
+    read-only spectator mode.
+    """
+    game = get_viewable_game(session, game_id, current_user.id)
+    if not game:
+        raise HTTPException(status_code=404, detail="Game not found")
+    my_seat = next((s for s in game.seats if s.user_id == current_user.id), None)
+    return render(
+        request,
+        "game_companion.html",
+        {
+            "title": f"Companion · Game {game_id}",
+            "game": game,
+            "my_seat": my_seat,
+            "seat_commander_images": get_seat_commander_image_urls(session, game),
+            "current_user": current_user,
+        },
+    )
 
 
 @router.post("/games/{game_id}/end")

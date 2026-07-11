@@ -75,15 +75,19 @@
             </span>
           </div>
           <div class="mast-controls">
-            <button type="button"
-                    class="mast-btn"
-                    id="undo-btn"
-                    onclick="undoLast()"
-                    disabled>↩ Undo</button>
-            <button type="button"
-                    class="mast-btn"
-                    id="pause-btn"
-                    onclick="togglePause()">⏸ Pause</button>
+            {# Undo + Pause are localStorage-only affordances; live mode is
+               server-authoritative (no client-side history), so hide both. #}
+            {% if game.status != 'in_progress' %}
+              <button type="button"
+                      class="mast-btn"
+                      id="undo-btn"
+                      onclick="undoLast()"
+                      disabled>↩ Undo</button>
+              <button type="button"
+                      class="mast-btn"
+                      id="pause-btn"
+                      onclick="togglePause()">⏸ Pause</button>
+            {% endif %}
             {% if is_owner %}
               <button type="button"
                       class="mast-btn"
@@ -131,8 +135,30 @@
           <div class="game-launch-format">{{ game.format or 'Commander' }} · {{ game.seats | length }} players</div>
           <button type="button" class="game-launch-btn" onclick="dismissLaunch(true)">⛶ Go fullscreen</button>
           <button type="button" class="game-launch-skip" onclick="dismissLaunch(false)">Continue without fullscreen</button>
+          {% if is_owner and game.status == 'created' %}
+            {# Opt-in to multi-device live mode. POSTs /live/start, which flips
+               the game to in_progress and redirects back — the page then boots
+               in live mode. Games never taken live keep the localStorage tracker. #}
+            <form method="post" action="/games/{{ game.id }}/live/start" style="margin-top:0.8rem">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+              <button type="submit" class="game-launch-btn go-live-btn">📱 Go Live (multi-device)</button>
+            </form>
+            <p class="game-launch-hint muted">Players join from their phones to control their own seats.</p>
+          {% endif %}
+          {% if game.status == 'in_progress' %}
+            <div class="companion-share">
+              <div class="companion-share-label">Players: join on your phone</div>
+              <input type="text" id="companion-url" class="companion-share-url" readonly>
+              <button type="button" class="game-launch-skip" onclick="copyCompanionUrl()">Copy link</button>
+            </div>
+          {% endif %}
         </div>
       </div>
+    {% endif %}
+    {# Companion mode — live connection status + optimistic-failure toast. #}
+    {% if game.status == 'in_progress' %}
+      <div id="live-reconnecting" class="live-reconnecting" style="display:none">Reconnecting…</div>
+      <div id="live-toast" class="live-toast" style="display:none"></div>
     {% endif %}
     {# ── Player grid — fixed 8-seat topology (preserved verbatim) ── #}
     {# Positions: p1=top-left p2=top-ctr p3=top-right             #}
@@ -453,10 +479,23 @@ const seatDefs = [
   {% endfor %}
 ];
 // v3.27.0 — collision-proof localStorage key (preserved).
-const clientToken = {{ game.client_token | tojson }};
+// Companion mode: the token is the OWNER-scoped table token (null for
+// non-owners — see the route). Non-owner localStorage falls back to the
+// game-id-only key; harmless (they can't mutate a `created` game).
+const clientToken = {{ table_token | tojson }};
 const storageKey = clientToken
   ? `mana-game-${gameId}-${clientToken}`
   : `mana-game-${gameId}`;
+
+// ── Companion mode (Session 2) ─────────────────────────────────
+// LIVE = the game is server-authoritative (status in_progress). In LIVE mode we
+// skip localStorage entirely and drive the UI from the SSE stream; mutations
+// apply optimistically then POST to /live/action. TABLE_TOKEN (owner tablet
+// only) grants all-seats control; it's the same value as clientToken.
+const LIVE = {{ (game.status == 'in_progress') | tojson }};
+const TABLE_TOKEN = clientToken;
+const CSRF = {{ csrf_token | tojson }};
+const COMPANION_URL = `${location.origin}/games/${gameId}/companion`;
 
 // ── Assign physical positions ──────────────────────────────────
 const allStored = seatDefs.every(s => s.storedPosition);
@@ -680,6 +719,12 @@ function gameFingerprint() {
 }
 
 let state;
+if (LIVE) {
+  // Live mode: server-authoritative. Start from a placeholder (freshState gives
+  // the full local shape from seatDefs); the first SSE event replaces it. No
+  // localStorage load, no fingerprint check, no save().
+  state = freshState();
+} else {
 try {
   const raw = localStorage.getItem(storageKey);
   const loaded = raw ? JSON.parse(raw) : null;
@@ -744,8 +789,82 @@ try {
     state.turnEvents = [{ ts: Date.now(), seatId: state.currentTurnId }];
   }
 } catch(e) { state = freshState(); }
+}
 
-function save() { localStorage.setItem(storageKey, JSON.stringify(state)); }
+function save() { if (LIVE) return; localStorage.setItem(storageKey, JSON.stringify(state)); }
+
+// ── Live-mode plumbing (Session 2) ─────────────────────────────
+// State is authoritative on the server. hydrateLiveState() normalizes the SSE
+// blob (empty cmd/extraCounters/eliminated dicts, no history) into the full
+// local shape so the EXISTING render() works verbatim.
+let lastSseState = null;
+function hydrateLiveState(s) {
+  s = s || {};
+  s.lives = s.lives || {};
+  s.eliminated = s.eliminated || {};
+  s.eliminatedAtTurn = s.eliminatedAtTurn || {};
+  s.cmd = s.cmd || {};
+  s.extraCounters = s.extraCounters || {};
+  seatDefs.forEach(sd => {
+    if (s.lives[sd.id] === undefined) s.lives[sd.id] = sd.startingLife;
+    if (s.eliminated[sd.id] === undefined) s.eliminated[sd.id] = false;
+    if (s.eliminatedAtTurn[sd.id] === undefined) s.eliminatedAtTurn[sd.id] = null;
+    if (!s.cmd[sd.id]) s.cmd[sd.id] = {};
+    sd.otherIds.forEach(oid => { if (s.cmd[sd.id][oid] === undefined) s.cmd[sd.id][oid] = 0; });
+    if (!Array.isArray(s.extraCounters[sd.id])) s.extraCounters[sd.id] = [];
+  });
+  s.history = s.history || [];              // render() reads history (chronicle/undo)
+  s.turn = s.turn || 1;
+  if (s.currentTurnId === undefined || s.currentTurnId === null) s.currentTurnId = firstSeatId;
+  s.turnEvents = s.turnEvents || [];
+  s.paused = false; s.pauseStartedTs = null; s.cumulativePausedMs = 0;
+  s.poison = s.poison || {}; s.exp = s.exp || {}; s.extraCounter = s.extraCounter || {};
+  return s;
+}
+function rerenderFromLastSse() {
+  if (lastSseState) { state = hydrateLiveState(JSON.parse(JSON.stringify(lastSseState))); render(); }
+}
+function postAction(action) {
+  if (TABLE_TOKEN) action.table_token = TABLE_TOKEN;  // owner tablet → all-seats
+  return fetch(`/games/${gameId}/live/action`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': CSRF },
+    body: JSON.stringify(action),
+  }).then(r => { if (!r.ok) throw new Error('live action failed'); return r.json(); })
+    .catch(() => { flashLive('Sync failed — reverting'); rerenderFromLastSse(); });
+}
+function flashLive(msg) {
+  const el = document.getElementById('live-toast');
+  if (!el) return;
+  el.textContent = msg; el.style.display = '';
+  clearTimeout(el._t); el._t = setTimeout(() => { el.style.display = 'none'; }, 2000);
+}
+function showReconnecting() { const el = document.getElementById('live-reconnecting'); if (el) el.style.display = ''; }
+function clearReconnecting() { const el = document.getElementById('live-reconnecting'); if (el) el.style.display = 'none'; }
+// Optimistic turn advance mirroring the server (_advance_turn): seat_number
+// order from the first seat, skip eliminated, increment turn on wrap.
+function liveAdvanceTurnOptimistic() {
+  const bySeat = seatDefs.slice().sort((a, b) => a.seatNumber - b.seatNumber).map(s => s.id);
+  if (!bySeat.length) return;
+  let start = bySeat.indexOf(firstSeatId); if (start < 0) start = 0;
+  const rot = bySeat.slice(start).concat(bySeat.slice(0, start));
+  let i = rot.indexOf(state.currentTurnId); if (i < 0) i = 0;
+  for (let step = 1; step <= rot.length; step++) {
+    const j = (i + step) % rot.length;
+    if (!state.eliminated[rot[j]]) {
+      state.currentTurnId = rot[j];
+      if (j <= i) state.turn = (state.turn || 1) + 1;
+      return;
+    }
+  }
+}
+function copyCompanionUrl() {
+  const el = document.getElementById('companion-url');
+  if (!el) return;
+  el.select();
+  (navigator.clipboard?.writeText(COMPANION_URL) || Promise.reject()).then(
+    () => flashLive('Link copied'), () => { try { document.execCommand('copy'); flashLive('Link copied'); } catch (_) {} });
+}
 function pushHistory(entry) {
   if (entry.ts === undefined) entry.ts = Date.now();
   state.history.push(entry);
@@ -780,6 +899,12 @@ function checkElimination(seatId) {
 }
 
 function adjustLife(seatId, delta) {
+  if (LIVE) {
+    state.lives[seatId] = (state.lives[seatId] || 0) + delta;
+    render();
+    postAction({ type: 'life', seat_id: seatId, delta });
+    return;
+  }
   state.lives[seatId] = (state.lives[seatId] || 0) + delta;
   pushHistory({ type: 'life', seatId, delta });
   checkElimination(seatId);
@@ -788,6 +913,19 @@ function adjustLife(seatId, delta) {
 
 function addCounter(seatId, type, customLabel) {
   if (!EXTRA_TYPES.includes(type)) return;
+  if (LIVE) {
+    // Optimistically ensure a pill exists; the server upsert creates-if-absent
+    // (delta 0). Custom counters with the same type collapse server-side.
+    const cs = getCounters(seatId);
+    if (type === 'custom' || !cs.find(c => c.type === type)) {
+      const entry = { type, value: 0 };
+      if (type === 'custom' && customLabel) entry.customLabel = customLabel;
+      cs.push(entry);
+    }
+    render();
+    postAction({ type: 'counter', seat_id: seatId, counter: type, delta: 0 });
+    return;
+  }
   const counters = getCounters(seatId);
   // De-dup non-custom: bump existing if same type already there. Custom
   // counters can stack (different labels = different concerns).
@@ -813,6 +951,11 @@ function adjustCounter(seatId, counterIdx, delta) {
   const newValue = Math.max(0, (ec.value || 0) + delta);
   const actualDelta = newValue - (ec.value || 0);
   ec.value = newValue;
+  if (LIVE) {
+    render();
+    if (actualDelta !== 0) postAction({ type: 'counter', seat_id: seatId, counter: ec.type, delta: actualDelta });
+    return;
+  }
   pushHistory({ type: 'extra', seatId, counterIdx,
                 counterType: ec.type, delta: actualDelta });
   checkElimination(seatId);
@@ -823,6 +966,14 @@ function removeCounter(seatId, counterIdx) {
   const counters = getCounters(seatId);
   const prev = counters[counterIdx];
   if (!prev) return;
+  if (LIVE) {
+    // No server "remove counter" action — zero it out instead (the pill stays).
+    const d = -(prev.value || 0);
+    prev.value = 0;
+    render();
+    if (d !== 0) postAction({ type: 'counter', seat_id: seatId, counter: prev.type, delta: d });
+    return;
+  }
   counters.splice(counterIdx, 1);
   pushHistory({ type: 'removeCounter', seatId, counterIdx, prev });
   save(); render();
@@ -830,6 +981,18 @@ function removeCounter(seatId, counterIdx) {
 
 function adjustCmd(receiverId, senderId, delta) {
   if (!state.cmd[receiverId]) state.cmd[receiverId] = {};
+  if (LIVE) {
+    // cmd is COUPLED to life in live mode too (matching the localStorage tracker
+    // below and the server). Optimistically apply the same actual-delta life
+    // change; the SSE echo confirms it.
+    const p = state.cmd[receiverId][senderId] || 0;
+    state.cmd[receiverId][senderId] = Math.max(0, p + delta);
+    const ad = state.cmd[receiverId][senderId] - p;
+    state.lives[receiverId] = (state.lives[receiverId] || 0) - ad;
+    render();
+    postAction({ type: 'cmd', receiver_seat_id: receiverId, attacker_seat_id: senderId, delta });
+    return;
+  }
   const prev = state.cmd[receiverId][senderId] || 0;
   state.cmd[receiverId][senderId] = Math.max(0, prev + delta);
   const actualDelta = state.cmd[receiverId][senderId] - prev;
@@ -843,10 +1006,21 @@ function toggleEliminate(seatId) {
   const becoming = !state.eliminated[seatId];
   state.eliminated[seatId] = becoming;
   state.eliminatedAtTurn[seatId] = becoming ? (state.turn || 1) : null;
+  if (LIVE) {
+    render();
+    postAction({ type: 'eliminate', seat_id: seatId, eliminated: becoming });
+    return;
+  }
   save(); render();
 }
 
 function nextTurn() {
+  if (LIVE) {
+    liveAdvanceTurnOptimistic();
+    render();
+    postAction({ type: 'turn' });
+    return;
+  }
   const alive = clockwiseSeats.filter(s => !state.eliminated[s.id]);
   if (!alive.length) return;
   const curIdx = alive.findIndex(s => s.id === state.currentTurnId);
@@ -1296,6 +1470,26 @@ function render() {
   }
 
   checkWinCondition();
+}
+
+// ── Live-mode boot (Session 2) ─────────────────────────────────
+if (LIVE) {
+  const urlInput = document.getElementById('companion-url');
+  if (urlInput) urlInput.value = COMPANION_URL;
+  // EventSource auto-reconnects; every event carries FULL state, so a reconnect
+  // self-heals. Keepalive comments (": keepalive") are ignored by EventSource.
+  const es = new EventSource(`/games/${gameId}/live/stream`);
+  es.onmessage = (e) => {
+    clearReconnecting();
+    try {
+      const payload = JSON.parse(e.data);
+      lastSseState = payload.state;
+      state = hydrateLiveState(payload.state);
+      render();
+    } catch (_) { /* ignore malformed frame */ }
+  };
+  es.onerror = () => showReconnecting();
+  window.addEventListener('beforeunload', () => es.close());
 }
 
 render();

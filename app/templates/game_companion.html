@@ -1,0 +1,236 @@
+{% extends "base.html" %}
+{# Phone companion view (companion mode, Session 2). Mobile-first, portrait,
+   thumb-reach. Seat-scoped: controls the requesting user's OWN seat only — the
+   table token is NEVER sent here. Extends base.html purely to inherit the
+   stylesheet + viewport; the companion CSS makes it a focused fullscreen tool. #}
+{% block content %}
+<div class="companion" id="companion">
+  <div id="cmp-reconnecting" class="live-reconnecting" style="display:none">Reconnecting…</div>
+  <div id="cmp-ended" class="cmp-ended" style="display:none">
+    <div class="cmp-ended-title">Game ended</div>
+    <a href="/games/{{ game.id }}" class="cmp-ended-link">View game summary →</a>
+  </div>
+
+  <header class="cmp-header" id="cmp-header">
+    <div class="cmp-turn">Turn <span id="cmp-turn-num">—</span></div>
+    <div class="cmp-active"><span id="cmp-active-name">—</span></div>
+  </header>
+
+  <div class="cmp-strip" id="cmp-strip"></div>
+
+  {% if my_seat %}
+    <main class="cmp-me">
+      <div class="cmp-my-name">{{ my_seat.player_name }} <span class="muted">(you)</span></div>
+      <div class="cmp-life" id="cmp-life">—</div>
+      <div class="cmp-life-btns">
+        <button type="button" class="cmp-btn cmp-btn-lg" onclick="adjLife(-5)">−5</button>
+        <button type="button" class="cmp-btn cmp-btn-xl" onclick="adjLife(-1)">−1</button>
+        <button type="button" class="cmp-btn cmp-btn-xl" onclick="adjLife(1)">+1</button>
+        <button type="button" class="cmp-btn cmp-btn-lg" onclick="adjLife(5)">+5</button>
+      </div>
+
+      <section class="cmp-section">
+        <h3 class="cmp-section-title">Commander damage received</h3>
+        <div id="cmp-cmd"></div>
+      </section>
+
+      <section class="cmp-section">
+        <h3 class="cmp-section-title">Counters</h3>
+        <div id="cmp-counter-pills" class="cmp-pills"></div>
+        <div class="cmp-counter-add">
+          <button type="button" class="cmp-btn-sm" onclick="toggleCounterMenu()">+ Add counter</button>
+          <div id="cmp-counter-menu" class="cmp-counter-menu" style="display:none">
+            {% for t in ['poison','rad','experience','energy','storm','custom'] %}
+              <button type="button" class="cmp-btn-sm" onclick="addCounter('{{ t }}')">{{ t }}</button>
+            {% endfor %}
+          </div>
+        </div>
+      </section>
+
+      <button type="button" class="cmp-btn-elim" id="cmp-elim-btn" onclick="toggleElim()">Eliminate me</button>
+      <button type="button" class="cmp-endturn" id="cmp-endturn" onclick="endTurn()">End turn</button>
+    </main>
+  {% else %}
+    <main class="cmp-spectator">
+      <p class="muted">Spectating — you don't have a seat in this game.</p>
+    </main>
+  {% endif %}
+
+  <div id="cmp-toast" class="live-toast" style="display:none"></div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+(function () {
+  const GID = {{ game.id }};
+  const CSRF = {{ csrf_token | tojson }};
+  const MY_SEAT_ID = {% if my_seat %}{{ my_seat.id }}{% else %}null{% endif %};
+  const SEATS = [
+    {% for s in game.seats %}
+    { id: {{ s.id }}, name: {{ s.player_name | tojson }}, seatNumber: {{ s.seat_number }} }{% if not loop.last %},{% endif %}
+    {% endfor %}
+  ];
+  const COUNTER_TYPES = ['poison','rad','experience','energy','storm','custom'];
+  const K = String;  // seat-id keys are strings in the server JSON
+
+  let st = null, lastSt = null, ended = false;
+
+  // ── rendering ────────────────────────────────────────────────
+  function seatName(id) { const s = SEATS.find(x => x.id === id); return s ? s.name : '—'; }
+  function myCounters() { return (st.extraCounters && st.extraCounters[K(MY_SEAT_ID)]) || []; }
+
+  function render() {
+    if (!st) return;
+    document.getElementById('cmp-turn-num').textContent = st.turn ?? '—';
+    document.getElementById('cmp-active-name').textContent = seatName(st.currentTurnId);
+    const myTurn = MY_SEAT_ID != null && st.currentTurnId === MY_SEAT_ID;
+    document.getElementById('cmp-header').classList.toggle('cmp-my-turn', myTurn);
+
+    // Strip: seated players other than me (or all seats for a spectator).
+    const others = SEATS.filter(s => s.id !== MY_SEAT_ID);
+    document.getElementById('cmp-strip').innerHTML = others.map(s => {
+      const life = (st.lives && st.lives[K(s.id)]);
+      const elim = st.eliminated && st.eliminated[K(s.id)];
+      const active = st.currentTurnId === s.id;
+      return `<div class="cmp-strip-seat${elim ? ' cmp-elim' : ''}${active ? ' cmp-active-seat' : ''}">
+        <span class="cmp-strip-name">${escapeHtml(s.name)}</span>
+        <span class="cmp-strip-life">${life ?? '—'}</span></div>`;
+    }).join('');
+
+    if (MY_SEAT_ID == null) return;  // spectator: header + strip only
+
+    const myLife = (st.lives && st.lives[K(MY_SEAT_ID)]) ?? 0;
+    const lifeEl = document.getElementById('cmp-life');
+    lifeEl.textContent = myLife;
+    lifeEl.classList.toggle('cmp-life-dead', myLife <= 0);
+
+    // Commander damage received by me, one row per opponent.
+    const recv = (st.cmd && st.cmd[K(MY_SEAT_ID)]) || {};
+    document.getElementById('cmp-cmd').innerHTML = others.map(s => {
+      const v = recv[K(s.id)] || 0;
+      const danger = v >= 21 ? ' cmp-cmd-danger' : v >= 16 ? ' cmp-cmd-warn' : '';
+      return `<div class="cmp-cmd-row">
+        <span class="cmp-cmd-from">from ${escapeHtml(s.name)}</span>
+        <button type="button" class="cmp-btn-sm" onclick="adjCmd(${s.id}, -1)">−</button>
+        <span class="cmp-cmd-val${danger}">${v}</span>
+        <button type="button" class="cmp-btn-sm" onclick="adjCmd(${s.id}, 1)">+</button>
+      </div>`;
+    }).join('');
+
+    // Counter pills.
+    document.getElementById('cmp-counter-pills').innerHTML = myCounters().map((c, i) => {
+      const label = c.type === 'custom' && c.customLabel ? c.customLabel : c.type;
+      return `<span class="cmp-pill">
+        <button type="button" class="cmp-btn-sm" onclick="adjCounter(${i}, -1)">−</button>
+        <span class="cmp-pill-label">${escapeHtml(label)} ${c.value}</span>
+        <button type="button" class="cmp-btn-sm" onclick="adjCounter(${i}, 1)">+</button></span>`;
+    }).join('');
+
+    const iAmElim = st.eliminated && st.eliminated[K(MY_SEAT_ID)];
+    const elimBtn = document.getElementById('cmp-elim-btn');
+    elimBtn.textContent = iAmElim ? "I'm back" : 'Eliminate me';
+    elimBtn.classList.toggle('cmp-elim-active', !!iAmElim);
+    document.getElementById('cmp-endturn').classList.toggle('cmp-endturn-mine', myTurn);
+  }
+
+  function escapeHtml(s) { return String(s).replace(/[&<>"']/g, c => (
+    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+
+  // ── mutations (seat-scoped, no table token) ──────────────────
+  function snapshot() { lastSt = JSON.parse(JSON.stringify(st)); }
+  function revert() { if (lastSt) { st = lastSt; render(); } }
+  function postAction(action) {
+    return fetch(`/games/${GID}/live/action`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': CSRF },
+      body: JSON.stringify(action),
+    }).then(r => {
+      if (r.status === 404) { showEnded(); throw new Error('ended'); }
+      if (!r.ok) throw new Error('failed');
+      return r.json();
+    }).catch(err => { if (err.message !== 'ended') { toast('Sync failed'); revert(); } });
+  }
+
+  window.adjLife = function (delta) {
+    if (!st || MY_SEAT_ID == null) return;
+    snapshot();
+    st.lives[K(MY_SEAT_ID)] = ((st.lives[K(MY_SEAT_ID)]) || 0) + delta;
+    render();
+    postAction({ type: 'life', seat_id: MY_SEAT_ID, delta });
+  };
+  window.adjCmd = function (fromId, delta) {
+    snapshot();
+    if (!st.cmd[K(MY_SEAT_ID)]) st.cmd[K(MY_SEAT_ID)] = {};
+    const cur = st.cmd[K(MY_SEAT_ID)][K(fromId)] || 0;
+    st.cmd[K(MY_SEAT_ID)][K(fromId)] = Math.max(0, cur + delta);
+    // cmd is coupled to life (matching the tracker + server): lose the actual
+    // (post-floor) cmd increase; a decrement symmetrically restores life.
+    const actual = st.cmd[K(MY_SEAT_ID)][K(fromId)] - cur;
+    st.lives[K(MY_SEAT_ID)] = ((st.lives[K(MY_SEAT_ID)]) || 0) - actual;
+    render();
+    postAction({ type: 'cmd', receiver_seat_id: MY_SEAT_ID, attacker_seat_id: fromId, delta });
+  };
+  window.addCounter = function (type) {
+    if (!COUNTER_TYPES.includes(type)) return;
+    document.getElementById('cmp-counter-menu').style.display = 'none';
+    snapshot();
+    const arr = st.extraCounters[K(MY_SEAT_ID)] || (st.extraCounters[K(MY_SEAT_ID)] = []);
+    if (type === 'custom' || !arr.find(c => c.type === type)) arr.push({ type, value: 0 });
+    render();
+    postAction({ type: 'counter', seat_id: MY_SEAT_ID, counter: type, delta: 0 });
+  };
+  window.adjCounter = function (idx, delta) {
+    snapshot();
+    const arr = myCounters(); const c = arr[idx];
+    if (!c) return;
+    const nv = Math.max(0, (c.value || 0) + delta); const actual = nv - (c.value || 0);
+    c.value = nv;
+    render();
+    if (actual !== 0) postAction({ type: 'counter', seat_id: MY_SEAT_ID, counter: c.type, delta: actual });
+  };
+  window.toggleElim = function () {
+    snapshot();
+    const becoming = !(st.eliminated && st.eliminated[K(MY_SEAT_ID)]);
+    st.eliminated[K(MY_SEAT_ID)] = becoming;
+    render();
+    postAction({ type: 'eliminate', seat_id: MY_SEAT_ID, eliminated: becoming });
+  };
+  window.endTurn = function () {
+    // POST-only (no optimistic guess): server rotation is authoritative and a
+    // single tap's round-trip is imperceptible.
+    postAction({ type: 'turn' });
+  };
+  window.toggleCounterMenu = function () {
+    const m = document.getElementById('cmp-counter-menu');
+    m.style.display = m.style.display === 'none' ? 'flex' : 'none';
+  };
+
+  // ── indicators ───────────────────────────────────────────────
+  function toast(msg) {
+    const el = document.getElementById('cmp-toast');
+    el.textContent = msg; el.style.display = '';
+    clearTimeout(el._t); el._t = setTimeout(() => { el.style.display = 'none'; }, 2000);
+  }
+  function showReconnecting() { document.getElementById('cmp-reconnecting').style.display = ''; }
+  function clearReconnecting() { document.getElementById('cmp-reconnecting').style.display = 'none'; }
+  function showEnded() {
+    if (ended) return;
+    ended = true;
+    document.getElementById('cmp-ended').style.display = 'flex';
+  }
+
+  // ── SSE stream ───────────────────────────────────────────────
+  const es = new EventSource(`/games/${GID}/live/stream`);
+  es.onmessage = (e) => {
+    clearReconnecting();
+    try { const p = JSON.parse(e.data); st = p.state; render(); } catch (_) {}
+  };
+  // Session 1 doesn't broadcast a finalize event, so passive end-detection is
+  // best-effort (a reconnecting spinner). An action POST returning 404 flips to
+  // the "Game ended" state definitively.
+  es.onerror = () => { if (!ended) showReconnecting(); };
+  window.addEventListener('beforeunload', () => es.close());
+})();
+</script>
+{% endblock %}

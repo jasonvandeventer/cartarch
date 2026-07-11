@@ -309,16 +309,20 @@ def test_counter_upsert_creates_then_increments(live4):
     assert arr == [{"type": "poison", "value": 5}]
 
 
-def test_cmd_floors_at_zero(live4):
+def test_cmd_floors_at_zero_and_restores_life_symmetrically(live4):
     L = live4
-    r, a = L["seats"][0], L["seats"][1]
-    _act(
+    r, a = L["seats"][0], L["seats"][1]  # r starts at 40 life
+    live = _act(
         L["db"],
         L["gid"],
         L["uid"],
         {"type": "cmd", "receiver_seat_id": r.id, "attacker_seat_id": a.id, "delta": 2},
         TABLE,
     )
+    st = _state(live)
+    assert st["cmd"][str(r.id)][str(a.id)] == 2
+    assert st["lives"][str(r.id)] == 38  # cmd +2 → life −2 (coupled)
+
     live = _act(
         L["db"],
         L["gid"],
@@ -326,7 +330,25 @@ def test_cmd_floors_at_zero(live4):
         {"type": "cmd", "receiver_seat_id": r.id, "attacker_seat_id": a.id, "delta": -9},
         TABLE,
     )
-    assert _state(live)["cmd"][str(r.id)][str(a.id)] == 0
+    st = _state(live)
+    assert st["cmd"][str(r.id)][str(a.id)] == 0  # cmd floored at 0
+    # Decrement restores only the actual 2 that was there (post-floor), not 9.
+    assert st["lives"][str(r.id)] == 40
+
+
+def test_cmd_couples_life_matching_local_tracker(live4):
+    L = live4
+    r, a = L["seats"][0], L["seats"][1]
+    live = _act(
+        L["db"],
+        L["gid"],
+        L["uid"],
+        {"type": "cmd", "receiver_seat_id": r.id, "attacker_seat_id": a.id, "delta": 3},
+        TABLE,
+    )
+    st = _state(live)
+    assert st["cmd"][str(r.id)][str(a.id)] == 3
+    assert st["lives"][str(r.id)] == 37  # cmd +3 → receiver life −3
 
 
 def test_turn_skips_eliminated_and_wraps(live4):
