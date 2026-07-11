@@ -1,5 +1,19 @@
 [
   {
+    "version": "4.3.0",
+    "date": "2026-07-11",
+    "added": [
+      "Companion mode — a live game can now be tracked across the table's tablet AND every player's phone at once. The game creator taps \"Go Live\" on the tablet; the game becomes a shared, server-backed session and a join link (with a QR to come) appears for players. Each player opens the companion view on their own phone — a big life total with fat thumb-reach buttons, their commander-damage-received rows, counters, an eliminate/revive toggle, and an End Turn button that lights up on their turn. Everything syncs live over a push stream: a life change on a phone shows on the tablet instantly, and vice versa. Reconnects heal themselves. Games you never take live keep working exactly as before, on the single device."
+    ],
+    "refined": [
+      "Commander damage stays coupled to life in live mode, matching the on-device tracker exactly: raising damage-from-a-commander lowers that player's life by the same amount, and lowering it restores life symmetrically (only what was actually there)."
+    ],
+    "resolved": [
+      "Companion mode Sessions 1 + 2: live game state (game_live_states), the table-token-vs-seat authorization model, the mutation API + SSE stream, tablet live-mode wiring, and the phone companion view."
+    ],
+    "archivist_note": "Two sessions plus an amendment behind one release. Session 1 laid the first-ever mid-game server write path: a game_live_states row (JSON blob mirroring the localStorage tracker's shape so the client render logic could be reused), an apply-action service with a deliberately split authorization model — the TABLE (anyone presenting the game's client_token, i.e. the shared tablet) may control all seats; a PLAYER (a user attributed to a seat) controls only their own — an in-process asyncio pub/sub, and an SSE stream that emits the FULL state every event so reconnecting clients self-heal. The load-bearing security property, proven by the test the whole model hangs on: the game creator on their PHONE (no table token) is seat-scoped like everyone else — the all-seats power lives with the physical tablet, not the account. Session 2 wired the tablet's existing tracker to boot in live mode (skip localStorage, subscribe to the stream, optimistic mutations that POST and let the echo confirm) WITHOUT rewriting its rendering, and added the standalone mobile companion page. The table token is rendered only into the owner's view — never a phone, never a spectator. The amendment restored cmd↔life coupling in live mode to match the localStorage tracker byte-for-byte, using the same post-floor actual-delta so decrements are symmetric. Single-replica pub/sub (Cartarch runs one pod), last-write-wins on the blob — both documented ceilings. 731 tests green."
+  },
+  {
     "version": "4.2.0",
     "date": "2026-07-10",
     "added": [
