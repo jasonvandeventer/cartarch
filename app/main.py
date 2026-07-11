@@ -73,6 +73,7 @@ from app.routes import (
     games,
     goldfish,
     imports,
+    live_games,
     playgroups,
     recommendations,
     sharing,
@@ -299,6 +300,7 @@ app.include_router(sharing.router)
 app.include_router(trades.router)
 app.include_router(goldfish.router)
 app.include_router(games.router)
+app.include_router(live_games.router)
 app.include_router(decks.router)
 app.include_router(collections.router)
 app.include_router(cards.router)

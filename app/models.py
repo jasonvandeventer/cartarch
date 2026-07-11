@@ -555,6 +555,13 @@ class Game(Base):
     )
     user: Mapped[User] = relationship()
     playgroup: Mapped[Playgroup | None] = relationship()
+    # Companion mode (issue: live game state). At most one live-state row per game
+    # (working memory during in_progress play). delete-orphan so delete_game
+    # (session.delete(game)) drops it in Python — SQLite runs FKs OFF, so the DB
+    # CASCADE is Postgres defense-in-depth; end_game deletes it explicitly on finalize.
+    live_state: Mapped[GameLiveState | None] = relationship(
+        back_populates="game", uselist=False, cascade="all, delete-orphan"
+    )
 
 
 class GameSeat(Base):
@@ -663,6 +670,35 @@ class GameGoalResult(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
 
     game_seat: Mapped[GameSeat] = relationship(back_populates="goal_results")
+
+
+class GameLiveState(Base):
+    """Companion mode — the live, mid-game working state of an in_progress game.
+
+    One row per game (``game_id`` UNIQUE), holding the same JSON blob the
+    localStorage tracker uses (lives / eliminated / cmd / counters / turn), so
+    the existing client render logic can be reused. This is the FIRST mid-game
+    server-persisted state — everything else about a game is written only at
+    create and finalize. The row is working memory: created by
+    ``live_game_service.start_live_game``, mutated by ``apply_live_action``, and
+    deleted on finalize (``end_game``) or game delete (``Game.live_state``
+    delete-orphan). Final life/turn persist on seats/game as before.
+
+    ``ondelete="CASCADE"`` is Postgres defense-in-depth (SQLite runs FKs OFF).
+    ``version`` bumps on every action for the SSE event id + last-write-wins.
+    """
+
+    __tablename__ = "game_live_states"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    game_id: Mapped[int] = mapped_column(
+        ForeignKey("games.id", ondelete="CASCADE"), nullable=False, unique=True, index=True
+    )
+    state: Mapped[str] = mapped_column(Text, nullable=False)
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=utc_now)
+
+    game: Mapped[Game] = relationship(back_populates="live_state")
 
 
 class TokenInventory(Base):

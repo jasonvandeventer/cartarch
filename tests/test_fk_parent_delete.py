@@ -825,6 +825,11 @@ KNOWN_NO_ENTRYPOINT = {
     "flips status to 'abandoned' and clears its audit_scans explicitly "
     "(audit_service.abandon_audit); the row persists as the audit_log linkage. "
     "Children audit_scans/audit_log (CASCADE) are Postgres defense-in-depth.",
+    "games": "companion mode — the only CASCADE child is game_live_states.game_id "
+    "(live working memory). It's deleted explicitly on finalize (game_service."
+    "end_game) and via the Game.live_state delete-orphan cascade on delete_game "
+    "(session.delete(game)); no dedicated parent-delete entrypoint in this suite. "
+    "SQLite runs FKs OFF, so the DB CASCADE is Postgres defense-in-depth.",
 }
 # Parents covered transitively by an existing entrypoint (not a direct parent here).
 TRANSITIVELY_COVERED = {

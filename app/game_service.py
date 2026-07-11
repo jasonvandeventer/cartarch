@@ -564,6 +564,12 @@ def end_game(
 
     game.turn_count = turn_count or None
     game.notes = notes.strip() or None
+    # Companion mode: the live-state row is working memory only. On finalize the
+    # final life/turn are captured on seats/game (above) exactly as before, so
+    # drop the live blob. session.delete works on SQLite (FKs OFF); it's also the
+    # ORM side of the Game.live_state delete-orphan cascade.
+    if game.live_state is not None:
+        session.delete(game.live_state)
     # v3.27.3 — mark the game as finalized. Replaces the "any seat has
     # placement → is_ended" derivation that templates used to compute;
     # template-side now reads game.status == "finalized" directly.
