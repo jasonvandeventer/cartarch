@@ -1,5 +1,20 @@
 [
   {
+    "version": "4.3.3",
+    "date": "2026-07-11",
+    "added": [
+      "Players can now pick their own deck from their phone before a game starts. Open the companion view for a game that's still being set up and, if you have a seat, you'll see your current deck with its commander art and a 'Change deck' picker of your decks — tap one and your seat updates in place. The choice locks the moment the game goes live. The owner's pre-assignment still stands; this just lets each player override their own seat without crowding the tablet."
+    ],
+    "refined": [
+      "The tablet's pre-game screen now notes that players can pick their deck from cartarch.com/companion before you go live.",
+      "The companion view shows a purpose-built 'waiting to start' deck-select screen for games that aren't live yet, instead of an inert life tracker."
+    ],
+    "resolved": [
+      "Companion mode: seated-player deck self-selection while a game is in 'created' status."
+    ],
+    "archivist_note": "A small self-service seam on companion mode. Seats and their decks are assigned by the game owner at creation; this lets a SEATED player change their OWN seat's deck from the phone while the game is still 'created' — a personal choice, so there is deliberately NO table-token path (the owner keeps editing seats through the game-edit surface). set_own_seat_deck enforces the rules: created-only (GameLockedError → 409 once live), caller must hold a seat (403), the deck must be owned by the caller (unknown id → 400, someone else's → 403), and deck_id None/0 clears it — legal, since creation allows a deckless seat. The load-bearing constraint was reuse: it re-derives every deck-denormalized seat field (deck_id, deck_name_at_game, commander_name_at_game) through the SAME _capture_deck_identity that create_game uses, so the snapshot can never drift from creation's. The companion template grew a pre-live branch (deck picker + commander-art background, in-place fetch update) that stays out of the live/spectator paths — no picker once the game is live, the server enforcing what the UI doesn't offer. The picker list matches game creation's filter exactly (all the user's decks, no brew exclusion). 762 tests green."
+  },
+  {
     "version": "4.3.2",
     "date": "2026-07-11",
     "added": [
