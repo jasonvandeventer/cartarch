@@ -14692,3 +14692,75 @@ body.gf-mode { overflow: hidden; }
   font-weight: 700;
   color: var(--accent-2);
 }
+
+/* --- Physical Audit Mode (issue #73, Phase 2) --- */
+.audit-progress-summary { margin-bottom: 1rem; }
+.audit-progress-line { margin: 0 0 0.4rem; font-size: 1.05rem; }
+.audit-progress-bar {
+  height: 12px; border-radius: var(--radius-pill);
+  background: var(--brand-gold-soft); overflow: hidden;
+}
+.audit-progress-bar-fill {
+  height: 100%; background: var(--brand-green);
+  transition: width 0.25s ease;
+}
+.audit-expected-list, .audit-extras-list { list-style: none; margin: 0; padding: 0; }
+.audit-expected-row, .audit-extra-row {
+  display: flex; gap: 0.6rem; align-items: baseline; flex-wrap: wrap;
+  padding: 0.35rem 0.6rem; border-radius: var(--radius-sm);
+  border-left: 3px solid transparent; margin-bottom: 0.2rem;
+}
+.audit-card-name { font-weight: 600; }
+.audit-card-qty { margin-left: auto; font-variant-numeric: tabular-nums; }
+.audit-status-complete { background: rgba(106, 130, 83, 0.16); border-left-color: var(--brand-green); }
+.audit-status-partial  { background: var(--brand-gold-soft); border-left-color: var(--accent-2); }
+.audit-status-unseen   { background: transparent; }
+.audit-extra-row { background: rgba(138, 46, 34, 0.10); border-left-color: var(--danger); }
+.audit-extra-badge {
+  font-size: 0.7rem; font-weight: 700; letter-spacing: 0.04em;
+  color: var(--danger); border: 1px solid var(--danger);
+  border-radius: var(--radius-sm); padding: 0 0.3rem;
+}
+.audit-scan-feedback {
+  display: flex; gap: 0.6rem; align-items: center;
+  padding: 0.6rem 0.8rem; border-radius: var(--radius-sm);
+  border: 1px solid transparent; margin-top: 0.6rem;
+}
+.audit-scan-tag { font-weight: 700; white-space: nowrap; }
+.audit-scan-match { background: rgba(106, 130, 83, 0.16); border-color: var(--brand-green); }
+.audit-scan-partial_match { background: var(--brand-gold-soft); border-color: var(--accent-2); }
+.audit-scan-extra { background: transparent; border-color: var(--danger); }
+.audit-search-badge { margin-left: auto; font-size: 0.7rem; padding: 0 0.35rem; border-radius: var(--radius-sm); }
+.audit-search-expected { color: var(--brand-green); border: 1px solid var(--brand-green); }
+.audit-search-unexpected { color: var(--muted); border: 1px solid var(--muted); }
+
+/* --- Audit reconciliation (issue #73, Phase 3) --- */
+.audit-conflict-banner { border: 1px solid var(--danger); }
+.audit-conflict-changes { margin: 0.4rem 0 0; padding-left: 1.2rem; }
+.audit-recon-row {
+  display: flex; gap: 0.8rem; align-items: baseline; flex-wrap: wrap;
+  justify-content: space-between; padding: 0.5rem 0;
+  border-bottom: 1px solid var(--brand-gold-soft);
+}
+.audit-recon-card { display: flex; flex-direction: column; gap: 0.1rem; }
+.audit-recon-actions { display: flex; gap: 0.8rem; flex-wrap: wrap; align-items: center; }
+.audit-recon-actions label { display: inline-flex; gap: 0.25rem; align-items: center; }
+
+/* --- Physical Audit Mode (issue #73, Phase 4: thumbnails, banner, history) --- */
+.audit-thumb {
+  width: 40px; height: auto; border-radius: 4px; flex: 0 0 auto;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+.audit-recon-info { display: flex; gap: 0.6rem; align-items: center; }
+.audit-resume-banner {
+  display: flex; gap: 0.8rem; align-items: center; justify-content: space-between;
+  flex-wrap: wrap; margin-bottom: 1rem; padding: 0.7rem 1rem;
+  border: 1px solid var(--accent); border-left: 4px solid var(--accent);
+  border-radius: var(--radius); background: var(--brand-gold-soft);
+}
+.audit-resume-actions { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+.audit-history-table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.audit-history-table th, .audit-history-table td {
+  text-align: left; padding: 0.35rem 0.6rem; border-bottom: 1px solid var(--brand-gold-soft);
+}
+.audit-history-table th { color: var(--muted); font-weight: 600; }

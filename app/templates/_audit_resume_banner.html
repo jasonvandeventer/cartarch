@@ -1,0 +1,20 @@
+{# Resume banner for an in-progress audit. Data (`audit_banner`) is injected on
+   every page by render() via _active_audit_banner_for. Info-level, not an error. #}
+{% if audit_banner %}
+  <div class="audit-resume-banner" role="status">
+    <span>
+      You have {{ 'a paused' if audit_banner.status == 'paused' else 'an active' }}
+      audit of <strong>{{ audit_banner.location_name }}</strong>.
+    </span>
+    <span class="audit-resume-actions">
+      <a href="/audit/start?location_id={{ audit_banner.location_id }}">
+        <button type="button" class="btn-like">Resume</button>
+      </a>
+      <form method="post" action="/audit/{{ audit_banner.audit_id }}/abandon"
+            onsubmit="return confirm('Abandon this audit? All scans will be discarded.');">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <button type="submit" class="btn-danger">Abandon</button>
+      </form>
+    </span>
+  </div>
+{% endif %}

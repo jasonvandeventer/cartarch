@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block content %}
+  <section class="panel">
+    <h2 class="panel-title">Audit already in progress</h2>
+    <p>
+      You have an {{ active_audit.status }} audit of
+      <strong>{{ active_location.name if active_location else "another location" }}</strong>.
+      Only one audit can be active at a time. Abandon it to start auditing
+      <strong>{{ target_location.name }}</strong>?
+    </p>
+    <p class="muted">Abandoning discards the scans recorded in the current audit.</p>
+    <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-top:1rem">
+      <form method="post" action="/audit/{{ active_audit.id }}/abandon"
+            onsubmit="this.querySelector('button').disabled=true">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <input type="hidden" name="next" value="/audit/start?location_id={{ target_location.id }}">
+        <button type="submit" class="btn-danger">Abandon &amp; audit {{ target_location.name }}</button>
+      </form>
+      <a href="/audit/start?location_id={{ active_audit.storage_location_id }}">
+        <button type="button" class="btn-like">Resume current audit</button>
+      </a>
+      <a href="/locations/{{ target_location.id }}"><button type="button">Cancel</button></a>
+    </div>
+  </section>
+{% endblock %}

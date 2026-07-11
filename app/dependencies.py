@@ -18,7 +18,7 @@ from sqlalchemy.orm import Session
 from app.db import SessionLocal
 from app.deck_service import CARD_ROLE_TAGS
 from app.inventory_service import FINISH_OPTIONS
-from app.models import InventoryRow, User
+from app.models import InventoryRow, StorageLocation, User
 from app.timeutil import utc_now
 
 logger = logging.getLogger(__name__)
@@ -706,6 +706,37 @@ _PREAUTH_TEMPLATES = frozenset(
 )
 
 
+def _active_audit_banner_for(user_id: int | None) -> dict | None:
+    """Resume-banner data for the user's active/paused audit, if any. Own
+    short-lived session (the ``_pending_count_for`` precedent); shows on every
+    page via ``render``. ``get_active_audit`` also lazily times out stale
+    sessions, so this doubles as the 24h cleanup trigger — hence the commit."""
+    if not user_id:
+        return None
+    from app import audit_service
+
+    session = SessionLocal()
+    try:
+        audit = audit_service.get_active_audit(session, user_id)
+        if audit is None:
+            session.commit()  # persist any lazy auto-abandon get_active_audit did
+            return None
+        location = session.get(StorageLocation, audit.storage_location_id)
+        banner = {
+            "audit_id": audit.id,
+            "location_id": audit.storage_location_id,
+            "location_name": location.name if location else "a location",
+            "status": audit.status,
+        }
+        session.commit()
+        return banner
+    except Exception:  # telemetry-grade; never fail a render over the banner
+        session.rollback()
+        return None
+    finally:
+        session.close()
+
+
 def render(
     request: Request,
     template: str,
@@ -719,6 +750,7 @@ def render(
         ),
         "pending_count": _pending_count_for(user_id),
         "trade_pending_count": _trade_pending_count_for(user_id),
+        "audit_banner": _active_audit_banner_for(user_id),
     }
     if ctx:
         context.update(ctx)

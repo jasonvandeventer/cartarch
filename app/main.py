@@ -64,6 +64,7 @@ from app.password_reset_service import (
 from app.routes import (
     account,
     admin,
+    audit,
     auth,
     cards,
     collections,
@@ -290,6 +291,7 @@ app.add_middleware(
 app.include_router(auth.router)
 app.include_router(admin.router)
 app.include_router(account.router)
+app.include_router(audit.router)
 app.include_router(drawers.router)
 app.include_router(playgroups.router)
 app.include_router(recommendations.router)

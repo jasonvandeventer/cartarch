@@ -1306,3 +1306,78 @@ class DailyCollectionValue(Base):
     __table_args__ = (
         UniqueConstraint("user_id", "snapshot_date", name="uq_daily_collection_values_user_date"),
     )
+
+
+class AuditSession(Base):
+    """Physical Audit Mode (issue #73) — one reconciliation pass over a single
+    storage location. ``snapshot_hash`` fingerprints the location's inventory at
+    start so reconciliation can detect drift (optimistic concurrency). At most
+    one active/paused session per user is enforced in the service layer.
+    """
+
+    __tablename__ = "audit_sessions"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    storage_location_id: Mapped[int] = mapped_column(
+        ForeignKey("storage_locations.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    status: Mapped[str] = mapped_column(String(16), default="active", nullable=False, index=True)
+    snapshot_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    # JSON baseline of the location's inventory at start ([{row_id, qty, label}]),
+    # so reconciliation can itemize what changed (not just that the hash differs).
+    # Nullable: audits started before this column exists diff hash-only.
+    snapshot_detail: Mapped[str | None] = mapped_column(Text, nullable=True)
+    started_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)
+    paused_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+class AuditScan(Base):
+    """One scan event inside an audit session. ``inventory_row_id`` is NULL for
+    extras (a scanned card with no matching expected row). ``scan_type`` is one
+    of ``match`` / ``extra`` / ``partial_match``.
+    """
+
+    __tablename__ = "audit_scans"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    audit_session_id: Mapped[int] = mapped_column(
+        ForeignKey("audit_sessions.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    inventory_row_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    card_id: Mapped[int] = mapped_column(ForeignKey("cards.id"), nullable=False, index=True)
+    finish: Mapped[str] = mapped_column(String(32), default="normal", nullable=False)
+    scan_type: Mapped[str] = mapped_column(String(16), nullable=False)
+    quantity_scanned: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    scanned_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    card: Mapped[Card] = relationship()
+
+
+class AuditLog(Base):
+    """Completed-audit record — the "when did I last verify Drawer 3?" signal.
+    ``actions_applied`` is a JSON string of the reconciliation changeset applied.
+    """
+
+    __tablename__ = "audit_log"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    audit_session_id: Mapped[int] = mapped_column(
+        ForeignKey("audit_sessions.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    storage_location_id: Mapped[int] = mapped_column(
+        ForeignKey("storage_locations.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    cards_expected: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    cards_seen: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    cards_missing: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    cards_extra: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    actions_applied: Mapped[str] = mapped_column(Text, default="[]", nullable=False)
+    completed_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)

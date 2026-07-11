@@ -1,0 +1,162 @@
+{% extends "base.html" %}
+{% from "_macros.html" import editorial_eyebrow, loc_type_label %}
+{% block content %}
+  <section class="panel hero-panel compact-hero">
+    <div class="hero-row">
+      <div>
+        {{ editorial_eyebrow("Audit · " ~ location.name) }}
+        <h2 class="panel-title">Auditing: {{ location.name }}</h2>
+        <p class="muted">{{ loc_type_label(location.type) }}</p>
+      </div>
+      <div style="display:flex;gap:0.5rem;flex-wrap:wrap">
+        <form method="post" action="/audit/{{ audit.id }}/pause" style="display:inline">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <button type="submit">Pause</button>
+        </form>
+        <form method="post" action="/audit/{{ audit.id }}/abandon" style="display:inline"
+              onsubmit="return confirm('Abandon this audit? All scans so far will be discarded.');">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <button type="submit" class="btn-danger">Abandon</button>
+        </form>
+        <form method="post" action="/audit/{{ audit.id }}/end" style="display:inline">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <button type="submit" class="btn-like">Finish Scanning</button>
+        </form>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h3 class="panel-title">Scan a card</h3>
+    <form id="audit-scan-form"
+          method="post"
+          action="/audit/{{ audit.id }}/scan"
+          class="add-card-form"
+          hx-post="/audit/{{ audit.id }}/scan"
+          hx-target="#scan-results"
+          hx-swap="innerHTML">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <input type="hidden" id="audit-scan-card-id" name="card_id" value="">
+      <label for="audit-scan-name-input" class="add-card-label">Card name</label>
+      <div class="add-card-input-row">
+        <input type="text" id="audit-scan-name-input" placeholder="e.g. Sol Ring" autocomplete="off">
+        <input type="number" id="audit-scan-qty" name="quantity" value="1" min="1" max="99"
+               inputmode="numeric" aria-label="Quantity" title="Quantity">
+      </div>
+      <div class="add-card-finish-row">
+        <label class="add-card-finish-label"><input type="radio" name="finish" value="normal" checked> Nonfoil</label>
+        <label class="add-card-finish-label"><input type="radio" name="finish" value="foil"> Foil</label>
+        <label class="add-card-finish-label"><input type="radio" name="finish" value="etched"> Etched</label>
+      </div>
+      <div id="audit-scan-results" class="add-card-results" role="listbox" aria-live="polite"></div>
+      <div class="add-card-actions">
+        <button type="submit" id="audit-scan-submit" class="add-card-submit" disabled>Scan</button>
+        <span id="audit-scan-status" class="muted small-text" aria-live="polite"></span>
+      </div>
+    </form>
+    <div id="scan-results" aria-live="polite"></div>
+  </section>
+
+  {% include "_audit_progress.html" %}
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  // Audit scan-input typeahead — mirrors the deck "Add card" pattern but hits the
+  // local, expected-set-aware /audit/api/card-search (returns card_id, not a
+  // Scryfall id) and refocuses the name field after each scan for rapid entry.
+  (function () {
+    var form = document.getElementById('audit-scan-form');
+    if (!form) return;
+    var nameInput = document.getElementById('audit-scan-name-input');
+    var hiddenId = document.getElementById('audit-scan-card-id');
+    var qtyInput = document.getElementById('audit-scan-qty');
+    var resultsEl = document.getElementById('audit-scan-results');
+    var submitBtn = document.getElementById('audit-scan-submit');
+    var statusEl = document.getElementById('audit-scan-status');
+    var sessionId = {{ audit.id }};
+    var acTimer = null, lastQuery = '', searchToken = 0;
+
+    function resetSelection() {
+      hiddenId.value = '';
+      submitBtn.disabled = true;
+      form.dataset.selectedCard = '';
+      searchToken++;
+    }
+
+    function selectCard(card) {
+      hiddenId.value = card.card_id || '';
+      nameInput.value = card.name + ' (' + (card.set_code || '').toUpperCase() + ' #' + (card.collector_number || '') + ')';
+      submitBtn.disabled = !hiddenId.value;
+      form.dataset.selectedCard = '1';
+      resultsEl.innerHTML = '';
+      statusEl.textContent = '';
+      searchToken++;
+    }
+
+    function renderResults(items) {
+      if (!items || !items.length) {
+        resultsEl.innerHTML = '<p class="muted small-text" style="margin:0.4rem 0 0">No owned cards matched.</p>';
+        return;
+      }
+      resultsEl.innerHTML = items.map(function (c, i) {
+        var setCode = (c.set_code || '?').toUpperCase();
+        var badge = c.expected
+          ? '<span class="audit-search-badge audit-search-expected">expected</span>'
+          : '<span class="audit-search-badge audit-search-unexpected">not expected</span>';
+        return (
+          '<button type="button" class="add-card-result" data-idx="' + i + '" role="option">' +
+          '<div class="add-card-result-meta">' +
+            '<strong>' + (c.name || '') + '</strong>' +
+            '<span class="muted">' + setCode + ' #' + (c.collector_number || '?') + '</span>' +
+          '</div>' + badge +
+          '</button>'
+        );
+      }).join('');
+      resultsEl.querySelectorAll('.add-card-result').forEach(function (btn) {
+        btn.addEventListener('click', function () { selectCard(items[parseInt(btn.dataset.idx, 10)]); });
+      });
+    }
+
+    nameInput.addEventListener('input', function () {
+      if (form.dataset.selectedCard) resetSelection();
+      var q = nameInput.value.trim();
+      if (q.length < 2) { clearTimeout(acTimer); searchToken++; resultsEl.innerHTML = ''; lastQuery = ''; return; }
+      if (q === lastQuery) return;
+      lastQuery = q;
+      clearTimeout(acTimer);
+      var myToken = ++searchToken, sentQuery = q;
+      acTimer = setTimeout(function () {
+        statusEl.textContent = 'Searching…';
+        fetch('/audit/api/card-search?session_id=' + sessionId + '&q=' + encodeURIComponent(q))
+          .then(function (r) { return r.ok ? r.json() : []; })
+          .then(function (data) {
+            if (myToken !== searchToken || nameInput.value.trim() !== sentQuery) return;
+            statusEl.textContent = '';
+            renderResults(data);
+          })
+          .catch(function () { if (myToken === searchToken) statusEl.textContent = ''; });
+      }, 200);
+    });
+
+    // Enter only submits once a card is selected.
+    nameInput.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' && !form.dataset.selectedCard) e.preventDefault();
+    });
+
+    // After a scan: clear the input and refocus the name field for the next card.
+    form.addEventListener('htmx:afterRequest', function (evt) {
+      if (evt.detail && evt.detail.successful) {
+        nameInput.value = '';
+        qtyInput.value = '1';
+        resultsEl.innerHTML = '';
+        lastQuery = '';
+        resetSelection();
+        nameInput.focus();
+      }
+    });
+
+    resetSelection();
+  })();
+</script>
+{% endblock %}

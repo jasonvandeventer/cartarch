@@ -821,6 +821,10 @@ KNOWN_NO_ENTRYPOINT = {
     "dropped by the ORM delete-orphan cascade (GameSeat.goal_results) on game/seat "
     "delete; no dedicated entrypoint here (verified in "
     "tests/test_game_goal_results.py).",
+    "audit_sessions": "issue #73 — an audit session is never row-deleted: abandon "
+    "flips status to 'abandoned' and clears its audit_scans explicitly "
+    "(audit_service.abandon_audit); the row persists as the audit_log linkage. "
+    "Children audit_scans/audit_log (CASCADE) are Postgres defense-in-depth.",
 }
 # Parents covered transitively by an existing entrypoint (not a direct parent here).
 TRANSITIVELY_COVERED = {

@@ -1,0 +1,156 @@
+{% extends "base.html" %}
+{% from "_macros.html" import editorial_eyebrow, loc_type_label, img_fallback %}
+{% macro card_thumb(scryfall_id, alt) %}
+  {% if scryfall_id %}
+    <img class="audit-thumb" loading="lazy" alt="{{ alt }}"
+         src="{{ mirror_image_url(scryfall_id, 'small') }}" {{ img_fallback(scryfall_id, 'small') }}>
+  {% endif %}
+{% endmacro %}
+{% block content %}
+  <section class="panel hero-panel compact-hero">
+    <div class="hero-row">
+      <div>
+        {{ editorial_eyebrow("Audit · Reconcile · " ~ location.name) }}
+        <h2 class="panel-title">Reconcile: {{ location.name }}</h2>
+        <p class="muted">
+          {{ delta.seen|length }} verified ·
+          {{ delta.missing|length }} missing ·
+          {{ delta.extras|length }} extra ·
+          {{ delta.partial_matches|length }} partial
+        </p>
+      </div>
+    </div>
+  </section>
+
+  {% if not snapshot_ok %}
+    {# Snapshot changed mid-audit — the reconciliation is invalid. No "continue
+       anyway": the operator must restart or abandon. #}
+    <section class="panel audit-conflict-banner">
+      <h3 class="panel-title">⚠ The inventory at this location changed during your audit</h3>
+      <p class="muted">These changes happened since you started, so this reconciliation can't be applied:</p>
+      <ul class="audit-conflict-changes">
+        {% for c in changes %}<li>{{ c }}</li>{% endfor %}
+      </ul>
+      <div style="display:flex;gap:0.5rem;margin-top:1rem">
+        <a href="/audit/start?location_id={{ audit.storage_location_id }}">
+          <button type="button" class="btn-like">Restart audit</button>
+        </a>
+        <form method="post" action="/audit/{{ audit.id }}/abandon"
+              onsubmit="return confirm('Abandon this audit? All scans will be discarded.');">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <button type="submit" class="btn-danger">Abandon</button>
+        </form>
+      </div>
+    </section>
+  {% else %}
+    <form method="post" action="/audit/{{ audit.id }}/reconcile">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+      {# Seen — no action needed; collapsed by default. #}
+      <section class="panel">
+        <details>
+          <summary><strong>{{ delta.seen|length }} cards verified present</strong></summary>
+          <ul class="audit-expected-list" style="margin-top:0.6rem">
+            {% for c in delta.seen %}
+              <li class="audit-expected-row audit-status-complete">
+                <span class="audit-card-name">{{ c.card_name }}</span>
+                <span class="muted">{{ c.set_code }} · {{ c.finish }}</span>
+                <span class="audit-card-qty">{{ c.quantity_seen }} / {{ c.quantity_expected }}</span>
+              </li>
+            {% endfor %}
+          </ul>
+        </details>
+      </section>
+
+      {# Missing — mark missing (default) or ignore (present, was skipped). #}
+      {% if delta.missing %}
+        <section class="panel">
+          <h3 class="panel-title">Missing <span class="muted">({{ delta.missing|length }})</span></h3>
+          {% for m in delta.missing %}
+            <div class="audit-recon-row">
+              <div class="audit-recon-info">
+                {{ card_thumb(m.scryfall_id, m.card_name) }}
+                <div class="audit-recon-card">
+                  <strong>{{ m.card_name }}</strong>
+                  <span class="muted">{{ m.set_code }} · {{ m.finish }} · seen {{ m.quantity_seen }}/{{ m.quantity_expected }} · missing {{ m.quantity_missing }}</span>
+                </div>
+              </div>
+              <div class="audit-recon-actions">
+                <label><input type="radio" name="missing_action_{{ m.inventory_row_id }}" value="mark_missing" checked> Mark missing</label>
+                <label><input type="radio" name="missing_action_{{ m.inventory_row_id }}" value="ignore_missing"> Ignore (was skipped)</label>
+              </div>
+            </div>
+          {% endfor %}
+        </section>
+      {% endif %}
+
+      {# Extras — add here, move an existing row here, or ignore (default). #}
+      {% if delta.extras %}
+        <section class="panel">
+          <h3 class="panel-title">Extras <span class="muted">({{ delta.extras|length }})</span></h3>
+          {% for e in delta.extras %}
+            {% set key = e.card_id ~ '_' ~ e.finish %}
+            <div class="audit-recon-row">
+              <div class="audit-recon-info">
+                {{ card_thumb(e.scryfall_id, e.card_name) }}
+                <div class="audit-recon-card">
+                  <strong>{{ e.card_name }}</strong>
+                  <span class="muted">{{ e.set_code }} · {{ e.finish }} · scanned x{{ e.quantity_scanned }}</span>
+                  {% if e.exists_elsewhere %}<span class="muted small-text">· owned elsewhere</span>{% endif %}
+                </div>
+              </div>
+              <div class="audit-recon-actions">
+                <label><input type="radio" name="extra_action_{{ key }}" value="add_extra"> Add here</label>
+                {% if e.sources %}
+                  <label><input type="radio" name="extra_action_{{ key }}" value="move_extra_here"> Move here from
+                    <select name="extra_source_{{ key }}">
+                      {% for s in e.sources %}
+                        <option value="{{ s.row_id }}">{{ s.location_name }}</option>
+                      {% endfor %}
+                    </select>
+                  </label>
+                {% endif %}
+                <label><input type="radio" name="extra_action_{{ key }}" value="ignore_extra" checked> Ignore</label>
+              </div>
+            </div>
+          {% endfor %}
+        </section>
+      {% endif %}
+
+      {# Partial matches — correct the printing, or ignore (default). #}
+      {% if delta.partial_matches %}
+        <section class="panel">
+          <h3 class="panel-title">Partial matches <span class="muted">({{ delta.partial_matches|length }})</span></h3>
+          {% for p in delta.partial_matches %}
+            {% set key = p.inventory_row_id ~ '_' ~ p.scanned_card_id %}
+            <div class="audit-recon-row">
+              <div class="audit-recon-info">
+                {{ card_thumb(p.scanned_scryfall_id, p.expected_card_name) }}
+                <div class="audit-recon-card">
+                  <strong>{{ p.expected_card_name }}</strong>
+                  <span class="muted">
+                    expected {{ p.expected_set }} · {{ p.expected_finish }} →
+                    scanned {{ p.scanned_set }} · {{ p.scanned_finish }} (x{{ p.quantity }})
+                  </span>
+                </div>
+              </div>
+              <div class="audit-recon-actions">
+                <label><input type="radio" name="partial_action_{{ key }}" value="update_printing"> Correct printing</label>
+                <label><input type="radio" name="partial_action_{{ key }}" value="ignore_partial" checked> Ignore</label>
+              </div>
+            </div>
+          {% endfor %}
+        </section>
+      {% endif %}
+
+      <section class="panel">
+        <div style="display:flex;gap:0.5rem;flex-wrap:wrap">
+          <button type="submit" class="btn-like">Apply changes</button>
+          <a href="/audit/start?location_id={{ audit.storage_location_id }}">
+            <button type="button">Back to scanning</button>
+          </a>
+        </div>
+      </section>
+    </form>
+  {% endif %}
+{% endblock %}

@@ -1,0 +1,58 @@
+{# Audit progress region: counters, progress bar, expected list, extras.
+   Rendered inline by audit_workspace.html and swapped out-of-band by
+   _audit_scan_response.html after each scan (set `oob = True`). #}
+{% from "_macros.html" import img_fallback %}
+{% set pct = ((progress.total_seen / progress.total_expected * 100) | round(0, 'floor')) if progress.total_expected else 0 %}
+<div id="audit-progress"{% if oob %} hx-swap-oob="true"{% endif %}>
+  <div id="progress-counters" class="audit-progress-summary">
+    <p class="audit-progress-line">
+      <strong>{{ progress.total_seen }}</strong> of
+      <strong>{{ progress.total_expected }}</strong> cards scanned
+      {% if progress.total_extras %}
+        <span class="muted">({{ progress.total_extras }} extra{{ 's' if progress.total_extras != 1 else '' }})</span>
+      {% endif %}
+    </p>
+    <div class="audit-progress-bar" role="progressbar"
+         aria-valuenow="{{ progress.total_seen }}" aria-valuemin="0"
+         aria-valuemax="{{ progress.total_expected }}">
+      <div class="audit-progress-bar-fill" style="width: {{ pct }}%"></div>
+    </div>
+  </div>
+
+  <section class="panel">
+    <h3 class="panel-title">Expected cards <span class="muted">({{ progress.total_remaining }} remaining)</span></h3>
+    {% if progress.expected_cards %}
+      <ul class="audit-expected-list">
+        {% for c in progress.expected_cards %}
+          <li class="audit-expected-row audit-status-{{ c.status }}">
+            <span class="audit-card-name">{{ c.card_name }}</span>
+            <span class="muted">{{ c.set_code }} #{{ c.collector_number }} · {{ c.finish }}</span>
+            <span class="audit-card-qty">{{ c.quantity_seen }} / {{ c.quantity_expected }}</span>
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p class="muted">This location has no expected cards.</p>
+    {% endif %}
+  </section>
+
+  {% if extras %}
+    <section class="panel">
+      <h3 class="panel-title">Extras <span class="muted">(not in expected set)</span></h3>
+      <ul class="audit-extras-list">
+        {% for e in extras %}
+          <li class="audit-extra-row">
+            {% if e.scryfall_id %}
+              <img class="audit-thumb" loading="lazy" alt=""
+                   src="{{ mirror_image_url(e.scryfall_id, 'small') }}" {{ img_fallback(e.scryfall_id, 'small') }}>
+            {% endif %}
+            <span class="audit-card-name">{{ e.card_name }}</span>
+            <span class="muted">{{ e.set_code }} #{{ e.collector_number }} · {{ e.finish }}</span>
+            <span class="audit-card-qty">x{{ e.quantity_scanned }}</span>
+            <span class="audit-extra-badge">EXTRA</span>
+          </li>
+        {% endfor %}
+      </ul>
+    </section>
+  {% endif %}
+</div>

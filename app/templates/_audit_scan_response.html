@@ -1,0 +1,19 @@
+{# HTMX response for POST /audit/{id}/scan.
+   Primary content swaps into #scan-results (the form's hx-target); the OOB
+   #audit-progress block (via the include) refreshes counters + lists in the
+   same response. #}
+{% from "_macros.html" import img_fallback %}
+<div class="audit-scan-feedback audit-scan-{{ result.scan_type }}">
+  {% if result.scryfall_id %}
+    <img class="audit-thumb" loading="lazy" alt=""
+         src="{{ mirror_image_url(result.scryfall_id, 'small') }}" {{ img_fallback(result.scryfall_id, 'small') }}>
+  {% endif %}
+  <span class="audit-scan-tag">
+    {% if result.scan_type == "match" %}✓ Match
+    {% elif result.scan_type == "partial_match" %}≈ Partial
+    {% else %}✗ Extra{% endif %}
+  </span>
+  <span class="audit-scan-message">{{ result.message }}</span>
+</div>
+{% set oob = True %}
+{% include "_audit_progress.html" %}

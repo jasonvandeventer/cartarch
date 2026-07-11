@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% from "_macros.html" import editorial_eyebrow %}
+{% block content %}
+  <section class="panel hero-panel compact-hero">
+    <div class="hero-row">
+      <div>
+        {{ editorial_eyebrow("Audit · Complete · " ~ location.name) }}
+        <h2 class="panel-title">Audit complete: {{ location.name }}</h2>
+        <p class="muted">Reconciled {{ log.completed_at.strftime('%Y-%m-%d %H:%M') }}</p>
+      </div>
+    </div>
+    <div class="stat-grid collection-stats-grid">
+      <div class="stat-card compact"><div class="stat-label">Expected</div><div class="stat-number">{{ log.cards_expected }}</div></div>
+      <div class="stat-card compact"><div class="stat-label">Seen</div><div class="stat-number">{{ log.cards_seen }}</div></div>
+      <div class="stat-card compact"><div class="stat-label">Missing</div><div class="stat-number">{{ log.cards_missing }}</div></div>
+      <div class="stat-card compact"><div class="stat-label">Extras</div><div class="stat-number">{{ log.cards_extra }}</div></div>
+      <div class="stat-card compact"><div class="stat-label">Actions applied</div><div class="stat-number">{{ actions_applied|length }}</div></div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h3 class="panel-title">Actions applied</h3>
+    {% if actions_applied %}
+      <ul class="audit-expected-list">
+        {% for a in actions_applied %}
+          <li class="audit-expected-row">
+            <span class="audit-card-name">{{ a.type }}</span>
+            <span class="muted">
+              {% if a.inventory_row_id %}row {{ a.inventory_row_id }}{% endif %}
+              {% if a.card_id %}· card {{ a.card_id }}{% endif %}
+              {% if a.quantity %}· x{{ a.quantity }}{% endif %}
+            </span>
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p class="muted">No changes were applied (everything verified or ignored).</p>
+    {% endif %}
+    <div style="display:flex;gap:0.5rem;margin-top:1rem">
+      <a href="/locations/{{ audit.storage_location_id }}"><button type="button" class="btn-like">Back to location</button></a>
+    </div>
+  </section>
+{% endblock %}

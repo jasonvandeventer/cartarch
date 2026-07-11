@@ -9,11 +9,15 @@
         <p class="muted">
           {{ loc_type_label(location.type) }}
           {% if location.parent %}· Parent: {{ location.parent.name }}{% endif %}
+          {% if last_audited %}· Last audited: {{ last_audited.strftime('%Y-%m-%d') }}{% endif %}
         </p>
       </div>
       <div style="display:flex;gap:0.5rem;flex-wrap:wrap">
         {% if location.type != "deck" %}
           <button type="button" class="btn-like" onclick="toggleQuickAddModal()">+ Quick add</button>
+          <a href="/audit/start?location_id={{ location.id }}">
+            <button type="button">Audit</button>
+          </a>
         {% endif %}
         <a href="/locations/{{ location.id }}/export">
           <button type="button">Export CSV</button>
@@ -154,6 +158,28 @@
   <div id="location-card-list">
     {% include "_location_card_list.html" %}
   </div>
+  {% if audit_history %}
+    <section class="panel">
+      <h3 class="panel-title">Audit history</h3>
+      <table class="audit-history-table">
+        <thead>
+          <tr><th>Completed</th><th>Expected</th><th>Seen</th><th>Missing</th><th>Extras</th><th>Actions</th></tr>
+        </thead>
+        <tbody>
+          {% for a in audit_history %}
+            <tr>
+              <td>{{ a.completed_at.strftime('%Y-%m-%d %H:%M') }}</td>
+              <td>{{ a.cards_expected }}</td>
+              <td>{{ a.cards_seen }}</td>
+              <td>{{ a.cards_missing }}</td>
+              <td>{{ a.cards_extra }}</td>
+              <td>{{ a.actions_count }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </section>
+  {% endif %}
   {% if location.type != "deck" %}
     {% include "_quick_add_modal.html" %}
   {% endif %}

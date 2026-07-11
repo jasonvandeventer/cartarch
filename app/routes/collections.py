@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import csv
 import io
+import json
 import math
 from dataclasses import dataclass
 from urllib.parse import urlencode
@@ -2064,6 +2065,21 @@ def location_detail_page(
 
     showcases = share_service.list_showcases(session, current_user.id)
 
+    from app import audit_service
+
+    audit_logs = audit_service.list_audit_history(session, current_user.id, location_id, limit=10)
+    audit_history = [
+        {
+            "completed_at": a.completed_at,
+            "cards_expected": a.cards_expected,
+            "cards_seen": a.cards_seen,
+            "cards_missing": a.cards_missing,
+            "cards_extra": a.cards_extra,
+            "actions_count": len(json.loads(a.actions_applied or "[]")),
+        }
+        for a in audit_logs
+    ]
+
     return render(
         request,
         "location_detail.html",
@@ -2081,6 +2097,8 @@ def location_detail_page(
             "locations": all_locations,
             "decks": decks,
             "showcases": showcases,
+            "audit_history": audit_history,
+            "last_audited": audit_logs[0].completed_at if audit_logs else None,
         },
     )
 
