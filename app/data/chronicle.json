@@ -1,5 +1,19 @@
 [
   {
+    "version": "4.3.1",
+    "date": "2026-07-11",
+    "added": [
+      "The Audit nav item is now a hub for Physical Audit Mode: any audit you have in progress (with Resume / Abandon), a table of your storage locations showing card counts and when each was last audited (never-audited and stalest first, so the most-overdue piles surface), and a cross-location history of recent completed audits. Start an audit for any location straight from the row."
+    ],
+    "refined": [
+      "The old \"Audit\" page — import-batch history and the transaction log with undo — was import tooling misnamed. It moved to Import History (/imports/history), reachable from the Import page and the post-import result screen, and is no longer gated to power users (it only ever showed your own import records)."
+    ],
+    "resolved": [
+      "Disambiguated the two \"Audit\" surfaces: the nav Audit entry is Physical Audit Mode (#73), and import-batch history lives under Imports."
+    ],
+    "archivist_note": "A naming untangle plus a hub. Two things were called \"audit\": the shipped Physical Audit Mode (v4.2.0 — reconcile a storage location against the database) and an old /audit page that was really import-batch history with undo. This release gives the Audit nav item to Physical Audit Mode via a new hub at /audit (active-audit resume banner, an auditable-locations table sorted never-audited-then-stalest so the most-overdue verification is always next, and cross-location recent history) and relocates import history to /imports/history, linked from the import surfaces. The old /audit URL is repurposed as the hub rather than 301'd (the same URL can't both redirect and render — a bookmark now lands on the hub). Two service helpers back the hub: list_auditable_locations (per-location card counts + last-audit summary, computed from audit_log) and list_all_audit_history (the cross-location counterpart of the location-scoped list). The relocated page's query logic is unchanged; only its URL, template, heading, and the dropped power-user gate moved. 741 tests green."
+  },
+  {
     "version": "4.3.0",
     "date": "2026-07-11",
     "added": [
