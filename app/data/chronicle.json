@@ -1,5 +1,17 @@
 [
   {
+    "version": "4.1.36",
+    "date": "2026-07-10",
+    "added": [
+      "Your collection's value is now tracked over time. Each day, after prices refresh, Cartarch records what your placed collection is worth, and the dashboard's Holdings panel draws a sparkline of the trend with the change over the window. The line starts empty and fills in as days accrue — there's no back-history to invent, so it grows forward from here."
+    ],
+    "refined": [],
+    "resolved": [
+      "Implemented issue #85: daily collection-value time series + Holdings chart."
+    ],
+    "archivist_note": "Shipped as two phases behind one release. Phase 1 is the recorder: a daily_collection_values table (one row per user per day, UNIQUE(user_id, snapshot_date)) and snapshot_collection_values(), appended to the existing daily price-ingest CronJob entrypoint (app.jobs.price_ingest) right after prices land — the load-bearing correction, since the issue and an early analysis pass both misfingered the gutted in-process _run_price_refresh_batch loop, which no longer writes prices. The snapshot reuses dashboard_service._placed_value_expr with is_pending=False, so a day's value reconciles to the cent with the Collection Value tile; the upsert makes a same-day re-run idempotent. Phase 2 is the view: _value_history_chart precomputes inline-SVG sparkline geometry (no JS, no chart lib) that the § II Holdings panel already had a stubbed placeholder for. Deliberate boundaries: price-only trend (Option A — no inventory-composition history), no backfill (accrues forward), <2 points keeps the 'accruing' note rather than drawing a one-dot 'trend'. Determinism/test posture held: pure SQL aggregation, an end-to-end dashboard-render assertion, 655 green."
+  },
+  {
     "version": "4.1.35",
     "date": "2026-07-10",
     "added": [],
