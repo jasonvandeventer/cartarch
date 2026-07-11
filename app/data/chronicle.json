@@ -1,5 +1,16 @@
 [
   {
+    "version": "4.3.6",
+    "date": "2026-07-11",
+    "added": [],
+    "refined": [],
+    "resolved": [
+      "Live games again auto-eliminate a player when they hit a loss condition — 0 or less life, 21+ commander damage from a single commander, or 10+ poison. This worked in the single-device tracker but had been silently missing from multi-device live games.",
+      "In live games an accidental over-tap now self-corrects: if an auto-eliminated player's life/commander-damage/poison is fixed back to a survivable value they return to the game automatically. A player you eliminate by hand still stays out until you bring them back."
+    ],
+    "archivist_note": "Regression fix: server-authoritative live mode never ran the localStorage tracker's auto-elimination, so a live game could finalize with players at 0 life / 21 cmd still marked alive (game 39). live_game_service now re-evaluates loss conditions for the affected seat after every life/counter/cmd action — the SAME checks as game_detail.html checkElimination(): life<=0, any single attacker's commander damage>=21, or a poison counter>=10. Two things the local tracker is silent on were added (both additive to the SSE blob): eliminationCause per seat (life|cmd|poison|manual) and auto-REVIVE — an AUTO elimination reverses when its own condition un-triggers (a live scoreboard correcting a mis-tap), while a MANUAL eliminate never auto-revives and only a manual revive clears it. Cause precedence follows the tracker's `||` order life>poison>cmd, so a commander-damage hit that both reaches 21 AND (coupled) drops life to 0 is a single elimination with cause 'life'. Each auto elimination/revive appends its own eliminate GameEvent (auto=true, cause, eliminated bool) inside the triggering action's transaction, actor_kind inherited. Clients replicate the check optimistically in LIVE-only helpers (the shared checkElimination is untouched, so the localStorage tracker's permanent-elimination behavior is unchanged); the companion labels an auto elimination by cause and offers the 'I'm back' manual revive only for manual eliminations. Rotation already skips eliminated seats. 784 tests green (+8 auto-elimination service tests)."
+  },
+  {
     "version": "4.3.5",
     "date": "2026-07-11",
     "added": [],
