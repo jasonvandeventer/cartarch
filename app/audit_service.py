@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import dataclass, field
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
@@ -899,3 +899,93 @@ def list_audit_history(
         .limit(limit)
         .all()
     )
+
+
+# --- Audit hub (cross-location overviews) ------------------------------------
+
+
+def list_auditable_locations(session: Session, user_id: int) -> list[dict]:
+    """Every storage location the user owns, with its card count and last-audit
+    summary — the Audit hub's "Locations" table.
+
+    Sort: never-audited first (by card_count desc — the biggest un-audited piles
+    surface at the top), then audited by ``last_audited_at`` ascending (stalest
+    first, so the longest-unverified location is next in line)."""
+    locations = session.query(StorageLocation).filter(StorageLocation.user_id == user_id).all()
+    counts = dict(
+        session.query(
+            InventoryRow.storage_location_id,
+            func.coalesce(func.sum(InventoryRow.quantity), 0),
+        )
+        .filter(
+            InventoryRow.user_id == user_id,
+            InventoryRow.storage_location_id.isnot(None),
+        )
+        .group_by(InventoryRow.storage_location_id)
+        .all()
+    )
+    # Most-recent completed audit per location (first seen in desc order wins).
+    last_by_loc: dict[int, AuditLog] = {}
+    for log in (
+        session.query(AuditLog)
+        .filter(AuditLog.user_id == user_id)
+        .order_by(AuditLog.completed_at.desc(), AuditLog.id.desc())
+        .all()
+    ):
+        last_by_loc.setdefault(log.storage_location_id, log)
+
+    out: list[dict] = []
+    for loc in locations:
+        last = last_by_loc.get(loc.id)
+        out.append(
+            {
+                "location_id": loc.id,
+                "name": loc.name,
+                "type": loc.type,
+                "card_count": int(counts.get(loc.id, 0)),
+                "last_audited_at": last.completed_at if last else None,
+                "last_audit_summary": (
+                    {
+                        "seen": last.cards_seen,
+                        "missing": last.cards_missing,
+                        "extras": last.cards_extra,
+                    }
+                    if last
+                    else None
+                ),
+            }
+        )
+
+    out.sort(
+        key=lambda d: (
+            0 if d["last_audited_at"] is None else 1,  # never-audited first
+            -d["card_count"] if d["last_audited_at"] is None else 0,  # then biggest pile
+            d["last_audited_at"] or datetime.min,  # then stalest first
+        )
+    )
+    return out
+
+
+def list_all_audit_history(session: Session, user_id: int, limit: int = 25) -> list[dict]:
+    """Completed audits across ALL locations, most recent first (the hub's Recent
+    Audits table). Cross-location counterpart of :func:`list_audit_history`."""
+    rows = (
+        session.query(AuditLog, StorageLocation.name)
+        .outerjoin(StorageLocation, AuditLog.storage_location_id == StorageLocation.id)
+        .filter(AuditLog.user_id == user_id)
+        .order_by(AuditLog.completed_at.desc(), AuditLog.id.desc())
+        .limit(limit)
+        .all()
+    )
+    return [
+        {
+            "completed_at": log.completed_at,
+            "location_name": loc_name or "—",
+            "cards_expected": log.cards_expected,
+            "cards_seen": log.cards_seen,
+            "cards_missing": log.cards_missing,
+            "cards_extra": log.cards_extra,
+            "actions_count": len(json.loads(log.actions_applied or "[]")),
+        }
+        for log, loc_name in rows
+    ]

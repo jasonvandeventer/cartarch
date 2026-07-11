@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+{% from "_macros.html" import editorial_eyebrow, loc_type_label %}
+{% block content %}
+  <section class="panel page-hero">
+    <div>
+      {{ editorial_eyebrow("System · Audit") }}
+      <h2 class="panel-title">Physical Audit</h2>
+      <p class="pagehead-tagline">Verify a storage location against the database — scan its cards, reconcile the difference.</p>
+    </div>
+  </section>
+
+  {% if active_audit %}
+    <section class="panel audit-resume-banner">
+      <div>
+        <strong>Audit in progress</strong> —
+        {{ active_location.name if active_location else "a location" }}
+        <span class="muted">
+          · started {{ active_audit.started_at.strftime('%Y-%m-%d %H:%M') }}
+          {% if active_progress %}
+            · {{ active_progress.total_seen }}/{{ active_progress.total_expected }} scanned
+            {% if active_progress.total_extras %}({{ active_progress.total_extras }} extra){% endif %}
+          {% endif %}
+        </span>
+      </div>
+      <div class="audit-resume-actions">
+        <a href="/audit/start?location_id={{ active_audit.storage_location_id }}">
+          <button type="button" class="btn-like">Resume</button>
+        </a>
+        <form method="post" action="/audit/{{ active_audit.id }}/abandon"
+              onsubmit="return confirm('Abandon this audit? All scans will be discarded.');">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <button type="submit" class="btn-danger">Abandon</button>
+        </form>
+      </div>
+    </section>
+  {% endif %}
+
+  <section class="panel">
+    <h3 class="panel-title">Locations</h3>
+    {% if auditable_locations %}
+      <div class="table-wrap">
+        <table class="audit-history-table">
+          <thead>
+            <tr>
+              <th>Location</th>
+              <th class="col-priority-mid">Type</th>
+              <th>Cards</th>
+              <th class="col-priority-mid">Last audited</th>
+              <th class="col-priority-low">Last result</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for loc in auditable_locations %}
+              <tr>
+                <td><a href="/locations/{{ loc.location_id }}">{{ loc.name }}</a></td>
+                <td class="col-priority-mid">{{ loc_type_label(loc.type) }}</td>
+                <td>{{ loc.card_count }}</td>
+                <td class="col-priority-mid">
+                  {% if loc.last_audited_at %}
+                    {{ loc.last_audited_at.strftime('%Y-%m-%d') }}
+                  {% else %}
+                    <span class="audit-never-badge">Never</span>
+                  {% endif %}
+                </td>
+                <td class="col-priority-low">
+                  {% if loc.last_audit_summary %}
+                    {{ loc.last_audit_summary.seen }} seen /
+                    {{ loc.last_audit_summary.missing }} missing /
+                    {{ loc.last_audit_summary.extras }} extra
+                  {% else %}—{% endif %}
+                </td>
+                <td style="text-align:right">
+                  <a href="/audit/start?location_id={{ loc.location_id }}">
+                    <button type="button" class="btn-like">Start Audit</button>
+                  </a>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p class="muted">No storage locations yet. <a href="/locations">Create one</a> to start auditing.</p>
+    {% endif %}
+  </section>
+
+  <section class="panel">
+    <h3 class="panel-title">Recent audits</h3>
+    {% if audit_history %}
+      <div class="table-wrap">
+        <table class="audit-history-table">
+          <thead>
+            <tr>
+              <th>Completed</th>
+              <th>Location</th>
+              <th>Expected</th>
+              <th>Seen</th>
+              <th>Missing</th>
+              <th>Extras</th>
+              <th class="col-priority-low">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for a in audit_history %}
+              <tr>
+                <td>{{ a.completed_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                <td>{{ a.location_name }}</td>
+                <td>{{ a.cards_expected }}</td>
+                <td>{{ a.cards_seen }}</td>
+                <td>{{ a.cards_missing }}</td>
+                <td>{{ a.cards_extra }}</td>
+                <td class="col-priority-low">{{ a.actions_count }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p class="muted">No completed audits yet.</p>
+    {% endif %}
+  </section>
+{% endblock %}

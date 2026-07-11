@@ -2248,14 +2248,17 @@ def location_export(
 # -----------------------------------------------------------------------------
 
 
-@router.get("/audit")
-def audit_page(
+@router.get("/imports/history")
+def import_history_page(
     request: Request,
     session: Session = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
 ):
-    if current_user.username not in DRAWER_SORTER_USERNAMES:
-        raise HTTPException(status_code=403, detail="Not available for your account")
+    """Import-batch history + transaction log (moved here from the old ``/audit``
+    page, which is now the Physical Audit Mode hub). Query logic is unchanged
+    from the old handler; only the URL, template, and heading moved. The former
+    ``drawer_sorter`` gate is dropped — this is now a general Imports surface (it
+    shows only the user's OWN batches/logs, no cross-user data)."""
     logs = list_transaction_logs(session, user_id=current_user.id)
     batches = (
         session.query(ImportBatch)
@@ -2266,9 +2269,9 @@ def audit_page(
 
     return render(
         request,
-        "audit.html",
+        "import_history.html",
         {
-            "title": "Audit Log",
+            "title": "Import History",
             "logs": logs,
             "batches": batches,
             "current_user": current_user,
@@ -2283,7 +2286,7 @@ async def imports_undo_last(
     _: None = CsrfRequired,
 ):
     undo_last_import(session, user_id=current_user.id)
-    return RedirectResponse(url="/audit", status_code=303)
+    return RedirectResponse(url="/imports/history", status_code=303)
 
 
 @router.post("/imports/undo-batch")

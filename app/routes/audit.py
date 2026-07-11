@@ -50,6 +50,41 @@ def _render_workspace(request: Request, session: Session, audit: AuditSession, u
     )
 
 
+@router.get("/audit")
+def audit_hub(
+    request: Request,
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+):
+    """Physical Audit Mode hub: any in-progress audit, the auditable-locations
+    table, and cross-location recent-audit history."""
+    # get_active_audit also triggers the lazy 24h timeout (may auto-abandon +
+    # write), so commit to persist that cleanup.
+    active = audit_service.get_active_audit(session, current_user.id)
+    active_location = None
+    active_progress = None
+    if active is not None:
+        active_location = session.get(StorageLocation, active.storage_location_id)
+        active_progress = audit_service.get_scan_progress(session, active.id, current_user.id)
+    session.commit()
+
+    return render(
+        request,
+        "audit_hub.html",
+        {
+            "title": "Audit",
+            "active_audit": active,
+            "active_location": active_location,
+            "active_progress": active_progress,
+            "auditable_locations": audit_service.list_auditable_locations(session, current_user.id),
+            "audit_history": audit_service.list_all_audit_history(
+                session, current_user.id, limit=25
+            ),
+            "current_user": current_user,
+        },
+    )
+
+
 @router.get("/audit/start")
 def audit_start(
     request: Request,

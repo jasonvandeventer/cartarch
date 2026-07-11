@@ -14864,3 +14864,13 @@ body.gf-mode { overflow: hidden; }
 }
 .cmp-ended-title { font-size: 1.6rem; font-weight: 800; }
 .cmp-ended-link { color: var(--accent-2); font-weight: 700; }
+
+/* ── Audit hub + import-history relocation (nav split) ── */
+.audit-never-badge {
+  display: inline-block; padding: 0 0.4rem; border-radius: var(--radius-sm);
+  font-size: 0.75rem; font-weight: 700; color: var(--muted);
+  border: 1px solid var(--muted);
+}
+.imports-hero-actions { margin-top: 0.6rem; }
+.muted-link { color: var(--muted); font-size: 0.9rem; text-decoration: none; }
+.muted-link:hover { color: var(--accent-2); }
