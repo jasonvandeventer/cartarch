@@ -134,13 +134,33 @@
             <div class="dashboard-holdings-lede">
               The collection sits at <b>${{ '{:,.2f}'.format(dashboard.holdings.placed_value) }}</b> across <b>{{ '{:,}'.format(dashboard.holdings.placed_cards) }}</b> placed cards.
             </div>
-            {% if dashboard.holdings.history_deferred %}
-              {# v3.28.5 spec bucket (d) — DEFERRED. Daily price-history is a
-                 separate future effort; the 30-day chart and delta ship as a
-                 clean known-deferred element rather than faked or broken. #}
+            {% if dashboard.holdings.chart %}
+              {% set c = dashboard.holdings.chart %}
+              {# issue #85 — value-over-time sparkline from the daily snapshots.
+                 Geometry precomputed in dashboard_service; viewBox + currentColor
+                 keep it responsive and theme-aware, no JS or chart lib. #}
+              <div class="dashboard-holdings-chart">
+                <svg class="dashboard-holdings-spark" viewBox="0 0 {{ c.width }} {{ c.height }}"
+                     preserveAspectRatio="none" role="img"
+                     aria-label="Collection value over the last {{ c.days }} days"
+                     style="width:100%;height:56px;display:block;color:{% if c.delta >= 0 %}#3fb950{% else %}#f85149{% endif %}">
+                  <polyline points="{{ c.points }}" fill="none" stroke="currentColor"
+                            stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"
+                            vector-effect="non-scaling-stroke"/>
+                </svg>
+                <div class="dashboard-holdings-delta muted">
+                  Last {{ c.days }} day{{ 's' if c.days != 1 else '' }}:
+                  <b style="color:{% if c.delta >= 0 %}#3fb950{% else %}#f85149{% endif %}">{% if c.delta >= 0 %}+${{ '{:,.2f}'.format(c.delta) }}{% else %}−${{ '{:,.2f}'.format(-c.delta) }}{% endif %}</b>
+                  ({{ '{:+.1f}'.format(c.delta_pct) }}%)
+                </div>
+              </div>
+            {% else %}
+              {# issue #85 — accrual backend (Phase 1) is live; the trend fills
+                 in once a second daily snapshot lands. Not "deferred" anymore,
+                 just waiting on data. #}
               <div class="dashboard-holdings-deferred">
                 <span class="dashboard-holdings-deferred-note">
-                  Value over time will appear here once daily price tracking lands. That's a separate future release — the headline above is the current total.
+                  Value over time will appear here as daily price snapshots accrue — check back after a couple of days of tracking.
                 </span>
               </div>
             {% endif %}

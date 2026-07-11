@@ -124,3 +124,103 @@ def test_price_ingest_main_calls_snapshot(monkeypatch):
 
     price_ingest.main()
     assert calls == {"ingest": 1, "snapshot": 1}
+
+
+# --- Phase 2: value-over-time chart ---------------------------------------------
+
+from app.dashboard_service import _value_history_chart  # noqa: E402
+
+
+def test_chart_none_with_fewer_than_two_points():
+    assert _value_history_chart([]) is None
+    assert _value_history_chart([{"date": "2026-07-10", "value": 5.0}]) is None
+
+
+def test_chart_geometry_and_delta():
+    series = [
+        {"date": "2026-07-08", "value": 100.0},
+        {"date": "2026-07-09", "value": 150.0},
+        {"date": "2026-07-10", "value": 120.0},
+    ]
+    c = _value_history_chart(series)
+    assert c is not None
+    assert len(c["points"].split()) == 3  # one coord per point
+    assert c["days"] == 3
+    assert c["min"] == 100.0 and c["max"] == 150.0
+    assert c["delta"] == 20.0  # 120 - 100
+    assert round(c["delta_pct"], 1) == 20.0
+    # y is inverted: the max-value point sits at the top padding, the min at the
+    # bottom; first & last x span the full inner width.
+    xs = [float(p.split(",")[0]) for p in c["points"].split()]
+    assert xs[0] == 4.0 and round(xs[-1], 1) == 316.0
+
+
+def test_chart_flat_series_does_not_divide_by_zero():
+    c = _value_history_chart(
+        [{"date": "2026-07-09", "value": 7.0}, {"date": "2026-07-10", "value": 7.0}]
+    )
+    assert c is not None and c["delta"] == 0.0 and c["delta_pct"] == 0.0
+
+
+def test_dashboard_holdings_exposes_chart_once_history_accrues(db, user):
+    _placed(db, user, "10.00", qty=1)
+    db.commit()
+    snapshot_collection_values(db, day=date(2026, 7, 9))
+    snapshot_collection_values(db, day=date(2026, 7, 10))
+    db.commit()
+
+    holdings = get_dashboard_data(db, user.id)["holdings"]
+    assert holdings["history_deferred"] is False
+    assert holdings["chart"] is not None
+    assert [p["date"] for p in holdings["value_series"]] == ["2026-07-09", "2026-07-10"]
+
+
+def test_dashboard_holdings_deferred_until_two_points(db, user):
+    _placed(db, user, "10.00", qty=1)
+    db.commit()
+    snapshot_collection_values(db, day=date(2026, 7, 10))  # only one day
+    db.commit()
+
+    holdings = get_dashboard_data(db, user.id)["holdings"]
+    assert holdings["history_deferred"] is True
+    assert holdings["chart"] is None
+
+
+def _dashboard_html(client, user):
+    """GET the authenticated dashboard. ``/`` branches on
+    ``get_optional_current_user`` (which the client fixture doesn't override, so
+    it would otherwise render the anonymous landing page)."""
+    from app import main
+    from app.dependencies import get_optional_current_user
+
+    main.app.dependency_overrides[get_optional_current_user] = lambda: user
+    try:
+        return client.get("/")
+    finally:
+        main.app.dependency_overrides.pop(get_optional_current_user, None)
+
+
+def test_dashboard_page_renders_sparkline(db, user, client):
+    """End-to-end: the home page draws the SVG sparkline once history exists."""
+    _placed(db, user, "10.00", qty=1)
+    db.commit()
+    snapshot_collection_values(db, day=date(2026, 7, 9))
+    snapshot_collection_values(db, day=date(2026, 7, 10))
+    db.commit()
+
+    resp = _dashboard_html(client, user)
+    assert resp.status_code == 200
+    assert "dashboard-holdings-chart" in resp.text
+    assert "dashboard-holdings-spark" in resp.text  # the sparkline SVG
+
+
+def test_dashboard_page_renders_accrual_note_without_history(db, user, client):
+    # Placed inventory (so the populated dashboard + Holdings panel render) but
+    # no snapshots yet → the panel shows the accrual note, not a chart.
+    _placed(db, user, "10.00", qty=1)
+    db.commit()
+
+    resp = _dashboard_html(client, user)
+    assert resp.status_code == 200
+    assert "daily price snapshots accrue" in resp.text
+    assert "dashboard-holdings-chart" not in resp.text  # no sparkline yet

@@ -136,6 +136,52 @@ def snapshot_collection_values(session: Session, day: date | None = None) -> int
     return len(totals)
 
 
+# § II Holdings value-over-time chart (issue #85 Phase 2). Sparkline geometry is
+# computed here (not in Jinja) so the template just drops in a <polyline>.
+VALUE_HISTORY_DAYS = 30
+_CHART_W = 320
+_CHART_H = 64
+_CHART_PAD = 4.0
+
+
+def _value_history_chart(series: list[dict]) -> dict | None:
+    """Build inline-SVG sparkline geometry + delta from a value series (issue
+    #85). Returns None with <2 points — one dot isn't a trend, so the panel
+    keeps its "history is still accruing" note until a second day lands.
+
+    ``points`` is a ready-to-use SVG polyline coordinate string in a
+    ``_CHART_W × _CHART_H`` box (y inverted so higher value sits higher). ``delta``
+    / ``delta_pct`` compare the oldest and newest points in the window.
+    """
+    if len(series) < 2:
+        return None
+    values = [p["value"] for p in series]
+    lo, hi = min(values), max(values)
+    span = (hi - lo) or 1.0  # flat series → a centered horizontal line
+    inner_w = _CHART_W - 2 * _CHART_PAD
+    inner_h = _CHART_H - 2 * _CHART_PAD
+    last_i = len(values) - 1
+    coords = []
+    for i, v in enumerate(values):
+        x = _CHART_PAD + inner_w * (i / last_i)
+        y = _CHART_PAD + inner_h * (1 - (v - lo) / span)
+        coords.append(f"{x:.1f},{y:.1f}")
+    first, last = values[0], values[-1]
+    delta = last - first
+    return {
+        "points": " ".join(coords),
+        "width": _CHART_W,
+        "height": _CHART_H,
+        "min": lo,
+        "max": hi,
+        "first": first,
+        "last": last,
+        "delta": delta,
+        "delta_pct": (delta / first * 100.0) if first else 0.0,
+        "days": len(values),
+    }
+
+
 def _time_greeting(now: datetime) -> str:
     """Time-aware greeting for the masthead. America/Chicago.
 
@@ -560,14 +606,26 @@ def get_dashboard_data(session: Session, user_id: int, now: datetime | None = No
     }
 
     # ── § II HOLDINGS ────────────────────────────────────────────────────────
-    # Current placed value (in dollars); 30-day delta + value-history chart
-    # are deferred (price-history infrastructure is a separate future
-    # release, per the v3.28.5 spec's bucket-d triage).
+    # Current placed value (in dollars) plus the value-over-time sparkline from
+    # the daily snapshots (issue #85). Until a second day accrues there's no
+    # trend to draw, so the panel falls back to the "history is accruing" note.
+    history_rows = (
+        session.query(DailyCollectionValue)
+        .filter(DailyCollectionValue.user_id == user_id)
+        .order_by(DailyCollectionValue.snapshot_date.asc())
+        .all()
+    )[-VALUE_HISTORY_DAYS:]
+    value_series = [
+        {"date": r.snapshot_date.isoformat(), "value": float(r.total_value)} for r in history_rows
+    ]
+    value_chart = _value_history_chart(value_series)
     holdings = {
         "placed_value": placed_value,
         "placed_cards": placed_cards,
-        # Marker for the template to render the deferred-chart placeholder.
-        "history_deferred": True,
+        "value_series": value_series,
+        "chart": value_chart,
+        # Still deferred (placeholder) until there are >=2 points to plot.
+        "history_deferred": value_chart is None,
     }
 
     return {
