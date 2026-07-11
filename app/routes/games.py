@@ -33,17 +33,19 @@ from app.game_service import (
     end_game,
     get_game,
     get_seat_commander_image_urls,
+    get_seat_commander_scryfall_ids,
     get_viewable_game,
     list_games,
     log_game,
     normalize_game_format,
     record_goal_results,
+    seat_commander_scryfall_id,
     set_game_playgroup,
     toggle_seat_art_background,
     update_game_notes,
     update_seat,
 )
-from app.models import Deck, User
+from app.models import Deck, Game, GameSeat, User
 from app.timeutil import utc_now
 
 router = APIRouter()
@@ -399,6 +401,7 @@ def game_companion_page(
     if not game:
         raise HTTPException(status_code=404, detail="Game not found")
     my_seat = next((s for s in game.seats if s.user_id == current_user.id), None)
+    seat_commanders = get_seat_commander_scryfall_ids(session, game)
     return render(
         request,
         "game_companion.html",
@@ -406,9 +409,51 @@ def game_companion_page(
             "title": f"Companion · Game {game_id}",
             "game": game,
             "my_seat": my_seat,
-            "seat_commander_images": get_seat_commander_image_urls(session, game),
+            "seat_commanders": seat_commanders,
+            "my_commander_id": seat_commanders.get(my_seat.id) if my_seat else None,
             "current_user": current_user,
         },
+    )
+
+
+@router.get("/companion")
+def companion_lobby(
+    request: Request,
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+):
+    """The phone's bookmark target — the current user's live/upcoming games (any
+    game they hold a seat in). in_progress first, then created; most recent first,
+    capped at 20. Standalone mobile page; never carries a table token."""
+    _status_order = {"in_progress": 0, "created": 1}
+    rows = (
+        session.query(GameSeat, Game)
+        .join(Game, GameSeat.game_id == Game.id)
+        .filter(
+            GameSeat.user_id == current_user.id,
+            Game.status.in_(("in_progress", "created")),
+        )
+        .order_by(Game.played_at.desc())  # stable sort below keeps this within each status
+        .all()
+    )
+    entries = [
+        {
+            "game_id": game.id,
+            "status": game.status,
+            "format": game.format or "Commander",
+            "seat_count": len(game.seats),
+            "played_at": game.played_at,
+            "deck_name": seat.deck_name_at_game or (seat.deck.name if seat.deck else None),
+            "commander_name": seat.commander_name_at_game,
+            "commander_id": seat_commander_scryfall_id(session, seat),
+        }
+        for seat, game in rows
+    ]
+    entries.sort(key=lambda e: _status_order.get(e["status"], 9))  # stable → played_at desc within
+    return render(
+        request,
+        "companion_lobby.html",
+        {"title": "Live Games", "entries": entries[:20], "current_user": current_user},
     )
 
 

@@ -753,3 +753,35 @@ def get_seat_commander_image_urls(session: Session, game: Game) -> dict[int, lis
                 break
         result[seat.id] = urls
     return result
+
+
+def seat_commander_scryfall_id(session: Session, seat: GameSeat) -> str | None:
+    """The scryfall_id of a seat's PRIMARY commander (for the companion view's
+    art background), or ``None``.
+
+    Same resolution as :func:`get_seat_commander_image_urls` — seat → deck →
+    ``role='commander'`` inventory rows in the deck's location, first by id — but
+    returns just the first commander's ``scryfall_id``. Degrades to ``None`` at
+    every gap: no deck, deck without a tagged commander, or a commander card with
+    no ``scryfall_id``."""
+    if not seat.deck_id or not seat.deck or not seat.deck.storage_location_id:
+        return None
+    row = (
+        session.query(InventoryRow)
+        .join(Card)
+        .filter(
+            InventoryRow.user_id == seat.deck.user_id,
+            InventoryRow.storage_location_id == seat.deck.storage_location_id,
+            InventoryRow.role == "commander",
+        )
+        .order_by(InventoryRow.id)
+        .first()
+    )
+    if row and row.card and row.card.scryfall_id:
+        return row.card.scryfall_id
+    return None
+
+
+def get_seat_commander_scryfall_ids(session: Session, game: Game) -> dict[int, str | None]:
+    """``{seat_id: commander_scryfall_id | None}`` for every seat in ``game``."""
+    return {seat.id: seat_commander_scryfall_id(session, seat) for seat in game.seats}

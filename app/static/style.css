@@ -14790,10 +14790,16 @@ body.gf-mode { overflow: hidden; }
 }
 
 /* Companion page — mobile-first, portrait, thumb-reach. */
+/* Standalone fullscreen companion: no page scroll, no double-tap zoom. */
+body.cmp-body { margin: 0; height: 100dvh; overflow: hidden; touch-action: manipulation; }
+.cmp-body button, .cmp-body a { touch-action: manipulation; }
 .companion {
-  max-width: 560px; margin: 0 auto; padding: 0.6rem 0.6rem 5rem;
-  display: flex; flex-direction: column; gap: 0.7rem; min-height: 100vh;
+  max-width: 560px; margin: 0 auto; padding: 0.5rem 0.6rem; box-sizing: border-box;
+  height: 100dvh; display: flex; flex-direction: column; gap: 0.5rem;
 }
+.cmp-header, .cmp-strip, .cmp-endturn { flex-shrink: 0; }
+.cmp-back { color: var(--muted); text-decoration: none; font-size: 1.2rem; line-height: 1; padding: 0 0.2rem; }
+.cmp-back:hover { color: var(--text); }
 .cmp-header {
   display: flex; justify-content: space-between; align-items: baseline;
   padding: 0.5rem 0.8rem; border-radius: var(--radius);
@@ -14816,7 +14822,26 @@ body.gf-mode { overflow: hidden; }
 .cmp-strip-name { font-size: 0.85rem; color: var(--text-dim); }
 .cmp-strip-life { font-weight: 700; font-variant-numeric: tabular-nums; }
 
-.cmp-me { display: flex; flex-direction: column; gap: 0.8rem; align-items: stretch; }
+.cmp-me {
+  flex: 1 1 auto; min-height: 0; position: relative; overflow: hidden;
+  border-radius: var(--radius); padding: 0.4rem;
+  display: flex; flex-direction: column; gap: 0.7rem; align-items: stretch;
+}
+/* Inner overflow region — only counters/cmd scroll, never the page. */
+.cmp-scroll {
+  flex: 1 1 auto; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch;
+  display: flex; flex-direction: column; gap: 0.7rem;
+}
+/* Commander art background: blurred, cover-cropped toward the top of the card,
+   under a dark gradient so the hero number + buttons stay legible. No art → no
+   ::before, so the panel keeps its solid background (no broken image). */
+.cmp-me.cmp-has-art::before {
+  content: ''; position: absolute; inset: 0; z-index: 0;
+  background-image: linear-gradient(rgba(0,0,0,0.5), rgba(0,0,0,0.64)), var(--cmp-art);
+  background-size: cover; background-position: center 18%;
+  filter: blur(3px); transform: scale(1.08);
+}
+.cmp-me > * { position: relative; z-index: 1; }
 .cmp-my-name { text-align: center; font-size: 0.95rem; }
 .cmp-life {
   text-align: center; font-size: 5.5rem; line-height: 1; font-weight: 800;
@@ -14874,3 +14899,31 @@ body.gf-mode { overflow: hidden; }
 .imports-hero-actions { margin-top: 0.6rem; }
 .muted-link { color: var(--muted); font-size: 0.9rem; text-decoration: none; }
 .muted-link:hover { color: var(--accent-2); }
+
+/* ── Companion lobby (phone bookmark target) ── */
+body.cmp-lobby-body { height: auto; min-height: 100dvh; overflow-y: auto; }
+.cmp-lobby { max-width: 560px; margin: 0 auto; padding: 0.9rem 0.7rem; box-sizing: border-box; }
+.cmp-lobby-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+.cmp-lobby-title { font-size: 1.4rem; margin: 0; }
+.cmp-lobby-list { display: flex; flex-direction: column; gap: 0.6rem; }
+.cmp-lobby-row {
+  display: block; text-decoration: none; color: var(--text); min-height: 64px;
+  padding: 0.9rem 1rem; border-radius: var(--radius); background: var(--brand-near-black);
+  border: 1px solid var(--brand-gold-soft); position: relative; overflow: hidden;
+}
+.cmp-lobby-row.cmp-has-art::before {
+  content: ''; position: absolute; inset: 0; z-index: 0;
+  background-image: linear-gradient(rgba(0,0,0,0.6), rgba(0,0,0,0.72)), var(--cmp-art);
+  background-size: cover; background-position: center 25%; filter: blur(1px); transform: scale(1.05);
+}
+.cmp-lobby-row > * { position: relative; z-index: 1; }
+.cmp-lobby-row-main { display: flex; align-items: center; gap: 0.6rem; }
+.cmp-lobby-deck { font-weight: 700; }
+.cmp-lobby-row-meta { font-size: 0.85rem; margin-top: 0.25rem; }
+.cmp-badge {
+  font-size: 0.7rem; font-weight: 800; padding: 0.12rem 0.45rem; border-radius: var(--radius-pill);
+  letter-spacing: 0.04em; white-space: nowrap;
+}
+.cmp-badge-live { background: var(--brand-green); color: #0e140b; }
+.cmp-badge-waiting { background: var(--brand-gold-soft); color: var(--text-dim); border: 1px solid var(--accent-2); }
+.cmp-lobby-empty { text-align: center; padding: 3rem 1rem; }

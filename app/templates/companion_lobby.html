@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+{# Companion lobby — the phone's bookmark target. Standalone, mobile-first. Lists
+   the games the user holds a seat in; never carries a table token. #}
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#081321">
+  <title>Live Games — Companion</title>
+  <link rel="icon" type="image/svg+xml" href="/static/brand/icon/favicon.svg">
+  <link rel="stylesheet" href="/static/style.css?v={{ static_v('style.css') }}">
+</head>
+<body class="cmp-body cmp-lobby-body">
+  <div class="cmp-lobby">
+    <header class="cmp-lobby-header">
+      <h1 class="cmp-lobby-title">Live Games</h1>
+      <a href="/" class="cmp-back" title="Back to Cartarch">✕</a>
+    </header>
+
+    {% if entries %}
+      <div class="cmp-lobby-list">
+        {% for e in entries %}
+          <a class="cmp-lobby-row{% if e.commander_id %} cmp-has-art{% endif %}"
+             href="/games/{{ e.game_id }}/companion"
+             {% if e.commander_id %}style="--cmp-art: url('{{ mirror_image_url(e.commander_id, 'normal') }}')"{% endif %}>
+            <div class="cmp-lobby-row-main">
+              <span class="cmp-badge cmp-badge-{{ 'live' if e.status == 'in_progress' else 'waiting' }}">
+                {{ 'LIVE' if e.status == 'in_progress' else 'Waiting' }}
+              </span>
+              <span class="cmp-lobby-deck">
+                {{ e.commander_name or e.deck_name or (e.format ~ ' game') }}
+              </span>
+            </div>
+            <div class="cmp-lobby-row-meta muted">
+              {{ e.format }} · {{ e.seat_count }} players · {{ e.played_at.strftime('%b %-d') }}
+            </div>
+          </a>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="cmp-lobby-empty muted">No games yet — your live games will appear here.</div>
+    {% endif %}
+  </div>
+</body>
+</html>

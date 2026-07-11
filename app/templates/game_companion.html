@@ -1,66 +1,79 @@
-{% extends "base.html" %}
-{# Phone companion view (companion mode, Session 2). Mobile-first, portrait,
-   thumb-reach. Seat-scoped: controls the requesting user's OWN seat only — the
-   table token is NEVER sent here. Extends base.html purely to inherit the
-   stylesheet + viewport; the companion CSS makes it a focused fullscreen tool. #}
-{% block content %}
-<div class="companion" id="companion">
-  <div id="cmp-reconnecting" class="live-reconnecting" style="display:none">Reconnecting…</div>
-  <div id="cmp-ended" class="cmp-ended" style="display:none">
-    <div class="cmp-ended-title">Game ended</div>
-    <a href="/games/{{ game.id }}" class="cmp-ended-link">View game summary →</a>
+<!DOCTYPE html>
+<html lang="en">
+{# Phone companion view (companion mode). STANDALONE — no base template, no site
+   chrome: a fullscreen, zoom-proof, seat-scoped tool. Controls only the
+   requesting user's OWN seat; the table token is NEVER sent here. #}
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#081321">
+  <title>Game {{ game.id }} — Companion</title>
+  <link rel="icon" type="image/svg+xml" href="/static/brand/icon/favicon.svg">
+  <link rel="stylesheet" href="/static/style.css?v={{ static_v('style.css') }}">
+</head>
+<body class="cmp-body">
+  <div class="companion" id="companion">
+    <div id="cmp-reconnecting" class="live-reconnecting" style="display:none">Reconnecting…</div>
+    <div id="cmp-ended" class="cmp-ended" style="display:none">
+      <div class="cmp-ended-title">Game ended</div>
+      <a href="/games/{{ game.id }}" class="cmp-ended-link">View game summary →</a>
+    </div>
+
+    <header class="cmp-header" id="cmp-header">
+      <div class="cmp-turn">Turn <span id="cmp-turn-num">—</span></div>
+      <div class="cmp-active"><span id="cmp-active-name">—</span></div>
+      <a href="/" class="cmp-back" title="Back to Cartarch">✕</a>
+    </header>
+
+    <div class="cmp-strip" id="cmp-strip"></div>
+
+    {% if my_seat %}
+      <main class="cmp-me{% if my_commander_id %} cmp-has-art{% endif %}"
+            {% if my_commander_id %}style="--cmp-art: url('{{ mirror_image_url(my_commander_id, 'normal') }}')"{% endif %}>
+        <div class="cmp-my-name">{{ my_seat.player_name }} <span class="muted">(you)</span></div>
+        <div class="cmp-life" id="cmp-life">—</div>
+        <div class="cmp-life-btns">
+          <button type="button" class="cmp-btn cmp-btn-lg" onclick="adjLife(-5)">−5</button>
+          <button type="button" class="cmp-btn cmp-btn-xl" onclick="adjLife(-1)">−1</button>
+          <button type="button" class="cmp-btn cmp-btn-xl" onclick="adjLife(1)">+1</button>
+          <button type="button" class="cmp-btn cmp-btn-lg" onclick="adjLife(5)">+5</button>
+        </div>
+
+        <div class="cmp-scroll">
+          <section class="cmp-section">
+            <h3 class="cmp-section-title">Commander damage received</h3>
+            <div id="cmp-cmd"></div>
+          </section>
+
+          <section class="cmp-section">
+            <h3 class="cmp-section-title">Counters</h3>
+            <div id="cmp-counter-pills" class="cmp-pills"></div>
+            <div class="cmp-counter-add">
+              <button type="button" class="cmp-btn-sm" onclick="toggleCounterMenu()">+ Add counter</button>
+              <div id="cmp-counter-menu" class="cmp-counter-menu" style="display:none">
+                {% for t in ['poison','rad','experience','energy','storm','custom'] %}
+                  <button type="button" class="cmp-btn-sm" onclick="addCounter('{{ t }}')">{{ t }}</button>
+                {% endfor %}
+              </div>
+            </div>
+          </section>
+
+          <button type="button" class="cmp-btn-elim" id="cmp-elim-btn" onclick="toggleElim()">Eliminate me</button>
+        </div>
+      </main>
+      <button type="button" class="cmp-endturn" id="cmp-endturn" onclick="endTurn()">End turn</button>
+    {% else %}
+      <main class="cmp-me cmp-spectator">
+        <p class="muted">Spectating — you don't have a seat in this game.</p>
+      </main>
+    {% endif %}
+
+    <div id="cmp-toast" class="live-toast" style="display:none"></div>
   </div>
 
-  <header class="cmp-header" id="cmp-header">
-    <div class="cmp-turn">Turn <span id="cmp-turn-num">—</span></div>
-    <div class="cmp-active"><span id="cmp-active-name">—</span></div>
-  </header>
-
-  <div class="cmp-strip" id="cmp-strip"></div>
-
-  {% if my_seat %}
-    <main class="cmp-me">
-      <div class="cmp-my-name">{{ my_seat.player_name }} <span class="muted">(you)</span></div>
-      <div class="cmp-life" id="cmp-life">—</div>
-      <div class="cmp-life-btns">
-        <button type="button" class="cmp-btn cmp-btn-lg" onclick="adjLife(-5)">−5</button>
-        <button type="button" class="cmp-btn cmp-btn-xl" onclick="adjLife(-1)">−1</button>
-        <button type="button" class="cmp-btn cmp-btn-xl" onclick="adjLife(1)">+1</button>
-        <button type="button" class="cmp-btn cmp-btn-lg" onclick="adjLife(5)">+5</button>
-      </div>
-
-      <section class="cmp-section">
-        <h3 class="cmp-section-title">Commander damage received</h3>
-        <div id="cmp-cmd"></div>
-      </section>
-
-      <section class="cmp-section">
-        <h3 class="cmp-section-title">Counters</h3>
-        <div id="cmp-counter-pills" class="cmp-pills"></div>
-        <div class="cmp-counter-add">
-          <button type="button" class="cmp-btn-sm" onclick="toggleCounterMenu()">+ Add counter</button>
-          <div id="cmp-counter-menu" class="cmp-counter-menu" style="display:none">
-            {% for t in ['poison','rad','experience','energy','storm','custom'] %}
-              <button type="button" class="cmp-btn-sm" onclick="addCounter('{{ t }}')">{{ t }}</button>
-            {% endfor %}
-          </div>
-        </div>
-      </section>
-
-      <button type="button" class="cmp-btn-elim" id="cmp-elim-btn" onclick="toggleElim()">Eliminate me</button>
-      <button type="button" class="cmp-endturn" id="cmp-endturn" onclick="endTurn()">End turn</button>
-    </main>
-  {% else %}
-    <main class="cmp-spectator">
-      <p class="muted">Spectating — you don't have a seat in this game.</p>
-    </main>
-  {% endif %}
-
-  <div id="cmp-toast" class="live-toast" style="display:none"></div>
-</div>
-{% endblock %}
-
-{% block extra_scripts %}
 <script>
 (function () {
   const GID = {{ game.id }};
@@ -233,4 +246,5 @@
   window.addEventListener('beforeunload', () => es.close());
 })();
 </script>
-{% endblock %}
+</body>
+</html>
