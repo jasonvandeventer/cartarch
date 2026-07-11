@@ -1,5 +1,17 @@
 [
   {
+    "version": "4.2.0",
+    "date": "2026-07-10",
+    "added": [
+      "Physical Audit Mode. You can now walk a storage location and reconcile it against what Cartarch believes is there. Start an audit of a location and it loads the expected cards in physical order (drawer-sorter order for drawers, alphabetical elsewhere); scan each card by name and Cartarch marks it a match, flags it as an extra that doesn't belong, or a partial match when it's the right card in a different printing or finish. Progress, an expected-card checklist, and an extras list update live as you go, each row with a card thumbnail. When you finish scanning, a reconciliation screen shows the full delta — seen, missing, extra, partial — and lets you approve each proposed change individually (mark missing, add the extra here, move an existing copy in from another location, or correct the printing) before anything is written. Nothing touches your inventory until you approve. Audits are interruptible: pause and resume within a day, with a resume banner on every page, and each completed audit is recorded in a per-location history (“Last audited”)."
+    ],
+    "refined": [],
+    "resolved": [
+      "Implemented issue #73: Physical Audit Mode — scan loop, reconciliation, card thumbnails, resume banner, per-location audit history, and a lazy 24h session timeout."
+    ],
+    "archivist_note": "Four phases behind one release. The spine is three tables (audit_sessions, audit_scans, audit_log) and a service layer that never mutates inventory until the operator approves the changeset — the load-bearing safety property. Each audit fingerprints the location's inventory at start (a sha256 snapshot hash, plus a JSON per-row baseline added in Phase 3) so reconciliation can run an optimistic-concurrency check and itemize exactly what changed if the location drifted mid-audit; a changed snapshot rejects the whole apply rather than writing against stale assumptions. The scan classifier reuses the drawer-sorter's own ordering for expected-card sequencing; reconciliation reuses the existing move-and-merge and transaction-log paths rather than reinventing them, tagging its mutations with audit_* event types. Owner-scoped throughout, one active audit per user, with a lazy 24h timeout that auto-abandons a stale session on the next action (no background job). 696 tests green."
+  },
+  {
     "version": "4.1.36",
     "date": "2026-07-10",
     "added": [
