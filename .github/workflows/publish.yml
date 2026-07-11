@@ -250,6 +250,15 @@ jobs:
           [ -s issues.txt ] || { echo "no referenced issues"; exit 0; }
           while read -r N; do
             [ -n "$N" ] || continue
+            # Skip PR numbers. Issues and PRs share one number space, so a
+            # release commit that cites a PR (e.g. "Phase 2 (#90)") lands here;
+            # `gh issue view <pr>` behaves inconsistently under `set -e` (some
+            # versions return a state that then falls through to a later
+            # hard-failing `gh issue view --json labels`). This automation is
+            # issue-only — `gh pr view` succeeds ONLY for a real PR.
+            if gh pr view "$N" --json number >/dev/null 2>&1; then
+              echo "#$N is a pull request — skipping"; continue
+            fi
             state="$(gh issue view "$N" --json state --jq .state 2>/dev/null || echo MISSING)"
             case "$state" in
               MISSING) echo "::warning::#$N referenced but not found — skipping"; continue ;;
