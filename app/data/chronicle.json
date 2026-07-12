@@ -1,5 +1,20 @@
 [
   {
+    "version": "4.4.0",
+    "date": "2026-07-11",
+    "added": [
+      "Physical Audit Mode can now audit just PART of a location — pick the sets you're checking (\"just the LTR and MH3 cards in Drawer 3\") instead of the whole drawer. Starting an audit shows a scope picker: audit everything, or tick sets (with per-set counts and a live selected total) and audit only those.",
+      "During a scoped audit, scanning a card from a set you didn't pick is filed as 'Out of scope' — acknowledged and shown collapsed, with no reconciliation prompts. It's not treated as an extra."
+    ],
+    "refined": [
+      "Scoped audits don't reset a location's 'last audited' date — that stays driven by the last FULL audit, so a quick partial check never makes a drawer look freshly verified. Scoped runs appear in history badged with their sets."
+    ],
+    "resolved": [
+      "Scoped audits: optional set-code filter at audit start (issue #73 follow-up), strictly additive to the full-location audit."
+    ],
+    "archivist_note": "Scoped audits narrow Physical Audit Mode to a chosen set of set-codes. Two nullable JSON columns (audit_sessions.scope / audit_log.scope, {\"set_codes\":[...]}, NULL = full audit) carry the scope; the log copy powers history badges and staleness. A single _audit_expected_rows(session, audit) helper filters the location's rows to the scope and is the ONE source of truth for the snapshot hash, expected set, scan matching, live progress, validate_snapshot, and compute_delta — so scoped is additive and null-scope is byte-for-byte the original behavior (regression-pinned). start_audit(set_codes=...) hashes only the scoped rows, so concurrent edits to unscoped cards at the same location don't trip the optimistic-concurrency check (in-scope edits still do); an empty scope is rejected. record_scan gates scope BEFORE match/partial/extra: a scanned card whose OWN set isn't in scope becomes a new out_of_scope AuditScan (inventory_row_id NULL, like extras but excluded from extra counts/lists), even when an in-scope printing of the same name is expected — the operator scanned what's in hand. compute_delta surfaces out_of_scope as its own action-less list; list_auditable_locations splits last_audited_at (last FULL audit — drives the 'Never' badge) from last_scoped_audit_at; list_all_audit_history returns scope_sets. Routes: GET /audit/start renders a scope picker (full=1 fast path preserves start-immediately; resume/confirm-switch still run first), POST /audit/start starts a scoped audit and re-renders the picker with an error on empty scope. Workspace/reconcile show the scope in the header + a neutral collapsed out-of-scope panel; the hub badges scoped history and shows a 'scoped {date}' subline. Migration verified up/down on SQLite + offline SQL for both dialects. 797 tests green (+13 scope tests)."
+  },
+  {
     "version": "4.3.6",
     "date": "2026-07-11",
     "added": [],
