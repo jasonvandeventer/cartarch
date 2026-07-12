@@ -1409,6 +1409,9 @@ class AuditSession(Base):
     # so reconciliation can itemize what changed (not just that the hash differs).
     # Nullable: audits started before this column exists diff hash-only.
     snapshot_detail: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Optional scope: JSON {"set_codes": [...]} restricting the audit to those
+    # sets at the location. NULL = full-location audit (the default/original).
+    scope: Mapped[str | None] = mapped_column(Text, nullable=True)
     started_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)
     paused_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
@@ -1416,8 +1419,9 @@ class AuditSession(Base):
 
 class AuditScan(Base):
     """One scan event inside an audit session. ``inventory_row_id`` is NULL for
-    extras (a scanned card with no matching expected row). ``scan_type`` is one
-    of ``match`` / ``extra`` / ``partial_match``.
+    extras and out-of-scope scans (no matching expected row). ``scan_type`` is
+    one of ``match`` / ``extra`` / ``partial_match`` / ``out_of_scope`` (the last
+    only in scoped audits: a scanned card whose set isn't in the audit's scope).
     """
 
     __tablename__ = "audit_scans"
@@ -1459,4 +1463,8 @@ class AuditLog(Base):
     cards_missing: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     cards_extra: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     actions_applied: Mapped[str] = mapped_column(Text, default="[]", nullable=False)
+    # Copied from the session at completion: JSON {"set_codes": [...]} for a
+    # scoped audit, NULL for a full-location audit. Drives history scope badges
+    # and the "last FULL audit" staleness signal on the hub.
+    scope: Mapped[str | None] = mapped_column(Text, nullable=True)
     completed_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)

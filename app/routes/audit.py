@@ -36,6 +36,8 @@ def _render_workspace(request: Request, session: Session, audit: AuditSession, u
     location = session.get(StorageLocation, audit.storage_location_id)
     progress = audit_service.get_scan_progress(session, audit.id, user.id)
     extras = audit_service.list_extras(session, audit.id, user.id)
+    out_of_scope = audit_service.list_out_of_scope(session, audit.id, user.id)
+    scope_sets = audit_service.scope_set_codes(audit)
     return render(
         request,
         "audit_workspace.html",
@@ -45,6 +47,8 @@ def _render_workspace(request: Request, session: Session, audit: AuditSession, u
             "audit": audit,
             "progress": progress,
             "extras": extras,
+            "out_of_scope": out_of_scope,
+            "scope_sets": scope_sets,
             "current_user": user,
         },
     )
@@ -85,40 +89,106 @@ def audit_hub(
     )
 
 
+def _resolve_active_or_none(request, session, location, current_user):
+    """Shared precedence: an active/paused audit ALWAYS takes priority over the
+    scope step. Returns a Response (resume workspace or confirm-switch page) when
+    an audit is in progress, else None (caller proceeds to scope/start)."""
+    active = audit_service.get_active_audit(session, current_user.id)
+    if active is None:
+        return None
+    if active.storage_location_id == location.id:
+        # Same location — resume in place (reactivate if paused).
+        if active.status == "paused":
+            audit_service.resume_audit(session, active.id, current_user.id)
+            session.commit()
+        return _render_workspace(request, session, active, current_user)
+    # A different location is mid-audit — confirm the switch before abandoning.
+    active_location = session.get(StorageLocation, active.storage_location_id)
+    return render(
+        request,
+        "audit_confirm_switch.html",
+        {
+            "title": "Audit in progress",
+            "active_audit": active,
+            "active_location": active_location,
+            "target_location": location,
+            "current_user": current_user,
+        },
+    )
+
+
+def _render_scope_picker(request, session, location, current_user, *, error=None):
+    location_sets = audit_service.list_location_sets(session, current_user.id, location.id)
+    return render(
+        request,
+        "audit_scope.html",
+        {
+            "title": f"Audit: {location.name}",
+            "location": location,
+            "location_sets": location_sets,
+            "total_cards": sum(s["card_count"] for s in location_sets),
+            "error": error,
+            "current_user": current_user,
+        },
+    )
+
+
 @router.get("/audit/start")
 def audit_start(
     request: Request,
     location_id: int,
+    full: int = 0,
     session: Session = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
 ):
+    """Resume/confirm-switch takes precedence (runs BEFORE the scope step). With
+    no active audit: ``full=1`` starts a full-location audit immediately (the fast
+    path); otherwise render the scope picker."""
     location = get_location(session, location_id=location_id, user_id=current_user.id)
     if location is None:
         raise HTTPException(status_code=404, detail="Location not found")
 
-    active = audit_service.get_active_audit(session, current_user.id)
-    if active is not None:
-        if active.storage_location_id == location_id:
-            # Same location — resume in place (reactivate if paused).
-            if active.status == "paused":
-                audit_service.resume_audit(session, active.id, current_user.id)
-                session.commit()
-            return _render_workspace(request, session, active, current_user)
-        # A different location is mid-audit — confirm the switch before abandoning.
-        active_location = session.get(StorageLocation, active.storage_location_id)
-        return render(
-            request,
-            "audit_confirm_switch.html",
-            {
-                "title": "Audit in progress",
-                "active_audit": active,
-                "active_location": active_location,
-                "target_location": location,
-                "current_user": current_user,
-            },
-        )
+    resolved = _resolve_active_or_none(request, session, location, current_user)
+    if resolved is not None:
+        return resolved
+
+    if not full:
+        return _render_scope_picker(request, session, location, current_user)
 
     audit, _expected = audit_service.start_audit(session, current_user.id, location_id)
+    session.commit()
+    return _render_workspace(request, session, audit, current_user)
+
+
+@router.post("/audit/start")
+async def audit_start_scoped(
+    request: Request,
+    location_id: int = Form(...),
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+    _: None = CsrfRequired,
+):
+    """Start an audit scoped to the selected sets (empty selection = full audit).
+    Active/paused audit still takes precedence."""
+    location = get_location(session, location_id=location_id, user_id=current_user.id)
+    if location is None:
+        raise HTTPException(status_code=404, detail="Location not found")
+
+    resolved = _resolve_active_or_none(request, session, location, current_user)
+    if resolved is not None:
+        return resolved
+
+    # set_codes is multi-valued (a checkbox per set); FastAPI caches the parsed
+    # form, so awaiting it here is free after CsrfRequired already read it.
+    form = await request.form()
+    set_codes = form.getlist("set_codes")
+    try:
+        audit, _expected = audit_service.start_audit(
+            session, current_user.id, location_id, set_codes=set_codes or None
+        )
+    except ValueError as e:
+        session.rollback()
+        return _render_scope_picker(request, session, location, current_user, error=str(e))
     session.commit()
     return _render_workspace(request, session, audit, current_user)
 
@@ -147,6 +217,7 @@ def audit_scan(
 
     progress = audit_service.get_scan_progress(session, audit.id, current_user.id)
     extras = audit_service.list_extras(session, audit.id, current_user.id)
+    out_of_scope = audit_service.list_out_of_scope(session, audit.id, current_user.id)
     return render(
         request,
         "_audit_scan_response.html",
@@ -155,6 +226,7 @@ def audit_scan(
             "audit": audit,
             "progress": progress,
             "extras": extras,
+            "out_of_scope": out_of_scope,
             "current_user": current_user,
         },
     )
@@ -219,6 +291,7 @@ def _render_reconcile(request, session, audit, current_user, *, conflict=False, 
             "audit": audit,
             "location": location,
             "delta": delta,
+            "scope_sets": audit_service.scope_set_codes(audit),
             "snapshot_ok": ok and not conflict,
             "changes": changes if changes is not None else snapshot_changes,
             "current_user": current_user,
@@ -347,15 +420,9 @@ def audit_card_search(
     if len(q) < 2:
         return JSONResponse([])
 
-    expected_card_ids = {
-        r.card_id
-        for r in session.query(InventoryRow.card_id)
-        .filter(
-            InventoryRow.user_id == current_user.id,
-            InventoryRow.storage_location_id == audit.storage_location_id,
-        )
-        .all()
-    }
+    # Scope-aware: "expected" reflects the audit's scoped expected rows, so a
+    # scoped audit doesn't badge out-of-scope printings as expected.
+    expected_card_ids = {r.card_id for r in audit_service._audit_expected_rows(session, audit)}
 
     cards = (
         session.query(Card)

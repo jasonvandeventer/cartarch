@@ -5,8 +5,11 @@
     <div class="hero-row">
       <div>
         {{ editorial_eyebrow("Audit · " ~ location.name) }}
-        <h2 class="panel-title">Auditing: {{ location.name }}</h2>
-        <p class="muted">{{ loc_type_label(location.type) }}</p>
+        <h2 class="panel-title">Auditing: {{ location.name }}{% if scope_sets %} <span class="audit-scope-badge">{{ scope_sets | join(', ') }}</span>{% endif %}</h2>
+        <p class="muted">
+          {{ loc_type_label(location.type) }}
+          {% if scope_sets %}· scoped to {{ scope_sets | join(', ') }} · {{ progress.total_expected }} card{{ 's' if progress.total_expected != 1 else '' }}{% endif %}
+        </p>
       </div>
       <div style="display:flex;gap:0.5rem;flex-wrap:wrap">
         <form method="post" action="/audit/{{ audit.id }}/pause" style="display:inline">

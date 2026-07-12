@@ -11,12 +11,14 @@
     <div class="hero-row">
       <div>
         {{ editorial_eyebrow("Audit · Reconcile · " ~ location.name) }}
-        <h2 class="panel-title">Reconcile: {{ location.name }}</h2>
+        <h2 class="panel-title">Reconcile: {{ location.name }}{% if scope_sets %} <span class="audit-scope-badge">{{ scope_sets | join(', ') }}</span>{% endif %}</h2>
         <p class="muted">
+          {% if scope_sets %}scoped to {{ scope_sets | join(', ') }} · {% endif %}
           {{ delta.seen|length }} verified ·
           {{ delta.missing|length }} missing ·
           {{ delta.extras|length }} extra ·
           {{ delta.partial_matches|length }} partial
+          {% if delta.out_of_scope %}· {{ delta.out_of_scope|length }} out of scope{% endif %}
         </p>
       </div>
     </div>
@@ -65,7 +67,7 @@
       {# Missing — mark missing (default) or ignore (present, was skipped). #}
       {% if delta.missing %}
         <section class="panel">
-          <h3 class="panel-title">Missing <span class="muted">({{ delta.missing|length }})</span></h3>
+          <h3 class="panel-title">Missing <span class="muted">({{ delta.missing|length }}{% if scope_sets %} — not found among the audited sets{% endif %})</span></h3>
           {% for m in delta.missing %}
             <div class="audit-recon-row">
               <div class="audit-recon-info">
@@ -140,6 +142,27 @@
               </div>
             </div>
           {% endfor %}
+        </section>
+      {% endif %}
+
+      {# Out of scope — scanned cards outside the audited sets. Display-only: no
+         action radios (they're acknowledged, not reconciled). #}
+      {% if delta.out_of_scope %}
+        <section class="panel">
+          <details>
+            <summary class="audit-oos-summary"><strong>Out of scope ({{ delta.out_of_scope|length }})</strong> <span class="muted">— scanned, outside the audited sets · no action</span></summary>
+            <ul class="audit-extras-list" style="margin-top:0.6rem">
+              {% for e in delta.out_of_scope %}
+                <li class="audit-extra-row audit-oos-row">
+                  {{ card_thumb(e.scryfall_id, e.card_name) }}
+                  <span class="audit-card-name">{{ e.card_name }}</span>
+                  <span class="muted">{{ e.set_code }} #{{ e.collector_number }} · {{ e.finish }}</span>
+                  <span class="audit-card-qty">x{{ e.quantity_scanned }}</span>
+                  <span class="audit-oos-badge">OUT OF SCOPE</span>
+                </li>
+              {% endfor %}
+            </ul>
+          </details>
         </section>
       {% endif %}
 

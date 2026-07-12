@@ -176,7 +176,8 @@ def test_route_start_creates_session_and_scan_returns_partial(db, client, user):
     _row(db, user.id, card, loc.id, qty=1)
     db.commit()
 
-    r = client.get(f"/audit/start?location_id={loc.id}")
+    # full=1 is the fast path that starts immediately (no scope picker).
+    r = client.get(f"/audit/start?location_id={loc.id}&full=1")
     assert r.status_code == 200
     assert "Auditing" in r.text
 
@@ -305,3 +306,55 @@ def test_route_non_owner_gets_404(db, client, user):
         == 404
     )
     assert client.get(f"/audit/start?location_id={loc.id}").status_code == 404
+
+
+# -- scoped audit routes (set-code subset) ------------------------------------
+
+
+def test_route_start_no_full_shows_scope_picker(db, client, user):
+    loc = _loc(db, user.id)
+    _row(db, user.id, _card(db, name="Bolt", set_code="LTR"), loc.id, qty=2)
+    _row(db, user.id, _card(db, name="Sol Ring", set_code="MH3"), loc.id, qty=1)
+    db.commit()
+
+    r = client.get(f"/audit/start?location_id={loc.id}")
+    assert r.status_code == 200
+    assert "Audit selected sets" in r.text  # the scope picker, not the workspace
+    assert "LTR" in r.text and "MH3" in r.text
+    # No session started by merely viewing the picker.
+    assert db.query(AuditSession).filter_by(user_id=user.id).count() == 0
+
+
+def test_route_start_scoped_post_starts_scoped_audit(db, client, user):
+    loc = _loc(db, user.id)
+    _row(db, user.id, _card(db, name="Bolt", set_code="LTR"), loc.id, qty=2)
+    _row(db, user.id, _card(db, name="Sol Ring", set_code="MH3"), loc.id, qty=1)
+    _row(db, user.id, _card(db, name="Boseiju", set_code="NEO"), loc.id, qty=1)
+    db.commit()
+
+    r = client.post(
+        "/audit/start",
+        data={"location_id": loc.id, "set_codes": ["LTR", "MH3"]},
+        follow_redirects=False,
+    )
+    assert r.status_code == 200
+    assert "Auditing" in r.text
+    audit = db.query(AuditSession).filter_by(user_id=user.id).one()
+    import json
+
+    assert json.loads(audit.scope) == {"set_codes": ["LTR", "MH3"]}
+
+
+def test_route_start_scoped_empty_reshows_picker_with_error(db, client, user):
+    loc = _loc(db, user.id)
+    _row(db, user.id, _card(db, name="Bolt", set_code="LTR"), loc.id, qty=1)
+    db.commit()
+
+    r = client.post(
+        "/audit/start",
+        data={"location_id": loc.id, "set_codes": ["ZZZ"]},
+        follow_redirects=False,
+    )
+    assert r.status_code == 200
+    assert "No cards from those sets" in r.text
+    assert db.query(AuditSession).filter_by(user_id=user.id).count() == 0

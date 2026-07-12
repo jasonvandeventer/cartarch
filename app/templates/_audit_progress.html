@@ -55,4 +55,28 @@
       </ul>
     </section>
   {% endif %}
+
+  {# Out of scope — scanned but not part of this scoped audit. Acknowledged only:
+     collapsed, no reconciliation actions. #}
+  {% if out_of_scope %}
+    <section class="panel">
+      <details>
+        <summary class="audit-oos-summary"><strong>Out of scope ({{ out_of_scope | length }})</strong> <span class="muted">— scanned, not part of this audit</span></summary>
+        <ul class="audit-extras-list" style="margin-top:0.6rem">
+          {% for e in out_of_scope %}
+            <li class="audit-extra-row audit-oos-row">
+              {% if e.scryfall_id %}
+                <img class="audit-thumb" loading="lazy" alt=""
+                     src="{{ mirror_image_url(e.scryfall_id, 'small') }}" {{ img_fallback(e.scryfall_id, 'small') }}>
+              {% endif %}
+              <span class="audit-card-name">{{ e.card_name }}</span>
+              <span class="muted">{{ e.set_code }} #{{ e.collector_number }} · {{ e.finish }}</span>
+              <span class="audit-card-qty">x{{ e.quantity_scanned }}</span>
+              <span class="audit-oos-badge">OUT OF SCOPE</span>
+            </li>
+          {% endfor %}
+        </ul>
+      </details>
+    </section>
+  {% endif %}
 </div>

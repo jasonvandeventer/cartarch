@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% from "_macros.html" import editorial_eyebrow, loc_type_label %}
+{% block content %}
+  <section class="panel hero-panel compact-hero">
+    <div class="hero-row">
+      <div>
+        {{ editorial_eyebrow("Audit · " ~ location.name) }}
+        <h2 class="panel-title">Audit: {{ location.name }}</h2>
+        <p class="muted">{{ loc_type_label(location.type) }} · {{ total_cards }} card{{ 's' if total_cards != 1 else '' }}</p>
+      </div>
+    </div>
+  </section>
+
+  {% if error %}
+    <section class="panel audit-conflict-banner">
+      <p class="muted" style="margin:0">{{ error }}</p>
+    </section>
+  {% endif %}
+
+  <section class="panel">
+    <h3 class="panel-title">Audit everything</h3>
+    <p class="muted">Verify the whole location — every card, in physical order.</p>
+    <a href="/audit/start?location_id={{ location.id }}&full=1">
+      <button type="button" class="btn-like">Audit everything ({{ total_cards }} card{{ 's' if total_cards != 1 else '' }})</button>
+    </a>
+  </section>
+
+  {% if location_sets %}
+    <section class="panel">
+      <h3 class="panel-title">Audit selected sets</h3>
+      <p class="muted">Verify just part of this location — pick the sets you're checking.</p>
+      <form method="post" action="/audit/start" id="audit-scope-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <input type="hidden" name="location_id" value="{{ location.id }}">
+        <ul class="audit-scope-list">
+          {% for s in location_sets %}
+            <li class="audit-scope-item">
+              <label class="audit-scope-label">
+                <input type="checkbox" name="set_codes" value="{{ s.set_code }}"
+                       class="audit-scope-cb" data-count="{{ s.card_count }}">
+                <span class="audit-scope-set">{{ s.set_code }}{% if s.set_name %} <span class="muted">— {{ s.set_name }}</span>{% endif %}</span>
+                <span class="audit-scope-count">{{ s.card_count }}</span>
+              </label>
+            </li>
+          {% endfor %}
+        </ul>
+        <div class="add-card-actions" style="margin-top:0.8rem">
+          <button type="submit" id="audit-scope-submit" class="btn-like" disabled>
+            Audit selected sets (<span id="audit-scope-total">0</span> cards)
+          </button>
+          <a href="/audit"><button type="button">Cancel</button></a>
+        </div>
+      </form>
+    </section>
+  {% else %}
+    <section class="panel">
+      <p class="muted">This location has no cards to audit.</p>
+    </section>
+  {% endif %}
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  // Live total of selected cards + enable submit only when ≥1 set is checked.
+  (function () {
+    var form = document.getElementById('audit-scope-form');
+    if (!form) return;
+    var boxes = form.querySelectorAll('.audit-scope-cb');
+    var totalEl = document.getElementById('audit-scope-total');
+    var submit = document.getElementById('audit-scope-submit');
+    function update() {
+      var total = 0, any = false;
+      boxes.forEach(function (b) {
+        if (b.checked) { total += parseInt(b.dataset.count, 10) || 0; any = true; }
+      });
+      totalEl.textContent = total;
+      submit.disabled = !any;
+    }
+    boxes.forEach(function (b) { b.addEventListener('change', update); });
+    update();
+  })();
+</script>
+{% endblock %}

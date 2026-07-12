@@ -101,6 +101,48 @@ def _location_rows(session: Session, user_id: int, storage_location_id: int) -> 
     )
 
 
+def _parse_scope(scope_json: str | None) -> set[str] | None:
+    """Uppercased set codes an audit is scoped to, or ``None`` for a full audit
+    (also None when the JSON is malformed or the code list is empty)."""
+    if not scope_json:
+        return None
+    try:
+        data = json.loads(scope_json)
+    except (ValueError, TypeError):
+        return None
+    codes = data.get("set_codes") if isinstance(data, dict) else None
+    if not codes:
+        return None
+    normalized = {str(c).strip().upper() for c in codes if str(c).strip()}
+    return normalized or None
+
+
+def scope_set_codes(audit: AuditSession) -> list[str] | None:
+    """Sorted set codes an audit is scoped to (for headers/badges), or ``None``
+    for a full audit."""
+    scope = _parse_scope(audit.scope)
+    return sorted(scope) if scope else None
+
+
+def _in_scope(row: InventoryRow, scope: set[str] | None) -> bool:
+    """A row is in scope when the audit is unscoped, or its card's set is listed."""
+    if scope is None:
+        return True
+    return bool(row.card) and (row.card.set_code or "").upper() in scope
+
+
+def _scoped_rows(rows: list[InventoryRow], scope: set[str] | None) -> list[InventoryRow]:
+    return [r for r in rows if _in_scope(r, scope)] if scope is not None else rows
+
+
+def _audit_expected_rows(session: Session, audit: AuditSession) -> list[InventoryRow]:
+    """The audit's expected inventory rows — the location's rows filtered to the
+    audit's scope (all rows for a full audit). The single source of truth for the
+    expected set across snapshot, scan matching, progress, and reconciliation."""
+    rows = _location_rows(session, audit.user_id, audit.storage_location_id)
+    return _scoped_rows(rows, _parse_scope(audit.scope))
+
+
 def _snapshot_hash(rows: list[InventoryRow]) -> str:
     """Deterministic fingerprint of a location's inventory: sorted (row id,
     quantity) pairs → sha256. Same inventory ⇒ same hash regardless of row
@@ -181,11 +223,19 @@ def get_active_audit(session: Session, user_id: int) -> AuditSession | None:
 
 
 def start_audit(
-    session: Session, user_id: int, storage_location_id: int
+    session: Session,
+    user_id: int,
+    storage_location_id: int,
+    set_codes: list[str] | None = None,
 ) -> tuple[AuditSession, list[InventoryRow]]:
     """Open an audit for a location. Returns the session and the expected card
     list in physical-encounter order. Raises if the user already has an active
-    OR paused audit (the paused one must be explicitly abandoned first)."""
+    OR paused audit (the paused one must be explicitly abandoned first).
+
+    ``set_codes`` scopes the audit to those sets: the snapshot and expected set
+    cover ONLY the matching rows, so concurrent changes to unscoped cards at the
+    same location don't invalidate it. ``None``/empty = a full-location audit
+    (unchanged behavior). A scope that matches no rows is rejected (ValueError)."""
     location = session.get(StorageLocation, storage_location_id)
     if location is None:
         raise ValueError(f"storage location {storage_location_id} not found")
@@ -195,18 +245,59 @@ def start_audit(
     if get_active_audit(session, user_id) is not None:
         raise ValueError("an audit is already active or paused; abandon it before starting another")
 
-    rows = _location_rows(session, user_id, storage_location_id)
+    all_rows = _location_rows(session, user_id, storage_location_id)
+    scope = {str(c).strip().upper() for c in (set_codes or []) if str(c).strip()} or None
+    scope_json = None
+    if scope is not None:
+        rows = _scoped_rows(all_rows, scope)
+        if not rows:
+            raise ValueError("No cards from those sets at this location")
+        scope_json = json.dumps({"set_codes": sorted(scope)})
+    else:
+        rows = all_rows
+
     audit = AuditSession(
         user_id=user_id,
         storage_location_id=storage_location_id,
         status="active",
         snapshot_hash=_snapshot_hash(rows),
         snapshot_detail=_snapshot_detail(rows),
+        scope=scope_json,
         started_at=utc_now(),
     )
     session.add(audit)
     session.flush()
     return audit, _expected_order(location, rows)
+
+
+def list_location_sets(session: Session, user_id: int, storage_location_id: int) -> list[dict]:
+    """Sets present at a location — ``set_code``, ``set_name`` (if known), and
+    ``card_count`` (summed quantities) — sorted by count desc. Powers the scope
+    picker at audit start."""
+    rows = (
+        session.query(
+            Card.set_code,
+            Card.set_name,
+            func.coalesce(func.sum(InventoryRow.quantity), 0),
+        )
+        .join(Card, InventoryRow.card_id == Card.id)
+        .filter(
+            InventoryRow.user_id == user_id,
+            InventoryRow.storage_location_id == storage_location_id,
+        )
+        .group_by(Card.set_code, Card.set_name)
+        .all()
+    )
+    agg: dict[str, dict] = {}
+    for code, name, count in rows:
+        key = (code or "").upper()
+        entry = agg.setdefault(key, {"set_code": key, "set_name": None, "card_count": 0})
+        entry["card_count"] += int(count)
+        if name and not entry["set_name"]:
+            entry["set_name"] = name
+    out = list(agg.values())
+    out.sort(key=lambda d: (-d["card_count"], d["set_code"]))
+    return out
 
 
 def pause_audit(session: Session, audit_session_id: int, user_id: int) -> AuditSession:
@@ -265,6 +356,7 @@ def complete_audit(
         cards_missing=cards_missing,
         cards_extra=cards_extra,
         actions_applied=json.dumps(actions_applied or []),
+        scope=audit.scope,  # copy the scope so history/staleness can distinguish scoped audits
         completed_at=audit.completed_at,
     )
     session.add(log)
@@ -287,7 +379,7 @@ def _scan_progress(session: Session, audit_session_id: int) -> dict:
 
 @dataclass
 class ScanResult:
-    scan_type: str  # match | extra | partial_match
+    scan_type: str  # match | extra | partial_match | out_of_scope
     audit_scan_id: int
     matched_row: InventoryRow | None
     message: str
@@ -300,6 +392,7 @@ class AuditProgress:
     total_seen: int
     total_remaining: int
     total_extras: int
+    total_out_of_scope: int = 0
     expected_cards: list[dict] = field(default_factory=list)
 
 
@@ -365,7 +458,19 @@ def record_scan(
     if card is None:
         raise ValueError(f"card {card_id} not found")
 
-    expected = _location_rows(session, user_id, audit.storage_location_id)
+    # 0. Scope gate (scoped audits only): the SCANNED card's own set decides. A
+    # card whose set isn't in scope is out_of_scope — acknowledged, not an extra,
+    # no reconciliation — even if an in-scope printing of the same name is
+    # expected (the operator scanned what's physically in hand). Runs BEFORE
+    # match/partial/extra.
+    scope = _parse_scope(audit.scope)
+    if scope is not None and (card.set_code or "").upper() not in scope:
+        scan = _add_scan(session, audit_session_id, None, card_id, finish, "out_of_scope", quantity)
+        return ScanResult(
+            "out_of_scope", scan.id, None, "Out of scope — not part of this audit", card.scryfall_id
+        )
+
+    expected = _scoped_rows(_location_rows(session, user_id, audit.storage_location_id), scope)
     seen = _seen_by_row(session, audit_session_id)
 
     # 1. Exact printing + finish with a copy still unseen.
@@ -416,7 +521,7 @@ def get_scan_progress(session: Session, audit_session_id: int, user_id: int) -> 
     status."""
     audit = _owned_audit(session, audit_session_id, user_id)
     location = session.get(StorageLocation, audit.storage_location_id)
-    rows = _expected_order(location, _location_rows(session, user_id, audit.storage_location_id))
+    rows = _expected_order(location, _audit_expected_rows(session, audit))
     seen = _seen_by_row(session, audit_session_id)
 
     total_extras = (
@@ -424,6 +529,14 @@ def get_scan_progress(session: Session, audit_session_id: int, user_id: int) -> 
         .filter(
             AuditScan.audit_session_id == audit_session_id,
             AuditScan.scan_type == "extra",
+        )
+        .scalar()
+    )
+    total_out_of_scope = (
+        session.query(func.coalesce(func.sum(AuditScan.quantity_scanned), 0))
+        .filter(
+            AuditScan.audit_session_id == audit_session_id,
+            AuditScan.scan_type == "out_of_scope",
         )
         .scalar()
     )
@@ -460,6 +573,7 @@ def get_scan_progress(session: Session, audit_session_id: int, user_id: int) -> 
         total_seen=total_seen,
         total_remaining=max(0, total_expected - total_seen),
         total_extras=int(total_extras or 0),
+        total_out_of_scope=int(total_out_of_scope or 0),
         expected_cards=expected_cards,
     )
 
@@ -496,6 +610,38 @@ def list_extras(session: Session, audit_session_id: int, user_id: int) -> list[d
     return list(agg.values())
 
 
+def list_out_of_scope(session: Session, audit_session_id: int, user_id: int) -> list[dict]:
+    """Scanned cards whose set wasn't in a scoped audit's scope, aggregated by
+    printing + finish. Acknowledged-only: shown collapsed, offered no actions."""
+    _owned_audit(session, audit_session_id, user_id)
+    scans = (
+        session.query(AuditScan)
+        .options(joinedload(AuditScan.card))
+        .filter(
+            AuditScan.audit_session_id == audit_session_id,
+            AuditScan.scan_type == "out_of_scope",
+        )
+        .all()
+    )
+    agg: dict[tuple[int, str], dict] = {}
+    for s in scans:
+        key = (s.card_id, s.finish)
+        entry = agg.get(key)
+        if entry is None:
+            agg[key] = {
+                "card_id": s.card_id,
+                "card_name": s.card.name if s.card else "",
+                "set_code": (s.card.set_code or "").upper() if s.card else "",
+                "collector_number": s.card.collector_number if s.card else "",
+                "finish": s.finish,
+                "quantity_scanned": s.quantity_scanned,
+                "scryfall_id": s.card.scryfall_id if s.card else None,
+            }
+        else:
+            entry["quantity_scanned"] += s.quantity_scanned
+    return list(agg.values())
+
+
 # --- Phase 3: reconciliation -------------------------------------------------
 
 
@@ -505,6 +651,7 @@ class AuditDelta:
     missing: list[dict] = field(default_factory=list)
     extras: list[dict] = field(default_factory=list)
     partial_matches: list[dict] = field(default_factory=list)
+    out_of_scope: list[dict] = field(default_factory=list)
 
 
 @dataclass
@@ -552,7 +699,7 @@ def compute_delta(session: Session, audit_session_id: int, user_id: int) -> Audi
     expected rows."""
     audit = _owned_audit(session, audit_session_id, user_id)
     location = session.get(StorageLocation, audit.storage_location_id)
-    expected = {r.id: r for r in _location_rows(session, user_id, audit.storage_location_id)}
+    expected = {r.id: r for r in _audit_expected_rows(session, audit)}
     ordered = _expected_order(location, list(expected.values()))
     match_seen, _partial_seen = _seen_by_row_and_type(session, audit_session_id)
 
@@ -633,6 +780,9 @@ def compute_delta(session: Session, audit_session_id: int, user_id: int) -> Audi
             }
         )
 
+    # Out-of-scope scans (scoped audits only) — display-only, no proposed actions.
+    delta.out_of_scope = list_out_of_scope(session, audit_session_id, user_id)
+
     return delta
 
 
@@ -644,7 +794,9 @@ def validate_snapshot(session: Session, audit_session_id: int) -> tuple[bool, li
     if audit is None:
         raise ValueError(f"audit session {audit_session_id} not found")
 
-    current_rows = _location_rows(session, audit.user_id, audit.storage_location_id)
+    # Scoped audits hash ONLY their in-scope rows, so unscoped changes at the same
+    # location don't trip the concurrency check (in-scope changes still do).
+    current_rows = _audit_expected_rows(session, audit)
     if _snapshot_hash(current_rows) == audit.snapshot_hash:
         return True, []
 
@@ -924,19 +1076,24 @@ def list_auditable_locations(session: Session, user_id: int) -> list[dict]:
         .group_by(InventoryRow.storage_location_id)
         .all()
     )
-    # Most-recent completed audit per location (first seen in desc order wins).
-    last_by_loc: dict[int, AuditLog] = {}
+    # Most-recent completed audit per location (first seen in desc order wins),
+    # split by scope: staleness ("last audited" / "Never") is driven by the last
+    # FULL audit; scoped audits are surfaced separately and never reset staleness.
+    last_full: dict[int, AuditLog] = {}
+    last_scoped: dict[int, AuditLog] = {}
     for log in (
         session.query(AuditLog)
         .filter(AuditLog.user_id == user_id)
         .order_by(AuditLog.completed_at.desc(), AuditLog.id.desc())
         .all()
     ):
-        last_by_loc.setdefault(log.storage_location_id, log)
+        target = last_scoped if log.scope else last_full
+        target.setdefault(log.storage_location_id, log)
 
     out: list[dict] = []
     for loc in locations:
-        last = last_by_loc.get(loc.id)
+        last = last_full.get(loc.id)
+        scoped = last_scoped.get(loc.id)
         out.append(
             {
                 "location_id": loc.id,
@@ -944,6 +1101,7 @@ def list_auditable_locations(session: Session, user_id: int) -> list[dict]:
                 "type": loc.type,
                 "card_count": int(counts.get(loc.id, 0)),
                 "last_audited_at": last.completed_at if last else None,
+                "last_scoped_audit_at": scoped.completed_at if scoped else None,
                 "last_audit_summary": (
                     {
                         "seen": last.cards_seen,
@@ -977,15 +1135,19 @@ def list_all_audit_history(session: Session, user_id: int, limit: int = 25) -> l
         .limit(limit)
         .all()
     )
-    return [
-        {
-            "completed_at": log.completed_at,
-            "location_name": loc_name or "—",
-            "cards_expected": log.cards_expected,
-            "cards_seen": log.cards_seen,
-            "cards_missing": log.cards_missing,
-            "cards_extra": log.cards_extra,
-            "actions_count": len(json.loads(log.actions_applied or "[]")),
-        }
-        for log, loc_name in rows
-    ]
+    result = []
+    for log, loc_name in rows:
+        scope = _parse_scope(log.scope)
+        result.append(
+            {
+                "completed_at": log.completed_at,
+                "location_name": loc_name or "—",
+                "cards_expected": log.cards_expected,
+                "cards_seen": log.cards_seen,
+                "cards_missing": log.cards_missing,
+                "cards_extra": log.cards_extra,
+                "actions_count": len(json.loads(log.actions_applied or "[]")),
+                "scope_sets": sorted(scope) if scope else None,
+            }
+        )
+    return result

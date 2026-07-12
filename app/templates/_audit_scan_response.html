@@ -11,6 +11,7 @@
   <span class="audit-scan-tag">
     {% if result.scan_type == "match" %}✓ Match
     {% elif result.scan_type == "partial_match" %}≈ Partial
+    {% elif result.scan_type == "out_of_scope" %}⊘ Out of scope
     {% else %}✗ Extra{% endif %}
   </span>
   <span class="audit-scan-message">{{ result.message }}</span>

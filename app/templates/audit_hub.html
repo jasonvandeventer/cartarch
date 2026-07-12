@@ -62,6 +62,9 @@
                   {% else %}
                     <span class="audit-never-badge">Never</span>
                   {% endif %}
+                  {% if loc.last_scoped_audit_at %}
+                    <span class="muted small-text audit-scoped-subline">scoped {{ loc.last_scoped_audit_at.strftime('%Y-%m-%d') }}</span>
+                  {% endif %}
                 </td>
                 <td class="col-priority-low">
                   {% if loc.last_audit_summary %}
@@ -105,7 +108,10 @@
             {% for a in audit_history %}
               <tr>
                 <td>{{ a.completed_at.strftime('%Y-%m-%d %H:%M') }}</td>
-                <td>{{ a.location_name }}</td>
+                <td>
+                  {{ a.location_name }}
+                  {% if a.scope_sets %}<span class="audit-scope-badge">{{ a.scope_sets | join(', ') }}</span>{% endif %}
+                </td>
                 <td>{{ a.cards_expected }}</td>
                 <td>{{ a.cards_seen }}</td>
                 <td>{{ a.cards_missing }}</td>
