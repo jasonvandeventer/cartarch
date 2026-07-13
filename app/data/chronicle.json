@@ -1,5 +1,15 @@
 [
   {
+    "version": "4.7.2",
+    "date": "2026-07-13",
+    "added": [],
+    "refined": [],
+    "resolved": [
+      "Momir creature cards no longer flicker on the table board — they only animate when a creature actually changes, instead of re-popping every second."
+    ],
+    "archivist_note": "v4.7.2 = fix Momir board flicker introduced by the v4.7.1 battlefield. The tablet's setInterval(render, 1000) (turn timers) re-ran renderMomirTokens every second, which rebuilt the seat's innerHTML — recreating every <img> and replaying the tc-momir-in spawn animation, so the enlarged battlefield cards re-popped once a second. Fix: signature-guard the token rebuild — el.dataset.sig = JSON.stringify(tokens) + a per-creature summoning-sick bit; return early when unchanged. The sick suffix refreshes summoning-sick outlines on a turn advance without re-popping seats whose creatures didn't change. Same guard added to game_companion.html renderTokens (it re-popped on every SSE update from any player's action). Cards now animate only on real changes. Suite 868 green."
+  },
+  {
     "version": "4.7.1",
     "date": "2026-07-13",
     "added": [
