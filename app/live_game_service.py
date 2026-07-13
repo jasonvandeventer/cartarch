@@ -112,29 +112,20 @@ def random_creature_at_cmc(session: Session, cmc: int) -> dict | None:
     }
 
 
-# ponytail: per-process memo of the MVs that have >=1 legal creature. Feeds the
-# Phase 5 picker (grey out empty MVs). invalidate_valid_mvs() busts it; web pods
-# otherwise refresh on restart — fine, the set is effectively static.
-_valid_momir_mvs: set[int] | None = None
-
-
 def valid_momir_mvs(session: Session) -> set[int]:
     """Set of integer MVs (0.._MAX_MOMIR_CMC) with at least one Momir-legal
-    creature. Memoized; call :func:`invalidate_valid_mvs` after an ingest."""
-    global _valid_momir_mvs
-    if _valid_momir_mvs is None:
-        rows = (
-            session.query(OracleCatalog.cmc)
-            .filter(OracleCatalog.is_momir_legal.is_(True))
-            .distinct()
-        )
-        _valid_momir_mvs = {int(c) for (c,) in rows if c is not None and 0 <= c <= _MAX_MOMIR_CMC}
-    return _valid_momir_mvs
+    creature — feeds the Phase 5 picker (grey out empty MVs).
 
-
-def invalidate_valid_mvs() -> None:
-    global _valid_momir_mvs
-    _valid_momir_mvs = None
+    ponytail: queried live, NOT memoized. The old per-process memo went stale
+    across processes — an ingest in the job pod couldn't bust a web pod's cache,
+    so a freshly-populated catalog left the picker greyed until a manual restart
+    (this bit prod on the v4.6.0 rollout). A DISTINCT over the indexed is_momir_legal
+    column is sub-millisecond and only runs on a Momir page render, so a cache
+    bought nothing but a footgun."""
+    rows = (
+        session.query(OracleCatalog.cmc).filter(OracleCatalog.is_momir_legal.is_(True)).distinct()
+    )
+    return {int(c) for (c,) in rows if c is not None and 0 <= c <= _MAX_MOMIR_CMC}
 
 
 # Physical clockwise seating slots (mirrors game_detail.html's CLOCKWISE). Turn

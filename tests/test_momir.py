@@ -39,7 +39,6 @@ def _creature(
 ):
     """Insert one oracle_catalog row (Momir Sim #109 — the creature source moved
     off the collection-bounded ``cards`` table to a one-row-per-name catalog)."""
-    live_game_service.invalidate_valid_mvs()  # keep the memo honest across seeds
     db.add(
         OracleCatalog(
             oracle_id=f"oid-{next(_seq)}",

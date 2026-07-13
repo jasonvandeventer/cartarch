@@ -3,7 +3,8 @@
 The Scryfall bulk fetch is replaced with an in-memory list of oracle entries —
 no live network. Covers: the is_momir_legal filter policy (creature-only, layout
 / vintage / set exclusions), multi-face FRONT-face extraction, upsert-by-oracle_id
-idempotency, JSON keyword/color passthrough, and the valid-MV cache bust.
+idempotency, JSON keyword/color passthrough, valid-MV reporting, and the Scryfall
+User-Agent contract.
 """
 
 from __future__ import annotations
@@ -11,6 +12,7 @@ from __future__ import annotations
 import json
 
 from app import live_game_service
+from app.jobs import oracle_ingest
 from app.jobs.oracle_ingest import extract, run_ingest
 from app.models import OracleCatalog
 
@@ -90,7 +92,6 @@ def test_extract_multiface_uses_front_face_but_root_cmc_and_id():
 
 
 def test_run_ingest_upserts_and_counts(db):
-    live_game_service.invalidate_valid_mvs()
     cards = [
         _entry("o1", "Bear", 2, keywords=["Trample"]),
         _entry("o2", "Bolt", 1, type_line="Instant"),  # skipped (non-creature)
@@ -112,9 +113,35 @@ def test_run_ingest_upserts_and_counts(db):
     assert db.query(OracleCatalog).count() == 2
 
 
-def test_run_ingest_feeds_valid_mvs_and_busts_cache(db):
+def test_stream_sends_non_default_user_agent(monkeypatch):
+    # Scryfall rejects the default requests/urllib User-Agent with HTTP 400
+    # (generic_user_agent) — the whole ingest died on the first request in prod.
+    # Pin that stream_oracle_cards sends a real, descriptive UA.
+    seen = []
+
+    class _Resp:
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return {"data": [{"type": "oracle_cards", "download_uri": "http://x/oracle.json"}]}
+
+    def _fake_get(url, headers=None, **kw):
+        seen.append(headers or {})
+        return _Resp()
+
+    monkeypatch.setattr(oracle_ingest.requests, "get", _fake_get)
+    monkeypatch.setattr(oracle_ingest, "_stream_json_array", lambda uri: iter(()))
+    list(oracle_ingest.stream_oracle_cards())
+
+    assert seen, "no HTTP request was made"
+    ua = seen[0].get("User-Agent", "")
+    assert ua and "python" not in ua.lower() and "requests" not in ua.lower()
+
+
+def test_run_ingest_feeds_valid_mvs_live(db):
     run_ingest(db, [_entry("o1", "One", 1), _entry("o2", "Three", 3)])
     assert live_game_service.valid_momir_mvs(db) == {1, 3}
-    # A later ingest adds a new MV; the helper must reflect it (cache busted).
+    # A later ingest adds a new MV; the helper (queried live) reflects it.
     run_ingest(db, [_entry("o3", "Five", 5)])
     assert live_game_service.valid_momir_mvs(db) == {1, 3, 5}

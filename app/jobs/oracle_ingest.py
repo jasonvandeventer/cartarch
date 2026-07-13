@@ -22,12 +22,17 @@ from collections.abc import Iterable, Iterator
 import ijson
 import requests
 
-from app import live_game_service
 from app.db import SessionLocal
 from app.models import OracleCatalog
 from app.timeutil import utc_now
 
 BULK_INDEX_URL = "https://api.scryfall.com/bulk-data"
+
+# Scryfall REQUIRES a descriptive, non-default User-Agent — the stdlib/requests
+# default is rejected with HTTP 400 (subcode generic_user_agent). Without this the
+# whole ingest fails on the very first request. (Their guidelines also ask for an
+# explicit Accept.)
+_HEADERS = {"User-Agent": "Cartarch/1.0 (+https://cartarch.com)", "Accept": "application/json"}
 
 # Layouts that are not real castable creatures even when the type line says
 # "Creature" (game tokens, emblems, the double-faced-token printings, art cards).
@@ -40,7 +45,7 @@ def _stream_json_array(url: str) -> Iterator[dict]:
     Scryfall bulk files are a bare ``[ {...}, {...} ]`` array, so ``ijson.items``
     over the ``item`` path streams one card at a time. ``decode_content``
     transparently inflates gzip."""
-    resp = requests.get(url, stream=True, timeout=(30, 600))
+    resp = requests.get(url, headers=_HEADERS, stream=True, timeout=(30, 600))
     resp.raise_for_status()
     resp.raw.decode_content = True
     try:
@@ -52,7 +57,9 @@ def _stream_json_array(url: str) -> Iterator[dict]:
 def stream_oracle_cards() -> Iterator[dict]:
     """Resolve the current oracle_cards download URI from the bulk index, then
     stream every card object from it."""
-    index = requests.get(BULK_INDEX_URL, timeout=(30, 60)).json()
+    resp = requests.get(BULK_INDEX_URL, headers=_HEADERS, timeout=(30, 60))
+    resp.raise_for_status()
+    index = resp.json()
     uri = next(e["download_uri"] for e in index["data"] if e["type"] == "oracle_cards")
     yield from _stream_json_array(uri)
 
@@ -137,10 +144,6 @@ def run_ingest(session, cards: Iterable[dict] | None = None) -> dict[str, int]:
             setattr(row, key, value)
         row.updated_at = now
     session.commit()
-    # The valid-MV set (Phase 5 picker) is memoized per process; bust this
-    # process's copy. Web pods pick up MV changes on next restart — acceptable
-    # because which MVs have >=1 legal creature is effectively static.
-    live_game_service.invalidate_valid_mvs()
     stats = {"inserted": inserted, "updated": updated, "skipped": skipped}
     print(f"[oracle-ingest] {stats}", flush=True)
     return stats
