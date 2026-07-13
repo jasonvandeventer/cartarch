@@ -14,7 +14,7 @@ import pytest
 from app import live_game_service
 from app.game_service import create_game
 from app.live_game_service import random_creature_at_cmc
-from app.models import Game, GameEvent, GameSeat, OracleCatalog, User
+from app.models import Game, GameEvent, GameLiveState, GameSeat, OracleCatalog, User
 
 _seq = itertools.count(1)
 
@@ -77,6 +77,25 @@ def _momir_game(db, owner_id, *, seats, status="created"):
 
 def _act(db, game_id, user_id, action, token=None):
     return live_game_service.apply_live_action(db, game_id, user_id, action, token)
+
+
+def _start(db, game, user_id, *, fund=True):
+    """Start live mode and (by default) fund every seat with lands/untapped so the
+    #110 activation cost (untapped >= cmc, hand >= 1) doesn't block pre-#110 tests.
+    Lands are set too — untap resets untapped = lands each turn."""
+    live = live_game_service.start_live_game(db, game.id, user_id)
+    if fund:
+        st = json.loads(live.state)
+        for s in game.seats:
+            st["lands"][str(s.id)] = 30
+            st["untapped"][str(s.id)] = 30
+        live.state = json.dumps(st)
+        db.flush()
+    return live
+
+
+def _live_state(db, game_id):
+    return json.loads(db.query(GameLiveState).filter_by(game_id=game_id).one().state)
 
 
 def _state(live):
@@ -176,7 +195,7 @@ def test_route_momir_defaults_life_to_24(db, client, user):
 def live_momir(db):
     owner = _user(db)
     game, seats = _momir_game(db, owner.id, seats=[{"user_id": owner.id}, {}])
-    live_game_service.start_live_game(db, game.id, owner.id)
+    _start(db, game, owner.id)
     _creature(db, "Grizzly Bears", 3, power="2", toughness="2")
     return {"db": db, "gid": game.id, "uid": owner.id, "seats": seats, "owner": owner}
 
@@ -184,7 +203,7 @@ def live_momir(db):
 def test_start_initializes_empty_tokens_for_momir(db):
     owner = _user(db)
     game, _ = _momir_game(db, owner.id, seats=[{}, {}])
-    live = live_game_service.start_live_game(db, game.id, owner.id)
+    live = _start(db, game, owner.id)
     st = _state(live)
     assert st["tokens"] == {} and st["momirTurnUsed"] == {}
 
@@ -413,7 +432,7 @@ def test_momir_taking_lethal_attack_auto_eliminates(db):
     game, seats = _momir_game(
         db, owner.id, seats=[{"user_id": owner.id, "starting_life": 24}, {"starting_life": 2}]
     )
-    live_game_service.start_live_game(db, game.id, owner.id)
+    _start(db, game, owner.id)
     _creature(db, "Colossus", 3, power="5", toughness="5")
     s1, s2 = seats
     _act(db, game.id, owner.id, {"type": "momir_activate", "seat_id": s1.id, "cmc": 3}, "TABLE")
@@ -440,7 +459,7 @@ def test_momir_attacker_declares_defender_resolves_auth(db):
     owner = _user(db)
     a, b = _user(db), _user(db)
     game, seats = _momir_game(db, owner.id, seats=[{"user_id": a.id}, {"user_id": b.id}])
-    live_game_service.start_live_game(db, game.id, owner.id)
+    _start(db, game, owner.id)
     _creature(db, "Grizzly Bears", 3)
     s1, s2 = seats
     _act(db, game.id, a.id, {"type": "momir_activate", "seat_id": s1.id, "cmc": 3})
@@ -478,7 +497,7 @@ def test_momir_multiplayer_each_defender_resolves_their_own(db):
         owner.id,
         seats=[{"user_id": p1.id}, {"user_id": p2.id}, {"user_id": p3.id}, {"user_id": p4.id}],
     )
-    live_game_service.start_live_game(db, game.id, owner.id)
+    _start(db, game, owner.id)
     _creature(db, "Grizzly Bears", 3, power="2", toughness="2")
     s1, s2, s3, s4 = seats
     # p1 activates + attacks p3; p2 activates + attacks p4 (own-seat, no table token).
@@ -618,7 +637,7 @@ def test_momir_activate_seat_scoped_auth(db):
     owner = _user(db)
     a, b = _user(db), _user(db)
     game, seats = _momir_game(db, owner.id, seats=[{"user_id": a.id}, {"user_id": b.id}])
-    live_game_service.start_live_game(db, game.id, owner.id)
+    _start(db, game, owner.id)
     _creature(db, "Grizzly Bears", 1)
     s1, s2 = seats
     # player_a controls own seat (no table token).
@@ -626,6 +645,138 @@ def test_momir_activate_seat_scoped_auth(db):
     # ...but not player_b's seat.
     with pytest.raises(PermissionError):
         _act(db, game.id, a.id, {"type": "momir_activate", "seat_id": s2.id, "cmc": 1})
+
+
+# ── Phase 2 (#110): resource layer — mana / hand / library ───────────────────
+
+
+def test_momir_start_draws_first_player_only(db):
+    owner = _user(db)
+    game, seats = _momir_game(db, owner.id, seats=[{"user_id": owner.id}, {}])
+    live = _start(db, game, owner.id, fund=False)
+    st = _state(live)
+    s1, s2 = seats
+    # Every player draws on their first turn (incl. the starter) — but only the
+    # starter's first turn has begun at game start.
+    assert st["hand"][str(s1.id)] == 8 and st["library"][str(s1.id)] == 59
+    assert st["hand"][str(s2.id)] == 7 and st["library"][str(s2.id)] == 60
+    assert st["lands"][str(s1.id)] == 0 and st["landPlayed"][str(s1.id)] is False
+
+
+def test_momir_turn_advance_untaps_draws_and_resets_land(db):
+    owner = _user(db)
+    game, seats = _momir_game(db, owner.id, seats=[{"user_id": owner.id}, {}])
+    _start(db, game, owner.id, fund=False)
+    s1, s2 = seats
+    sid = str(s2.id)
+    # s2 mid-"tap" state: 5 lands but only 2 untapped, a small library, a tapped
+    # token, and a used land drop — poke the blob directly for the tapped token.
+    _act(
+        db,
+        game.id,
+        owner.id,
+        {"type": "momir_adjust", "seat_id": s2.id, "lands": 5, "untapped": 2, "library": 10},
+        "TABLE",
+    )
+    live = db.query(GameLiveState).filter_by(game_id=game.id).one()
+    st = json.loads(live.state)
+    st["tokens"][sid] = [
+        {"name": "x", "power": "1", "toughness": "1", "tapped": True, "alive": True}
+    ]
+    st["landPlayed"][sid] = True
+    live.state = json.dumps(st)
+    db.flush()
+
+    live = _act(db, game.id, owner.id, {"type": "turn"}, "TABLE")  # passes to s2
+    st = _state(live)
+    assert st["untapped"][sid] == 5  # untapped = lands
+    assert st["landPlayed"][sid] is False  # land drop reset
+    assert st["tokens"][sid][0]["tapped"] is False  # creatures untapped
+    assert st["hand"][sid] == 8 and st["library"][sid] == 9  # drew one
+
+
+def test_momir_play_land(live_momir):
+    L = live_momir
+    db, gid, uid = L["db"], L["gid"], L["uid"]
+    s = L["seats"][0]
+    sid = str(s.id)
+    st0 = _live_state(db, gid)
+    lands0, un0, hand0 = st0["lands"][sid], st0["untapped"][sid], st0["hand"][sid]
+    _act(db, gid, uid, {"type": "momir_play_land", "seat_id": s.id}, "TABLE")
+    st = _live_state(db, gid)
+    assert st["lands"][sid] == lands0 + 1 and st["untapped"][sid] == un0 + 1
+    assert st["hand"][sid] == hand0 - 1 and st["landPlayed"][sid] is True
+    with pytest.raises(ValueError):  # one land per turn
+        _act(db, gid, uid, {"type": "momir_play_land", "seat_id": s.id}, "TABLE")
+    # empty hand → no card to play (use s2, land drop still available)
+    s2 = L["seats"][1]
+    _act(db, gid, uid, {"type": "momir_adjust", "seat_id": s2.id, "hand": 0}, "TABLE")
+    with pytest.raises(ValueError):
+        _act(db, gid, uid, {"type": "momir_play_land", "seat_id": s2.id}, "TABLE")
+
+
+def test_momir_activate_cost_math(live_momir):
+    L = live_momir
+    db, gid, uid = L["db"], L["gid"], L["uid"]
+    s = L["seats"][0]
+    sid = str(s.id)
+    st0 = _live_state(db, gid)
+    un0, hand0 = st0["untapped"][sid], st0["hand"][sid]
+    _act(db, gid, uid, {"type": "momir_activate", "seat_id": s.id, "cmc": 3}, "TABLE")
+    st = _live_state(db, gid)
+    assert st["untapped"][sid] == un0 - 3  # tapped {3} mana
+    assert st["hand"][sid] == hand0 - 1  # discarded a card
+
+
+def test_momir_activate_requires_mana_and_a_card(live_momir):
+    L = live_momir
+    db, gid, uid = L["db"], L["gid"], L["uid"]
+    s = L["seats"][0]
+    _act(db, gid, uid, {"type": "momir_adjust", "seat_id": s.id, "untapped": 2}, "TABLE")
+    with pytest.raises(ValueError):  # 2 untapped < cmc 3
+        _act(db, gid, uid, {"type": "momir_activate", "seat_id": s.id, "cmc": 3}, "TABLE")
+    _act(
+        db, gid, uid, {"type": "momir_adjust", "seat_id": s.id, "untapped": 10, "hand": 0}, "TABLE"
+    )
+    with pytest.raises(ValueError):  # no card to discard
+        _act(db, gid, uid, {"type": "momir_activate", "seat_id": s.id, "cmc": 3}, "TABLE")
+
+
+def test_momir_deck_out_eliminates_and_stays_out(db):
+    owner = _user(db)
+    game, seats = _momir_game(db, owner.id, seats=[{"user_id": owner.id}, {}])
+    _start(db, game, owner.id, fund=False)
+    s1, s2 = seats
+    sid = str(s2.id)
+    _act(db, game.id, owner.id, {"type": "momir_adjust", "seat_id": s2.id, "library": 0}, "TABLE")
+    live = _act(db, game.id, owner.id, {"type": "turn"}, "TABLE")  # s2 draws from empty
+    st = _state(live)
+    assert st["eliminated"][sid] is True and st["eliminationCause"][sid] == "deck"
+    ev = (
+        db.query(GameEvent)
+        .filter_by(game_id=game.id, action_type="eliminate")
+        .order_by(GameEvent.id.desc())
+        .first()
+    )
+    assert json.loads(ev.payload) == {"auto": True, "cause": "deck", "eliminated": True}
+    # deck-out is permanent — a later life gain must NOT auto-revive it.
+    live = _act(db, game.id, owner.id, {"type": "life", "seat_id": s2.id, "delta": 5}, "TABLE")
+    assert _state(live)["eliminated"][sid] is True
+
+
+def test_momir_adjust_is_table_only(db):
+    owner = _user(db)
+    a = _user(db)
+    game, seats = _momir_game(db, owner.id, seats=[{"user_id": a.id}, {}])
+    _start(db, game, owner.id)
+    s1, _ = seats
+    sid = str(s1.id)
+    with pytest.raises(PermissionError):  # a seat player cannot adjust, even own seat
+        _act(db, game.id, a.id, {"type": "momir_adjust", "seat_id": s1.id, "library": 10})
+    _act(db, game.id, a.id, {"type": "momir_adjust", "seat_id": s1.id, "library": 10}, "TABLE")
+    assert _live_state(db, game.id)["library"][sid] == 10
+    with pytest.raises(ValueError):  # negatives rejected
+        _act(db, game.id, a.id, {"type": "momir_adjust", "seat_id": s1.id, "library": -1}, "TABLE")
 
 
 # ── Constraint: Commander games untouched ────────────────────────────────────
@@ -642,11 +793,32 @@ def test_commander_start_has_no_tokens_field(db):
     assert "tokens" not in _state(live)
 
 
+def test_commander_has_no_resource_keys(db):
+    owner = _user(db)
+    game = Game(user_id=owner.id, format="Commander", status="created", client_token="TABLE")
+    db.add(game)
+    db.flush()
+    db.add_all(
+        [
+            GameSeat(game_id=game.id, seat_number=i, player_name=f"P{i}", user_id=owner.id)
+            for i in (1, 2)
+        ]
+    )
+    db.flush()
+    live = live_game_service.start_live_game(db, game.id, owner.id)
+    st = _state(live)
+    assert not ({"library", "hand", "lands", "untapped", "landPlayed"} & st.keys())
+    # advancing the turn must not add any Momir resource keys either
+    live = _act(db, game.id, owner.id, {"type": "turn"}, "TABLE")
+    st = _state(live)
+    assert not ({"library", "hand", "lands", "untapped", "landPlayed"} & st.keys())
+
+
 def test_momir_pages_render(db, client, user):
     # Owner is `user` (client fixture pins get_current_user → user). Seat the
     # owner so the companion page shows the seat-scoped view, and start live.
     game, seats = _momir_game(db, user.id, seats=[{"user_id": user.id}, {}])
-    live_game_service.start_live_game(db, game.id, user.id)
+    _start(db, game, user.id)
     db.commit()
 
     detail = client.get(f"/games/{game.id}")

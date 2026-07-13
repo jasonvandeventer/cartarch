@@ -37,10 +37,28 @@ from app.timeutil import utc_now
 # companion infra: momir_activate (summon a random creature at a CMC) and
 # momir_kill_token (grey out a dead token). Both are seat-scoped and rejected in
 # non-Momir games — Commander games never see the tokens field or these types.
-_MOMIR_TYPES = {"momir_activate", "momir_kill_token", "momir_attack", "momir_resolve"}
+_MOMIR_TYPES = {
+    "momir_activate",
+    "momir_kill_token",
+    "momir_attack",
+    "momir_resolve",
+    "momir_play_land",
+    "momir_adjust",
+}
 _MUTATING_TYPES = {"life", "counter", "cmd", "eliminate", "turn"} | _MOMIR_TYPES
 
 _MAX_MOMIR_CMC = 16  # no creatures exist above ~16 CMC in MTG
+
+# Momir Sim #110 — per-seat resource layer (mana / hand / library). Seeded at
+# start and lazily back-filled (setdefault) so a game that began before this
+# feature doesn't KeyError. Adjustable only via the table-token momir_adjust.
+_MOMIR_RES_DEFAULTS = {
+    "library": 60,
+    "hand": 7,
+    "lands": 0,
+    "untapped": 0,
+    "landPlayed": False,
+}
 
 
 def _is_momir(game: Game) -> bool:
@@ -172,6 +190,9 @@ def _initial_state(game: Game) -> dict:
         state["momirTurnUsed"] = {}
         state["attacks"] = []  # pending declared attackers awaiting block decisions
         state["attackSeq"] = 0
+        # Per-seat resource layer (#110). One map per field, keyed like lives.
+        for key, default in _MOMIR_RES_DEFAULTS.items():
+            state[key] = {str(s.id): default for s in seats}
     return state
 
 
@@ -193,8 +214,14 @@ def start_live_game(session: Session, game_id: int, user_id: int) -> GameLiveSta
         raise ValueError(f"Cannot start live mode for a game in status '{game.status}'")
 
     game.status = "in_progress"
+    init = _initial_state(game)
+    # #110 — the starting player draws on their first turn too (Momir multiplayer
+    # rule: EVERY player draws, unlike paper MTG where the starter skips). Run the
+    # starting seat's begin-of-turn now so its untap/land-reset/draw is applied.
+    if _is_momir(game) and init.get("currentTurnId") is not None:
+        _begin_momir_turn(session, game.id, init["currentTurnId"], init, has_table=True)
     live = GameLiveState(
-        state=json.dumps(_initial_state(game)),
+        state=json.dumps(init),
         version=1,
         updated_at=utc_now(),
     )
@@ -265,6 +292,12 @@ def _authorize_seat_scoped(
             raise PermissionError("Only a seated player may advance the turn")
         return
 
+    # #110 — resource correction is a table-only power (seats get hard validation;
+    # only the tablet can fix mis-taps). This branch runs only when the table token
+    # was absent, so any seat player reaching here is rejected.
+    if atype == "momir_adjust":
+        raise PermissionError("Only the table can adjust Momir resources")
+
     seat_field = "receiver_seat_id" if atype == "cmd" else "seat_id"
     seat = seats_by_id.get(_coerce_int(action.get(seat_field)))
     # seat is guaranteed to exist here (validated before auth); attribution decides.
@@ -287,11 +320,13 @@ def _validate_action_seats(atype: str, action: dict, seats_by_id: dict[int, Game
         _require_seat(action.get("seat_id"), seats_by_id, "seat_id")
 
 
-def _apply_mutation(session: Session, atype: str, action: dict, state: dict, game: Game) -> dict:
+def _apply_mutation(
+    session: Session, atype: str, action: dict, state: dict, game: Game, has_table: bool
+) -> dict:
     """Mutate ``state`` in place and return event-payload EXTRAS (empty except for
     cmd, which returns raw + post-floor ``actual`` deltas, and the Momir actions,
-    which return the summoned creature / whiff / killed index). ``session`` is
-    used only by momir_activate (its creature query); the other types ignore it."""
+    which return the summoned creature / whiff / killed index). ``session`` is used
+    by the Momir creature query and by the deck-out event on turn advance."""
     if atype == "momir_activate":
         return _apply_momir_activate(session, action, state)
     if atype == "momir_kill_token":
@@ -300,6 +335,10 @@ def _apply_mutation(session: Session, atype: str, action: dict, state: dict, gam
         return _apply_momir_attack(action, state)
     if atype == "momir_resolve":
         return _apply_momir_resolve(action, state)
+    if atype == "momir_play_land":
+        return _apply_momir_play_land(action, state)
+    if atype == "momir_adjust":
+        return _apply_momir_adjust(action, state)
 
     if atype == "life":
         sid = str(_coerce_int(action["seat_id"]))
@@ -347,7 +386,7 @@ def _apply_mutation(session: Session, atype: str, action: dict, state: dict, gam
             causes.pop(sid, None)
 
     elif atype == "turn":
-        _advance_turn(state, game)
+        _advance_turn(session, state, game, has_table)
 
     return {}
 
@@ -379,10 +418,21 @@ def _apply_momir_activate(session: Session, action: dict, state: dict) -> dict:
     if used.get(sid) == round_no:
         raise ValueError("Momir can only be activated once per turn")
 
+    # #110 — activation costs {cmc} in untapped lands plus discarding a card. You
+    # must be able to pay to activate. (The picker is constrained to affordable +
+    # non-empty MVs, so these rejects are a hard-validation backstop.)
+    _ensure_res(state, sid)
+    if int(state["untapped"][sid]) < cmc:
+        raise ValueError("not enough untapped lands to activate Momir")
+    if int(state["hand"][sid]) < 1:
+        raise ValueError("no card in hand to discard")
+
     creature = random_creature_at_cmc(session, cmc)
     tokens = state.setdefault("tokens", {})
     if creature is None:
-        return {"cmc": cmc, "creature": None, "whiff": True}  # whiff: quota not spent
+        # Safety-net whiff: no cost and no quota spent (should be unreachable once
+        # the picker only offers non-empty MVs).
+        return {"cmc": cmc, "creature": None, "whiff": True}
     token = {
         "name": creature["name"],
         "power": creature["power"],
@@ -394,8 +444,52 @@ def _apply_momir_activate(session: Session, action: dict, state: dict) -> dict:
         "alive": True,
     }
     tokens.setdefault(sid, []).append(token)
+    state["untapped"][sid] = int(state["untapped"][sid]) - cmc  # tap the mana
+    state["hand"][sid] = int(state["hand"][sid]) - 1  # discard
     used[sid] = round_no  # spend the once-per-turn quota
     return {"cmc": cmc, "creature": token, "whiff": False}
+
+
+def _ensure_res(state: dict, sid: str) -> None:
+    """Lazy setdefault backfill of a seat's resource fields (#110) so a Momir game
+    that started before the resource layer doesn't KeyError."""
+    for key, default in _MOMIR_RES_DEFAULTS.items():
+        state.setdefault(key, {}).setdefault(sid, default)
+
+
+def _apply_momir_play_land(action: dict, state: dict) -> dict:
+    """Play one card from hand as a land (#110): once per turn, requires a card in
+    hand. The land enters untapped, so it's usable for mana this same turn."""
+    sid = str(_coerce_int(action["seat_id"]))
+    _ensure_res(state, sid)
+    if int(state["hand"][sid]) < 1:
+        raise ValueError("no card in hand to play as a land")
+    if state["landPlayed"][sid]:
+        raise ValueError("a land has already been played this turn")
+    state["hand"][sid] = int(state["hand"][sid]) - 1
+    state["lands"][sid] = int(state["lands"][sid]) + 1
+    state["untapped"][sid] = int(state["untapped"][sid]) + 1
+    state["landPlayed"][sid] = True
+    return {}
+
+
+def _apply_momir_adjust(action: dict, state: dict) -> dict:
+    """Table-only correction of a seat's resource counts (#110) — the tablet fixes
+    mis-taps. Auth (table-token-only) is enforced upstream in
+    :func:`_authorize_seat_scoped`; here we just apply. Only the four counts are
+    adjustable (not landPlayed); each clamped to a non-negative integer."""
+    sid = str(_coerce_int(action["seat_id"]))
+    _ensure_res(state, sid)
+    changed = {}
+    for key in ("library", "hand", "lands", "untapped"):
+        if key not in action:
+            continue
+        val = _coerce_int(action.get(key))
+        if val is None or val < 0:
+            raise ValueError(f"{key} must be a non-negative integer")
+        state[key][sid] = val
+        changed[key] = val
+    return {"adjusted": changed}
 
 
 def _apply_momir_kill(action: dict, state: dict) -> dict:
@@ -515,14 +609,20 @@ def _apply_momir_resolve(action: dict, state: dict) -> dict:
     }
 
 
-def _advance_turn(state: dict, game: Game) -> None:
+def _advance_turn(session: Session, state: dict, game: Game, has_table: bool) -> None:
     """Advance ``currentTurnId`` to the next non-eliminated seat in physical
     clockwise order; increment ``turn`` when the rotation wraps past the first
-    seat."""
+    seat. In Momir, the seat the turn passes TO then begins its turn (untap +
+    draw), which can deck it out."""
     # Combat ends with the turn: drop any attackers still awaiting a block
-    # decision (Momir-only key — absent in Commander state, left untouched).
+    # decision (Momir-only key — absent in Commander state, left untouched). Also
+    # clear damage marked this turn (#111 tokens carry `damage`; setdefault-safe).
     if "attacks" in state:
         state["attacks"] = []
+    for toks in state.get("tokens", {}).values():
+        for tok in toks:
+            if "damage" in tok:
+                tok["damage"] = 0
     seats = _clockwise_seats(game)
     if not seats:
         return
@@ -541,8 +641,43 @@ def _advance_turn(state: dict, game: Game) -> None:
             state["currentTurnId"] = cand
             if j <= i:  # wrapped back to/through the first seat → new round
                 state["turn"] = int(state.get("turn", 1)) + 1
+            if _is_momir(game):
+                _begin_momir_turn(session, game.id, cand, state, has_table)
             return
     # everyone eliminated → leave currentTurnId as-is.
+
+
+def _begin_momir_turn(
+    session: Session, game_id: int, seat_id: int, state: dict, has_table: bool
+) -> None:
+    """Start-of-turn upkeep for a Momir seat (#110): untap all its lands, untap
+    its creature tokens (#111 `tapped` flag), reset the land drop, then draw one —
+    decking out (auto-elimination, cause ``deck``) if the library is empty."""
+    sid = str(seat_id)
+    _ensure_res(state, sid)
+    state["untapped"][sid] = int(state["lands"][sid])
+    for tok in state.get("tokens", {}).get(sid, []):
+        tok["tapped"] = False
+    state["landPlayed"][sid] = False
+    if int(state["library"][sid]) <= 0:  # forced draw on an empty library → decked
+        _deck_out(session, game_id, seat_id, state, has_table)
+        return
+    state["library"][sid] = int(state["library"][sid]) - 1
+    state["hand"][sid] = int(state["hand"][sid]) + 1
+
+
+def _deck_out(session: Session, game_id: int, seat_id: int, state: dict, has_table: bool) -> None:
+    """Auto-eliminate a seat that tried to draw from an empty library (#110). Rides
+    the auto-elim infra but is triggered here (not via ``_loss_cause``, which is
+    life/poison/cmd only — deck-out has no life-state signal). The ``deck`` cause
+    is permanent, protected from auto-revive like ``manual``."""
+    sid = str(seat_id)
+    if state.get("eliminated", {}).get(sid):
+        return  # already out
+    state.setdefault("eliminated", {})[sid] = True
+    state.setdefault("eliminatedAtTurn", {})[sid] = int(state.get("turn", 1))
+    state.setdefault("eliminationCause", {})[sid] = "deck"
+    _append_auto_elim_event(session, game_id, seat_id, "deck", True, state, has_table)
 
 
 _SENSITIVE_KEYS = ("table_token", "csrf_token")
@@ -641,8 +776,11 @@ def _auto_eliminate(
     sid = str(seat_id)
     causes = state.setdefault("eliminationCause", {})
     currently = bool(state.get("eliminated", {}).get(sid))
-    if currently and causes.get(sid) == "manual":
-        return  # manual lock
+    # Manual and deck-out (#110) eliminations are permanent — never auto-revive
+    # (deck-out has no _loss_cause signal, so a life mutation would otherwise
+    # "recover" a decked player).
+    if currently and causes.get(sid) in ("manual", "deck"):
+        return
 
     cause = _loss_cause(state, sid)
     if cause and not currently:  # alive → auto-eliminated
@@ -721,7 +859,7 @@ def apply_live_action(
         _authorize_seat_scoped(atype, action, game, user_id, seats_by_id)
 
     state = json.loads(live.state)
-    extras = _apply_mutation(session, atype, action, state, game)
+    extras = _apply_mutation(session, atype, action, state, game, has_table)
 
     # Event append shares this transaction — no event without its mutation. The
     # triggering event is recorded first, then any auto-elimination/revive it
