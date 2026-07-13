@@ -229,6 +229,27 @@ def main() -> None:
         except Exception as exc:
             session.rollback()
             print(f"[price-ingest] valuation snapshot error: {exc}", flush=True)
+        # #98 — per-card daily price history (feeds 1d/7d/30d deltas + trends).
+        # Same isolated-failure posture as the valuation snapshot.
+        try:
+            from app.price_history_service import snapshot_card_prices
+
+            rows = snapshot_card_prices(session)
+            print(f"[price-ingest] price-history snapshot: {rows} row(s)", flush=True)
+        except Exception as exc:
+            session.rollback()
+            print(f"[price-ingest] price-history error: {exc}", flush=True)
+        # #99 — evaluate watchlist target-cross alerts on the fresh prices and
+        # send each opted-in user a digest. Isolated (a send failure must not fail
+        # the ingest).
+        try:
+            from app.jobs.price_alerts import run_alerts
+
+            sent = run_alerts(session)
+            print(f"[price-ingest] price alerts: {sent} email(s)", flush=True)
+        except Exception as exc:
+            session.rollback()
+            print(f"[price-ingest] price-alerts error: {exc}", flush=True)
     finally:
         session.close()
 

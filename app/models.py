@@ -61,6 +61,9 @@ class User(Base):
     # NULL until next authenticated request for existing users (no backfill,
     # and explicitly NOT copied from last_signed_in_at — different semantics).
     last_active_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # #99 — opt-in to watchlist price-alert emails (a card crossing target_price).
+    # Default off; NULL for existing rows (no backfill), treated as off.
+    price_alerts_enabled: Mapped[bool | None] = mapped_column(Boolean, nullable=True, default=False)
 
     inventory_rows: Mapped[list[InventoryRow]] = relationship(back_populates="user")
     decks: Mapped[list[Deck]] = relationship(back_populates="user")
@@ -208,6 +211,28 @@ class CardPrice(Base):
 
     __table_args__ = (
         UniqueConstraint("scryfall_id", "finish", name="uq_card_prices_printing_finish"),
+    )
+
+
+class CardPriceHistory(Base):
+    """#98 — daily snapshot of each priced printing's resolved price, one row per
+    ``(scryfall_id, finish, snapshot_date)``. Global (per-printing, not per-user),
+    written once a day by the price ingest for every ``card_prices`` row that
+    resolves to a value. Feeds 1d/7d/30d deltas + trend surfaces. Mirrors the
+    #85 DailyCollectionValue pattern at per-(card,finish) grain; series accrues
+    forward (no backfill)."""
+
+    __tablename__ = "card_price_history"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    scryfall_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    finish: Mapped[str] = mapped_column(String(16), nullable=False)
+    snapshot_date: Mapped[date] = mapped_column(Date, nullable=False)
+    price: Mapped[float] = mapped_column(Float, nullable=False)
+    __table_args__ = (
+        UniqueConstraint(
+            "scryfall_id", "finish", "snapshot_date", name="uq_card_price_history_day"
+        ),
     )
 
 
@@ -946,6 +971,12 @@ class WatchlistItem(Base):
     # this is user-entered numeric input, not a Scryfall wire-format
     # round-trip the way Card.price_usd is.
     target_price: Mapped[float | None] = mapped_column(Float, nullable=True)
+    # #99 — alert dedup state. last_alerted_at is set when a target-cross email
+    # fires and cleared on a run where the price is back above target, so the
+    # alert fires once per crossing episode (never daily spam). last_alerted_price
+    # is the price at that send (for the email + audit). NULL = never alerted.
+    last_alerted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    last_alerted_price: Mapped[float | None] = mapped_column(Float, nullable=True)
 
     user: Mapped[User] = relationship(back_populates="watchlist_items")
     card: Mapped[Card | None] = relationship()

@@ -64,6 +64,12 @@
              maxlength="64"
              value="{{ current_user.display_name or '' }}"
              placeholder="Shown in nav, decks, games">
+      {# #99 — opt in to watchlist price-alert emails (a watched card reaching its target). #}
+      <label style="display:flex;align-items:center;gap:0.5rem;margin-top:0.75rem;font-weight:normal">
+        <input type="checkbox" name="price_alerts_enabled" value="true"
+               {% if current_user.price_alerts_enabled %}checked{% endif %}>
+        Email me when a wishlist card hits my target price
+      </label>
       <button type="submit">Update Profile</button>
     </form>
   </section>

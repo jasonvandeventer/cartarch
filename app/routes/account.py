@@ -69,6 +69,7 @@ def update_profile(
     request: Request,
     email: str = Form(...),
     display_name: str = Form(""),
+    price_alerts_enabled: bool = Form(False),  # #99 — checkbox: present only when on
     session: Session = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
     _: None = CsrfRequired,
@@ -93,6 +94,7 @@ def update_profile(
     if user:
         user.username = email
         user.display_name = display_name
+        user.price_alerts_enabled = bool(price_alerts_enabled)  # #99
         session.commit()
 
     return RedirectResponse(url="/account?success=profile_updated", status_code=303)

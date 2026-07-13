@@ -181,10 +181,10 @@
       <span class="card-detail-panel-aux">USD · MTGJSON</span>
     </h3>
     <div class="card-detail-prices">
-      {% for label, finish, value in [
-           ("Regular", "normal", prices.regular),
-           ("Foil", "foil", prices.foil),
-           ("Etched", "etched", prices.etched)] %}
+      {% for label, finish, value, dkey in [
+           ("Regular", "normal", prices.regular, "regular"),
+           ("Foil", "foil", prices.foil, "foil"),
+           ("Etched", "etched", prices.etched, "etched")] %}
         <div class="card-detail-prices-row">
           <span class="card-detail-prices-l">{{ label }}</span>
           <span class="card-detail-prices-v">
@@ -192,6 +192,12 @@
             {% if price_overrides.get(finish) %}
               <span class="badge" title="Manual override">override</span>
             {% endif %}
+            {# #98 — 1d/7d/30d change from daily price history (shown once enough days exist). #}
+            {% set d = price_delta.get(dkey, {}) %}
+            {% for w in [1, 7, 30] %}{% if d.get(w) %}{% set ch = d[w] %}
+              <span style="font-size:0.72rem;margin-left:0.3rem;{% if ch.pct > 0 %}color:#22c55e{% elif ch.pct < 0 %}color:#ef4444{% else %}opacity:0.6{% endif %}"
+                    title="{{ w }}d ago ${{ ch['from'] }} → ${{ ch.to }}">{{ w }}d {% if ch.pct > 0 %}+{% endif %}{{ ch.pct }}%</span>
+            {% endif %}{% endfor %}
           </span>
           <form method="post" action="/cards/{{ card.id }}/price-override"
                 class="inline-form card-detail-price-override">

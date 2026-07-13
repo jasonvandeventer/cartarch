@@ -130,7 +130,7 @@ def card_detail_page(
     #   owned counts (across the user's InventoryRows) + watch markers.
     # § II In Decks — which of the user's decks contain this card
     #   (InventoryRow.storage_location_id JOIN Deck.storage_location_id).
-    # § III Prices — static USD per finish. 1d/7d/30d deltas DEFERRED.
+    # § III Prices — USD per finish + 1d/7d/30d deltas from the daily price history (#98).
     # § IV Legality — parsed from Card.legalities JSON.
     # § V History — TransactionLog filtered by user + card_id, top 10.
 
@@ -225,6 +225,15 @@ def card_detail_page(
         for row in session.query(CardPrice).filter(CardPrice.scryfall_id == target_card.scryfall_id)
         if row.manual_override
     }
+    # #98 — 1d/7d/30d price deltas per finish from the daily history (empty until
+    # the series has enough days; the template renders chips only when present).
+    from app.price_history_service import price_deltas
+
+    price_delta = {
+        "regular": price_deltas(session, target_card.scryfall_id, "normal"),
+        "foil": price_deltas(session, target_card.scryfall_id, "foil"),
+        "etched": price_deltas(session, target_card.scryfall_id, "etched"),
+    }
 
     # § IV — Legality. Card.legalities is a JSON-encoded dict from Scryfall;
     # parse-fail returns an empty dict so the template renders cleanly.
@@ -270,6 +279,7 @@ def card_detail_page(
             "in_decks": in_decks,
             "prices": prices,
             "price_overrides": overrides,
+            "price_delta": price_delta,
             "legality_map": legality_map,
             "history_rows": history_rows,
         },
