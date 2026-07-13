@@ -1133,6 +1133,8 @@ def test_momir_pages_render(db, client, user):
     assert detail.status_code == 200
     assert "momir-bar" in detail.text  # activation bar rendered for Momir live
     assert "momir-combat" in detail.text  # tablet combat (declare/block) panel present
+    assert "momir-res-" in detail.text  # #113 per-seat resource bar mount point
+    assert "MOMIR_VALID_MVS" in detail.text  # #113 valid-MV set injected for the picker
 
     companion = client.get(f"/games/{game.id}/companion")
     assert companion.status_code == 200

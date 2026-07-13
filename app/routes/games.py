@@ -48,8 +48,18 @@ from app.game_service import (
     update_game_notes,
     update_seat,
 )
+from app.live_game_service import valid_momir_mvs
 from app.models import Deck, Game, GameSeat, User
 from app.timeutil import utc_now
+
+
+def _momir_valid_mvs(session, game) -> list[int]:
+    """Sorted MVs with >=1 legal creature, for greying the Momir picker (#113).
+    Empty for non-Momir games."""
+    if game.format and game.format.lower() == "momir":
+        return sorted(valid_momir_mvs(session))
+    return []
+
 
 router = APIRouter()
 
@@ -378,6 +388,7 @@ def game_detail_page(
         # to the game-id-only key, which is harmless: they can't mutate a
         # `created` game, and live-mode state is server-authoritative.)
         "table_token": game.client_token if is_owner else None,
+        "momir_valid_mvs": _momir_valid_mvs(session, game),
     }
 
     # v3.33.2 — finalized games render a read-only summary (final standings,
@@ -431,6 +442,7 @@ def game_companion_page(
             "my_commander_id": seat_commanders.get(my_seat.id) if my_seat else None,
             "my_decks": my_decks,
             "current_user": current_user,
+            "momir_valid_mvs": _momir_valid_mvs(session, game),
         },
     )
 

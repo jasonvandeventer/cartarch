@@ -66,6 +66,36 @@
     .momir-combat-row { display: flex; align-items: center; flex-wrap: wrap; gap: 0.35rem; }
     .momir-combat-desc { margin-right: 0.4rem; }
     .momir-combat-cancel { min-height: 2rem; width: 2rem; border: none; border-radius: 0.4rem; background: rgba(255,255,255,0.1); color: inherit; }
+    .momir-combat-block-on { background: #6d28d9 !important; border-color: #a78bfa !important; color: #fff !important; }
+    .momir-combat-confirm { min-height: 2.4rem; padding: 0 0.6rem; border: none; border-radius: 0.4rem; background: #6d28d9; color: #fff; }
+    .momir-combat-confirm:disabled { opacity: 0.45; }
+    /* #113 — per-seat resource bar (library / hand / lands / untapped / land drop) */
+    .momir-res { display: flex; flex-wrap: wrap; align-items: center; gap: 0.2rem 0.45rem; justify-content: center;
+      margin: 0.15rem 0; font-size: 0.72rem; }
+    .momir-res-stat { display: inline-flex; align-items: center; gap: 0.15rem; }
+    .momir-res-k { opacity: 0.7; }
+    .momir-res-v { font-weight: 700; }
+    .momir-res-untap { color: #a78bfa; }
+    .momir-res-landdrop { color: #6ee7b7; }
+    .momir-res-step { min-width: 1.15rem; min-height: 1.15rem; line-height: 1; border: none; border-radius: 0.25rem;
+      background: rgba(255,255,255,0.08); color: inherit; padding: 0; font-size: 0.7rem; cursor: pointer; }
+    .momir-res-land { min-height: 1.5rem; padding: 0 0.45rem; border: none; border-radius: 0.3rem; background: #065f46; color: #d1fae5; font-size: 0.7rem; }
+    .momir-res-land:disabled { opacity: 0.4; }
+    /* #113 — token overlays: keyword badges, tapped, summoning sick, damage */
+    .tc-momir-token.tc-momir-tapped .tc-momir-img { transform: rotate(18deg); }
+    .tc-momir-token.tc-momir-sick .tc-momir-img { outline: 2px dashed rgba(255,255,255,0.35); outline-offset: -2px; }
+    .tc-momir-badges { position: absolute; top: 0; left: 0; display: flex; flex-wrap: wrap; gap: 1px; max-width: 100%; }
+    .tc-momir-badge { font-size: 0.5rem; font-weight: 700; line-height: 1; padding: 1px 2px; border-radius: 2px;
+      background: rgba(109,40,217,0.9); color: #fff; }
+    .tc-momir-dmg { position: absolute; bottom: 0; left: 0; font-size: 0.5rem; font-weight: 700; padding: 0 2px;
+      border-radius: 2px; background: rgba(185,28,28,0.9); color: #fff; }
+    .momir-cmc-btn:disabled { opacity: 0.3; cursor: default; }
+    /* #113 — primitives in the token menu */
+    .momir-tm-oracle { font-size: 0.72rem; opacity: 0.85; margin: 0.25rem 0; white-space: pre-wrap; max-height: 6rem; overflow-y: auto; }
+    .momir-tm-kw { display: flex; flex-wrap: wrap; gap: 0.2rem; margin-bottom: 0.3rem; }
+    .momir-tm-abil { min-height: 2.2rem; padding: 0 0.5rem; border: 1px solid rgba(255,255,255,0.2); border-radius: 0.4rem;
+      background: rgba(255,255,255,0.06); color: inherit; }
+    .momir-tm-num { width: 3rem; min-height: 2.2rem; border-radius: 0.4rem; }
   </style>
   {% endif %}
   {% set winner = game.seats | selectattr('placement', 'eq', 1) | first | default(none) %}
@@ -316,8 +346,9 @@
                 </span>
               </div>
             {% endif %}
-            {# Momir Basic — summoned creature strip (populated by render()). #}
+            {# Momir Basic — resource bar + summoned creature strip (render()). #}
             {% if not is_ended and game.format|lower == 'momir' %}
+              <div class="momir-res" id="momir-res-{{ seat.id }}"></div>
               <div class="tc-momir-tokens" id="momir-tokens-{{ seat.id }}"></div>
             {% endif %}
             {# Two bottom corners — BL life numeral, BR button grid #}
@@ -600,8 +631,25 @@ const COMPANION_URL = `${location.origin}/games/${gameId}/companion`;
 // ── Momir Basic (format="momir") — creature display + activation ─
 const IS_MOMIR = {{ (game.format|lower == 'momir') | tojson }};
 const MIRROR = {{ mirror_image_url('__SID__', 'small') | tojson }};  // small = tablet strip
+const MOMIR_VALID_MVS = new Set({{ momir_valid_mvs | default([]) | tojson }});  // #113 — MVs with >=1 legal creature
 let momirSeatId = null;   // seat currently selected in the activation bar
 let momirCmc = null;      // CMC awaiting Activate
+const momirBlockSel = {};  // #113 — seq -> Set of chosen blocker indexes (multi-block)
+
+// #113 — combat keyword / effective-P-T helpers (mirror live_game_service).
+const MOMIR_RES_DEFAULTS = { library: 60, hand: 7, lands: 0, untapped: 0, landPlayed: false };
+function momirRes(seatId, key) {
+  const m = (state && state[key]) || {};
+  const v = m[seatId];
+  return v === undefined ? MOMIR_RES_DEFAULTS[key] : v;
+}
+function tokHasKw(t, kw) { return (t.keywords || []).some(k => String(k).toLowerCase() === kw); }
+function tokCounters(t) { const c = t.counters || {}; return [c.p1p1 || 0, c.m1m1 || 0]; }
+function tokEffPow(t) { const [p, m] = tokCounters(t); return momirPtInt(t.power) + p - m; }
+function tokEffTou(t) { const [p, m] = tokCounters(t); return momirPtInt(t.toughness) + p - m; }
+function tokSick(t) {
+  return Number(t.turn_created) >= Number(state.turn || 1) && !tokHasKw(t, 'haste');
+}
 
 // ── Assign physical positions ──────────────────────────────────
 const allStored = seatDefs.every(s => s.storedPosition);
@@ -1553,7 +1601,7 @@ function render() {
       activePill.style.display = (s.id === state.currentTurnId && !state.eliminated[s.id]) ? '' : 'none';
     }
 
-    if (IS_MOMIR) renderMomirTokens(s.id);
+    if (IS_MOMIR) { renderMomirResources(s.id); renderMomirTokens(s.id); }
   });
 
   if (IS_MOMIR) { refreshMomirGo(); renderCombat(); }  // once-per-turn + pending attacks
@@ -1647,6 +1695,21 @@ function escHtml(s) { return String(s).replace(/[&<>"']/g, c => (
   { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
 function momirSeatTokens(seatId) { return (state.tokens && state.tokens[seatId]) || []; }
 function momirPt(t) { return (t.power != null && t.toughness != null) ? `${t.power}/${t.toughness}` : ''; }
+// #113 — effective P/T for display (base ± counters). Falls back to the raw
+// string for variable P/T so "*"/"X" creatures still read sensibly.
+function momirEffPt(t) {
+  if (t.power == null || t.toughness == null) return '';
+  const [plus, minus] = tokCounters(t);
+  if (plus || minus) return `${tokEffPow(t)}/${tokEffTou(t)}`;
+  return `${t.power}/${t.toughness}`;
+}
+const _KW_ABBR = { flying: 'F', reach: 'R', 'first strike': 'FS', 'double strike': 'DS', deathtouch: 'DT',
+  trample: 'T', lifelink: 'LL', menace: 'M', vigilance: 'V', haste: 'H', indestructible: 'I', defender: 'D' };
+function momirKwBadges(t) {
+  const shown = (t.keywords || []).map(k => _KW_ABBR[String(k).toLowerCase()]).filter(Boolean);
+  if (!shown.length) return '';
+  return `<span class="tc-momir-badges">${shown.map(a => `<span class="tc-momir-badge">${a}</span>`).join('')}</span>`;
+}
 
 function renderMomirTokens(seatId) {
   const el = document.getElementById(`momir-tokens-${seatId}`);
@@ -1655,14 +1718,54 @@ function renderMomirTokens(seatId) {
   el.innerHTML = toks.map((t, i) => {
     const dead = t.alive === false;
     const img = MIRROR.replace('__SID__', t.scryfall_id);
-    // Tapping a live token opens the attack/kill menu; dead is inert.
+    const cls = ['tc-momir-token'];
+    if (dead) cls.push('tc-momir-dead');
+    if (!dead && t.tapped) cls.push('tc-momir-tapped');
+    if (!dead && tokSick(t)) cls.push('tc-momir-sick');
+    const dmg = (!dead && Number(t.damage) > 0) ? `<span class="tc-momir-dmg">${Number(t.damage)}</span>` : '';
     const click = dead ? '' : ` onclick="openTokenMenu(${seatId}, ${i})"`;
-    return `<div class="tc-momir-token${dead ? ' tc-momir-dead' : ''}"${click} title="${escHtml(t.name)}${dead ? ' (dead)' : ' — tap: attack / kill'}">
+    const tip = dead ? ' (dead — tap: revive)' : ' — tap: combat / abilities';
+    return `<div class="${cls.join(' ')}"${click} title="${escHtml(t.name)}${tip}">
       <img class="tc-momir-img" src="${img}" alt="${escHtml(t.name)}" loading="lazy"
            onerror="this.onerror=null;this.src='https://api.scryfall.com/cards/${t.scryfall_id}?format=image&version=small'">
-      <span class="tc-momir-pt">${momirPt(t)}</span></div>`;
+      ${dead ? '' : momirKwBadges(t)}${dmg}
+      <span class="tc-momir-pt">${momirEffPt(t)}</span></div>`;
   }).join('');
+  // Dead tokens are tappable for revive (the whole cell is inert above, so add a
+  // dedicated handler on dead cells).
+  el.querySelectorAll('.tc-momir-dead').forEach((cell, di) => {
+    const deadIdx = toks.map((t, i) => [t, i]).filter(([t]) => t.alive === false)[di];
+    if (deadIdx) cell.onclick = () => openTokenMenu(seatId, deadIdx[1]);
+  });
 }
+
+// #113 — per-seat resource bar: library / hand / lands (untapped) / land drop,
+// with tap-to-correct steppers (table-authorized) and Play Land.
+function renderMomirResources(seatId) {
+  const el = document.getElementById(`momir-res-${seatId}`);
+  if (!el) return;
+  const lib = momirRes(seatId, 'library'), hand = momirRes(seatId, 'hand');
+  const lands = momirRes(seatId, 'lands'), untap = momirRes(seatId, 'untapped');
+  const landPlayed = momirRes(seatId, 'landPlayed');
+  const stat = (key, label, val, extra = '') =>
+    `<span class="momir-res-stat">
+       <button type="button" class="momir-res-step" onclick="adjustRes(${seatId},'${key}',-1)" title="−1 ${label}">−</button>
+       <span class="momir-res-k">${label}</span><span class="momir-res-v ${extra}">${val}</span>
+       <button type="button" class="momir-res-step" onclick="adjustRes(${seatId},'${key}',1)" title="+1 ${label}">+</button>
+     </span>`;
+  el.innerHTML =
+    stat('library', 'Lib', lib) +
+    stat('hand', 'Hand', hand) +
+    `<span class="momir-res-stat">${stat('lands', 'Lands', lands)}
+       <span class="momir-res-untap" title="untapped">(${untap})</span></span>` +
+    (landPlayed ? `<span class="momir-res-landdrop" title="land played this turn">land✓</span>` : '') +
+    `<button type="button" class="momir-res-land" onclick="playLand(${seatId})" ${(landPlayed || hand < 1) ? 'disabled' : ''}>Play land</button>`;
+}
+function adjustRes(seatId, key, delta) {
+  const cur = momirRes(seatId, key);
+  postAction({ type: 'momir_adjust', seat_id: seatId, [key]: Math.max(0, Number(cur) + delta) });
+}
+function playLand(seatId) { postAction({ type: 'momir_play_land', seat_id: seatId }); }
 
 // ── Tablet combat: attack a player (unblocked) or into a blocker (fight) ──────
 function momirPtInt(v) { const m = String(v == null ? '' : v).match(/-?\d+/); return m ? parseInt(m[0], 10) : 0; }
@@ -1670,16 +1773,58 @@ function seatName(id) { return (seatDefs.find(s => s.id === id) || {}).name || `
 // A token menu DECLARES an attack on a player (you can't attack creatures); the
 // defender's block decision happens in the combat panel (renderCombat).
 window.openTokenMenu = function (seatId, idx) {
-  const atk = momirSeatTokens(seatId)[idx];
-  if (!atk || atk.alive === false) return;
+  const t = momirSeatTokens(seatId)[idx];
+  if (!t) return;
+  const dead = t.alive === false;
+  const inner = document.getElementById('momir-tm-inner');
+  const kw = (t.keywords || []).length
+    ? `<div class="momir-tm-kw">${t.keywords.map(k => `<span class="tc-momir-badge">${escHtml(k)}</span>`).join('')}</div>` : '';
+  const oracle = t.oracle_text ? `<div class="momir-tm-oracle">${escHtml(t.oracle_text)}</div>` : '';
+  const [pc, mc] = tokCounters(t);
+  const head = `<div class="momir-tm-head"><b>${escHtml(t.name)}</b> ${momirEffPt(t)}` +
+    `${(pc || mc) ? ` <span class="muted">(+${pc}/−${mc})</span>` : ''}${t.tapped ? ' · tapped' : ''}` +
+    `${dead ? ' · dead' : (tokSick(t) ? ' · sick' : '')}</div>`;
+
+  if (dead) {
+    inner.innerHTML = head + kw + oracle +
+      `<button type="button" class="momir-tm-hit" onclick="postTM({type:'momir_revive_token',seat_id:${seatId},index:${idx}})">✚ Revive</button>`;
+    document.getElementById('momir-token-menu').style.display = 'flex';
+    return;
+  }
+
   const foes = seatDefs.filter(s => s.id !== seatId && !state.eliminated[s.id]);
-  const rows = foes.map(s =>
-    `<button type="button" class="momir-tm-hit" onclick="tabletDeclare(${seatId},${idx},${s.id})">→ ${escHtml(seatName(s.id))}</button>`
+  const attack = foes.map(s =>
+    `<button type="button" class="momir-tm-hit" onclick="tabletDeclare(${seatId},${idx},${s.id})">⚔ → ${escHtml(seatName(s.id))}</button>`
   ).join('') || '<div class="muted">No opponents</div>';
-  document.getElementById('momir-tm-inner').innerHTML =
-    `<div class="momir-tm-head">Attack a player with <b>${escHtml(atk.name)}</b> ${momirPt(atk)}</div>${rows}` +
-    `<button type="button" class="momir-tm-kill" onclick="killTokenTablet(${seatId},${idx});closeTokenMenu()">☠ Mark dead</button>`;
+  // Abilities (#112 primitives) — the humans resolve the oracle text; these just
+  // do the bookkeeping. Damage marks (death check runs); counters shift P/T.
+  const abil =
+    `<div class="momir-tm-row"><span class="momir-res-k">Damage</span>` +
+      [1, 2, 3, 5].map(n => `<button type="button" class="momir-tm-abil" onclick="postTM({type:'momir_damage',seat_id:${seatId},index:${idx},amount:${n}})">${n}</button>`).join('') +
+      `<input type="number" min="1" class="momir-tm-num" id="momir-dmg-n" placeholder="N">` +
+      `<button type="button" class="momir-tm-abil" onclick="dmgN(${seatId},${idx})">Deal</button></div>` +
+    `<div class="momir-tm-row"><span class="momir-res-k">+1/+1</span>` +
+      `<button type="button" class="momir-tm-abil" onclick="postTM({type:'momir_counter_token',seat_id:${seatId},index:${idx},counter:'p1p1',delta:1})">＋</button>` +
+      `<button type="button" class="momir-tm-abil" onclick="postTM({type:'momir_counter_token',seat_id:${seatId},index:${idx},counter:'p1p1',delta:-1})">−</button>` +
+      `<span class="momir-res-k">−1/−1</span>` +
+      `<button type="button" class="momir-tm-abil" onclick="postTM({type:'momir_counter_token',seat_id:${seatId},index:${idx},counter:'m1m1',delta:1})">＋</button>` +
+      `<button type="button" class="momir-tm-abil" onclick="postTM({type:'momir_counter_token',seat_id:${seatId},index:${idx},counter:'m1m1',delta:-1})">−</button></div>` +
+    `<div class="momir-tm-row">` +
+      `<button type="button" class="momir-tm-abil" onclick="postTM({type:'momir_tap_token',seat_id:${seatId},index:${idx}})">${t.tapped ? 'Untap' : 'Tap'}</button>` +
+      `<button type="button" class="momir-tm-abil" onclick="postTM({type:'momir_sacrifice',seat_id:${seatId},index:${idx}})">Sacrifice</button>` +
+      `<button type="button" class="momir-tm-kill" onclick="killTokenTablet(${seatId},${idx});closeTokenMenu()">☠ Kill</button></div>`;
+
+  inner.innerHTML = head + kw + oracle +
+    `<div class="momir-tm-head" style="margin-top:0.3rem">Attack a player</div>${attack}` +
+    `<div class="momir-tm-head" style="margin-top:0.3rem">Abilities</div>${abil}`;
   document.getElementById('momir-token-menu').style.display = 'flex';
+};
+// Post a primitive with the table token, then re-render from the echo. Keeps the
+// menu open so the operator can chain several (a common ability sequence).
+window.postTM = function (action) { momirCombatPost(action); };
+window.dmgN = function (seatId, idx) {
+  const n = parseInt((document.getElementById('momir-dmg-n') || {}).value, 10);
+  if (Number.isInteger(n) && n >= 1) postTM({ type: 'momir_damage', seat_id: seatId, index: idx, amount: n });
 };
 window.closeTokenMenu = function () { document.getElementById('momir-token-menu').style.display = 'none'; };
 window.tabletDeclare = function (seatId, idx, targetSeat) {
@@ -1689,40 +1834,69 @@ window.tabletDeclare = function (seatId, idx, targetSeat) {
 
 // Combat panel: every pending attack, resolved on the defender's behalf (block /
 // take / cancel) — the shared tablet uses the table token to act for any seat.
+function momirKwText(t) {
+  const s = (t.keywords || []).map(k => _KW_ABBR[String(k).toLowerCase()]).filter(Boolean);
+  return s.length ? ` <span class="muted">[${s.join(' ')}]</span>` : '';
+}
 function renderCombat() {
   const el = document.getElementById('momir-combat');
   if (!el) return;
   const attacks = (state && state.attacks) || [];
+  // Drop stale block selections for attacks that have resolved.
+  const liveSeqs = new Set(attacks.map(a => a.seq));
+  Object.keys(momirBlockSel).forEach(k => { if (!liveSeqs.has(Number(k))) delete momirBlockSel[k]; });
   if (!attacks.length) { el.style.display = 'none'; el.innerHTML = ''; return; }
   el.style.display = 'flex';
   el.innerHTML = `<div class="momir-combat-title">Combat — defender blocks or takes</div>` +
     attacks.map(a => {
       const atk = momirSeatTokens(a.attacker_seat)[a.attacker_index];
       if (!atk) return '';
-      const pw = momirPtInt(atk.power);
-      const blockers = momirSeatTokens(a.target_seat).map((t, j) => [t, j]).filter(([t]) => t.alive !== false)
-        .map(([t, j]) => `<button type="button" class="momir-tm-block" onclick="tabletResolve(${a.seq},${a.target_seat},${j})" title="block with ${escHtml(t.name)}">🛡 ${momirPt(t)}</button>`).join('');
+      const pw = tokEffPow(atk);
+      const sel = momirBlockSel[a.seq] || (momirBlockSel[a.seq] = new Set());
+      // Only untapped, live creatures can block (server enforces; hide the rest).
+      const blockers = momirSeatTokens(a.target_seat).map((t, j) => [t, j])
+        .filter(([t]) => t.alive !== false && !t.tapped)
+        .map(([t, j]) => `<button type="button" class="momir-tm-block${sel.has(j) ? ' momir-combat-block-on' : ''}"
+          onclick="toggleBlock(${a.seq},${j})" title="block with ${escHtml(t.name)}">🛡 ${momirEffPt(t)}</button>`).join('');
+      const n = sel.size;
       return `<div class="momir-combat-row">
-        <span class="momir-combat-desc">${escHtml(seatName(Number(a.attacker_seat)))}'s <b>${escHtml(atk.name)}</b> ${momirPt(atk)} → ${escHtml(seatName(Number(a.target_seat)))}</span>
-        <button type="button" class="momir-tm-hit" onclick="tabletResolve(${a.seq},${a.target_seat},null)">Take −${pw}</button>
+        <span class="momir-combat-desc">${escHtml(seatName(Number(a.attacker_seat)))}'s <b>${escHtml(atk.name)}</b> ${momirEffPt(atk)}${momirKwText(atk)} → ${escHtml(seatName(Number(a.target_seat)))}</span>
+        <button type="button" class="momir-tm-hit" onclick="tabletTake(${a.seq},${a.target_seat})">Take −${pw}</button>
         ${blockers}
-        <button type="button" class="momir-combat-cancel" onclick="tabletResolve(${a.seq},${a.target_seat},'cancel')">✕</button>
+        <button type="button" class="momir-combat-confirm" onclick="tabletBlock(${a.seq},${a.target_seat})" ${n ? '' : 'disabled'}>Block (${n})</button>
+        <button type="button" class="momir-combat-cancel" onclick="tabletCancel(${a.seq},${a.target_seat})" title="cancel attack">✕</button>
       </div>`;
     }).join('');
 }
-window.tabletResolve = function (seq, defenderSeat, blockIdx) {
-  const action = { type: 'momir_resolve', seat_id: defenderSeat, seq };
-  if (blockIdx === 'cancel') action.cancel = true;
-  else if (blockIdx != null) action.block_index = blockIdx;
-  momirCombatPost(action);
+window.toggleBlock = function (seq, j) {
+  const sel = momirBlockSel[seq] || (momirBlockSel[seq] = new Set());
+  if (sel.has(j)) sel.delete(j); else sel.add(j);
+  renderCombat();
 };
-function momirCombatPost(action) {
+window.tabletTake = function (seq, seat) {
+  delete momirBlockSel[seq];
+  momirCombatPost({ type: 'momir_resolve', seat_id: seat, seq, block_indexes: [] });
+};
+window.tabletBlock = function (seq, seat) {
+  const sel = momirBlockSel[seq];
+  if (!sel || !sel.size) return;
+  // Keep the selection until the server accepts it — a legality 400 (flying,
+  // menace) flashes the reason and lets the operator adjust the blockers.
+  momirCombatPost({ type: 'momir_resolve', seat_id: seat, seq, block_indexes: [...sel] }, () => delete momirBlockSel[seq]);
+};
+window.tabletCancel = function (seq, seat) {
+  delete momirBlockSel[seq];
+  momirCombatPost({ type: 'momir_resolve', seat_id: seat, seq, cancel: true });
+};
+function momirCombatPost(action, onSuccess) {
   fetch(`/games/${gameId}/live/action`, {
     method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': CSRF },
     body: JSON.stringify(Object.assign({ table_token: TABLE_TOKEN }, action)),
   }).then(async r => {
-    if (!r.ok) { const d = await r.json().catch(() => ({})); flashLive(d.detail || 'Combat failed'); return; }
-    const p = await r.json(); state = hydrateLiveState(p.state); render();
+    if (!r.ok) { const d = await r.json().catch(() => ({})); flashLive(d.detail || 'Action failed'); return; }
+    const p = await r.json();
+    if (onSuccess) onSuccess();
+    state = hydrateLiveState(p.state); render();
   }).catch(() => flashLive('Sync failed'));
 }
 
@@ -1739,6 +1913,15 @@ function pickMomirSeat(seatId) {
   document.querySelectorAll('#momir-seat-sel .momir-seat-btn').forEach(b =>
     b.classList.toggle('momir-seat-on', Number(b.dataset.seat) === seatId));
   refreshMomirGo();
+}
+// #113 — grey out MVs the selected seat can't summon: no legal creature at that
+// MV, or unaffordable (MV > untapped mana). The 11-16 input is gated in refreshMomirGo.
+function refreshMomirCmcButtons() {
+  const untap = momirSeatId != null ? Number(momirRes(momirSeatId, 'untapped')) : 16;
+  document.querySelectorAll('#momir-bar .momir-cmc-btn').forEach(b => {
+    const c = Number(b.dataset.cmc);
+    b.disabled = !(MOMIR_VALID_MVS.has(c) && c <= untap);
+  });
 }
 function pickTabletCmc(cmc) {
   momirCmc = cmc;
@@ -1765,10 +1948,18 @@ function refreshMomirGo() {
   // can't again until the round advances. (Sorcery-speed is left flexible on the
   // shared tablet — the operator activates for whichever player is taking a turn.)
   if (momirSeatId != null && momirSeatUsedThisTurn(momirSeatId)) {
-    go.disabled = true; go.textContent = 'Used this turn'; return;
+    go.disabled = true; go.textContent = 'Used this turn'; refreshMomirCmcButtons(); return;
   }
-  go.disabled = (momirSeatId == null || momirCmc == null);
-  go.textContent = 'Activate';
+  const hand = momirSeatId != null ? Number(momirRes(momirSeatId, 'hand')) : 1;
+  const untap = momirSeatId != null ? Number(momirRes(momirSeatId, 'untapped')) : 16;
+  if (momirSeatId != null && hand < 1) {
+    go.disabled = true; go.textContent = 'No cards in hand'; refreshMomirCmcButtons(); return;
+  }
+  // Affordable = a legal creature exists at the MV and there's enough untapped mana.
+  const affordable = momirCmc == null || (MOMIR_VALID_MVS.has(momirCmc) && momirCmc <= untap);
+  go.disabled = (momirSeatId == null || momirCmc == null || !affordable);
+  go.textContent = (momirCmc != null && !affordable) ? `Need ${momirCmc} mana` : 'Activate';
+  refreshMomirCmcButtons();
 }
 function activateMomirTablet() {
   if (momirSeatId == null || momirCmc == null || momirSeatUsedThisTurn(momirSeatId)) return;
