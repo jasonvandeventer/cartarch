@@ -40,6 +40,7 @@ from app.timeutil import utc_now
 _MOMIR_TYPES = {
     "momir_activate",
     "momir_kill_token",
+    "momir_revive_token",
     "momir_attack",
     "momir_resolve",
     "momir_play_land",
@@ -90,6 +91,9 @@ def random_creature_at_cmc(session: Session, cmc: int) -> dict | None:
         "type_line": row.type_line,
         "scryfall_id": row.scryfall_id,
         "cmc": cmc,
+        # #111 — keywords ride onto the token at summon so combat is a
+        # self-contained blob read (no catalog join at damage time).
+        "keywords": json.loads(row.keywords or "[]"),
     }
 
 
@@ -331,6 +335,8 @@ def _apply_mutation(
         return _apply_momir_activate(session, action, state)
     if atype == "momir_kill_token":
         return _apply_momir_kill(action, state)
+    if atype == "momir_revive_token":
+        return _apply_momir_revive(action, state)
     if atype == "momir_attack":
         return _apply_momir_attack(action, state)
     if atype == "momir_resolve":
@@ -442,6 +448,11 @@ def _apply_momir_activate(session: Session, action: dict, state: dict) -> dict:
         "cmc": cmc,
         "turn_created": round_no,
         "alive": True,
+        # #111 combat state — self-contained on the token.
+        "keywords": creature.get("keywords", []),
+        "tapped": False,
+        "damage": 0,  # marked this turn; cleared on turn advance
+        "counters": {"p1p1": 0, "m1m1": 0},  # Phase 4 writes these
     }
     tokens.setdefault(sid, []).append(token)
     state["untapped"][sid] = int(state["untapped"][sid]) - cmc  # tap the mana
@@ -503,6 +514,44 @@ def _apply_momir_kill(action: dict, state: dict) -> dict:
     return {"index": idx}
 
 
+def _apply_momir_revive(action: dict, state: dict) -> dict:
+    """Un-kill a token (#111) — the inverse of momir_kill_token, for undoing a
+    mis-tap or a combat call the math got wrong. Seat-scoped like kill (own seat
+    or the table token); marked damage is left as-is (it clears on turn advance)."""
+    sid = str(_coerce_int(action["seat_id"]))
+    idx = _coerce_int(action.get("index"))
+    tokens = state.get("tokens", {}).get(sid, [])
+    if idx is None or not (0 <= idx < len(tokens)):
+        raise ValueError("token index out of range")
+    tokens[idx]["alive"] = True
+    return {"index": idx}
+
+
+# --- Momir combat keyword engine (#111, Tier 1) ------------------------------
+
+
+def _has_kw(token: dict, kw: str) -> bool:
+    """Case-insensitive keyword membership. ``kw`` is lowercase; Scryfall stores
+    title-case ("First strike", "Double strike")."""
+    return any((k or "").casefold() == kw for k in (token.get("keywords") or []))
+
+
+def _counters(token: dict) -> tuple[int, int]:
+    c = token.get("counters") or {}
+    return int(c.get("p1p1", 0)), int(c.get("m1m1", 0))
+
+
+def _eff_pow(token: dict) -> int:
+    """Effective power: parsed base + p1p1 − m1m1 (variable P/T → 0 base)."""
+    plus, minus = _counters(token)
+    return _pt_int(token.get("power")) + plus - minus
+
+
+def _eff_tou(token: dict) -> int:
+    plus, minus = _counters(token)
+    return _pt_int(token.get("toughness")) + plus - minus
+
+
 def _pt_int(value) -> int:
     """Best-effort integer for a raw P/T string. Numeric ("7") → 7; a leading-int
     variable ("1+*") → 1; a pure variable ("*", "X") → 0. Combat math only runs on
@@ -531,16 +580,28 @@ def _apply_momir_attack(action: dict, state: dict) -> dict:
     decides whether to block, via :func:`_apply_momir_resolve`. Pending attacks
     are cleared when the turn advances (combat ends with the turn).
 
-    A creature can be declared as an attacker only once at a time."""
+    A creature can be declared as an attacker only once at a time. #111 — the
+    attacker must be untapped, not summoning-sick (controlled since the start of
+    the turn, i.e. ``turn_created < current round``, unless it has haste), and not
+    have defender. Declaring TAPS the attacker unless it has vigilance."""
     a_sid = str(_coerce_int(action["seat_id"]))
     t_sid = str(_coerce_int(action.get("target_seat_id")))
     if a_sid == t_sid:
         raise ValueError("a creature must attack another player, not its controller")
     a_idx = _coerce_int(action.get("index"))
     attacker = _live_token(state, a_sid, a_idx, "attacking")
+    if attacker.get("tapped"):
+        raise ValueError("a tapped creature cannot attack")
+    if _has_kw(attacker, "defender"):
+        raise ValueError("a creature with defender cannot attack")
+    sick = int(attacker.get("turn_created", 0)) >= int(state.get("turn", 1))
+    if sick and not _has_kw(attacker, "haste"):
+        raise ValueError("that creature is summoning sick")
     attacks = state.setdefault("attacks", [])
     if any(x["attacker_seat"] == a_sid and x["attacker_index"] == a_idx for x in attacks):
         raise ValueError("that creature is already attacking")
+    if not _has_kw(attacker, "vigilance"):
+        attacker["tapped"] = True  # attacking taps, unless vigilance
     seq = int(state.get("attackSeq", 0)) + 1
     state["attackSeq"] = seq
     attacks.append(
@@ -550,16 +611,18 @@ def _apply_momir_attack(action: dict, state: dict) -> dict:
 
 
 def _apply_momir_resolve(action: dict, state: dict) -> dict:
-    """The DEFENDING player resolves a pending attack aimed at them — the block
-    decision belongs to the defender, not the attacker:
+    """The DEFENDING player resolves a pending attack aimed at them (#111):
 
-    * **Take it** (no ``block_index``): lose the attacker's power in life.
-    * **Block** (``block_index`` = one of your live creatures): your blocker and
-      the attacker deal their power to each other; either dies if lethal
-      (``power >= toughness``, numeric only). No life loss.
+    * **Take it** (no blocks): lose the attacker's power in life (double for an
+      unblocked double-striker).
+    * **Block** (``block_indexes`` = your live untapped creatures; legacy single
+      ``block_index`` still accepted): the keyword combat engine runs — first- /
+      double-strike steps, deathtouch, trample, lifelink, indestructible.
     * **Cancel** (``cancel`` truthy): dismiss a mis-declared attack, no effect.
 
-    A blank/dead attacker (killed since declaration) simply fizzles."""
+    Block legality: blockers must be untapped and alive; a flyer is blockable only
+    by flying/reach; a menacing attacker needs 0 or ≥2 blockers. A dead/gone
+    attacker fizzles."""
     d_sid = str(_coerce_int(action["seat_id"]))  # the defender resolving
     seq = _coerce_int(action.get("seq"))
     attacks = state.setdefault("attacks", [])
@@ -578,34 +641,110 @@ def _apply_momir_resolve(action: dict, state: dict) -> dict:
     attacker = a_list[ai] if isinstance(ai, int) and 0 <= ai < len(a_list) else None
     if attacker is None or attacker.get("alive") is False:
         return {"seq": seq, "resolution": "fizzle"}  # attacker died before blocks
-    a_pow, a_tou = _pt_int(attacker.get("power")), _pt_int(attacker.get("toughness"))
 
-    block_index = action.get("block_index")
-    if block_index is None:  # take the hit
-        state["lives"][d_sid] = int(state["lives"].get(d_sid, 0)) - a_pow
-        return {
-            "seq": seq,
-            "resolution": "unblocked",
-            "attacker_name": attacker.get("name"),
-            "target_seat_id": int(d_sid),
-            "damage": a_pow,
-        }
+    # Resolve the declared blockers (block_indexes[], or the legacy single
+    # block_index). Empty → the defender takes the hit.
+    raw = action.get("block_indexes")
+    if raw is None and action.get("block_index") is not None:
+        raw = [action["block_index"]]
+    block_idx = [i for i in (_coerce_int(x) for x in (raw or [])) if i is not None]
+    if len(set(block_idx)) != len(block_idx):
+        raise ValueError("a creature cannot block twice")
+    d_tokens = state.get("tokens", {}).get(d_sid, [])
+    blockers = []
+    for i in block_idx:
+        if not (0 <= i < len(d_tokens)) or d_tokens[i].get("alive") is False:
+            raise ValueError("blocking creature not found or dead")
+        if d_tokens[i].get("tapped"):
+            raise ValueError("a tapped creature cannot block")
+        blockers.append(d_tokens[i])
 
-    blocker = _live_token(state, d_sid, _coerce_int(block_index), "blocking")
-    b_pow, b_tou = _pt_int(blocker.get("power")), _pt_int(blocker.get("toughness"))
-    attacker_died = a_tou > 0 and b_pow >= a_tou
-    blocker_died = b_tou > 0 and a_pow >= b_tou
-    if attacker_died:
-        attacker["alive"] = False
-    if blocker_died:
-        blocker["alive"] = False
+    if _has_kw(attacker, "flying") and any(
+        not (_has_kw(b, "flying") or _has_kw(b, "reach")) for b in blockers
+    ):
+        raise ValueError("only creatures with flying or reach can block a flyer")
+    if _has_kw(attacker, "menace") and 0 < len(blockers) < 2:
+        raise ValueError("a menacing creature must be blocked by two or more creatures")
+
+    return _run_combat(state, seq, entry["attacker_seat"], attacker, blockers, d_sid)
+
+
+def _run_combat(
+    state: dict, seq: int, a_sid: str, attacker: dict, blockers: list[dict], d_sid: str
+) -> dict:
+    """Deal combat damage between one attacker and its blockers (or the defending
+    player when unblocked), in a first-strike step then a normal step. Marks
+    damage on tokens, applies state-based deaths after each step, and accumulates
+    trample / player damage and lifelink life gain. See #111 for the model."""
+    trample = _has_kw(attacker, "trample")
+    lifegain: dict[str, int] = {}
+    dt_killed: set[int] = set()  # id() of tokens that took deathtouch damage
+    player_dmg = 0
+
+    def gain(sid: str, source: dict, amount: int) -> None:
+        if amount > 0 and _has_kw(source, "lifelink"):
+            lifegain[sid] = lifegain.get(sid, 0) + amount
+
+    def deals_in(t: dict, step: str) -> bool:
+        fs, ds = _has_kw(t, "first strike"), _has_kw(t, "double strike")
+        return (fs or ds) if step == "first" else (ds or not fs)
+
+    for step in ("first", "normal"):
+        # Attacker assigns its power (lethal-then-next across blockers in order;
+        # deathtouch makes 1 lethal; trample spills the rest to the player).
+        if attacker.get("alive") is not False and deals_in(attacker, step):
+            remaining = max(0, _eff_pow(attacker))
+            live_blockers = [b for b in blockers if b.get("alive") is not False]
+            if not blockers:  # unblocked → straight to the player
+                player_dmg += remaining
+                gain(a_sid, attacker, remaining)
+            else:
+                dt = _has_kw(attacker, "deathtouch")
+                for b in live_blockers:
+                    if remaining <= 0:
+                        break
+                    lethal = 1 if dt else max(1, _eff_tou(b) - int(b.get("damage", 0)))
+                    assign = min(remaining, lethal)
+                    b["damage"] = int(b.get("damage", 0)) + assign
+                    if dt:
+                        dt_killed.add(id(b))
+                    gain(a_sid, attacker, assign)
+                    remaining -= assign
+                if trample and remaining > 0:
+                    player_dmg += remaining
+                    gain(a_sid, attacker, remaining)
+        # Blockers deal to the attacker simultaneously (only while it's alive).
+        if attacker.get("alive") is not False:
+            for b in blockers:
+                if b.get("alive") is False or not deals_in(b, step):
+                    continue
+                bp = max(0, _eff_pow(b))
+                attacker["damage"] = int(attacker.get("damage", 0)) + bp
+                if _has_kw(b, "deathtouch") and bp > 0:
+                    dt_killed.add(id(attacker))
+                gain(d_sid, b, bp)
+        # State-based deaths after the step (before the next step deals).
+        for t in [attacker, *blockers]:
+            if t.get("alive") is False or _has_kw(t, "indestructible"):
+                continue
+            tou = _eff_tou(t)
+            if id(t) in dt_killed or (tou > 0 and int(t.get("damage", 0)) >= tou):
+                t["alive"] = False
+
+    if player_dmg:
+        state["lives"][d_sid] = int(state["lives"].get(d_sid, 0)) - player_dmg
+    for sid, amount in lifegain.items():
+        state["lives"][sid] = int(state["lives"].get(sid, 0)) + amount
+
     return {
         "seq": seq,
-        "resolution": "blocked",
+        "resolution": "blocked" if blockers else "unblocked",
         "attacker_name": attacker.get("name"),
-        "blocker_name": blocker.get("name"),
-        "attacker_died": attacker_died,
-        "blocker_died": blocker_died,
+        "blockers": [b.get("name") for b in blockers],
+        "player_damage": player_dmg,
+        "attacker_died": attacker.get("alive") is False,
+        "blockers_died": [b.get("alive") is False for b in blockers],
+        "life_gained": lifegain,
     }
 
 

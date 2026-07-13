@@ -115,6 +115,7 @@ def test_random_creature_returns_all_fields(db):
         "type_line": "Creature — Bear",
         "scryfall_id": c["scryfall_id"],  # some printing's id
         "cmc": 2,
+        "keywords": [],  # #111 — carried onto the token at summon
     }
     assert c["scryfall_id"].startswith("sid-")
 
@@ -196,7 +197,9 @@ def live_momir(db):
     owner = _user(db)
     game, seats = _momir_game(db, owner.id, seats=[{"user_id": owner.id}, {}])
     _start(db, game, owner.id)
-    _creature(db, "Grizzly Bears", 3, power="2", toughness="2")
+    # Haste so a creature summoned this turn can attack this turn — most combat
+    # tests declare on the summon turn (#111 summoning sickness otherwise blocks).
+    _creature(db, "Grizzly Bears", 3, power="2", toughness="2", keywords='["Haste"]')
     return {"db": db, "gid": game.id, "uid": owner.id, "seats": seats, "owner": owner}
 
 
@@ -433,7 +436,7 @@ def test_momir_taking_lethal_attack_auto_eliminates(db):
         db, owner.id, seats=[{"user_id": owner.id, "starting_life": 24}, {"starting_life": 2}]
     )
     _start(db, game, owner.id)
-    _creature(db, "Colossus", 3, power="5", toughness="5")
+    _creature(db, "Colossus", 3, power="5", toughness="5", keywords='["Haste"]')
     s1, s2 = seats
     _act(db, game.id, owner.id, {"type": "momir_activate", "seat_id": s1.id, "cmc": 3}, "TABLE")
     live = _act(
@@ -460,7 +463,7 @@ def test_momir_attacker_declares_defender_resolves_auth(db):
     a, b = _user(db), _user(db)
     game, seats = _momir_game(db, owner.id, seats=[{"user_id": a.id}, {"user_id": b.id}])
     _start(db, game, owner.id)
-    _creature(db, "Grizzly Bears", 3)
+    _creature(db, "Grizzly Bears", 3, keywords='["Haste"]')
     s1, s2 = seats
     _act(db, game.id, a.id, {"type": "momir_activate", "seat_id": s1.id, "cmc": 3})
     # b cannot declare an attack with a's creature (a's seat).
@@ -498,7 +501,7 @@ def test_momir_multiplayer_each_defender_resolves_their_own(db):
         seats=[{"user_id": p1.id}, {"user_id": p2.id}, {"user_id": p3.id}, {"user_id": p4.id}],
     )
     _start(db, game, owner.id)
-    _creature(db, "Grizzly Bears", 3, power="2", toughness="2")
+    _creature(db, "Grizzly Bears", 3, power="2", toughness="2", keywords='["Haste"]')
     s1, s2, s3, s4 = seats
     # p1 activates + attacks p3; p2 activates + attacks p4 (own-seat, no table token).
     _act(db, game.id, p1.id, {"type": "momir_activate", "seat_id": s1.id, "cmc": 3})
@@ -571,65 +574,36 @@ def test_momir_attack_self_dead_and_double_declare_rejected(live_momir):
         )
 
 
-def test_momir_resolve_cancel_and_fizzle_and_turn_clears(live_momir):
-    L = live_momir
-    s1, s2 = L["seats"]
-    _act(
-        L["db"], L["gid"], L["uid"], {"type": "momir_activate", "seat_id": s1.id, "cmc": 3}, "TABLE"
-    )
+def test_momir_resolve_cancel_and_fizzle_and_turn_clears(db):
+    owner = _user(db)
+    game, seats = _momir_game(db, owner.id, seats=[{"user_id": owner.id}, {}])
+    _start(db, game, owner.id)
+    # Haste (can attack the turn it's summoned) + Vigilance (declaring doesn't tap,
+    # so the same creature can be re-declared after a cancel/revive).
+    _creature(db, "Serra Angel", 3, power="4", toughness="4", keywords='["Haste", "Vigilance"]')
+    s1, s2 = seats
+
+    def act(a):
+        return _act(db, game.id, owner.id, a, "TABLE")
+
+    act({"type": "momir_activate", "seat_id": s1.id, "cmc": 3})
     # cancel a mis-declared attack → no life change, cleared.
-    live = _act(
-        L["db"],
-        L["gid"],
-        L["uid"],
-        {"type": "momir_attack", "seat_id": s1.id, "index": 0, "target_seat_id": s2.id},
-        "TABLE",
-    )
-    live = _act(
-        L["db"],
-        L["gid"],
-        L["uid"],
-        {"type": "momir_resolve", "seat_id": s2.id, "seq": _seq_of(live), "cancel": True},
-        "TABLE",
-    )
+    live = act({"type": "momir_attack", "seat_id": s1.id, "index": 0, "target_seat_id": s2.id})
+    live = act({"type": "momir_resolve", "seat_id": s2.id, "seq": _seq_of(live), "cancel": True})
     assert _state(live)["lives"][str(s2.id)] == 24 and _state(live)["attacks"] == []
     # fizzle: attacker dies before the defender resolves → no damage.
-    live = _act(
-        L["db"],
-        L["gid"],
-        L["uid"],
-        {"type": "momir_attack", "seat_id": s1.id, "index": 0, "target_seat_id": s2.id},
-        "TABLE",
-    )
+    live = act({"type": "momir_attack", "seat_id": s1.id, "index": 0, "target_seat_id": s2.id})
     seq = _seq_of(live)
-    _act(
-        L["db"],
-        L["gid"],
-        L["uid"],
-        {"type": "momir_kill_token", "seat_id": s1.id, "index": 0},
-        "TABLE",
-    )
-    live = _act(
-        L["db"],
-        L["gid"],
-        L["uid"],
-        {"type": "momir_resolve", "seat_id": s2.id, "seq": seq},
-        "TABLE",
-    )
+    act({"type": "momir_kill_token", "seat_id": s1.id, "index": 0})
+    live = act({"type": "momir_resolve", "seat_id": s2.id, "seq": seq})
     assert _state(live)["lives"][str(s2.id)] == 24  # fizzled
-    # advancing the turn clears any pending attacks (combat ends with the turn).
-    _act(
-        L["db"], L["gid"], L["uid"], {"type": "momir_activate", "seat_id": s2.id, "cmc": 3}, "TABLE"
-    )
-    live = _act(
-        L["db"],
-        L["gid"],
-        L["uid"],
-        {"type": "momir_attack", "seat_id": s2.id, "index": 0, "target_seat_id": s1.id},
-        "TABLE",
-    )
+    # revive the (mistakenly killed) attacker, re-declare, then advance the turn →
+    # pending attacks clear (combat ends with the turn). Also exercises revive.
+    act({"type": "momir_revive_token", "seat_id": s1.id, "index": 0})
+    live = act({"type": "momir_attack", "seat_id": s1.id, "index": 0, "target_seat_id": s2.id})
     assert len(_state(live)["attacks"]) == 1
-    live = _act(L["db"], L["gid"], L["uid"], {"type": "turn"}, "TABLE")
+    assert _state(live)["tokens"][str(s1.id)][0]["alive"] is True  # revived
+    live = act({"type": "turn"})
     assert _state(live)["attacks"] == []
 
 
@@ -777,6 +751,179 @@ def test_momir_adjust_is_table_only(db):
     assert _live_state(db, game.id)["library"][sid] == 10
     with pytest.raises(ValueError):  # negatives rejected
         _act(db, game.id, a.id, {"type": "momir_adjust", "seat_id": s1.id, "library": -1}, "TABLE")
+
+
+# ── Phase 3 (#111): keyword combat engine ────────────────────────────────────
+
+
+def _tok(power, toughness, keywords=(), **over):
+    """A combat-ready token blob. turn_created=0 → never summoning sick."""
+    t = {
+        "name": "T",
+        "power": str(power),
+        "toughness": str(toughness),
+        "type_line": "Creature",
+        "scryfall_id": "sid-x",
+        "cmc": 1,
+        "turn_created": 0,
+        "alive": True,
+        "keywords": list(keywords),
+        "tapped": False,
+        "damage": 0,
+        "counters": {"p1p1": 0, "m1m1": 0},
+    }
+    t.update(over)
+    return t
+
+
+def _combat(db, attacker, blockers, *, atk_life=24, def_life=24):
+    """Set up a 2-seat Momir game with an exact attacker (s1[0]) and blockers
+    (s2) by poking the blob — sidesteps the once-per-turn summon quota so we can
+    place multiple blockers. Returns (act, s1, s2)."""
+    owner = _user(db)
+    game, seats = _momir_game(db, owner.id, seats=[{"user_id": owner.id}, {}])
+    _start(db, game, owner.id, fund=False)
+    s1, s2 = seats
+    live = db.query(GameLiveState).filter_by(game_id=game.id).one()
+    st = json.loads(live.state)
+    st["tokens"][str(s1.id)] = [attacker]
+    st["tokens"][str(s2.id)] = list(blockers)
+    st["lives"][str(s1.id)] = atk_life
+    st["lives"][str(s2.id)] = def_life
+    live.state = json.dumps(st)
+    db.flush()
+
+    def act(a):
+        return _act(db, game.id, owner.id, a, "TABLE")
+
+    return act, s1, s2
+
+
+def _fight(act, s1, s2, block_indexes=None):
+    """Declare s1[0] → s2, then resolve with the given blocks; return final state."""
+    live = act({"type": "momir_attack", "seat_id": s1.id, "index": 0, "target_seat_id": s2.id})
+    seq = _seq_of(live)
+    a = {"type": "momir_resolve", "seat_id": s2.id, "seq": seq}
+    if block_indexes is not None:
+        a["block_indexes"] = block_indexes
+    return _state(act(a))
+
+
+def test_combat_vanilla_block_trade(db):
+    act, s1, s2 = _combat(db, _tok(2, 2), [_tok(2, 2)])
+    st = _fight(act, s1, s2, [0])
+    assert st["tokens"][str(s1.id)][0]["alive"] is False  # both 2/2 trade
+    assert st["tokens"][str(s2.id)][0]["alive"] is False
+    assert st["lives"][str(s2.id)] == 24  # blocked → no life loss
+
+
+def test_combat_unblocked_hits_player(db):
+    act, s1, s2 = _combat(db, _tok(3, 3), [_tok(2, 2)])
+    st = _fight(act, s1, s2, [])  # choose not to block
+    assert st["lives"][str(s2.id)] == 21
+    assert st["tokens"][str(s2.id)][0]["alive"] is True
+
+
+def test_combat_first_strike_kills_before_retaliation(db):
+    act, s1, s2 = _combat(db, _tok(2, 2, ["First strike"]), [_tok(2, 2)])
+    st = _fight(act, s1, s2, [0])
+    assert st["tokens"][str(s1.id)][0]["alive"] is True  # struck first, took none
+    assert st["tokens"][str(s2.id)][0]["alive"] is False
+
+
+def test_combat_first_strike_plus_deathtouch(db):
+    act, s1, s2 = _combat(db, _tok(1, 1, ["First strike", "Deathtouch"]), [_tok(3, 3)])
+    st = _fight(act, s1, s2, [0])
+    assert st["tokens"][str(s1.id)][0]["alive"] is True  # 1 deathtouch damage, first
+    assert st["tokens"][str(s2.id)][0]["alive"] is False  # dies to deathtouch
+
+
+def test_combat_deathtouch_trades_up(db):
+    act, s1, s2 = _combat(db, _tok(1, 1, ["Deathtouch"]), [_tok(5, 5)])
+    st = _fight(act, s1, s2, [0])
+    assert st["tokens"][str(s1.id)][0]["alive"] is False  # takes 5
+    assert st["tokens"][str(s2.id)][0]["alive"] is False  # deathtouch
+
+
+def test_combat_trample_plus_deathtouch_spills(db):
+    act, s1, s2 = _combat(db, _tok(5, 5, ["Trample", "Deathtouch"]), [_tok(3, 3)])
+    st = _fight(act, s1, s2, [0])
+    assert st["tokens"][str(s2.id)][0]["alive"] is False
+    assert st["tokens"][str(s1.id)][0]["alive"] is True  # takes 3 < 5
+    assert st["lives"][str(s2.id)] == 24 - 4  # 1 lethal (deathtouch), 4 tramples
+
+
+def test_combat_trample_over_toughness(db):
+    act, s1, s2 = _combat(db, _tok(5, 5, ["Trample"]), [_tok(2, 2)])
+    st = _fight(act, s1, s2, [0])
+    assert st["lives"][str(s2.id)] == 24 - 3  # 2 lethal to blocker, 3 tramples
+
+
+def test_combat_double_strike_plus_lifelink(db):
+    # blocker 1/4 survives the first-strike step, so both steps deal + gain life.
+    act, s1, s2 = _combat(db, _tok(2, 2, ["Double strike", "Lifelink"]), [_tok(1, 4)])
+    st = _fight(act, s1, s2, [0])
+    assert st["tokens"][str(s2.id)][0]["alive"] is False  # 2+2 = 4 >= 4
+    assert st["lives"][str(s1.id)] == 24 + 4  # lifelink both steps
+    assert st["tokens"][str(s1.id)][0]["alive"] is True  # took 1 < 2
+
+
+def test_combat_lifelink_unblocked(db):
+    act, s1, s2 = _combat(db, _tok(3, 3, ["Lifelink"]), [_tok(2, 2)])
+    st = _fight(act, s1, s2, [])
+    assert st["lives"][str(s2.id)] == 21 and st["lives"][str(s1.id)] == 27
+
+
+def test_combat_indestructible_survives_lethal_and_deathtouch(db):
+    act, s1, s2 = _combat(db, _tok(2, 2, ["Deathtouch"]), [_tok(2, 2, ["Indestructible"])])
+    st = _fight(act, s1, s2, [0])
+    assert st["tokens"][str(s2.id)][0]["alive"] is True  # indestructible shrugs deathtouch
+    assert st["tokens"][str(s1.id)][0]["alive"] is False  # attacker takes 2, dies
+
+
+def test_combat_flying_only_blockable_by_flying_or_reach(db):
+    act, s1, s2 = _combat(db, _tok(2, 2, ["Flying"]), [_tok(2, 2)])
+    with pytest.raises(ValueError):  # ground creature can't block a flyer
+        _fight(act, s1, s2, [0])
+    act, s1, s2 = _combat(db, _tok(2, 2, ["Flying"]), [_tok(2, 2, ["Reach"])])
+    st = _fight(act, s1, s2, [0])
+    assert st["tokens"][str(s1.id)][0]["alive"] is False  # reach blocks fine
+
+
+def test_combat_menace_needs_two_blockers(db):
+    act, s1, s2 = _combat(db, _tok(3, 3, ["Menace"]), [_tok(2, 2), _tok(2, 2)])
+    with pytest.raises(ValueError):  # single block illegal
+        _fight(act, s1, s2, [0])
+    act, s1, s2 = _combat(db, _tok(3, 3, ["Menace"]), [_tok(2, 2), _tok(2, 2)])
+    st = _fight(act, s1, s2, [0, 1])  # two blockers legal
+    assert st["tokens"][str(s1.id)][0]["alive"] is False  # takes 2+2 = 4 >= 3
+
+
+def test_combat_vigilance_does_not_tap(db):
+    act, s1, s2 = _combat(db, _tok(2, 2, ["Vigilance"]), [_tok(2, 2)])
+    live = act({"type": "momir_attack", "seat_id": s1.id, "index": 0, "target_seat_id": s2.id})
+    assert _state(live)["tokens"][str(s1.id)][0]["tapped"] is False  # vigilance: no tap
+    # a non-vigilance attacker taps on declare
+    act, s1, s2 = _combat(db, _tok(2, 2), [_tok(2, 2)])
+    live = act({"type": "momir_attack", "seat_id": s1.id, "index": 0, "target_seat_id": s2.id})
+    assert _state(live)["tokens"][str(s1.id)][0]["tapped"] is True
+
+
+def test_combat_summoning_sickness_blocks_attack(db):
+    sick = _tok(2, 2, turn_created=1)  # summoned this round (turn == 1)
+    act, s1, s2 = _combat(db, sick, [_tok(2, 2)])
+    with pytest.raises(ValueError):  # sick, no haste
+        act({"type": "momir_attack", "seat_id": s1.id, "index": 0, "target_seat_id": s2.id})
+    hasty = _tok(2, 2, ["Haste"], turn_created=1)
+    act, s1, s2 = _combat(db, hasty, [_tok(2, 2)])
+    live = act({"type": "momir_attack", "seat_id": s1.id, "index": 0, "target_seat_id": s2.id})
+    assert len(_state(live)["attacks"]) == 1  # haste lets it attack
+
+
+def test_combat_tapped_creature_cannot_block(db):
+    act, s1, s2 = _combat(db, _tok(2, 2), [_tok(2, 2, tapped=True)])
+    with pytest.raises(ValueError):
+        _fight(act, s1, s2, [0])
 
 
 # ── Constraint: Commander games untouched ────────────────────────────────────
