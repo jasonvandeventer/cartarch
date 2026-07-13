@@ -102,15 +102,17 @@
     /* #113 battlefield — each seat's cell becomes a readable creature board:
        big cards + names, the Commander-damage chrome dropped (no commanders). */
     .momir-board .tc-cmd-strip { display: none; }
-    /* Sit the creature band between the top corners (name/status) and the bottom
-       corners (life numeral + life pad), scrolling within that band. */
-    .momir-board .tc-momir-tokens { gap: 0.45rem; align-content: flex-start; overflow-y: auto;
-      margin: 2rem 0.5rem 2.6rem; max-height: calc(100% - 4.6rem); padding: 0.15rem; }
-    .momir-board .tc-momir-token { width: 5rem; }
+    /* The creature band fills the zone between the top corners (name/status) and
+       the bottom corners (life numeral + life pad), centered both ways. Card width
+       is set per-seat by sizeMomirBoard() so fewer creatures = larger cards. */
+    .momir-board .tc-momir-tokens { gap: 0.5rem; flex: 1 1 auto; min-height: 0;
+      margin: 1.4rem 0 2.6rem; align-content: center; align-items: center;
+      justify-content: center; overflow: hidden; }
+    .momir-board .tc-momir-token { width: var(--momir-card-w, 4.5rem); }
     .momir-board .tc-momir-pt { font-size: 0.85rem; padding: 0 0.2rem; }
     .momir-board .tc-momir-badge { font-size: 0.58rem; }
-    .momir-board .tc-momir-name { display: block; max-width: 5rem; margin-top: 0.08rem;
-      font-size: 0.62rem; line-height: 1.05; text-align: center;
+    .momir-board .tc-momir-name { display: block; max-width: var(--momir-card-w, 4.5rem);
+      margin-top: 0.08rem; font-size: 0.62rem; line-height: 1.05; text-align: center;
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .tc-momir-name { display: none; }  /* names only render in battlefield mode */
   </style>
@@ -839,8 +841,8 @@ document.addEventListener('webkitfullscreenchange', () => {
 
 document.body.classList.add('game-mode');
 initGrid();
-window.addEventListener('resize', () => { applyLayout(); });
-portraitMQ.addEventListener('change', () => { applyLayout(); });
+window.addEventListener('resize', () => { applyLayout(); if (IS_MOMIR) sizeMomirBoard(); });
+portraitMQ.addEventListener('change', () => { applyLayout(); if (IS_MOMIR) sizeMomirBoard(); });
 
 {% if not is_ended %}
 // ── State ─────────────────────────────────────────────────────
@@ -1625,7 +1627,7 @@ function render() {
     if (IS_MOMIR) { renderMomirResources(s.id); renderMomirTokens(s.id); }
   });
 
-  if (IS_MOMIR) { refreshMomirGo(); renderCombat(); }  // once-per-turn + pending attacks
+  if (IS_MOMIR) { refreshMomirGo(); renderCombat(); sizeMomirBoard(); }  // + battlefield card sizing
 
   const active = seatDefs.find(s => s.id === state.currentTurnId);
   const turnVal = state.turn ?? 1;
@@ -1767,6 +1769,29 @@ function renderMomirTokens(seatId) {
   el.querySelectorAll('.tc-momir-dead').forEach((cell, di) => {
     const deadIdx = toks.map((t, i) => [t, i]).filter(([t]) => t.alive === false)[di];
     if (deadIdx) cell.onclick = () => openTokenMenu(seatId, deadIdx[1]);
+  });
+}
+
+// #113 battlefield — size each seat's creature cards to fill its zone: pick the
+// card width that best packs N cards into the container (fewer creatures → bigger
+// cards). Idempotent (sets a CSS var), so calling it every render is cheap.
+function sizeMomirBoard() {
+  if (!IS_MOMIR) return;
+  const gap = 8, RH = 1.55;  // px gap; card total-height / width (image + name)
+  seatDefs.forEach(s => {
+    const el = document.getElementById(`momir-tokens-${s.id}`);
+    if (!el) return;
+    const n = el.children.length, W = el.clientWidth, H = el.clientHeight;
+    if (!n || !W || !H) return;
+    let best = 0;
+    for (let cols = 1; cols <= n; cols++) {
+      const rows = Math.ceil(n / cols);
+      const byW = (W - gap * (cols + 1)) / cols;
+      const byH = ((H - gap * (rows + 1)) / rows) / RH;
+      best = Math.max(best, Math.min(byW, byH));
+    }
+    best = Math.max(30, Math.min(best, 220));  // clamp: ~1.9rem .. ~13.75rem
+    el.style.setProperty('--momir-card-w', best + 'px');
   });
 }
 
