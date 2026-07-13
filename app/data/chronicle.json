@@ -1,5 +1,15 @@
 [
   {
+    "version": "4.6.5",
+    "date": "2026-07-13",
+    "added": [
+      "On the table view, hover a summoned Momir creature with a mouse or trackpad to see a large preview of the card following your cursor. Touch devices are unaffected — tapping still opens the creature's action menu."
+    ],
+    "refined": [],
+    "resolved": [],
+    "archivist_note": "v4.6.5 = Momir hover-to-zoom on the tablet (game_detail.html). One shared #momir-hover-zoom <img>, event-delegated mouseover/mousemove/mouseout on document (survives token re-renders), loads the normal-size mirror image on hover with a Scryfall fallback. Gated by matchMedia('(hover: hover)') so touch never triggers it. Cursor-follow placement clamps to the viewport. CSS-only visibility + fixed positioning; no new deps."
+  },
+  {
     "version": "4.6.4",
     "date": "2026-07-13",
     "added": [],
