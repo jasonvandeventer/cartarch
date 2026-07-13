@@ -214,6 +214,7 @@ def create_game(
     first_seat_number: int | None = None,
     client_token: str | None = None,
     played_at: Any = None,
+    momir_physical: bool = False,
 ) -> Game:
     """Create a game and its seats. seats is a list of {player_name, deck_id, starting_life}.
 
@@ -245,6 +246,8 @@ def create_game(
         first_seat_number=first_seat_number,
         client_token=client_token,
         created_at=now,
+        # #113 — physical mode only applies to Momir; ignore the flag otherwise.
+        momir_physical=bool(momir_physical) and (format == "Momir"),
     )
     session.add(game)
     session.flush()

@@ -32,6 +32,12 @@
         <p class="muted" id="momir-note" style="display:none">
           Momir Basic — each player uses only basic lands. The app generates random creatures.
         </p>
+        {# #113 physical-table mode — real basic-land decks, app tracks only creatures. #}
+        <label id="momir-physical-label" style="display:none">
+          <input type="checkbox" name="momir_physical" value="true" checked>
+          Physical decks — you're using real basic lands. The app skips mana/hand/library
+          tracking and just rolls creatures + runs combat (turn it off for a fully digital game).
+        </label>
         <label>Starting Life Total</label>
         <select name="starting_life" id="starting_life">
           <option value="40" selected>40 (Commander)</option>
@@ -176,6 +182,7 @@ function onFormatChange() {
   const fmt = document.getElementById('format-select').value;
   isMomir = fmt === 'Momir';
   document.getElementById('momir-note').style.display = isMomir ? '' : 'none';
+  document.getElementById('momir-physical-label').style.display = isMomir ? '' : 'none';  // #113
   if (isMomir) document.getElementById('starting_life').value = '24';
   renderSeats();
 }

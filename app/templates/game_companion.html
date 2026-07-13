@@ -316,6 +316,7 @@
     const m = (st && st[key]) || {}; const v = m[K(seatId)];
     return v === undefined ? MOMIR_RES_DEFAULTS[key] : v;
   }
+  function cmpPhysical() { return !!(st && st.momirPhysical); }  // #113 real-card game
   function tokHasKw(t, kw) { return (t.keywords || []).some(k => String(k).toLowerCase() === kw); }
   function tokCounters(t) { const c = t.counters || {}; return [c.p1p1 || 0, c.m1m1 || 0]; }
   function tokEffPow(t) { const [p, m] = tokCounters(t); return ptInt(t.power) + p - m; }
@@ -449,7 +450,7 @@
   function renderMyResources() {
     const el = document.getElementById('cmp-res');
     if (!el) return;
-    if (!IS_MOMIR || MY_SEAT_ID == null) { el.style.display = 'none'; return; }
+    if (!IS_MOMIR || MY_SEAT_ID == null || cmpPhysical()) { el.style.display = 'none'; return; }  // #113
     el.style.display = '';
     const lib = momirRes(MY_SEAT_ID, 'library'), hand = momirRes(MY_SEAT_ID, 'hand');
     const lands = momirRes(MY_SEAT_ID, 'lands'), untap = momirRes(MY_SEAT_ID, 'untapped');
@@ -621,15 +622,17 @@
     if (!IS_MOMIR || MY_SEAT_ID == null) return;
     const go = document.getElementById('cmp-momir-go');
     const btns = document.querySelectorAll('#cmp-momir-cmc .cmp-momir-cmc-btn');
-    const hand = Number(momirRes(MY_SEAT_ID, 'hand'));
-    const untap = Number(momirRes(MY_SEAT_ID, 'untapped'));
+    // #113 physical: real cards pay the cost, so don't gate on hand/mana.
+    const phys = cmpPhysical();
+    const hand = phys ? 1 : Number(momirRes(MY_SEAT_ID, 'hand'));
+    const untap = phys ? 16 : Number(momirRes(MY_SEAT_ID, 'untapped'));
     let block = null;
     if (momirUsedThisTurn()) block = 'Activated this turn';
     else if (!momirMyTurn()) block = 'Activate on your turn';
     else if (hand < 1) block = 'No cards in hand';
     btns.forEach(b => {
       const c = Number(b.dataset.cmc);
-      // #113 — grey MVs with no legal creature or unaffordable (> untapped mana).
+      // grey MVs with no legal creature (and, when digital, unaffordable ones).
       const affordable = MOMIR_VALID_MVS.has(c) && c <= untap;
       b.disabled = !!block || !affordable;
       if (block || !affordable) b.classList.remove('cmp-momir-cmc-on');

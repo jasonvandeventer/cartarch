@@ -200,9 +200,13 @@ def _initial_state(game: Game) -> dict:
         state["momirTurnUsed"] = {}
         state["attacks"] = []  # pending declared attackers awaiting block decisions
         state["attackSeq"] = 0
-        # Per-seat resource layer (#110). One map per field, keyed like lives.
-        for key, default in _MOMIR_RES_DEFAULTS.items():
-            state[key] = {str(s.id): default for s in seats}
+        # #113 physical mode — real basic-land decks handle mana/hand/library, so
+        # skip the digital resource layer entirely (no double bookkeeping).
+        state["momirPhysical"] = bool(game.momir_physical)
+        if not state["momirPhysical"]:
+            # Per-seat resource layer (#110). One map per field, keyed like lives.
+            for key, default in _MOMIR_RES_DEFAULTS.items():
+                state[key] = {str(s.id): default for s in seats}
     return state
 
 
@@ -447,12 +451,15 @@ def _apply_momir_activate(session: Session, action: dict, state: dict) -> dict:
 
     # #110 — activation costs {cmc} in untapped lands plus discarding a card. You
     # must be able to pay to activate. (The picker is constrained to affordable +
-    # non-empty MVs, so these rejects are a hard-validation backstop.)
-    _ensure_res(state, sid)
-    if int(state["untapped"][sid]) < cmc:
-        raise ValueError("not enough untapped lands to activate Momir")
-    if int(state["hand"][sid]) < 1:
-        raise ValueError("no card in hand to discard")
+    # non-empty MVs, so these rejects are a hard-validation backstop.) In #113
+    # physical mode the real cards pay the cost, so the app doesn't gate on it.
+    physical = bool(state.get("momirPhysical"))
+    if not physical:
+        _ensure_res(state, sid)
+        if int(state["untapped"][sid]) < cmc:
+            raise ValueError("not enough untapped lands to activate Momir")
+        if int(state["hand"][sid]) < 1:
+            raise ValueError("no card in hand to discard")
 
     creature = random_creature_at_cmc(session, cmc)
     tokens = state.setdefault("tokens", {})
@@ -477,8 +484,9 @@ def _apply_momir_activate(session: Session, action: dict, state: dict) -> dict:
         "oracle_text": creature.get("oracle_text"),  # #112 — humans resolve it
     }
     tokens.setdefault(sid, []).append(token)
-    state["untapped"][sid] = int(state["untapped"][sid]) - cmc  # tap the mana
-    state["hand"][sid] = int(state["hand"][sid]) - 1  # discard
+    if not physical:
+        state["untapped"][sid] = int(state["untapped"][sid]) - cmc  # tap the mana
+        state["hand"][sid] = int(state["hand"][sid]) - 1  # discard
     used[sid] = round_no  # spend the once-per-turn quota
     return {"cmc": cmc, "creature": token, "whiff": False}
 
@@ -494,6 +502,8 @@ def _apply_momir_play_land(action: dict, state: dict) -> dict:
     """Play one card from hand as a land (#110): once per turn, requires a card in
     hand. The land enters untapped, so it's usable for mana this same turn."""
     sid = str(_coerce_int(action["seat_id"]))
+    if state.get("momirPhysical"):
+        raise ValueError("lands are physical in this game")
     _ensure_res(state, sid)
     if int(state["hand"][sid]) < 1:
         raise ValueError("no card in hand to play as a land")
@@ -512,6 +522,8 @@ def _apply_momir_adjust(action: dict, state: dict) -> dict:
     :func:`_authorize_seat_scoped`; here we just apply. Only the four counts are
     adjustable (not landPlayed); each clamped to a non-negative integer."""
     sid = str(_coerce_int(action["seat_id"]))
+    if state.get("momirPhysical"):
+        raise ValueError("no digital resources to adjust in physical mode")
     _ensure_res(state, sid)
     changed = {}
     for key in ("library", "hand", "lands", "untapped"):
@@ -882,10 +894,14 @@ def _begin_momir_turn(
     its creature tokens (#111 `tapped` flag), reset the land drop, then draw one —
     decking out (auto-elimination, cause ``deck``) if the library is empty."""
     sid = str(seat_id)
-    _ensure_res(state, sid)
-    state["untapped"][sid] = int(state["lands"][sid])
+    # Untap this seat's creatures every turn — combat state, not a resource, so it
+    # happens in physical mode too.
     for tok in state.get("tokens", {}).get(sid, []):
         tok["tapped"] = False
+    if state.get("momirPhysical"):
+        return  # real cards handle mana / draw / deck-out
+    _ensure_res(state, sid)
+    state["untapped"][sid] = int(state["lands"][sid])
     state["landPlayed"][sid] = False
     if int(state["library"][sid]) <= 0:  # forced draw on an empty library → decked
         _deck_out(session, game_id, seat_id, state, has_table)

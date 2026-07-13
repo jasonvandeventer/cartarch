@@ -545,6 +545,11 @@ class Game(Base):
     # migration backfills existing rows to canonical values too. NULL is
     # effectively unreachable after migration but the column type permits it.
     format: Mapped[str | None] = mapped_column(String(64), nullable=True, default="Commander")
+    # #113 physical-table mode — a Momir game played with real basic-land decks:
+    # the app skips digital mana/hand/library tracking (the physical cards handle
+    # it) and just rolls creatures + runs combat. Nullable/default False; only
+    # meaningful for format="Momir".
+    momir_physical: Mapped[bool | None] = mapped_column(Boolean, nullable=True, default=False)
     # v3.27.3 — service-layer enum (CANONICAL_GAME_STATUSES in game_service.py).
     # Replaces the brittle "any seat has placement → game is finalized"
     # derivation that lived in game_detail.html line 3. Column nullable=True

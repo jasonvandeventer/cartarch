@@ -55,8 +55,14 @@ def _creature(
     db.flush()
 
 
-def _momir_game(db, owner_id, *, seats, status="created"):
-    game = Game(user_id=owner_id, format="Momir", status=status, client_token="TABLE")
+def _momir_game(db, owner_id, *, seats, status="created", physical=False):
+    game = Game(
+        user_id=owner_id,
+        format="Momir",
+        status=status,
+        client_token="TABLE",
+        momir_physical=physical,
+    )
     db.add(game)
     db.flush()
     seat_objs = []
@@ -83,7 +89,7 @@ def _start(db, game, user_id, *, fund=True):
     #110 activation cost (untapped >= cmc, hand >= 1) doesn't block pre-#110 tests.
     Lands are set too — untap resets untapped = lands each turn."""
     live = live_game_service.start_live_game(db, game.id, user_id)
-    if fund:
+    if fund and not game.momir_physical:  # physical games have no digital resources
         st = json.loads(live.state)
         for s in game.seats:
             st["lands"][str(s.id)] = 30
@@ -1084,6 +1090,72 @@ def test_commander_rejects_momir_primitive(db):
             {"type": "momir_tap_token", "seat_id": seat.id, "index": 0},
             "TABLE",
         )
+
+
+# ── Phase 5 (#113): physical-table mode ──────────────────────────────────────
+
+
+def test_momir_physical_has_no_resource_layer(db):
+    owner = _user(db)
+    game, seats = _momir_game(db, owner.id, seats=[{"user_id": owner.id}, {}], physical=True)
+    live = _start(db, game, owner.id)
+    st = _state(live)
+    assert st["momirPhysical"] is True
+    assert not ({"library", "hand", "lands", "untapped", "landPlayed"} & st.keys())
+    assert st["tokens"] == {}  # creature layer still present
+
+
+def test_momir_physical_activate_needs_no_mana_or_hand(db):
+    owner = _user(db)
+    game, seats = _momir_game(db, owner.id, seats=[{"user_id": owner.id}, {}], physical=True)
+    _start(db, game, owner.id)
+    _creature(db, "Grizzly Bears", 3)
+    s1, _ = seats
+    live = _act(
+        db, game.id, owner.id, {"type": "momir_activate", "seat_id": s1.id, "cmc": 3}, "TABLE"
+    )
+    st = _state(live)
+    assert len(st["tokens"][str(s1.id)]) == 1
+    assert "untapped" not in st and "hand" not in st  # no resource keys conjured
+    with pytest.raises(ValueError):  # once-per-turn still enforced
+        _act(db, game.id, owner.id, {"type": "momir_activate", "seat_id": s1.id, "cmc": 3}, "TABLE")
+
+
+def test_momir_physical_rejects_land_and_adjust(db):
+    owner = _user(db)
+    game, seats = _momir_game(db, owner.id, seats=[{"user_id": owner.id}, {}], physical=True)
+    _start(db, game, owner.id)
+    s1, _ = seats
+    with pytest.raises(ValueError):
+        _act(db, game.id, owner.id, {"type": "momir_play_land", "seat_id": s1.id}, "TABLE")
+    with pytest.raises(ValueError):
+        _act(
+            db, game.id, owner.id, {"type": "momir_adjust", "seat_id": s1.id, "library": 5}, "TABLE"
+        )
+
+
+def test_momir_physical_turn_untaps_creatures_without_drawing(db):
+    owner = _user(db)
+    game, seats = _momir_game(db, owner.id, seats=[{"user_id": owner.id}, {}], physical=True)
+    _start(db, game, owner.id)
+    _creature(db, "Grizzly Bears", 3, keywords='["Haste"]')
+    s1, s2 = seats
+    _act(db, game.id, owner.id, {"type": "momir_activate", "seat_id": s1.id, "cmc": 3}, "TABLE")
+    _act(
+        db,
+        game.id,
+        owner.id,
+        {"type": "momir_attack", "seat_id": s1.id, "index": 0, "target_seat_id": s2.id},
+        "TABLE",
+    )
+    assert (
+        _live_state(db, game.id)["tokens"][str(s1.id)][0]["tapped"] is True
+    )  # attacking tapped it
+    _act(db, game.id, owner.id, {"type": "turn"}, "TABLE")
+    live = _act(db, game.id, owner.id, {"type": "turn"}, "TABLE")  # back to s1
+    st = _state(live)
+    assert st["tokens"][str(s1.id)][0]["tapped"] is False  # untapped on their turn
+    assert "library" not in st  # no draw / deck-out machinery
 
 
 # ── Constraint: Commander games untouched ────────────────────────────────────

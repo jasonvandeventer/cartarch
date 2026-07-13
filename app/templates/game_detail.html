@@ -649,6 +649,7 @@ function momirRes(seatId, key) {
   const v = m[seatId];
   return v === undefined ? MOMIR_RES_DEFAULTS[key] : v;
 }
+function momirPhysical() { return !!(state && state.momirPhysical); }  // #113 real-card game
 function tokHasKw(t, kw) { return (t.keywords || []).some(k => String(k).toLowerCase() === kw); }
 function tokCounters(t) { const c = t.counters || {}; return [c.p1p1 || 0, c.m1m1 || 0]; }
 function tokEffPow(t) { const [p, m] = tokCounters(t); return momirPtInt(t.power) + p - m; }
@@ -1750,6 +1751,8 @@ function renderMomirTokens(seatId) {
 function renderMomirResources(seatId) {
   const el = document.getElementById(`momir-res-${seatId}`);
   if (!el) return;
+  if (momirPhysical()) { el.style.display = 'none'; return; }  // #113 — real cards handle these
+  el.style.display = '';
   const lib = momirRes(seatId, 'library'), hand = momirRes(seatId, 'hand');
   const lands = momirRes(seatId, 'lands'), untap = momirRes(seatId, 'untapped');
   const landPlayed = momirRes(seatId, 'landPlayed');
@@ -1923,7 +1926,8 @@ function pickMomirSeat(seatId) {
 // #113 — grey out MVs the selected seat can't summon: no legal creature at that
 // MV, or unaffordable (MV > untapped mana). The 11-16 input is gated in refreshMomirGo.
 function refreshMomirCmcButtons() {
-  const untap = momirSeatId != null ? Number(momirRes(momirSeatId, 'untapped')) : 16;
+  // #113 physical: no digital mana cap — grey only MVs with no legal creature.
+  const untap = (momirPhysical() || momirSeatId == null) ? 16 : Number(momirRes(momirSeatId, 'untapped'));
   document.querySelectorAll('#momir-bar .momir-cmc-btn').forEach(b => {
     const c = Number(b.dataset.cmc);
     b.disabled = !(MOMIR_VALID_MVS.has(c) && c <= untap);
@@ -1956,9 +1960,10 @@ function refreshMomirGo() {
   if (momirSeatId != null && momirSeatUsedThisTurn(momirSeatId)) {
     go.disabled = true; go.textContent = 'Used this turn'; refreshMomirCmcButtons(); return;
   }
-  const hand = momirSeatId != null ? Number(momirRes(momirSeatId, 'hand')) : 1;
-  const untap = momirSeatId != null ? Number(momirRes(momirSeatId, 'untapped')) : 16;
-  if (momirSeatId != null && hand < 1) {
+  const phys = momirPhysical();
+  const hand = (phys || momirSeatId == null) ? 1 : Number(momirRes(momirSeatId, 'hand'));
+  const untap = (phys || momirSeatId == null) ? 16 : Number(momirRes(momirSeatId, 'untapped'));
+  if (hand < 1) {
     go.disabled = true; go.textContent = 'No cards in hand'; refreshMomirCmcButtons(); return;
   }
   // Affordable = a legal creature exists at the MV and there's enough untapped mana.

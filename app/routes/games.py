@@ -147,6 +147,7 @@ def game_create(
     starting_life: int = Form(40),
     first_seat_number: int | None = Form(None),
     playgroup_id: str = Form(""),
+    momir_physical: bool = Form(False),
     session: Session = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
     _: None = CsrfRequired,
@@ -223,6 +224,7 @@ def game_create(
         seats=seats,
         first_seat_number=fsn,
         client_token=secrets.token_urlsafe(8),
+        momir_physical=momir_physical,
     )
     # v3.32.0 — optional playgroup link. set_game_playgroup validates the
     # owner is a member of the target playgroup; a bad / non-member / empty
