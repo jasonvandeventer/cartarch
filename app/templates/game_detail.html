@@ -105,9 +105,11 @@
     /* The creature band fills the zone between the top corners (name/status) and
        the bottom corners (life numeral + life pad), centered both ways. Card width
        is set per-seat by sizeMomirBoard() so fewer creatures = larger cards. */
-    .momir-board .tc-momir-tokens { gap: 0.5rem; flex: 1 1 auto; min-height: 0;
-      margin: 1.4rem 0 2.6rem; align-content: center; align-items: center;
-      justify-content: center; overflow: hidden; }
+    /* Occupy the card's central grid area (between the name/status row and the
+       life row) and truly center the cards within it, both axes. */
+    .momir-board .tc-momir-tokens { grid-area: mid; gap: 0.5rem; margin: 0;
+      align-content: center; align-items: center; justify-content: center;
+      overflow: hidden; min-height: 0; min-width: 0; }
     .momir-board .tc-momir-token { width: var(--momir-card-w, 4.5rem); }
     .momir-board .tc-momir-pt { font-size: 0.85rem; padding: 0 0.2rem; }
     .momir-board .tc-momir-badge { font-size: 0.58rem; }
