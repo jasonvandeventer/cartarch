@@ -1,5 +1,19 @@
 [
   {
+    "version": "4.6.3",
+    "date": "2026-07-13",
+    "added": [
+      "The Momir simulator now has a full table + phone interface. Each player shows their library, hand, and lands (with untapped mana) and a Play Land button; the mana-value picker greys out costs you can't pay or that have no creatures.",
+      "Creatures show effective power/toughness with counters, marked damage, keyword badges, and tapped / summoning-sick indicators, with the full rules text a tap away.",
+      "Combat is guided end to end: tap a creature to attack a player, and the defender picks any number of blockers (the app enforces flying, menace, and untapped rules). Resolve abilities right on a creature — damage, +1/+1 and -1/-1 counters, tap, sacrifice, revive."
+    ],
+    "refined": [],
+    "resolved": [
+      "Momir Sim phase 5 (#113): tablet + phone UI over the phase 1-4 engine. All Momir-only; Commander games show none of it."
+    ],
+    "archivist_note": "v4.6.3 = Momir Sim phase 5 (#113), the UI over the phases 1-4 engine. Tablet game_detail.html + phone game_companion.html, both SSE-driven full-state render, Momir-only. Per-seat resource bar (library/hand/lands/untapped/landPlayed): tablet has tap-to-correct steppers via momir_adjust (table-token), phone is read-only (adjust is table-only) + momir_play_land. MV picker greys MVs with no legal creature (valid_momir_mvs injected into the render context in routes/games.py, no separate endpoint) and unaffordable MVs (> untapped); Activate/go gated on empty hand / spent quota / off-turn. Token cards show effective P/T (base ± p1p1/m1m1), marked damage, keyword badges, tapped (rotate) + summoning-sick (dashed outline). Combat: declare taps into the pending-attacks panel; defender resolves with a multi-block toggle-chip UI sending block_indexes[] (legality 400s flashed inline, selection retained). Token tap-menu carries the #112 primitives (momir_damage / momir_counter_token / momir_tap_token / momir_sacrifice / momir_revive_token) + oracle text; player damage stays the existing life action. Deck-out cause made permanent in the phone's optimistic auto-elim too. Headless-verified (page renders, node --check on both scripts, 863 tests); the two-browser start->deck-out + Commander-regression walkthrough is manual."
+  },
+  {
     "version": "4.6.2",
     "date": "2026-07-13",
     "added": [
