@@ -1,5 +1,15 @@
 [
   {
+    "version": "4.7.0",
+    "date": "2026-07-13",
+    "added": [
+      "Momir Basic now has a 'Physical decks' mode for playing in paper: use your real basic-land decks and let the app handle only the random creatures and combat. When it's on (the default for new Momir games), the app no longer tracks mana, hand, or library — your physical cards do that — so you just pick a mana value and it rolls the creature. Turn it off for a fully digital game where the app tracks everything."
+    ],
+    "refined": [],
+    "resolved": [],
+    "archivist_note": "v4.7.0 = Momir physical-table mode (#113), first slice of paper-Momir support. New nullable games.momir_physical column (migration c2d3e4f5a6b7, additive ADD COLUMN); a 'Physical decks' checkbox on the new-game form, shown for Momir and checked by default; create_game only honors it for format=Momir. The flag is stamped into the live-state blob as state.momirPhysical at _initial_state, the single source both the service and the templates read. When physical: _initial_state skips the #110 resource maps (library/hand/lands/untapped/landPlayed); start_live_game's first-turn begin is a no-op on resources; momir_activate requires no untapped/hand and deducts nothing (once-per-turn quota still enforced); momir_play_land and momir_adjust raise; _begin_momir_turn untaps the seat's creatures (combat state) but does not draw/deck-out. Tablet (game_detail.html) and phone (game_companion.html) hide the resource bar and drop the mana cap from the MV picker (empty MVs still grey). Life tracking unchanged. Tests: no-resource-layer, mana-free activation, land/adjust rejection, turn untap-without-draw. Suite 868 green."
+  },
+  {
     "version": "4.6.6",
     "date": "2026-07-13",
     "added": [
