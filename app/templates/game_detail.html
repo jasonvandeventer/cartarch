@@ -1990,19 +1990,22 @@ function killTokenTablet(seatId, idx) {
   postAction({ type: 'momir_kill_token', seat_id: seatId, index: idx });
 }
 
-// Hover-to-zoom: a single shared preview that follows the cursor over a token,
-// loading the larger mirror image only on hover. Pointer devices only (touch has
-// no hover — tapping already opens the token menu). Event-delegated so it
+// Zoom a summoned creature via a single shared preview, loading the larger mirror
+// image only when shown. Pointer devices: hover (the preview follows the cursor).
+// Touchscreens (both the tablet and phone are touch): long-press to peek, release
+// to dismiss — a quick tap still opens the token menu. Event-delegated so it
 // survives token re-renders.
 function initMomirHoverZoom() {
-  if (!window.matchMedia || !window.matchMedia('(hover: hover)').matches) return;
   const zoom = document.getElementById('momir-hover-zoom');
   if (!zoom) return;
   zoom.onerror = () => {  // mirror miss → Scryfall fallback, same as the thumbnails
     const sid = zoom.dataset.sid;
     if (sid) { zoom.onerror = null; zoom.src = `https://api.scryfall.com/cards/${sid}?format=image&version=normal`; }
   };
-  const place = (e) => {
+  const show = (sid) => { zoom.dataset.sid = sid; zoom.src = MIRROR_LARGE.replace('__SID__', sid); zoom.style.display = 'block'; };
+  const hide = () => { zoom.style.display = 'none'; };
+  const atCursor = (e) => {
+    zoom.style.transform = 'none';
     const w = zoom.offsetWidth || 240, h = zoom.offsetHeight || 340;
     let x = e.clientX + 18, y = e.clientY + 18;
     if (x + w > window.innerWidth) x = e.clientX - w - 18;
@@ -2010,21 +2013,41 @@ function initMomirHoverZoom() {
     zoom.style.left = Math.max(8, x) + 'px';
     zoom.style.top = Math.max(8, y) + 'px';
   };
-  document.addEventListener('mouseover', (e) => {
+  const centered = () => { zoom.style.left = '50%'; zoom.style.top = '50%'; zoom.style.transform = 'translate(-50%,-50%)'; };
+
+  if (window.matchMedia && window.matchMedia('(hover: hover)').matches) {
+    document.addEventListener('mouseover', (e) => {
+      const cell = e.target.closest && e.target.closest('.tc-momir-token');
+      if (!cell || !cell.dataset.sid) return;
+      show(cell.dataset.sid); atCursor(e);
+    });
+    document.addEventListener('mousemove', (e) => {
+      if (zoom.style.display === 'block' && e.target.closest && e.target.closest('.tc-momir-token')) atCursor(e);
+    });
+    document.addEventListener('mouseout', (e) => {
+      const to = e.relatedTarget;
+      if (!to || !(to.closest && to.closest('.tc-momir-token'))) hide();
+    });
+  }
+
+  // Touch long-press (≈350ms); a drag past a small threshold cancels (it's a scroll).
+  let timer = null, longed = false, start = null;
+  document.addEventListener('touchstart', (e) => {
     const cell = e.target.closest && e.target.closest('.tc-momir-token');
     if (!cell || !cell.dataset.sid) return;
-    zoom.dataset.sid = cell.dataset.sid;
-    zoom.src = MIRROR_LARGE.replace('__SID__', cell.dataset.sid);
-    zoom.style.display = 'block';
-    place(e);
+    const t = e.touches[0]; start = [t.clientX, t.clientY]; longed = false;
+    timer = setTimeout(() => { longed = true; show(cell.dataset.sid); centered(); }, 350);
+  }, { passive: true });
+  document.addEventListener('touchmove', (e) => {
+    if (!start) return;
+    const t = e.touches[0];
+    if (Math.hypot(t.clientX - start[0], t.clientY - start[1]) > 12) clearTimeout(timer);
+  }, { passive: true });
+  document.addEventListener('touchend', (e) => {
+    clearTimeout(timer); start = null;
+    if (longed) { e.preventDefault(); hide(); longed = false; }  // preventDefault stops the tap → menu
   });
-  document.addEventListener('mousemove', (e) => {
-    if (zoom.style.display === 'block' && e.target.closest && e.target.closest('.tc-momir-token')) place(e);
-  });
-  document.addEventListener('mouseout', (e) => {
-    const to = e.relatedTarget;
-    if (!to || !(to.closest && to.closest('.tc-momir-token'))) zoom.style.display = 'none';
-  });
+  document.addEventListener('touchcancel', () => { clearTimeout(timer); hide(); longed = false; start = null; });
 }
 
 // ── Live-mode boot (Session 2) ─────────────────────────────────

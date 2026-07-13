@@ -88,6 +88,9 @@
     .cmp-tmenu-close { width: 100%; min-height: 2.6rem; margin-top: 0.3rem; border: none; border-radius: 0.5rem; background: rgba(255,255,255,0.1); color: inherit; }
     .cmp-momir-cmc-btn:disabled { opacity: 0.3; }
     .cmp-momir-cmc-input { width: 4.5rem; min-height: 2.4rem; border-radius: 0.4rem; }
+    #cmp-hover-zoom { position: fixed; left: 50%; top: 50%; transform: translate(-50%,-50%);
+      z-index: 2000; width: 80vw; max-width: 22rem; border-radius: 0.7rem;
+      box-shadow: 0 8px 34px rgba(0,0,0,0.8); pointer-events: none; display: none; }
   </style>
 </head>
 {% if my_seat and game.status == 'created' %}
@@ -249,6 +252,8 @@
           </section>
           {# Token action sheet (attack / abilities / revive), opened by tapping a creature. #}
           <div class="cmp-tmenu" id="cmp-tmenu" style="display:none"></div>
+          {# Long-press zoom preview (one shared element). #}
+          <img id="cmp-hover-zoom" alt="">
         {% endif %}
 
         <div class="cmp-scroll">
@@ -291,6 +296,7 @@
   const IS_MOMIR = {{ (game.format|lower == 'momir') | tojson }};
   // Mirror URL template with a placeholder — rebuild the same URL the server would.
   const MIRROR = {{ mirror_image_url('__SID__', 'normal') | tojson }};
+  const MIRROR_LARGE = {{ mirror_image_url('__SID__', 'large') | tojson }};  // long-press zoom
   const SEATS = [
     {% for s in game.seats %}
     { id: {{ s.id }}, name: {{ s.player_name | tojson }}, seatNumber: {{ s.seat_number }} }{% if not loop.last %},{% endif %}
@@ -428,7 +434,7 @@
     if (aliveFlag && t.tapped) cls.push('cmp-token-tapped');
     if (aliveFlag && tokSick(t)) cls.push('cmp-token-sick');
     const dmg = (aliveFlag && Number(t.damage) > 0) ? `<span class="cmp-token-dmg">${Number(t.damage)}</span>` : '';
-    return `<div class="${cls.join(' ')}" onclick="openCmpTokenMenu(${i})" style="cursor:pointer">
+    return `<div class="${cls.join(' ')}" onclick="openCmpTokenMenu(${i})" data-sid="${t.scryfall_id}" style="cursor:pointer">
       <img class="cmp-token-img" src="${tokenImg(t.scryfall_id)}" alt="${escapeHtml(t.name)}" loading="lazy"
            onerror="this.onerror=null;this.src='https://api.scryfall.com/cards/${t.scryfall_id}?format=image&version=normal'">
       ${dmg}
@@ -795,6 +801,48 @@
     ended = true;
     document.getElementById('cmp-ended').style.display = 'flex';
   }
+
+  // Zoom a creature: long-press to peek (touch), or hover (pointer). A quick tap
+  // still opens the token sheet. One shared preview, event-delegated.
+  function initCmpZoom() {
+    const zoom = document.getElementById('cmp-hover-zoom');
+    if (!zoom) return;
+    zoom.onerror = () => {
+      const sid = zoom.dataset.sid;
+      if (sid) { zoom.onerror = null; zoom.src = `https://api.scryfall.com/cards/${sid}?format=image&version=large`; }
+    };
+    const show = (sid) => { zoom.dataset.sid = sid; zoom.src = MIRROR_LARGE.replace('__SID__', sid); zoom.style.display = 'block'; };
+    const hide = () => { zoom.style.display = 'none'; };
+    if (window.matchMedia && window.matchMedia('(hover: hover)').matches) {
+      document.addEventListener('mouseover', (e) => {
+        const c = e.target.closest && e.target.closest('.cmp-token');
+        if (!c || !c.dataset.sid) return;
+        show(c.dataset.sid);
+      });
+      document.addEventListener('mouseout', (e) => {
+        const to = e.relatedTarget;
+        if (!to || !(to.closest && to.closest('.cmp-token'))) hide();
+      });
+    }
+    let timer = null, longed = false, start = null;
+    document.addEventListener('touchstart', (e) => {
+      const c = e.target.closest && e.target.closest('.cmp-token');
+      if (!c || !c.dataset.sid) return;
+      const t = e.touches[0]; start = [t.clientX, t.clientY]; longed = false;
+      timer = setTimeout(() => { longed = true; show(c.dataset.sid); }, 350);
+    }, { passive: true });
+    document.addEventListener('touchmove', (e) => {
+      if (!start) return;
+      const t = e.touches[0];
+      if (Math.hypot(t.clientX - start[0], t.clientY - start[1]) > 12) clearTimeout(timer);
+    }, { passive: true });
+    document.addEventListener('touchend', (e) => {
+      clearTimeout(timer); start = null;
+      if (longed) { e.preventDefault(); hide(); longed = false; }  // suppress the tap → sheet
+    });
+    document.addEventListener('touchcancel', () => { clearTimeout(timer); hide(); longed = false; start = null; });
+  }
+  if (IS_MOMIR) initCmpZoom();
 
   // ── SSE stream ───────────────────────────────────────────────
   const es = new EventSource(`/games/${GID}/live/stream`);
