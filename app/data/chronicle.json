@@ -1,5 +1,15 @@
 [
   {
+    "version": "4.6.4",
+    "date": "2026-07-13",
+    "added": [],
+    "refined": [],
+    "resolved": [
+      "Momir activation was impossible in production — the mana-value picker greyed out everything. The creature catalog had never been populated because its Scryfall import was being rejected. Fixed the import and loaded the catalog; Momir now summons across all mana values."
+    ],
+    "archivist_note": "v4.6.4 = hotfix for Momir activation being dead in prod since v4.6.0. Root cause: app/jobs/oracle_ingest.py never set a User-Agent, so Scryfall rejected every request with HTTP 400 (generic_user_agent) and the ingest failed on the first call — oracle_catalog stayed empty, valid_momir_mvs() returned {} and the MV picker greyed out entirely. Masked because tests mock the fetch and Phase 0 recon used curl (which sends its own UA). Fix: descriptive User-Agent + Accept on both requests.get calls (index + bulk download), pinned by a monkeypatched test that fails on a default UA. Also dropped the per-process valid_momir_mvs memo: it couldn't be invalidated across processes (a job-pod ingest can't bust a web-pod cache), so a freshly-populated catalog stayed invisible until a manual rollout restart. Now queried live (DISTINCT over the indexed is_momir_legal column, sub-ms, only on a Momir render); removed invalidate_valid_mvs and callers. Prod hot-fixed out of band before this shipped: ran the corrected ingest (19,752 rows, 17.5k legal) against cartarch-prod Postgres + rolled the web pod to clear the stale memo. Suite 864 green."
+  },
+  {
     "version": "4.6.3",
     "date": "2026-07-13",
     "added": [
