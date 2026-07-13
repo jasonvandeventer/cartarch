@@ -1,5 +1,18 @@
 [
   {
+    "version": "4.6.2",
+    "date": "2026-07-13",
+    "added": [
+      "Momir creatures now show their rules text, and you can resolve abilities by hand with new controls: deal damage to a creature or player, add or remove +1/+1 and -1/-1 counters, tap or untap a creature, and sacrifice one. The app tracks the results (a creature that takes lethal damage or drops to 0 toughness dies) without trying to read the card for you.",
+      "Abilities that reach across the table work too — you can target another player's creature or life (\"my creature enters and deals 2 to your creature\"), and every such action is written to the game log with who did it, so the table can sort out any dispute."
+    ],
+    "refined": [],
+    "resolved": [
+      "Momir Sim phase 4 (#112): manual ability primitives. Everything stays Momir-only; Commander games are untouched."
+    ],
+    "archivist_note": "v4.6.2 = Momir Sim phase 4 (#112), Tier-2 manual ability primitives, Momir-only. Tokens carry oracle_text (from oracle_catalog at summon); the app never interprets it. New actions: momir_damage (N to a token → mark damage + _token_dies check, or to a seat → life loss + auto-elim recheck via _affected_seat), momir_counter_token (+/- p1p1/m1m1, both maps kept raw / no annihilation, clamped >=0, m1m1-to-<=0-toughness death recheck), momir_tap_token (toggle tapped), momir_sacrifice (delegates to _apply_momir_kill but logs under its own action_type). Draw/discard/mill remain momir_adjust; life stays the existing life action (not duplicated). _token_dies helper: numeric-toughness + indestructible guards, dies on eff toughness <=0 or marked damage >= eff toughness; variable P/T stays manual. Cross-seat auth: _MOMIR_CROSS_SEAT primitives permit ANY seated player (own or cross board), non-seated 403, table override; _append_event now stamps actor_user_id into the payload (no schema change) so cross-seat resolution is attributable. Auth-matrix + counter-death + distinct-sacrifice-event tests; 863 green."
+  },
+  {
     "version": "4.6.1",
     "date": "2026-07-13",
     "added": [
