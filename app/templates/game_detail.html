@@ -96,6 +96,9 @@
     .momir-tm-abil { min-height: 2.2rem; padding: 0 0.5rem; border: 1px solid rgba(255,255,255,0.2); border-radius: 0.4rem;
       background: rgba(255,255,255,0.06); color: inherit; }
     .momir-tm-num { width: 3rem; min-height: 2.2rem; border-radius: 0.4rem; }
+    /* hover-to-zoom preview for summoned creatures (pointer devices only) */
+    #momir-hover-zoom { position: fixed; z-index: 2000; width: 15rem; max-width: 42vw;
+      border-radius: 0.6rem; box-shadow: 0 8px 30px rgba(0,0,0,0.7); pointer-events: none; display: none; }
   </style>
   {% endif %}
   {% set winner = game.seats | selectattr('placement', 'eq', 1) | first | default(none) %}
@@ -417,6 +420,8 @@
       </div>
       {# Pending-attacks combat panel (defender blocks or takes). #}
       <div class="momir-combat" id="momir-combat" style="display:none"></div>
+      {# Hover-to-zoom preview (pointer devices) — one shared element. #}
+      <img id="momir-hover-zoom" alt="">
       {# Token action popup (attack / kill), opened by tapping a creature. #}
       <div class="momir-token-menu" id="momir-token-menu" style="display:none">
         <div class="momir-tm-inner" id="momir-tm-inner"></div>
@@ -631,6 +636,7 @@ const COMPANION_URL = `${location.origin}/games/${gameId}/companion`;
 // ── Momir Basic (format="momir") — creature display + activation ─
 const IS_MOMIR = {{ (game.format|lower == 'momir') | tojson }};
 const MIRROR = {{ mirror_image_url('__SID__', 'small') | tojson }};  // small = tablet strip
+const MIRROR_LARGE = {{ mirror_image_url('__SID__', 'normal') | tojson }};  // hover-zoom preview
 const MOMIR_VALID_MVS = new Set({{ momir_valid_mvs | default([]) | tojson }});  // #113 — MVs with >=1 legal creature
 let momirSeatId = null;   // seat currently selected in the activation bar
 let momirCmc = null;      // CMC awaiting Activate
@@ -1725,7 +1731,7 @@ function renderMomirTokens(seatId) {
     const dmg = (!dead && Number(t.damage) > 0) ? `<span class="tc-momir-dmg">${Number(t.damage)}</span>` : '';
     const click = dead ? '' : ` onclick="openTokenMenu(${seatId}, ${i})"`;
     const tip = dead ? ' (dead — tap: revive)' : ' — tap: combat / abilities';
-    return `<div class="${cls.join(' ')}"${click} title="${escHtml(t.name)}${tip}">
+    return `<div class="${cls.join(' ')}"${click} data-sid="${t.scryfall_id}" title="${escHtml(t.name)}${tip}">
       <img class="tc-momir-img" src="${img}" alt="${escHtml(t.name)}" loading="lazy"
            onerror="this.onerror=null;this.src='https://api.scryfall.com/cards/${t.scryfall_id}?format=image&version=small'">
       ${dead ? '' : momirKwBadges(t)}${dmg}
@@ -1984,9 +1990,46 @@ function killTokenTablet(seatId, idx) {
   postAction({ type: 'momir_kill_token', seat_id: seatId, index: idx });
 }
 
+// Hover-to-zoom: a single shared preview that follows the cursor over a token,
+// loading the larger mirror image only on hover. Pointer devices only (touch has
+// no hover — tapping already opens the token menu). Event-delegated so it
+// survives token re-renders.
+function initMomirHoverZoom() {
+  if (!window.matchMedia || !window.matchMedia('(hover: hover)').matches) return;
+  const zoom = document.getElementById('momir-hover-zoom');
+  if (!zoom) return;
+  zoom.onerror = () => {  // mirror miss → Scryfall fallback, same as the thumbnails
+    const sid = zoom.dataset.sid;
+    if (sid) { zoom.onerror = null; zoom.src = `https://api.scryfall.com/cards/${sid}?format=image&version=normal`; }
+  };
+  const place = (e) => {
+    const w = zoom.offsetWidth || 240, h = zoom.offsetHeight || 340;
+    let x = e.clientX + 18, y = e.clientY + 18;
+    if (x + w > window.innerWidth) x = e.clientX - w - 18;
+    if (y + h > window.innerHeight) y = window.innerHeight - h - 8;
+    zoom.style.left = Math.max(8, x) + 'px';
+    zoom.style.top = Math.max(8, y) + 'px';
+  };
+  document.addEventListener('mouseover', (e) => {
+    const cell = e.target.closest && e.target.closest('.tc-momir-token');
+    if (!cell || !cell.dataset.sid) return;
+    zoom.dataset.sid = cell.dataset.sid;
+    zoom.src = MIRROR_LARGE.replace('__SID__', cell.dataset.sid);
+    zoom.style.display = 'block';
+    place(e);
+  });
+  document.addEventListener('mousemove', (e) => {
+    if (zoom.style.display === 'block' && e.target.closest && e.target.closest('.tc-momir-token')) place(e);
+  });
+  document.addEventListener('mouseout', (e) => {
+    const to = e.relatedTarget;
+    if (!to || !(to.closest && to.closest('.tc-momir-token'))) zoom.style.display = 'none';
+  });
+}
+
 // ── Live-mode boot (Session 2) ─────────────────────────────────
 if (LIVE) {
-  if (IS_MOMIR) buildMomirSeatSelector();
+  if (IS_MOMIR) { buildMomirSeatSelector(); initMomirHoverZoom(); }
   const urlInput = document.getElementById('companion-url');
   if (urlInput) urlInput.value = COMPANION_URL;
   // EventSource auto-reconnects; every event carries FULL state, so a reconnect
