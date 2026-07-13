@@ -141,6 +141,14 @@ def game_create(
     current_user: User = Depends(get_current_user),
     _: None = CsrfRequired,
 ):
+    # v3.27.2 — format normalization (see the note at create_game below). Done
+    # up front because the Momir life default depends on it.
+    canonical_format = normalize_game_format(format)
+    # Momir Basic starts at 24 life. The Commander default (40) means the user
+    # left the life picker untouched, so swap in 24; an explicit 20/30 still wins.
+    if canonical_format == "Momir" and starting_life == 40:
+        starting_life = 24
+
     seats = []
     for i in range(player_count):
         name = player_names[i].strip() if i < len(player_names) else f"Player {i + 1}"
@@ -195,8 +203,8 @@ def game_create(
     # CANONICAL_GAME_FORMATS; unknown / empty / form-tampered values
     # resolve to DEFAULT_GAME_FORMAT (Commander). Game creation must
     # never fail due to a format problem, matching the v3.25.1 non-
-    # blocking philosophy for first_seat_number.
-    canonical_format = normalize_game_format(format)
+    # blocking philosophy for first_seat_number. (canonical_format computed
+    # at the top of this handler — the Momir life default needs it early.)
 
     game = create_game(
         session,

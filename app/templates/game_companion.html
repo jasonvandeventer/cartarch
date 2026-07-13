@@ -13,6 +13,56 @@
   <title>Game {{ game.id }} — Companion</title>
   <link rel="icon" type="image/svg+xml" href="/static/brand/icon/favicon.svg">
   <link rel="stylesheet" href="/static/style.css?v={{ static_v('style.css') }}">
+  <style>
+    /* Momir Basic — companion additions (scoped; Commander view unaffected). */
+    .cmp-momir { margin: 0.75rem 0; }
+    .cmp-momir-cmc { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-bottom: 0.5rem; }
+    .cmp-momir-cmc-btn {
+      flex: 1 1 2.4rem; min-width: 2.4rem; min-height: 2.6rem; font-size: 1.15rem;
+      border-radius: 0.5rem; border: 1px solid rgba(255,255,255,0.18);
+      background: rgba(255,255,255,0.05); color: inherit;
+    }
+    .cmp-momir-cmc-btn.cmp-momir-cmc-on { background: #6d28d9; border-color: #a78bfa; color: #fff; }
+    .cmp-btn-momir { width: 100%; min-height: 3rem; font-size: 1.05rem; background: #6d28d9; color: #fff; }
+    .cmp-btn-momir:disabled { opacity: 0.5; }
+    .cmp-momir-summoning { text-align: center; padding: 0.5rem; opacity: 0.8; font-style: italic; }
+    .cmp-tokens { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+    .cmp-token { position: relative; width: 5.5rem; text-align: center; animation: cmp-token-in 0.4s ease; }
+    @keyframes cmp-token-in { from { transform: scale(0.6); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+    .cmp-token-img { width: 100%; border-radius: 0.4rem; display: block; }
+    .cmp-token-dead { opacity: 0.4; filter: grayscale(1); }
+    .cmp-token-meta { display: flex; flex-direction: column; font-size: 0.7rem; line-height: 1.2; margin-top: 0.15rem; }
+    .cmp-token-pt { font-weight: 700; }
+    .cmp-token-kill {
+      position: absolute; top: 0.15rem; right: 0.15rem; font-size: 0.65rem;
+      padding: 0.1rem 0.3rem; border-radius: 0.3rem; border: none;
+      background: rgba(0,0,0,0.65); color: #f87171;
+    }
+    .cmp-token-atk {
+      position: absolute; top: 0.15rem; left: 0.15rem; font-size: 0.7rem;
+      padding: 0.1rem 0.3rem; border-radius: 0.3rem; border: none;
+      background: rgba(0,0,0,0.65); color: #fbbf24;
+    }
+    .cmp-token-attacking { outline: 2px solid #fbbf24; border-radius: 0.4rem; }
+    .cmp-attack-menu {
+      margin-top: 0.5rem; padding: 0.5rem; border-radius: 0.5rem;
+      background: rgba(251,191,36,0.1); border: 1px solid rgba(251,191,36,0.4);
+    }
+    .cmp-atk-head { margin-bottom: 0.4rem; }
+    .cmp-atk-row { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-bottom: 0.35rem; align-items: center; }
+    .cmp-atk-hit { flex: 1 1 auto; min-height: 2.4rem; border-radius: 0.4rem; border: none; background: #b91c1c; color: #fff; font-size: 0.95rem; }
+    .cmp-atk-block { min-height: 2.4rem; padding: 0 0.5rem; border-radius: 0.4rem; border: 1px solid rgba(255,255,255,0.25); background: rgba(255,255,255,0.06); color: inherit; }
+    .cmp-atk-cancel { width: 100%; margin-top: 0.25rem; }
+    .cmp-incoming {
+      margin: 0.5rem 0; padding: 0.6rem; border-radius: 0.5rem;
+      background: rgba(185,28,28,0.16); border: 1px solid rgba(248,113,113,0.55);
+    }
+    .cmp-incoming-row { margin-bottom: 0.5rem; }
+    .cmp-incoming-atk { margin-bottom: 0.3rem; font-size: 0.95rem; }
+    .cmp-graveyard { margin-top: 0.5rem; font-size: 0.85rem; }
+    .cmp-strip-creatures { font-size: 0.75rem; opacity: 0.85; }
+    .cmp-strip-toklist { font-size: 0.7rem; opacity: 0.9; margin-top: 0.2rem; text-align: left; }
+  </style>
 </head>
 {% if my_seat and game.status == 'created' %}
 <body class="cmp-body">
@@ -26,30 +76,40 @@
           id="cmp-prelive"
           {% if my_commander_id %}style="--cmp-art: url('{{ mirror_image_url(my_commander_id, 'normal') }}')"{% endif %}>
       <div class="cmp-my-name">{{ my_seat.player_name }} <span class="muted">(you)</span></div>
-      <div class="cmp-prelive-current">
-        <div class="cmp-prelive-label">Your deck</div>
-        <div class="cmp-prelive-deckname" id="cmp-deck-name">
-          {{ my_seat.commander_name_at_game or my_seat.deck_name_at_game or 'No deck selected' }}
+      {% if game.format|lower == 'momir' %}
+        {# Momir Basic — no deck to pick; players use basic lands + generated creatures. #}
+        <div class="cmp-prelive-current">
+          <div class="cmp-prelive-label">Momir Basic</div>
+          <div class="cmp-prelive-deckname">Random creatures</div>
+          <div class="cmp-prelive-sub muted">Basic lands only — activate Momir to summon</div>
         </div>
-        <div class="cmp-prelive-sub muted" id="cmp-deck-sub">
-          {% if my_seat.commander_name_at_game and my_seat.deck_name_at_game %}{{ my_seat.deck_name_at_game }}{% endif %}
+        <p class="cmp-prelive-note muted">Waiting for the game to start.</p>
+      {% else %}
+        <div class="cmp-prelive-current">
+          <div class="cmp-prelive-label">Your deck</div>
+          <div class="cmp-prelive-deckname" id="cmp-deck-name">
+            {{ my_seat.commander_name_at_game or my_seat.deck_name_at_game or 'No deck selected' }}
+          </div>
+          <div class="cmp-prelive-sub muted" id="cmp-deck-sub">
+            {% if my_seat.commander_name_at_game and my_seat.deck_name_at_game %}{{ my_seat.deck_name_at_game }}{% endif %}
+          </div>
         </div>
-      </div>
-      <button type="button" class="cmp-endturn" onclick="toggleDeckPicker()">Change deck</button>
-      <div class="cmp-scroll" id="cmp-deck-picker" style="display:none">
-        <button type="button" class="cmp-deck-opt{% if not my_seat.deck_id %} cmp-deck-current{% endif %}"
-                data-deck-id="0" onclick="pickDeck(0)">
-          <span class="cmp-deck-opt-name">No tracked deck</span>
-        </button>
-        {% for d in my_decks %}
-          <button type="button" class="cmp-deck-opt{% if d.id == my_seat.deck_id %} cmp-deck-current{% endif %}"
-                  data-deck-id="{{ d.id }}" onclick="pickDeck({{ d.id }})">
-            <span class="cmp-deck-opt-name">{{ d.name }}</span>
-            {% if d.commander_name %}<span class="cmp-deck-opt-cmd muted">{{ d.commander_name }}</span>{% endif %}
+        <button type="button" class="cmp-endturn" onclick="toggleDeckPicker()">Change deck</button>
+        <div class="cmp-scroll" id="cmp-deck-picker" style="display:none">
+          <button type="button" class="cmp-deck-opt{% if not my_seat.deck_id %} cmp-deck-current{% endif %}"
+                  data-deck-id="0" onclick="pickDeck(0)">
+            <span class="cmp-deck-opt-name">No tracked deck</span>
           </button>
-        {% endfor %}
-      </div>
-      <p class="cmp-prelive-note muted">Waiting for the game to start. Your deck locks in once it goes live.</p>
+          {% for d in my_decks %}
+            <button type="button" class="cmp-deck-opt{% if d.id == my_seat.deck_id %} cmp-deck-current{% endif %}"
+                    data-deck-id="{{ d.id }}" onclick="pickDeck({{ d.id }})">
+              <span class="cmp-deck-opt-name">{{ d.name }}</span>
+              {% if d.commander_name %}<span class="cmp-deck-opt-cmd muted">{{ d.commander_name }}</span>{% endif %}
+            </button>
+          {% endfor %}
+        </div>
+        <p class="cmp-prelive-note muted">Waiting for the game to start. Your deck locks in once it goes live.</p>
+      {% endif %}
     </main>
     <div id="cmp-toast" class="live-toast" style="display:none"></div>
   </div>
@@ -133,6 +193,33 @@
           <button type="button" class="cmp-btn cmp-btn-lg" onclick="adjLife(5)">+5</button>
         </div>
 
+        {% if game.format|lower == 'momir' %}
+          {# ── Incoming attacks (defender's block decision) ── #}
+          <section class="cmp-incoming" id="cmp-incoming" style="display:none"></section>
+          {# ── Momir Basic — summon a random creature at a chosen CMC ── #}
+          <section class="cmp-momir" id="cmp-momir">
+            <h3 class="cmp-section-title">Momir — activate at CMC</h3>
+            <div class="cmp-momir-cmc" id="cmp-momir-cmc">
+              {% for c in range(0, 11) %}
+                <button type="button" class="cmp-momir-cmc-btn" data-cmc="{{ c }}"
+                        onclick="pickMomirCmc({{ c }})">{{ c }}</button>
+              {% endfor %}
+            </div>
+            <button type="button" class="cmp-btn cmp-btn-momir" id="cmp-momir-go"
+                    onclick="activateMomir()" disabled>Select a CMC</button>
+            <div class="cmp-momir-summoning" id="cmp-momir-summoning" style="display:none">Summoning…</div>
+          </section>
+          <section class="cmp-section">
+            <h3 class="cmp-section-title">My creatures</h3>
+            <div id="cmp-tokens" class="cmp-tokens"></div>
+            <div id="cmp-attack-menu" class="cmp-attack-menu" style="display:none"></div>
+            <details class="cmp-graveyard" id="cmp-graveyard" style="display:none">
+              <summary>Graveyard (<span id="cmp-grave-count">0</span>)</summary>
+              <div id="cmp-tokens-dead" class="cmp-tokens cmp-tokens-dead"></div>
+            </details>
+          </section>
+        {% endif %}
+
         <div class="cmp-scroll">
           <section class="cmp-section">
             <h3 class="cmp-section-title">Commander damage received</h3>
@@ -170,6 +257,9 @@
   const GID = {{ game.id }};
   const CSRF = {{ csrf_token | tojson }};
   const MY_SEAT_ID = {% if my_seat %}{{ my_seat.id }}{% else %}null{% endif %};
+  const IS_MOMIR = {{ (game.format|lower == 'momir') | tojson }};
+  // Mirror URL template with a placeholder — rebuild the same URL the server would.
+  const MIRROR = {{ mirror_image_url('__SID__', 'normal') | tojson }};
   const SEATS = [
     {% for s in game.seats %}
     { id: {{ s.id }}, name: {{ s.player_name | tojson }}, seatNumber: {{ s.seat_number }} }{% if not loop.last %},{% endif %}
@@ -177,6 +267,8 @@
   ];
   const COUNTER_TYPES = ['poison','rad','experience','energy','storm','custom'];
   const K = String;  // seat-id keys are strings in the server JSON
+  let momirCmc = null;                 // selected CMC awaiting Activate
+  const expandedSeats = new Set();     // other-seat strip cells showing their creatures
 
   let st = null, lastSt = null, ended = false;
 
@@ -197,12 +289,29 @@
       const life = (st.lives && st.lives[K(s.id)]);
       const elim = st.eliminated && st.eliminated[K(s.id)];
       const active = st.currentTurnId === s.id;
-      return `<div class="cmp-strip-seat${elim ? ' cmp-elim' : ''}${active ? ' cmp-active-seat' : ''}">
+      // Momir: compact creature count, tap the cell to expand a text list (6c).
+      let momir = '';
+      if (IS_MOMIR) {
+        const toks = seatTokens(s.id).filter(t => t.alive !== false);
+        const expanded = expandedSeats.has(s.id);
+        momir = `<span class="cmp-strip-creatures">🐾 ${toks.length}</span>`;
+        if (expanded && toks.length) {
+          momir += `<div class="cmp-strip-toklist">` + toks.map(t =>
+            `${escapeHtml(t.name)} ${ptOf(t)}`).join('<br>') + `</div>`;
+        }
+      }
+      const tap = IS_MOMIR ? ` onclick="toggleSeatCreatures(${s.id})"` : '';
+      return `<div class="cmp-strip-seat${elim ? ' cmp-elim' : ''}${active ? ' cmp-active-seat' : ''}"${tap}>
         <span class="cmp-strip-name">${escapeHtml(s.name)}</span>
-        <span class="cmp-strip-life">${life ?? '—'}</span></div>`;
+        <span class="cmp-strip-life">${life ?? '—'}</span>${momir}</div>`;
     }).join('');
 
     if (MY_SEAT_ID == null) return;  // spectator: header + strip only
+
+    renderTokens();
+    renderMomirControls();
+    renderAttackMenu();
+    renderIncoming();
 
     const myLife = (st.lives && st.lives[K(MY_SEAT_ID)]) ?? 0;
     const lifeEl = document.getElementById('cmp-life');
@@ -248,6 +357,161 @@
 
   function escapeHtml(s) { return String(s).replace(/[&<>"']/g, c => (
     { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+
+  // ── Momir tokens ─────────────────────────────────────────────
+  function seatTokens(id) { return (st.tokens && st.tokens[K(id)]) || []; }
+  function myTokens() { return seatTokens(MY_SEAT_ID); }
+  function ptOf(t) { return (t.power != null && t.toughness != null) ? `${t.power}/${t.toughness}` : ''; }
+  function tokenImg(sid) { return MIRROR.replace('__SID__', sid); }
+
+  function tokenCard(t, i, aliveFlag) {
+    const controls = aliveFlag
+      ? `<button type="button" class="cmp-token-atk" onclick="toggleAttack(${i})" title="Attack">⚔</button>
+         <button type="button" class="cmp-token-kill" onclick="killToken(${i})">Kill</button>` : '';
+    return `<div class="cmp-token${aliveFlag ? '' : ' cmp-token-dead'}${attackingIdx === i ? ' cmp-token-attacking' : ''}">
+      <img class="cmp-token-img" src="${tokenImg(t.scryfall_id)}" alt="${escapeHtml(t.name)}" loading="lazy"
+           onerror="this.onerror=null;this.src='https://api.scryfall.com/cards/${t.scryfall_id}?format=image&version=normal'">
+      <div class="cmp-token-meta">
+        <span class="cmp-token-name">${escapeHtml(t.name)}</span>
+        <span class="cmp-token-pt">${ptOf(t)}</span>
+        <span class="cmp-token-turn muted">T${t.turn_created}</span>
+      </div>${controls}</div>`;
+  }
+
+  // ── Combat: attack a player (unblocked) or into a blocker (creatures fight) ──
+  function ptInt(v) { const m = String(v == null ? '' : v).match(/-?\d+/); return m ? parseInt(m[0], 10) : 0; }
+  let attackingIdx = null;
+  window.toggleAttack = function (i) {
+    attackingIdx = (attackingIdx === i) ? null : i;
+    renderTokens(); renderAttackMenu();
+  };
+  // Attacker picks a PLAYER to attack (you can't attack creatures). The defender
+  // decides whether to block — see renderIncoming() below.
+  function renderAttackMenu() {
+    const el = document.getElementById('cmp-attack-menu');
+    if (!el) return;
+    const atk = attackingIdx == null ? null : myTokens()[attackingIdx];
+    if (!atk || atk.alive === false) { attackingIdx = null; el.style.display = 'none'; el.innerHTML = ''; return; }
+    const foes = SEATS.filter(s => s.id !== MY_SEAT_ID && !(st.eliminated && st.eliminated[K(s.id)]));
+    el.style.display = '';
+    el.innerHTML = `<div class="cmp-atk-head">Attack a player with <b>${escapeHtml(atk.name)}</b> ${ptOf(atk)}</div>` +
+      (foes.map(s => `<button type="button" class="cmp-atk-hit" onclick="declareAttack(${attackingIdx}, ${s.id})">→ ${escapeHtml(s.name)}</button>`).join('')
+        || '<div class="muted">No opponents to attack</div>') +
+      `<button type="button" class="cmp-btn-sm cmp-atk-cancel" onclick="toggleAttack(${attackingIdx})">Cancel</button>`;
+  }
+  window.declareAttack = function (i, targetSeat) {
+    attackingIdx = null; renderAttackMenu();
+    momirPost({ type: 'momir_attack', seat_id: MY_SEAT_ID, index: i, target_seat_id: targetSeat }, 'Attack failed');
+  };
+
+  // Defender side: incoming attacks aimed at me, each resolved by ME (block / take).
+  function renderIncoming() {
+    const el = document.getElementById('cmp-incoming');
+    if (!el) return;
+    if (!IS_MOMIR || MY_SEAT_ID == null) { el.style.display = 'none'; return; }
+    const mine = (st.attacks || []).filter(a => K(a.target_seat) === K(MY_SEAT_ID));
+    if (!mine.length) { el.style.display = 'none'; el.innerHTML = ''; return; }
+    const myBlockers = myTokens().map((t, j) => [t, j]).filter(([t]) => t.alive !== false);
+    el.style.display = '';
+    el.innerHTML = `<h3 class="cmp-section-title">Incoming attacks — block or take</h3>` +
+      mine.map(a => {
+        const atk = seatTokens(a.attacker_seat)[a.attacker_index];
+        if (!atk) return '';
+        const pw = ptInt(atk.power);
+        const from = seatName(Number(a.attacker_seat));
+        return `<div class="cmp-incoming-row">
+          <div class="cmp-incoming-atk">${escapeHtml(from)}'s <b>${escapeHtml(atk.name)}</b> ${ptOf(atk)} attacks you</div>
+          <div class="cmp-atk-row">
+            <button type="button" class="cmp-atk-hit" onclick="resolveAttack(${a.seq}, null)">Take −${pw}</button>
+            ${myBlockers.map(([t, j]) => `<button type="button" class="cmp-atk-block" onclick="resolveAttack(${a.seq}, ${j})" title="block with ${escapeHtml(t.name)}">🛡 ${ptOf(t)}</button>`).join('')}
+          </div></div>`;
+      }).join('');
+  }
+  window.resolveAttack = function (seq, blockIdx) {
+    const action = { type: 'momir_resolve', seat_id: MY_SEAT_ID, seq };
+    if (blockIdx != null) action.block_index = blockIdx;
+    momirPost(action, 'Could not resolve');
+  };
+  function momirPost(action, failMsg) {
+    fetch(`/games/${GID}/live/action`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': CSRF },
+      body: JSON.stringify(action),
+    }).then(async r => {
+      if (r.status === 404) { showEnded(); return; }
+      if (!r.ok) { const d = await r.json().catch(() => ({})); toast(d.detail || failMsg); return; }
+      const p = await r.json(); st = p.state; render();
+    }).catch(() => toast('Sync failed'));
+  }
+
+  function renderTokens() {
+    if (!IS_MOMIR || MY_SEAT_ID == null) return;
+    const alive = [], dead = [];
+    myTokens().forEach((t, i) => (t.alive === false ? dead : alive).push([t, i]));
+    document.getElementById('cmp-tokens').innerHTML =
+      alive.map(([t, i]) => tokenCard(t, i, true)).join('') || '<span class="muted">No creatures yet</span>';
+    document.getElementById('cmp-tokens-dead').innerHTML = dead.map(([t, i]) => tokenCard(t, i, false)).join('');
+    document.getElementById('cmp-grave-count').textContent = dead.length;
+    document.getElementById('cmp-graveyard').style.display = dead.length ? '' : 'none';
+  }
+
+  window.toggleSeatCreatures = function (id) {
+    if (expandedSeats.has(id)) expandedSeats.delete(id); else expandedSeats.add(id);
+    render();
+  };
+  // Momir rules: once per turn (server-enforced), on your own turn (soft — the
+  // control is disabled off-turn here, not hard-rejected by the server).
+  function momirMyTurn() { return st && st.currentTurnId === MY_SEAT_ID; }
+  function momirUsedThisTurn() {
+    return !!(st && st.momirTurnUsed && st.momirTurnUsed[K(MY_SEAT_ID)] === st.turn);
+  }
+  function renderMomirControls() {
+    if (!IS_MOMIR || MY_SEAT_ID == null) return;
+    const go = document.getElementById('cmp-momir-go');
+    const btns = document.querySelectorAll('#cmp-momir-cmc .cmp-momir-cmc-btn');
+    let block = null;
+    if (momirUsedThisTurn()) block = 'Activated this turn';
+    else if (!momirMyTurn()) block = 'Activate on your turn';
+    btns.forEach(b => { b.disabled = !!block; if (block) b.classList.remove('cmp-momir-cmc-on'); });
+    if (block) { momirCmc = null; go.disabled = true; go.textContent = block; }
+    else { go.disabled = momirCmc == null; go.textContent = momirCmc == null ? 'Select a CMC' : `Activate CMC ${momirCmc}`; }
+  }
+  window.pickMomirCmc = function (cmc) {
+    if (momirUsedThisTurn() || !momirMyTurn()) return;  // guarded by renderMomirControls
+    momirCmc = cmc;
+    document.querySelectorAll('#cmp-momir-cmc .cmp-momir-cmc-btn').forEach(b =>
+      b.classList.toggle('cmp-momir-cmc-on', Number(b.dataset.cmc) === cmc));
+    document.getElementById('cmp-momir-go').disabled = false;
+    document.getElementById('cmp-momir-go').textContent = `Activate CMC ${cmc}`;
+  };
+  window.activateMomir = function () {
+    if (momirCmc == null || MY_SEAT_ID == null || !momirMyTurn() || momirUsedThisTurn()) return;
+    const cmc = momirCmc;
+    const summoning = document.getElementById('cmp-momir-summoning');
+    summoning.style.display = '';
+    const before = myTokens().length;
+    // No optimistic add — the server picks the creature (a DB query, slightly
+    // slower than a life tap). Whiff = the token count didn't grow.
+    fetch(`/games/${GID}/live/action`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': CSRF },
+      body: JSON.stringify({ type: 'momir_activate', seat_id: MY_SEAT_ID, cmc }),
+    }).then(async r => {
+      summoning.style.display = 'none';
+      if (r.status === 404) { showEnded(); return; }
+      if (!r.ok) { const d = await r.json().catch(() => ({})); toast(d.detail || 'Could not activate'); return; }
+      const p = await r.json();
+      const after = ((p.state.tokens && p.state.tokens[K(MY_SEAT_ID)]) || []).length;
+      if (after <= before) toast(`No creature at CMC ${cmc}`);  // whiff
+      st = p.state; render();  // SSE echo also arrives; render now for immediacy
+    }).catch(() => { summoning.style.display = 'none'; toast('Sync failed'); });
+  };
+  window.killToken = function (idx) {
+    snapshot();
+    const t = myTokens()[idx];
+    if (!t) return;
+    t.alive = false;
+    render();
+    postAction({ type: 'momir_kill_token', seat_id: MY_SEAT_ID, index: idx });
+  };
 
   // Optimistic auto-eliminate/revive mirroring the server (_auto_eliminate) so
   // my panel doesn't flash alive-then-eliminated before the SSE echo. AUTO

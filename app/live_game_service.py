@@ -25,14 +25,69 @@ from __future__ import annotations
 
 import json
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app import live_game_events
 from app.game_service import get_game, get_viewable_game
-from app.models import Game, GameEvent, GameLiveState, GameSeat
+from app.models import Card, Game, GameEvent, GameLiveState, GameSeat
 from app.timeutil import utc_now
 
-_MUTATING_TYPES = {"life", "counter", "cmd", "eliminate", "turn"}
+# Momir Basic (format="momir") layers two extra actions on top of the shared
+# companion infra: momir_activate (summon a random creature at a CMC) and
+# momir_kill_token (grey out a dead token). Both are seat-scoped and rejected in
+# non-Momir games — Commander games never see the tokens field or these types.
+_MOMIR_TYPES = {"momir_activate", "momir_kill_token", "momir_attack", "momir_resolve"}
+_MUTATING_TYPES = {"life", "counter", "cmd", "eliminate", "turn"} | _MOMIR_TYPES
+
+_MAX_MOMIR_CMC = 16  # no creatures exist above ~16 CMC in MTG
+
+
+def _is_momir(game: Game) -> bool:
+    return (game.format or "").casefold() == "momir"
+
+
+def random_creature_at_cmc(session: Session, cmc: int) -> dict | None:
+    """Pick a random creature printing at ``cmc`` for Momir Basic, deduplicated by
+    card name (many printings exist; any one carries the same P/T and the image
+    comes from the mirror regardless of printing). Returns ``None`` when no
+    creature exists at that CMC (a legal Momir "whiff", common at very high CMC).
+
+    Dialect-agnostic (``func.random()`` → SQLite ``random()`` / Postgres
+    ``random()``). Dedup is a two-step to stay portable: pick a random distinct
+    name (GROUP BY, uniform per-name rather than weighted by printing count),
+    then a random printing of it — SELECT DISTINCT + ORDER BY random() is
+    rejected by Postgres, GROUP BY is not."""
+    filters = (
+        Card.type_line.like("%Creature%"),
+        Card.cmc == cmc,
+        Card.type_line.notlike("%Token%"),
+        Card.scryfall_id.isnot(None),
+    )
+    name_row = (
+        session.query(Card.name)
+        .filter(*filters)
+        .group_by(Card.name)
+        .order_by(func.random())
+        .first()
+    )
+    if name_row is None:
+        return None
+    card = (
+        session.query(Card)
+        .filter(*filters, Card.name == name_row[0])
+        .order_by(func.random())
+        .first()
+    )
+    return {
+        "name": card.name,
+        "power": card.power,
+        "toughness": card.toughness,
+        "type_line": card.type_line,
+        "scryfall_id": card.scryfall_id,
+        "cmc": cmc,
+    }
+
 
 # Physical clockwise seating slots (mirrors game_detail.html's CLOCKWISE). Turn
 # rotation follows PHYSICAL seating order, derived from each seat's grid_position
@@ -88,7 +143,7 @@ def _initial_state(game: Game) -> dict:
     """The live blob at start — mirrors the localStorage tracker shape. Object
     keys are seat-id STRINGS (JSON coerces them anyway; matches JS render)."""
     seats = _clockwise_seats(game)
-    return {
+    state = {
         "lives": {str(s.id): s.starting_life for s in seats},
         "eliminated": {},
         "eliminatedAtTurn": {},
@@ -98,6 +153,15 @@ def _initial_state(game: Game) -> dict:
         "currentTurnId": _first_seat_id(game, seats),
         "turnEvents": [],
     }
+    # Momir-only: seat-id-keyed map of summoned creature tokens + the per-seat
+    # once-per-turn activation ledger (seat_id -> round it last activated).
+    # Both absent in Commander games so their blob is byte-identical to before.
+    if _is_momir(game):
+        state["tokens"] = {}
+        state["momirTurnUsed"] = {}
+        state["attacks"] = []  # pending declared attackers awaiting block decisions
+        state["attackSeq"] = 0
+    return state
 
 
 # --- lifecycle ---------------------------------------------------------------
@@ -205,13 +269,27 @@ def _validate_action_seats(atype: str, action: dict, seats_by_id: dict[int, Game
     if atype == "cmd":
         _require_seat(action.get("receiver_seat_id"), seats_by_id, "receiver_seat_id")
         _require_seat(action.get("attacker_seat_id"), seats_by_id, "attacker_seat_id")
-    else:  # life, counter, eliminate
+    elif atype == "momir_attack":  # attacker's seat + the defending seat
+        _require_seat(action.get("seat_id"), seats_by_id, "seat_id")
+        _require_seat(action.get("target_seat_id"), seats_by_id, "target_seat_id")
+    else:  # life, counter, eliminate, momir_activate, momir_kill_token
         _require_seat(action.get("seat_id"), seats_by_id, "seat_id")
 
 
-def _apply_mutation(atype: str, action: dict, state: dict, game: Game) -> dict:
+def _apply_mutation(session: Session, atype: str, action: dict, state: dict, game: Game) -> dict:
     """Mutate ``state`` in place and return event-payload EXTRAS (empty except for
-    cmd, which returns the raw + post-floor ``actual`` delta)."""
+    cmd, which returns raw + post-floor ``actual`` deltas, and the Momir actions,
+    which return the summoned creature / whiff / killed index). ``session`` is
+    used only by momir_activate (its creature query); the other types ignore it."""
+    if atype == "momir_activate":
+        return _apply_momir_activate(session, action, state)
+    if atype == "momir_kill_token":
+        return _apply_momir_kill(action, state)
+    if atype == "momir_attack":
+        return _apply_momir_attack(action, state)
+    if atype == "momir_resolve":
+        return _apply_momir_resolve(action, state)
+
     if atype == "life":
         sid = str(_coerce_int(action["seat_id"]))
         state["lives"][sid] = int(state["lives"].get(sid, 0)) + _require_delta(action)
@@ -263,10 +341,177 @@ def _apply_mutation(atype: str, action: dict, state: dict, game: Game) -> dict:
     return {}
 
 
+def _apply_momir_activate(session: Session, action: dict, state: dict) -> dict:
+    """Summon a random creature at ``cmc`` onto the acting seat — the Momir Vig
+    ability: ``{X}, discard a card: create a token copy of a random creature with
+    mana value X``. The mana cost + discard are paper-side (no hand/land tracking
+    — the format is basic lands + creatures only), so the ONE rule the tracker
+    enforces is **once per turn** per seat: a seat may activate Momir once per
+    round, the quota resetting when the turn counter advances.
+
+    Sorcery-speed / your-own-turn is a UI-guided soft rule (the clients disable
+    the control off-turn) rather than a hard server reject, so imperfect turn
+    tracking never wedges a casual game.
+
+    A whiff (no creature at that CMC) does NOT consume the once-per-turn quota —
+    a mis-picked impossible CMC shouldn't waste your turn. Extras carry the
+    creature (or the whiff) for the event + the SSE-driven UI reveal."""
+    sid = str(_coerce_int(action["seat_id"]))
+    cmc = _coerce_int(action.get("cmc"))
+    if cmc is None or not (0 <= cmc <= _MAX_MOMIR_CMC):
+        raise ValueError(f"cmc must be an integer between 0 and {_MAX_MOMIR_CMC}")
+
+    # Once per turn (per round). Each seat takes exactly one turn per round, so
+    # the round counter (state["turn"]) uniquely identifies "this seat's turn".
+    round_no = int(state.get("turn", 1))
+    used = state.setdefault("momirTurnUsed", {})
+    if used.get(sid) == round_no:
+        raise ValueError("Momir can only be activated once per turn")
+
+    creature = random_creature_at_cmc(session, cmc)
+    tokens = state.setdefault("tokens", {})
+    if creature is None:
+        return {"cmc": cmc, "creature": None, "whiff": True}  # whiff: quota not spent
+    token = {
+        "name": creature["name"],
+        "power": creature["power"],
+        "toughness": creature["toughness"],
+        "type_line": creature["type_line"],
+        "scryfall_id": creature["scryfall_id"],
+        "cmc": cmc,
+        "turn_created": round_no,
+        "alive": True,
+    }
+    tokens.setdefault(sid, []).append(token)
+    used[sid] = round_no  # spend the once-per-turn quota
+    return {"cmc": cmc, "creature": token, "whiff": False}
+
+
+def _apply_momir_kill(action: dict, state: dict) -> dict:
+    """Mark one of a seat's tokens dead (greys out; no life/damage coupling)."""
+    sid = str(_coerce_int(action["seat_id"]))
+    idx = _coerce_int(action.get("index"))
+    tokens = state.get("tokens", {}).get(sid, [])
+    if idx is None or not (0 <= idx < len(tokens)):
+        raise ValueError("token index out of range")
+    tokens[idx]["alive"] = False
+    return {"index": idx}
+
+
+def _pt_int(value) -> int:
+    """Best-effort integer for a raw P/T string. Numeric ("7") → 7; a leading-int
+    variable ("1+*") → 1; a pure variable ("*", "X") → 0. Combat math only runs on
+    the numeric part — a 0 from an unparseable value applies no auto-damage/lethal
+    (the players resolve those creatures by hand)."""
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        import re
+
+        m = re.match(r"-?\d+", str(value or ""))
+        return int(m.group()) if m else 0
+
+
+def _live_token(state: dict, sid: str, idx, what: str) -> dict:
+    tokens = state.get("tokens", {}).get(sid, [])
+    if idx is None or not (0 <= idx < len(tokens)) or tokens[idx].get("alive") is False:
+        raise ValueError(f"{what} creature not found or dead")
+    return tokens[idx]
+
+
+def _apply_momir_attack(action: dict, state: dict) -> dict:
+    """DECLARE an attack: the attacking player sends one of their creatures at a
+    PLAYER (you attack players, never creatures). This only records a *pending*
+    attack in ``state["attacks"]`` — no damage yet. The DEFENDING player then
+    decides whether to block, via :func:`_apply_momir_resolve`. Pending attacks
+    are cleared when the turn advances (combat ends with the turn).
+
+    A creature can be declared as an attacker only once at a time."""
+    a_sid = str(_coerce_int(action["seat_id"]))
+    t_sid = str(_coerce_int(action.get("target_seat_id")))
+    if a_sid == t_sid:
+        raise ValueError("a creature must attack another player, not its controller")
+    a_idx = _coerce_int(action.get("index"))
+    attacker = _live_token(state, a_sid, a_idx, "attacking")
+    attacks = state.setdefault("attacks", [])
+    if any(x["attacker_seat"] == a_sid and x["attacker_index"] == a_idx for x in attacks):
+        raise ValueError("that creature is already attacking")
+    seq = int(state.get("attackSeq", 0)) + 1
+    state["attackSeq"] = seq
+    attacks.append(
+        {"seq": seq, "attacker_seat": a_sid, "attacker_index": a_idx, "target_seat": t_sid}
+    )
+    return {"seq": seq, "attacker_name": attacker.get("name"), "target_seat_id": int(t_sid)}
+
+
+def _apply_momir_resolve(action: dict, state: dict) -> dict:
+    """The DEFENDING player resolves a pending attack aimed at them — the block
+    decision belongs to the defender, not the attacker:
+
+    * **Take it** (no ``block_index``): lose the attacker's power in life.
+    * **Block** (``block_index`` = one of your live creatures): your blocker and
+      the attacker deal their power to each other; either dies if lethal
+      (``power >= toughness``, numeric only). No life loss.
+    * **Cancel** (``cancel`` truthy): dismiss a mis-declared attack, no effect.
+
+    A blank/dead attacker (killed since declaration) simply fizzles."""
+    d_sid = str(_coerce_int(action["seat_id"]))  # the defender resolving
+    seq = _coerce_int(action.get("seq"))
+    attacks = state.setdefault("attacks", [])
+    entry = next((x for x in attacks if x["seq"] == seq), None)
+    if entry is None:
+        raise ValueError("no such pending attack")
+    if entry["target_seat"] != d_sid:
+        raise ValueError("only the defending player can resolve this attack")
+    attacks.remove(entry)
+
+    if action.get("cancel"):
+        return {"seq": seq, "resolution": "cancel"}
+
+    a_list = state.get("tokens", {}).get(entry["attacker_seat"], [])
+    ai = entry["attacker_index"]
+    attacker = a_list[ai] if isinstance(ai, int) and 0 <= ai < len(a_list) else None
+    if attacker is None or attacker.get("alive") is False:
+        return {"seq": seq, "resolution": "fizzle"}  # attacker died before blocks
+    a_pow, a_tou = _pt_int(attacker.get("power")), _pt_int(attacker.get("toughness"))
+
+    block_index = action.get("block_index")
+    if block_index is None:  # take the hit
+        state["lives"][d_sid] = int(state["lives"].get(d_sid, 0)) - a_pow
+        return {
+            "seq": seq,
+            "resolution": "unblocked",
+            "attacker_name": attacker.get("name"),
+            "target_seat_id": int(d_sid),
+            "damage": a_pow,
+        }
+
+    blocker = _live_token(state, d_sid, _coerce_int(block_index), "blocking")
+    b_pow, b_tou = _pt_int(blocker.get("power")), _pt_int(blocker.get("toughness"))
+    attacker_died = a_tou > 0 and b_pow >= a_tou
+    blocker_died = b_tou > 0 and a_pow >= b_tou
+    if attacker_died:
+        attacker["alive"] = False
+    if blocker_died:
+        blocker["alive"] = False
+    return {
+        "seq": seq,
+        "resolution": "blocked",
+        "attacker_name": attacker.get("name"),
+        "blocker_name": blocker.get("name"),
+        "attacker_died": attacker_died,
+        "blocker_died": blocker_died,
+    }
+
+
 def _advance_turn(state: dict, game: Game) -> None:
     """Advance ``currentTurnId`` to the next non-eliminated seat in physical
     clockwise order; increment ``turn`` when the rotation wraps past the first
     seat."""
+    # Combat ends with the turn: drop any attackers still awaiting a block
+    # decision (Momir-only key — absent in Commander state, left untouched).
+    if "attacks" in state:
+        state["attacks"] = []
     seats = _clockwise_seats(game)
     if not seats:
         return
@@ -368,6 +613,10 @@ def _affected_seat(atype: str, action: dict) -> int | None:
         return _coerce_int(action.get("seat_id"))
     if atype == "cmd":
         return _coerce_int(action.get("receiver_seat_id"))
+    # Resolving an attack (taking it) drains the defending seat's life → re-check
+    # them. Declaring an attack changes no life, so it needs no re-check.
+    if atype == "momir_resolve":
+        return _coerce_int(action.get("seat_id"))
     return None
 
 
@@ -448,6 +697,10 @@ def apply_live_action(
     atype = (action or {}).get("type")
     if atype not in _MUTATING_TYPES:
         raise ValueError(f"Unknown action type: {atype!r}")
+    # Momir actions (+ the tokens state field) exist ONLY in Momir games; a
+    # Commander game rejects them so its state stays untouched.
+    if atype in _MOMIR_TYPES and not _is_momir(game):
+        raise ValueError("Momir actions are only valid in Momir games")
 
     seats_by_id = {s.id: s for s in game.seats}
     _validate_action_seats(atype, action, seats_by_id)  # 400 on bad seat, table path included
@@ -457,7 +710,7 @@ def apply_live_action(
         _authorize_seat_scoped(atype, action, game, user_id, seats_by_id)
 
     state = json.loads(live.state)
-    extras = _apply_mutation(atype, action, state, game)
+    extras = _apply_mutation(session, atype, action, state, game)
 
     # Event append shares this transaction — no event without its mutation. The
     # triggering event is recorded first, then any auto-elimination/revive it

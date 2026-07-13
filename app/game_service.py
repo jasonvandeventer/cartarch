@@ -54,6 +54,7 @@ CANONICAL_GAME_FORMATS = (
     "Vintage",
     "Draft",
     "Sealed",
+    "Momir",  # Momir Basic — companion generates random creatures; no decks
     "Other",
 )
 NEW_GAME_FORMAT_CHOICES = CANONICAL_GAME_FORMATS[:-1]  # excludes 'Other'

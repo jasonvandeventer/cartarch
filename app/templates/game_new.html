@@ -18,7 +18,7 @@
            service-layer normalize_game_format. 'Other' is backfill-only
            (not user-selectable) — see CANONICAL_GAME_FORMATS in
            game_service.py. #}
-        <select name="format">
+        <select name="format" id="format-select" onchange="onFormatChange()">
           <option value="Commander" selected>Commander</option>
           <option value="Standard">Standard</option>
           <option value="Modern">Modern</option>
@@ -26,10 +26,16 @@
           <option value="Vintage">Vintage</option>
           <option value="Draft">Draft</option>
           <option value="Sealed">Sealed</option>
+          <option value="Momir">Momir Basic</option>
         </select>
+        {# Momir Basic — no decks; the app generates random creatures. #}
+        <p class="muted" id="momir-note" style="display:none">
+          Momir Basic — each player uses only basic lands. The app generates random creatures.
+        </p>
         <label>Starting Life Total</label>
         <select name="starting_life" id="starting_life">
           <option value="40" selected>40 (Commander)</option>
+          <option value="24">24 (Momir)</option>
           <option value="20">20 (Standard/Modern)</option>
           <option value="30">30 (Brawl)</option>
         </select>
@@ -161,6 +167,18 @@ const POS_LABEL = {p1:'1',p2:'2',p3:'3',p4:'4',p5:'5',p6:'6',p7:'7',p8:'8'};
 // seats[i] = { playerName, userId, deckId, position }
 let seats = [];
 let pendingAssignIdx = null; // seat index waiting for position assignment
+let isMomir = false;         // Momir Basic: no decks, 24 life, creature note
+
+// Momir Basic has no decks and defaults to 24 life. Toggling the format
+// re-renders the seat rows (dropping/restoring the deck pickers) and shows the
+// note. Life is a suggestion — the user may still override it.
+function onFormatChange() {
+  const fmt = document.getElementById('format-select').value;
+  isMomir = fmt === 'Momir';
+  document.getElementById('momir-note').style.display = isMomir ? '' : 'none';
+  if (isMomir) document.getElementById('starting_life').value = '24';
+  renderSeats();
+}
 
 function setPlayerCount(n, event) {
   playerCount = n;
@@ -201,6 +219,14 @@ function renderSeats() {
     const deckOptions = decks.map(d =>
       `<option value="${d.id}"${seat.deckId === d.id ? ' selected' : ''}>${d.name}</option>`
     ).join('');
+    // Momir Basic uses no decks — hide the picker but keep an empty hidden field
+    // so the deck_ids form array still aligns 1:1 with the seats.
+    const deckField = isMomir
+      ? `<input type="hidden" name="deck_ids" value="">`
+      : `<select name="deck_ids" id="deck-sel-${i}" style="min-width:180px">
+          <option value="">— no deck —</option>
+          ${deckOptions}
+        </select>`;
 
     const posLabel = seat.position ? `Seat ${POS_LABEL[seat.position]}` : '— choose seat —';
     const posClass = seat.position ? 'seat-pos-pill assigned' : 'seat-pos-pill unassigned';
@@ -217,10 +243,7 @@ function renderSeats() {
           <option value="">— no user —</option>
           ${userOptions}
         </select>
-        <select name="deck_ids" id="deck-sel-${i}" style="min-width:180px">
-          <option value="">— no deck —</option>
-          ${deckOptions}
-        </select>
+        ${deckField}
       </div>
     `;
     container.appendChild(div);
@@ -286,14 +309,16 @@ function onUserChange(seatIndex, selectEl) {
   const userId = selectEl.value ? parseInt(selectEl.value) : null;
   seats[seatIndex].userId = userId;
   const decks = userId ? (decksByUser[userId] || []) : [];
-  const deckSel = document.getElementById(`deck-sel-${seatIndex}`);
-  deckSel.innerHTML = '<option value="">— no deck —</option>';
-  decks.forEach(d => {
-    const opt = document.createElement('option');
-    opt.value = d.id;
-    opt.textContent = d.name;
-    deckSel.appendChild(opt);
-  });
+  const deckSel = document.getElementById(`deck-sel-${seatIndex}`);  // absent in Momir
+  if (deckSel) {
+    deckSel.innerHTML = '<option value="">— no deck —</option>';
+    decks.forEach(d => {
+      const opt = document.createElement('option');
+      opt.value = d.id;
+      opt.textContent = d.name;
+      deckSel.appendChild(opt);
+    });
+  }
   // Auto-fill name
   const nameInput = document.getElementById(`name-${seatIndex}`);
   const userObj = users.find(u => u.id === userId);
