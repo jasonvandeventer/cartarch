@@ -567,12 +567,19 @@ def end_game(
     turn_count: int | None,
     notes: str,
     win_condition: str | None = None,
+    elimination_causes: dict[int, str | None] | None = None,
 ) -> bool:
     """Record final placements, life totals, and turn count for a game.
 
-    placements: {seat_id: placement_int}  (1 = winner)
+    placements: {seat_id: placement_int}  (1 = winner; ties allowed — see #114)
     final_lives: {seat_id: life_total}
+    elimination_causes: {seat_id: cause_str|None}  (#114 — per-seat cause)
+
+    Safe to re-run on an already-finalized game (the post-finalization result
+    edit path calls this again); it overwrites the fields, skips the live-state
+    bookend (guarded below), and does not re-stamp ended_at.
     """
+    elimination_causes = elimination_causes or {}
     game = session.query(Game).filter(Game.id == game_id, Game.user_id == user_id).first()
     if not game:
         return False
@@ -582,6 +589,8 @@ def end_game(
             seat.placement = placements[seat.id]
         if seat.id in final_lives:
             seat.final_life = final_lives[seat.id]
+        if seat.id in elimination_causes:
+            seat.elimination_cause = elimination_causes[seat.id] or None
 
     game.turn_count = turn_count or None
     game.notes = notes.strip() or None

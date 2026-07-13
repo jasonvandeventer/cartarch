@@ -214,6 +214,78 @@ def test_win_condition_persists_and_normalizes(db, user):
     )
     assert db.get(Game, game.id).win_condition == "commander"
 
+
+# ── #114: tied placements + elimination cause + post-finalization editing ─────
+
+
+def test_end_game_stores_tied_placements_and_causes(db, user):
+    game, seats = _started_game(db, user, [user.id, None, None, None])
+    s1, s2, s3, s4 = seats
+    game_service.end_game(
+        db,
+        game.id,
+        user.id,
+        placements={s1.id: 1, s2.id: 2, s3.id: 2, s4.id: 2},  # three tied at 2nd
+        final_lives={},
+        turn_count=6,
+        notes="",
+        elimination_causes={s2.id: "cmd", s3.id: "poison", s4.id: "effect"},
+    )
+    db.expire_all()
+    assert db.get(GameSeat, s1.id).placement == 1
+    assert [db.get(GameSeat, s.id).placement for s in (s2, s3, s4)] == [2, 2, 2]
+    assert db.get(GameSeat, s2.id).elimination_cause == "cmd"
+    assert db.get(GameSeat, s4.id).elimination_cause == "effect"
+
+
+def test_post_finalize_edit_overwrites_and_audits(db, client, user):
+    game, seats = _started_game(db, user, [user.id, None])
+    s1, s2 = seats
+    game_service.end_game(db, game.id, user.id, {s1.id: 1, s2.id: 2}, {s2.id: 5}, 5, "")
+    db.commit()
+    edits_before = [e for e in _events(db, game.id) if e.action_type == "result_edit"]
+    assert edits_before == []
+
+    r = client.post(
+        f"/games/{game.id}/end",
+        data={
+            f"placement_{s1.id}": "1",
+            f"placement_{s2.id}": "1",  # correct to a tie at 1st
+            f"final_life_{s2.id}": "0",
+            f"elimination_cause_{s2.id}": "concession",
+            "turn_count": "5",
+            "win_condition": "combat",
+            "notes": "fixed after the game",
+        },
+        follow_redirects=False,
+    )
+    assert r.status_code == 303
+    db.expire_all()
+    assert db.get(GameSeat, s2.id).placement == 1  # overwritten to the tie
+    assert db.get(GameSeat, s2.id).elimination_cause == "concession"
+    assert db.get(Game, game.id).notes == "fixed after the game"
+
+    edits = [e for e in _events(db, game.id) if e.action_type == "result_edit"]
+    assert len(edits) == 1  # exactly one audit row for the edit
+    assert edits[0].actor_kind == "owner" and edits[0].seat_id is None
+    assert json.loads(edits[0].payload)["editor_user_id"] == user.id
+
+
+def test_result_edit_rejects_non_owner(db, client, user):
+    other = _user(db)
+    game, seats = _started_game(db, other, [other.id, None])  # owned by someone else
+    game_service.end_game(db, game.id, other.id, {seats[0].id: 1}, {}, 3, "")
+    db.commit()
+    # client is authenticated as `user`, not the owner → owner-scoped get_game 404s.
+    r = client.post(
+        f"/games/{game.id}/end",
+        data={f"placement_{seats[0].id}": "2"},
+        follow_redirects=False,
+    )
+    assert r.status_code == 404
+    db.expire_all()
+    assert db.get(GameSeat, seats[0].id).placement == 1  # unchanged
+
     # Absent → NULL.
     g2, s2 = _started_game(db, user, [user.id, None])
     game_service.end_game(db, g2.id, user.id, placements={}, final_lives={}, turn_count=1, notes="")

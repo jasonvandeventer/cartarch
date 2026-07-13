@@ -503,6 +503,9 @@
           <form method="post" action="/games/{{ game.id }}/end">
             <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
             <div class="stack-form">
+              <p class="muted" style="margin:0 0 0.5rem;font-size:0.85rem">
+                Placements are proposed from elimination order (simultaneous deaths tie) — adjust as needed.
+              </p>
               {% for seat in game.seats %}
                 <div class="end-game-row">
                   <span class="end-game-player">{{ seat.player_name }}</span>
@@ -527,6 +530,18 @@
                          id="submit-life-{{ seat.id }}"
                          placeholder="Final life"
                          style="width:100px">
+                  {# #114 — per-seat elimination cause, pre-filled from the tracker. #}
+                  <select name="elimination_cause_{{ seat.id }}" id="elimcause-{{ seat.id }}"
+                          title="How this player was eliminated">
+                    <option value="">— cause —</option>
+                    <option value="life">Life total</option>
+                    <option value="cmd">Commander damage</option>
+                    <option value="poison">Poison</option>
+                    <option value="deck">Decked out</option>
+                    <option value="effect">Effect / ability</option>
+                    <option value="concession">Concession</option>
+                    <option value="manual">Manual (other)</option>
+                  </select>
                 </div>
                 {# issue #47 — goal completion checkboxes, only for seats whose
                    deck the recorder owns (multiplayer: the deck owner's goals
@@ -1341,9 +1356,45 @@ function toggleEndGame() {
       const el = document.getElementById(`submit-life-${s.id}`);
       if (el) el.value = state.lives[s.id];
     });
+    // #114 — propose placements by elimination order, tying simultaneous deaths.
+    const props = proposePlacements();
+    if (props) {
+      seatDefs.forEach(s => {
+        const pel = document.getElementById(`placement-${s.id}`);
+        if (pel && props[s.id] != null) pel.value = String(props[s.id]);
+      });
+    }
+    // #114 — pre-fill each seat's elimination cause from what the tracker recorded.
+    seatDefs.forEach(s => {
+      const cel = document.getElementById(`elimcause-${s.id}`);
+      if (cel) cel.value = (state.eliminationCause && state.eliminationCause[s.id]) || '';
+    });
     const tc = document.getElementById('submit-turns');
     if (tc) tc.value = state.turn;
   }
+}
+
+// #114 — standard competition ranking (1,2,2,2,2). Alive seats rank 1; eliminated
+// seats ordered by eliminatedAtTurn DESC (last out ranks better), seats sharing a
+// turn tie. Returns null when nobody's out yet (leave placements blank).
+function proposePlacements() {
+  const alive = [], dead = [];
+  seatDefs.forEach(s => (state.eliminated[s.id] ? dead : alive).push(s));
+  if (!dead.length) return null;
+  const out = {};
+  alive.forEach(s => { out[s.id] = 1; });
+  const byTurn = {};
+  dead.forEach(s => {
+    const t = (state.eliminatedAtTurn && state.eliminatedAtTurn[s.id] != null) ? state.eliminatedAtTurn[s.id] : 0;
+    (byTurn[t] = byTurn[t] || []).push(s);
+  });
+  let above = alive.length;  // seats ranked strictly above the next band
+  Object.keys(byTurn).map(Number).sort((a, b) => b - a).forEach(t => {
+    const rank = above + 1;
+    byTurn[t].forEach(s => { out[s.id] = rank; });
+    above += byTurn[t].length;
+  });
+  return out;
 }
 
 // ── Auto-win (preserved) ───────────────────────────────────────
@@ -1353,14 +1404,7 @@ function checkWinCondition() {
   const alive = seatDefs.filter(s => !state.eliminated[s.id]);
   if (alive.length !== 1) return;
   autoWinTriggered = true;
-  const winner = alive[0];
-  const placementEl = document.getElementById(`placement-${winner.id}`);
-  if (placementEl) placementEl.value = '1';
-  seatDefs.filter(s => s.id !== winner.id).forEach((s, i) => {
-    const el = document.getElementById(`placement-${s.id}`);
-    if (el) el.value = String(i + 2);
-  });
-  toggleEndGame();
+  toggleEndGame();  // opens + pre-fills competition-ranked placements + causes
 }
 
 // ── Turn timing (v3.26.7, extended for v3.28.13 pause) ─────────

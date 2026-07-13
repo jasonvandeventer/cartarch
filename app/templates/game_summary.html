@@ -24,6 +24,7 @@
       <div style="display:flex;gap:0.5rem;flex-wrap:wrap">
         {% if is_owner %}
           <button type="button" class="btn-like" onclick="togglePlayersModal()">Players</button>
+          <button type="button" class="btn-like" onclick="toggleEditResult()">Edit result</button>
         {% endif %}
         <a href="/games"><button type="button">Back to games</button></a>
         {% if is_owner %}
@@ -43,19 +44,22 @@
     {% endif %}
   </section>
 
+  {% set cause_labels = {'life':'Life total','cmd':'Commander damage','poison':'Poison','deck':'Decked out','effect':'Effect / ability','concession':'Concession','manual':'Manual'} %}
   <section class="panel">
     <h3 class="panel-title">Final standings</h3>
     <div class="table-wrap">
       <table class="stacking-table">
         <thead>
-          <tr><th>Place</th><th>Player</th><th>Deck / Commander</th><th>Final life</th></tr>
+          <tr><th>Place</th><th>Player</th><th>Deck / Commander</th><th>Final life</th><th>Out by</th></tr>
         </thead>
         <tbody>
           {% for seat in standings %}
+            {# #114 — mark shared placements as a tie (T-2nd). #}
+            {% set shared = seat.placement and (standings | selectattr('placement', 'equalto', seat.placement) | list | length) > 1 %}
             <tr>
               <td data-label="Place">
                 {% if seat.placement %}
-                  {{ seat.placement }}{{ {1:'st',2:'nd',3:'rd'}.get(seat.placement, 'th') }}
+                  {% if shared %}T-{% endif %}{{ seat.placement }}{{ {1:'st',2:'nd',3:'rd'}.get(seat.placement, 'th') }}
                   {% if seat.placement == 1 %}🏆{% endif %}
                 {% else %}<span class="muted">—</span>{% endif %}
               </td>
@@ -68,6 +72,9 @@
               </td>
               <td data-label="Final life">
                 {% if seat.final_life is not none %}{{ seat.final_life }}{% else %}<span class="muted">—</span>{% endif %}
+              </td>
+              <td data-label="Out by">
+                {% if seat.elimination_cause %}{{ cause_labels.get(seat.elimination_cause, seat.elimination_cause) }}{% else %}<span class="muted">—</span>{% endif %}
               </td>
             </tr>
           {% endfor %}
@@ -84,6 +91,75 @@
       <p class="muted" style="margin:0">No notes recorded.</p>
     {% endif %}
   </section>
+
+  {% if is_owner %}
+    {# #114 — post-finalization result edit. Pre-filled with current values; posts
+       to the same /end route (safe re-run); the route logs a result_edit event. #}
+    <div id="edit-result-modal"
+         style="display:none;position:fixed;inset:0;z-index:900;background:rgba(0,0,0,0.6);
+                align-items:flex-start;justify-content:center;overflow-y:auto;padding:2rem 1rem">
+      <div class="panel" style="max-width:640px;width:100%;margin-top:2rem">
+        <h3 class="panel-title">Edit result</h3>
+        <form method="post" action="/games/{{ game.id }}/end">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <p class="muted" style="font-size:0.85rem">Duplicate placements are allowed — tie simultaneous eliminations.</p>
+          <div class="table-wrap">
+            <table class="stacking-table">
+              <thead><tr><th>Player</th><th>Place</th><th>Final life</th><th>Out by</th></tr></thead>
+              <tbody>
+                {% for seat in game.seats %}
+                  <tr>
+                    <td data-label="Player">{{ seat.player_name }}</td>
+                    <td data-label="Place">
+                      <select name="placement_{{ seat.id }}">
+                        <option value="">—</option>
+                        {% for p in range(1, game.seats|length + 1) %}
+                          <option value="{{ p }}" {% if seat.placement == p %}selected{% endif %}>
+                            {{ p }}{{ {1:'st',2:'nd',3:'rd'}.get(p, 'th') }}{% if p == 1 %} (Winner){% endif %}
+                          </option>
+                        {% endfor %}
+                      </select>
+                    </td>
+                    <td data-label="Final life">
+                      <input type="number" name="final_life_{{ seat.id }}" style="width:90px"
+                             value="{{ seat.final_life if seat.final_life is not none else '' }}">
+                    </td>
+                    <td data-label="Out by">
+                      <select name="elimination_cause_{{ seat.id }}">
+                        {% for val, lbl in [('','— cause —'),('life','Life total'),('cmd','Commander damage'),('poison','Poison'),('deck','Decked out'),('effect','Effect / ability'),('concession','Concession'),('manual','Manual (other)')] %}
+                          <option value="{{ val }}" {% if (seat.elimination_cause or '') == val %}selected{% endif %}>{{ lbl }}</option>
+                        {% endfor %}
+                      </select>
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          <label>Turns played</label>
+          <input type="number" name="turn_count" min="1" style="width:120px" value="{{ game.turn_count or '' }}">
+          <label>How did the game end?</label>
+          <div class="win-condition-row">
+            {% for val, lbl in [('','Skip'),('combat','Combat damage'),('commander','Commander damage'),('combo','Combo'),('attrition','Attrition'),('concession','Concession'),('other','Other')] %}
+              <label class="win-cond-opt"><input type="radio" name="win_condition" value="{{ val }}" {% if (game.win_condition or '') == val %}checked{% endif %}> {{ lbl }}</label>
+            {% endfor %}
+          </div>
+          <label>Notes</label>
+          <textarea name="notes" rows="2" style="width:100%">{{ game.notes or '' }}</textarea>
+          <div style="display:flex;gap:0.5rem;margin-top:1rem">
+            <button type="submit">Save changes</button>
+            <button type="button" onclick="toggleEditResult()">Cancel</button>
+          </div>
+        </form>
+      </div>
+    </div>
+    <script>
+      function toggleEditResult() {
+        const m = document.getElementById('edit-result-modal');
+        m.style.display = m.style.display === 'flex' ? 'none' : 'flex';
+      }
+    </script>
+  {% endif %}
 
   {% include "_players_modal.html" %}
 {% endblock %}

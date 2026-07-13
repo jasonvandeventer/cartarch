@@ -631,6 +631,11 @@ class GameSeat(Base):
     placement: Mapped[int | None] = mapped_column(Integer, nullable=True)
     starting_life: Mapped[int] = mapped_column(Integer, default=40, nullable=False)
     final_life: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # #114 — per-seat elimination cause, persisted at finalize (was transient in
+    # the live blob). "life"/"cmd"/"poison"/"deck" auto-tracked, or a manual
+    # sub-cause "commander"/"poison"/"effect"/"concession"/"manual". NULL = winner /
+    # not recorded. Corrigible via the post-finalization result edit.
+    elimination_cause: Mapped[str | None] = mapped_column(String(32), nullable=True)
     grid_position: Mapped[str | None] = mapped_column(String(4), nullable=True)
     # v3.27.5 — seat→user attribution. Two-column design mirrors v3.27.1's
     # deck-identity snapshot (live FK + analytics-stable snapshot).

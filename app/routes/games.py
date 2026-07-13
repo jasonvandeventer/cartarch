@@ -12,6 +12,7 @@ move changes wiring only, not logic. ``gameFingerprint()`` is untouched.
 
 from __future__ import annotations
 
+import json
 import secrets
 from datetime import datetime
 
@@ -49,7 +50,7 @@ from app.game_service import (
     update_seat,
 )
 from app.live_game_service import valid_momir_mvs
-from app.models import Deck, Game, GameSeat, User
+from app.models import Deck, Game, GameEvent, GameSeat, User
 from app.timeutil import utc_now
 
 
@@ -539,9 +540,11 @@ async def game_end(
 
     placements: dict[int, int] = {}
     final_lives: dict[int, int | None] = {}
+    elimination_causes: dict[int, str | None] = {}
     for seat in game.seats:
         p_val = form_data.get(f"placement_{seat.id}", "")
         l_val = form_data.get(f"final_life_{seat.id}", "")
+        c_val = form_data.get(f"elimination_cause_{seat.id}", None)
         if p_val:
             try:
                 placements[seat.id] = int(p_val)
@@ -552,6 +555,9 @@ async def game_end(
                 final_lives[seat.id] = int(l_val)
             except ValueError:
                 pass
+        # A submitted cause field (even blank) is an explicit set; absent → leave.
+        if c_val is not None:
+            elimination_causes[seat.id] = str(c_val).strip() or None
 
     turn_count_raw = form_data.get("turn_count", "")
     notes = str(form_data.get("notes", ""))
@@ -561,7 +567,41 @@ async def game_end(
     except ValueError:
         tc = None
 
-    end_game(session, game_id, current_user.id, placements, final_lives, tc, notes, win_condition)
+    # #114 — a re-run on an already-finalized game is a result EDIT; audit it.
+    was_finalized = game.status == "finalized"
+    end_game(
+        session,
+        game_id,
+        current_user.id,
+        placements,
+        final_lives,
+        tc,
+        notes,
+        win_condition,
+        elimination_causes,
+    )
+    if was_finalized:
+        session.add(
+            GameEvent(
+                game_id=game_id,
+                seat_id=None,
+                action_type="result_edit",
+                payload=json.dumps(
+                    {
+                        "editor_user_id": current_user.id,
+                        "placements": {str(k): v for k, v in placements.items()},
+                        "final_lives": {str(k): v for k, v in final_lives.items()},
+                        "elimination_causes": {str(k): v for k, v in elimination_causes.items()},
+                        "turn_count": tc,
+                        "win_condition": win_condition,
+                    }
+                ),
+                turn=game.turn_count or 1,
+                actor_kind="owner",
+                created_at=utc_now(),
+            )
+        )
+        session.commit()
 
     # issue #47 — per-seat goal completion. Checkbox name is goal_{seat}_{goal};
     # presence = achieved. record_goal_results re-validates ownership (only the
