@@ -1,5 +1,21 @@
 [
   {
+    "version": "4.6.1",
+    "date": "2026-07-13",
+    "added": [
+      "Momir combat now understands creature keywords. Attack and block work with flying and reach, first strike and double strike, deathtouch, trample, lifelink, menace, vigilance, haste, indestructible — the app resolves who dies and how much damage tramples through or drains to life.",
+      "Block with more than one creature at once, and the game enforces the rules: a flyer can only be blocked by flying or reach, a menacing attacker needs at least two blockers, and a tapped or summoning-sick creature can't attack.",
+      "Undo a combat call the app got wrong (or a mis-tap) with a new revive action, the mirror of marking a creature dead."
+    ],
+    "refined": [
+      "Attacking now taps your creature (unless it has vigilance), and a creature can't attack the turn it's summoned unless it has haste — matching real Magic."
+    ],
+    "resolved": [
+      "Momir Sim phase 3 (#111): keyword combat engine. Anything the keyword engine doesn't model is still resolvable by hand, and every combat action stays Momir-only — Commander games are untouched."
+    ],
+    "archivist_note": "v4.6.1 = Momir Sim phase 3 (#111), keyword combat engine (Tier 1), Momir-only. Tokens carry keywords (copied from oracle_catalog at summon), tapped, damage, and a {p1p1,m1m1} counters map; effective P/T = _pt_int(base) + p1p1 - m1m1 (variable P/T → 0, manual). momir_attack declare rejects tapped / summoning-sick (turn_created >= state.turn unless haste) / defender and taps the attacker unless vigilance. momir_resolve takes block_indexes[] (legacy single block_index still accepted): blockers must be untapped+alive, a flyer is blockable only by flying/reach, a menacing attacker needs 0 or >=2 blockers. _run_combat does a first-strike then a normal step (double strike deals in both, first-strike-only in the first, vanilla in the normal), lethal-then-next damage assignment across blockers in declared order (deathtouch makes 1 lethal), trample spill to the defending player, simultaneous blocker->attacker damage, lifelink life gain (both steps + player damage), and state-based deaths after each step (marked damage >= eff toughness OR deathtouched, unless indestructible). momir_revive_token added (inverse of kill, seat/table scoped). Out of scope (no combat effect): protection, ward, hexproof/shroud, banding, fear/intimidate/landwalk, damage-assignment-order overrides. Table-driven 15-case keyword matrix (each keyword + first-strike/deathtouch, trample/deathtouch, double-strike/lifelink, menace single-block reject, flying-vs-reach, vigilance no-tap, haste-vs-sickness, indestructible-vs-deathtouch). 853 tests green."
+  },
+  {
     "version": "4.6.0",
     "date": "2026-07-13",
     "added": [
