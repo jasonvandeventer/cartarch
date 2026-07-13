@@ -1,5 +1,21 @@
 [
   {
+    "version": "4.6.0",
+    "date": "2026-07-13",
+    "added": [
+      "Momir now draws from the full Magic oracle — every legal creature, not just the ones in your collection. The pool roughly tripled, so activating a mana value gives a genuinely random creature at that cost, and mana values that have no creatures are skipped.",
+      "Momir games now track resources: each seat has a library, a hand, and lands. You draw automatically at the start of your turn, play one land per turn from your hand, and activating Momir costs untapped mana equal to the mana value plus discarding a card.",
+      "Deck-out: trying to draw from an empty library eliminates you, shown on the scoreboard like any other loss."
+    ],
+    "refined": [
+      "The shared tablet can correct any seat's library / hand / lands / untapped counts when a tap or draw drifts out of sync — players can't edit each other's counts."
+    ],
+    "resolved": [
+      "Momir Sim phases 1–2 (#109 oracle catalog + ingest, #110 resource layer). Commander games are byte-for-byte unchanged — every new state field and action is Momir-only."
+    ],
+    "archivist_note": "v4.6.0 = Momir Sim phases 1–2, both additive and Momir-only. Phase 1 (#109): new oracle_catalog table (one row per oracle_id/name) populated by app.jobs.oracle_ingest — streaming (ijson) Scryfall oracle_cards bulk upsert, is_momir_legal filter policy (creature / non-token-emblem-artseries-dfctoken layout / vintage-legal / non-memorabilia), multi-face FRONT-face extraction with root cmc/id/keywords. random_creature_at_cmc repointed off the collection-bounded cards table to the catalog (same return shape; GROUP-BY dedup removed), plus a memoized valid_momir_mvs helper busted on ingest. Manual invoke python -m app.jobs.oracle_ingest (no scheduler). Live ingest of the 38k-entry bulk → 17.5k legal creatures. Phase 2 (#110): per-seat resource state library/hand/lands/untapped/landPlayed with lazy setdefault backfill; turn-advance begins the seat (untap lands, untap tokens, reset land drop, draw 1 — starter draws turn 1 too); deck-out auto-elimination (cause 'deck', own trigger at draw time, permanent/no auto-revive like manual); momir_play_land; hardened momir_activate (untapped>=cmc AND hand>=1 → taps mana + discards); table-token-only momir_adjust. 838 tests green."
+  },
+  {
     "version": "4.5.0",
     "date": "2026-07-12",
     "added": [
