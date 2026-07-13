@@ -1140,6 +1140,8 @@ def test_momir_pages_render(db, client, user):
     assert companion.status_code == 200
     assert "cmp-momir" in companion.text  # phone activation section rendered
     assert "cmp-incoming" in companion.text  # defender block-decision section present
+    assert "cmp-res" in companion.text  # #113 phone resource bar
+    assert "cmp-tmenu" in companion.text  # #113 phone token action sheet
 
 
 def test_commander_rejects_momir_activate(db):

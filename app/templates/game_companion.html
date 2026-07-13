@@ -62,6 +62,32 @@
     .cmp-graveyard { margin-top: 0.5rem; font-size: 0.85rem; }
     .cmp-strip-creatures { font-size: 0.75rem; opacity: 0.85; }
     .cmp-strip-toklist { font-size: 0.7rem; opacity: 0.9; margin-top: 0.2rem; text-align: left; }
+    /* #113 — phone Momir surfaces */
+    .cmp-res { display: flex; flex-wrap: wrap; align-items: center; gap: 0.3rem 0.6rem; margin: 0.5rem 0;
+      padding: 0.4rem 0.5rem; border-radius: 0.5rem; background: rgba(109,40,217,0.12); border: 1px solid rgba(167,139,250,0.35); font-size: 0.85rem; }
+    .cmp-res-stat { display: inline-flex; align-items: center; gap: 0.25rem; }
+    .cmp-res-k { opacity: 0.7; } .cmp-res-v { font-weight: 700; } .cmp-res-untap { color: #a78bfa; }
+    .cmp-res-step { min-width: 1.5rem; min-height: 1.5rem; border: none; border-radius: 0.3rem; background: rgba(255,255,255,0.08); color: inherit; }
+    .cmp-res-land { min-height: 2rem; padding: 0 0.6rem; border: none; border-radius: 0.4rem; background: #065f46; color: #d1fae5; }
+    .cmp-res-land:disabled { opacity: 0.4; }
+    .cmp-token.cmp-token-tapped .cmp-token-img { transform: rotate(16deg); }
+    .cmp-token.cmp-token-sick .cmp-token-img { outline: 2px dashed rgba(255,255,255,0.4); outline-offset: -2px; }
+    .cmp-token-badges { display: flex; flex-wrap: wrap; gap: 1px; justify-content: center; margin-top: 0.1rem; }
+    .cmp-badge { font-size: 0.55rem; font-weight: 700; padding: 0 3px; border-radius: 2px; background: rgba(109,40,217,0.9); color: #fff; }
+    .cmp-token-dmg { position: absolute; bottom: 0.15rem; left: 0.15rem; font-size: 0.6rem; font-weight: 700; padding: 0 3px; border-radius: 2px; background: rgba(185,28,28,0.9); color: #fff; }
+    .cmp-atk-block.cmp-atk-block-on { background: #6d28d9; border-color: #a78bfa; color: #fff; }
+    .cmp-atk-confirm { min-height: 2.4rem; padding: 0 0.6rem; border: none; border-radius: 0.4rem; background: #6d28d9; color: #fff; }
+    .cmp-atk-confirm:disabled { opacity: 0.45; }
+    .cmp-tmenu { position: fixed; left: 0; right: 0; bottom: 0; z-index: 900; max-height: 70vh; overflow-y: auto;
+      padding: 0.75rem; border-top-left-radius: 0.8rem; border-top-right-radius: 0.8rem;
+      background: #1e1b2e; border: 1px solid rgba(167,139,250,0.5); box-shadow: 0 -6px 24px rgba(0,0,0,0.6); }
+    .cmp-tmenu-oracle { font-size: 0.85rem; opacity: 0.9; white-space: pre-wrap; margin: 0.4rem 0; max-height: 8rem; overflow-y: auto; }
+    .cmp-tmenu-row { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-bottom: 0.4rem; align-items: center; }
+    .cmp-tmenu-btn { min-height: 2.6rem; padding: 0 0.6rem; border: 1px solid rgba(255,255,255,0.2); border-radius: 0.5rem; background: rgba(255,255,255,0.06); color: inherit; font-size: 0.95rem; }
+    .cmp-tmenu-num { width: 3.5rem; min-height: 2.6rem; border-radius: 0.5rem; }
+    .cmp-tmenu-close { width: 100%; min-height: 2.6rem; margin-top: 0.3rem; border: none; border-radius: 0.5rem; background: rgba(255,255,255,0.1); color: inherit; }
+    .cmp-momir-cmc-btn:disabled { opacity: 0.3; }
+    .cmp-momir-cmc-input { width: 4.5rem; min-height: 2.4rem; border-radius: 0.4rem; }
   </style>
 </head>
 {% if my_seat and game.status == 'created' %}
@@ -196,7 +222,8 @@
         {% if game.format|lower == 'momir' %}
           {# ── Incoming attacks (defender's block decision) ── #}
           <section class="cmp-incoming" id="cmp-incoming" style="display:none"></section>
-          {# ── Momir Basic — summon a random creature at a chosen CMC ── #}
+          {# ── Momir Basic — resources + summon a random creature at a chosen CMC ── #}
+          <div class="cmp-res" id="cmp-res"></div>
           <section class="cmp-momir" id="cmp-momir">
             <h3 class="cmp-section-title">Momir — activate at CMC</h3>
             <div class="cmp-momir-cmc" id="cmp-momir-cmc">
@@ -204,6 +231,8 @@
                 <button type="button" class="cmp-momir-cmc-btn" data-cmc="{{ c }}"
                         onclick="pickMomirCmc({{ c }})">{{ c }}</button>
               {% endfor %}
+              <input type="number" class="cmp-momir-cmc-input" id="cmp-momir-cmc-input" min="11" max="16"
+                     placeholder="11-16" oninput="pickMomirCmcInput(this.value)">
             </div>
             <button type="button" class="cmp-btn cmp-btn-momir" id="cmp-momir-go"
                     onclick="activateMomir()" disabled>Select a CMC</button>
@@ -218,6 +247,8 @@
               <div id="cmp-tokens-dead" class="cmp-tokens cmp-tokens-dead"></div>
             </details>
           </section>
+          {# Token action sheet (attack / abilities / revive), opened by tapping a creature. #}
+          <div class="cmp-tmenu" id="cmp-tmenu" style="display:none"></div>
         {% endif %}
 
         <div class="cmp-scroll">
@@ -267,8 +298,25 @@
   ];
   const COUNTER_TYPES = ['poison','rad','experience','energy','storm','custom'];
   const K = String;  // seat-id keys are strings in the server JSON
+  const MOMIR_VALID_MVS = new Set({{ momir_valid_mvs | default([]) | tojson }});  // #113
   let momirCmc = null;                 // selected CMC awaiting Activate
+  let cmpMenuIdx = null;               // #113 — token index whose action sheet is open
+  const cmpBlockSel = {};              // #113 — seq -> Set of chosen blocker indexes
   const expandedSeats = new Set();     // other-seat strip cells showing their creatures
+
+  // #113 — combat keyword / effective-P-T + resource helpers (mirror the server).
+  const MOMIR_RES_DEFAULTS = { library: 60, hand: 7, lands: 0, untapped: 0, landPlayed: false };
+  function momirRes(seatId, key) {
+    const m = (st && st[key]) || {}; const v = m[K(seatId)];
+    return v === undefined ? MOMIR_RES_DEFAULTS[key] : v;
+  }
+  function tokHasKw(t, kw) { return (t.keywords || []).some(k => String(k).toLowerCase() === kw); }
+  function tokCounters(t) { const c = t.counters || {}; return [c.p1p1 || 0, c.m1m1 || 0]; }
+  function tokEffPow(t) { const [p, m] = tokCounters(t); return ptInt(t.power) + p - m; }
+  function tokEffTou(t) { const [p, m] = tokCounters(t); return ptInt(t.toughness) + p - m; }
+  function tokSick(t) { return Number(t.turn_created) >= Number((st && st.turn) || 1) && !tokHasKw(t, 'haste'); }
+  const _KW_ABBR = { flying: 'F', reach: 'R', 'first strike': 'FS', 'double strike': 'DS', deathtouch: 'DT',
+    trample: 'T', lifelink: 'LL', menace: 'M', vigilance: 'V', haste: 'H', indestructible: 'I', defender: 'D' };
 
   let st = null, lastSt = null, ended = false;
 
@@ -308,9 +356,9 @@
 
     if (MY_SEAT_ID == null) return;  // spectator: header + strip only
 
+    renderMyResources();
     renderTokens();
     renderMomirControls();
-    renderAttackMenu();
     renderIncoming();
 
     const myLife = (st.lives && st.lives[K(MY_SEAT_ID)]) ?? 0;
@@ -364,19 +412,101 @@
   function ptOf(t) { return (t.power != null && t.toughness != null) ? `${t.power}/${t.toughness}` : ''; }
   function tokenImg(sid) { return MIRROR.replace('__SID__', sid); }
 
+  // #113 — effective P/T (base ± counters) + keyword badges for the token card.
+  function effPtOf(t) {
+    if (t.power == null || t.toughness == null) return '';
+    const [plus, minus] = tokCounters(t);
+    return (plus || minus) ? `${tokEffPow(t)}/${tokEffTou(t)}` : `${t.power}/${t.toughness}`;
+  }
+  function kwBadges(t) {
+    const a = (t.keywords || []).map(k => _KW_ABBR[String(k).toLowerCase()]).filter(Boolean);
+    return a.length ? `<div class="cmp-token-badges">${a.map(x => `<span class="cmp-badge">${x}</span>`).join('')}</div>` : '';
+  }
   function tokenCard(t, i, aliveFlag) {
-    const controls = aliveFlag
-      ? `<button type="button" class="cmp-token-atk" onclick="toggleAttack(${i})" title="Attack">⚔</button>
-         <button type="button" class="cmp-token-kill" onclick="killToken(${i})">Kill</button>` : '';
-    return `<div class="cmp-token${aliveFlag ? '' : ' cmp-token-dead'}${attackingIdx === i ? ' cmp-token-attacking' : ''}">
+    const cls = ['cmp-token'];
+    if (!aliveFlag) cls.push('cmp-token-dead');
+    if (aliveFlag && t.tapped) cls.push('cmp-token-tapped');
+    if (aliveFlag && tokSick(t)) cls.push('cmp-token-sick');
+    const dmg = (aliveFlag && Number(t.damage) > 0) ? `<span class="cmp-token-dmg">${Number(t.damage)}</span>` : '';
+    return `<div class="${cls.join(' ')}" onclick="openCmpTokenMenu(${i})" style="cursor:pointer">
       <img class="cmp-token-img" src="${tokenImg(t.scryfall_id)}" alt="${escapeHtml(t.name)}" loading="lazy"
            onerror="this.onerror=null;this.src='https://api.scryfall.com/cards/${t.scryfall_id}?format=image&version=normal'">
+      ${dmg}
       <div class="cmp-token-meta">
         <span class="cmp-token-name">${escapeHtml(t.name)}</span>
-        <span class="cmp-token-pt">${ptOf(t)}</span>
-        <span class="cmp-token-turn muted">T${t.turn_created}</span>
-      </div>${controls}</div>`;
+        <span class="cmp-token-pt">${effPtOf(t)}${t.tapped ? ' ·T' : ''}</span>
+      </div>${aliveFlag ? kwBadges(t) : ''}</div>`;
   }
+
+  // #113 — per-seat resource bar (own seat). Read-only counts (momir_adjust is
+  // table-only), plus Play Land (seat-scoped).
+  function renderMyResources() {
+    const el = document.getElementById('cmp-res');
+    if (!el) return;
+    if (!IS_MOMIR || MY_SEAT_ID == null) { el.style.display = 'none'; return; }
+    el.style.display = '';
+    const lib = momirRes(MY_SEAT_ID, 'library'), hand = momirRes(MY_SEAT_ID, 'hand');
+    const lands = momirRes(MY_SEAT_ID, 'lands'), untap = momirRes(MY_SEAT_ID, 'untapped');
+    const landPlayed = momirRes(MY_SEAT_ID, 'landPlayed');
+    el.innerHTML =
+      `<span class="cmp-res-stat"><span class="cmp-res-k">Lib</span><span class="cmp-res-v">${lib}</span></span>` +
+      `<span class="cmp-res-stat"><span class="cmp-res-k">Hand</span><span class="cmp-res-v">${hand}</span></span>` +
+      `<span class="cmp-res-stat"><span class="cmp-res-k">Lands</span><span class="cmp-res-v">${lands}</span><span class="cmp-res-untap">(${untap})</span></span>` +
+      (landPlayed ? `<span class="cmp-res-untap">land✓</span>` : '') +
+      `<button type="button" class="cmp-res-land" onclick="playLand()" ${(landPlayed || hand < 1) ? 'disabled' : ''}>Play land</button>`;
+  }
+  window.playLand = function () { momirPost({ type: 'momir_play_land', seat_id: MY_SEAT_ID }, 'Could not play land'); };
+
+  // #113 — token action sheet: attack a player, resolve abilities (#112
+  // primitives) on your own creature, or revive a dead one.
+  window.openCmpTokenMenu = function (i) {
+    const t = myTokens()[i];
+    if (!t) return;
+    cmpMenuIdx = i;
+    const el = document.getElementById('cmp-tmenu');
+    const dead = t.alive === false;
+    const kw = (t.keywords || []).length
+      ? `<div class="cmp-tmenu-row">${t.keywords.map(k => `<span class="cmp-badge">${escapeHtml(k)}</span>`).join('')}</div>` : '';
+    const oracle = t.oracle_text ? `<div class="cmp-tmenu-oracle">${escapeHtml(t.oracle_text)}</div>` : '';
+    const head = `<div class="cmp-atk-head"><b>${escapeHtml(t.name)}</b> ${effPtOf(t)}${t.tapped ? ' · tapped' : (dead ? '' : (tokSick(t) ? ' · sick' : ''))}</div>`;
+    let body;
+    if (dead) {
+      body = `<button type="button" class="cmp-tmenu-btn" onclick="cmpTM({type:'momir_revive_token',seat_id:${MY_SEAT_ID},index:${i}})">✚ Revive</button>`;
+    } else {
+      const foes = SEATS.filter(s => s.id !== MY_SEAT_ID && !(st.eliminated && st.eliminated[K(s.id)]));
+      const attack = foes.map(s => `<button type="button" class="cmp-atk-hit" onclick="cmpDeclare(${i},${s.id})">⚔ → ${escapeHtml(s.name)}</button>`).join('') || '<div class="muted">No opponents</div>';
+      body =
+        `<div class="cmp-atk-head" style="margin-top:0.3rem">Attack a player</div><div class="cmp-tmenu-row">${attack}</div>` +
+        `<div class="cmp-atk-head" style="margin-top:0.3rem">Abilities</div>` +
+        `<div class="cmp-tmenu-row"><span class="cmp-res-k">Damage</span>` +
+          [1, 2, 3].map(n => `<button type="button" class="cmp-tmenu-btn" onclick="cmpTM({type:'momir_damage',seat_id:${MY_SEAT_ID},index:${i},amount:${n}})">${n}</button>`).join('') +
+          `<input type="number" min="1" class="cmp-tmenu-num" id="cmp-dmg-n" placeholder="N"><button type="button" class="cmp-tmenu-btn" onclick="cmpDmgN(${i})">Deal</button></div>` +
+        `<div class="cmp-tmenu-row"><span class="cmp-res-k">+1/+1</span>` +
+          `<button type="button" class="cmp-tmenu-btn" onclick="cmpTM({type:'momir_counter_token',seat_id:${MY_SEAT_ID},index:${i},counter:'p1p1',delta:1})">＋</button>` +
+          `<button type="button" class="cmp-tmenu-btn" onclick="cmpTM({type:'momir_counter_token',seat_id:${MY_SEAT_ID},index:${i},counter:'p1p1',delta:-1})">−</button>` +
+          `<span class="cmp-res-k">−1/−1</span>` +
+          `<button type="button" class="cmp-tmenu-btn" onclick="cmpTM({type:'momir_counter_token',seat_id:${MY_SEAT_ID},index:${i},counter:'m1m1',delta:1})">＋</button>` +
+          `<button type="button" class="cmp-tmenu-btn" onclick="cmpTM({type:'momir_counter_token',seat_id:${MY_SEAT_ID},index:${i},counter:'m1m1',delta:-1})">−</button></div>` +
+        `<div class="cmp-tmenu-row">` +
+          `<button type="button" class="cmp-tmenu-btn" onclick="cmpTM({type:'momir_tap_token',seat_id:${MY_SEAT_ID},index:${i}})">${t.tapped ? 'Untap' : 'Tap'}</button>` +
+          `<button type="button" class="cmp-tmenu-btn" onclick="cmpTM({type:'momir_sacrifice',seat_id:${MY_SEAT_ID},index:${i}})">Sacrifice</button>` +
+          `<button type="button" class="cmp-token-kill cmp-tmenu-btn" onclick="killToken(${i});closeCmpTokenMenu()">☠ Kill</button></div>`;
+    }
+    el.innerHTML = head + kw + oracle + body + `<button type="button" class="cmp-tmenu-close" onclick="closeCmpTokenMenu()">Close</button>`;
+    el.style.display = '';
+  };
+  window.closeCmpTokenMenu = function () { cmpMenuIdx = null; const el = document.getElementById('cmp-tmenu'); if (el) el.style.display = 'none'; };
+  window.cmpDeclare = function (i, targetSeat) {
+    closeCmpTokenMenu();
+    momirPost({ type: 'momir_attack', seat_id: MY_SEAT_ID, index: i, target_seat_id: targetSeat }, 'Attack failed');
+  };
+  // Post a primitive, then re-open the sheet on the same token so counts refresh
+  // and the operator can chain (a common multi-step ability resolution).
+  window.cmpTM = function (action) { momirPost(action, 'Action failed', () => { if (cmpMenuIdx != null) openCmpTokenMenu(cmpMenuIdx); }); };
+  window.cmpDmgN = function (i) {
+    const n = parseInt((document.getElementById('cmp-dmg-n') || {}).value, 10);
+    if (Number.isInteger(n) && n >= 1) cmpTM({ type: 'momir_damage', seat_id: MY_SEAT_ID, index: i, amount: n });
+  };
 
   // ── Combat: attack a player (unblocked) or into a blocker (creatures fight) ──
   function ptInt(v) { const m = String(v == null ? '' : v).match(/-?\d+/); return m ? parseInt(m[0], 10) : 0; }
@@ -410,29 +540,45 @@
     if (!el) return;
     if (!IS_MOMIR || MY_SEAT_ID == null) { el.style.display = 'none'; return; }
     const mine = (st.attacks || []).filter(a => K(a.target_seat) === K(MY_SEAT_ID));
+    const liveSeqs = new Set(mine.map(a => a.seq));
+    Object.keys(cmpBlockSel).forEach(k => { if (!liveSeqs.has(Number(k))) delete cmpBlockSel[k]; });
     if (!mine.length) { el.style.display = 'none'; el.innerHTML = ''; return; }
-    const myBlockers = myTokens().map((t, j) => [t, j]).filter(([t]) => t.alive !== false);
+    // Only untapped, live creatures can block (server enforces; hide the rest).
+    const myBlockers = myTokens().map((t, j) => [t, j]).filter(([t]) => t.alive !== false && !t.tapped);
     el.style.display = '';
     el.innerHTML = `<h3 class="cmp-section-title">Incoming attacks — block or take</h3>` +
       mine.map(a => {
         const atk = seatTokens(a.attacker_seat)[a.attacker_index];
         if (!atk) return '';
-        const pw = ptInt(atk.power);
+        const pw = tokEffPow(atk);
         const from = seatName(Number(a.attacker_seat));
+        const sel = cmpBlockSel[a.seq] || (cmpBlockSel[a.seq] = new Set());
+        const kwt = (atk.keywords || []).map(k => _KW_ABBR[String(k).toLowerCase()]).filter(Boolean);
         return `<div class="cmp-incoming-row">
-          <div class="cmp-incoming-atk">${escapeHtml(from)}'s <b>${escapeHtml(atk.name)}</b> ${ptOf(atk)} attacks you</div>
+          <div class="cmp-incoming-atk">${escapeHtml(from)}'s <b>${escapeHtml(atk.name)}</b> ${effPtOf(atk)}${kwt.length ? ` <span class="muted">[${kwt.join(' ')}]</span>` : ''} attacks you</div>
           <div class="cmp-atk-row">
-            <button type="button" class="cmp-atk-hit" onclick="resolveAttack(${a.seq}, null)">Take −${pw}</button>
-            ${myBlockers.map(([t, j]) => `<button type="button" class="cmp-atk-block" onclick="resolveAttack(${a.seq}, ${j})" title="block with ${escapeHtml(t.name)}">🛡 ${ptOf(t)}</button>`).join('')}
+            <button type="button" class="cmp-atk-hit" onclick="cmpTake(${a.seq})">Take −${pw}</button>
+            ${myBlockers.map(([t, j]) => `<button type="button" class="cmp-atk-block${sel.has(j) ? ' cmp-atk-block-on' : ''}" onclick="cmpToggleBlock(${a.seq},${j})" title="block with ${escapeHtml(t.name)}">🛡 ${effPtOf(t)}</button>`).join('')}
+            <button type="button" class="cmp-atk-confirm" onclick="cmpBlock(${a.seq})" ${sel.size ? '' : 'disabled'}>Block (${sel.size})</button>
           </div></div>`;
       }).join('');
   }
-  window.resolveAttack = function (seq, blockIdx) {
-    const action = { type: 'momir_resolve', seat_id: MY_SEAT_ID, seq };
-    if (blockIdx != null) action.block_index = blockIdx;
-    momirPost(action, 'Could not resolve');
+  window.cmpToggleBlock = function (seq, j) {
+    const sel = cmpBlockSel[seq] || (cmpBlockSel[seq] = new Set());
+    if (sel.has(j)) sel.delete(j); else sel.add(j);
+    renderIncoming();
   };
-  function momirPost(action, failMsg) {
+  window.cmpTake = function (seq) {
+    delete cmpBlockSel[seq];
+    momirPost({ type: 'momir_resolve', seat_id: MY_SEAT_ID, seq, block_indexes: [] }, 'Could not resolve');
+  };
+  window.cmpBlock = function (seq) {
+    const sel = cmpBlockSel[seq];
+    if (!sel || !sel.size) return;
+    // Keep selection on a legality 400 (flying / menace) so it can be adjusted.
+    momirPost({ type: 'momir_resolve', seat_id: MY_SEAT_ID, seq, block_indexes: [...sel] }, 'Could not resolve', () => delete cmpBlockSel[seq]);
+  };
+  function momirPost(action, failMsg, onOk) {
     fetch(`/games/${GID}/live/action`, {
       method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': CSRF },
       body: JSON.stringify(action),
@@ -440,6 +586,7 @@
       if (r.status === 404) { showEnded(); return; }
       if (!r.ok) { const d = await r.json().catch(() => ({})); toast(d.detail || failMsg); return; }
       const p = await r.json(); st = p.state; render();
+      if (onOk) onOk();
     }).catch(() => toast('Sync failed'));
   }
 
@@ -468,20 +615,36 @@
     if (!IS_MOMIR || MY_SEAT_ID == null) return;
     const go = document.getElementById('cmp-momir-go');
     const btns = document.querySelectorAll('#cmp-momir-cmc .cmp-momir-cmc-btn');
+    const hand = Number(momirRes(MY_SEAT_ID, 'hand'));
+    const untap = Number(momirRes(MY_SEAT_ID, 'untapped'));
     let block = null;
     if (momirUsedThisTurn()) block = 'Activated this turn';
     else if (!momirMyTurn()) block = 'Activate on your turn';
-    btns.forEach(b => { b.disabled = !!block; if (block) b.classList.remove('cmp-momir-cmc-on'); });
-    if (block) { momirCmc = null; go.disabled = true; go.textContent = block; }
-    else { go.disabled = momirCmc == null; go.textContent = momirCmc == null ? 'Select a CMC' : `Activate CMC ${momirCmc}`; }
+    else if (hand < 1) block = 'No cards in hand';
+    btns.forEach(b => {
+      const c = Number(b.dataset.cmc);
+      // #113 — grey MVs with no legal creature or unaffordable (> untapped mana).
+      const affordable = MOMIR_VALID_MVS.has(c) && c <= untap;
+      b.disabled = !!block || !affordable;
+      if (block || !affordable) b.classList.remove('cmp-momir-cmc-on');
+    });
+    if (block) { momirCmc = null; go.disabled = true; go.textContent = block; return; }
+    const affordable = momirCmc == null || (MOMIR_VALID_MVS.has(momirCmc) && momirCmc <= untap);
+    go.disabled = momirCmc == null || !affordable;
+    go.textContent = momirCmc == null ? 'Select a CMC' : (!affordable ? `Need ${momirCmc} mana` : `Activate CMC ${momirCmc}`);
   }
   window.pickMomirCmc = function (cmc) {
-    if (momirUsedThisTurn() || !momirMyTurn()) return;  // guarded by renderMomirControls
+    const el = document.getElementById('cmp-momir-cmc-input'); if (el) el.value = '';
     momirCmc = cmc;
     document.querySelectorAll('#cmp-momir-cmc .cmp-momir-cmc-btn').forEach(b =>
       b.classList.toggle('cmp-momir-cmc-on', Number(b.dataset.cmc) === cmc));
-    document.getElementById('cmp-momir-go').disabled = false;
-    document.getElementById('cmp-momir-go').textContent = `Activate CMC ${cmc}`;
+    renderMomirControls();
+  };
+  window.pickMomirCmcInput = function (val) {
+    const n = parseInt(val, 10);
+    momirCmc = (Number.isInteger(n) && n >= 0 && n <= 16) ? n : null;
+    document.querySelectorAll('#cmp-momir-cmc .cmp-momir-cmc-btn').forEach(b => b.classList.remove('cmp-momir-cmc-on'));
+    renderMomirControls();
   };
   window.activateMomir = function () {
     if (momirCmc == null || MY_SEAT_ID == null || !momirMyTurn() || momirUsedThisTurn()) return;
@@ -516,7 +679,7 @@
   // Optimistic auto-eliminate/revive mirroring the server (_auto_eliminate) so
   // my panel doesn't flash alive-then-eliminated before the SSE echo. AUTO
   // eliminations revive when their condition un-triggers; MANUAL never does.
-  const CAUSE_LABELS = { life: 'life total', cmd: 'commander damage', poison: 'poison' };
+  const CAUSE_LABELS = { life: 'life total', cmd: 'commander damage', poison: 'poison', deck: 'decked out' };
   function cmpLossCause(id) {
     const life = st.lives[K(id)];
     if (life !== undefined && life <= 0) return 'life';
@@ -530,7 +693,8 @@
     st.eliminated = st.eliminated || {};
     st.eliminationCause = st.eliminationCause || {};
     const currently = !!st.eliminated[K(id)];
-    if (currently && st.eliminationCause[K(id)] === 'manual') return;  // manual lock
+    // manual + deck-out (#110) are permanent — never optimistically revive.
+    if (currently && ['manual', 'deck'].includes(st.eliminationCause[K(id)])) return;
     const cause = cmpLossCause(id);
     if (cause && !currently) {
       st.eliminated[K(id)] = true;
