@@ -1,5 +1,15 @@
 [
   {
+    "version": "4.7.1",
+    "date": "2026-07-13",
+    "added": [
+      "The center-table view now shows Momir creatures as a readable battlefield: each player's summoned creatures appear as large cards with their name and power/toughness, right in that player's seat, so you can glance at the tablet and read the whole board instead of squinting at tiny thumbnails. Long-press or hover any creature to zoom it full-size."
+    ],
+    "refined": [],
+    "resolved": [],
+    "archivist_note": "v4.7.1 = Momir tablet battlefield layout (#113). Reuses the existing physical-seating grid (buildDynamicGrid positions + rotates each seat to face its player) but adds a momir-board class to #tracker-grid for Momir games; CSS then makes each seat's creature band the focal content — .tc-momir-token 2.6rem→5rem, a .tc-momir-name label under each card (hidden outside board mode), larger P/T, and the band scrolls within margin/max-height that clears the top corners (name/status) and bottom corners (life numeral + life pad). Commander-damage strip hidden in board mode. Applies to all Momir games (physical + digital). No JS action-path changes; token onclick (menu) + long-press/hover zoom unchanged. CAVEAT: pure CSS/layout, could not be verified headlessly (no browser in the build env) — visual check on a real tablet pending. Suite 868 green."
+  },
+  {
     "version": "4.7.0",
     "date": "2026-07-13",
     "added": [
