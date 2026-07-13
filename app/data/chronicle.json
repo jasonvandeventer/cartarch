@@ -1,5 +1,19 @@
 [
   {
+    "version": "4.8.0",
+    "date": "2026-07-13",
+    "added": [
+      "When several players are knocked out by the same action (an alpha strike, a board wipe), the finalize screen now proposes tied placements instead of ranking them by who tapped their phone first — you can still adjust before saving. Tied places show as 'T-2nd' on the game record.",
+      "You can now fix a finished game's record. A finalized game has an 'Edit result' button (owner only) to correct placements, final life, how the game ended, notes, and each player's elimination cause. Edits are written to the game log so the history stays honest.",
+      "Each player's elimination cause (life, commander damage, poison, decked, or a manual reason like an effect or concession) is now recorded on the game and shown in the final standings."
+    ],
+    "refined": [],
+    "resolved": [
+      "Companion mode: tied placements for simultaneous eliminations + post-finalization record editing (#114)."
+    ],
+    "archivist_note": "v4.8.0 = #114, three parts. (1) Tied placements: game_detail.html finalize modal replaces the single-survivor auto-fill with proposePlacements() — standard competition ranking (1,2,2,2,2) grouping seats by eliminatedAtTurn (alive→1; dead ordered by turn DESC, same-turn ties; each band rank = seats-above+1), pre-filled on modal open, operator-adjustable (the <select>s already allow duplicates). No migration — the data model already tolerated duplicate placements (win-rate reads placement==1 only; standings sort tie-stable). game_summary.html shows T-<n> for shared placements. (2) Post-finalization editing: owner-only 'Edit result' modal on game_summary.html, server-side pre-filled, posts to the existing POST /games/{id}/end (end_game is a safe re-run — live-state bookend guarded by `is not None`, ended_at re-stamp guarded). game_end route captures was_finalized before end_game and appends a result_edit GameEvent (actor_kind='owner', editor_user_id + submitted values in payload) on edits — zero schema change (action_type/actor_kind are free String cols). (3) Elimination cause: new nullable GameSeat.elimination_cause (migration d3e4f5a6b7c8, additive ADD COLUMN), end_game accepts an elimination_causes dict, route parses elimination_cause_{seat}, finalize modal pre-fills from state.eliminationCause, edit modal from the column, shown in standings. Tests: ties+causes stored, edit overwrites + emits exactly one owner audit event, non-owner 404. Suite 871 green. Follow-ups: eliminate-button-adjacency UX hazard (separate issue); one-time game-43 data correction (seats 193-196 -> placement 2) via the new edit UI."
+  },
+  {
     "version": "4.7.4",
     "date": "2026-07-13",
     "added": [],
