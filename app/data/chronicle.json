@@ -1,5 +1,16 @@
 [
   {
+    "version": "4.5.0",
+    "date": "2026-07-12",
+    "added": [
+      "New game format: Momir Basic. When you start a game you can now pick Momir — everyone plays with only basic lands and the app generates the creatures. Momir games begin at 24 life and skip deck selection.",
+      "In a live Momir game, activate at a chosen mana value to summon a random creature of that cost — once per turn, like the real Momir ability. Your creatures show on both the phone and the tablet with their art and power/toughness; you can mark one dead, and picking a mana value with no creatures doesn't waste your turn.",
+      "Momir combat: attack another player with a creature, and that player decides whether to block with one of their own creatures (the two fight; a creature dealt lethal damage dies) or take the damage. It works for every seat in a multiplayer game."
+    ],
+    "refined": [],
+    "resolved": []
+  },
+  {
     "version": "4.4.0",
     "date": "2026-07-11",
     "added": [
