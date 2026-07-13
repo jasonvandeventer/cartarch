@@ -599,8 +599,16 @@
 
   function renderTokens() {
     if (!IS_MOMIR || MY_SEAT_ID == null) return;
+    const my = myTokens();
+    // Skip the rebuild when nothing changed — every SSE update (any player acting)
+    // otherwise recreates the cards and replays the cmp-token-in pop animation.
+    const sick = my.map(t => (t.alive !== false && tokSick(t) ? '1' : '0')).join('');
+    const sig = `${JSON.stringify(my)}|${sick}`;
+    const host = document.getElementById('cmp-tokens');
+    if (host.dataset.sig === sig) return;
+    host.dataset.sig = sig;
     const alive = [], dead = [];
-    myTokens().forEach((t, i) => (t.alive === false ? dead : alive).push([t, i]));
+    my.forEach((t, i) => (t.alive === false ? dead : alive).push([t, i]));
     document.getElementById('cmp-tokens').innerHTML =
       alive.map(([t, i]) => tokenCard(t, i, true)).join('') || '<span class="muted">No creatures yet</span>';
     document.getElementById('cmp-tokens-dead').innerHTML = dead.map(([t, i]) => tokenCard(t, i, false)).join('');

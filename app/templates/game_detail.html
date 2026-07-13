@@ -1736,6 +1736,15 @@ function renderMomirTokens(seatId) {
   const el = document.getElementById(`momir-tokens-${seatId}`);
   if (!el) return;
   const toks = momirSeatTokens(seatId);
+  // render() runs every second (turn timers). Skip rebuilding the token DOM when
+  // nothing about this seat's creatures changed — otherwise the img elements are
+  // recreated and the tc-momir-in spawn animation replays every second (flicker).
+  // The sick-bit suffix refreshes summoning-sick outlines when they flip (turn
+  // advance) without re-popping seats whose creatures didn't change.
+  const sick = toks.map(t => (t.alive !== false && tokSick(t) ? '1' : '0')).join('');
+  const sig = `${JSON.stringify(toks)}|${sick}`;
+  if (el.dataset.sig === sig) return;
+  el.dataset.sig = sig;
   el.innerHTML = toks.map((t, i) => {
     const dead = t.alive === false;
     const img = MIRROR.replace('__SID__', t.scryfall_id);
