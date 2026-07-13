@@ -1,5 +1,15 @@
 [
   {
+    "version": "4.7.4",
+    "date": "2026-07-13",
+    "added": [],
+    "refined": [
+      "Momir creatures now sit truly centered in each player's zone on the table board — both vertically and horizontally."
+    ],
+    "resolved": [],
+    "archivist_note": "v4.7.4 = truly center the Momir battlefield cards. Root cause: body.game-mode .tracker-card is a CSS grid (grid-template-areas 'tl tr' / 'mid mid' / 'bl br'), so the v4.7.3 flex:1 + margins on .tc-momir-tokens didn't control its placement — it drifted off-center (esp. the single-card / rotated-seat case). Fix: give .momir-board .tc-momir-tokens grid-area: mid (the full-width 1fr central row between the name/status row and the life row) and center its cards on both axes (align-content/align-items/justify-content center); dropped the stale flex/margin. sizeMomirBoard() packs into that region unchanged. Physical mode (no resource bar) is clean; digital-mode momir-res auto-places low but that combo is secondary. Suite 868 green."
+  },
+  {
     "version": "4.7.3",
     "date": "2026-07-13",
     "added": [
