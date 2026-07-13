@@ -1,5 +1,18 @@
 [
   {
+    "version": "4.9.0",
+    "date": "2026-07-13",
+    "added": [
+      "Cards now track price history. A card's detail page shows how its price has moved over 1 day / 7 days / 30 days per finish (green up, red down) — the change chips appear as the daily history builds up.",
+      "Wishlist price alerts: turn on 'Email me when a wishlist card hits my target price' in Account settings, set a target on any watched card, and you'll get a daily email digest when one reaches it. It notifies once per drop and re-arms if the price climbs back above your target — no daily spam. Alerts are free and opt-in (off by default)."
+    ],
+    "refined": [],
+    "resolved": [
+      "Per-card daily price history (#98) and watchlist price alerts (#99)."
+    ],
+    "archivist_note": "v4.9.0 = #98 + #99, shipped together off the existing daily price ingest. #98: new CardPriceHistory table (uq scryfall_id+finish+snapshot_date, global/no user FK, Float price); snapshot_card_prices(session, day) in app/price_history_service.py mirrors #85 snapshot_collection_values (load today's rows into a dict, upsert, skip printings with no resolvable price via resolve_price_value/parse_price), piggybacked in price_ingest.main() after the collection snapshot in its own try/except. price_deltas(session, scryfall_id, finish) returns {1,7,30: {from,to,abs,pct}} using latest vs nearest row <= latest-Nd. Card detail route/template (§III Prices) render per-finish delta chips (regular->normal finish). #99: User.price_alerts_enabled opt-in (nullable Boolean, checkbox on /account update_profile) + WatchlistItem.last_alerted_at/last_alerted_price dedup. New app/email.py send_email(to,subject,text) — Resend POST factored from password_reset_service, synchronous, DEV_MODE/no-key no-op, never raises. New app/jobs/price_alerts.run_alerts(session): opted-in active users, reuse list_watchlist's target_met, per-user digest to user.username (=email), stamp dedup only on successful send (failed send retries), clear last_alerted_at when back above target (fires once per crossing episode). Piggybacked in price_ingest.main() after the history snapshot. One additive migration e4f5a6b7c8d9 (down_revision d3e4f5a6b7c8). NO platform-repo change — both jobs ride the existing cartarch-price-ingest CronJob. Deferred: movement/±% triggered alerts (#99b), dashboard/spotlight/sets delta surfaces, history downsampling. Tests: snapshot upsert+skip-null, delta math, alert fire-once/re-arm/opt-out/failed-send-retry, ingest main calls both hooks. Suite 877 green."
+  },
+  {
     "version": "4.8.0",
     "date": "2026-07-13",
     "added": [
