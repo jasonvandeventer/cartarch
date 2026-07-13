@@ -1206,6 +1206,7 @@ def test_momir_pages_render(db, client, user):
     assert "momir-combat" in detail.text  # tablet combat (declare/block) panel present
     assert "momir-res-" in detail.text  # #113 per-seat resource bar mount point
     assert "MOMIR_VALID_MVS" in detail.text  # #113 valid-MV set injected for the picker
+    assert "momir-board" in detail.text  # #113 battlefield layout class on the grid
 
     companion = client.get(f"/games/{game.id}/companion")
     assert companion.status_code == 200

@@ -99,6 +99,20 @@
     /* hover-to-zoom preview for summoned creatures (pointer devices only) */
     #momir-hover-zoom { position: fixed; z-index: 2000; width: 15rem; max-width: 42vw;
       border-radius: 0.6rem; box-shadow: 0 8px 30px rgba(0,0,0,0.7); pointer-events: none; display: none; }
+    /* #113 battlefield — each seat's cell becomes a readable creature board:
+       big cards + names, the Commander-damage chrome dropped (no commanders). */
+    .momir-board .tc-cmd-strip { display: none; }
+    /* Sit the creature band between the top corners (name/status) and the bottom
+       corners (life numeral + life pad), scrolling within that band. */
+    .momir-board .tc-momir-tokens { gap: 0.45rem; align-content: flex-start; overflow-y: auto;
+      margin: 2rem 0.5rem 2.6rem; max-height: calc(100% - 4.6rem); padding: 0.15rem; }
+    .momir-board .tc-momir-token { width: 5rem; }
+    .momir-board .tc-momir-pt { font-size: 0.85rem; padding: 0 0.2rem; }
+    .momir-board .tc-momir-badge { font-size: 0.58rem; }
+    .momir-board .tc-momir-name { display: block; max-width: 5rem; margin-top: 0.08rem;
+      font-size: 0.62rem; line-height: 1.05; text-align: center;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .tc-momir-name { display: none; }  /* names only render in battlefield mode */
   </style>
   {% endif %}
   {% set winner = game.seats | selectattr('placement', 'eq', 1) | first | default(none) %}
@@ -260,7 +274,7 @@
     {# The center slot (.card-slot-center) is intentionally OMITTED here
        — v3.28.13 migrates turn-indicator content to the masthead per Fork F.
        buildDynamicGrid() defensively hides any cached old center slot. #}
-    <div class="tracker-grid" id="tracker-grid">
+    <div class="tracker-grid{% if not is_ended and game.format|lower == 'momir' %} momir-board{% endif %}" id="tracker-grid">
       {% for seat in game.seats %}
         <div class="card-slot" id="slot-{{ seat.id }}">
           <div class="tracker-card"
@@ -1736,7 +1750,8 @@ function renderMomirTokens(seatId) {
       <img class="tc-momir-img" src="${img}" alt="${escHtml(t.name)}" loading="lazy"
            onerror="this.onerror=null;this.src='https://api.scryfall.com/cards/${t.scryfall_id}?format=image&version=small'">
       ${dead ? '' : momirKwBadges(t)}${dmg}
-      <span class="tc-momir-pt">${momirEffPt(t)}</span></div>`;
+      <span class="tc-momir-pt">${momirEffPt(t)}</span>
+      <span class="tc-momir-name">${escHtml(t.name)}</span></div>`;
   }).join('');
   // Dead tokens are tappable for revive (the whole cell is inert above, so add a
   // dedicated handler on dead cells).
