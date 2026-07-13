@@ -139,6 +139,42 @@ class Card(Base):
     transaction_logs: Mapped[list[TransactionLog]] = relationship(back_populates="card")
 
 
+class OracleCatalog(Base):
+    """Momir Sim #109 — full Scryfall oracle_cards catalog, one row per oracle_id
+    (i.e. one row per card NAME, not per printing). This replaces the
+    collection-bounded ``cards`` table as the Momir creature source: ``cards``
+    only holds what a user owns (~5.6k creature names), so it starved the Momir
+    pool and its ``keywords`` were mostly unpopulated. Populated by
+    ``app.jobs.oracle_ingest`` (manual/occasional bulk refresh).
+
+    Multi-face layouts store the FRONT face's name/text/P-T/mana_cost with the
+    root-level cmc, colors identity, and a representative ``scryfall_id`` (the
+    mirror image key — clients build img.cartarch.com URLs from it unchanged).
+    ``keywords``/``colors``/``color_identity`` are JSON array text exactly as
+    Scryfall provides. ``is_momir_legal`` is the precomputed pool filter (Momir
+    queries trust it — the token/vintage/set exclusions live in the ingest, not
+    the query)."""
+
+    __tablename__ = "oracle_catalog"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    oracle_id: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    name: Mapped[str] = mapped_column(String(255), index=True)
+    mana_cost: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    cmc: Mapped[float | None] = mapped_column(Float, nullable=True, index=True)
+    type_line: Mapped[str | None] = mapped_column(Text, nullable=True)
+    oracle_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    keywords: Mapped[str | None] = mapped_column(Text, nullable=True)
+    power: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    toughness: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    colors: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    color_identity: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    layout: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    scryfall_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    is_momir_legal: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, index=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
+
+
 class CardPrice(Base):
     """MTGJSON-sourced price for one printing + finish (MTGJSON ingest issue).
 

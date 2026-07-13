@@ -30,7 +30,7 @@ from sqlalchemy.orm import Session
 
 from app import live_game_events
 from app.game_service import get_game, get_viewable_game
-from app.models import Card, Game, GameEvent, GameLiveState, GameSeat
+from app.models import Game, GameEvent, GameLiveState, GameSeat, OracleCatalog
 from app.timeutil import utc_now
 
 # Momir Basic (format="momir") layers two extra actions on top of the shared
@@ -48,45 +48,56 @@ def _is_momir(game: Game) -> bool:
 
 
 def random_creature_at_cmc(session: Session, cmc: int) -> dict | None:
-    """Pick a random creature printing at ``cmc`` for Momir Basic, deduplicated by
-    card name (many printings exist; any one carries the same P/T and the image
-    comes from the mirror regardless of printing). Returns ``None`` when no
-    creature exists at that CMC (a legal Momir "whiff", common at very high CMC).
+    """Pick a random Momir-legal creature at ``cmc``. Returns ``None`` when none
+    exists at that CMC (a legal Momir "whiff", common at very high CMC).
 
-    Dialect-agnostic (``func.random()`` → SQLite ``random()`` / Postgres
-    ``random()``). Dedup is a two-step to stay portable: pick a random distinct
-    name (GROUP BY, uniform per-name rather than weighted by printing count),
-    then a random printing of it — SELECT DISTINCT + ORDER BY random() is
-    rejected by Postgres, GROUP BY is not."""
-    filters = (
-        Card.type_line.like("%Creature%"),
-        Card.cmc == cmc,
-        Card.type_line.notlike("%Token%"),
-        Card.scryfall_id.isnot(None),
-    )
-    name_row = (
-        session.query(Card.name)
-        .filter(*filters)
-        .group_by(Card.name)
+    Momir Sim #109 — sourced from ``oracle_catalog`` (one row per NAME already,
+    so the old GROUP-BY-then-repick dedup dance is gone) instead of the
+    collection-bounded ``cards`` table. The token/vintage/set exclusions are
+    precomputed into ``is_momir_legal`` at ingest, so the query just trusts it.
+    Return shape is unchanged so callers/clients don't change. Dialect-agnostic
+    (``func.random()`` → SQLite/Postgres ``random()``)."""
+    row = (
+        session.query(OracleCatalog)
+        .filter(OracleCatalog.is_momir_legal.is_(True), OracleCatalog.cmc == cmc)
         .order_by(func.random())
         .first()
     )
-    if name_row is None:
+    if row is None:
         return None
-    card = (
-        session.query(Card)
-        .filter(*filters, Card.name == name_row[0])
-        .order_by(func.random())
-        .first()
-    )
     return {
-        "name": card.name,
-        "power": card.power,
-        "toughness": card.toughness,
-        "type_line": card.type_line,
-        "scryfall_id": card.scryfall_id,
+        "name": row.name,
+        "power": row.power,
+        "toughness": row.toughness,
+        "type_line": row.type_line,
+        "scryfall_id": row.scryfall_id,
         "cmc": cmc,
     }
+
+
+# ponytail: per-process memo of the MVs that have >=1 legal creature. Feeds the
+# Phase 5 picker (grey out empty MVs). invalidate_valid_mvs() busts it; web pods
+# otherwise refresh on restart — fine, the set is effectively static.
+_valid_momir_mvs: set[int] | None = None
+
+
+def valid_momir_mvs(session: Session) -> set[int]:
+    """Set of integer MVs (0.._MAX_MOMIR_CMC) with at least one Momir-legal
+    creature. Memoized; call :func:`invalidate_valid_mvs` after an ingest."""
+    global _valid_momir_mvs
+    if _valid_momir_mvs is None:
+        rows = (
+            session.query(OracleCatalog.cmc)
+            .filter(OracleCatalog.is_momir_legal.is_(True))
+            .distinct()
+        )
+        _valid_momir_mvs = {int(c) for (c,) in rows if c is not None and 0 <= c <= _MAX_MOMIR_CMC}
+    return _valid_momir_mvs
+
+
+def invalidate_valid_mvs() -> None:
+    global _valid_momir_mvs
+    _valid_momir_mvs = None
 
 
 # Physical clockwise seating slots (mirrors game_detail.html's CLOCKWISE). Turn

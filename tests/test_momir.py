@@ -14,7 +14,7 @@ import pytest
 from app import live_game_service
 from app.game_service import create_game
 from app.live_game_service import random_creature_at_cmc
-from app.models import Card, Game, GameEvent, GameSeat, User
+from app.models import Game, GameEvent, GameSeat, OracleCatalog, User
 
 _seq = itertools.count(1)
 
@@ -26,22 +26,33 @@ def _user(db, name=None) -> User:
     return u
 
 
-def _creature(db, name, cmc, *, power="2", toughness="2", type_line="Creature — Bear", printings=1):
-    """Insert ``printings`` distinct printings (unique scryfall_id/collector) of
-    one creature name, all sharing name/cmc/P-T — mirrors real reprints."""
-    for _ in range(printings):
-        db.add(
-            Card(
-                scryfall_id=f"sid-{next(_seq)}",
-                name=name,
-                set_code="tst",
-                collector_number=str(next(_seq)),
-                type_line=type_line,
-                cmc=cmc,
-                power=power,
-                toughness=toughness,
-            )
+def _creature(
+    db,
+    name,
+    cmc,
+    *,
+    power="2",
+    toughness="2",
+    type_line="Creature — Bear",
+    keywords="[]",
+    is_momir_legal=True,
+):
+    """Insert one oracle_catalog row (Momir Sim #109 — the creature source moved
+    off the collection-bounded ``cards`` table to a one-row-per-name catalog)."""
+    live_game_service.invalidate_valid_mvs()  # keep the memo honest across seeds
+    db.add(
+        OracleCatalog(
+            oracle_id=f"oid-{next(_seq)}",
+            name=name,
+            cmc=cmc,
+            type_line=type_line,
+            power=power,
+            toughness=toughness,
+            keywords=keywords,
+            scryfall_id=f"sid-{next(_seq)}",
+            is_momir_legal=is_momir_legal,
         )
+    )
     db.flush()
 
 
@@ -95,29 +106,28 @@ def test_random_creature_none_when_no_creature_at_cmc(db):
     assert random_creature_at_cmc(db, 7) is None  # nothing at 7 either
 
 
-def test_random_creature_excludes_tokens_and_noncreatures(db):
-    _creature(db, "Bear Token", 0, type_line="Token Creature — Bear")  # Token → excluded
-    db.add(
-        Card(
-            scryfall_id="sid-noncre",
-            name="Lightning Bolt",
-            set_code="tst",
-            collector_number="x1",
-            type_line="Instant",
-            cmc=0,
-        )
-    )
-    db.flush()
+def test_random_creature_excludes_non_legal(db):
+    # The pool query trusts the precomputed is_momir_legal flag (token/vintage/set
+    # exclusions live in the ingest now, not the query). A non-legal row at a CMC
+    # with no legal creature → whiff.
+    _creature(db, "Un-Set Thing", 0, is_momir_legal=False)
     assert random_creature_at_cmc(db, 0) is None
 
 
-def test_random_creature_dedups_by_name_and_randomizes(db):
-    # Two names at CMC 2, one heavily reprinted. Dedup-by-name means both are
-    # reachable regardless of printing count; over many calls both appear.
-    _creature(db, "Grizzly Bears", 2, printings=6)
-    _creature(db, "Runeclaw Bear", 2, printings=1)
+def test_random_creature_randomizes_across_names(db):
+    # One row per name (no printing dedup). Two names at CMC 2 → over many calls
+    # both are reachable.
+    _creature(db, "Grizzly Bears", 2)
+    _creature(db, "Runeclaw Bear", 2)
     seen = {random_creature_at_cmc(db, 2)["name"] for _ in range(40)}
     assert seen == {"Grizzly Bears", "Runeclaw Bear"}
+
+
+def test_valid_momir_mvs_reports_populated_cmcs(db):
+    _creature(db, "One Drop", 1)
+    _creature(db, "Three Drop", 3)
+    _creature(db, "Banned Thing", 5, is_momir_legal=False)  # excluded from the set
+    assert live_game_service.valid_momir_mvs(db) == {1, 3}
 
 
 # ── Step 2: Momir game creation ──────────────────────────────────────────────
