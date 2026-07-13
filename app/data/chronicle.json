@@ -1,5 +1,15 @@
 [
   {
+    "version": "4.6.6",
+    "date": "2026-07-13",
+    "added": [
+      "Zoom a summoned creature on a touchscreen: press and hold it to peek a large preview of the card, release to dismiss — a quick tap still opens the creature's action menu. Works on both the table and phone views (and still zooms on hover with a mouse)."
+    ],
+    "refined": [],
+    "resolved": [],
+    "archivist_note": "v4.6.6 = extend the Momir card zoom (v4.6.5) to touch on BOTH game_detail.html and game_companion.html. Long-press (~350ms, cancelled by a >12px drag = scroll) shows a shared preview element, release/touchcancel hides it; touchend preventDefault suppresses the synthesized click so a long-press doesn't also open the token menu. Tablet retains pointer hover (cursor-follow) via matchMedia('(hover: hover)'); both surfaces share the long-press path. Phone got a #cmp-hover-zoom element + MIRROR_LARGE (large size), data-sid on cmp-token cells, initCmpZoom(). Event-delegated on document so it survives token re-renders. No new deps; JS node --check clean both files."
+  },
+  {
     "version": "4.6.5",
     "date": "2026-07-13",
     "added": [
