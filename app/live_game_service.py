@@ -45,7 +45,19 @@ _MOMIR_TYPES = {
     "momir_resolve",
     "momir_play_land",
     "momir_adjust",
+    # #112 ability primitives — humans execute the oracle text.
+    "momir_damage",
+    "momir_counter_token",
+    "momir_tap_token",
+    "momir_sacrifice",
 }
+
+# #112 — primitives that may target ANOTHER seat's board/life (an ability like
+# "deals 2 to target creature" crosses seats). Any SEATED player may perform
+# them; every use is event-logged with the acting user. Non-seated → 403. Table
+# token retains full override. Hard-blocking cross-seat effects would wedge
+# legitimate ability resolution, so the audit log + social contract govern.
+_MOMIR_CROSS_SEAT = {"momir_damage", "momir_counter_token", "momir_tap_token", "momir_sacrifice"}
 _MUTATING_TYPES = {"life", "counter", "cmd", "eliminate", "turn"} | _MOMIR_TYPES
 
 _MAX_MOMIR_CMC = 16  # no creatures exist above ~16 CMC in MTG
@@ -94,6 +106,9 @@ def random_creature_at_cmc(session: Session, cmc: int) -> dict | None:
         # #111 — keywords ride onto the token at summon so combat is a
         # self-contained blob read (no catalog join at damage time).
         "keywords": json.loads(row.keywords or "[]"),
+        # #112 — oracle text rides along too; the app never interprets it, players
+        # resolve abilities by hand via the primitives.
+        "oracle_text": row.oracle_text,
     }
 
 
@@ -302,6 +317,13 @@ def _authorize_seat_scoped(
     if atype == "momir_adjust":
         raise PermissionError("Only the table can adjust Momir resources")
 
+    # #112 — ability primitives may cross seats (an ETB that damages an opponent's
+    # creature). ANY seated player may resolve them; the event log records who.
+    if atype in _MOMIR_CROSS_SEAT:
+        if not any(s.user_id == user_id for s in game.seats):
+            raise PermissionError("Only a seated player may resolve abilities")
+        return
+
     seat_field = "receiver_seat_id" if atype == "cmd" else "seat_id"
     seat = seats_by_id.get(_coerce_int(action.get(seat_field)))
     # seat is guaranteed to exist here (validated before auth); attribution decides.
@@ -320,7 +342,7 @@ def _validate_action_seats(atype: str, action: dict, seats_by_id: dict[int, Game
     elif atype == "momir_attack":  # attacker's seat + the defending seat
         _require_seat(action.get("seat_id"), seats_by_id, "seat_id")
         _require_seat(action.get("target_seat_id"), seats_by_id, "target_seat_id")
-    else:  # life, counter, eliminate, momir_activate, momir_kill_token
+    else:  # life, counter, eliminate, momir_activate/kill/revive, #112 primitives
         _require_seat(action.get("seat_id"), seats_by_id, "seat_id")
 
 
@@ -345,6 +367,14 @@ def _apply_mutation(
         return _apply_momir_play_land(action, state)
     if atype == "momir_adjust":
         return _apply_momir_adjust(action, state)
+    if atype == "momir_damage":
+        return _apply_momir_damage(action, state)
+    if atype == "momir_counter_token":
+        return _apply_momir_counter(action, state)
+    if atype == "momir_tap_token":
+        return _apply_momir_tap(action, state)
+    if atype == "momir_sacrifice":
+        return _apply_momir_kill(action, state)  # same effect; type distinguishes the log
 
     if atype == "life":
         sid = str(_coerce_int(action["seat_id"]))
@@ -452,7 +482,8 @@ def _apply_momir_activate(session: Session, action: dict, state: dict) -> dict:
         "keywords": creature.get("keywords", []),
         "tapped": False,
         "damage": 0,  # marked this turn; cleared on turn advance
-        "counters": {"p1p1": 0, "m1m1": 0},  # Phase 4 writes these
+        "counters": {"p1p1": 0, "m1m1": 0},  # #112 primitives write these
+        "oracle_text": creature.get("oracle_text"),  # #112 — humans resolve it
     }
     tokens.setdefault(sid, []).append(token)
     state["untapped"][sid] = int(state["untapped"][sid]) - cmc  # tap the mana
@@ -550,6 +581,73 @@ def _eff_pow(token: dict) -> int:
 def _eff_tou(token: dict) -> int:
     plus, minus = _counters(token)
     return _pt_int(token.get("toughness")) + plus - minus
+
+
+def _numeric_tou(token: dict) -> bool:
+    """Whether the base toughness is a plain integer. Variable P/T ("*", "1+*",
+    "X") is NOT — those creatures are resolved manually and never auto-die."""
+    try:
+        int(token.get("toughness"))
+        return True
+    except (TypeError, ValueError):
+        return False
+
+
+def _token_dies(token: dict) -> bool:
+    """State-based death for the #112 primitives: a numeric-toughness creature
+    dies to lethal marked damage or to 0-or-less effective toughness (e.g. m1m1
+    counters). Indestructible survives; variable P/T stays manual."""
+    if _has_kw(token, "indestructible") or not _numeric_tou(token):
+        return False
+    tou = _eff_tou(token)
+    return tou <= 0 or int(token.get("damage", 0)) >= tou
+
+
+def _apply_momir_damage(action: dict, state: dict) -> dict:
+    """#112 — deal N damage to a target token (marks damage; death check runs) OR
+    to a target seat's life (auto-elim rechecked upstream). Token when ``index``
+    is given, otherwise the seat named by ``seat_id``. Manual primitive: a human
+    resolves an ability's damage; the app just does the bookkeeping."""
+    sid = str(_coerce_int(action["seat_id"]))
+    amount = _coerce_int(action.get("amount"))
+    if amount is None or amount < 1:
+        raise ValueError("amount must be a positive integer")
+    if action.get("index") is None:  # seat/player damage
+        state["lives"][sid] = int(state["lives"].get(sid, 0)) - amount
+        return {"target": "seat", "amount": amount}
+    token = _live_token(state, sid, _coerce_int(action.get("index")), "target")
+    token["damage"] = int(token.get("damage", 0)) + amount
+    died = _token_dies(token)
+    if died:
+        token["alive"] = False
+    return {"target": "token", "amount": amount, "died": died}
+
+
+def _apply_momir_counter(action: dict, state: dict) -> dict:
+    """#112 — add/remove +1/+1 (``p1p1``) or -1/-1 (``m1m1``) counters on a token.
+    Both maps are kept raw (opposing counters are NOT annihilated). A death recheck
+    runs after (m1m1 to 0 toughness kills)."""
+    sid = str(_coerce_int(action["seat_id"]))
+    kind = str(action.get("counter") or "")
+    if kind not in ("p1p1", "m1m1"):
+        raise ValueError("counter must be 'p1p1' or 'm1m1'")
+    delta = _require_delta(action)
+    token = _live_token(state, sid, _coerce_int(action.get("index")), "target")
+    counters = token.setdefault("counters", {"p1p1": 0, "m1m1": 0})
+    counters[kind] = max(0, int(counters.get(kind, 0)) + delta)  # can't go negative
+    died = _token_dies(token)
+    if died:
+        token["alive"] = False
+    return {"counter": kind, "delta": delta, "value": counters[kind], "died": died}
+
+
+def _apply_momir_tap(action: dict, state: dict) -> dict:
+    """#112 — toggle a token's tapped state (manual tap/untap for abilities the
+    engine doesn't drive)."""
+    sid = str(_coerce_int(action["seat_id"]))
+    token = _live_token(state, sid, _coerce_int(action.get("index")), "target")
+    token["tapped"] = not token.get("tapped", False)
+    return {"tapped": token["tapped"]}
 
 
 def _pt_int(value) -> int:
@@ -838,11 +936,15 @@ def _append_event(
     state: dict,
     has_table: bool,
     extras: dict,
+    user_id: int | None = None,
 ) -> None:
     """Append one GameEvent for a live action — inside the action's transaction
-    (the caller commits). The table/csrf tokens are stripped from the payload."""
+    (the caller commits). The table/csrf tokens are stripped from the payload; the
+    acting user is stamped as ``actor_user_id`` (#112 — cross-seat ability
+    primitives can be resolved by a non-owning player, so the audit needs who)."""
     payload = {k: v for k, v in action.items() if k not in _SENSITIVE_KEYS}
     payload.update(extras)  # cmd's raw_delta / actual_delta
+    payload["actor_user_id"] = user_id
     session.add(
         GameEvent(
             game_id=game_id,
@@ -901,6 +1003,9 @@ def _affected_seat(atype: str, action: dict) -> int | None:
     # Resolving an attack (taking it) drains the defending seat's life → re-check
     # them. Declaring an attack changes no life, so it needs no re-check.
     if atype == "momir_resolve":
+        return _coerce_int(action.get("seat_id"))
+    # #112 — damage to a SEAT (no index) drains its life; token damage does not.
+    if atype == "momir_damage" and action.get("index") is None:
         return _coerce_int(action.get("seat_id"))
     return None
 
@@ -1003,7 +1108,7 @@ def apply_live_action(
     # Event append shares this transaction — no event without its mutation. The
     # triggering event is recorded first, then any auto-elimination/revive it
     # caused appends its own eliminate event (state serialized AFTER both).
-    _append_event(session, game_id, atype, action, state, has_table, extras)
+    _append_event(session, game_id, atype, action, state, has_table, extras, user_id)
     affected = _affected_seat(atype, action)
     if affected is not None:
         _auto_eliminate(session, game_id, affected, state, has_table)

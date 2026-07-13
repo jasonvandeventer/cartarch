@@ -116,6 +116,7 @@ def test_random_creature_returns_all_fields(db):
         "scryfall_id": c["scryfall_id"],  # some printing's id
         "cmc": 2,
         "keywords": [],  # #111 — carried onto the token at summon
+        "oracle_text": None,  # #112 — carried onto the token (unset in this seed)
     }
     assert c["scryfall_id"].startswith("sid-")
 
@@ -924,6 +925,166 @@ def test_combat_tapped_creature_cannot_block(db):
     act, s1, s2 = _combat(db, _tok(2, 2), [_tok(2, 2, tapped=True)])
     with pytest.raises(ValueError):
         _fight(act, s1, s2, [0])
+
+
+# ── Phase 4 (#112): ability primitives ───────────────────────────────────────
+
+
+def test_momir_damage_token_marks_and_kills(db):
+    act, s1, s2 = _combat(db, _tok(2, 2), [_tok(2, 2)])
+    sid = str(s1.id)
+    st = _state(act({"type": "momir_damage", "seat_id": s1.id, "index": 0, "amount": 1}))
+    assert st["tokens"][sid][0]["damage"] == 1 and st["tokens"][sid][0]["alive"] is True
+    st = _state(act({"type": "momir_damage", "seat_id": s1.id, "index": 0, "amount": 1}))
+    assert st["tokens"][sid][0]["alive"] is False  # 2 >= toughness 2
+
+
+def test_momir_damage_seat_loses_life_and_auto_elims(db):
+    act, s1, s2 = _combat(db, _tok(2, 2), [_tok(2, 2)], def_life=2)
+    st = _state(act({"type": "momir_damage", "seat_id": s2.id, "amount": 5}))
+    assert st["lives"][str(s2.id)] == 2 - 5
+    assert st["eliminated"][str(s2.id)] is True
+    assert st["eliminationCause"][str(s2.id)] == "life"
+
+
+def test_momir_damage_rejects_bad_amount(db):
+    act, s1, s2 = _combat(db, _tok(2, 2), [_tok(2, 2)])
+    with pytest.raises(ValueError):
+        act({"type": "momir_damage", "seat_id": s1.id, "index": 0, "amount": 0})
+
+
+def test_momir_counter_p1p1_and_m1m1_raw_and_death(db):
+    act, s1, s2 = _combat(db, _tok(2, 2), [_tok(2, 2)])
+    sid = str(s1.id)
+    st = _state(
+        act(
+            {
+                "type": "momir_counter_token",
+                "seat_id": s1.id,
+                "index": 0,
+                "counter": "p1p1",
+                "delta": 2,
+            }
+        )
+    )
+    assert st["tokens"][sid][0]["counters"] == {"p1p1": 2, "m1m1": 0}
+    # m1m1 to 4: eff toughness = 2 + 2 - 4 = 0 → dies. Both maps stay raw (no
+    # annihilation of opposing counters).
+    st = _state(
+        act(
+            {
+                "type": "momir_counter_token",
+                "seat_id": s1.id,
+                "index": 0,
+                "counter": "m1m1",
+                "delta": 4,
+            }
+        )
+    )
+    tok = st["tokens"][sid][0]
+    assert tok["counters"] == {"p1p1": 2, "m1m1": 4}
+    assert tok["alive"] is False
+
+
+def test_momir_counter_cannot_go_negative(db):
+    act, s1, s2 = _combat(db, _tok(2, 2), [_tok(2, 2)])
+    st = _state(
+        act(
+            {
+                "type": "momir_counter_token",
+                "seat_id": s1.id,
+                "index": 0,
+                "counter": "p1p1",
+                "delta": -5,
+            }
+        )
+    )
+    assert st["tokens"][str(s1.id)][0]["counters"]["p1p1"] == 0
+
+
+def test_momir_tap_token_toggles(db):
+    act, s1, s2 = _combat(db, _tok(2, 2), [_tok(2, 2)])
+    sid = str(s1.id)
+    st = _state(act({"type": "momir_tap_token", "seat_id": s1.id, "index": 0}))
+    assert st["tokens"][sid][0]["tapped"] is True
+    st = _state(act({"type": "momir_tap_token", "seat_id": s1.id, "index": 0}))
+    assert st["tokens"][sid][0]["tapped"] is False
+
+
+def test_momir_sacrifice_kills_and_logs_distinct_type(db):
+    act, s1, s2 = _combat(db, _tok(2, 2), [_tok(2, 2)])
+    st = _state(act({"type": "momir_sacrifice", "seat_id": s1.id, "index": 0}))
+    assert st["tokens"][str(s1.id)][0]["alive"] is False
+    ev = (
+        db.query(GameEvent)
+        .filter_by(action_type="momir_sacrifice")
+        .order_by(GameEvent.id.desc())
+        .first()
+    )
+    assert ev is not None and json.loads(ev.payload)["index"] == 0
+
+
+def test_momir_primitive_auth_matrix(db):
+    # owner is NOT seated (a viewer); a and b hold the two seats.
+    owner = _user(db)
+    a, b = _user(db), _user(db)
+    game, seats = _momir_game(db, owner.id, seats=[{"user_id": a.id}, {"user_id": b.id}])
+    _start(db, game, owner.id)
+    s1, s2 = seats
+    live = db.query(GameLiveState).filter_by(game_id=game.id).one()
+    stt = json.loads(live.state)
+    stt["tokens"][str(s1.id)] = [_tok(2, 2)]
+    stt["tokens"][str(s2.id)] = [_tok(2, 2)]
+    live.state = json.dumps(stt)
+    db.flush()
+
+    # own board (a → s1): OK, no table token needed.
+    _act(db, game.id, a.id, {"type": "momir_tap_token", "seat_id": s1.id, "index": 0})
+    # cross board (a → s2): OK, and the acting user is recorded on the event.
+    _act(db, game.id, a.id, {"type": "momir_tap_token", "seat_id": s2.id, "index": 0})
+    ev = (
+        db.query(GameEvent)
+        .filter_by(action_type="momir_tap_token", seat_id=s2.id)
+        .order_by(GameEvent.id.desc())
+        .first()
+    )
+    assert json.loads(ev.payload)["actor_user_id"] == a.id
+    # non-seated viewer (owner): 403.
+    with pytest.raises(PermissionError):
+        _act(
+            db,
+            game.id,
+            owner.id,
+            {"type": "momir_damage", "seat_id": s1.id, "index": 0, "amount": 1},
+        )
+
+
+def test_momir_token_carries_oracle_text(live_momir):
+    L = live_momir
+    db, gid, uid = L["db"], L["gid"], L["uid"]
+    s = L["seats"][0]
+    live = _act(db, gid, uid, {"type": "momir_activate", "seat_id": s.id, "cmc": 3}, "TABLE")
+    tok = _state(live)["tokens"][str(s.id)][0]
+    assert "oracle_text" in tok  # carried from the catalog (None in this seed)
+
+
+def test_commander_rejects_momir_primitive(db):
+    owner = _user(db)
+    game = Game(user_id=owner.id, format="Commander", status="created", client_token="TABLE")
+    db.add(game)
+    db.flush()
+    seat = GameSeat(game_id=game.id, seat_number=1, player_name="P1", user_id=owner.id)
+    db.add(seat)
+    db.flush()
+    live_game_service.start_live_game(db, game.id, owner.id)
+    with pytest.raises(ValueError):
+        _act(
+            db,
+            game.id,
+            owner.id,
+            {"type": "momir_tap_token", "seat_id": seat.id, "index": 0},
+            "TABLE",
+        )
 
 
 # ── Constraint: Commander games untouched ────────────────────────────────────
