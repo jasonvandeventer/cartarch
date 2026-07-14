@@ -1,5 +1,15 @@
 [
   {
+    "version": "4.11.1",
+    "date": "2026-07-14",
+    "added": [],
+    "refined": [
+      "Deck-page search pane polish from playgroup feedback: the pane now sits right above the card list (instead of at the top of the page), the Grid/List view toggle moved up into the deck header, the default tab is now This Deck (filtering the list is the pane's main job), and — the actual bug — the pane remembers which tab you were on across page reloads, so toggling Grid/List or clicking Clear no longer bounces you back to the Add-card tab."
+    ],
+    "resolved": [],
+    "archivist_note": "vX.Y.Z = #87 follow-up (playgroup feedback, 2026-07-14). Four changes, template-only. (1) BUG — tab reset on full reload: the Grid/List toggle POST (Referer 303), the Clear links, and the pull-to-deck POST all reload the page, and the server-side search_mode picker fell back to 'add' (or 'collection' if a stale collection_search param was carried by the deck-tab Clear link — exactly the user's report). Fix: the active tab persists in sessionStorage per deck path ('deck-search-tab:<pathname>') on every tab activation, restored on load WITHOUT focus (focusing would scroll-jump). The stored tab wins over the server pick — safe because a mode's search can only be submitted from its own tab, so stored == server pick whenever URL params matter. (2) The whole .deck-search-panel moved from the top of the page to directly above #deck-card-list (below commanders) — 'closer to the list of cards'. (3) The Grid/List deck-view-toggle form extracted from the Deck tab into the hero action row (same POST /account/deck-view-pref + Referer round-trip). (4) Server default tab: 'collection' if collection_search else 'deck' (was else-'add'); Add has no full-reload path so the server never needs to pick it — sessionStorage restores it client-side. Anchor-asserted script move; forms verbatim (ids/hx-*/classes unchanged). Verified: all three modes render 200 with correct active tab, exactly one view-toggle instance, hero-toggle < panel < card-list ordering; tab JS node-checked; suite 908 green."
+  },
+  {
     "version": "4.11.0",
     "date": "2026-07-14",
     "added": [
