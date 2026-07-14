@@ -85,3 +85,50 @@ def price_deltas(
             "pct": round((latest.price - prior.price) / prior.price * 100, 1),
         }
     return out
+
+
+# Card-detail price sparkline geometry (inline SVG, no chart lib — mirrors the
+# #85 dashboard value chart). y is inverted so a higher price sits higher.
+_SPARK_W, _SPARK_H, _SPARK_PAD = 240, 44, 3
+
+
+def price_sparkline(session: Session, scryfall_id: str, finish: str, days: int = 90) -> dict | None:
+    """Inline-SVG sparkline for a printing+finish's price over the last ``days``.
+    Returns ``None`` with fewer than 2 points (one dot isn't a trend — the card
+    page keeps its "history is still accruing" note until a second day lands)."""
+    rows = (
+        session.query(CardPriceHistory)
+        .filter(
+            CardPriceHistory.scryfall_id == scryfall_id,
+            CardPriceHistory.finish == finish,
+        )
+        .order_by(CardPriceHistory.snapshot_date.desc())
+        .limit(days)
+        .all()
+    )
+    rows = list(reversed(rows))  # oldest → newest for the left-to-right line
+    if len(rows) < 2:
+        return None
+    values = [float(r.price) for r in rows]
+    lo, hi = min(values), max(values)
+    span = (hi - lo) or 1.0  # flat series → a centered horizontal line
+    inner_w = _SPARK_W - 2 * _SPARK_PAD
+    inner_h = _SPARK_H - 2 * _SPARK_PAD
+    last_i = len(values) - 1
+    coords = [
+        f"{_SPARK_PAD + inner_w * (i / last_i):.1f},"
+        f"{_SPARK_PAD + inner_h * (1 - (v - lo) / span):.1f}"
+        for i, v in enumerate(values)
+    ]
+    first, last = values[0], values[-1]
+    delta = round(last - first, 2)
+    return {
+        "points": " ".join(coords),
+        "width": _SPARK_W,
+        "height": _SPARK_H,
+        "min": round(lo, 2),
+        "max": round(hi, 2),
+        "days": len(values),
+        "delta": delta,
+        "delta_pct": round(delta / first * 100, 1) if first else 0.0,
+    }

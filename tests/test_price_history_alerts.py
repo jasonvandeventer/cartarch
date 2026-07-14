@@ -70,6 +70,28 @@ def test_price_deltas_windows(db):
     assert price_deltas(db, "missing", "normal") == {}
 
 
+def test_price_sparkline(db):
+    from app.price_history_service import price_sparkline
+
+    base = date(2026, 7, 10)
+    # One point → no trend → None.
+    db.add(CardPriceHistory(scryfall_id="sid-s", finish="normal", snapshot_date=base, price=5.0))
+    db.flush()
+    assert price_sparkline(db, "sid-s", "normal") is None
+
+    for d, p in [(base + timedelta(days=1), 6.0), (base + timedelta(days=2), 9.0)]:
+        db.add(CardPriceHistory(scryfall_id="sid-s", finish="normal", snapshot_date=d, price=p))
+    db.flush()
+    sp = price_sparkline(db, "sid-s", "normal")
+    assert sp is not None
+    assert sp["days"] == 3
+    assert len(sp["points"].split(" ")) == 3  # one coord per day, oldest→newest
+    assert sp["min"] == 5.0 and sp["max"] == 9.0
+    assert sp["delta"] == 4.0  # 5.0 → 9.0
+    assert sp["delta_pct"] == 80.0
+    assert price_sparkline(db, "missing", "normal") is None
+
+
 # ── #99 alerts ───────────────────────────────────────────────────────────────
 
 

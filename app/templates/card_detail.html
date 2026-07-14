@@ -198,6 +198,20 @@
               <span style="font-size:0.72rem;margin-left:0.3rem;{% if ch.pct > 0 %}color:#22c55e{% elif ch.pct < 0 %}color:#ef4444{% else %}opacity:0.6{% endif %}"
                     title="{{ w }}d ago ${{ ch['from'] }} → ${{ ch.to }}">{{ w }}d {% if ch.pct > 0 %}+{% endif %}{{ ch.pct }}%</span>
             {% endif %}{% endfor %}
+            {# Price-history sparkline (inline SVG; appears once ≥2 daily snapshots exist). #}
+            {% set sp = price_spark.get(dkey) %}
+            {% if sp %}
+              <span class="card-detail-prices-spark"
+                    title="{{ label }} price over {{ sp.days }} day{{ 's' if sp.days != 1 else '' }}: ${{ '%.2f'|format(sp.min) }}–${{ '%.2f'|format(sp.max) }}">
+                <svg viewBox="0 0 {{ sp.width }} {{ sp.height }}" preserveAspectRatio="none"
+                     class="price-spark-svg" role="img" aria-label="{{ label }} price history"
+                     style="color:{% if sp.delta >= 0 %}#22c55e{% else %}#ef4444{% endif %}">
+                  <polyline points="{{ sp.points }}" fill="none" stroke="currentColor" stroke-width="1.5"
+                            stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>
+                </svg>
+                <span class="price-spark-cap">{{ sp.days }}d {% if sp.delta >= 0 %}+{% endif %}{{ sp.delta_pct }}%</span>
+              </span>
+            {% endif %}
           </span>
           <form method="post" action="/cards/{{ card.id }}/price-override"
                 class="inline-form card-detail-price-override">

@@ -10466,6 +10466,24 @@ table.dmtx .dmtx-rowhead {
   color: var(--text);
   font-weight: 600;
 }
+/* Price-history sparkline (#98 follow-up). */
+.card-detail-prices-spark {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.35rem;
+}
+.price-spark-svg {
+  width: 150px;
+  height: 28px;
+  display: block;
+  flex: none;
+}
+.price-spark-cap {
+  font-size: 0.72rem;
+  color: var(--muted);
+  font-family: ui-monospace, "JetBrains Mono", monospace;
+}
 .card-detail-prices-deferred {
   font-family: "Newsreader", serif;
   font-style: italic;

@@ -1,5 +1,15 @@
 [
   {
+    "version": "4.10.13",
+    "date": "2026-07-14",
+    "added": [
+      "Card detail pages now show a little price-history sparkline per finish — a small line of the card's price over time (green if up, red if down) next to the existing 1d/7d/30d change chips. It appears once at least two daily price snapshots have accrued and fills out over the coming weeks."
+    ],
+    "refined": [],
+    "resolved": [],
+    "archivist_note": "vX.Y.Z = #98 follow-up (price-history graph). New price_sparkline(session, scryfall_id, finish, days=90) in price_history_service — last N daily card_price_history rows oldest→newest, returns None with <2 points (one dot isn't a trend), else inline-SVG polyline geometry (240x44 box, y inverted) + min/max/delta/delta_pct/days, mirroring the #85 dashboard value chart exactly (no chart lib). card_detail route passes price_spark={regular,foil,etched}; template renders a <polyline> below the delta chips in each price row (green/red by delta sign) + an 'Nd ±%' caption, only when present. Data already accruing from the daily price ingest (24k rows, 1 day so far — sparkline shows nothing until day 2, chips need 2/7/30 days). Test: one point→None, three points→3 coords + correct min/max/delta_pct, missing→None. Template + service only, no schema/route-signature change. Suite 901 green; card page renders 200 with the sparkline."
+  },
+  {
     "version": "4.10.12",
     "date": "2026-07-14",
     "added": [

@@ -227,12 +227,18 @@ def card_detail_page(
     }
     # #98 — 1d/7d/30d price deltas per finish from the daily history (empty until
     # the series has enough days; the template renders chips only when present).
-    from app.price_history_service import price_deltas
+    from app.price_history_service import price_deltas, price_sparkline
 
     price_delta = {
         "regular": price_deltas(session, target_card.scryfall_id, "normal"),
         "foil": price_deltas(session, target_card.scryfall_id, "foil"),
         "etched": price_deltas(session, target_card.scryfall_id, "etched"),
+    }
+    # A price-history sparkline per finish (None until ≥2 daily snapshots exist).
+    price_spark = {
+        "regular": price_sparkline(session, target_card.scryfall_id, "normal"),
+        "foil": price_sparkline(session, target_card.scryfall_id, "foil"),
+        "etched": price_sparkline(session, target_card.scryfall_id, "etched"),
     }
 
     # § IV — Legality. Card.legalities is a JSON-encoded dict from Scryfall;
@@ -280,6 +286,7 @@ def card_detail_page(
             "prices": prices,
             "price_overrides": overrides,
             "price_delta": price_delta,
+            "price_spark": price_spark,
             "legality_map": legality_map,
             "history_rows": history_rows,
         },
