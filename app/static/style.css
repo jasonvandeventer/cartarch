@@ -13237,6 +13237,31 @@ table.dmtx .dmtx-rowhead {
   color: var(--muted);
   padding: 1rem 0;
 }
+/* #94 — look-at-top-N modal action bar (+1 reveal / bottom-in-random-order) */
+.gf-modal-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border);
+}
+.gf-modal-action-btn {
+  padding: 0.3rem 0.6rem;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  border-radius: var(--radius-sm);
+  font: 500 12px/1 "Montserrat", system-ui, sans-serif;
+  cursor: pointer;
+}
+.gf-modal-action-btn:hover:not(:disabled) {
+  border-color: var(--brand-gold);
+  color: var(--brand-gold);
+}
+.gf-modal-action-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
 
 /* Responsive: collapse rails + sidebar at narrow widths */
 @media (max-width: 980px) {

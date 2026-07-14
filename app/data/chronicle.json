@@ -1,5 +1,17 @@
 [
   {
+    "version": "4.10.3",
+    "date": "2026-07-14",
+    "added": [
+      "The goldfish playtester's 'Look at top N' window gains two buttons. '+1 reveal' turns over the next card down — for Possibility Storm, Cascade, and other 'reveal until you find X' effects where you don't know how deep you'll go. 'Bottom in random order' sends every currently-revealed card to the bottom of your library shuffled, matching how Cascade and Discover put the rest of the revealed cards on the bottom."
+    ],
+    "refined": [],
+    "resolved": [
+      "Goldfish library-look '+1 reveal' and 'bottom in random order' buttons (#94)."
+    ],
+    "archivist_note": "vX.Y.Z = #94. Client-only, two functions on the existing look-at-top-N modal (kind:'look', {n, ids} — the v4.0.2 reveal-window model). lookRevealOneMore: n += 1, authorize library[n-1]'s id into ctx.ids, retitle, refreshModalIfOpen; guarded no-op at n >= library.length. lookBottomRevealedRandom: visible = library.slice(0,n) ∩ ids (the SAME intersection refreshModalIfOpen renders, so a card already scried to the bottom is not re-bottomed), remove those from library, shuffle (existing Fisher-Yates), push to bottom, closeModal + render. Both respect the reveal-window invariant: a card the player wasn't shown never surfaces. UI: buildLookActions() appends a .gf-modal-actions bar (below the grid) whenever the modal kind is 'look' — hooked into BOTH openModal and refreshModalIfOpen's look branch so the buttons survive a reactive re-render after a per-card menu move; '+1 reveal' disables at the bottom of the library. Other modal kinds (browse/browse-library/create-token) never get the bar (kind guard). CSS: .gf-modal-actions + .gf-modal-action-btn cloned from .gf-mp-clear tokens. Client-only: static_v content hash busts caches; no schema, no route, no payload change; gameFingerprint untouched (goldfish isn't the tracker). No JS test harness in-repo, so logic was pinned by a standalone node self-check (reveal expands + authorizes; bottom-random preserves count, moves only visible top-N∩ids, leaves already-bottomed cards). node --check clean; pytest 887 green; app boots."
+  },
+  {
     "version": "4.10.2",
     "date": "2026-07-13",
     "added": [],

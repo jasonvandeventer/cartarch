@@ -554,6 +554,63 @@
     openModal("Top " + taken.length + " of library", taken);
   }
 
+  // #94 — actions inside the look-at-top-N modal. "+1 reveal" extends the
+  // reveal window by one card (Possibility Storm / reveal-until effects);
+  // "Bottom in random order" sends every currently-revealed card to the
+  // library bottom shuffled (Cascade / Discover resolution).
+  function lookRevealOneMore() {
+    const ctx = state.modalContext;
+    if (!ctx || ctx.kind !== "look") return;
+    if (ctx.n >= state.library.length) return; // nothing left to reveal
+    ctx.n += 1;
+    const nextInst = state.library[ctx.n - 1];
+    if (nextInst && !ctx.ids.includes(nextInst.id)) ctx.ids.push(nextInst.id);
+    modalTitle.textContent = "Top " + ctx.n + " of library";
+    refreshModalIfOpen();
+  }
+
+  function lookBottomRevealedRandom() {
+    const ctx = state.modalContext;
+    if (!ctx || ctx.kind !== "look") return;
+    const revealed = new Set(ctx.ids || []);
+    // Currently-revealed = the originally-revealed ids still within the top-N
+    // window (the same intersection refreshModalIfOpen renders); a card already
+    // scried to the bottom is no longer revealed and stays put.
+    const visible = state.library.slice(0, ctx.n).filter((inst) => revealed.has(inst.id));
+    if (visible.length === 0) {
+      closeModal();
+      return;
+    }
+    const visibleIds = new Set(visible.map((inst) => inst.id));
+    state.library = state.library.filter((inst) => !visibleIds.has(inst.id));
+    const shuffled = visible.slice();
+    shuffle(shuffled);
+    for (const inst of shuffled) state.library.push(inst);
+    closeModal();
+    render();
+  }
+
+  // The look-modal action bar. Appended to the modal body (below the grid) by
+  // openModal + refreshModalIfOpen whenever the modal kind is "look".
+  function buildLookActions() {
+    const bar = document.createElement("div");
+    bar.className = "gf-modal-actions";
+    const more = document.createElement("button");
+    more.type = "button";
+    more.className = "gf-modal-action-btn";
+    more.textContent = "+1 reveal";
+    more.disabled = !state.modalContext || state.modalContext.n >= state.library.length;
+    more.addEventListener("click", lookRevealOneMore);
+    const bottom = document.createElement("button");
+    bottom.type = "button";
+    bottom.className = "gf-modal-action-btn";
+    bottom.textContent = "Bottom in random order";
+    bottom.addEventListener("click", lookBottomRevealedRandom);
+    bar.appendChild(more);
+    bar.appendChild(bottom);
+    return bar;
+  }
+
   /**
    * Library Browse — tutor path. Display sorted (mana value, then name) so
    * the user can't read draw order. Closing the modal RESHUFFLES, whether
@@ -2334,6 +2391,9 @@
       for (const inst of instances) grid.appendChild(buildCardEl(inst, "modal"));
       modalBody.appendChild(grid);
     }
+    if (state.modalContext && state.modalContext.kind === "look") {
+      modalBody.appendChild(buildLookActions());
+    }
     modal.hidden = false;
   }
 
@@ -2374,6 +2434,9 @@
       grid.className = "gf-modal-grid";
       for (const inst of instances) grid.appendChild(buildCardEl(inst, "modal"));
       modalBody.appendChild(grid);
+    }
+    if (kind === "look") {
+      modalBody.appendChild(buildLookActions());
     }
   }
 
