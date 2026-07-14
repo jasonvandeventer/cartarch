@@ -222,6 +222,9 @@
           <button type="button" class="cmp-btn cmp-btn-lg" onclick="adjLife(5)">+5</button>
         </div>
 
+        {# #115 — Planechase (shown for any game once the table enables it). #}
+        <section class="cmp-planechase" id="cmp-planechase" style="display:none"></section>
+
         {% if game.format|lower == 'momir' %}
           {# ── Incoming attacks (defender's block decision) ── #}
           <section class="cmp-incoming" id="cmp-incoming" style="display:none"></section>
@@ -331,12 +334,41 @@
   function seatName(id) { const s = SEATS.find(x => x.id === id); return s ? s.name : '—'; }
   function myCounters() { return (st.extraCounters && st.extraCounters[K(MY_SEAT_ID)]) || []; }
 
+  // #115 — Planechase panel on the phone. Enable is table-only (not offered
+  // here); a seated player may roll the die + planeswalk. Hidden until enabled.
+  function renderCompanionPlanechase() {
+    const el = document.getElementById('cmp-planechase');
+    if (!el) return;
+    if (!st.planechase) { el.style.display = 'none'; return; }
+    el.style.display = 'block';
+    const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g,
+      c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    const plane = st.currentPlane;
+    let html = '<h3 class="cmp-section-title">Planechase</h3>';
+    if (plane) {
+      const img = MIRROR_LARGE.replace('__SID__', plane.scryfall_id);
+      html +=
+        `<img class="pc-plane-img" style="width:100%" src="${img}" alt="${esc(plane.name)}" ` +
+        `onerror="this.onerror=null;this.src='https://api.scryfall.com/cards/${plane.scryfall_id}?format=image&version=normal'">` +
+        `<div class="pc-plane-name">${esc(plane.name)}</div>` +
+        `<div class="pc-plane-text">${esc(plane.text)}</div>`;
+    }
+    html +=
+      '<div class="pc-controls" style="margin-top:0.5rem">' +
+      '<button type="button" class="cmp-btn" onclick="postAction({type:\'planar_roll\'})">🎲 Roll</button>' +
+      '<button type="button" class="cmp-btn" onclick="postAction({type:\'planeswalk\'})">↪ Planeswalk</button></div>';
+    if (st.lastRoll) html += `<div class="pc-roll pc-roll-${st.lastRoll}">Rolled: ${st.lastRoll}</div>`;
+    el.innerHTML = html;
+  }
+
   function render() {
     if (!st) return;
     document.getElementById('cmp-turn-num').textContent = st.turn ?? '—';
     document.getElementById('cmp-active-name').textContent = seatName(st.currentTurnId);
     const myTurn = MY_SEAT_ID != null && st.currentTurnId === MY_SEAT_ID;
     document.getElementById('cmp-header').classList.toggle('cmp-my-turn', myTurn);
+
+    renderCompanionPlanechase();  // #115 — plane display + roll/walk (any game)
 
     // Strip: seated players other than me (or all seats for a spectator).
     const others = SEATS.filter(s => s.id !== MY_SEAT_ID);

@@ -24,8 +24,9 @@ token-gated: seat players and playgroup members may watch.
 from __future__ import annotations
 
 import json
+import secrets
 
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from app import live_game_events
@@ -58,7 +59,15 @@ _MOMIR_TYPES = {
 # token retains full override. Hard-blocking cross-seat effects would wedge
 # legitimate ability resolution, so the audit log + social contract govern.
 _MOMIR_CROSS_SEAT = {"momir_damage", "momir_counter_token", "momir_tap_token", "momir_sacrifice"}
-_MUTATING_TYPES = {"life", "counter", "cmd", "eliminate", "turn"} | _MOMIR_TYPES
+
+# #115 — Planechase overlay: a shared plane deck on ANY live game (not a format).
+# Additive on the state blob (fields appear only once enabled), so Commander /
+# Momir blobs stay byte-identical until a table turns Planechase on. Enable is
+# table-only (game config); rolling the planar die + planeswalking are open to any
+# seated player (the active player rolls, but enforcing "whose turn" is fussy for
+# a casual tracker — the social contract governs, every action is event-logged).
+_PLANECHASE_TYPES = {"planechase_enable", "planar_roll", "planeswalk"}
+_MUTATING_TYPES = {"life", "counter", "cmd", "eliminate", "turn"} | _MOMIR_TYPES | _PLANECHASE_TYPES
 
 _MAX_MOMIR_CMC = 16  # no creatures exist above ~16 CMC in MTG
 
@@ -110,6 +119,102 @@ def random_creature_at_cmc(session: Session, cmc: int) -> dict | None:
         # resolve abilities by hand via the primitives.
         "oracle_text": row.oracle_text,
     }
+
+
+# ── Planechase (#115) ─────────────────────────────────────────────────────────
+# Planes + phenomena live in oracle_catalog alongside creatures (the ingest keeps
+# them, is_momir_legal=False so they never leak into the Momir pool). type_line
+# "Plane — X" (a leading "Plane " excludes "Planeswalker") or "...Phenomenon".
+
+
+def _plane_filter():
+    return or_(
+        OracleCatalog.type_line.like("Plane %"),
+        OracleCatalog.type_line.like("%Phenomenon%"),
+    )
+
+
+def _shuffled_plane_ids(session: Session, only: list[int] | None = None) -> list[int]:
+    """Plane/phenomenon ids in random order (DB ``random()`` — server-authoritative,
+    dialect-agnostic). ``only`` reshuffles a specific subset (the discard pile)."""
+    q = session.query(OracleCatalog.id).filter(_plane_filter())
+    if only is not None:
+        if not only:
+            return []
+        q = q.filter(OracleCatalog.id.in_(only))
+    return [pid for (pid,) in q.order_by(func.random()).all()]
+
+
+def _plane_dict(session: Session, plane_id: int | None) -> dict | None:
+    if plane_id is None:
+        return None
+    row = session.get(OracleCatalog, plane_id)
+    if row is None:
+        return None
+    return {
+        "id": row.id,
+        "name": row.name,
+        "text": row.oracle_text or "",
+        "scryfall_id": row.scryfall_id,
+        "type": row.type_line or "",
+    }
+
+
+def _advance_plane(session: Session, state: dict) -> None:
+    """Move the current plane to discard and reveal the next; reshuffle the discard
+    back into the deck when it empties (paper rule)."""
+    deck = state.get("planeDeck", [])
+    discard = state.get("planeDiscard", [])
+    current = state.get("currentPlane")
+    if current:
+        discard.append(current["id"])
+    if not deck:
+        deck = _shuffled_plane_ids(session, only=discard)
+        discard = []
+    nxt = deck.pop(0) if deck else None
+    state["planeDeck"] = deck
+    state["planeDiscard"] = discard
+    state["currentPlane"] = _plane_dict(session, nxt)
+
+
+def _apply_planechase_enable(session: Session, action: dict, state: dict) -> dict:
+    """Enable/disable the Planechase overlay. Enable shuffles the whole plane pool
+    and reveals the top plane; disable strips the fields (blob back to byte-identical)."""
+    if not bool(action.get("enabled", True)):
+        for key in ("planechase", "planeDeck", "planeDiscard", "currentPlane", "lastRoll"):
+            state.pop(key, None)
+        return {}
+    ids = _shuffled_plane_ids(session)
+    if not ids:
+        raise ValueError("No planes in the catalog — run the plane ingest first")
+    state["planechase"] = True
+    state["planeDeck"] = ids
+    state["planeDiscard"] = []
+    state["currentPlane"] = None
+    state["lastRoll"] = None
+    _advance_plane(session, state)  # reveal the first plane
+    return {}
+
+
+def _apply_planeswalk(session: Session, action: dict, state: dict) -> dict:
+    if not state.get("planechase"):
+        raise ValueError("Planechase is not enabled for this game")
+    _advance_plane(session, state)
+    return {}
+
+
+def _apply_planar_roll(session: Session, action: dict, state: dict) -> dict:
+    """Roll the 6-face planar die: 4 blank / 1 chaos / 1 planeswalk. A planeswalk
+    result advances the plane in the same action (one tap = roll + resolve). The
+    chaos effect is on the plane card — players read + resolve it by hand."""
+    if not state.get("planechase"):
+        raise ValueError("Planechase is not enabled for this game")
+    roll = secrets.randbelow(6)
+    face = "chaos" if roll == 4 else "planeswalk" if roll == 5 else "blank"
+    state["lastRoll"] = face
+    if face == "planeswalk":
+        _advance_plane(session, state)
+    return {"face": face}
 
 
 def valid_momir_mvs(session: Session) -> set[int]:
@@ -306,6 +411,15 @@ def _authorize_seat_scoped(
             raise PermissionError("Only a seated player may advance the turn")
         return
 
+    # #115 — enabling Planechase is a table-only game config; rolling the planar
+    # die + planeswalking are open to any seated player (their phone).
+    if atype == "planechase_enable":
+        raise PermissionError("Only the table can enable Planechase")
+    if atype in _PLANECHASE_TYPES:
+        if not any(s.user_id == user_id for s in game.seats):
+            raise PermissionError("Only a seated player may control Planechase")
+        return
+
     # #110 — resource correction is a table-only power (seats get hard validation;
     # only the tablet can fix mis-taps). This branch runs only when the table token
     # was absent, so any seat player reaching here is rejected.
@@ -329,8 +443,8 @@ def _authorize_seat_scoped(
 def _validate_action_seats(atype: str, action: dict, seats_by_id: dict[int, GameSeat]) -> None:
     """Validate that referenced seats belong to this game (→ 400). Runs BEFORE
     authorization so a bad seat is a 400 even on the table-token path."""
-    if atype == "turn":
-        return
+    if atype == "turn" or atype in _PLANECHASE_TYPES:
+        return  # table/game-level actions — no seat reference
     if atype == "cmd":
         _require_seat(action.get("receiver_seat_id"), seats_by_id, "receiver_seat_id")
         _require_seat(action.get("attacker_seat_id"), seats_by_id, "attacker_seat_id")
@@ -370,6 +484,13 @@ def _apply_mutation(
         return _apply_momir_tap(action, state)
     if atype == "momir_sacrifice":
         return _apply_momir_kill(action, state)  # same effect; type distinguishes the log
+
+    if atype == "planechase_enable":
+        return _apply_planechase_enable(session, action, state)
+    if atype == "planar_roll":
+        return _apply_planar_roll(session, action, state)
+    if atype == "planeswalk":
+        return _apply_planeswalk(session, action, state)
 
     if atype == "life":
         sid = str(_coerce_int(action["seat_id"]))

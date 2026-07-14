@@ -1,5 +1,17 @@
 [
   {
+    "version": "4.10.7",
+    "date": "2026-07-14",
+    "added": [
+      "Planechase, for live games. On the tablet (or any phone in the game) the table can enable a shared plane deck: it shows the current plane, and anyone can roll the planar die (4 blank / 1 chaos / 1 planeswalk) or planeswalk to the next plane. Everything syncs across every device in real time, and each roll/walk is recorded to the game log. It sits alongside a normal Commander (or Momir) game — turn it off and the game is untouched."
+    ],
+    "refined": [],
+    "resolved": [
+      "Planechase tracker on companion mode (#115) — first supplemental-format tracker carved out of the #86 companion epic."
+    ],
+    "archivist_note": "vX.Y.Z = #115. A Planechase overlay on the EXISTING companion live-game infra — mirrors how Momir layered actions on the shared pipeline, so no new architecture. Three new action types in live_game_service (`_PLANECHASE_TYPES`, added to `_MUTATING_TYPES`, NOT `_MOMIR_TYPES` so they work in any game): `planechase_enable` (table-only — shuffles the whole plane pool via DB `random()`, reveals the top plane; disable strips the fields so the blob is byte-identical to before), `planar_roll` (secrets.randbelow(6) → 4 blank/1 chaos/1 planeswalk; a planeswalk result advances the plane in the same action), `planeswalk` (advance; reshuffles the discard back when the deck empties — paper rule). Roll/walk are open to any seated player (phone), enable is table-only — wired into `_validate_action_seats` (no seat ref) + `_authorize_seat_scoped`. State fields (planechase/planeDeck/planeDiscard/currentPlane/lastRoll) are additive — appear only once enabled. Data: planes + phenomena now live in `oracle_catalog` alongside creatures — the oracle ingest's creature-only filter relaxed to ALSO keep `type_line` startswith 'Plane ' (a trailing space excludes 'Planeswalker') or containing 'Phenomenon', with is_momir_legal=False so they never leak into the Momir pool (its query is is_momir_legal-gated). NO migration (oracle_catalog already has type_line/oracle_text/scryfall_id). DEPLOY STEP: the plane rows only exist after a prod re-run of `python -m app.jobs.oracle_ingest` (run post-deploy, like the original Momir ingest). UI: a `renderPlanechase()` panel on the tablet (game_detail.html) + `renderCompanionPlanechase()` on the phone (game_companion.html) — current plane image (mirror) + text + Roll/Planeswalk buttons; SSE `_publish` sends the full blob so all devices re-render (no whitelist). Client-only otherwise; the existing /live/action route dispatches the new types with zero route change. Tests drive the REAL pipeline (enable/roll/walk/reshuffle invariants + auth: enable table-only, roll seated-ok) + the ingest keep-filter (planes/phenomena kept, planeswalker/instant skipped). Suite 894 green; tablet + companion render 200 with the panel. Next #86 children: #116 Archenemy, #117 solo AI Momir."
+  },
+  {
     "version": "4.10.6",
     "date": "2026-07-14",
     "added": [
