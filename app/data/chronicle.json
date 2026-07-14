@@ -1,5 +1,15 @@
 [
   {
+    "version": "4.10.11",
+    "date": "2026-07-14",
+    "added": [],
+    "refined": [],
+    "resolved": [
+      "Planechase: the center-tablet plane now faces the far side of the table (its text mirrored below for the near player), and the Roll / Planeswalk buttons on the phone companion now work."
+    ],
+    "archivist_note": "vX.Y.Z = #115 two fixes. (1) Tablet plane rotation flipped 90deg → -90deg (`.pc-center-img`) so it faces the FAR side of the table as intended (owner reads the mirrored text below it); the phone stays +90deg (upright for the holder). (2) Companion Roll/Planeswalk were dead: the companion script is an IIFE and inline onclick runs in GLOBAL scope, but those buttons called `postAction(...)` directly — and postAction is scoped INSIDE the IIFE (every other companion action goes through a `window.*` wrapper). Added `window.pcRoll` / `window.pcWalk` and pointed the buttons at them. The tablet was unaffected (its postAction is global — its inline handlers like nextTurn() already prove it). Template + CSS only. Suite 894 green; companion renders 200 with the window wrappers."
+  },
+  {
     "version": "4.10.10",
     "date": "2026-07-14",
     "added": [],

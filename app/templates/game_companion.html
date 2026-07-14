@@ -344,6 +344,11 @@
     try { localStorage.setItem('pcHidden', PC_HIDDEN ? '1' : '0'); } catch (e) {}
     renderCompanionPlanechase();
   };
+  // Inline onclick runs in GLOBAL scope, but postAction is scoped inside this
+  // IIFE — so the buttons must call window.* wrappers (same as every other
+  // companion action), not postAction directly.
+  window.pcRoll = function () { postAction({ type: 'planar_roll' }); };
+  window.pcWalk = function () { postAction({ type: 'planeswalk' }); };
 
   function renderCompanionPlanechase() {
     const el = document.getElementById('cmp-planechase');
@@ -368,8 +373,8 @@
     }
     html +=
       '<div class="pc-controls" style="margin-top:0.5rem">' +
-      '<button type="button" class="cmp-btn" onclick="postAction({type:\'planar_roll\'})">🎲 Roll</button>' +
-      '<button type="button" class="cmp-btn" onclick="postAction({type:\'planeswalk\'})">↪ Planeswalk</button></div>';
+      '<button type="button" class="cmp-btn" onclick="pcRoll()">🎲 Roll</button>' +
+      '<button type="button" class="cmp-btn" onclick="pcWalk()">↪ Planeswalk</button></div>';
     if (st.lastRoll) html += `<div class="pc-roll pc-roll-${st.lastRoll}">Rolled: ${st.lastRoll}</div>`;
     el.innerHTML = html;
   }

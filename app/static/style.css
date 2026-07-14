@@ -15125,7 +15125,9 @@ body.cmp-lobby-body { height: auto; min-height: 100dvh; overflow-y: auto; }
   left: 50%;
   top: 50%;
   width: 71.8%; /* = 1/1.393; rotated, this fills the landscape wrapper */
-  transform: translate(-50%, -50%) rotate(90deg);
+  /* -90°: the plane faces the FAR side of the table (upside-down to the near/
+     bottom player, who reads the mirrored text below it instead). */
+  transform: translate(-50%, -50%) rotate(-90deg);
   border-radius: 0.5rem;
   box-shadow: 0 8px 34px rgba(0, 0, 0, 0.75);
 }
