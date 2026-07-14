@@ -1,5 +1,15 @@
 [
   {
+    "version": "4.10.4",
+    "date": "2026-07-14",
+    "added": [],
+    "refined": [],
+    "resolved": [
+      "Searching your collection from a deck page — and clicking 'Add to This Deck' on a result — no longer throws you back to the top of the page. Your scroll position is kept so you don't lose your place in a long deck (#92)."
+    ],
+    "archivist_note": "vX.Y.Z = #92. Two full-page-reload paths on deck_detail reset scroll: the Search Collection GET form and the 'Add to This Deck' pull form (POST /decks/pull → 303 back to /decks/{id}). The issue's 'Reset #2' named the top add-card HTMX form, but that (like the deck filter form) is a modifier-less innerHTML swap on #deck-card-list and does NOT move scroll in htmx 1.9.12 — the actual second reset is the pull form's redirect. Fix = scroll preservation (the issue's sanctioned alternative to an HTMX conversion), which also covers the pull path an HTMX-ify of just the search form would miss: a small deck-scoped script saves window.scrollY to sessionStorage (key 'deck-scroll:'+pathname) on submit of .collection-search-form / .deck-add-form only, and on the ensuing reload restores once + clears the key (sets history.scrollRestoration='manual' so the browser's top-scroll doesn't win). HTMX swap forms are deliberately excluded so they never strand a stale saved position; the key is per-deck-path so an unrelated visit never restores. Added a .collection-search-form class to the GET form (.deck-add-form already unique to the pull form). Template-only, no backend/route/schema change. node --check clean; a node self-check pins save-on-matching-submit, restore-once-then-clear, non-matching-form-no-save, and per-path isolation. pytest 887 green; app boots; GET /health 200."
+  },
+  {
     "version": "4.10.3",
     "date": "2026-07-14",
     "added": [

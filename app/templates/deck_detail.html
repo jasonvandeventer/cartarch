@@ -552,7 +552,7 @@
       <p class="muted">
         Search your owned cards: name, <code>t:type</code>, <code>c:WU</code>, <code>cmc:&gt;3</code>, <code>o:oracle</code>, <code>finish:foil</code>.
       </p>
-      <form method="get" action="/decks/{{ deck.id }}" class="filter-row">
+      <form method="get" action="/decks/{{ deck.id }}" class="filter-row collection-search-form">
         <input type="hidden" name="search" value="{{ search }}">
         <input type="text"
                name="collection_search"
@@ -1298,6 +1298,34 @@
           if (host && host.querySelector('.switch-printing-modal')) closeModal();
         });
         document.addEventListener('switchprinting:close', closeModal);
+      })();
+      </script>
+      <script>
+      /* #92 — preserve scroll across the two Search-Collection reloads. Both
+         do a FULL-page navigation (the collection-search GET form, and the
+         "Add to This Deck" pull POST which 303-redirects back here), so the
+         browser lands at the top and the user loses their place in a long
+         deck. The top add-card form and the deck filter/sort form are HTMX
+         innerHTML swaps (no navigation, no scroll change) — deliberately NOT
+         included, so they never leave a stale saved position behind.
+
+         Save scrollY only when one of those two forms submits; restore once on
+         the reload we caused, then clear. A save is keyed to the deck path, so
+         an unrelated visit to the page never triggers a restore. */
+      (function () {
+        var KEY = 'deck-scroll:' + location.pathname;
+        try {
+          var saved = sessionStorage.getItem(KEY);
+          if (saved !== null) {
+            sessionStorage.removeItem(KEY);
+            if (history.scrollRestoration) history.scrollRestoration = 'manual';
+            window.scrollTo(0, parseInt(saved, 10) || 0);
+          }
+        } catch (e) { /* private mode / storage disabled — degrade to top */ }
+        document.addEventListener('submit', function (e) {
+          if (!e.target.matches('.collection-search-form, .deck-add-form')) return;
+          try { sessionStorage.setItem(KEY, String(window.scrollY)); } catch (e2) {}
+        });
       })();
       </script>
     {% endif %}
