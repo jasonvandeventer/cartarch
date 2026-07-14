@@ -3307,50 +3307,85 @@ def resort_collection(
     # strictly from local columns here (type_line best-effort until a
     # card is backfilled), so this stays a pure in-memory sort.
 
-    # Pre-load all drawer StorageLocations in one query instead of 6 separate ones.
+    # #104: per-user rules win first (query -> any location). Unmatched rows fall
+    # through to the legacy drawer sort. Lazy import breaks the module cycle
+    # (sorter_rule_service imports the search parser from this module).
+    from app.sorter_rule_service import evaluate_rules
+
+    rule_targets = evaluate_rules(session, user_id, [row.id for row in rows])
+
+    # All of the user's locations, for resolving rule targets and detecting which
+    # are the numbered drawers driving the legacy slot machinery.
+    locs = {
+        loc.id: loc
+        for loc in session.query(StorageLocation).filter(StorageLocation.user_id == user_id)
+    }
     drawer_loc_ids: dict[int, int | None] = {i: None for i in range(1, 7)}
-    for loc in session.query(StorageLocation).filter(
-        StorageLocation.user_id == user_id,
-        StorageLocation.type == "drawer",
-    ):
+    drawer_number_of: dict[int, int] = {}  # location id -> drawer number
+    for loc in locs.values():
+        if loc.type != "drawer":
+            continue
         try:
             n = int(loc.name.replace("Drawer", "").strip())
-            if 1 <= n <= 6:
-                drawer_loc_ids[n] = loc.id
         except ValueError:
-            pass
+            continue
+        if 1 <= n <= 6:
+            drawer_loc_ids[n] = loc.id
+            drawer_number_of[loc.id] = n
+    has_drawers = any(v is not None for v in drawer_loc_ids.values())
 
-    # Compute target drawer once per row and sort.
-    row_target_drawer: dict[int, int] = {row.id: assign_drawer(row) for row in rows}
-    rows.sort(key=lambda r: (row_target_drawer[r.id], drawer_sort_key(r)))
-
-    grouped: dict[int, list[InventoryRow]] = {i: [] for i in range(1, 7)}
+    # Decide each placed row's bucket = (storage_location_id, drawer_number|None).
+    # A rule target wins; otherwise the legacy drawer sort, but only if the user
+    # actually has drawers — a new user with no rule and no drawers is left alone.
+    placements: dict[int, tuple[int | None, int | None]] = {}
     for row in rows:
-        grouped[row_target_drawer[row.id]].append(row)
+        target_loc_id = rule_targets.get(row.id)
+        if target_loc_id is not None:
+            placements[row.id] = (target_loc_id, drawer_number_of.get(target_loc_id))
+        elif has_drawers:
+            n = assign_drawer(row)
+            placements[row.id] = (drawer_loc_ids[n], n)
+    if not placements:
+        return 0
+
+    grouped: dict[tuple[int | None, int | None], list[InventoryRow]] = {}
+    for row in rows:
+        if row.id in placements:
+            grouped.setdefault(placements[row.id], []).append(row)
+    for bucket_rows in grouped.values():
+        bucket_rows.sort(key=drawer_sort_key)
 
     now = utc_now()
     bulk_updates: list[dict] = []
     audit_logs: list[dict] = []
 
-    for drawer_number, drawer_rows in grouped.items():
-        loc_id = drawer_loc_ids[drawer_number]
-        for index, row in enumerate(drawer_rows, start=1):
-            target_drawer = str(drawer_number)
-            target_slot = str(index)
-            if row.drawer == target_drawer and row.slot == target_slot:
+    for (loc_id, drawer_number), bucket_rows in grouped.items():
+        target_drawer = str(drawer_number) if drawer_number is not None else None
+        for index, row in enumerate(bucket_rows, start=1):
+            # Non-drawer locations (binder/box) carry no slot — the drawer slot
+            # machinery only applies to numbered drawers.
+            target_slot = str(index) if drawer_number is not None else None
+            if target_drawer is not None:
+                if row.drawer == target_drawer and row.slot == target_slot:
+                    continue
+            elif row.storage_location_id == loc_id and row.drawer is None and row.slot is None:
                 continue
 
             old_drawer = row.drawer
             old_slot = row.slot
             old_is_pending = row.is_pending
-            is_cross_drawer_move = not old_is_pending and old_drawer != target_drawer
-            new_is_pending = bool(old_is_pending or is_cross_drawer_move)
+            # Physical position = drawer number for a drawer, else which location.
+            if target_drawer is not None:
+                moved = not old_is_pending and old_drawer != target_drawer
+            else:
+                moved = not old_is_pending and row.storage_location_id != loc_id
+            new_is_pending = bool(old_is_pending or moved)
             # Capture the old position when a placed row is pulled to pending
             # so the pending page can show the user where to physically pull
             # the card from. Imported rows (already pending) never had a
             # previous physical location, so they leave from_drawer NULL.
-            new_from_drawer = old_drawer if is_cross_drawer_move else row.from_drawer
-            new_from_slot = old_slot if is_cross_drawer_move else row.from_slot
+            new_from_drawer = old_drawer if moved else row.from_drawer
+            new_from_slot = old_slot if moved else row.from_slot
 
             bulk_updates.append(
                 {
@@ -3366,10 +3401,19 @@ def resort_collection(
                 }
             )
 
-            # Only audit physical cross-drawer moves — slot renumbering within the
-            # same drawer produces no actionable entry and would flood the log on
-            # large imports.
-            if not old_is_pending and old_drawer is not None and old_drawer != target_drawer:
+            # Only audit physical moves — slot renumbering within the same drawer
+            # produces no actionable entry and would flood the log on large imports.
+            if moved:
+                src = (
+                    f"drawer={old_drawer} slot={old_slot or '-'}"
+                    if old_drawer is not None
+                    else f"location={row.storage_location_id}"
+                )
+                dst = (
+                    f"drawer={target_drawer} slot={target_slot}"
+                    if target_drawer is not None
+                    else f"location={loc_id}"
+                )
                 audit_logs.append(
                     {
                         "user_id": user_id,
@@ -3377,10 +3421,10 @@ def resort_collection(
                         "card_id": row.card_id,
                         "finish": row.finish,
                         "quantity_delta": 0,
-                        "source_location": f"drawer={old_drawer} slot={row.slot or '-'}",
-                        "destination_location": f"drawer={target_drawer} slot={target_slot}",
+                        "source_location": src,
+                        "destination_location": dst,
                         "inventory_row_id": row.id,
-                        "note": "Auto-sorted collection row; moved to a new drawer and marked pending for physical relocation",
+                        "note": "Auto-sorted collection row; moved and marked pending for physical relocation",
                         "batch_id": None,
                     }
                 )

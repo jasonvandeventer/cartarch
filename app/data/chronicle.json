@@ -1,5 +1,17 @@
 [
   {
+    "version": "4.10.0",
+    "date": "2026-07-13",
+    "added": [
+      "Sorter rules: on the Storage Locations page you can now define your own rules for where cards go when you auto-sort. Each rule is a search query pointed at a location — e.g. 't:vampire → Vampires binder', 'price:>10 → Valuables drawer'. Rules run top to bottom and the first match wins; drag them with ▲▼ to set priority. Rules can target any of your locations (drawer, binder, or box), and an empty query makes a catch-all. Cards matching no rule fall back to the usual drawer sort, or stay in Pending if you don't use drawers."
+    ],
+    "refined": [],
+    "resolved": [
+      "Configurable per-user sorter rule engine (#104), part 1 of 2 — the rules engine, evaluation, and UI. Part 2 opens the sorter to all users by removing the legacy username gate."
+    ],
+    "archivist_note": "v4.10.0 = #104 part 1. Replaces the hardcoded 6-drawer taxonomy's exclusivity with a per-user rule engine, WITHOUT rewriting the legacy sort (kept intact as the fallback). A rule = an existing collection-search query string -> a target StorageLocation, so the search parser is reused verbatim (no DSL). New SorterRule model (user_id FK CASCADE indexed, position server_default text('0'), query String(512), target_location_id FK storage_locations CASCADE, is_active server_default true, created_at) + migration f5a6b7c8d9e0 (down_revision e4f5a6b7c8d9), mirroring the deck_goals ordered-list shape. New app/sorter_rule_service.py: validate_query (tokenize + assert every TERM yields a non-None _term_to_clause; empty=catch-all — fills the gap that live search silently drops bad terms), evaluate_rules(session, user_id, row_ids)->{row_id: target_location_id} (per active rule ascending position, ONE batched query joined to Card, chunked under the SQLite 999-param limit, first-match-wins — O(rules) not O(rows*rules)), and DeckGoal-cloned CRUD/reorder (list/create/edit/move/set_active/delete, owner-scoped, validates query + target ownership). resort_collection integration: rule targets computed first (lazy import breaks the module cycle), rule-matched rows filed into any location — drawer targets keep the exact legacy drawer/slot machinery, non-drawer targets set storage_location_id with drawer/slot NULL; unmatched rows fall to assign_drawer iff the user has drawers, else left alone. Move detection generalized (physical position = drawer number for drawers, storage_location_id for locations) so the existing user's drawer behavior is byte-for-byte preserved (golden test pins assign_drawer/drawer_sort_key). Rules UI: _sorter_rule_controls.html on the Locations page (▲▼ reorder, inline edit, enable/disable, delete, append form) + /sorter-rules[/{id}/edit|move|toggle|delete] routes in routes/collections.py, all CSRF-guarded. DEFERRED to part 2: removing DRAWER_SORTER_USERNAMES gate across ~30 sites (universalize sorter to all users), intake auto-sort universalization, per-user VALUE/KEEP thresholds. Tests: golden characterization (assign_drawer/drawer_sort_key), validate_query, evaluate first-match/catch-all/inactive, resort binder-redirect + drawer-fallback, CRUD/reorder, /locations render + create route + bad-query banner. Suite 886 green."
+  },
+  {
     "version": "4.9.0",
     "date": "2026-07-13",
     "added": [

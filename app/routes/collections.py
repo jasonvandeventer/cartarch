@@ -89,6 +89,14 @@ from app.presentation_service import (
     build_pending_view_model,
 )
 from app.pricing import card_metadata, effective_price
+from app.sorter_rule_service import (
+    create_sorter_rule,
+    delete_sorter_rule,
+    edit_sorter_rule,
+    list_sorter_rules,
+    move_sorter_rule,
+    set_sorter_rule_active,
+)
 
 router = APIRouter()
 
@@ -1679,6 +1687,10 @@ def locations_page(
 
     parent_locations = [loc for loc in locations if loc.type in {"root", "box", "binder", "other"}]
 
+    # #104 sorter rules — targets are any of the user's non-deck locations.
+    sorter_rules = list_sorter_rules(session, current_user.id)
+    rule_target_locations = [loc for loc in locations if loc.type != "deck"]
+
     return render(
         request,
         "locations.html",
@@ -1689,8 +1701,79 @@ def locations_page(
             "location_types": ["binder", "box", "drawer", "other"],
             "location_summaries": location_summaries,
             "current_user": current_user,
+            "sorter_rules": sorter_rules,
+            "rule_target_locations": rule_target_locations,
         },
     )
+
+
+# #104 sorter-rule routes. The literal "sorter-rules" prefix keeps these clear of
+# the /locations/{location_id} typed-int routes. All CSRF-guarded + owner-scoped
+# in the service (a bad query / non-owned target → ?rule_error banner).
+@router.post("/sorter-rules")
+def sorter_rule_create(
+    query: str = Form(""),
+    target_location_id: int = Form(...),
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+    _: None = CsrfRequired,
+):
+    try:
+        create_sorter_rule(session, current_user.id, query, target_location_id)
+    except ValueError:
+        return RedirectResponse("/locations?rule_error=1#sorter-rules", status_code=303)
+    return RedirectResponse("/locations#sorter-rules", status_code=303)
+
+
+@router.post("/sorter-rules/{rule_id}/edit")
+def sorter_rule_edit(
+    rule_id: int,
+    query: str = Form(""),
+    target_location_id: int = Form(...),
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+    _: None = CsrfRequired,
+):
+    try:
+        edit_sorter_rule(session, current_user.id, rule_id, query, target_location_id)
+    except ValueError:
+        return RedirectResponse("/locations?rule_error=1#sorter-rules", status_code=303)
+    return RedirectResponse("/locations#sorter-rules", status_code=303)
+
+
+@router.post("/sorter-rules/{rule_id}/move")
+def sorter_rule_move(
+    rule_id: int,
+    direction: str = Form(...),
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+    _: None = CsrfRequired,
+):
+    move_sorter_rule(session, current_user.id, rule_id, direction)
+    return RedirectResponse("/locations#sorter-rules", status_code=303)
+
+
+@router.post("/sorter-rules/{rule_id}/toggle")
+def sorter_rule_toggle(
+    rule_id: int,
+    active: str = Form("0"),
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+    _: None = CsrfRequired,
+):
+    set_sorter_rule_active(session, current_user.id, rule_id, active == "1")
+    return RedirectResponse("/locations#sorter-rules", status_code=303)
+
+
+@router.post("/sorter-rules/{rule_id}/delete")
+def sorter_rule_delete(
+    rule_id: int,
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+    _: None = CsrfRequired,
+):
+    delete_sorter_rule(session, current_user.id, rule_id)
+    return RedirectResponse("/locations#sorter-rules", status_code=303)
 
 
 @router.post("/locations")

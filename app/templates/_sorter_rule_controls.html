@@ -1,0 +1,85 @@
+{# #104 — per-user sorter rules. A rule = a collection-search query -> a target
+   location, evaluated top-to-bottom (first match wins) when you auto-sort. Rows
+   matching no rule fall back to the drawer sort (if you have drawers) or Pending.
+   Clones the deck-goal controls pattern: mutations are separate sibling <form>s. #}
+<div id="sorter-rules" class="sorter-rules-controls" style="margin-top: 1.5rem; border-top: 1px solid var(--border, #333); padding-top: 1rem">
+  <h2 style="margin: 0 0 0.25rem">Sorter rules</h2>
+  <p class="muted" style="margin: 0 0 0.75rem">
+    Each rule sends cards matching a search query to a location. Rules run top to
+    bottom; the first match wins. Uses the same syntax as collection search
+    (e.g. <code>t:vampire</code>, <code>price:&gt;10</code>, <code>set:mom</code>).
+    An empty query is a catch-all (put it last).
+  </p>
+  {% if request.query_params.get('rule_error') %}
+    <p class="error-banner" style="color: var(--danger, #c00); margin: 0 0 0.5rem">
+      Couldn't save that rule — check the query syntax and the target location.
+    </p>
+  {% endif %}
+
+  {% if sorter_rules %}
+    <ul class="sorter-rules-list" style="list-style: none; padding: 0; margin: 0 0 0.75rem">
+      {% for r in sorter_rules %}
+        <li class="sorter-rule-item" style="margin-bottom: 0.4rem; {% if not r.is_active %}opacity: 0.55{% endif %}">
+          <div style="display: flex; gap: 0.25rem; align-items: baseline; flex-wrap: wrap">
+            <form action="/sorter-rules/{{ r.id }}/move" method="post" style="display: inline">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+              <input type="hidden" name="direction" value="up">
+              <button type="submit" class="btn-like" title="Higher priority"{% if loop.first %} disabled{% endif %}>▲</button>
+            </form>
+            <form action="/sorter-rules/{{ r.id }}/move" method="post" style="display: inline">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+              <input type="hidden" name="direction" value="down">
+              <button type="submit" class="btn-like" title="Lower priority"{% if loop.last %} disabled{% endif %}>▼</button>
+            </form>
+            <span class="sorter-rule-label">
+              <code>{{ r.query or '(everything else)' }}</code>
+              → <strong>{{ r.target_location.name }}</strong>
+              {% if not r.is_active %}<span class="muted">(disabled)</span>{% endif %}
+            </span>
+            <form action="/sorter-rules/{{ r.id }}/toggle" method="post" style="display: inline">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+              <input type="hidden" name="active" value="{{ '0' if r.is_active else '1' }}">
+              <button type="submit" class="btn-like" title="Enable/disable">{{ 'Disable' if r.is_active else 'Enable' }}</button>
+            </form>
+            <form action="/sorter-rules/{{ r.id }}/delete" method="post" style="display: inline">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+              <button type="submit" class="btn-danger-small" title="Delete permanently"
+                      onclick="return confirm('Delete this rule?');">✕</button>
+            </form>
+          </div>
+          <details class="inline-details">
+            <summary class="btn-like">Edit</summary>
+            <form action="/sorter-rules/{{ r.id }}/edit" method="post" class="stack-form" style="margin-top: 0.25rem">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+              <input type="text" name="query" value="{{ r.query }}" maxlength="512" placeholder="Search query (empty = catch-all)">
+              <select name="target_location_id" required>
+                {% for loc in rule_target_locations %}
+                  <option value="{{ loc.id }}"{% if loc.id == r.target_location_id %} selected{% endif %}>{{ loc.name }}</option>
+                {% endfor %}
+              </select>
+              <button type="submit">Save rule</button>
+            </form>
+          </details>
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p class="muted" style="margin: 0 0 0.75rem">No sorter rules yet.</p>
+  {% endif %}
+
+  {% if rule_target_locations %}
+    <form action="/sorter-rules" method="post" class="stack-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <input type="text" name="query" maxlength="512" placeholder="Search query (e.g. t:vampire) — empty = catch-all">
+      <select name="target_location_id" required>
+        <option value="" disabled selected>Send to…</option>
+        {% for loc in rule_target_locations %}
+          <option value="{{ loc.id }}">{{ loc.name }}</option>
+        {% endfor %}
+      </select>
+      <button type="submit">Add rule</button>
+    </form>
+  {% else %}
+    <p class="muted">Create a location above first, then add a rule targeting it.</p>
+  {% endif %}
+</div>

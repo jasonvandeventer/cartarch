@@ -261,6 +261,36 @@ class StorageLocation(Base):
     inventory_rows: Mapped[list[InventoryRow]] = relationship(back_populates="storage_location")
 
 
+class SorterRule(Base):
+    """#104 — a per-user drawer-sorter rule: a collection-search ``query`` string
+    matches cards, which are then filed into ``target_location``. Rules are
+    evaluated in ascending ``position``, first match wins; a card matching no
+    active rule falls through to the legacy drawer sort (if the user has drawer
+    locations) or stays Pending. ``query`` reuses the collection-search grammar
+    verbatim (empty = matches everything → a catch-all/default rule)."""
+
+    __tablename__ = "sorter_rules"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    position: Mapped[int] = mapped_column(
+        Integer, default=0, server_default=text("0"), nullable=False
+    )
+    query: Mapped[str] = mapped_column(String(512), nullable=False, default="")
+    target_location_id: Mapped[int] = mapped_column(
+        ForeignKey("storage_locations.id", ondelete="CASCADE"), nullable=False
+    )
+    is_active: Mapped[bool] = mapped_column(
+        Boolean, default=True, server_default=true(), nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
+
+    user: Mapped[User] = relationship()
+    target_location: Mapped[StorageLocation] = relationship()
+
+
 class InventoryRow(Base):
     __tablename__ = "inventory_rows"
 
