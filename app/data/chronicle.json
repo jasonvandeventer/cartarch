@@ -1,5 +1,15 @@
 [
   {
+    "version": "4.11.6",
+    "date": "2026-07-14",
+    "added": [],
+    "refined": [
+      "The deck page's analytics sections (Commander Synergy, Upgrade Targets, Combos, Tokens) now have proper spacing between them instead of butting against each other."
+    ],
+    "resolved": [],
+    "archivist_note": "vX.Y.Z = owner feedback clarification (the v4.11.4 pill-gap guess was the wrong target — the sections, not the pills, were touching; the pill spacing stays as a harmless improvement). Root cause: .page-shell spaces its DIRECT grid children with gap:1rem, but the lazy panels fragment replaces the placeholder as ONE grid child, so the sections inside #deck-lazy-panels-content had zero gap. Fix: #deck-lazy-panels-content { display:grid; gap:1rem } — identical rhythm to the shell. CSS-only."
+  },
+  {
     "version": "4.11.5",
     "date": "2026-07-14",
     "added": [],

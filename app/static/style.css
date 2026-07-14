@@ -15309,6 +15309,14 @@ body.cmp-lobby-body { height: auto; min-height: 100dvh; overflow-y: auto; }
   border-radius: 0.25rem;
 }
 
+/* The lazy-loaded deck analytics fragment is ONE .page-shell grid child, so
+   its inner sections (Synergy / Upgrade Targets / Combos / Tokens) don't get
+   the shell's gap — give the fragment the same grid rhythm. */
+#deck-lazy-panels-content {
+  display: grid;
+  gap: 1rem;
+}
+
 /* #103 Phase B — bracket chip (persisted estimate) + Win Conditions panel. */
 .deck-bracket-chip {
   display: inline-flex;
