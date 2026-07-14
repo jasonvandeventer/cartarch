@@ -446,10 +446,10 @@
         <button type="button" class="momir-tm-close" onclick="closeTokenMenu()">Close</button>
       </div>
     {% endif %}
-    {# ── Planechase overlay (#115) — shared plane deck on any live game.
-       Filled by renderPlanechase(); hidden until the table enables it. ── #}
+    {# ── Planechase (#115) — the current plane shown LARGE in the center of the
+       table (readable across the pod); the controls live in the bottom bar. ── #}
     {% if not is_ended %}
-      <div class="planechase-bar" id="planechase-bar" style="display:none"></div>
+      <div class="pc-center" id="planechase-center" style="display:none"></div>
     {% endif %}
     {# ── Editorial bottom bar — § Chronicle (active games only) ── #}
     {% if not is_ended %}
@@ -462,6 +462,8 @@
           <span class="bottombar-entries" id="chron-entries"></span>
         </div>
         <div class="bottombar-actions">
+          {# #115 — Planechase controls (Enable, or Roll / Planeswalk / close). #}
+          <span class="bottombar-pc" id="planechase-controls"></span>
           <button type="button"
                   class="bottombar-btn"
                   onclick="openDamageMatrix(null)">⚔ Damage matrix</button>
@@ -1751,42 +1753,43 @@ function render() {
 // this renders nothing for a normal game. Enable is table-only; roll + walk are
 // open to any seated player (the backend authorizes; the UI just posts).
 function renderPlanechase() {
-  const bar = document.getElementById('planechase-bar');
-  if (!bar) return;
+  const ctrls = document.getElementById('planechase-controls');
+  const center = document.getElementById('planechase-center');
+  if (!ctrls || !center) return;
+
   if (!state.planechase) {
-    if (TABLE_TOKEN) {
-      bar.style.display = 'flex';
-      bar.innerHTML =
-        '<button type="button" class="pc-btn" onclick="postAction({type:\'planechase_enable\'})">🎴 Enable Planechase</button>';
-    } else {
-      bar.style.display = 'none';
-    }
+    center.style.display = 'none';
+    // Enable lives in the bottom bar (table-only). Nothing for non-table views.
+    ctrls.innerHTML = TABLE_TOKEN
+      ? '<button type="button" class="bottombar-btn" onclick="postAction({type:\'planechase_enable\'})">🎴 Planechase</button>'
+      : '';
     return;
   }
-  bar.style.display = 'flex';
-  const plane = state.currentPlane;
-  const deckCount = (state.planeDeck || []).length;
+
+  // Bottom-bar controls: roll / planeswalk (+ last roll, + close for the table).
   const roll = state.lastRoll;
-  let html = '';
+  let c =
+    '<button type="button" class="bottombar-btn" onclick="postAction({type:\'planar_roll\'})">🎲 Roll</button>' +
+    '<button type="button" class="bottombar-btn" onclick="postAction({type:\'planeswalk\'})">↪ Planeswalk</button>';
+  if (roll) c += `<span class="pc-roll pc-roll-${roll}" title="Planar die">${roll}</span>`;
+  if (TABLE_TOKEN)
+    c +=
+      '<button type="button" class="bottombar-btn" title="Turn off Planechase" onclick="postAction({type:\'planechase_enable\',enabled:false})">✕</button>';
+  ctrls.innerHTML = c;
+
+  // The plane itself, LARGE in the center of the table.
+  const plane = state.currentPlane;
   if (plane) {
     const img = MIRROR_LARGE.replace('__SID__', plane.scryfall_id);
-    html +=
-      `<div class="pc-plane"><img class="pc-plane-img" src="${img}" alt="${escHtml(plane.name)}" ` +
+    center.innerHTML =
+      `<img class="pc-center-img" src="${img}" alt="${escHtml(plane.name)}" ` +
       `onerror="this.onerror=null;this.src='https://api.scryfall.com/cards/${plane.scryfall_id}?format=image&version=normal'">` +
-      `<div class="pc-plane-info"><div class="pc-plane-name">${escHtml(plane.name)}</div>` +
-      `<div class="pc-plane-text">${escHtml(plane.text || '')}</div></div></div>`;
+      `<div class="pc-center-name">${escHtml(plane.name)}</div>` +
+      `<div class="pc-center-text">${escHtml(plane.text || '')}</div>`;
+    center.style.display = 'flex';
+  } else {
+    center.style.display = 'none';
   }
-  html +=
-    '<div class="pc-controls">' +
-    '<button type="button" class="pc-btn" onclick="postAction({type:\'planar_roll\'})">🎲 Roll planar die</button>' +
-    '<button type="button" class="pc-btn" onclick="postAction({type:\'planeswalk\'})">↪ Planeswalk</button>' +
-    `<span class="pc-deck-count">${deckCount} in deck</span>`;
-  if (roll) html += `<span class="pc-roll pc-roll-${roll}">Rolled: ${roll}</span>`;
-  if (TABLE_TOKEN)
-    html +=
-      '<button type="button" class="pc-btn pc-btn-off" onclick="postAction({type:\'planechase_enable\',enabled:false})">Disable</button>';
-  html += '</div>';
-  bar.innerHTML = html;
 }
 
 // ── Live-mode turn timer (client-side timeline) ────────────────

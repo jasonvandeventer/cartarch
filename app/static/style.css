@@ -15089,47 +15089,66 @@ body.cmp-lobby-body { height: auto; min-height: 100dvh; overflow-y: auto; }
   align-self: flex-end;
 }
 
-/* #115 — Planechase overlay panel on the live game tracker (any game).
-   The tablet tracker is a full-screen grid, so this floats (fixed) above the
-   editorial bottom bar like the Momir bar — NOT in document flow (which would
-   render it off-screen). The phone companion reuses the .pc-* pieces in flow. */
-.planechase-bar {
+/* #115 — Planechase on the live game tracker.
+   Tablet: the current plane shows LARGE in the center of the table (readable
+   across the pod, over the seat-grid center data); controls sit in the bottom
+   bar next to Damage matrix. Phone companion reuses the .pc-* pieces in flow. */
+
+/* Centered plane on the tablet. Fixed + pointer-events:none so it's readable
+   from across the table without ever blocking a seat's taps underneath. */
+.pc-center {
   position: fixed;
   left: 50%;
-  transform: translateX(-50%);
-  bottom: 3.25rem;
-  z-index: 600;
-  display: none; /* JS toggles to flex */
-  flex-wrap: wrap;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 590; /* above the seat grid, below the Momir bar (600) + menus */
+  pointer-events: none;
+  display: none; /* JS → flex */
+  flex-direction: column;
   align-items: center;
-  gap: 0.6rem;
-  max-width: 92vw;
-  padding: 0.4rem 0.7rem;
-  background: rgba(20, 30, 55, 0.92);
-  border: 1px solid rgba(120, 160, 255, 0.4);
-  border-radius: 0.6rem;
-  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.5);
+  gap: 0.4rem;
+  width: clamp(240px, 26vw, 420px);
+  text-align: center;
 }
-/* Tablet bar is compact: small plane thumb, name only (full text lives on the
-   plane card + each player's phone). */
-.planechase-bar .pc-plane { align-items: center; }
-.planechase-bar .pc-plane-img { width: 60px; }
-.planechase-bar .pc-plane-text { display: none; }
-.pc-plane { display: flex; gap: 0.75rem; align-items: flex-start; flex: 1 1 340px; }
-.pc-plane-img { width: 120px; border-radius: 0.4rem; flex: none; }
-.pc-plane-name { font-weight: 700; margin-bottom: 0.25rem; }
-.pc-plane-text { font-size: 0.85rem; white-space: pre-wrap; opacity: 0.9; }
-.pc-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
-.pc-btn {
-  min-height: 2.2rem; padding: 0.3rem 0.8rem;
-  border: 1px solid rgba(120, 160, 255, 0.5); border-radius: 0.4rem;
-  background: rgba(60, 90, 160, 0.4); color: #dbe6ff; cursor: pointer;
-  font: 500 0.9rem "Montserrat", system-ui, sans-serif;
+.pc-center-img {
+  width: 100%;
+  border-radius: 0.5rem;
+  box-shadow: 0 8px 34px rgba(0, 0, 0, 0.75);
 }
-.pc-btn:hover { background: rgba(90, 130, 210, 0.55); }
-.pc-btn-off { border-color: rgba(255,255,255,0.2); background: rgba(255,255,255,0.06); color: inherit; }
-.pc-deck-count { font-size: 0.8rem; opacity: 0.7; }
-.pc-roll { font-weight: 700; padding: 0.15rem 0.5rem; border-radius: 0.3rem; }
+.pc-center-name {
+  font: 700 1.5rem "Newsreader", Georgia, serif;
+  color: #fff;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.95);
+}
+.pc-center-text {
+  font-size: 0.82rem;
+  line-height: 1.35;
+  color: #eef2fb;
+  max-width: 100%;
+  white-space: pre-wrap;
+  background: rgba(0, 0, 0, 0.55);
+  padding: 0.4rem 0.6rem;
+  border-radius: 0.4rem;
+}
+
+/* Bottom-bar Planechase controls (Enable, or Roll / Planeswalk / ✕). */
+.bottombar-pc {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.pc-roll {
+  font-weight: 700;
+  padding: 0.15rem 0.5rem;
+  border-radius: 0.3rem;
+  text-transform: capitalize;
+}
 .pc-roll-chaos { color: #fca5a5; }
 .pc-roll-planeswalk { color: #93c5fd; }
-.pc-roll-blank { opacity: 0.7; }
+.pc-roll-blank { opacity: 0.65; }
+
+/* Phone companion (in-flow) plane display. */
+.pc-plane-img { width: 100%; border-radius: 0.4rem; }
+.pc-plane-name { font-weight: 700; margin: 0.25rem 0; }
+.pc-plane-text { font-size: 0.85rem; white-space: pre-wrap; opacity: 0.9; }
+.pc-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }

@@ -1,5 +1,15 @@
 [
   {
+    "version": "4.10.9",
+    "date": "2026-07-14",
+    "added": [],
+    "refined": [
+      "Planechase layout on the tablet: the current plane is now shown large in the center of the table — readable across the pod — and the controls (Enable, then Roll planar die / Planeswalk) moved into the bottom bar next to Damage matrix. In companion mode, the shared plane in the middle matters more than the per-seat data it overlays."
+    ],
+    "resolved": [],
+    "archivist_note": "vX.Y.Z = #115 UX polish (owner request). Replaced the floating bottom-center Planechase bar with two pieces: (1) `#planechase-center` — the current plane image + name + text shown LARGE at the viewport center (`position:fixed; translate(-50%,-50%); z-index 590` above the seat grid but below the Momir bar/menus; `pointer-events:none` so it never blocks a seat's taps underneath — it overlays the four seats' center CMDR-damage mini-panels, which the owner explicitly deprioritized vs reading the plane across the table); (2) `#planechase-controls` — a `.bottombar-pc` span inside `.bottombar-actions` before the Damage matrix button, holding Enable (off) or Roll/Planeswalk/✕ (on) + the last-roll badge. renderPlanechase() rewritten to fill both. Template + CSS only, no service/logic change (actions/auth unchanged). Companion phone panel unchanged (still shows the plane + roll/walk in flow). Suite 894 green; tablet renders 200 with #planechase-center + bottombar controls."
+  },
+  {
     "version": "4.10.8",
     "date": "2026-07-14",
     "added": [],
