@@ -15089,19 +15089,32 @@ body.cmp-lobby-body { height: auto; min-height: 100dvh; overflow-y: auto; }
   align-self: flex-end;
 }
 
-/* #115 — Planechase overlay panel on the live game tracker (any game). */
+/* #115 — Planechase overlay panel on the live game tracker (any game).
+   The tablet tracker is a full-screen grid, so this floats (fixed) above the
+   editorial bottom bar like the Momir bar — NOT in document flow (which would
+   render it off-screen). The phone companion reuses the .pc-* pieces in flow. */
 .planechase-bar {
-  display: none;
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 3.25rem;
+  z-index: 600;
+  display: none; /* JS toggles to flex */
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.75rem;
-  margin: 0.75rem auto;
-  max-width: 900px;
-  padding: 0.6rem 0.9rem;
-  background: rgba(20, 30, 55, 0.6);
-  border: 1px solid rgba(120, 160, 255, 0.35);
+  gap: 0.6rem;
+  max-width: 92vw;
+  padding: 0.4rem 0.7rem;
+  background: rgba(20, 30, 55, 0.92);
+  border: 1px solid rgba(120, 160, 255, 0.4);
   border-radius: 0.6rem;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.5);
 }
+/* Tablet bar is compact: small plane thumb, name only (full text lives on the
+   plane card + each player's phone). */
+.planechase-bar .pc-plane { align-items: center; }
+.planechase-bar .pc-plane-img { width: 60px; }
+.planechase-bar .pc-plane-text { display: none; }
 .pc-plane { display: flex; gap: 0.75rem; align-items: flex-start; flex: 1 1 340px; }
 .pc-plane-img { width: 120px; border-radius: 0.4rem; flex: none; }
 .pc-plane-name { font-weight: 700; margin-bottom: 0.25rem; }

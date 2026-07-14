@@ -1,5 +1,15 @@
 [
   {
+    "version": "4.10.8",
+    "date": "2026-07-14",
+    "added": [],
+    "refined": [],
+    "resolved": [
+      "The Planechase controls (#115) now actually appear on the tablet. The 'Enable Planechase' bar was rendering off-screen; it now floats above the bottom bar like the Momir controls."
+    ],
+    "archivist_note": "vX.Y.Z = #115 follow-up. The planechase-bar was in normal document flow, but the tablet tracker (game_detail.html) is a full-screen grid — so the panel rendered below the fold / behind the grid and was invisible (reported with a live Commander pod showing no Enable button). Fix: CSS-only — .planechase-bar is now `position: fixed; bottom: 3.25rem; left:50%; translateX(-50%)` (the same floating slot the Momir bar uses), z-index 600, and compacted for the tablet (60px plane thumb, name only — `.planechase-bar .pc-plane-text{display:none}`; the phone companion keeps the full text in flow). No JS/logic change — renderPlanechase() + TABLE_TOKEN gating were already correct; the element just had no visible position. Momir+Planechase on the same game would share the 3.25rem slot (rare combo, acceptable)."
+  },
+  {
     "version": "4.10.7",
     "date": "2026-07-14",
     "added": [
