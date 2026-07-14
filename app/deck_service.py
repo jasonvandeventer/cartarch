@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import re
 
-from sqlalchemy import func, or_, text
+from sqlalchemy import bindparam, func, or_, text
 from sqlalchemy.orm import Session, joinedload
 
 from app.audit_service import log_transaction
@@ -1962,10 +1962,37 @@ def list_decks(session: Session, user_id: int) -> list[Deck]:
         .all()
     )
 
+    # #103 Phase B — persisted bracket + combo-fingerprint maps, ONE query each
+    # (never estimated on the request path). Local import: combo_refresh_service
+    # imports from this module, so top-level would cycle.
+    from app.combo_refresh_service import deck_combo_fingerprint
+    from app.models import DeckCombo
+
+    _deck_ids = [d.id for d in decks]
+    _est_map: dict[int, int] = {}
+    _fp_map: dict[int, str] = {}
+    if _deck_ids:
+        _est_map = {
+            r[0]: r[1]
+            for r in session.execute(
+                text(
+                    "SELECT deck_id, final_bracket FROM deck_bracket_estimates "
+                    "WHERE deck_id IN :ids"
+                ).bindparams(bindparam("ids", expanding=True)),
+                {"ids": _deck_ids},
+            )
+        }
+        _fp_map = {
+            dc.deck_id: dc.fingerprint
+            for dc in session.query(DeckCombo).filter(DeckCombo.deck_id.in_(_deck_ids))
+        }
+
     for deck in decks:
         if not deck.storage_location_id:
             deck.card_count = 0
             deck.total_value = 0.0
+            deck.bracket = None
+            deck.bracket_stale = False
             continue
 
         deck.card_count = (
@@ -2025,6 +2052,14 @@ def list_decks(session: Session, user_id: int) -> list[Deck]:
         # double-counting a shared card's value across sibling builds.
         _analytics_rows = resolved_deck_rows(session, deck, user_id)
         deck.consistency = compute_consistency(_analytics_rows) if _analytics_rows else None
+        # #103 Phase B — bracket chip data. Stale = the current decklist differs
+        # from the fingerprint the daemon last evaluated (it catches up on its
+        # own); fingerprint reuses the rows already in hand (no extra query).
+        deck.bracket = _est_map.get(deck.id)
+        _fp = _fp_map.get(deck.id)
+        deck.bracket_stale = _fp is None or (
+            _analytics_rows is not None and _fp != deck_combo_fingerprint(_analytics_rows)
+        )
         # issue: per-deck Total Value. Reuses all_rows (own rows only — inbound
         # variant shares are excluded, so a card is never double-counted across
         # sibling builds). Proxies excluded — a buy-list copy isn't held value.

@@ -200,6 +200,73 @@ def test_empty_deck_persists_without_network(db, monkeypatch):
     assert json.loads(db.query(DeckCombo).one().payload) == {"included": []}
 
 
+# ── Phase B — surfaces read persisted-only, with staleness ───────────────────
+
+
+def test_deck_combo_status_staleness(db, monkeypatch):
+    u = _user(db)
+    d = _deck(db, u.id)
+    _add_card(db, u.id, d, "Sol Ring")
+    rows = crs.resolved_deck_rows(db, d, u.id)
+    # Never computed → combos None, stale.
+    st = crs.deck_combo_status(db, d.id, rows)
+    assert st["combos"] is None and st["stale"] is True
+    # Computed → fresh.
+    _patch_fetch(monkeypatch, FAKE_COMBOS)
+    crs.refresh_stale_deck_combos(db)
+    st = crs.deck_combo_status(db, d.id, crs.resolved_deck_rows(db, d, u.id))
+    assert st["combos"] == FAKE_COMBOS and st["stale"] is False
+    # Deck edited → stale until the daemon catches up.
+    _add_card(db, u.id, d, "Mana Vault")
+    st = crs.deck_combo_status(db, d.id, crs.resolved_deck_rows(db, d, u.id))
+    assert st["combos"] == FAKE_COMBOS and st["stale"] is True
+
+
+def test_panels_fragment_renders_win_conditions(client, db, user, monkeypatch):
+    d = _deck(db, user.id)
+    _add_card(db, user.id, d, "Kiki-Jiki, Mirror Breaker", role="commander")
+    db.commit()
+    # Before the daemon has computed: panel hidden.
+    r = client.get(f"/decks/{d.id}/panels")
+    assert r.status_code == 200 and "Win Conditions" not in r.text
+    # Daemon computes → panel renders from the persisted row.
+    _patch_fetch(monkeypatch, FAKE_COMBOS)
+    crs.refresh_stale_deck_combos(db)
+    db.commit()
+    r = client.get(f"/decks/{d.id}/panels")
+    assert "Win Conditions" in r.text
+    assert "A + B" in r.text  # the combo's card names
+    assert "deck changed" not in r.text  # fresh
+    # Edit the deck → staleness chip appears (still renders the old combos).
+    _add_card(db, user.id, d, "Zealous Conscripts")
+    db.commit()
+    r = client.get(f"/decks/{d.id}/panels")
+    assert "Win Conditions" in r.text and "deck changed" in r.text
+
+
+def test_decks_list_bracket_chip(client, db, user, monkeypatch):
+    _seed_bracket_rules(db)
+    d = _deck(db, user.id)
+    _add_card(db, user.id, d, "Sol Ring")
+    _patch_fetch(monkeypatch, {"included": []})
+    crs.refresh_stale_deck_combos(db)  # persists combos + a bracket estimate
+    db.commit()
+    r = client.get("/decks")
+    assert r.status_code == 200
+    assert "deck-bracket-chip" in r.text  # chip rendered from the persisted row
+
+
+def test_deck_detail_hero_badge(client, db, user, monkeypatch):
+    _seed_bracket_rules(db)
+    d = _deck(db, user.id)
+    _add_card(db, user.id, d, "Sol Ring")
+    _patch_fetch(monkeypatch, {"included": []})
+    crs.refresh_stale_deck_combos(db)
+    db.commit()
+    r = client.get(f"/decks/{d.id}")
+    assert r.status_code == 200 and "deck-bracket-chip" in r.text
+
+
 def test_delete_deck_cleans_combo_row(db, monkeypatch):
     from app.deck_service import delete_deck
 

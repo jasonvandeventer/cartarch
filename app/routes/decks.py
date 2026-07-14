@@ -26,6 +26,7 @@ from app.bracket_v2_service import (
     load_persisted_estimate,
     persist_estimate,
 )
+from app.combo_refresh_service import deck_combo_status
 from app.db import DATA_DIR
 from app.deck_service import (
     CARD_ROLE_TAGS,
@@ -649,6 +650,20 @@ def deck_detail_page(
             health = compute_deck_health(all_deck_rows)
             consistency = compute_consistency(all_deck_rows)
 
+    # #103 Phase B — hero bracket badge from the PERSISTED estimate only (the
+    # request path never estimates; v3.27.9 invariant). Staleness = the deck's
+    # current fingerprint differs from the one the daemon last evaluated.
+    bracket_badge = None
+    if deck and deck.storage_location_id:
+        _est = load_persisted_estimate(session, deck.id)
+        if _est:
+            _cs = (
+                deck_combo_status(session, deck.id, all_deck_rows)
+                if all_deck_rows
+                else {"stale": True}
+            )
+            bracket_badge = {"bracket": _est["bracket"], "stale": _cs["stale"]}
+
     # v3.27.9: bracket_v2 estimator no longer runs on the request path. The
     # bracket display rolled up to "untrusted" pending a dedicated analytics
     # rebuild (see roadmap.md Deferred / latent items "Deck Analytics
@@ -747,6 +762,7 @@ def deck_detail_page(
             "deck_total_value": deck_total_value if deck else 0.0,
             "deck_total_cards": total_cards if deck else 0,
             "bracket_v2": bracket_v2,
+            "bracket_badge": bracket_badge,
             "token_requirements": _token_requirements,
             "token_inventory_options": (list_tokens(session, current_user.id) if deck else []),
             # v3.30.9 — auto-detected tokens NOT yet tracked, read from the
@@ -937,22 +953,17 @@ def deck_panels_fragment(
     # uses, or the fragment writes under a key the detail read never matches.
     all_deck_rows = resolved_deck_rows(session, deck, current_user.id)
 
-    # v3.27.9: combos + bracket no longer compute on the panels endpoint.
-    # compute_deck_combos issued a Spellbook /find-my-combos POST per deck
-    # (request-path network invariant violation surfaced on /decks cold load;
-    # see roadmap.md Deferred / latent items "Deck Analytics Rebuild").
-    # Synergy + dead-cards still render: synergy reads combos as a dict but
-    # tolerates an empty .included gracefully (loses the "Direct via combo
-    # membership" classification path, keeps tribal / payoff / engine paths).
-    # tokens / synergy / dead_cards are all local computations against the
-    # bulk Scryfall cache and stay on the request path. compute_deck_combos
-    # / bracket_v2_service are dormant code — left importable for the
-    # analytics rebuild to reuse. (The V1 compute_deck_bracket estimator was
-    # deleted in the pre-v4 cleanup sprint, 2026-06-09.)
+    # #103 Phase B — combos come from the deck_combos table (written only by the
+    # combo-refresh daemon; v3.27.9's request-path Spellbook POST stays dead).
+    # The synergy classifier regains its "Direct via combo membership" path, and
+    # the Win Conditions panel returns with an as-of timestamp + staleness chip.
+    # The panels file-cache keeps its v3.27.9 placeholder combos shape (goldfish
+    # quick-add reads that dict) — persisted combos are a separate read.
     bracket = None
     synergy = None
     combos: dict = {"included": [], "almost": []}
     tokens: list = []
+    combo_status = {"combos": None, "computed_at": None, "stale": True}
 
     if all_deck_rows:
         ck = _panels_cache_key(all_deck_rows)
@@ -964,7 +975,8 @@ def deck_panels_fragment(
             tokens = compute_deck_tokens(all_deck_rows)
             _write_panels_cache(deck_id, ck, {"tokens": tokens, "combos": combos})
 
-        synergy = compute_deck_synergy(all_deck_rows, combos)
+        combo_status = deck_combo_status(session, deck.id, all_deck_rows)
+        synergy = compute_deck_synergy(all_deck_rows, combo_status["combos"] or {"included": []})
         dead_cards = compute_dead_cards(all_deck_rows, synergy)
     else:
         dead_cards = None
@@ -977,6 +989,7 @@ def deck_panels_fragment(
             "bracket": bracket,
             "synergy": synergy,
             "combos": combos,
+            "combo_status": combo_status,
             "tokens": tokens,
             "dead_cards": dead_cards,
         },

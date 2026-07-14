@@ -14,6 +14,13 @@
             {{ deck.name }}
             <span class="mana-pip-row">{{ mana_pips(color_identity) }}</span>
             {% if deck.is_brew %}<span class="brew-badge" title="Brew deck — may contain cards you don't own; unowned cards are proxies">Brew</span>{% endif %}
+            {# #103 Phase B — persisted bracket estimate (never computed here);
+               ⟳ = deck changed since evaluation, the daemon refreshes it. #}
+            {% if bracket_badge %}
+              <a href="/decks/{{ deck.id }}/bracket"
+                 class="deck-bracket-chip bracket-{{ bracket_badge.bracket }}"
+                 title="Bracket estimate {{ bracket_badge.bracket }}{% if bracket_badge.stale %} — deck changed since evaluation; refreshing automatically{% endif %}">B{{ bracket_badge.bracket }}{% if bracket_badge.stale %} <span class="deck-bracket-stale">⟳</span>{% endif %}</a>
+            {% endif %}
           </h2>
           <p class="muted">{{ deck.format or 'Unspecified format' }}</p>
           {% if deck.notes %}<p class="muted">{{ deck.notes }}</p>{% endif %}

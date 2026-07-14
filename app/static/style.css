@@ -15308,3 +15308,58 @@ body.cmp-lobby-body { height: auto; min-height: 100dvh; overflow-y: auto; }
   width: 48px;
   border-radius: 0.25rem;
 }
+
+/* #103 Phase B — bracket chip (persisted estimate) + Win Conditions panel. */
+.deck-bracket-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.1rem 0.5rem;
+  border: 1px solid;
+  border-radius: 999px;
+  font: 700 0.75rem "Montserrat", system-ui, sans-serif;
+  text-decoration: none;
+  vertical-align: middle;
+}
+.deck-bracket-stale {
+  font-weight: 400;
+  opacity: 0.75;
+}
+.combos-asof {
+  font-size: 0.75rem;
+  font-weight: 400;
+  margin-left: 0.5rem;
+}
+.combos-stale-chip {
+  font: 500 0.7rem "Montserrat", system-ui, sans-serif;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  background: rgba(234, 179, 8, 0.15);
+  border: 1px solid rgba(234, 179, 8, 0.4);
+  color: #fde047;
+  margin-left: 0.4rem;
+  vertical-align: middle;
+}
+.combos-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+.combos-cards {
+  font-weight: 600;
+}
+.combos-results {
+  font-size: 0.85rem;
+}
+.combos-desc summary {
+  cursor: pointer;
+  font-size: 0.8rem;
+}
+.combos-desc p {
+  font-size: 0.85rem;
+  white-space: pre-wrap;
+  margin: 0.3rem 0 0;
+}

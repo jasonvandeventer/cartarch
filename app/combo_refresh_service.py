@@ -97,3 +97,25 @@ def load_deck_combos(session: Session, deck_id: int) -> dict | None:
         return json.loads(row.payload)
     except ValueError:
         return None
+
+
+def deck_combo_status(session: Session, deck_id: int, rows: list) -> dict:
+    """Phase B read seam with the honesty signal: the persisted combos plus
+    whether they're STALE (deck's current fingerprint ≠ the persisted one —
+    i.e. the deck changed and the daemon hasn't caught up yet). ``rows`` is the
+    caller's already-loaded resolved deck rows (no extra row query).
+
+    Returns ``{"combos": dict|None, "computed_at": datetime|None, "stale": bool}``;
+    combos None = never computed (surfaces hide rather than show nothing-yet)."""
+    row = session.query(DeckCombo).filter(DeckCombo.deck_id == deck_id).first()
+    if row is None:
+        return {"combos": None, "computed_at": None, "stale": True}
+    try:
+        payload = json.loads(row.payload)
+    except ValueError:
+        payload = None
+    return {
+        "combos": payload,
+        "computed_at": row.computed_at,
+        "stale": row.fingerprint != deck_combo_fingerprint(rows),
+    }

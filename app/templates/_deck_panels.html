@@ -93,10 +93,43 @@
       </details>
     </section>
   {% endif %}
-  {# v3.27.9: combos panel removed pending analytics rebuild (see roadmap.md
-     Deferred / latent items "Deck Analytics Rebuild"). The render-context
-     `combos` value is now always {included: [], almost: []}; the synergy
-     classifier still consumes it but contributes nothing via the combo path. #}
+  {# #103 Phase B — Win Conditions returns, reading ONLY the persisted
+     deck_combos row (written by the combo-refresh daemon; the request path
+     never calls Spellbook). Honesty rules: hidden until the daemon has computed
+     once; a "deck changed" chip when the current decklist differs from the one
+     the combos were computed for. #}
+  {% if combo_status and combo_status.combos is not none %}
+    {% set _included = combo_status.combos.get('included', []) %}
+    <section class="panel combos-panel">
+      <h3 class="panel-title">
+        Win Conditions
+        <span class="combos-asof muted">as of {{ combo_status.computed_at | format_local_datetime("%-d %b %Y") if combo_status.computed_at else '—' }}</span>
+        {% if combo_status.stale %}
+          <span class="combos-stale-chip" title="The decklist changed since these combos were computed — they refresh automatically within a few minutes.">deck changed · refreshing</span>
+        {% endif %}
+      </h3>
+      {% if _included %}
+        <ul class="combos-list">
+          {% for c in _included %}
+            <li class="combos-item">
+              <div class="combos-cards">{{ c.card_names | join(' + ') }}</div>
+              {% if c.results %}
+                <div class="combos-results muted">→ {{ c.results | join(' · ') }}</div>
+              {% endif %}
+              {% if c.description %}
+                <details class="combos-desc">
+                  <summary class="muted">How it works</summary>
+                  <p>{{ c.description }}</p>
+                </details>
+              {% endif %}
+            </li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <p class="muted">No complete combos detected in this deck (per Commander Spellbook).</p>
+      {% endif %}
+    </section>
+  {% endif %}
   {% if tokens %}
     <section class="panel">
       <h3 class="panel-title">Tokens</h3>

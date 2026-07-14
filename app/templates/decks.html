@@ -93,6 +93,10 @@
               <span class="decks-featured-fmt">{{ featured.format or 'Commander' }}</span>
               <span class="decks-featured-cards">{{ featured.card_count or 0 }} cards</span>
               <span class="decks-featured-value">· ${{ "%.2f" | format(featured.total_value or 0.0) }}</span>
+              {% if featured.bracket %}
+                <a href="/decks/{{ featured.id }}/bracket" class="deck-bracket-chip bracket-{{ featured.bracket }}"
+                   title="Bracket estimate {{ featured.bracket }}{% if featured.bracket_stale %} — deck changed since evaluation; refreshing automatically{% endif %}">B{{ featured.bracket }}{% if featured.bracket_stale %} <span class="deck-bracket-stale">⟳</span>{% endif %}</a>
+              {% endif %}
               {% if featured.is_brew %}<span class="brew-badge" title="Brew deck — may contain cards you don't own">Brew</span>{% endif %}
             </div>
             {% if featured.blurb %}
@@ -144,6 +148,10 @@
                 <span class="decks-row-fmt">{{ deck.format or 'Commander' }}</span>
                 <span class="decks-row-cards">· {{ deck.card_count or 0 }} cards</span>
                 <span class="decks-row-value">· ${{ "%.2f" | format(deck.total_value or 0.0) }}</span>
+                {% if deck.bracket %}
+                  <a href="/decks/{{ deck.id }}/bracket" class="deck-bracket-chip bracket-{{ deck.bracket }}"
+                     title="Bracket estimate {{ deck.bracket }}{% if deck.bracket_stale %} — deck changed since evaluation; refreshing automatically{% endif %}">B{{ deck.bracket }}{% if deck.bracket_stale %} <span class="deck-bracket-stale">⟳</span>{% endif %}</a>
+                {% endif %}
                 {% if deck.is_brew %}<span class="brew-badge" title="Brew deck — may contain cards you don't own">Brew</span>{% endif %}
               </div>
               {% if deck.blurb %}

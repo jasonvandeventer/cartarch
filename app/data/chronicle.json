@@ -1,5 +1,17 @@
 [
   {
+    "version": "4.11.3",
+    "date": "2026-07-14",
+    "added": [
+      "Combo data and bracket estimates are back on deck pages, for the first time since they were pulled for performance in v3.27. The deck page's analytics panels regain a Win Conditions section (your deck's complete combos per Commander Spellbook, with an as-of date), the Commander Synergy classifier counts combo membership again, and a colored bracket chip (B1–B5) appears in the deck header and on the deck list — linking to the full bracket evaluation. Everything is read from the background worker's stored results, so pages stay fast; if you've edited a deck since its last evaluation, the chip shows a ⟳ and the panel says 'deck changed · refreshing' until the worker catches up (a few minutes)."
+    ],
+    "refined": [],
+    "resolved": [
+      "Deck Analytics Rebuild (#103) Phase B — the surfaces. Phase C (the /decks N+1 rewrite) remains."
+    ],
+    "archivist_note": "vX.Y.Z = #103 Phase B, per the design-of-record. Everything reads PERSISTED rows only (deck_combos + deck_bracket_estimates, both daemon-written) — the request path never estimates or calls Spellbook (v3.27.9 invariant); staleness is always visible, never silent (the trust bar). New combo_refresh_service.deck_combo_status(session, deck_id, rows) -> {combos, computed_at, stale} — stale = current fingerprint ≠ persisted fingerprint, computed from rows the caller already loaded (no extra row query). Surfaces: (1) panels fragment reads deck_combo_status, feeds the persisted payload to compute_deck_synergy (the 'Direct via combo membership' path live again) and renders a Win Conditions panel in _deck_panels.html — hidden until first daemon compute, as-of date, 'deck changed · refreshing' chip when stale; the panels FILE cache keeps its v3.27.9 placeholder combos shape (goldfish quick-add reads that dict) — persisted combos are a separate read. (2) deck_detail hero: bracket chip (deck-bracket-chip + existing .bracket-1..5 colors) from load_persisted_estimate + staleness, linking to the #82 /bracket page; one indexed lookup + one DeckCombo read. (3) /decks list: deck.bracket/.bracket_stale annotated in list_decks via TWO prefetch queries (deck_bracket_estimates IN-list with expanding bindparam + DeckCombo map) — fingerprints reuse the _analytics_rows already loaded per deck, so ZERO added per-deck queries (the existing 3×N N+1 is untouched, Phase C's job); chips on the featured card + every editorial row. combo_refresh_service imported lazily in deck_service (it imports FROM deck_service — cycle). Tests (4 new, 11 total in the file): status staleness lifecycle, panels fragment hidden→rendered→stale-chip, /decks chip, detail hero badge. Suite 912 green. NEXT: Phase C — list_decks fixed-query rewrite behind a golden test."
+  },
+  {
     "version": "4.11.2",
     "date": "2026-07-14",
     "added": [],
