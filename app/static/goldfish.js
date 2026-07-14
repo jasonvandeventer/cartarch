@@ -1169,7 +1169,7 @@
   function setPreview(inst) {
     const frame = document.getElementById("gf-preview-frame");
     frame.innerHTML = "";
-    const img = buildCardImg(inst.card, "normal", "gf-preview-img", () =>
+    const img = buildCardImg(inst.card, "large", "gf-preview-img", () =>
       renderFallback(frame, inst)
     );
     if (img) {
