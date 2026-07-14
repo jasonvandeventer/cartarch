@@ -95,6 +95,7 @@ def test_collection_filter_parses_params():
         finishes=["foil"],
         price_min=" 1.5 ",
         price_max="not-a-number",
+        loc=["3", "5"],
     )
     assert f.colors == "WU"
     assert f.types == "Creature,Instant"
@@ -103,9 +104,15 @@ def test_collection_filter_parses_params():
     assert f.facet_price_min == 1.5
     assert f.facet_price_max is None  # non-numeric → facet skipped
     assert f.price_max_raw == "not-a-number"  # raw echoed for the template
+    # #97 — repeated `loc` checkboxes collapse to a joined id string.
+    assert f.location_ids == "3,5"
 
-    # Already-joined toolbar/pagination token survives unchanged.
-    assert collection_filter(colors=["WU"], types=[], status=[], finishes=[]).colors == "WU"
+    # Already-joined toolbar/pagination token survives unchanged (both facets + loc).
+    joined = collection_filter(colors=["WU"], types=[], status=[], finishes=[], loc=["3,5"])
+    assert joined.colors == "WU"
+    assert joined.location_ids == "3,5"
+    # Empty = no location filter.
+    assert collection_filter(colors=[], types=[], status=[], finishes=[], loc=[]).location_ids == ""
 
 
 def test_resolve_scope_drawer_vs_location_vs_missing():
@@ -149,6 +156,7 @@ def test_filtered_query_equals_grid_set():
         types=[],
         status=[],
         finishes=[],
+        loc=[],
     )
 
     # Shared export path.
@@ -168,3 +176,34 @@ def test_filtered_query_equals_grid_set():
     assert export_ids == grid_ids == {cheap.id}
     assert pricey.id not in export_ids  # over the price cap
     assert elsewhere.id not in export_ids  # different location
+
+
+def test_location_ids_multiselect_excludes_and_keeps_pending():
+    """#97 — the multi-select `location_ids` filter restricts to the chosen
+    locations PLUS pending/unfiled rows; unchosen locations are excluded. Empty
+    = no filter (matches the old 'All Locations'). Grid == export on both."""
+    _engine, sm = _engine_sm()
+    s = sm()
+    u = _user(s)
+    keep = _loc(s, u.id, "Keep Binder")
+    drop = _loc(s, u.id, "Drop Deck", type_="deck")
+    in_keep = _row(s, u.id, _card(s, "In Keep"), keep.id)
+    in_drop = _row(s, u.id, _card(s, "In Drop"), drop.id)
+    pend = _row(s, u.id, _card(s, "Pending"), None, pending=True)
+    s.commit()
+
+    def ids_for(location_ids):
+        f = collection_filter(colors=[], types=[], status=[], finishes=[], loc=location_ids)
+        base, _sel, _drw = _filtered_collection_query(s, u.id, f)
+        export_ids = {rid for (rid,) in base.with_entities(InventoryRow.id).all()}
+        rows, _t = list_inventory_rows(s, user_id=u.id, location_ids=f.location_ids, per_page=100)
+        grid_ids = {r.id for r in rows}
+        assert export_ids == grid_ids  # single source of truth: grid == export
+        return export_ids
+
+    # Empty → everything (default all-checked behavior).
+    assert ids_for([]) == {in_keep.id, in_drop.id, pend.id}
+    # Keep only "Keep Binder" checked → Drop Deck's card excluded, pending kept.
+    assert ids_for([str(keep.id)]) == {in_keep.id, pend.id}
+    # Equivalent joined-token form (pagination/export links).
+    assert ids_for([str(keep.id)]) == ids_for([f"{keep.id}"])

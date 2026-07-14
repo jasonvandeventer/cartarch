@@ -10680,6 +10680,53 @@ table.dmtx .dmtx-rowhead {
   min-width: 220px;
 }
 
+/* #97 — multi-select Locations filter (collapsible checkbox set in the toolbar).
+   The options render as an absolutely-positioned popover so a long location list
+   never reflows the toolbar. */
+.collection-loc-filter {
+  position: relative;
+  display: inline-block;
+}
+.collection-loc-filter > summary {
+  cursor: pointer;
+  padding: 0.4rem 0.6rem;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font: 500 13px/1 "Montserrat", system-ui, sans-serif;
+  color: var(--text-dim);
+  white-space: nowrap;
+  list-style: none;
+}
+.collection-loc-filter[open] > summary {
+  border-color: var(--brand-gold);
+  color: var(--brand-gold);
+}
+.collection-loc-options {
+  position: absolute;
+  z-index: 30;
+  margin-top: 0.3rem;
+  max-height: 320px;
+  overflow-y: auto;
+  min-width: 220px;
+  padding: 0.5rem 0.6rem;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+.collection-loc-option {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font: 400 13px/1.3 "Montserrat", system-ui, sans-serif;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
 /* Grid/Rows segmented toggle */
 .collection-view-toggle {
   display: inline-flex;

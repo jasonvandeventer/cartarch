@@ -1423,6 +1423,7 @@ def build_collection_filter_query(
     facet_price_max: float | None = None,
     finish: str = "",
     location_id: int = 0,
+    location_ids: str = "",
     drawer: str = "",
 ):
     """Joined + filtered Collection base query, BEFORE sort / count / paginate.
@@ -1469,8 +1470,24 @@ def build_collection_filter_query(
             StorageLocation.name == f"Drawer {drawer.strip()}",
             StorageLocation.type == "drawer",
         )
-    elif location_id:
-        base_query = base_query.filter(InventoryRow.storage_location_id == location_id)
+    else:
+        # #97 — multi-select Locations filter. `location_ids` is a comma-joined
+        # id string (facet convention). Non-empty = restrict to those locations
+        # PLUS unfiled/pending rows (storage_location_id IS NULL is never "in" a
+        # location a user could uncheck, so excluding a deck still surfaces
+        # cards not yet filed). Empty (default / all-checked / all-unchecked) =
+        # no location filter — identical to the old "All Locations". Takes
+        # precedence over the legacy single `location_id` (deep-link) param.
+        selected_ids = [int(x) for x in location_ids.split(",") if x.strip()]
+        if selected_ids:
+            base_query = base_query.filter(
+                or_(
+                    InventoryRow.storage_location_id.is_(None),
+                    InventoryRow.storage_location_id.in_(selected_ids),
+                )
+            )
+        elif location_id:
+            base_query = base_query.filter(InventoryRow.storage_location_id == location_id)
 
     return base_query
 
@@ -1569,6 +1586,7 @@ def list_inventory_rows(
     finish: str = "",
     drawer: str = "",
     location_id: int = 0,
+    location_ids: str = "",
     sort: str = "newest",
     direction: str = "desc",
     page: int = 1,
@@ -1612,6 +1630,7 @@ def list_inventory_rows(
         facet_price_max=facet_price_max,
         finish=finish,
         location_id=location_id,
+        location_ids=location_ids,
         drawer=drawer,
     )
 

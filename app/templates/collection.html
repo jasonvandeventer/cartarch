@@ -145,15 +145,29 @@
         <option value="foil" {% if finish_filter == 'foil' %}selected{% endif %}>Foil</option>
         <option value="etched" {% if finish_filter == 'etched' %}selected{% endif %}>Etched</option>
       </select>
-      <select name="location_id">
-        <option value="0">All Locations</option>
-        {% for loc in locations %}
-          {% if loc.type != "root" %}
-            <option value="{{ loc.id }}"
-                    {% if location_id == loc.id %}selected{% endif %}>{{ loc.name }} ({{ loc.type }})</option>
-          {% endif %}
-        {% endfor %}
-      </select>
+      {# #97 — multi-select Locations filter (replaces the single-select
+         dropdown). Checkboxes default to all-checked = the old "All Locations";
+         unchecking a location excludes its cards from results. Collapsed by
+         default so a 30+ location list doesn't dominate the toolbar; opens when
+         a filter is active. `loc` submits one checked id per box (the toolbar
+         GET form), which the collection_filter dependency joins to an id-string. #}
+      {% set active_loc_ids = location_ids.split(',') if location_ids else [] %}
+      {% set selectable_locs = locations | rejectattr('type', 'equalto', 'root') | list %}
+      {% set is_loc_filtered = active_loc_ids and (active_loc_ids | length < selectable_locs | length) %}
+      <details class="collection-loc-filter"{% if is_loc_filtered %} open{% endif %}>
+        <summary>Locations{% if is_loc_filtered %} · {{ active_loc_ids | length }}/{{ selectable_locs | length }}{% endif %}</summary>
+        <div class="collection-loc-options">
+          {% for loc in locations %}
+            {% if loc.type != "root" %}
+              <label class="collection-loc-option">
+                <input type="checkbox" name="loc" value="{{ loc.id }}"
+                       {% if not active_loc_ids or (loc.id | string) in active_loc_ids %}checked{% endif %}>
+                {{ loc.name }} <span class="muted">({{ loc.type }})</span>
+              </label>
+            {% endif %}
+          {% endfor %}
+        </div>
+      </details>
       {# v3.36.11 — shared SORT control (app/sort_spec.py: COLLECTION_SORT_OPTIONS).
          Canonical seven fields incl. Rarity (by rank) + Quantity Available, plus
          the collection-specific extras Date Added / Placement / Owned Count. The
@@ -170,7 +184,7 @@
       <input type="hidden" name="view" value="{{ view_mode }}">
       <button type="submit">Apply</button>
       <a href="/collection"><button type="button">Clear all</button></a>
-      {% set export_qs %}search={{ search|urlencode }}&finish={{ finish_filter }}&location_id={{ location_id }}&sort={{ sort }}&direction={{ direction }}&colors={{ facet_colors_set | sort | join('') }}&types={{ facet_types_set | sort | join(',') | urlencode }}&status={{ facet_status_set | sort | join(',') }}&finishes={{ facet_finishes_set | sort | join(',') }}&price_min={{ facet_price_min_raw }}&price_max={{ facet_price_max_raw }}{% endset %}
+      {% set export_qs %}search={{ search|urlencode }}&finish={{ finish_filter }}&location_id={{ location_id }}&loc={{ location_ids }}&sort={{ sort }}&direction={{ direction }}&colors={{ facet_colors_set | sort | join('') }}&types={{ facet_types_set | sort | join(',') | urlencode }}&status={{ facet_status_set | sort | join(',') }}&finishes={{ facet_finishes_set | sort | join(',') }}&price_min={{ facet_price_min_raw }}&price_max={{ facet_price_max_raw }}{% endset %}
       <a href="/collection/export?{{ export_qs }}">
         <button type="button">Export CSV</button>
       </a>
@@ -217,6 +231,7 @@
               <input type="hidden" name="price_max" value="{{ facet_price_max_raw }}">
               <input type="hidden" name="finish" value="{{ finish_filter }}">
               <input type="hidden" name="location_id" value="{{ location_id }}">
+              <input type="hidden" name="loc" value="{{ location_ids }}">
               <label>Add matching to showcase:
                 <select name="showcase_id" required>
                   {% for sc in showcases %}
@@ -243,6 +258,7 @@
             <input type="hidden" name="price_max" value="{{ facet_price_max_raw }}">
             <input type="hidden" name="finish" value="{{ finish_filter }}">
             <input type="hidden" name="location_id" value="{{ location_id }}">
+            <input type="hidden" name="loc" value="{{ location_ids }}">
             <label>Move matching to location:
               <select name="target_location_id" required>
                 {% for loc in locations %}
@@ -268,6 +284,7 @@
             <input type="hidden" name="price_max" value="{{ facet_price_max_raw }}">
             <input type="hidden" name="finish" value="{{ finish_filter }}">
             <input type="hidden" name="location_id" value="{{ location_id }}">
+            <input type="hidden" name="loc" value="{{ location_ids }}">
             <label>Cull cheap drawer dupes to:
               <select name="target_location_id" required>
                 {% for loc in locations %}
@@ -293,6 +310,7 @@
             <input type="hidden" name="price_max" value="{{ facet_price_max_raw }}">
             <input type="hidden" name="finish" value="{{ finish_filter }}">
             <input type="hidden" name="location_id" value="{{ location_id }}">
+            <input type="hidden" name="loc" value="{{ location_ids }}">
             <button type="submit" class="btn-danger-small">Delete matching ({{ '{:,}'.format(total_count) }} rows) →</button>
           </form>
           <p class="collection-bulk-note muted">Permanently deletes the placed cards matching the filter (pending excluded). Shows a preview with the blast radius — decks, showcases, shared showcases — and requires confirmation; an unfiltered whole-collection delete also requires typing DELETE.</p>
@@ -317,6 +335,7 @@
           <input type="hidden" name="search" value="{{ search }}">
           <input type="hidden" name="finish" value="{{ finish_filter }}">
           <input type="hidden" name="location_id" value="{{ location_id }}">
+          <input type="hidden" name="loc" value="{{ location_ids }}">
           <input type="hidden" name="sort" value="{{ sort }}">
           <input type="hidden" name="direction" value="{{ direction }}">
           <input type="hidden" name="view" value="{{ view_mode }}">
@@ -395,7 +414,7 @@
 
           <div class="collection-facet-actions">
             <button type="submit" class="collection-facet-apply">Apply filters</button>
-            <a href="/collection?search={{ search|urlencode }}&finish={{ finish_filter }}&location_id={{ location_id }}&sort={{ sort }}&direction={{ direction }}&view={{ view_mode }}"
+            <a href="/collection?search={{ search|urlencode }}&finish={{ finish_filter }}&location_id={{ location_id }}&loc={{ location_ids }}&sort={{ sort }}&direction={{ direction }}&view={{ view_mode }}"
                class="collection-facet-clear-link">Clear facets</a>
           </div>
         </form>

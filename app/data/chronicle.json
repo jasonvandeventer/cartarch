@@ -1,5 +1,17 @@
 [
   {
+    "version": "4.10.5",
+    "date": "2026-07-14",
+    "added": [
+      "The collection search's Locations filter is now multi-select. Instead of a single dropdown (all, or one location), it's a compact checkbox list — every location checked by default. Uncheck any location to exclude its cards from the results, which makes 'show me everything that isn't already in this deck' a one-click filter. It composes with search, facets, and sort, and the bulk actions + CSV/JSON export all act on exactly the filtered set."
+    ],
+    "refined": [],
+    "resolved": [
+      "Collection search — multi-select Locations filter (#97)."
+    ],
+    "archivist_note": "vX.Y.Z = #97. Replaced the single-select `location_id` dropdown with a collapsible `loc` checkbox set (all-checked default). Modeled on the existing facet convention (colors/types): `loc` is read as repeated params from the toolbar checkboxes AND survives a single joined `loc=1,2` token from export/pagination links — collection_filter joins both into one comma id-string `CollectionFilter.location_ids`. build_collection_filter_query gained `location_ids: str`: non-empty → `storage_location_id IS NULL OR IN(ids)` (pending/unfiled rows are always surfaced, so excluding a deck still shows cards not yet filed); empty (default all-checked, or all-unchecked) → no filter, identical to the old 'All Locations'. Takes precedence over the legacy single `location_id` (kept for deep links). Threaded through the whole shared-filter surface so bulk == grid == export (the single-source invariant): list_inventory_rows, _filtered_collection_query (export), _bulk_filter_placed_ids + its 4 routes (bulk-add-showcase, bulk-move, delete-preview, delete-matching), and the toolbar/bulk/pagination templates forward `loc`. The header stats + per-location pills and the drawer-cull path (resolve_drawer_cull_candidates) deliberately stay all-locations — the pills are a full-collection overview and the cull is a drawer-maintenance op orthogonal to a location-exclusion filter. UI: a `<details>` popover checkbox list (absolutely positioned so a 30+ location list never reflows the toolbar), opens + shows an N/total badge only when a proper subset is checked. Tests: collection_filter parses repeated + joined `loc`; a new grid==export exclusion test (unchosen location dropped, pending kept, empty=all). Suite 888 green; /collection + export render 200 with and without an active loc filter."
+  },
+  {
     "version": "4.10.4",
     "date": "2026-07-14",
     "added": [],

@@ -311,6 +311,7 @@ class CollectionFilter:
     search: str
     finish: str
     location_id: int
+    location_ids: str
     sort: str
     direction: str
     page: int
@@ -339,6 +340,11 @@ def collection_filter(
     search: str = "",
     finish: str = "",
     location_id: int = 0,
+    # #97 — multi-select Locations filter. Read as repeated params (`loc=1&loc=2`
+    # from the toolbar checkboxes) OR a single joined token (`loc=1,2` from
+    # export/pagination links); joined below into one comma id-string, exactly as
+    # the facet params collapse. Empty = no location filter (all locations).
+    loc: list[str] = Query(default=[]),
     sort: str = "newest",
     direction: str = "desc",
     page: int = 1,
@@ -376,6 +382,7 @@ def collection_filter(
         search=search,
         finish=finish,
         location_id=location_id,
+        location_ids=",".join(x.strip() for part in loc for x in part.split(",") if x.strip()),
         sort=sort,
         direction=direction,
         page=page,
@@ -430,6 +437,7 @@ def _filtered_collection_query(session: Session, user_id: int, filters: Collecti
         facet_price_max=filters.facet_price_max,
         finish=filters.finish,
         location_id=scope_location_id,
+        location_ids=filters.location_ids,
         drawer=drawer,
     )
     return base_query, selected_location, drawer
@@ -445,6 +453,7 @@ def collection_page(
     search = filters.search
     finish = filters.finish
     location_id = filters.location_id
+    location_ids = filters.location_ids
     sort = filters.sort
     direction = filters.direction
     page = filters.page
@@ -483,6 +492,7 @@ def collection_page(
         finish=finish,
         drawer=drawer,
         location_id=scope_location_id,
+        location_ids=location_ids,
         sort=sort,
         direction=direction,
         page=page,
@@ -514,6 +524,7 @@ def collection_page(
             facet_price_max=facet_price_max,
             finish=finish,
             location_id=scope_location_id,
+            location_ids=location_ids,
             drawer=drawer,
         )
         .with_entities(func.coalesce(func.sum(InventoryRow.quantity), 0))
@@ -659,6 +670,7 @@ def collection_page(
             "locations": locations,
             "showcases": showcases,
             "location_id": location_id,
+            "location_ids": location_ids,
             "current_user": current_user,
             "show_onboarding": show_onboarding,
             "use_drawer_sorter": has_sortable_setup(session, current_user.id),
@@ -895,6 +907,7 @@ def _bulk_filter_placed_ids(
     price_max: str,
     finish: str,
     location_id: int,
+    location_ids: str = "",
 ) -> tuple[list[int], int]:
     """Resolve the current Collection filter to ``(placed_row_ids,
     pending_excluded_count)``.
@@ -939,6 +952,7 @@ def _bulk_filter_placed_ids(
         facet_price_max=facet_price_max,
         finish=finish,
         location_id=scope_location_id,
+        location_ids=location_ids,
         drawer=drawer,
     )
     placed_ids = [
@@ -977,6 +991,7 @@ def collection_bulk_add_showcase(
     price_max: str = Form(""),
     finish: str = Form(""),
     location_id: int = Form(0),
+    loc: str = Form(""),
     include_proxies: bool = Form(False),
     session: Session = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
@@ -994,6 +1009,7 @@ def collection_bulk_add_showcase(
         "price_max": price_max,
         "finish": finish,
         "location_id": location_id,
+        "loc": loc,
     }
     placed_ids, pending_excluded = _bulk_filter_placed_ids(
         session,
@@ -1007,6 +1023,7 @@ def collection_bulk_add_showcase(
         price_max=price_max,
         finish=finish,
         location_id=location_id,
+        location_ids=loc,
     )
     # Proxies are skipped by default here too — same rule as the Showcase-page
     # bulk-adds (two bulk paths must not have opposite proxy defaults). Opt in
@@ -1047,6 +1064,7 @@ def collection_bulk_move(
     price_max: str = Form(""),
     finish: str = Form(""),
     location_id: int = Form(0),
+    loc: str = Form(""),
     session: Session = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
     _: None = CsrfRequired,
@@ -1061,6 +1079,7 @@ def collection_bulk_move(
         "price_max": price_max,
         "finish": finish,
         "location_id": location_id,
+        "loc": loc,
     }
     # Destination must be owned and NOT a deck: moving straight into a deck
     # location would bypass pull_card_to_deck reconciliation / role / variant
@@ -1082,6 +1101,7 @@ def collection_bulk_move(
         price_max=price_max,
         finish=finish,
         location_id=location_id,
+        location_ids=loc,
     )
     moved = 0
     for row_id in placed_ids:
@@ -1165,6 +1185,7 @@ def collection_cull_preview(
     price_max: str = Form(""),
     finish: str = Form(""),
     location_id: int = Form(0),
+    loc: str = Form(""),
     session: Session = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
     _: None = CsrfRequired,
@@ -1187,6 +1208,7 @@ def collection_cull_preview(
         "price_max": price_max,
         "finish": finish,
         "location_id": location_id,
+        "loc": loc,
     }
     # Same non-deck guard as bulk-move: a deck destination would bypass deck
     # reconciliation. Bulk must be a real (non-deck) StorageLocation.
@@ -1264,6 +1286,7 @@ def collection_cull_to_bulk(
     price_max: str = Form(""),
     finish: str = Form(""),
     location_id: int = Form(0),
+    loc: str = Form(""),
     session: Session = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
     _: None = CsrfRequired,
@@ -1283,6 +1306,7 @@ def collection_cull_to_bulk(
         "price_max": price_max,
         "finish": finish,
         "location_id": location_id,
+        "loc": loc,
     }
     target = get_location(session, location_id=target_location_id, user_id=current_user.id)
     if target is None or target.type == "deck":
@@ -1415,6 +1439,7 @@ def collection_delete_preview(
     price_max: str = Form(""),
     finish: str = Form(""),
     location_id: int = Form(0),
+    loc: str = Form(""),
     session: Session = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
     _: None = CsrfRequired,
@@ -1433,6 +1458,7 @@ def collection_delete_preview(
         "price_max": price_max,
         "finish": finish,
         "location_id": location_id,
+        "loc": loc,
     }
     placed_ids, pending_excluded = _bulk_filter_placed_ids(
         session,
@@ -1446,6 +1472,7 @@ def collection_delete_preview(
         price_max=price_max,
         finish=finish,
         location_id=location_id,
+        location_ids=loc,
     )
     blast = _delete_blast_radius(session, current_user.id, placed_ids)
     return render(
@@ -1477,6 +1504,7 @@ def collection_delete_matching(
     price_max: str = Form(""),
     finish: str = Form(""),
     location_id: int = Form(0),
+    loc: str = Form(""),
     confirm_text: str = Form(""),
     session: Session = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
@@ -1503,6 +1531,7 @@ def collection_delete_matching(
         "price_max": price_max,
         "finish": finish,
         "location_id": location_id,
+        "loc": loc,
     }
     if _is_unfiltered(filter_params) and confirm_text.strip() != "DELETE":
         return _collection_filter_redirect(
@@ -1521,6 +1550,7 @@ def collection_delete_matching(
         price_max=price_max,
         finish=finish,
         location_id=location_id,
+        location_ids=loc,
     )
     card_count = _delete_blast_radius(session, current_user.id, placed_ids)["card_count"]
     deleted = bulk_delete_inventory_rows(session, row_ids=placed_ids, user_id=current_user.id)
@@ -1616,6 +1646,7 @@ async def pending_confirm(
     request: Request,
     row_id: int = Form(...),
     location_id: int = Form(0),
+    loc: str = Form(""),
     session: Session = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
     _: None = CsrfRequired,
