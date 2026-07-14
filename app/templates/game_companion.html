@@ -224,6 +224,8 @@
 
         {# #115 — Planechase (shown for any game once the table enables it). #}
         <section class="cmp-planechase" id="cmp-planechase" style="display:none"></section>
+        {# #116 — Archenemy scheme deck (shown once the table enables it). #}
+        <section class="cmp-planechase" id="cmp-archenemy" style="display:none"></section>
 
         {% if game.format|lower == 'momir' %}
           {# ── Incoming attacks (defender's block decision) ── #}
@@ -349,6 +351,46 @@
   // companion action), not postAction directly.
   window.pcRoll = function () { postAction({ type: 'planar_roll' }); };
   window.pcWalk = function () { postAction({ type: 'planeswalk' }); };
+  window.schemeSetMotion = function () { postAction({ type: 'scheme_set_in_motion' }); };
+
+  function renderCompanionArchenemy() {
+    const el = document.getElementById('cmp-archenemy');
+    if (!el) return;
+    if (!st.archenemy) { el.style.display = 'none'; return; }
+    el.style.display = 'block';
+    const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g,
+      c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    const iAmArchenemy = st.archenemySeatId != null && st.archenemySeatId === MY_SEAT_ID;
+    let html =
+      '<div class="cmp-pc-head"><h3 class="cmp-section-title">Archenemy</h3>' +
+      `<button type="button" class="cmp-pc-toggle" onclick="togglePcHide()">${PC_HIDDEN ? 'Show' : 'Hide'}</button></div>`;
+    const cur = st.schemeCurrent;
+    if (cur && !PC_HIDDEN) {
+      const img = MIRROR_LARGE.replace('__SID__', cur.scryfall_id);
+      html +=
+        `<img class="pc-plane-img" style="width:100%" src="${img}" alt="${esc(cur.name)}" ` +
+        `onerror="this.onerror=null;this.src='https://api.scryfall.com/cards/${cur.scryfall_id}?format=image&version=normal'">` +
+        `<div class="pc-plane-name">${esc(cur.name)}</div>` +
+        `<div class="pc-plane-text">${esc(cur.text)}</div>`;
+    } else if (cur) {
+      html += `<div class="pc-plane-name">${esc(cur.name)} <span class="muted">(hidden)</span></div>`;
+    } else {
+      html += '<div class="muted" style="font-size:0.85rem">No scheme in motion yet.</div>';
+    }
+    const ongoing = st.ongoingSchemes || [];
+    if (ongoing.length && !PC_HIDDEN) {
+      html += '<div class="cmp-arch-ongoing">' +
+        ongoing.map(s => `<img src="${MIRROR_LARGE.replace('__SID__', s.scryfall_id)}" alt="${esc(s.name)}" title="${esc(s.name)}">`).join('') +
+        '</div>';
+    }
+    // Only the archenemy sets schemes in motion (the backend allows any seated
+    // player, but the button is the archenemy's action).
+    if (iAmArchenemy) {
+      html += '<div class="pc-controls" style="margin-top:0.5rem">' +
+        '<button type="button" class="cmp-btn" onclick="schemeSetMotion()">🗡 Set scheme in motion</button></div>';
+    }
+    el.innerHTML = html;
+  }
 
   function renderCompanionPlanechase() {
     const el = document.getElementById('cmp-planechase');
@@ -387,6 +429,7 @@
     document.getElementById('cmp-header').classList.toggle('cmp-my-turn', myTurn);
 
     renderCompanionPlanechase();  // #115 — plane display + roll/walk (any game)
+    renderCompanionArchenemy();   // #116 — scheme display + set-in-motion
 
     // Strip: seated players other than me (or all seats for a spectator).
     const others = SEATS.filter(s => s.id !== MY_SEAT_ID);

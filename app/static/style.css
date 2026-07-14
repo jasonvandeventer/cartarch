@@ -15193,3 +15193,58 @@ body.cmp-lobby-body { height: auto; min-height: 100dvh; overflow-y: auto; }
   font-size: 0.8rem;
   cursor: pointer;
 }
+
+/* #116 — Archenemy: the scheme in motion (portrait, upright) centered on the
+   tablet, ongoing schemes as a thumbnail strip below. Controls in the bottom
+   bar next to the Planechase ones. */
+.arch-center {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 588; /* just under the Planechase center (590) */
+  pointer-events: none;
+  display: none; /* JS → flex */
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  width: clamp(200px, 20vw, 300px);
+  text-align: center;
+}
+.arch-who {
+  font: 700 0.95rem "Montserrat", system-ui, sans-serif;
+  color: #f26d6d;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.9);
+}
+.arch-scheme-img {
+  width: 100%;
+  border-radius: 0.5rem;
+  box-shadow: 0 8px 34px rgba(0, 0, 0, 0.75);
+}
+.arch-ongoing {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  justify-content: center;
+  margin-top: 0.3rem;
+}
+.arch-ongoing-img {
+  width: 56px;
+  border-radius: 0.25rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
+}
+.bottombar-arch-label {
+  font-size: 0.85rem;
+  opacity: 0.8;
+}
+/* Phone companion: ongoing-scheme thumbnails. */
+.cmp-arch-ongoing {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin-top: 0.4rem;
+}
+.cmp-arch-ongoing img {
+  width: 48px;
+  border-radius: 0.25rem;
+}

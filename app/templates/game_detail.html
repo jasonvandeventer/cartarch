@@ -450,6 +450,8 @@
        table (readable across the pod); the controls live in the bottom bar. ── #}
     {% if not is_ended %}
       <div class="pc-center" id="planechase-center" style="display:none"></div>
+      {# #116 — Archenemy: the scheme in motion + ongoing schemes, center table. #}
+      <div class="arch-center" id="archenemy-center" style="display:none"></div>
     {% endif %}
     {# ── Editorial bottom bar — § Chronicle (active games only) ── #}
     {% if not is_ended %}
@@ -464,6 +466,8 @@
         <div class="bottombar-actions">
           {# #115 — Planechase controls (Enable, or Roll / Planeswalk / close). #}
           <span class="bottombar-pc" id="planechase-controls"></span>
+          {# #116 — Archenemy controls (seat picker, or Set scheme / close). #}
+          <span class="bottombar-pc" id="archenemy-controls"></span>
           <button type="button"
                   class="bottombar-btn"
                   onclick="openDamageMatrix(null)">⚔ Damage matrix</button>
@@ -1745,6 +1749,7 @@ function render() {
   }
 
   renderPlanechase();  // #115 — shared plane deck overlay (any game)
+  renderArchenemy();   // #116 — archenemy scheme deck overlay (any game)
   checkWinCondition();
 }
 
@@ -1790,6 +1795,59 @@ function renderPlanechase() {
   } else {
     center.style.display = 'none';
   }
+}
+
+// #116 — Archenemy overlay. Off: the table designates the archenemy via a seat
+// picker in the bottom bar. On: the scheme in motion shows large in the center
+// (schemes are portrait — no rotation), ongoing schemes as a strip below; the
+// bottom bar has "Set scheme" + ✕. Roll/set are open to any seated player.
+function renderArchenemy() {
+  const ctrls = document.getElementById('archenemy-controls');
+  const center = document.getElementById('archenemy-center');
+  if (!ctrls || !center) return;
+
+  if (!state.archenemy) {
+    center.style.display = 'none';
+    if (TABLE_TOKEN) {
+      let h = '<span class="bottombar-arch-label">🗡 Archenemy:</span>';
+      seatDefs.forEach(s => {
+        h += `<button type="button" class="bottombar-btn" onclick="postAction({type:'archenemy_enable',seat_id:${s.id}})">${escHtml(s.name)}</button>`;
+      });
+      ctrls.innerHTML = h;
+    } else {
+      ctrls.innerHTML = '';
+    }
+    return;
+  }
+
+  let c = '<button type="button" class="bottombar-btn" onclick="postAction({type:\'scheme_set_in_motion\'})">🗡 Set scheme</button>';
+  if (TABLE_TOKEN)
+    c += '<button type="button" class="bottombar-btn" title="Turn off Archenemy" onclick="postAction({type:\'archenemy_enable\',enabled:false})">✕</button>';
+  ctrls.innerHTML = c;
+
+  const cur = state.schemeCurrent;
+  const ongoing = state.ongoingSchemes || [];
+  const arch = seatDefs.find(s => s.id === state.archenemySeatId);
+  let html = arch ? `<div class="arch-who">🗡 ${escHtml(arch.name)}</div>` : '';
+  if (cur) {
+    const img = MIRROR_LARGE.replace('__SID__', cur.scryfall_id);
+    html +=
+      `<img class="arch-scheme-img" src="${img}" alt="${escHtml(cur.name)}" ` +
+      `onerror="this.onerror=null;this.src='https://api.scryfall.com/cards/${cur.scryfall_id}?format=image&version=normal'">` +
+      `<div class="pc-center-name">${escHtml(cur.name)}</div>` +
+      `<div class="pc-center-text">${escHtml(cur.text || '')}</div>`;
+  }
+  if (ongoing.length) {
+    html +=
+      '<div class="arch-ongoing">' +
+      ongoing.map(s =>
+        `<img class="arch-ongoing-img" src="${MIRROR_LARGE.replace('__SID__', s.scryfall_id)}" ` +
+        `alt="${escHtml(s.name)}" title="${escHtml(s.name)} — ongoing">`
+      ).join('') +
+      '</div>';
+  }
+  center.innerHTML = html;
+  center.style.display = (cur || ongoing.length || arch) ? 'flex' : 'none';
 }
 
 // ── Live-mode turn timer (client-side timeline) ────────────────

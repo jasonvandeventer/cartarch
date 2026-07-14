@@ -1,5 +1,17 @@
 [
   {
+    "version": "4.10.12",
+    "date": "2026-07-14",
+    "added": [
+      "Archenemy, for live games. The table designates one player as the archenemy and hands them a shared scheme deck. On their turn they 'set a scheme in motion' — the top scheme reveals on the center tablet (and the archenemy's phone), and Ongoing schemes stay parked on the board until manually abandoned. Like Planechase, it rides on any Commander game and is byte-identical to a normal game when off."
+    ],
+    "refined": [],
+    "resolved": [
+      "Archenemy scheme-deck tracker on companion mode (#116) — second supplemental-format tracker from the #86 companion epic."
+    ],
+    "archivist_note": "vX.Y.Z = #116. Same shape as Planechase (#115) on the shared companion pipeline. Three action types (`_ARCHENEMY_TYPES`, added to `_MUTATING_TYPES`, not `_MOMIR_TYPES`): `archenemy_enable` (table-only; designates `archenemySeatId`, shuffles the scheme pool via DB random(); re-enabling while on just re-points the seat, no reshuffle; disable strips the fields), `scheme_set_in_motion` (retire the previous non-ongoing current to discard, reveal the next, reshuffle discard when empty, park an Ongoing scheme in `ongoingSchemes`), `scheme_abandon` (manual clear — default, since the app can't know arbitrary leaves-conditions: with scheme_id drops that ongoing scheme, without clears the current). set/abandon are open to any seated player; enable table-only (wired into _validate_action_seats + _authorize_seat_scoped). State additive: archenemy/archenemySeatId/schemeDeck/schemeDiscard/schemeCurrent/ongoingSchemes. Data: schemes join oracle_catalog via the ingest filter (`\"Scheme\" in type_line`, is_momir_legal=False) — DEPLOY STEP: re-run `python -m app.jobs.oracle_ingest` in prod to populate them (~140 schemes), same as the plane ingest. Schemes are PORTRAIT (no rotation, unlike planes). UI: tablet `#archenemy-center` (current scheme large + ongoing thumbnail strip + archenemy name), a seat-picker→Set-scheme control cluster in the bottom bar (renderArchenemy); phone `#cmp-archenemy` shows the scheme + ongoing + a Set-in-motion button to the archenemy seat only (renderCompanionArchenemy, window.schemeSetMotion for the IIFE-scope inline handler). Defaults: full pool shuffled, one designated seat, manual ongoing-clear, life untouched. Tests: enable/designate, ongoing-accumulate + non-ongoing-discard + reshuffle, abandon, auth, ingest keeps schemes. Suite 900 green; tablet + companion render 200. Both-on with Planechase would overlap the center (rare). Next #86 child: #117 solo AI Momir."
+  },
+  {
     "version": "4.10.11",
     "date": "2026-07-14",
     "added": [],

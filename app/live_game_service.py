@@ -67,7 +67,18 @@ _MOMIR_CROSS_SEAT = {"momir_damage", "momir_counter_token", "momir_tap_token", "
 # seated player (the active player rolls, but enforcing "whose turn" is fussy for
 # a casual tracker — the social contract governs, every action is event-logged).
 _PLANECHASE_TYPES = {"planechase_enable", "planar_roll", "planeswalk"}
-_MUTATING_TYPES = {"life", "counter", "cmd", "eliminate", "turn"} | _MOMIR_TYPES | _PLANECHASE_TYPES
+
+# #116 — Archenemy overlay: a shared scheme deck for a designated archenemy seat,
+# on any live game. Same additive-state / any-game shape as Planechase. Enable
+# (which designates the archenemy) is table-only; setting a scheme in motion +
+# abandoning ongoing schemes are open to any seated player (the archenemy).
+_ARCHENEMY_TYPES = {"archenemy_enable", "scheme_set_in_motion", "scheme_abandon"}
+_MUTATING_TYPES = (
+    {"life", "counter", "cmd", "eliminate", "turn"}
+    | _MOMIR_TYPES
+    | _PLANECHASE_TYPES
+    | _ARCHENEMY_TYPES
+)
 
 _MAX_MOMIR_CMC = 16  # no creatures exist above ~16 CMC in MTG
 
@@ -215,6 +226,119 @@ def _apply_planar_roll(session: Session, action: dict, state: dict) -> dict:
     if face == "planeswalk":
         _advance_plane(session, state)
     return {"face": face}
+
+
+# ── Archenemy (#116) ──────────────────────────────────────────────────────────
+# Schemes live in oracle_catalog alongside creatures/planes (is_momir_legal=False).
+# type_line "Scheme" or "Ongoing Scheme" (the latter persists in play).
+
+
+def _scheme_filter():
+    return OracleCatalog.type_line.like("%Scheme%")
+
+
+def _shuffled_scheme_ids(session: Session, only: list[int] | None = None) -> list[int]:
+    q = session.query(OracleCatalog.id).filter(_scheme_filter())
+    if only is not None:
+        if not only:
+            return []
+        q = q.filter(OracleCatalog.id.in_(only))
+    return [sid for (sid,) in q.order_by(func.random()).all()]
+
+
+def _scheme_dict(session: Session, scheme_id: int | None) -> dict | None:
+    if scheme_id is None:
+        return None
+    row = session.get(OracleCatalog, scheme_id)
+    if row is None:
+        return None
+    type_line = row.type_line or ""
+    return {
+        "id": row.id,
+        "name": row.name,
+        "text": row.oracle_text or "",
+        "scryfall_id": row.scryfall_id,
+        "type": type_line,
+        "ongoing": "Ongoing" in type_line,
+    }
+
+
+def _apply_archenemy_enable(session: Session, action: dict, state: dict) -> dict:
+    """Enable/disable Archenemy. Enable designates the archenemy seat and shuffles
+    the scheme deck; re-enabling while on just re-points the seat (no reshuffle).
+    Disable strips the fields (blob back to byte-identical)."""
+    if not bool(action.get("enabled", True)):
+        for key in (
+            "archenemy",
+            "archenemySeatId",
+            "schemeDeck",
+            "schemeDiscard",
+            "schemeCurrent",
+            "ongoingSchemes",
+        ):
+            state.pop(key, None)
+        return {}
+    seat_id = _coerce_int(action.get("seat_id"))
+    if state.get("archenemy"):
+        state["archenemySeatId"] = seat_id  # already running — just reassign
+        return {}
+    ids = _shuffled_scheme_ids(session)
+    if not ids:
+        raise ValueError("No schemes in the catalog — run the scheme ingest first")
+    state["archenemy"] = True
+    state["archenemySeatId"] = seat_id
+    state["schemeDeck"] = ids
+    state["schemeDiscard"] = []
+    state["schemeCurrent"] = None
+    state["ongoingSchemes"] = []
+    return {}
+
+
+def _apply_scheme_set_in_motion(session: Session, action: dict, state: dict) -> dict:
+    """Set the top scheme in motion: retire the previous non-ongoing current to the
+    discard, reveal the next (reshuffle discard when the deck empties), and park an
+    Ongoing scheme in the persistent list."""
+    if not state.get("archenemy"):
+        raise ValueError("Archenemy is not enabled for this game")
+    cur = state.get("schemeCurrent")
+    if cur and not cur.get("ongoing"):
+        state.setdefault("schemeDiscard", []).append(cur["id"])
+    deck = state.get("schemeDeck", [])
+    discard = state.get("schemeDiscard", [])
+    if not deck:
+        deck = _shuffled_scheme_ids(session, only=discard)
+        discard = []
+    nxt = deck.pop(0) if deck else None
+    state["schemeDeck"] = deck
+    state["schemeDiscard"] = discard
+    scheme = _scheme_dict(session, nxt)
+    state["schemeCurrent"] = scheme
+    if scheme and scheme.get("ongoing"):
+        state.setdefault("ongoingSchemes", []).append(scheme)
+    return {}
+
+
+def _apply_scheme_abandon(session: Session, action: dict, state: dict) -> dict:
+    """Manually abandon a scheme (default: the app can't know arbitrary leaves
+    conditions). With ``scheme_id`` → drop that ongoing scheme; without → clear the
+    current in-motion scheme. Abandoned schemes go to the discard."""
+    if not state.get("archenemy"):
+        raise ValueError("Archenemy is not enabled for this game")
+    sid = _coerce_int(action.get("scheme_id"))
+    if sid is not None:
+        ongoing = state.get("ongoingSchemes", [])
+        state["ongoingSchemes"] = [s for s in ongoing if s.get("id") != sid]
+        if any(s.get("id") == sid for s in ongoing):
+            state.setdefault("schemeDiscard", []).append(sid)
+        # A cleared ongoing scheme that is also the current one drops from view.
+        if (state.get("schemeCurrent") or {}).get("id") == sid:
+            state["schemeCurrent"] = None
+    else:
+        cur = state.get("schemeCurrent")
+        if cur:
+            state.setdefault("schemeDiscard", []).append(cur["id"])
+            state["schemeCurrent"] = None
+    return {}
 
 
 def valid_momir_mvs(session: Session) -> set[int]:
@@ -420,6 +544,13 @@ def _authorize_seat_scoped(
             raise PermissionError("Only a seated player may control Planechase")
         return
 
+    if atype == "archenemy_enable":
+        raise PermissionError("Only the table can enable Archenemy")
+    if atype in _ARCHENEMY_TYPES:
+        if not any(s.user_id == user_id for s in game.seats):
+            raise PermissionError("Only a seated player may control Archenemy")
+        return
+
     # #110 — resource correction is a table-only power (seats get hard validation;
     # only the tablet can fix mis-taps). This branch runs only when the table token
     # was absent, so any seat player reaching here is rejected.
@@ -445,6 +576,11 @@ def _validate_action_seats(atype: str, action: dict, seats_by_id: dict[int, Game
     authorization so a bad seat is a 400 even on the table-token path."""
     if atype == "turn" or atype in _PLANECHASE_TYPES:
         return  # table/game-level actions — no seat reference
+    if atype in _ARCHENEMY_TYPES:
+        # Only archenemy_enable names a seat (the designated archenemy); validate it.
+        if atype == "archenemy_enable" and action.get("seat_id") is not None:
+            _require_seat(action.get("seat_id"), seats_by_id, "seat_id")
+        return
     if atype == "cmd":
         _require_seat(action.get("receiver_seat_id"), seats_by_id, "receiver_seat_id")
         _require_seat(action.get("attacker_seat_id"), seats_by_id, "attacker_seat_id")
@@ -491,6 +627,13 @@ def _apply_mutation(
         return _apply_planar_roll(session, action, state)
     if atype == "planeswalk":
         return _apply_planeswalk(session, action, state)
+
+    if atype == "archenemy_enable":
+        return _apply_archenemy_enable(session, action, state)
+    if atype == "scheme_set_in_motion":
+        return _apply_scheme_set_in_motion(session, action, state)
+    if atype == "scheme_abandon":
+        return _apply_scheme_abandon(session, action, state)
 
     if atype == "life":
         sid = str(_coerce_int(action["seat_id"]))

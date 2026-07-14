@@ -92,9 +92,15 @@ def extract(card: dict) -> dict | None:
     faces = card.get("card_faces")
     front = faces[0] if faces else card
     type_line = front.get("type_line") or card.get("type_line") or ""
-    # Keep creatures (the Momir pool) plus planes + phenomena (#115 Planechase).
-    # "Plane " (trailing space) matches "Plane — X" but not "Planeswalker".
-    if not ("Creature" in type_line or type_line.startswith("Plane ") or "Phenomenon" in type_line):
+    # Keep creatures (the Momir pool), planes + phenomena (#115 Planechase), and
+    # schemes (#116 Archenemy). "Plane " (trailing space) matches "Plane — X" but
+    # not "Planeswalker"; "Scheme" covers both "Scheme" and "Ongoing Scheme".
+    if not (
+        "Creature" in type_line
+        or type_line.startswith("Plane ")
+        or "Phenomenon" in type_line
+        or "Scheme" in type_line
+    ):
         return None
     return {
         "oracle_id": oracle_id,
