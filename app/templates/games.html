@@ -117,7 +117,7 @@
     </section>
   {% endif %}
   {# ── Notes modal — view/edit Game.notes (v3.26.0); one shared modal across rows ── #}
-  <div id="notes-modal" class="notes-modal" style="display:none">
+  <div id="notes-modal" class="notes-modal" data-dismiss style="display:none">
     <div class="notes-modal-inner">
       <h3 style="margin:0 0 0.75rem;font-size:1.15rem">Game Notes</h3>
       <div id="notes-modal-display"
@@ -173,15 +173,7 @@
       });
     });
 
-    // Click outside the inner card closes the modal
-    notesModal?.addEventListener('click', (e) => {
-      if (e.target === notesModal) closeNotesModal();
-    });
-    // ESC closes when modal is open
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && notesModal && notesModal.style.display !== 'none') {
-        closeNotesModal();
-      }
-    });
+    // #118 — backdrop click + Escape handled by the shared data-dismiss
+    // mechanism in base.html (dirty-guarded, unlike the old bespoke handlers).
 </script>
 {% endblock %}

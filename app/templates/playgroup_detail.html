@@ -151,7 +151,7 @@
       <h3 class="panel-title">Owner controls</h3>
 
       {# Rename + notes inside an inline popout, matching locations.html / decks.html idiom #}
-      <details class="inline-details">
+      <details class="inline-details js-dismiss">
         <summary class="btn-like">Edit name / notes</summary>
         <div class="edit-popout mobile-popover">
           <form method="post" action="/playgroups/{{ playgroup.id }}/edit" class="stack-form">
@@ -168,7 +168,7 @@
       {# Transfer ownership — a select of other members + confirm #}
       {% set other_members = members | rejectattr('user.id', 'equalto', current_user.id) | list %}
       {% if other_members %}
-        <details class="inline-details">
+        <details class="inline-details js-dismiss">
           <summary class="btn-like">Transfer ownership</summary>
           <div class="edit-popout mobile-popover">
             <form method="post" action="/playgroups/{{ playgroup.id }}/transfer-ownership" class="stack-form"
@@ -188,7 +188,7 @@
       {% endif %}
 
       {# Delete — type-the-name confirm (the destructive-action pattern from games / users) #}
-      <details class="inline-details">
+      <details class="inline-details js-dismiss">
         <summary class="btn-danger-small">Delete playgroup…</summary>
         <div class="edit-popout mobile-popover">
           <form method="post" action="/playgroups/{{ playgroup.id }}/delete" class="stack-form">

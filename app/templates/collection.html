@@ -154,7 +154,7 @@
       {% set active_loc_ids = location_ids.split(',') if location_ids else [] %}
       {% set selectable_locs = locations | rejectattr('type', 'equalto', 'root') | list %}
       {% set is_loc_filtered = active_loc_ids and (active_loc_ids | length < selectable_locs | length) %}
-      <details class="collection-loc-filter"{% if is_loc_filtered %} open{% endif %}>
+      <details class="collection-loc-filter js-dismiss"{% if is_loc_filtered %} open{% endif %}>
         <summary>Locations{% if is_loc_filtered %} · {{ active_loc_ids | length }}/{{ selectable_locs | length }}{% endif %}</summary>
         <div class="collection-loc-options">
           {% for loc in locations %}

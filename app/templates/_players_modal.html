@@ -8,7 +8,7 @@
    Requires context: is_owner, game, pickable_users, user_playgroups, csrf_token. #}
 {% if is_owner %}
   {% set pickable_ids = pickable_users | map(attribute='id') | list %}
-  <div id="players-modal" class="end-game-modal" style="display:none">
+  <div id="players-modal" class="end-game-modal" data-dismiss style="display:none">
     <div class="end-game-inner" style="max-width:640px">
       <h3 style="margin:0 0 0.35rem">Players &amp; sharing</h3>
       <p class="muted" style="margin:0 0 1rem;font-size:0.9rem">

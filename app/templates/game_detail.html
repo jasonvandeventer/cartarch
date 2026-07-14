@@ -491,7 +491,7 @@
         <button type="button" class="add-counter-opt" data-type="custom">● Custom…</button>
       </div>
       {# ── Damage matrix modal (Fork G) ──────────────────────────── #}
-      <div id="damage-matrix-modal" class="damage-matrix-modal" style="display:none">
+      <div id="damage-matrix-modal" class="damage-matrix-modal" data-dismiss style="display:none">
         <div class="damage-matrix-inner">
           <div class="damage-matrix-head">
             <span class="bottombar-eyebrow">
@@ -508,7 +508,7 @@
       </div>
       {# ── End-game modal (preserved verbatim) ───────────────────── #}
       {% if is_owner %}
-      <div id="end-game-modal" class="end-game-modal" style="display:none">
+      <div id="end-game-modal" class="end-game-modal" data-dismiss style="display:none">
         <div class="end-game-inner">
           <h3 style="margin:0 0 1rem">Record result</h3>
           <form method="post" action="/games/{{ game.id }}/end">
