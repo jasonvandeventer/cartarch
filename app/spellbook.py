@@ -8,6 +8,12 @@ _COMBO_CACHE_VERSION = 1
 
 _API_URL = "https://backend.commanderspellbook.com/find-my-combos/"
 
+# Descriptive UA (the Scryfall v4.6.4 lesson — default python-requests UAs get
+# rejected by some API fronts) + a timeout generous enough for 100-card POSTs;
+# 10s produced intermittent failures on larger decks in the daemon's cold pass.
+_HEADERS = {"User-Agent": "Cartarch/1.0 (+https://cartarch.com)", "Accept": "application/json"}
+_TIMEOUT = 30
+
 
 def fetch_deck_combos(main_names: list[str], commander_names: list[str]) -> dict | None:
     """POST card lists to CommanderSpellbook and return parsed included combos.
@@ -27,10 +33,13 @@ def fetch_deck_combos(main_names: list[str], commander_names: list[str]) -> dict
     }
 
     try:
-        resp = requests.post(_API_URL, json=payload, timeout=10)
+        resp = requests.post(_API_URL, json=payload, headers=_HEADERS, timeout=_TIMEOUT)
         resp.raise_for_status()
         raw = resp.json()
-    except Exception:
+    except Exception as exc:
+        # Cause visible in the daemon logs (429 vs timeout vs 4xx matter for
+        # tuning); the None contract (persist nothing, retry) is unchanged.
+        print(f"[spellbook] fetch failed: {exc!r}", flush=True)
         return None
 
     results = raw.get("results", {})

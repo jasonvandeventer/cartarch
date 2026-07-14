@@ -1,5 +1,16 @@
 [
   {
+    "version": "4.11.2",
+    "date": "2026-07-14",
+    "added": [],
+    "refined": [],
+    "resolved": [
+      "Combo-refresh daemon hardening: Spellbook requests now carry a descriptive User-Agent, get a 30s timeout (10s dropped larger decklists), and failures log their actual cause instead of being silent.",
+      "Deck search pane: text carried into the Add-card (all of Magic) tab now actually triggers the autocomplete search — previously it filled the box but sat inert until you typed another character."
+    ],
+    "archivist_note": "vX.Y.Z = #103 Phase A follow-up, from watching the prod cold pass: 21/41 decks persisted on the first passes (12 with real combos — Spellbook reachable and working), but several decks failed repeatedly with the cause swallowed by the bare `except: return None`. Three-line hardening in app/spellbook.py: (1) descriptive User-Agent + Accept headers (the Scryfall v4.6.4 generic_user_agent lesson — cheap insurance against API-front UA rejection), (2) timeout 10s → 30s (the likely failure mode: find-my-combos on 100-card lists is slow; 10s was the original request-path budget, irrelevant for a daemon), (3) the exception now prints `[spellbook] fetch failed: ...` so 429-vs-timeout-vs-4xx is visible in pod logs for tuning. The None contract (persist nothing, stale fingerprint retries next pass) is unchanged — the daemon was already converging correctly, just blind. PLUS a second #87-feedback fix in the same slot: carried text into the Add tab filled the input but never ran the autocomplete — a programmatic .value set doesn't fire the `input` event the autocomplete listens on; activate() now dispatches `new Event('input', {bubbles:true})` after carrying (harmless on the submit-based tabs; the 200ms debounce + 2-char minimum still gate the fetch). Suite 908 green."
+  },
+  {
     "version": "4.11.1",
     "date": "2026-07-14",
     "added": [],

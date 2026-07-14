@@ -1145,7 +1145,14 @@
             m.hidden = !on;
             if (on) {
               var inp = textInput(m);
-              if (inp && !inp.value && carried) inp.value = carried;
+              if (inp && !inp.value && carried) {
+                inp.value = carried;
+                // #87 feedback — a programmatic .value set doesn't fire the
+                // input event, so the Add tab's autocomplete never ran on
+                // carried text. Dispatch it so the mode's own handlers react
+                // (the other tabs are submit-based; the event is harmless).
+                inp.dispatchEvent(new Event('input', { bubbles: true }));
+              }
             }
           });
           if (focus) {
