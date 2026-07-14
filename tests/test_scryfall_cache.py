@@ -66,7 +66,8 @@ CREATE TABLE scryfall_cards (
     defense          TEXT,
     power            TEXT,
     toughness        TEXT,
-    keywords         TEXT
+    keywords         TEXT,
+    produced_mana    TEXT
 )
 """
 
@@ -334,11 +335,11 @@ def test_columns_match_normalizer():
     else:
         print(f"  [FAIL] column/normalizer mismatch:\n    cols={_COLS}\n    norm={norm_keys}")
         failed += 1
-    if len(_COLS) == 27:
-        print("  [OK] 27 columns (#76 added power + toughness + keywords as the 25th-27th)")
+    if len(_COLS) == 28:
+        print("  [OK] 28 columns (#100 added produced_mana as the 28th)")
         passed += 1
     else:
-        print(f"  [FAIL] expected 27 columns, got {len(_COLS)}")
+        print(f"  [FAIL] expected 28 columns, got {len(_COLS)}")
         failed += 1
     assert failed == 0
 

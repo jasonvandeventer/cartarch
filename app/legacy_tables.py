@@ -210,6 +210,8 @@ scryfall_cards = Table(
     Column("power", Text),
     Column("toughness", Text),
     Column("keywords", Text),
+    # #100 — produced_mana (Alembic a7b8c9d0e1f2), 28th seam column.
+    Column("produced_mana", Text),
     Index("ix_scryfall_cards_set_collector", "set_code", "collector_number"),
     Index("ix_scryfall_cards_name", "name"),
 )

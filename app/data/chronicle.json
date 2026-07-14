@@ -1,5 +1,17 @@
 [
   {
+    "version": "4.10.14",
+    "date": "2026-07-14",
+    "added": [
+      "The goldfish playtester's mana is now smarter about lands. Tapping a land that makes exactly one color (a basic, a mono tapland) adds that mana automatically — no color prompt. A dual/tri land still asks, but only offers the colors it actually makes. Unknown lands fall back to the full picker as before."
+    ],
+    "refined": [],
+    "resolved": [
+      "Goldfish fully-automated mana pool (#100)."
+    ],
+    "archivist_note": "vX.Y.Z = #100. New Card.produced_mana column (nullable Text, JSON array text — '[]' produces-nothing vs NULL not-yet-populated, same contract as keywords) + migration a7b8c9d0e1f2 (adds it to BOTH cards AND the byte-identical scryfall_cards cache seam). Threaded produced_mana through the full seam so the cache-first backfill path carries it: _normalize_card_payload (28th key), _CACHE_COLUMNS (→ _BULK_UPSERT_SQL + SELECT auto-flow), _cached_row_to_payload, legacy_tables.scryfall_cards, and the two parity/bulk test schemas + the 27→28 column-count assert. Both passive-backfill sites (trait-backfill for new cards, price-refresh staleness cycle for existing) set card.produced_mana = fresh.get('produced_mana'), so it populates automatically over the staleness cycle after the bulk-data daemon rebuilds the cache with the new column (no manual ingest, unlike the plane/scheme catalogs). goldfish route serializes produced_mana into the deck JSON. goldfish.js: producedManaColors(inst) parses produced_mana (with a Basic-land color_identity fallback while backfilling — Wastes→C), and toggleTap auto-adds on a 1-color land, opens openManaPicker(el, colors) restricted for multi-color, full picker when unknown. Basics work immediately via the fallback; other lands fill in as cards re-refresh. Defaults per the issue's open Qs: MDFC lands aren't special-cased (their produced_mana lists both faces → multi-color prompt, acceptable); basics short-circuit via type_line. Tests: seam parity (28 cols), producedManaColors JS self-check (single/multi/basic-fallback/Wastes/unknown/junk-filter). Suite 901 green; migration single head."
+  },
+  {
     "version": "4.10.13",
     "date": "2026-07-14",
     "added": [

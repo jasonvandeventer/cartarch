@@ -74,7 +74,8 @@ CREATE TABLE scryfall_cards (
     defense          TEXT,
     power            TEXT,
     toughness        TEXT,
-    keywords         TEXT
+    keywords         TEXT,
+    produced_mana    TEXT
 )
 """
 _META_DDL = "CREATE TABLE scryfall_bulk_meta (key TEXT PRIMARY KEY, value TEXT)"

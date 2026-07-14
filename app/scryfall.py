@@ -199,6 +199,11 @@ def _normalize_card_payload(raw: dict[str, Any]) -> dict[str, Any]:
         "power": power,
         "toughness": toughness,
         "keywords": json.dumps(raw.get("keywords") or []),
+        # #100 — 28th key, appended LAST. A Card ORM column (not stripped).
+        # produced_mana JSON array text ("[]" = produces nothing, NULL = not yet
+        # populated — same contract as keywords). Root-level in Scryfall
+        # (aggregated across faces), so no first-face fallback.
+        "produced_mana": json.dumps(raw.get("produced_mana") or []),
     }
 
 
@@ -474,7 +479,7 @@ _CACHE_COLUMNS = (
     "image_url, type_line, oracle_text, price_usd, price_usd_foil, "
     "price_usd_etched, colors, color_identity, mana_cost, cmc, legalities, "
     "full_art, frame_effects, set_type, layout, produced_tokens, "
-    "loyalty, defense, power, toughness, keywords"
+    "loyalty, defense, power, toughness, keywords, produced_mana"
 )
 
 
@@ -535,6 +540,8 @@ def _cached_row_to_payload(m) -> dict[str, Any]:
         "power": m["power"],
         "toughness": m["toughness"],
         "keywords": m["keywords"],
+        # #100 — 28th field, stored JSON array text, verbatim like keywords.
+        "produced_mana": m["produced_mana"],
     }
 
 

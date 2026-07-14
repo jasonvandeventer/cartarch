@@ -109,6 +109,10 @@ def goldfish_page(
                 "oracle_text": card.oracle_text,
                 "colors": card.colors,
                 "color_identity": card.color_identity,
+                # #100 — Scryfall produced_mana (JSON array text; NULL until the
+                # trait-backfill fills it). Lets the goldfish auto-add mana on a
+                # land tap instead of prompting for color.
+                "produced_mana": card.produced_mana,
                 # v3.36.1 — dormant payload data for the goldfish loyalty/
                 # defense auto-init (Step 4). Read straight off the cached
                 # Card columns (seam-populated by the daemon); NO request-

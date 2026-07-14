@@ -471,6 +471,8 @@ def _run_price_refresh_batch() -> None:
                 card.power = fresh.get("power")
                 card.toughness = fresh.get("toughness")
                 card.keywords = fresh.get("keywords")
+                # #100 — produced_mana, same ride (goldfish auto-mana).
+                card.produced_mana = fresh.get("produced_mana")
                 card.updated_at = now
                 updated += 1
         session.commit()
@@ -552,6 +554,8 @@ def _run_trait_backfill_batch() -> int:
                 card.power = fresh.get("power")
                 card.toughness = fresh.get("toughness")
                 card.keywords = fresh.get("keywords")
+                # #100 — produced_mana, same ride (goldfish auto-mana).
+                card.produced_mana = fresh.get("produced_mana")
                 card.updated_at = now
             else:
                 # Scryfall didn't return it — mark done (non-NULL) so the

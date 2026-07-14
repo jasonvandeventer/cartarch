@@ -297,6 +297,27 @@
     return kindOf(inst.card) === "land";
   }
 
+  // #100 — the mana colors a land produces, from Card.produced_mana (JSON array
+  // text). Falls back to a basic land's color identity while produced_mana is
+  // still backfilling (a basic with none — Wastes — produces colorless).
+  function producedManaColors(inst) {
+    const card = inst.card || {};
+    let arr = card.produced_mana;
+    if (typeof arr === "string") {
+      try { arr = JSON.parse(arr); } catch (e) { arr = null; }
+    }
+    let colors = Array.isArray(arr) ? arr.filter((x) => MANA_COLORS.includes(x)) : [];
+    if (colors.length === 0 && /\bBasic\b/.test(card.type_line || "")) {
+      let ci = card.color_identity;
+      if (typeof ci === "string") {
+        try { ci = JSON.parse(ci); } catch (e) { ci = ci.split(""); }
+      }
+      colors = Array.isArray(ci) ? ci.filter((x) => MANA_COLORS.includes(x)) : [];
+      if (colors.length === 0) colors = ["C"];
+    }
+    return colors;
+  }
+
   function moveTo(id, targetZone, opts = {}) {
     const found = findInstance(id);
     if (!found) return;
@@ -529,7 +550,17 @@
       // Re-find the card element after re-render — buildCardEl recreated it.
       const cardEl =
         document.querySelector(`.gf-card[data-inst-id="${id}"]`) || anchorEl;
-      openManaPicker(cardEl);
+      // #100 — auto-add when the produced color is unambiguous; prompt (with
+      // only the relevant colors) when it's a multi-color land; full picker when
+      // the data isn't known yet.
+      const colors = producedManaColors(found.inst);
+      if (colors.length === 1) {
+        adjustMana(colors[0], 1);
+      } else if (colors.length > 1) {
+        openManaPicker(cardEl, colors);
+      } else {
+        openManaPicker(cardEl);
+      }
     }
   }
 
@@ -708,13 +739,16 @@
     }
   }
 
-  function openManaPicker(anchor) {
+  function openManaPicker(anchor, colors) {
     closeManaPicker();
+    // #100 — restrict the buttons to a land's produced colors when known; the
+    // full palette is the fallback for lands with no produced-mana data yet.
+    const opts = Array.isArray(colors) && colors.length ? colors : MANA_COLORS;
     const picker = document.createElement("div");
     picker.className = "gf-mana-picker";
     picker.innerHTML =
       '<div class="gf-mana-picker-prompt">Add mana:</div>' +
-      MANA_COLORS.map(
+      opts.map(
         (c) =>
           '<button type="button" class="gf-mana-picker-btn gf-mp-' +
           c.toLowerCase() +

@@ -136,6 +136,10 @@ class Card(Base):
     power: Mapped[str | None] = mapped_column(String(16), nullable=True)
     toughness: Mapped[str | None] = mapped_column(String(16), nullable=True)
     keywords: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # #100 — Scryfall ``produced_mana`` (JSON array text, e.g. ``["R","W"]``; "[]"
+    # = produces nothing vs NULL = not yet backfilled, same contract as keywords).
+    # Lets the goldfish auto-add mana on a land tap instead of prompting for color.
+    produced_mana: Mapped[str | None] = mapped_column(Text, nullable=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
 
     inventory_rows: Mapped[list[InventoryRow]] = relationship(back_populates="card")
