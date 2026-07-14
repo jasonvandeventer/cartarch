@@ -1128,14 +1128,17 @@ def compute_deck_health(rows: list) -> dict:
     }
 
 
-def compute_deck_combos(all_rows: list) -> dict:
-    """Fetch win conditions and near-combos from CommanderSpellbook for this deck."""
+def compute_deck_combos(all_rows: list) -> dict | None:
+    """Fetch win conditions from CommanderSpellbook for this deck.
+
+    #103 Phase A — ``None`` means the fetch FAILED (retry later); an empty deck
+    short-circuits to a genuine empty result without touching the network."""
     from app.spellbook import fetch_deck_combos
 
     commander_names = [r.card.name for r in all_rows if r.card and r.role == "commander"]
     main_names = [r.card.name for r in all_rows if r.card and r.role != "commander"]
     if not main_names and not commander_names:
-        return {"included": [], "almost": []}
+        return {"included": []}
     return fetch_deck_combos(main_names, commander_names)
 
 
@@ -4109,6 +4112,11 @@ def delete_deck(session: Session, deck_id: int, user_id: int, *, commit: bool = 
 
     session.execute(text("DELETE FROM deck_bracket_findings WHERE deck_id = :d"), {"d": deck.id})
     session.execute(text("DELETE FROM deck_bracket_estimates WHERE deck_id = :d"), {"d": deck.id})
+    # #103 Phase A — the deck's persisted combo row (CASCADE is PG-only
+    # defense-in-depth; SQLite needs the explicit delete, same pattern as above).
+    from app.models import DeckCombo
+
+    session.query(DeckCombo).filter(DeckCombo.deck_id == deck.id).delete(synchronize_session=False)
     session.query(DeckTokenRequirement).filter(DeckTokenRequirement.deck_id == deck.id).delete(
         synchronize_session=False
     )

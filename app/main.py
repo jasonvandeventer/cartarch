@@ -213,6 +213,7 @@ async def lifespan(app: FastAPI):
         (_trait_backfill_loop, "trait-backfill"),
         (_bulk_data_loop, "bulk-data"),
         (_loyalty_defense_backfill_loop, "loyalty-backfill"),
+        (_combo_refresh_loop, "combo-refresh"),
     ):
         thread = threading.Thread(target=_target, daemon=True, name=_name)
         thread.start()
@@ -684,6 +685,40 @@ def _loyalty_defense_backfill_loop() -> None:
             return
         if shutdown_event.wait(_LOYALTY_BACKFILL_BUSY_SECONDS):
             return
+
+
+# #103 Phase A — combo-refresh daemon. Fingerprints every deck each pass and
+# only on change POSTs to CommanderSpellbook + recomputes the bracket estimate
+# (combo signal restored). Bounded: <= _COMBO_REFRESH_BATCH Spellbook POSTs per
+# pass. The v3.27.9 request-path network invariant holds — this is the ONLY
+# place Spellbook is called.
+_COMBO_REFRESH_BATCH = 3
+_COMBO_REFRESH_BUSY_SECONDS = 15  # between passes while stale decks remain
+_COMBO_REFRESH_IDLE_SECONDS = 900  # re-scan cadence once everything is fresh
+
+
+def _run_combo_refresh_batch() -> int:
+    from app.combo_refresh_service import refresh_stale_deck_combos
+
+    session = SessionLocal()
+    try:
+        return refresh_stale_deck_combos(session, limit=_COMBO_REFRESH_BATCH)
+    except Exception as exc:
+        session.rollback()
+        print(f"[combo-refresh] error: {exc}", flush=True)
+        return 0
+    finally:
+        session.close()
+
+
+def _combo_refresh_loop() -> None:
+    if shutdown_event.wait(60):  # after migrations/init; bail if stopping
+        return
+    while not shutdown_event.is_set():
+        processed = _run_combo_refresh_batch()
+        shutdown_event.wait(
+            _COMBO_REFRESH_BUSY_SECONDS if processed else _COMBO_REFRESH_IDLE_SECONDS
+        )
 
 
 @app.get("/")

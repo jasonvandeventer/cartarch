@@ -389,6 +389,27 @@ class Deck(Base):
     )
 
 
+class DeckCombo(Base):
+    """#103 Phase A — persisted CommanderSpellbook combo results per deck.
+
+    Written ONLY by the combo-refresh daemon (never on the request path — the
+    v3.27.9 invariant). ``fingerprint`` is a hash of the deck's played card
+    names; the daemon re-POSTs to Spellbook only when it changes, so the
+    fingerprint diff IS the cache invalidation (no write-path hooks). ``payload``
+    is the ``compute_deck_combos`` dict as JSON. One row per deck (UNIQUE).
+    """
+
+    __tablename__ = "deck_combos"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    deck_id: Mapped[int] = mapped_column(
+        ForeignKey("decks.id", ondelete="CASCADE"), unique=True, nullable=False
+    )
+    fingerprint: Mapped[str] = mapped_column(String(64), nullable=False)
+    payload: Mapped[str] = mapped_column(Text, nullable=False)
+    computed_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)
+
+
 class DeckGoal(Base):
     """Issue #46 — per-deck goals (Feature 1 of 2).
 

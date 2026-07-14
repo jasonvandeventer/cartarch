@@ -1,5 +1,17 @@
 [
   {
+    "version": "4.11.0",
+    "date": "2026-07-14",
+    "added": [
+      "The groundwork for bringing combo data and trusted bracket estimates back to deck pages (removed in v3.27.9 for performance): a background worker now keeps every deck's CommanderSpellbook combo results and bracket estimate up to date automatically. It notices when a deck's cards change and re-evaluates just that deck — nothing runs while you're loading pages. The combo-aware bracket signal (dormant since v3.27.9) is live again in the stored estimates. The deck-page displays return in the next release."
+    ],
+    "refined": [],
+    "resolved": [
+      "Deck Analytics Rebuild (#103) Phase A — combo-refresh daemon + persisted combos + bracket auto-recompute. Phases B (surfaces) and C (N+1) follow."
+    ],
+    "archivist_note": "vX.Y.Z = #103 Phase A, per the design-of-record on the issue. New deck_combos table (deck_id UNIQUE, fingerprint, payload JSON, computed_at; migration b8c9d0e1f2a3) + app/combo_refresh_service.py + a 5th daemon loop (combo-refresh: batch 3 decks/pass, 15s busy / 900s idle, starts 60s after boot). Core mechanism: deck_combo_fingerprint = sha256 over sorted commander/main name sets from resolved_deck_rows (full played decklist incl. variant shares; quantity-insensitive since Spellbook takes name lists) — the fingerprint diff IS the cache invalidation, zero deck-write-path hooks. Only a changed fingerprint POSTs to Spellbook; after persisting combos the daemon recomputes + persists the bracket via estimate_bracket_v2(combos=...) — the combo-role signal (compact/primary/backup) forced None since v3.27.9 is restored. FAILURE SEMANTICS FIX: spellbook.fetch_deck_combos returned {included:[],almost:[]} on network failure — indistinguishable from 'no combos', which would have persisted a wrong empty result and advanced the fingerprint (never retried). Now returns None on failure; compute_deck_combos propagates it; the daemon persists NOTHING on None so the stale fingerprint retries next pass. An empty deck short-circuits to a genuine {included:[]} with no network. delete_deck gains the explicit DeckCombo cleanup (SQLite FKs off; PG CASCADE stays defense-in-depth). load_deck_combos(session, deck_id) is the Phase B read seam. Request-path network invariant intact — the daemon is the ONLY Spellbook caller. Tests (7): fingerprint stability/change, persist+bracket round-trip (with a commander_bracket_rules seed + app.legacy_tables import, the test_deck_bracket_page precedent), fresh-deck-zero-network, fetch-failure-retries, batch limit bounds, empty-deck-no-network, delete_deck cleanup. Suite 908 green; migration single head. NEXT: Phase B (Win Conditions panel + bracket badge/column, persisted-only + staleness chips), Phase C (list_decks N+1 behind a golden test)."
+  },
+  {
     "version": "4.10.15",
     "date": "2026-07-14",
     "resolved": [

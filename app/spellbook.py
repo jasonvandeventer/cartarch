@@ -9,8 +9,13 @@ _COMBO_CACHE_VERSION = 1
 _API_URL = "https://backend.commanderspellbook.com/find-my-combos/"
 
 
-def fetch_deck_combos(main_names: list[str], commander_names: list[str]) -> dict:
-    """POST card lists to CommanderSpellbook and return parsed included/almost combos."""
+def fetch_deck_combos(main_names: list[str], commander_names: list[str]) -> dict | None:
+    """POST card lists to CommanderSpellbook and return parsed included combos.
+
+    #103 Phase A — returns ``None`` on any network/parse failure so the caller
+    (the combo-refresh daemon) can distinguish "Spellbook was unreachable" from
+    "this deck genuinely has no combos" and retry next pass instead of
+    persisting a wrong empty result."""
     cache_key = (_COMBO_CACHE_VERSION, frozenset(main_names + commander_names))
     cached = _CACHE.get(cache_key)
     if cached and time.time() - cached["ts"] < _CACHE_TTL:
@@ -26,7 +31,7 @@ def fetch_deck_combos(main_names: list[str], commander_names: list[str]) -> dict
         resp.raise_for_status()
         raw = resp.json()
     except Exception:
-        return {"included": [], "almost": []}
+        return None
 
     results = raw.get("results", {})
     deck_set = set(main_names + commander_names)
