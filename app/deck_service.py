@@ -1987,6 +1987,25 @@ def list_decks(session: Session, user_id: int) -> list[Deck]:
             for dc in session.query(DeckCombo).filter(DeckCombo.deck_id.in_(_deck_ids))
         }
 
+    # #103 Phase C — the N+1 fix (pinned by tests/test_list_decks_golden.py).
+    # The old loop ran 3-4 queries PER DECK (count / commanders / all-rows /
+    # resolved-rows, the last two overlapping) plus lazy card loads. Now ONE
+    # batched rows query covers every deck; per-deck queries remain only for
+    # the rare variant-group share resolution (gated on variant_group_id).
+    _loc_ids = [d.storage_location_id for d in decks if d.storage_location_id]
+    _rows_by_loc: dict[int, list[InventoryRow]] = {}
+    if _loc_ids:
+        for _r in (
+            session.query(InventoryRow)
+            .options(joinedload(InventoryRow.card))
+            .join(Card)
+            .filter(
+                InventoryRow.user_id == user_id,
+                InventoryRow.storage_location_id.in_(_loc_ids),
+            )
+        ):
+            _rows_by_loc.setdefault(_r.storage_location_id, []).append(_r)
+
     for deck in decks:
         if not deck.storage_location_id:
             deck.card_count = 0
@@ -1995,78 +2014,49 @@ def list_decks(session: Session, user_id: int) -> list[Deck]:
             deck.bracket_stale = False
             continue
 
-        deck.card_count = (
-            session.query(func.sum(InventoryRow.quantity))
-            .filter(
-                InventoryRow.user_id == user_id,
-                InventoryRow.storage_location_id == deck.storage_location_id,
-            )
-            .scalar()
-            or 0
-        )
-        # issue #27 — the deck card count includes inbound variant-group shares
-        # (the FULL decklist). Gated on variant_group_id, so non-variant decks
-        # run zero extra queries. Collection count is unaffected — shares are
-        # never InventoryRows of this deck.
-        deck.card_count += inbound_share_count_for_deck(session, deck)
+        own_rows = _rows_by_loc.get(deck.storage_location_id, [])
 
-        commander_rows = (
-            session.query(InventoryRow)
-            .join(Card)
-            .filter(
-                InventoryRow.user_id == user_id,
-                InventoryRow.storage_location_id == deck.storage_location_id,
-                InventoryRow.role == "commander",
-            )
-            .all()
+        # issue #27 — the deck card count includes inbound variant-group shares
+        # (the FULL decklist). Gated on variant_group_id inside the helper, so
+        # non-variant decks run zero extra queries. Collection count is
+        # unaffected — shares are never InventoryRows of this deck.
+        deck.card_count = sum(r.quantity for r in own_rows) + inbound_share_count_for_deck(
+            session, deck
         )
+
         seen: set[str] = set()
-        for row in commander_rows:
-            for letter in (row.card.color_identity or "").split():
-                seen.add(letter)
+        for row in own_rows:
+            if row.role == "commander":
+                for letter in (row.card.color_identity or "").split():
+                    seen.add(letter)
         deck.color_identity = " ".join(p for p in ["W", "U", "B", "R", "G"] if p in seen)
 
-        # v3.27.9: combos + bracket removed from the per-deck loop. The combo
-        # path made one Spellbook /find-my-combos POST per deck on cold cache
-        # (request-path network invariant violation — 14s /decks load against
-        # 11 decks). The bracket display rolled up to "untrusted" until a
-        # dedicated analytics rebuild lands; see the Deferred / latent items
-        # entry "Deck Analytics Rebuild" in roadmap.md. compute_deck_combos is
-        # deliberately left importable for the rebuild (dormant code, same
-        # pattern as the retired .site-header CSS in v3.27.8). The V1
-        # compute_deck_bracket estimator was deleted in the pre-v4 cleanup
-        # sprint (2026-06-09); bracket_v2_service.py is the sole estimator.
-        # consistency stays — it's a local computation.
-        all_rows = (
-            session.query(InventoryRow)
-            .join(Card)
-            .filter(
-                InventoryRow.user_id == user_id,
-                InventoryRow.storage_location_id == deck.storage_location_id,
-            )
-            .all()
-        )
         # issue #57 — consistency describes the full played decklist, so it
-        # includes inbound variant-group shares (short-circuits to own rows for
-        # a non-variant deck). Total Value below stays own-rows-only to avoid
-        # double-counting a shared card's value across sibling builds.
-        _analytics_rows = resolved_deck_rows(session, deck, user_id)
+        # includes inbound variant-group shares (empty for a non-variant deck,
+        # matching resolved_deck_rows' short-circuit). Sorted by id like
+        # resolved_deck_rows (keeps downstream determinism). Total Value below
+        # stays own-rows-only to avoid double-counting a shared card's value.
+        if deck.variant_group_id is not None:
+            _inbound = [row for row, _src in inbound_shared_rows_for_deck(session, deck)]
+            _analytics_rows = sorted(own_rows + _inbound, key=lambda r: r.id)
+        else:
+            _analytics_rows = sorted(own_rows, key=lambda r: r.id)
         deck.consistency = compute_consistency(_analytics_rows) if _analytics_rows else None
+
         # #103 Phase B — bracket chip data. Stale = the current decklist differs
         # from the fingerprint the daemon last evaluated (it catches up on its
         # own); fingerprint reuses the rows already in hand (no extra query).
         deck.bracket = _est_map.get(deck.id)
         _fp = _fp_map.get(deck.id)
-        deck.bracket_stale = _fp is None or (
-            _analytics_rows is not None and _fp != deck_combo_fingerprint(_analytics_rows)
-        )
-        # issue: per-deck Total Value. Reuses all_rows (own rows only — inbound
-        # variant shares are excluded, so a card is never double-counted across
-        # sibling builds). Proxies excluded — a buy-list copy isn't held value.
-        # effective_price reads only persisted Card columns (no network).
+        deck.bracket_stale = _fp is None or _fp != deck_combo_fingerprint(_analytics_rows)
+
+        # issue: per-deck Total Value (own rows only — inbound variant shares
+        # excluded, so a card is never double-counted across sibling builds).
+        # Proxies excluded — a buy-list copy isn't held value. effective_price
+        # reads only persisted Card columns (no network).
         deck.total_value = sum(
             (effective_price(r.card, r.finish) or 0.0) * r.quantity
-            for r in all_rows
+            for r in own_rows
             if r.card and not r.is_proxy
         )
 

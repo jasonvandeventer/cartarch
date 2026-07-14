@@ -1,5 +1,17 @@
 [
   {
+    "version": "4.11.5",
+    "date": "2026-07-14",
+    "added": [],
+    "refined": [
+      "The Decks page loads with a fixed handful of database queries no matter how many decks you have — previously it ran 3–4 queries per deck. Nothing visible changes; it's just faster and stays fast as the collection grows."
+    ],
+    "resolved": [
+      "Deck Analytics Rebuild (#103) Phase C — the list_decks N+1 rewrite. All three phases of #103 are now shipped."
+    ],
+    "archivist_note": "vX.Y.Z = #103 Phase C, the final phase. list_decks ran 3-4 queries PER DECK (SUM count, commanders, all-rows, resolved-rows — the last two overlapping — plus lazy Card loads on the un-joinedloaded all_rows). Rewrite: ONE batched rows query (joinedload card, storage_location_id IN all deck locations) grouped in Python feeds card_count / color_identity / total_value / consistency inputs / the Phase B fingerprint; per-deck queries survive ONLY for variant-group share resolution (inbound_share_count_for_deck + inbound_shared_rows_for_deck, both gated on variant_group_id — rare). Semantics preserved exactly, pinned FIRST by tests/test_list_decks_golden.py (the #104 characterization pattern): commander WU identity ordering, proxy excluded from value but counted in card_count, inbound share counted in card_count but never value, empty deck, location-less deck (bracket None/stale False), no-estimate deck (bracket None/stale True). _analytics_rows sorted by id matching resolved_deck_rows' determinism contract. PLUS a query-count regression guard: an event-listener test asserts ≤6 SELECTs for 6 non-variant decks (per-deck queries returning would be 20+ and fail loudly). Fixed query set: decks + estimates + fingerprints + batched rows = 4. Suite 914 green. #103 COMPLETE: Phase A (daemon+persist, v4.11.0-.2), Phase B (surfaces, v4.11.3-.4), Phase C (this)."
+  },
+  {
     "version": "4.11.4",
     "date": "2026-07-14",
     "added": [],
