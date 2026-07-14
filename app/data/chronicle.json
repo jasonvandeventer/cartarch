@@ -1,5 +1,15 @@
 [
   {
+    "version": "4.10.2",
+    "date": "2026-07-13",
+    "added": [],
+    "refined": [
+      "The goldfish playtester's card preview panel now loads high-resolution card images. Hovering a card shows the sharp 672x936 rendering instead of the mid-size image; battlefield and hand thumbnails are unchanged."
+    ],
+    "resolved": [],
+    "archivist_note": "vX.Y.Z = #93. One-token change: setPreview() passes 'large' instead of 'normal' to buildCardImg. Not a bug, a lagging call site: the #83 mirror-first refactor already made cardImageChain size-generic (mirror {base}/{id}/{size}.jpg → Scryfall API version={size} → text face), so the preview panel was the last surface requesting a size below what its rendered box deserved; the plumbing existed, only the size literal lagged. Grid/battlefield/modal stay 'small' (correct for thumbnail boxes; upgrading them multiplies battlefield bandwidth for no visible gain). The no-scryfall_id custom-token branch ignores the size arg by design (raw image_url path, text fallback unchanged), deliberately untouched. Pre-verified the mirror serves /large.jpg before shipping. Client-only: static_v content hash busts caches on deploy; no schema, no payload change, gameFingerprint untouched (goldfish isn't the tracker). No automated coverage is possible for a client size string (no JS harness); acceptance was a devtools network check of the mirror-large request plus a forced-miss fallback walk. Suite green."
+  },
+  {
     "version": "4.10.1",
     "date": "2026-07-13",
     "added": [
