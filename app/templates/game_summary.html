@@ -83,6 +83,109 @@
     </div>
   </section>
 
+  {% if analytics %}
+    {# #95 — per-game analytics replayed from the live event stream. Hidden
+       entirely for games with no recorded events (pre-v4.3 / localStorage). #}
+    {% set a = analytics %}
+    <section class="panel game-analytics">
+      <h3 class="panel-title">Game analytics</h3>
+
+      {# 1. Life over time — one inline-SVG polyline per seat (no chart lib,
+         matches the #85 dashboard sparkline approach). #}
+      {% set lc = a.life_chart %}
+      <div class="ga-block">
+        <h4 class="ga-heading">Life over time</h4>
+        <div class="ga-life-chart">
+          <svg viewBox="0 0 {{ lc.width }} {{ lc.height }}" preserveAspectRatio="none"
+               role="img" aria-label="Life totals per turn"
+               style="width:100%;height:180px;display:block">
+            {% for s in lc.series %}
+              <polyline points="{{ s.points }}" fill="none" stroke="{{ s.color }}"
+                        stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"
+                        vector-effect="non-scaling-stroke"/>
+            {% endfor %}
+          </svg>
+          <div class="ga-axis muted">
+            <span>Turn 1</span><span>{{ lc.life_lo }}–{{ lc.life_hi }} life</span><span>Turn {{ lc.max_turn }}</span>
+          </div>
+        </div>
+        <div class="ga-legend">
+          {% for s in lc.series %}
+            <span class="ga-legend-item">
+              <span class="ga-swatch" style="background:{{ s.color }}"></span>{{ s.label }}
+              <span class="muted">({{ s.final }})</span>
+            </span>
+          {% endfor %}
+        </div>
+      </div>
+
+      {# 2. Elimination timeline #}
+      {% if a.timeline %}
+        <div class="ga-block">
+          <h4 class="ga-heading">Elimination order</h4>
+          <ol class="ga-timeline">
+            {% for e in a.timeline %}
+              <li>
+                <span class="ga-swatch" style="background:{{ e.color }}"></span>
+                <strong>{{ e.label }}</strong>
+                {% if e.turn %}· turn {{ e.turn }}{% endif %}
+                {% if e.cause %}· {{ cause_labels.get(e.cause, e.cause) }}{% endif %}
+                <span class="muted">· {{ e.remaining }} left</span>
+              </li>
+            {% endfor %}
+          </ol>
+        </div>
+      {% endif %}
+
+      {# 3. Commander-damage matrix — receiver (row) × attacker (col). #}
+      {% if a.cmd_matrix.any %}
+        <div class="ga-block">
+          <h4 class="ga-heading">Commander damage</h4>
+          <p class="muted ga-subnote">Rows take damage from columns; ≥21 from one source is lethal.</p>
+          <div class="table-wrap">
+            <table class="stacking-table ga-cmd-matrix">
+              <thead>
+                <tr>
+                  <th>from →</th>
+                  {% for col in a.cmd_matrix.columns %}<th>{{ col.label }}</th>{% endfor %}
+                </tr>
+              </thead>
+              <tbody>
+                {% for row in a.cmd_matrix.rows %}
+                  <tr>
+                    <th scope="row">{{ row.label }}</th>
+                    {% for cell in row.cells %}
+                      <td class="{% if cell.self %}ga-cell-self{% elif cell.lethal %}ga-cell-lethal{% elif cell.value %}ga-cell-hit{% endif %}">
+                        {% if cell.self %}—{% else %}{{ cell.value }}{% endif %}
+                      </td>
+                    {% endfor %}
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      {% endif %}
+
+      {# 4. Pace #}
+      {% set p = a.pace %}
+      <div class="ga-block">
+        <h4 class="ga-heading">Pace</h4>
+        <p class="ga-pace-summary">
+          <strong>{{ p.total }}</strong> total · {{ p.turn_count }} turns · {{ p.avg_turn }} avg/turn
+        </p>
+        {% if p.turns %}
+          <div class="ga-pace-strip" aria-hidden="true">
+            {% for t in p.turns %}
+              <span class="ga-pace-bar" style="height:{{ [t.pct, 6] | max }}%"
+                    title="Turn {{ t.turn }}: {{ t.label }}"></span>
+            {% endfor %}
+          </div>
+        {% endif %}
+      </div>
+    </section>
+  {% endif %}
+
   <section class="panel">
     <h3 class="panel-title">Notes</h3>
     {% if game.notes %}

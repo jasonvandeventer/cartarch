@@ -27,6 +27,7 @@ from app.dependencies import (
     render,
     safe_redirect_url,
 )
+from app.game_analytics_service import build_game_analytics
 from app.game_service import (
     NEW_GAME_FORMAT_CHOICES,
     GameLockedError,
@@ -403,6 +404,9 @@ def game_detail_page(
             key=lambda s: (s.placement is None, s.placement or 0, s.seat_number),
         )
         ctx["elapsed"] = _format_game_elapsed(game)
+        # #95 — per-game analytics replayed from game_events (None for pre-v4.3 /
+        # localStorage games → the template hides the section).
+        ctx["analytics"] = build_game_analytics(session, game.id)
         return render(request, "game_summary.html", ctx)
 
     return render(request, "game_detail.html", ctx)

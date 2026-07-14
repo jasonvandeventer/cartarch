@@ -15045,3 +15045,46 @@ body.cmp-lobby-body { height: auto; min-height: 100dvh; overflow-y: auto; }
 /* ── End-game win-condition selector ── */
 .win-condition-row { display: flex; flex-wrap: wrap; gap: 0.4rem 0.8rem; margin: 0.2rem 0 0.4rem; }
 .win-cond-opt { display: inline-flex; align-items: center; gap: 0.3rem; font-size: 0.9rem; color: var(--text-dim); }
+
+/* #95 — per-game analytics section on the finalized game summary. */
+.game-analytics .ga-block { margin: 1.25rem 0 0; }
+.game-analytics .ga-block:first-of-type { margin-top: 0.5rem; }
+.ga-heading {
+  font: 600 13px/1.2 "Montserrat", system-ui, sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-dim);
+  margin: 0 0 0.5rem;
+}
+.ga-subnote { margin: -0.3rem 0 0.5rem; font-size: 0.82rem; }
+.ga-life-chart {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.5rem 0.6rem 0.3rem;
+  background: var(--panel-2);
+}
+.ga-axis { display: flex; justify-content: space-between; font-size: 0.75rem; margin-top: 0.2rem; }
+.ga-legend { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: 0.5rem; }
+.ga-legend-item { display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.85rem; }
+.ga-swatch {
+  display: inline-block; width: 0.7rem; height: 0.7rem;
+  border-radius: 2px; flex: none; vertical-align: middle;
+}
+.ga-timeline { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.35rem; }
+.ga-timeline li { display: flex; align-items: center; gap: 0.4rem; font-size: 0.9rem; }
+.ga-cmd-matrix td { text-align: center; font-variant-numeric: tabular-nums; }
+.ga-cmd-matrix th[scope="row"] { text-align: left; white-space: nowrap; }
+.ga-cell-self { color: var(--muted); }
+.ga-cell-hit { color: var(--text); }
+.ga-cell-lethal { color: #f85149; font-weight: 700; }
+.ga-pace-summary { margin: 0 0 0.5rem; }
+.ga-pace-strip {
+  display: flex; align-items: flex-end; gap: 3px;
+  height: 48px; padding: 0.3rem; border: 1px solid var(--border);
+  border-radius: var(--radius-sm); background: var(--panel-2);
+}
+.ga-pace-bar {
+  flex: 1 1 0; min-width: 3px;
+  background: var(--brand-gold, #b8860b); border-radius: 1px 1px 0 0;
+  align-self: flex-end;
+}

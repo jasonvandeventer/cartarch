@@ -1,5 +1,17 @@
 [
   {
+    "version": "4.10.6",
+    "date": "2026-07-14",
+    "added": [
+      "Finished live games now get a Game Analytics section on their summary page, rebuilt from the taps you already made during the game — nothing new to log. It shows life totals over the course of the game (one line per player), the elimination order (who went out on which turn and how), a commander-damage matrix (who dealt lethal to whom), and pace (total time, turns, and a per-turn strip). Games recorded before live mode existed simply don't show the section."
+    ],
+    "refined": [],
+    "resolved": [
+      "Per-game analytics view (#95) — Phase 3 of the game event history spec."
+    ],
+    "archivist_note": "vX.Y.Z = #95, Phase 3. New app/game_analytics_service.build_game_analytics(session, game_id) -> dict|None does ONE ordered pass over the game_events stream and returns the render-ready pieces; the finalized route (game_summary.html) calls it and the template hides the whole section when it's None (no live_started event = pre-v4.3/localStorage game). Replay fidelity is the crux: life-over-time is reconstructed from the live_started baseline by applying `life.delta` to the seat and `-cmd.actual_delta` to the receiver — the SAME coupled post-floor value live_game_service persisted (per the spec, analytics NEVER re-derives the cmd floor rule). Elimination timeline, the commander-damage matrix, and seat identity read straight off the live_started/finalized bookend state blobs (eliminated / eliminatedAtTurn / eliminationCause / cmd maps), so no seats-table joins. Pace = deltas between consecutive `turn` event timestamps + total wall clock (finalized - live_started). Charts are server-computed inline SVG polylines (one per seat) matching the #85 dashboard sparkline approach — no JS/chart lib. NOTE: `state.turn` is the ROUND counter (bumps only when the rotation wraps past the first seat), so the life x-axis is rounds. Test drives the REAL service chain (start_live_game -> apply_live_action life/cmd/turn -> end_game) so payloads can't drift from the writer, asserting life finals (coupled cmd+life), the elimination order/cause/remaining, the lethal cmd cell, and pace; plus the no-events None case. Read-only, no schema/route-write change. Suite 890 green; finalized game page renders 200 with all four surfaces. Phase 4 (cross-game aggregation, #96) still gated on ~15-20 recorded games."
+  },
+  {
     "version": "4.10.5",
     "date": "2026-07-14",
     "added": [
