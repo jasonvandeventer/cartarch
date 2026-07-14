@@ -1,5 +1,15 @@
 [
   {
+    "version": "4.10.15",
+    "date": "2026-07-14",
+    "resolved": [
+      "The deck page's three separate, scattered search boxes are now one tabbed search bar at the top: Add card (all of Magic), Your collection, and This deck. Pick a tab, type once — the text carries over when you switch modes. Each search still does exactly what it did; they're just no longer spread down the page (#87)."
+    ],
+    "added": [],
+    "refined": [],
+    "archivist_note": "vX.Y.Z = #87, UI-only (no backend — the three backends stay distinct per #55). Consolidated deck_detail.html's three scattered search surfaces — Add-card (Scryfall autocomplete → hx-post add-card, was top), Search-Collection (GET reload → inline owned-results grid, was mid-page), and Deck-Cards filter (hx-get cards-partial + sort/group/view, was above the list) — into ONE `.deck-search-panel` at the top with a segmented tab control. Each mode's form is relocated VERBATIM (same ids/hx-*/classes) into a `.deck-search-mode` div, so the add-card autocomplete JS, the #92 scroll-preserve (.collection-search-form/.deck-add-form), and every backend keep working untouched. Server picks the initial tab (`search_mode` = collection if collection_search else deck if search/health_filter else add) so a full-reload search lands on the right tab; a small JS toggles tabs client-side and carries the typed text across. Relocation done via an anchor-asserting script (verbatim block moves) then the old Search-Collection + Deck-Cards sections removed. Verified: all 3 modes render 200 with the correct active tab and all forms present; 901 suite green incl. 123 deck tests. Deferred: keyboard shortcuts for mode-switch; unified single results area (results still render per-mode — collection in-tab, add/deck in the deck list)."
+  },
+  {
     "version": "4.10.14",
     "date": "2026-07-14",
     "added": [

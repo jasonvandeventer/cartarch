@@ -176,14 +176,20 @@
     </section>
   {% endif %}
   {% if deck %}
-    <section class="panel add-card-panel">
-      <h3 class="panel-title" style="margin-bottom: 0.4rem">Add card to this deck</h3>
-      <p class="muted" style="margin-top: 0; margin-bottom: 0.6rem">
-        Type a card name, pick a printing (scroll the list for older
-        reprints), and click Add. If you already own the card, it'll be
-        moved from your collection. <a href="/import">Import a list</a>
-        for bulk add.
-      </p>
+    <section class="panel deck-search-panel">
+      {# #87 — one tabbed search bar replaces the three scattered surfaces
+         (Add card / Search Collection / Deck Cards). Each mode keeps its
+         original form (ids, hx-*, classes) verbatim so its backend + JS are
+         unchanged; the tabs just show/hide and carry the typed text across.
+         The server picks the initial tab from the active params. #}
+      {% set search_mode = 'collection' if collection_search else ('deck' if (search or health_filter) else 'add') %}
+      <div class="deck-search-tabs" role="tablist" aria-label="Deck search">
+        <button type="button" class="deck-search-tab{% if search_mode == 'add' %} active{% endif %}" data-mode="add">＋ Add card <span class="deck-search-tab-sub">all of Magic</span></button>
+        <button type="button" class="deck-search-tab{% if search_mode == 'collection' %} active{% endif %}" data-mode="collection">Your collection</button>
+        <button type="button" class="deck-search-tab{% if search_mode == 'deck' %} active{% endif %}" data-mode="deck">This deck</button>
+      </div>
+      <div class="deck-search-mode" data-mode="add"{% if search_mode != 'add' %} hidden{% endif %}>
+        <p class="muted deck-search-hint">Search all of Magic, pick a printing, and Add. Owned copies are moved from your collection. <a href="/import">Import a list</a> for bulk.</p>
       <form id="deck-add-card-form"
             method="post"
             action="/decks/{{ deck.id }}/add-card"
@@ -233,6 +239,136 @@
           <span id="deck-add-status" class="muted small-text" aria-live="polite"></span>
         </div>
       </form>
+      </div>
+      <div class="deck-search-mode" data-mode="collection"{% if search_mode != 'collection' %} hidden{% endif %}>
+        <p class="muted deck-search-hint">Search your owned cards: name, <code>t:type</code>, <code>c:WU</code>, <code>cmc:&gt;3</code>, <code>o:oracle</code>, <code>finish:foil</code>.</p>
+      <form method="get" action="/decks/{{ deck.id }}" class="filter-row collection-search-form">
+        <input type="hidden" name="search" value="{{ search }}">
+        <input type="text"
+               name="collection_search"
+               placeholder="Search your collection to add cards"
+               value="{{ collection_search }}">
+        <button type="submit">Search Collection</button>
+        <a href="/decks/{{ deck.id }}?search={{ search }}">
+          <button type="button">Clear</button>
+        </a>
+      </form>
+      {% if collection_search and collection_results %}
+        <div class="inventory-grid" style="margin-top: 1rem;">
+          {% for result in collection_results %}
+            <article class="inventory-card inventory-card-compact">
+              <div class="inventory-card-media">
+                {% if result.card.image_url %}
+                  <a href="/cards/{{ result.card.id }}">
+                    <img class="inventory-thumb"
+                         src="{{ mirror_image_url(result.card.scryfall_id) }}"
+                         {{ img_fallback(result.card.scryfall_id) }}
+                         alt="{{ result.card.name }}"
+                         loading="lazy">
+                  </a>
+                {% else %}
+                  <a href="/cards/{{ result.card.id }}"
+                     class="inventory-thumb placeholder"></a>
+                {% endif %}
+              </div>
+              <div class="inventory-card-body">
+                <h3 class="inventory-card-title">
+                  <a href="https://scryfall.com/card/{{ result.card.set_code }}/{{ result.card.collector_number }}"
+                     target="_blank"
+                     rel="noreferrer">{{ result.card.name }}</a>
+                </h3>
+                <div class="inventory-subtitle">
+                  {{ result.card.set_name }} · {{ result.card.set_code|upper }} #{{ result.card.collector_number }}
+                </div>
+                <div class="inventory-meta">
+                  {{ result.finish|capitalize }} · Owned Qty {{ result.quantity }}
+                  {% if result.effective_price is not none %}
+                    · ${{ '%.2f'|format(result.effective_price) }} each
+                  {% endif %}
+                </div>
+                <div class="inventory-location">{{ result.location_label }}</div>
+                <form action="/decks/pull"
+                      method="post"
+                      class="deck-add-form"
+                      style="margin-top: 0.75rem;
+                             display: flex;
+                             gap: 0.4rem;
+                             align-items: center;
+                             flex-wrap: wrap">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                  <input type="hidden" name="deck_id" value="{{ deck.id }}">
+                  <input type="hidden" name="inventory_row_id" value="{{ result.id }}">
+                  <input type="number"
+                         name="quantity"
+                         value="1"
+                         min="1"
+                         max="{{ result.quantity }}"
+                         style="width: 64px">
+                  <button type="submit">Add to This Deck</button>
+                </form>
+              </div>
+            </article>
+          {% endfor %}
+        </div>
+      {% elif collection_search %}
+        <p class="muted" style="margin-top: 1rem;">No owned cards matched that search.</p>
+      {% endif %}
+      </div>
+      <div class="deck-search-mode" data-mode="deck"{% if search_mode != 'deck' %} hidden{% endif %}>
+        <p class="muted deck-search-hint">Filter, sort, and group the cards already in this deck.</p>
+      <form method="get"
+            action="/decks/{{ deck.id }}"
+            class="filter-row"
+            hx-get="/decks/{{ deck.id }}/cards-partial"
+            hx-target="#deck-card-list"
+            hx-swap="innerHTML"
+            hx-push-url="true">
+        <input type="hidden"
+               name="collection_search"
+               value="{{ collection_search }}">
+        <input type="text"
+               name="search"
+               placeholder="t:creature OR t:artifact · id:gb · -t:land · cmc:&gt;=3 · is:commander · lang:ja"
+               data-mobile-placeholder="Search…"
+               value="{{ search }}">
+        {# v3.36.11 — shared SORT control (sort_spec.DECK_SORT_OPTIONS). In list
+           view this sorts WITHIN each group_by bucket (group_deck_items keeps
+           input order per group); the Group select below is a separate axis. #}
+        {% include "_sort_controls.html" %}
+        <input type="hidden" name="view" value="{{ view_mode }}">
+        <select name="group" {% if view_mode != 'list' %}disabled{% endif %}>
+          <option value="type" {% if group_by == 'type' %}selected{% endif %}>Group: Type</option>
+          <option value="cmc" {% if group_by == 'cmc' %}selected{% endif %}>Group: Mana Value</option>
+          <option value="color" {% if group_by == 'color' %}selected{% endif %}>Group: Color</option>
+          <option value="role" {% if group_by == 'role' %}selected{% endif %}>Group: Role Tag</option>
+          <option value="subtype" {% if group_by == 'subtype' %}selected{% endif %}>Group: Subtype</option>
+        </select>
+        <button type="submit">Apply</button>
+        <a href="/decks/{{ deck.id }}?collection_search={{ collection_search }}">
+          <button type="button">Clear</button>
+        </a>
+      </form>
+      {# View-mode toggle. Two buttons that POST to the pref-update route
+         and persist the choice on the User row. Both buttons send the
+         destination view as `view=`; the route also accepts `group=` for
+         the group-by selector, which we leave to the search form above.
+         A successful POST 303s back to the current URL via the Referer,
+         so the user lands on the same deck with the new view. #}
+      <form action="/account/deck-view-pref"
+            method="post"
+            class="filter-row deck-view-toggle"
+            style="margin-top: 0.5rem">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <button type="submit"
+                name="view"
+                value="grid"
+                class="deck-view-toggle-btn {% if view_mode == 'grid' %}active{% endif %}">Grid</button>
+        <button type="submit"
+                name="view"
+                value="list"
+                class="deck-view-toggle-btn {% if view_mode == 'list' %}active{% endif %}">List</button>
+      </form>
+      </div>
     </section>
   {% endif %}
   {% if bracket_v2 %}
@@ -547,83 +683,6 @@
     </section>
   {% endif %}
   {% if deck %}
-    <section class="panel controls-panel">
-      <h3>Search Collection</h3>
-      <p class="muted">
-        Search your owned cards: name, <code>t:type</code>, <code>c:WU</code>, <code>cmc:&gt;3</code>, <code>o:oracle</code>, <code>finish:foil</code>.
-      </p>
-      <form method="get" action="/decks/{{ deck.id }}" class="filter-row collection-search-form">
-        <input type="hidden" name="search" value="{{ search }}">
-        <input type="text"
-               name="collection_search"
-               placeholder="Search your collection to add cards"
-               value="{{ collection_search }}">
-        <button type="submit">Search Collection</button>
-        <a href="/decks/{{ deck.id }}?search={{ search }}">
-          <button type="button">Clear</button>
-        </a>
-      </form>
-      {% if collection_search and collection_results %}
-        <div class="inventory-grid" style="margin-top: 1rem;">
-          {% for result in collection_results %}
-            <article class="inventory-card inventory-card-compact">
-              <div class="inventory-card-media">
-                {% if result.card.image_url %}
-                  <a href="/cards/{{ result.card.id }}">
-                    <img class="inventory-thumb"
-                         src="{{ mirror_image_url(result.card.scryfall_id) }}"
-                         {{ img_fallback(result.card.scryfall_id) }}
-                         alt="{{ result.card.name }}"
-                         loading="lazy">
-                  </a>
-                {% else %}
-                  <a href="/cards/{{ result.card.id }}"
-                     class="inventory-thumb placeholder"></a>
-                {% endif %}
-              </div>
-              <div class="inventory-card-body">
-                <h3 class="inventory-card-title">
-                  <a href="https://scryfall.com/card/{{ result.card.set_code }}/{{ result.card.collector_number }}"
-                     target="_blank"
-                     rel="noreferrer">{{ result.card.name }}</a>
-                </h3>
-                <div class="inventory-subtitle">
-                  {{ result.card.set_name }} · {{ result.card.set_code|upper }} #{{ result.card.collector_number }}
-                </div>
-                <div class="inventory-meta">
-                  {{ result.finish|capitalize }} · Owned Qty {{ result.quantity }}
-                  {% if result.effective_price is not none %}
-                    · ${{ '%.2f'|format(result.effective_price) }} each
-                  {% endif %}
-                </div>
-                <div class="inventory-location">{{ result.location_label }}</div>
-                <form action="/decks/pull"
-                      method="post"
-                      class="deck-add-form"
-                      style="margin-top: 0.75rem;
-                             display: flex;
-                             gap: 0.4rem;
-                             align-items: center;
-                             flex-wrap: wrap">
-                  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                  <input type="hidden" name="deck_id" value="{{ deck.id }}">
-                  <input type="hidden" name="inventory_row_id" value="{{ result.id }}">
-                  <input type="number"
-                         name="quantity"
-                         value="1"
-                         min="1"
-                         max="{{ result.quantity }}"
-                         style="width: 64px">
-                  <button type="submit">Add to This Deck</button>
-                </form>
-              </div>
-            </article>
-          {% endfor %}
-        </div>
-      {% elif collection_search %}
-        <p class="muted" style="margin-top: 1rem;">No owned cards matched that search.</p>
-      {% endif %}
-    </section>
     {% if commanders %}
       <section class="panel controls-panel">
         <h3>Commander{{ 's' if commanders|length > 1 }}</h3>
@@ -640,80 +699,6 @@
         </div>
       </section>
     {% endif %}
-    <section class="panel controls-panel">
-      <h3>
-        Deck Cards
-        {% if health_filter %}
-          — <span class="health-filter-badge">{{ {"ramp":"Ramp","draw":"Card Draw","removal":"Removal","wipes":"Board Wipes"}[health_filter] }}</span> <a href="/decks/{{ deck.id }}?sort={{ sort }}&direction={{ direction }}"
-    class="health-filter-clear">× clear</a>
-        {% endif %}
-      </h3>
-      {# HTMX: hx-get hits a partial endpoint that returns just the filtered
-         card grid; hx-target swaps it in place so scroll position and other
-         panels stay intact. hx-push-url updates the address bar so the user
-         can bookmark/share the search. The form retains method="get" and
-         action="/decks/{id}" as a no-JS fallback — without HTMX it submits
-         normally and the full deck-detail route serves the same result.
-
-         hx-trigger is left to its form default (`submit`) so clicking Apply
-         OR pressing Enter inside the search input both fire the HTMX
-         request. Auto-firing on sort/direction `change` was tried but the
-         CSS attribute-selector trigger spec was a parse-quirk magnet across
-         browsers — keeping the submit-only path is the conservative call.
-         See docs/mobile_patterns.md for the HTMX pattern reference. #}
-      <form method="get"
-            action="/decks/{{ deck.id }}"
-            class="filter-row"
-            hx-get="/decks/{{ deck.id }}/cards-partial"
-            hx-target="#deck-card-list"
-            hx-swap="innerHTML"
-            hx-push-url="true">
-        <input type="hidden"
-               name="collection_search"
-               value="{{ collection_search }}">
-        <input type="text"
-               name="search"
-               placeholder="t:creature OR t:artifact · id:gb · -t:land · cmc:&gt;=3 · is:commander · lang:ja"
-               data-mobile-placeholder="Search…"
-               value="{{ search }}">
-        {# v3.36.11 — shared SORT control (sort_spec.DECK_SORT_OPTIONS). In list
-           view this sorts WITHIN each group_by bucket (group_deck_items keeps
-           input order per group); the Group select below is a separate axis. #}
-        {% include "_sort_controls.html" %}
-        <input type="hidden" name="view" value="{{ view_mode }}">
-        <select name="group" {% if view_mode != 'list' %}disabled{% endif %}>
-          <option value="type" {% if group_by == 'type' %}selected{% endif %}>Group: Type</option>
-          <option value="cmc" {% if group_by == 'cmc' %}selected{% endif %}>Group: Mana Value</option>
-          <option value="color" {% if group_by == 'color' %}selected{% endif %}>Group: Color</option>
-          <option value="role" {% if group_by == 'role' %}selected{% endif %}>Group: Role Tag</option>
-          <option value="subtype" {% if group_by == 'subtype' %}selected{% endif %}>Group: Subtype</option>
-        </select>
-        <button type="submit">Apply</button>
-        <a href="/decks/{{ deck.id }}?collection_search={{ collection_search }}">
-          <button type="button">Clear</button>
-        </a>
-      </form>
-      {# View-mode toggle. Two buttons that POST to the pref-update route
-         and persist the choice on the User row. Both buttons send the
-         destination view as `view=`; the route also accepts `group=` for
-         the group-by selector, which we leave to the search form above.
-         A successful POST 303s back to the current URL via the Referer,
-         so the user lands on the same deck with the new view. #}
-      <form action="/account/deck-view-pref"
-            method="post"
-            class="filter-row deck-view-toggle"
-            style="margin-top: 0.5rem">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-        <button type="submit"
-                name="view"
-                value="grid"
-                class="deck-view-toggle-btn {% if view_mode == 'grid' %}active{% endif %}">Grid</button>
-        <button type="submit"
-                name="view"
-                value="list"
-                class="deck-view-toggle-btn {% if view_mode == 'list' %}active{% endif %}">List</button>
-      </form>
-    </section>
       {# #54 — Bulk Move / Bulk Delete moved out of inline <details> into
          top-of-page modals (see the modal markup near the end of this block).
          <details> content stayed findable by Ctrl+F even when collapsed; the
@@ -1142,6 +1127,35 @@
         });
 
         resetSelection();
+      })();
+      </script>
+      <script>
+      // #87 — unified deck search: one bar, three modes (Add / Collection /
+      // Deck). Each mode is a separate form (unchanged wiring); the tabs just
+      // show/hide and carry the typed text across so switching keeps it.
+      (function () {
+        var tabs = document.querySelectorAll('.deck-search-tab');
+        var modes = document.querySelectorAll('.deck-search-mode');
+        if (!tabs.length) return;
+        function textInput(modeEl) { return modeEl ? modeEl.querySelector('input[type="text"]') : null; }
+        tabs.forEach(function (tab) {
+          tab.addEventListener('click', function () {
+            var mode = tab.dataset.mode;
+            var active = document.querySelector('.deck-search-mode:not([hidden])');
+            var carried = active ? (textInput(active) || {}).value || '' : '';
+            tabs.forEach(function (t) { t.classList.toggle('active', t === tab); });
+            modes.forEach(function (m) {
+              var on = m.dataset.mode === mode;
+              m.hidden = !on;
+              if (on) {
+                var inp = textInput(m);
+                if (inp && !inp.value && carried) inp.value = carried;
+              }
+            });
+            var inp = textInput(document.querySelector('.deck-search-mode[data-mode="' + mode + '"]'));
+            if (inp) inp.focus();
+          });
+        });
       })();
       </script>
     {% endif %}

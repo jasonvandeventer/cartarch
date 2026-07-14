@@ -2382,6 +2382,48 @@ td {
 .add-card-panel {
   padding: 1rem 1.4rem;
 }
+
+/* #87 — unified deck search: one tabbed bar for Add / Collection / Deck. */
+.deck-search-panel {
+  padding: 0.9rem 1.2rem 1rem;
+}
+.deck-search-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 0.85rem;
+}
+.deck-search-tab {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-dim);
+  padding: 0.45rem 0.7rem;
+  margin-bottom: -1px;
+  font: 600 0.92rem "Montserrat", system-ui, sans-serif;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.deck-search-tab:hover {
+  color: var(--text);
+}
+.deck-search-tab.active {
+  color: var(--brand-gold, #b8860b);
+  border-bottom-color: var(--brand-gold, #b8860b);
+}
+.deck-search-tab-sub {
+  font-weight: 400;
+  font-size: 0.78rem;
+  opacity: 0.6;
+}
+.deck-search-hint {
+  margin: 0 0 0.6rem;
+  font-size: 0.85rem;
+}
+.deck-search-mode[hidden] {
+  display: none;
+}
 .add-card-form {
   display: flex;
   flex-direction: column;
