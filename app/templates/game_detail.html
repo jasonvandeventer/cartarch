@@ -1782,8 +1782,8 @@ function renderPlanechase() {
   if (plane) {
     const img = MIRROR_LARGE.replace('__SID__', plane.scryfall_id);
     center.innerHTML =
-      `<img class="pc-center-img" src="${img}" alt="${escHtml(plane.name)}" ` +
-      `onerror="this.onerror=null;this.src='https://api.scryfall.com/cards/${plane.scryfall_id}?format=image&version=normal'">` +
+      `<div class="pc-center-imgwrap"><img class="pc-center-img" src="${img}" alt="${escHtml(plane.name)}" ` +
+      `onerror="this.onerror=null;this.src='https://api.scryfall.com/cards/${plane.scryfall_id}?format=image&version=normal'"></div>` +
       `<div class="pc-center-name">${escHtml(plane.name)}</div>` +
       `<div class="pc-center-text">${escHtml(plane.text || '')}</div>`;
     center.style.display = 'flex';

@@ -15107,11 +15107,25 @@ body.cmp-lobby-body { height: auto; min-height: 100dvh; overflow-y: auto; }
   flex-direction: column;
   align-items: center;
   gap: 0.4rem;
-  width: clamp(240px, 26vw, 420px);
+  width: clamp(320px, 34vw, 520px);
   text-align: center;
 }
-.pc-center-img {
+/* Scryfall serves planes as a PORTRAIT image with the content rotated; rotate
+   90° to landscape (card top toward the top of the screen — away from the
+   bottom player). The wrapper is the landscape box; the img (sized by its
+   portrait width) rotates to fill it, so the name/text below don't overlap. */
+.pc-center-imgwrap {
+  position: relative;
   width: 100%;
+  aspect-ratio: 1.393; /* landscape plane */
+  pointer-events: none;
+}
+.pc-center-img {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 71.8%; /* = 1/1.393; rotated, this fills the landscape wrapper */
+  transform: translate(-50%, -50%) rotate(90deg);
   border-radius: 0.5rem;
   box-shadow: 0 8px 34px rgba(0, 0, 0, 0.75);
 }
@@ -15147,8 +15161,33 @@ body.cmp-lobby-body { height: auto; min-height: 100dvh; overflow-y: auto; }
 .pc-roll-planeswalk { color: #93c5fd; }
 .pc-roll-blank { opacity: 0.65; }
 
-/* Phone companion (in-flow) plane display. */
-.pc-plane-img { width: 100%; border-radius: 0.4rem; }
+/* Phone companion (in-flow) plane display. The plane rotates to landscape and
+   fits the phone width (same portrait→landscape rotation as the tablet). */
+.pc-plane-wrap {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1.393; /* landscape plane */
+  overflow: hidden;
+  border-radius: 0.4rem;
+}
+.pc-plane-wrap .pc-plane-img {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 71.8%; /* = 1/1.393; rotated, fills the landscape wrapper */
+  transform: translate(-50%, -50%) rotate(90deg);
+  border-radius: 0;
+}
 .pc-plane-name { font-weight: 700; margin: 0.25rem 0; }
 .pc-plane-text { font-size: 0.85rem; white-space: pre-wrap; opacity: 0.9; }
 .pc-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+.cmp-pc-head { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+.cmp-pc-toggle {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: inherit;
+  border-radius: 0.4rem;
+  padding: 0.2rem 0.6rem;
+  font-size: 0.8rem;
+  cursor: pointer;
+}

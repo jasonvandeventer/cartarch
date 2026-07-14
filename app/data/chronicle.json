@@ -1,5 +1,15 @@
 [
   {
+    "version": "4.10.10",
+    "date": "2026-07-14",
+    "added": [],
+    "refined": [
+      "Planechase planes now display horizontally (the right way up) instead of sideways, on both the center tablet and each phone. On the tablet the plane faces the far side of the table with its text mirrored below for the near player; on phones the plane fits the screen width, and there's a Hide button to collapse it on your own device."
+    ],
+    "resolved": [],
+    "archivist_note": "vX.Y.Z = #115 orientation + phone polish (owner request). Scryfall serves planar cards as a PORTRAIT image with the content rotated 90° CCW, so they displayed sideways. Fix (CSS): the plane img is wrapped in a landscape box (aspect-ratio 1.393) and rotated `rotate(90deg)` with width:71.8% (=1/1.393) so the rotated image exactly fills the wrapper without disturbing sibling flow — card top ends up toward the top of the screen (tablet: away from the bottom player, text mirrored below serves the near side; phone: upright for the holder). Tablet uses `.pc-center-imgwrap`; the phone companion wraps the img in `.pc-plane-wrap` (width 100% → fits phone width). Phone gains a per-device Hide/Show toggle (`togglePcHide`, persisted in localStorage as `pcHidden`) that collapses the plane image to just its name on that phone only — renderCompanionPlanechase re-renders on toggle. Template + CSS only, no service change. Suite 894 green; tablet + companion render 200. If a plane ever reads upside-down the rotation is a one-line flip to -90deg."
+  },
+  {
     "version": "4.10.9",
     "date": "2026-07-14",
     "added": [],

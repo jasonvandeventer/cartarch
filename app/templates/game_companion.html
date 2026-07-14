@@ -336,6 +336,15 @@
 
   // #115 — Planechase panel on the phone. Enable is table-only (not offered
   // here); a seated player may roll the die + planeswalk. Hidden until enabled.
+  // Per-device "hide the plane" preference (this phone only), persisted.
+  let PC_HIDDEN = false;
+  try { PC_HIDDEN = localStorage.getItem('pcHidden') === '1'; } catch (e) {}
+  window.togglePcHide = function () {
+    PC_HIDDEN = !PC_HIDDEN;
+    try { localStorage.setItem('pcHidden', PC_HIDDEN ? '1' : '0'); } catch (e) {}
+    renderCompanionPlanechase();
+  };
+
   function renderCompanionPlanechase() {
     const el = document.getElementById('cmp-planechase');
     if (!el) return;
@@ -344,14 +353,18 @@
     const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g,
       c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
     const plane = st.currentPlane;
-    let html = '<h3 class="cmp-section-title">Planechase</h3>';
-    if (plane) {
+    let html =
+      '<div class="cmp-pc-head"><h3 class="cmp-section-title">Planechase</h3>' +
+      `<button type="button" class="cmp-pc-toggle" onclick="togglePcHide()">${PC_HIDDEN ? 'Show' : 'Hide'}</button></div>`;
+    if (plane && !PC_HIDDEN) {
       const img = MIRROR_LARGE.replace('__SID__', plane.scryfall_id);
       html +=
-        `<img class="pc-plane-img" style="width:100%" src="${img}" alt="${esc(plane.name)}" ` +
-        `onerror="this.onerror=null;this.src='https://api.scryfall.com/cards/${plane.scryfall_id}?format=image&version=normal'">` +
+        `<div class="pc-plane-wrap"><img class="pc-plane-img" src="${img}" alt="${esc(plane.name)}" ` +
+        `onerror="this.onerror=null;this.src='https://api.scryfall.com/cards/${plane.scryfall_id}?format=image&version=normal'"></div>` +
         `<div class="pc-plane-name">${esc(plane.name)}</div>` +
         `<div class="pc-plane-text">${esc(plane.text)}</div>`;
+    } else if (plane) {
+      html += `<div class="pc-plane-name">${esc(plane.name)} <span class="muted">(hidden)</span></div>`;
     }
     html +=
       '<div class="pc-controls" style="margin-top:0.5rem">' +
