@@ -228,20 +228,20 @@ def test_panels_fragment_renders_win_conditions(client, db, user, monkeypatch):
     db.commit()
     # Before the daemon has computed: panel hidden.
     r = client.get(f"/decks/{d.id}/panels")
-    assert r.status_code == 200 and "Win Conditions" not in r.text
+    assert r.status_code == 200 and "combos-panel" not in r.text
     # Daemon computes → panel renders from the persisted row.
     _patch_fetch(monkeypatch, FAKE_COMBOS)
     crs.refresh_stale_deck_combos(db)
     db.commit()
     r = client.get(f"/decks/{d.id}/panels")
-    assert "Win Conditions" in r.text
+    assert "combos-panel" in r.text
     assert "A + B" in r.text  # the combo's card names
     assert "deck changed" not in r.text  # fresh
     # Edit the deck → staleness chip appears (still renders the old combos).
     _add_card(db, user.id, d, "Zealous Conscripts")
     db.commit()
     r = client.get(f"/decks/{d.id}/panels")
-    assert "Win Conditions" in r.text and "deck changed" in r.text
+    assert "combos-panel" in r.text and "deck changed" in r.text
 
 
 def test_decks_list_bracket_chip(client, db, user, monkeypatch):

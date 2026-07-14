@@ -3025,7 +3025,7 @@ td {
 .card-tag-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.25rem;
+  gap: 0.45rem 0.35rem; /* row-gap first — stacked pills need breathing room */
   margin-top: 0.35rem;
 }
 .card-tag {

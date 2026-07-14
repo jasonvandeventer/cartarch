@@ -102,8 +102,8 @@
     {% set _included = combo_status.combos.get('included', []) %}
     <section class="panel combos-panel">
       <h3 class="panel-title">
-        Win Conditions
-        <span class="combos-asof muted">as of {{ combo_status.computed_at | format_local_datetime("%-d %b %Y") if combo_status.computed_at else '—' }}</span>
+        Combos
+        <span class="combos-asof muted">per Commander Spellbook · as of {{ combo_status.computed_at | format_local_datetime("%-d %b %Y") if combo_status.computed_at else '—' }}</span>
         {% if combo_status.stale %}
           <span class="combos-stale-chip" title="The decklist changed since these combos were computed — they refresh automatically within a few minutes.">deck changed · refreshing</span>
         {% endif %}
@@ -126,7 +126,7 @@
           {% endfor %}
         </ul>
       {% else %}
-        <p class="muted">No complete combos detected in this deck (per Commander Spellbook).</p>
+        <p class="muted">No complete combos detected in this deck.</p>
       {% endif %}
     </section>
   {% endif %}

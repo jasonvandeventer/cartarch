@@ -1,5 +1,15 @@
 [
   {
+    "version": "4.11.4",
+    "date": "2026-07-14",
+    "added": [],
+    "refined": [
+      "The deck page's new combo panel is now titled 'Combos' (it reports Commander Spellbook combos, not win conditions generally — the source is credited in the subtitle), and the card tag pills (Ramp/Removal/Synergy…) get a bit more breathing room when they stack."
+    ],
+    "resolved": [],
+    "archivist_note": "vX.Y.Z = #103 Phase B polish (owner feedback). (1) _deck_panels.html panel retitled Win Conditions → Combos; 'per Commander Spellbook' moved into the as-of subtitle; empty-state de-duplicated. Tests re-anchored on the combos-panel class (unambiguous vs title text). (2) .card-tag-row gap 0.25rem → '0.45rem 0.35rem' (row-gap first — the stacked/wrapped case on narrow cards read as touching). Suite 912 green."
+  },
+  {
     "version": "4.11.3",
     "date": "2026-07-14",
     "added": [
