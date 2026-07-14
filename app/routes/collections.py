@@ -30,7 +30,6 @@ from app.audit_service import list_transaction_logs
 from app.deck_service import create_deck, list_decks_basic
 from app.decklist_service import name_owned_counts
 from app.dependencies import (
-    DRAWER_SORTER_USERNAMES,
     CsrfRequired,
     get_current_user,
     get_db_session,
@@ -93,6 +92,7 @@ from app.sorter_rule_service import (
     create_sorter_rule,
     delete_sorter_rule,
     edit_sorter_rule,
+    has_sortable_setup,
     list_sorter_rules,
     move_sorter_rule,
     set_sorter_rule_active,
@@ -661,7 +661,7 @@ def collection_page(
             "location_id": location_id,
             "current_user": current_user,
             "show_onboarding": show_onboarding,
-            "use_drawer_sorter": current_user.username in DRAWER_SORTER_USERNAMES,
+            "use_drawer_sorter": has_sortable_setup(session, current_user.id),
             # v3.28.8 — facet state + counts + view mode for the
             # faceted-sidebar Collection redesign. Each facet's set is
             # parsed from a CSV URL param; the template renders the
@@ -864,7 +864,7 @@ async def collection_resort(
     current_user: User = Depends(get_current_user),
     _: None = CsrfRequired,
 ):
-    if current_user.username in DRAWER_SORTER_USERNAMES:
+    if has_sortable_setup(session, current_user.id):
         resort_collection(session, user_id=current_user.id)
     return RedirectResponse(url="/collection", status_code=303)
 
@@ -1555,7 +1555,7 @@ def pending_page(
         .first()
     )
 
-    use_drawer_sorter = current_user.username in DRAWER_SORTER_USERNAMES
+    use_drawer_sorter = has_sortable_setup(session, current_user.id)
     locations = [] if use_drawer_sorter else list_locations(session, current_user.id)
     view_model = build_pending_view_model(rows)
 
@@ -1637,7 +1637,7 @@ async def pending_confirm_all(
     current_user: User = Depends(get_current_user),
     _: None = CsrfRequired,
 ):
-    if current_user.username in DRAWER_SORTER_USERNAMES:
+    if has_sortable_setup(session, current_user.id):
         confirm_all_pending(session, user_id=current_user.id)
     return RedirectResponse(url="/pending", status_code=303)
 

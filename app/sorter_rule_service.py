@@ -31,6 +31,17 @@ def _chunks(items: list, size: int = _PARAM_CHUNK) -> Iterator[list]:
         yield items[i : i + size]
 
 
+def has_sortable_setup(session: Session, user_id: int) -> bool:
+    """True if the user participates in the auto-sorter — i.e. has ≥1 sorter rule
+    or ≥1 drawer location. Replaces the DRAWER_SORTER_USERNAMES username gate (#104):
+    the sorter is now open to anyone who sets one up."""
+    from app.location_service import user_has_drawers
+
+    if session.query(SorterRule.id).filter(SorterRule.user_id == user_id).first() is not None:
+        return True
+    return user_has_drawers(session, user_id)
+
+
 def validate_query(query: str) -> str | None:
     """Return an error message for a bad rule query, or None if valid. Empty is
     valid (matches everything → a catch-all/default rule). Fills the gap that the

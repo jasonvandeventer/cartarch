@@ -79,7 +79,6 @@ from app.deck_service import (
 )
 from app.decklist_service import build_brew_buylist
 from app.dependencies import (
-    DRAWER_SORTER_USERNAMES,
     CsrfRequired,
     get_current_user,
     get_db_session,
@@ -100,6 +99,7 @@ from app.location_service import list_locations
 from app.models import Card, Deck, InventoryRow, User
 from app.pricing import card_metadata, effective_price
 from app.scryfall import autocomplete_cards_for_add, fetch_card_printings
+from app.sorter_rule_service import has_sortable_setup
 from app.timeutil import utc_now
 from app.token_service import deck_token_status, list_tokens
 
@@ -634,7 +634,7 @@ def deck_detail_page(
                 }
             )
 
-    use_drawer_sorter = current_user.username in DRAWER_SORTER_USERNAMES
+    use_drawer_sorter = has_sortable_setup(session, current_user.id)
 
     analytics = None
     health = None
@@ -832,7 +832,7 @@ def _deck_cards_partial_response(
     items, _, _ = _build_deck_card_items(
         session, deck, current_user.id, search="", sort="name", direction="asc"
     )
-    use_drawer_sorter = current_user.username in DRAWER_SORTER_USERNAMES
+    use_drawer_sorter = has_sortable_setup(session, current_user.id)
     return render(
         request,
         "_deck_card_list.html",
@@ -892,7 +892,7 @@ def deck_cards_partial(
         session.commit()
 
     items, _, _ = _build_deck_card_items(session, deck, current_user.id, search, sort, direction)
-    use_drawer_sorter = current_user.username in DRAWER_SORTER_USERNAMES
+    use_drawer_sorter = has_sortable_setup(session, current_user.id)
     response = render(
         request,
         "_deck_card_list.html",
@@ -993,7 +993,7 @@ def bulk_move_deck_cards(
     _: None = CsrfRequired,
 ):
     if target_location_id == "sorter":
-        if current_user.username not in DRAWER_SORTER_USERNAMES:
+        if not has_sortable_setup(session, current_user.id):
             return RedirectResponse(f"/decks/{deck_id}", status_code=303)
         for row_id in row_ids:
             return_card_from_deck(session, user_id=current_user.id, deck_row_id=row_id)
@@ -1121,7 +1121,7 @@ async def decks_delete(
     # delete_deck disbands rather than destroys: real (claimed) rows return to
     # the collection as pending. For drawer-sorter users, re-file them into
     # their drawers so the round trip is byte-identical (mirrors decks_return).
-    if current_user.username in DRAWER_SORTER_USERNAMES:
+    if has_sortable_setup(session, current_user.id):
         resort_collection(session, user_id=current_user.id)
 
     return RedirectResponse(url="/decks", status_code=303)
@@ -1443,7 +1443,7 @@ async def decks_add_card(
         items, _value, _count = _build_deck_card_items(
             session, deck, current_user.id, search="", sort="name", direction="asc"
         )
-        use_drawer_sorter = current_user.username in DRAWER_SORTER_USERNAMES
+        use_drawer_sorter = has_sortable_setup(session, current_user.id)
         response = render(
             request,
             "_deck_card_list.html",
@@ -1751,7 +1751,7 @@ async def decks_return(
         slot=slot,
     )
 
-    if current_user.username in DRAWER_SORTER_USERNAMES:
+    if has_sortable_setup(session, current_user.id):
         resort_collection(session, user_id=current_user.id)
 
     return RedirectResponse(url=f"/decks/{deck_id}", status_code=303)

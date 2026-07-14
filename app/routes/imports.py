@@ -29,7 +29,6 @@ from app.deck_service import (
     share_card_to_deck,
 )
 from app.dependencies import (
-    DRAWER_SORTER_USERNAMES,
     CsrfRequired,
     get_current_user,
     get_db_session,
@@ -63,6 +62,7 @@ from app.scryfall import (
     fetch_card_by_set_and_number,
     search_cards_by_name,
 )
+from app.sorter_rule_service import has_sortable_setup
 from app.timeutil import utc_now
 
 router = APIRouter()
@@ -122,7 +122,7 @@ def import_page(
         {
             "title": "Import",
             "current_user": current_user,
-            "use_drawer_sorter": current_user.username in DRAWER_SORTER_USERNAMES,
+            "use_drawer_sorter": has_sortable_setup(session, current_user.id),
             "locations": list_locations(session, current_user.id),
         },
     )
@@ -170,7 +170,7 @@ async def import_preview(
         "format_name": result["format_name"],
         "filename": file.filename,
         "current_user": current_user,
-        "use_drawer_sorter": current_user.username in DRAWER_SORTER_USERNAMES,
+        "use_drawer_sorter": has_sortable_setup(session, current_user.id),
         "locations": list_locations(session, current_user.id),
         "decks": list_decks_basic(session, user_id=current_user.id),
         "location_resolutions": location_resolutions,
@@ -226,7 +226,7 @@ async def import_list_preview(
             "format_name": result["format_name"],
             "filename": "pasted list",
             "current_user": current_user,
-            "use_drawer_sorter": current_user.username in DRAWER_SORTER_USERNAMES,
+            "use_drawer_sorter": has_sortable_setup(session, current_user.id),
             "locations": list_locations(session, current_user.id),
             "decks": list_decks_basic(session, user_id=current_user.id),
             "location_resolutions": location_resolutions,
@@ -496,7 +496,7 @@ def _intake_routing_preview(
     apply (an explicit destination was chosen so nothing auto-sorts, the user
     isn't a drawer-sorter, or nothing would route). Keeps the "N → drawers,
     M → bulk" line off previews where intake routing won't run."""
-    if target_location_id != 0 or current_user.username not in DRAWER_SORTER_USERNAMES:
+    if target_location_id != 0 or not has_sortable_setup(session, current_user.id):
         return None
     drawers_n, bulk_n = summarize_intake_routing(session, current_user.id, matches_rows)
     if drawers_n == 0 and bulk_n == 0:
@@ -1307,7 +1307,7 @@ async def import_commit(
                 "format_name": "(re-confirmation needed)",
                 "filename": filename,
                 "current_user": current_user,
-                "use_drawer_sorter": current_user.username in DRAWER_SORTER_USERNAMES,
+                "use_drawer_sorter": has_sortable_setup(session, current_user.id),
                 "locations": list_locations(session, current_user.id),
                 "decks": list_decks_basic(session, user_id=current_user.id),
                 "location_resolutions": location_resolutions,
@@ -1426,7 +1426,7 @@ async def import_commit(
             placed_in = loc.name if loc else None
             placed_in_url = f"/locations/{target_location_id}" if loc else "/pending"
             placed_in_kind = ("deck" if loc.type == "deck" else "location") if loc else None
-        elif pending_row_ids and current_user.username in DRAWER_SORTER_USERNAMES:
+        elif pending_row_ids and has_sortable_setup(session, current_user.id):
             # v3.38.0 intake routing: divert cheap non-staple surplus to Bulk
             # BEFORE the sorter runs, so the sorter only ever places keepers.
             route_intake_to_bulk(session, current_user.id, pending_row_ids)
@@ -1522,7 +1522,7 @@ async def import_commit(
             # sorter would yank them straight back out into the drawers. The
             # sorter only runs on the "Auto-sort to drawers" path (the elif
             # below, where no target_location_id was selected).
-        elif row_ids and current_user.username in DRAWER_SORTER_USERNAMES:
+        elif row_ids and has_sortable_setup(session, current_user.id):
             # v3.38.0 intake routing: divert cheap non-staple surplus to Bulk
             # BEFORE the sorter runs, so the sorter only ever places keepers.
             route_intake_to_bulk(session, current_user.id, row_ids)
@@ -1547,7 +1547,7 @@ async def import_commit(
             # sorter only runs on the "Auto-sort to drawers" path (the elif
             # below, where no target_location_id was selected).
 
-        elif row_ids and current_user.username in DRAWER_SORTER_USERNAMES:
+        elif row_ids and has_sortable_setup(session, current_user.id):
             # v3.38.0 intake routing: divert cheap non-staple surplus to Bulk
             # BEFORE the sorter runs, so the sorter only ever places keepers.
             route_intake_to_bulk(session, current_user.id, row_ids)
@@ -1613,7 +1613,7 @@ async def manual_import_preview(
             "set_code": set_code,
             "collector_number": collector_number,
             "current_user": current_user,
-            "use_drawer_sorter": current_user.username in DRAWER_SORTER_USERNAMES,
+            "use_drawer_sorter": has_sortable_setup(session, current_user.id),
             "locations": list_locations(session, current_user.id),
             "decks": list_decks_basic(session, user_id=current_user.id),
         },
@@ -1849,7 +1849,7 @@ async def manual_import_commit(
             # sorter would yank them straight back out into the drawers. The
             # sorter only runs on the "Auto-sort to drawers" path (the elif
             # below, where no target_location_id was selected).
-        elif row_ids and current_user.username in DRAWER_SORTER_USERNAMES:
+        elif row_ids and has_sortable_setup(session, current_user.id):
             # v3.38.0 intake routing: divert cheap non-staple surplus to Bulk
             # BEFORE the sorter runs, so the sorter only ever places keepers.
             route_intake_to_bulk(session, current_user.id, row_ids)
@@ -1873,7 +1873,7 @@ async def manual_import_commit(
             # sorter would yank them straight back out into the drawers. The
             # sorter only runs on the "Auto-sort to drawers" path (the elif
             # below, where no target_location_id was selected).
-        elif row_ids and current_user.username in DRAWER_SORTER_USERNAMES:
+        elif row_ids and has_sortable_setup(session, current_user.id):
             # v3.38.0 intake routing: divert cheap non-staple surplus to Bulk
             # BEFORE the sorter runs, so the sorter only ever places keepers.
             route_intake_to_bulk(session, current_user.id, row_ids)

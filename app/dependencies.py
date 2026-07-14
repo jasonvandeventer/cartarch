@@ -28,10 +28,6 @@ logger = logging.getLogger(__name__)
 # named constant matching the ``LOGIN_RATE_LIMIT_WINDOW`` convention.
 LAST_ACTIVE_THROTTLE = timedelta(minutes=5)
 
-# Users who get drawer-centric features (auto-sorter, Drawers page, Audit page).
-# Update here to add or remove users — no other changes needed.
-DRAWER_SORTER_USERNAMES: frozenset[str] = frozenset({"jason@vanfreckle.com", "test"})
-
 templates = Jinja2Templates(directory="app/templates")
 
 # v3.27.17 — host allowlist for Referer-based redirect validation.
@@ -139,7 +135,6 @@ def _dev_version() -> str:
 
 
 templates.env.globals["app_version"] = os.getenv("APP_VERSION") or _dev_version()
-templates.env.globals["drawer_sorter_usernames"] = DRAWER_SORTER_USERNAMES
 templates.env.globals["card_role_tags"] = CARD_ROLE_TAGS
 # issue #52 — single source of truth for the finish-correction control's options
 # (the service validates membership against the same FINISH_OPTIONS).
@@ -673,6 +668,24 @@ def _pending_count_for(user_id: int | None) -> int:
         session.close()
 
 
+def _has_drawers_for(user_id: int | None) -> bool:
+    """Whether the user has any drawer location — gates the drawer-specific nav
+    (#104, replaces the DRAWER_SORTER_USERNAMES username gate). Short-lived session,
+    the _pending_count_for precedent."""
+    if not user_id:
+        return False
+    session = SessionLocal()
+    try:
+        return (
+            session.query(StorageLocation.id)
+            .filter(StorageLocation.user_id == user_id, StorageLocation.type == "drawer")
+            .first()
+            is not None
+        )
+    finally:
+        session.close()
+
+
 def _trade_pending_count_for(user_id: int | None) -> int:
     """Count trades awaiting this user's action — i.e. proposed trades
     where they are the recipient. Used by the Trades nav badge (v3.29.2).
@@ -751,6 +764,7 @@ def render(
         "pending_count": _pending_count_for(user_id),
         "trade_pending_count": _trade_pending_count_for(user_id),
         "audit_banner": _active_audit_banner_for(user_id),
+        "has_drawers": _has_drawers_for(user_id),
     }
     if ctx:
         context.update(ctx)

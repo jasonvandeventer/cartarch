@@ -53,6 +53,23 @@ def test_validate_query():
     assert srs.validate_query("foo:bar") is not None  # unknown key rejected
 
 
+def test_has_sortable_setup_replaces_username_gate(db, user):
+    from app.location_service import user_has_drawers
+
+    # no rules, no drawers → not a sorter user (gate closed)
+    assert srs.has_sortable_setup(db, user.id) is False
+    assert user_has_drawers(db, user.id) is False
+    # a rule alone opens the sorter (drawers not required)
+    binder = _loc(db, user.id, "V")
+    srs.create_sorter_rule(db, user.id, "t:vampire", binder.id)
+    assert srs.has_sortable_setup(db, user.id) is True
+    assert user_has_drawers(db, user.id) is False
+    # a drawer alone also opens it
+    _loc(db, user.id, "Drawer 1", type_="drawer")
+    db.flush()
+    assert user_has_drawers(db, user.id) is True
+
+
 # ── evaluation ───────────────────────────────────────────────────────────────
 
 

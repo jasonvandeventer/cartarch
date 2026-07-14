@@ -1,5 +1,17 @@
 [
   {
+    "version": "4.10.1",
+    "date": "2026-07-13",
+    "added": [
+      "The card sorter is now open to everyone. Previously the auto-sorter, Drawers page, and sort options were limited to specific accounts; now anyone can use them. Set up sorter rules (or numbered drawers) on the Storage Locations page and the sort options appear across imports, the collection, and pending placement. The Drawers page and its nav link show once you have at least one drawer location."
+    ],
+    "refined": [],
+    "resolved": [
+      "Configurable per-user sorter rule engine (#104), part 2 of 2 — removed the DRAWER_SORTER_USERNAMES username gate; the sorter is universal."
+    ],
+    "archivist_note": "v4.10.1 = #104 part 2. Deleted the DRAWER_SORTER_USERNAMES frozenset + its Jinja global. Two data-driven predicates replace it: location_service.user_has_drawers(session, user_id) (≥1 drawer location) gates the drawer-specific /drawers pages + nav; sorter_rule_service.has_sortable_setup(session, user_id) (≥1 rule OR ≥1 drawer) gates every 'is a sorter user' branch (the old `use_drawer_sorter` flag). render() injects has_drawers per-request (the _pending_count_for short-session precedent) for base.html nav; the ~20 route sites (main/decks/collections/imports) compute has_sortable_setup inline from the handler's session. drawers.py guards → user_has_drawers (403 'no drawer locations' if none). Intake auto-sort now fires for any sortable-setup user and routes through resort_collection (rule-aware) — route_intake_to_bulk resolves its Bulk location lazily so a rules-only user isn't forced to pre-create one. No new gate-hiding for the rules UI itself: _sorter_rule_controls.html on /locations is unconditional, so a brand-new user bootstraps by creating a location + rule. Tests: has_sortable_setup/user_has_drawers open on rule-alone and drawer-alone; suite 886 green. DEFERRED: drawer-specific labels ('Auto-sort to drawers' still literal for rules-only users — cosmetic), per-user VALUE/KEEP thresholds."
+  },
+  {
     "version": "4.10.0",
     "date": "2026-07-13",
     "added": [

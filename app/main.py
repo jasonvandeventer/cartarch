@@ -39,7 +39,6 @@ from app.decklist_service import (
     resolve_short_form_lines,
 )
 from app.dependencies import (
-    DRAWER_SORTER_USERNAMES,
     CsrfRequired,
     client_ip_for,
     get_current_user,
@@ -84,6 +83,7 @@ from app.scryfall import (
     bulk_refresh_prices,
     fetch_payloads_uncached,
 )
+from app.sorter_rule_service import has_sortable_setup
 from app.timeutil import utc_now
 from app.watchlist_service import (
     add_to_watchlist,
@@ -724,7 +724,7 @@ def home(
         {
             "title": "Cartarch",
             "current_user": current_user,
-            "use_drawer_sorter": current_user.username in DRAWER_SORTER_USERNAMES,
+            "use_drawer_sorter": has_sortable_setup(session, current_user.id),
             "show_onboarding": show_onboarding,
             "dashboard": dashboard,
         },

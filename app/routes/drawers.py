@@ -3,9 +3,10 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
-from app.dependencies import DRAWER_SORTER_USERNAMES, get_current_user, get_db_session, render
+from app.dependencies import get_current_user, get_db_session, render
 from app.drawer_service import list_drawer_groups, list_rows_for_drawer
 from app.inventory_service import get_drawer_label
+from app.location_service import user_has_drawers
 from app.models import User
 from app.pricing import effective_price
 
@@ -18,8 +19,8 @@ def drawers_page(
     session: Session = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
 ):
-    if current_user.username not in DRAWER_SORTER_USERNAMES:
-        raise HTTPException(status_code=403, detail="Not available for your account")
+    if not user_has_drawers(session, current_user.id):
+        raise HTTPException(status_code=403, detail="You have no drawer locations")
     grouped = list_drawer_groups(session, user_id=current_user.id)
 
     # v3.27.10 prereq 1: switch the per-drawer headline from len(rows) to
@@ -61,8 +62,8 @@ def drawer_detail_page(
     session: Session = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
 ):
-    if current_user.username not in DRAWER_SORTER_USERNAMES:
-        raise HTTPException(status_code=403, detail="Not available for your account")
+    if not user_has_drawers(session, current_user.id):
+        raise HTTPException(status_code=403, detail="You have no drawer locations")
     rows = list_rows_for_drawer(session, drawer, user_id=current_user.id)
 
     items = []

@@ -421,3 +421,14 @@ def list_rows_for_location(
         .order_by(InventoryRow.slot.asc())
         .all()
     )
+
+
+def user_has_drawers(session: Session, user_id: int) -> bool:
+    """True if the user has any numbered-drawer location. Gates the drawer-specific
+    /drawers pages + nav (#104 — replaces the DRAWER_SORTER_USERNAMES username gate)."""
+    return (
+        session.query(StorageLocation.id)
+        .filter(StorageLocation.user_id == user_id, StorageLocation.type == "drawer")
+        .first()
+        is not None
+    )
