@@ -120,6 +120,9 @@ deck_bracket_estimates = Table(
     Column("confidence_mechanics_clarity", Float),
     Column("confidence_intent_alignment", Float),
     Column("confidence_combo_detection_depth", Float),
+    # #121 — the computed floor (pure function over hard findings). The blended
+    # score/confidence columns above stop feeding any user surface.
+    Column("floor_bracket", Integer),
     Index("ix_bracket_estimates_deck", "deck_id"),
     sqlite_autoincrement=True,
 )

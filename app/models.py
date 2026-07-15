@@ -349,6 +349,11 @@ class Deck(Base):
     intent_combo: Mapped[str | None] = mapped_column(String(16), nullable=True)
     intent_winning: Mapped[str | None] = mapped_column(String(16), nullable=True)
     intent_played: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    # #121 — the owner's declared bracket (1-5). NULL = undeclared; the UI
+    # prompts, never fills. The bracket is what the owner DECLARES; the deck's
+    # contents impose a floor on what may be declared (deck_bracket_estimates
+    # .floor_bracket). Cartarch verifies a declaration is legal, never guesses.
+    declared_bracket: Mapped[int | None] = mapped_column(Integer, nullable=True)
     blurb: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
     # v3.33.0 — optional link into a "variant group": a family of builds of the

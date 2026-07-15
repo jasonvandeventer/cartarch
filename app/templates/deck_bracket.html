@@ -1,16 +1,18 @@
 {% extends "base.html" %}
 {% from "_macros.html" import editorial_eyebrow %}
 {% block content %}
-  {# #82 — dedicated Bracket Evaluation page. Reuses the dormant .bracket-v2-*
-     markup that used to live inline on deck detail (pulled in v3.27.9 to keep
-     the deck page off the estimator's per-deck compute). This page is opt-in,
-     so viewing a bracket no longer taxes deck detail. GET is read-only; the
-     Re-evaluate button POSTs to /bracket/refresh. #}
+  {# #121 — the bracket is what the owner DECLARES; the deck's contents impose
+     a floor on what may be declared. This page verifies a declaration is
+     legal — it never guesses a number. The pre-#121 blended estimate (score
+     double + confidence floats + mechanics/intent blend) no longer renders
+     anywhere; the floor derivation below is a pure function over hard
+     findings, every assertion citing exact cards. GET stays read-only; the
+     daemon keeps findings fresh, and Re-evaluate is an explicit local POST. #}
   <section class="panel hero-panel compact-hero">
     <div class="hero-row">
       <div>
         {{ editorial_eyebrow("Play · Decks · " ~ deck.name ~ " · Bracket") }}
-        <h2 class="panel-title">Bracket Evaluation</h2>
+        <h2 class="panel-title">Bracket</h2>
         <p class="muted">{{ deck.name }}</p>
       </div>
       <div>
@@ -21,81 +23,95 @@
 
   {% if refresh_error %}
     <section class="panel">
-      <p class="muted">⚠️ Re-evaluation failed — the estimate below (if any) is unchanged. Try again in a moment.</p>
+      <p class="muted">⚠️ Re-evaluation failed — the findings below (if any) are unchanged. Try again in a moment.</p>
+    </section>
+  {% endif %}
+
+  {% set floor = bracket_v2.floor_bracket if bracket_v2 else none %}
+  {% set violation = deck.declared_bracket and floor and deck.declared_bracket < floor %}
+
+  <section class="panel bracket-v2-panel">
+    <h3 class="panel-title">Declared bracket</h3>
+    <div class="bracket-declare-row">
+      <div class="bracket-v2-badge bracket-{{ deck.declared_bracket or 0 }}{% if violation %} bracket-violation{% endif %}">
+        {{ deck.declared_bracket or "—" }}
+      </div>
+      <div class="bracket-v2-meta">
+        {% if deck.declared_bracket %}
+          <div>You declared <strong>Bracket {{ deck.declared_bracket }}</strong>.</div>
+        {% else %}
+          <div>This deck is <strong>undeclared</strong>. The bracket is yours to
+            declare — Cartarch checks a declaration against the deck's contents,
+            it never picks a number for you.</div>
+        {% endif %}
+        <form action="/decks/{{ deck.id }}/declare-bracket" method="post" class="bracket-declare-form">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <label>
+            Declare:
+            <select name="declared_bracket">
+              <option value="">— undeclared —</option>
+              {% for b, lbl in [(1, "1 · Exhibition"), (2, "2 · Core"), (3, "3 · Upgraded"), (4, "4 · Optimized"), (5, "5 · cEDH")] %}
+                <option value="{{ b }}" {% if deck.declared_bracket == b %}selected{% endif %}>{{ lbl }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <button type="submit">Save</button>
+        </form>
+      </div>
+    </div>
+  </section>
+
+  {% if violation %}
+    <section class="panel bracket-violation-panel">
+      <h3 class="panel-title">⚠ Declaration below the floor</h3>
+      <p>
+        Declared <strong>Bracket {{ deck.declared_bracket }}</strong>, but the deck's contents
+        impose a floor of <strong>Bracket {{ floor }}</strong>. To make this declaration legal,
+        cut the cards behind these findings:
+      </p>
+      <ul class="bracket-v2-findings">
+        {% for f in bracket_v2.floor_findings %}
+          <li class="bracket-v2-finding bracket-v2-{{ f.severity }}">{{ f.message }}</li>
+        {% endfor %}
+      </ul>
     </section>
   {% endif %}
 
   {% if bracket_v2 %}
     <section class="panel bracket-v2-panel">
-      <h3 class="panel-title">Bracket Estimate <span class="muted">(v2 preview)</span></h3>
-      <div class="bracket-v2-row">
-        <div class="bracket-v2-badge bracket-{{ bracket_v2.bracket }}">{{ bracket_v2.bracket }}</div>
-        <div class="bracket-v2-meta">
-          <div class="bracket-v2-mech">
-            Mechanical signal: <strong>{{ bracket_v2.mechanics_bracket }}</strong>
-            {% if bracket_v2.score is not none %}
-              <span class="bracket-v2-score"
-                    title="Soft power score (0-100). Informational only — does not change the bracket.">
-                · Power score <strong>{{ bracket_v2.score }}</strong>/100
-              </span>
-            {% endif %}
-          </div>
-          {% if bracket_v2.intent_bracket %}
-            <div class="bracket-v2-intent">
-              Your intent: <strong>{{ bracket_v2.intent_bracket }}</strong>
-              {% if bracket_v2.intent_bracket == bracket_v2.mechanics_bracket %}
-                <span class="bracket-v2-aligned">✓ Aligned</span>
-              {% endif %}
-            </div>
-          {% else %}
-            <div class="muted">Intent survey not answered</div>
-          {% endif %}
-          <div class="muted">Rules v{{ bracket_v2.rules_version }}</div>
-          {% if bracket_v2.generated_at %}
-            <div class="muted">Last evaluated: {{ bracket_v2.generated_at }}</div>
-          {% endif %}
-        </div>
-        <div class="bracket-v2-confidence">
-          {% if bracket_v2.confidence.tagging_coverage is not none %}
-            {% set pct = (bracket_v2.confidence.tagging_coverage * 100)|round|int %}
-            <div class="bracket-v2-conf-row"
-                 title="% of non-basic cards that fire a bracket-relevant signal (fast mana, tutors, free interaction, mass land denial, extra turns, stax). Casual decks are expectedly low; cEDH-tier decks high.">
-              <span class="bracket-v2-conf-label">Signal density</span>
-              <div class="bracket-v2-conf-bar-wrap">
-                <div class="bracket-v2-conf-bar" style="width: {{ pct }}%"></div>
-              </div>
-              <span class="bracket-v2-conf-val">{{ pct }}%</span>
-            </div>
-          {% endif %}
-          {% if bracket_v2.confidence.mechanics_clarity is not none %}
-            {% set pct = (bracket_v2.confidence.mechanics_clarity * 100)|round|int %}
-            <div class="bracket-v2-conf-row">
-              <span class="bracket-v2-conf-label">Mechanics clarity</span>
-              <div class="bracket-v2-conf-bar-wrap">
-                <div class="bracket-v2-conf-bar" style="width: {{ pct }}%"></div>
-              </div>
-              <span class="bracket-v2-conf-val">{{ pct }}%</span>
-            </div>
-          {% endif %}
-          {% if bracket_v2.confidence.intent_alignment is not none %}
-            {% set pct = (bracket_v2.confidence.intent_alignment * 100)|round|int %}
-            <div class="bracket-v2-conf-row">
-              <span class="bracket-v2-conf-label">Intent alignment</span>
-              <div class="bracket-v2-conf-bar-wrap">
-                <div class="bracket-v2-conf-bar" style="width: {{ pct }}%"></div>
-              </div>
-              <span class="bracket-v2-conf-val">{{ pct }}%</span>
-            </div>
-          {% endif %}
-        </div>
+      <h3 class="panel-title">
+        Floor: Bracket {{ floor or "—" }}
+        <span class="bracket-confidence-badge bracket-confidence-verified" title="Derived from hard findings only — Game Changers, mass land denial, two-card combos — each citing exact cards.">VERIFIED</span>
+      </h3>
+      {% if floor is none %}
+        <p class="muted">This estimate predates floor computation — re-evaluate to compute it.</p>
+      {% elif bracket_v2.floor_findings %}
+        <p class="muted">The minimum bracket these contents can legally declare. Derivation:</p>
+        <ul class="bracket-v2-findings">
+          {% for f in bracket_v2.floor_findings %}
+            <li class="bracket-v2-finding bracket-v2-{{ f.severity }}">
+              <span class="bracket-v2-sev-icon">{% if f.severity == 'critical' %}⛔{% else %}⚠️{% endif %}</span>
+              {{ f.message }}
+            </li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <p class="muted">No Game Changers, mass land denial, or two-card combos detected — the floor is Bracket 2 (floor 1 does not exist computationally).</p>
+      {% endif %}
+      <div class="muted small-text">
+        Rules v{{ bracket_v2.rules_version }}
+        {% if bracket_v2.generated_at %} · last evaluated {{ bracket_v2.generated_at }}{% endif %}
       </div>
-      {% if bracket_v2.findings %}
-        <details class="bracket-v2-findings-details" open>
+
+      {% if bracket_v2.advisory_findings %}
+        <details class="bracket-v2-findings-details">
           <summary>
-            Why this bracket ({{ bracket_v2.findings|length }} signal{{ "" if bracket_v2.findings|length == 1 else "s" }})
+            Advisory signals ({{ bracket_v2.advisory_findings|length }})
+            <span class="bracket-confidence-badge bracket-confidence-advisory" title="Density and inference signals — context for a declaration, never part of the floor.">ADVISORY</span>
           </summary>
+          <p class="muted small-text">These never raise the floor — tutor density is officially not a bracket input.</p>
           <ul class="bracket-v2-findings">
-            {% for f in bracket_v2.findings %}
+            {% for f in bracket_v2.advisory_findings %}
               <li class="bracket-v2-finding bracket-v2-{{ f.severity }}">
                 <span class="bracket-v2-sev-icon">
                   {% if f.severity == 'critical' %}⛔{% elif f.severity == 'warning' %}⚠️{% else %}ℹ️{% endif %}
@@ -105,9 +121,8 @@
             {% endfor %}
           </ul>
         </details>
-      {% else %}
-        <p class="muted">No bracket-relevant signals flagged for this deck.</p>
       {% endif %}
+
       <form action="/decks/{{ deck.id }}/bracket/refresh" method="post">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
         <button type="submit">Re-evaluate</button>
@@ -116,69 +131,11 @@
   {% else %}
     <section class="panel">
       <h3 class="panel-title">No evaluation yet</h3>
-      <p class="muted">This deck hasn't been evaluated. Run an evaluation to see its estimated power bracket, the signals behind it, and confidence indicators.</p>
+      <p class="muted">Run an evaluation to compute the floor this deck's contents impose — the exact Game Changers, mass land denial, and two-card combos, cited by card.</p>
       <form action="/decks/{{ deck.id }}/bracket/refresh" method="post">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
         <button type="submit">Run Evaluation</button>
       </form>
     </section>
   {% endif %}
-
-  <section class="panel">
-    <details class="bracket-v2-intent-survey">
-      <summary>
-        {% if bracket_v2 and bracket_v2.intent_bracket %}Update{% else %}Answer{% endif %} pod intent survey
-      </summary>
-      <form action="/decks/{{ deck.id }}/intent" method="post" class="bracket-v2-intent-form">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-        <input type="hidden" name="next" value="/decks/{{ deck.id }}/bracket">
-        <label>
-          What pod is this deck for?
-          <select name="intent_pod">
-            <option value="">— pick —</option>
-            {% for v, lbl in [("precon","Precon"),("casual","Casual"),("upgraded","Upgraded"),("optimized","Optimized"),("cedh","cEDH"),("none","No preference")] %}
-              <option value="{{ v }}" {% if deck.intent_pod == v %}selected{% endif %}>{{ lbl }}</option>
-            {% endfor %}
-          </select>
-        </label>
-        <label>
-          Are you trying to win quickly?
-          <select name="intent_speed">
-            <option value="">— pick —</option>
-            {% for v, lbl in [("quickly","Yes — turn 5-7"),("eventually","Eventually — turn 8-10"),("journey","The journey is the point")] %}
-              <option value="{{ v }}" {% if deck.intent_speed == v %}selected{% endif %}>{{ lbl }}</option>
-            {% endfor %}
-          </select>
-        </label>
-        <label>
-          Does the deck intentionally assemble combos?
-          <select name="intent_combo">
-            <option value="">— pick —</option>
-            {% for v, lbl in [("plan","Yes — combo is the plan"),("backup","Yes — backup plan"),("no","No — just good cards")] %}
-              <option value="{{ v }}" {% if deck.intent_combo == v %}selected{% endif %}>{{ lbl }}</option>
-            {% endfor %}
-          </select>
-        </label>
-        <label>
-          How do you feel about losing?
-          <select name="intent_winning">
-            <option value="">— pick —</option>
-            {% for v, lbl in [("consistent","Want to win consistently"),("balanced","Winning's nice, game matters more"),("wild","Wild game over winning")] %}
-              <option value="{{ v }}" {% if deck.intent_winning == v %}selected{% endif %}>{{ lbl }}</option>
-            {% endfor %}
-          </select>
-        </label>
-        <label>
-          Has this deck been at the table before?
-          <select name="intent_played">
-            <option value="">— pick —</option>
-            {% for v, lbl in [("untested","Haven't played it"),("fine","People seemed fine"),("mixed","Mixed reactions"),("groaned","People groaned")] %}
-              <option value="{{ v }}" {% if deck.intent_played == v %}selected{% endif %}>{{ lbl }}</option>
-            {% endfor %}
-          </select>
-        </label>
-        <button type="submit">Save Intent</button>
-      </form>
-    </details>
-  </section>
 {% endblock %}

@@ -1973,11 +1973,11 @@ def list_decks(session: Session, user_id: int) -> list[Deck]:
     _fp_map: dict[int, str] = {}
     if _deck_ids:
         _est_map = {
-            r[0]: r[1]
+            r[0]: {"final": r[1], "floor": r[2]}
             for r in session.execute(
                 text(
-                    "SELECT deck_id, final_bracket FROM deck_bracket_estimates "
-                    "WHERE deck_id IN :ids"
+                    "SELECT deck_id, final_bracket, floor_bracket "
+                    "FROM deck_bracket_estimates WHERE deck_id IN :ids"
                 ).bindparams(bindparam("ids", expanding=True)),
                 {"ids": _deck_ids},
             )
@@ -2011,6 +2011,8 @@ def list_decks(session: Session, user_id: int) -> list[Deck]:
             deck.card_count = 0
             deck.total_value = 0.0
             deck.bracket = None
+            deck.bracket_floor = None
+            deck.bracket_violation = False
             deck.bracket_stale = False
             continue
 
@@ -2046,7 +2048,16 @@ def list_decks(session: Session, user_id: int) -> list[Deck]:
         # #103 Phase B — bracket chip data. Stale = the current decklist differs
         # from the fingerprint the daemon last evaluated (it catches up on its
         # own); fingerprint reuses the rows already in hand (no extra query).
-        deck.bracket = _est_map.get(deck.id)
+        # #121 — the chip is declared-first (the owner's number), floor as the
+        # computed minimum; declared < floor marks the violation state.
+        _est = _est_map.get(deck.id) or {}
+        deck.bracket = deck.declared_bracket or _est.get("floor")
+        deck.bracket_floor = _est.get("floor")
+        deck.bracket_violation = bool(
+            deck.declared_bracket
+            and deck.bracket_floor
+            and deck.declared_bracket < deck.bracket_floor
+        )
         _fp = _fp_map.get(deck.id)
         deck.bracket_stale = _fp is None or _fp != deck_combo_fingerprint(_analytics_rows)
 

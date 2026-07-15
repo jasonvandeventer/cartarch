@@ -26,7 +26,7 @@ from app.bracket_v2_service import (
     load_persisted_estimate,
     persist_estimate,
 )
-from app.combo_refresh_service import deck_combo_status
+from app.combo_refresh_service import deck_combo_status, load_deck_combos
 from app.db import DATA_DIR
 from app.deck_service import (
     CARD_ROLE_TAGS,
@@ -655,16 +655,26 @@ def deck_detail_page(
     # #103 Phase B — hero bracket badge from the PERSISTED estimate only (the
     # request path never estimates; v3.27.9 invariant). Staleness = the deck's
     # current fingerprint differs from the one the daemon last evaluated.
+    # #121 — the chip shows the owner's DECLARED bracket beside the computed
+    # floor; declared < floor renders the violation state. Never a guess.
     bracket_badge = None
     if deck and deck.storage_location_id:
         _est = load_persisted_estimate(session, deck.id)
-        if _est:
+        _floor = _est.get("floor_bracket") if _est else None
+        if _est or deck.declared_bracket:
             _cs = (
                 deck_combo_status(session, deck.id, all_deck_rows)
                 if all_deck_rows
                 else {"stale": True}
             )
-            bracket_badge = {"bracket": _est["bracket"], "stale": _cs["stale"]}
+            bracket_badge = {
+                "declared": deck.declared_bracket,
+                "floor": _floor,
+                "violation": bool(
+                    deck.declared_bracket and _floor and deck.declared_bracket < _floor
+                ),
+                "stale": _cs["stale"],
+            }
 
     # v3.27.9: bracket_v2 estimator no longer runs on the request path. The
     # bracket display rolled up to "untrusted" pending a dedicated analytics
@@ -1727,6 +1737,38 @@ def deck_bracket_page(
     )
 
 
+@router.post("/decks/{deck_id}/declare-bracket")
+def deck_declare_bracket(
+    deck_id: int,
+    declared_bracket: str = Form(""),
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+    _: None = CsrfRequired,
+):
+    """#121 — the owner's bracket declaration (1-5; empty = undeclared).
+
+    The app verifies a declaration against the computed floor; it never fills
+    this in. Declaring below the floor is ALLOWED and surfaces the violation
+    state — the owner may be mid-edit toward a lower bracket.
+    """
+    deck = get_deck(session, deck_id=deck_id, user_id=current_user.id)
+    if not deck:
+        raise HTTPException(status_code=404, detail="Deck not found")
+    value = declared_bracket.strip()
+    if value:
+        try:
+            parsed = int(value)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="declared_bracket must be 1-5") from None
+        if not 1 <= parsed <= 5:
+            raise HTTPException(status_code=400, detail="declared_bracket must be 1-5")
+        deck.declared_bracket = parsed
+    else:
+        deck.declared_bracket = None
+    session.commit()
+    return RedirectResponse(url=f"/decks/{deck_id}/bracket", status_code=303)
+
+
 @router.post("/decks/{deck_id}/bracket/refresh")
 def deck_bracket_refresh(
     deck_id: int,
@@ -1742,7 +1784,11 @@ def deck_bracket_refresh(
     if not deck:
         raise HTTPException(status_code=404, detail="Deck not found")
     try:
-        estimate = estimate_bracket_v2(session, deck, current_user.id, combos=None)
+        # #121 — the floor's two-card-combo input comes from the PERSISTED
+        # combo payload (a local read; the daemon owns the Spellbook network
+        # call, so re-eval stays "local-only and fast").
+        combos = load_deck_combos(session, deck.id)
+        estimate = estimate_bracket_v2(session, deck, current_user.id, combos=combos)
         persist_estimate(session, deck.id, estimate)
     except Exception as exc:  # noqa: BLE001 — surface a banner, never 500 the page
         print(f"[bracket_v2] refresh failed deck={deck.id}: {exc}", flush=True)
