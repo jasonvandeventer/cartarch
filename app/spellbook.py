@@ -4,7 +4,7 @@ import requests
 
 _CACHE: dict = {}
 _CACHE_TTL = 3600
-_COMBO_CACHE_VERSION = 1
+_COMBO_CACHE_VERSION = 2  # #121: payload gained bracket_tag + mana_value_needed
 
 _API_URL = "https://backend.commanderspellbook.com/find-my-combos/"
 
@@ -58,6 +58,13 @@ def _parse_combo(combo: dict, deck_set: set) -> dict:
     return {
         "id": combo.get("id", ""),
         "card_names": uses_names,
+        # #121 — floor inputs. bracket_tag is Spellbook's own bracket
+        # annotation (R=Ruthless, S=Spicy, P=Powerful, O=Oddball, C=Core,
+        # E=Exhibition, B=Banned); mana_value_needed is the combined mana
+        # value to execute the line. Older persisted payloads lack both —
+        # the floor's earliness check falls back to the combined-MV proxy.
+        "bracket_tag": combo.get("bracketTag") or None,
+        "mana_value_needed": combo.get("manaValueNeeded"),
         "owned": [n for n in uses_names if n in deck_set],
         "missing": [],
         "description": combo.get("description", "").strip(),

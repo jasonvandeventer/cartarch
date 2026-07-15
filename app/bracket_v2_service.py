@@ -25,7 +25,7 @@ import re
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
-from sqlalchemy import text
+from sqlalchemy import bindparam, text
 from sqlalchemy.orm import Session
 
 if TYPE_CHECKING:
@@ -228,6 +228,7 @@ class BracketEstimate:
     confidence_mechanics_clarity: float | None = None
     confidence_intent_alignment: float | None = None
     confidence_combo_detection_depth: float | None = None
+    floor_bracket: int | None = None
 
 
 def _load_rules(session: Session) -> dict[int, dict]:
@@ -346,7 +347,11 @@ def estimate_bracket_v1(
                 finding_type="mass_land_denial_detected",
                 finding_value=", ".join(signals["mass_land_denial"][:3]),
                 severity="critical",
-                message=f"Mass land denial detected ({mld_count}). Pushes deck to Bracket 4+.",
+                message=(
+                    f"Mass land denial ({mld_count}): "
+                    + ", ".join(signals["mass_land_denial"])
+                    + ". Pushes deck to Bracket 4+."
+                ),
                 contributes_to_bracket=4,
                 weight=5.0,
             )
@@ -390,10 +395,12 @@ def estimate_bracket_v1(
                 finding_type="game_changer_detected",
                 finding_value=", ".join(signals["game_changers"][:5]),
                 severity="warning" if gc_count <= 3 else "critical",
+                # #121 — the message is the violation chip's "what do I cut"
+                # list, so it names every GC card (message is Text; the capped
+                # finding_value stays as the compact form).
                 message=(
                     f"{gc_count} Game Changer{'s' if gc_count != 1 else ''}: "
-                    f"{', '.join(signals['game_changers'][:5])}"
-                    + (f" (+ {gc_count - 5} more)" if gc_count > 5 else "")
+                    + ", ".join(signals["game_changers"])
                 ),
                 contributes_to_bracket=bracket,
                 weight=3.0 + gc_count,
@@ -810,6 +817,114 @@ def derive_combo_role(
     return "incidental", findings
 
 
+# ---------------------------------------------------------------------------
+# #121: bracket floor — declared vs computed minimum
+# ---------------------------------------------------------------------------
+# The bracket is what the owner DECLARES (decks.declared_bracket); the deck's
+# contents impose a minimum on what may be declared. The floor is a pure
+# function over HARD findings only — Game Changer count, mass land denial,
+# two-card combos. Advisory findings (tutor / fast-mana / free-interaction
+# density, extra turns, combo-role inference) NEVER fold into the floor.
+# Every floor derivation cites exact cards. Floor 1 does not exist
+# computationally (nothing decklist-decidable separates B1 from B2).
+
+# Finding types whose presence drives the floor — the evidence panel shows
+# these as the VERIFIED derivation, everything else as advisory.
+FLOOR_FINDING_TYPES = frozenset(
+    {"game_changer_detected", "mass_land_denial_detected", "two_card_combo_detected"}
+)
+
+# Shared confidence vocabulary (program spec §16) — all #121 surfaces use these.
+CONFIDENCE_VERIFIED = "VERIFIED"
+CONFIDENCE_ADVISORY = "ADVISORY"
+
+# Combo-earliness rule of record (#121, documented per the release notes
+# requirement): Commander Spellbook's find-my-combos DOES expose its own
+# bracket annotation (bracketTag: R=Ruthless, S=Spicy, P=Powerful, O=Oddball,
+# C=Core, E=Exhibition, B=Banned — verified against their OpenAPI schema
+# 2026-07-14), so when the persisted payload carries it, early = tag 'R'.
+# Payloads persisted before the tag was carried fall back to the stated
+# deterministic proxy: combined mana value of the two pieces <= 6 -> early.
+EARLY_COMBO_TAGS = frozenset({"R"})
+EARLY_COMBO_MV_PROXY = 6.0
+
+
+def _combo_is_early(session: Session, combo: dict) -> tuple[bool, str]:
+    """(early?, human-readable why) for one two-card combo."""
+    tag = combo.get("bracket_tag")
+    if tag:
+        early = tag in EARLY_COMBO_TAGS
+        return early, f"Spellbook bracket tag '{tag}'"
+    mv = combo.get("mana_value_needed")
+    if mv is None:
+        names = combo.get("card_names", [])
+        rows = session.execute(
+            text("SELECT name, MIN(cmc) FROM cards WHERE name IN :names GROUP BY name").bindparams(
+                bindparam("names", expanding=True)
+            ),
+            {"names": names},
+        ).fetchall()
+        if len(rows) != len(names):
+            return False, "mana values unavailable — not treated as early"
+        mv = sum(r[1] or 0 for r in rows)
+    early = float(mv) <= EARLY_COMBO_MV_PROXY
+    return early, f"combined mana value {float(mv):g} (proxy: <= {EARLY_COMBO_MV_PROXY:g} = early)"
+
+
+def compute_bracket_floor(
+    session: Session, deck, user_id: int, combos: dict | None
+) -> tuple[int, list[Finding]]:
+    """#121 — the minimum bracket the deck's contents impose on a declaration.
+
+    Pure function of the deck list + persisted combos:
+      - Game Changers: count >= 4 -> floor 4; 1-3 -> floor 3
+      - mass land denial present -> floor 4
+      - two-card combo -> floor 3; EARLY two-card combo -> floor 4
+      - otherwise floor 2
+
+    Returns (floor, two_card_combo findings). GC / MLD evidence is already
+    emitted by estimate_bracket_v1 in the same estimate (game_changer_detected
+    / mass_land_denial_detected cite the exact cards); only the two-card-combo
+    findings are new here.
+    """
+    signals = _gather_deck_signals(session, deck.storage_location_id, user_id)
+    floor = 2
+    findings: list[Finding] = []
+
+    gc_count = len(signals["game_changers"])
+    if gc_count >= 4:
+        floor = max(floor, 4)
+    elif gc_count >= 1:
+        floor = max(floor, 3)
+
+    if signals["mass_land_denial"]:
+        floor = max(floor, 4)
+
+    for combo in (combos or {}).get("included", []):
+        names = combo.get("card_names", [])
+        if len(names) != 2:
+            continue
+        early, why = _combo_is_early(session, combo)
+        contributes = 4 if early else 3
+        floor = max(floor, contributes)
+        findings.append(
+            Finding(
+                finding_type="two_card_combo_detected",
+                finding_value=", ".join(names)[:255],
+                severity="critical" if early else "warning",
+                message=(
+                    f"Two-card combo: {names[0]} + {names[1]} — "
+                    f"{'early' if early else 'not early'} ({why}). "
+                    f"Floor {contributes}."
+                ),
+                contributes_to_bracket=contributes,
+                weight=6.0,
+            )
+        )
+
+    return floor, findings
+
+
 def estimate_bracket_v2(
     session: Session, deck, user_id: int, combos: dict | None = None
 ) -> BracketEstimate:
@@ -852,6 +967,11 @@ def estimate_bracket_v2(
         for cf in combo_findings:
             if cf.contributes_to_bracket:
                 mechanics_bracket = max(mechanics_bracket, cf.contributes_to_bracket)
+
+    # #121 — the floor is computed alongside and persisted with the estimate;
+    # its two-card-combo findings join the evidence table.
+    floor_bracket, floor_findings = compute_bracket_floor(session, deck, user_id, combos)
+    findings += floor_findings
 
     intent_bracket = derive_intent_bracket(deck)
     final_bracket, intent_alignment, extra_findings = resolve_mechanics_intent(
@@ -905,6 +1025,7 @@ def estimate_bracket_v2(
         confidence_mechanics_clarity=mechanics_clarity,
         confidence_intent_alignment=intent_alignment,
         confidence_combo_detection_depth=combo_detection_depth,
+        floor_bracket=floor_bracket,
     )
 
 
@@ -926,11 +1047,11 @@ def persist_estimate(session: Session, deck_id: int, estimate: BracketEstimate) 
             """
             INSERT INTO deck_bracket_estimates (
                 deck_id, estimated_bracket, mechanics_bracket, intent_bracket,
-                final_bracket, score, rules_version,
+                final_bracket, floor_bracket, score, rules_version,
                 confidence_tagging_coverage, confidence_mechanics_clarity,
                 confidence_intent_alignment, confidence_combo_detection_depth
             ) VALUES (
-                :d, :bracket, :mech, :intent, :final, :score, :v,
+                :d, :bracket, :mech, :intent, :final, :floor, :score, :v,
                 :ctc, :cmc, :cia, :ccd
             )
             RETURNING id
@@ -942,6 +1063,7 @@ def persist_estimate(session: Session, deck_id: int, estimate: BracketEstimate) 
             "mech": estimate.mechanics_bracket,
             "intent": estimate.intent_bracket,
             "final": estimate.final_bracket,
+            "floor": estimate.floor_bracket,
             "score": estimate.score,
             "v": estimate.rules_version,
             "ctc": estimate.confidence_tagging_coverage,
@@ -995,7 +1117,7 @@ def load_persisted_estimate(session: Session, deck_id: int) -> dict | None:
             "SELECT id, final_bracket, mechanics_bracket, intent_bracket, score, "
             "rules_version, generated_at, confidence_tagging_coverage, "
             "confidence_mechanics_clarity, confidence_intent_alignment, "
-            "confidence_combo_detection_depth "
+            "confidence_combo_detection_depth, floor_bracket "
             "FROM deck_bracket_estimates WHERE deck_id = :d "
             "ORDER BY generated_at DESC, id DESC LIMIT 1"
         ),
@@ -1010,6 +1132,9 @@ def load_persisted_estimate(session: Session, deck_id: int) -> dict | None:
         ),
         {"e": est[0]},
     ).fetchall()
+    all_findings = [
+        {"type": f[0], "value": f[1], "severity": f[2], "message": f[3]} for f in findings
+    ]
     return {
         "bracket": est[1],
         "mechanics_bracket": est[2],
@@ -1023,7 +1148,10 @@ def load_persisted_estimate(session: Session, deck_id: int) -> dict | None:
             "intent_alignment": est[9],
             "combo_detection_depth": est[10],
         },
-        "findings": [
-            {"type": f[0], "value": f[1], "severity": f[2], "message": f[3]} for f in findings
-        ],
+        # #121 — floor + split findings. Estimates persisted before the floor
+        # column report floor None; surfaces show "not yet evaluated".
+        "floor_bracket": est[11],
+        "findings": all_findings,
+        "floor_findings": [f for f in all_findings if f["type"] in FLOOR_FINDING_TYPES],
+        "advisory_findings": [f for f in all_findings if f["type"] not in FLOOR_FINDING_TYPES],
     }

@@ -15359,6 +15359,56 @@ body.cmp-lobby-body { height: auto; min-height: 100dvh; overflow-y: auto; }
   font-weight: 400;
   opacity: 0.75;
 }
+/* #121 — declared-vs-floor chip states + confidence badges. bracket-0 is the
+   undeclared chip (no bracket-N color class fires). */
+.bracket-0,
+.bracket- {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.25);
+  color: inherit;
+}
+.deck-bracket-floor {
+  font-weight: 400;
+  opacity: 0.8;
+}
+.bracket-violation {
+  background: rgba(239, 68, 68, 0.2) !important;
+  border-color: #ef4444 !important;
+  color: #fca5a5 !important;
+}
+.bracket-violation-panel {
+  border: 1px solid rgba(239, 68, 68, 0.5);
+}
+.bracket-confidence-badge {
+  font: 700 0.65rem "Montserrat", system-ui, sans-serif;
+  letter-spacing: 0.08em;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  border: 1px solid;
+  vertical-align: middle;
+  margin-left: 0.4rem;
+}
+.bracket-confidence-verified {
+  background: rgba(100, 180, 100, 0.15);
+  border-color: rgba(100, 180, 100, 0.4);
+  color: #86efac;
+}
+.bracket-confidence-advisory {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.25);
+  color: inherit;
+}
+.bracket-declare-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+}
+.bracket-declare-form {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
 .combos-asof {
   font-size: 0.75rem;
   font-weight: 400;

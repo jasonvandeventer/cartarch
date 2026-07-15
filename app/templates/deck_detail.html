@@ -14,12 +14,13 @@
             {{ deck.name }}
             <span class="mana-pip-row">{{ mana_pips(color_identity) }}</span>
             {% if deck.is_brew %}<span class="brew-badge" title="Brew deck — may contain cards you don't own; unowned cards are proxies">Brew</span>{% endif %}
-            {# #103 Phase B — persisted bracket estimate (never computed here);
-               ⟳ = deck changed since evaluation, the daemon refreshes it. #}
+            {# #121 — declared-first chip: the owner's number beside the
+               computed floor. Violation (declared < floor) turns the chip
+               red; ⟳ = deck changed since evaluation, the daemon catches up. #}
             {% if bracket_badge %}
               <a href="/decks/{{ deck.id }}/bracket"
-                 class="deck-bracket-chip bracket-{{ bracket_badge.bracket }}"
-                 title="Bracket estimate {{ bracket_badge.bracket }}{% if bracket_badge.stale %} — deck changed since evaluation; refreshing automatically{% endif %}">B{{ bracket_badge.bracket }}{% if bracket_badge.stale %} <span class="deck-bracket-stale">⟳</span>{% endif %}</a>
+                 class="deck-bracket-chip bracket-{{ bracket_badge.declared or bracket_badge.floor }}{% if bracket_badge.violation %} bracket-violation{% endif %}"
+                 title="{% if bracket_badge.declared %}Declared Bracket {{ bracket_badge.declared }}{% else %}Undeclared{% endif %}{% if bracket_badge.floor %} · contents impose a floor of {{ bracket_badge.floor }}{% endif %}{% if bracket_badge.violation %} — declaration below the floor{% endif %}{% if bracket_badge.stale %} — deck changed since evaluation; refreshing automatically{% endif %}">{% if bracket_badge.declared %}B{{ bracket_badge.declared }}{% else %}B?{% endif %}{% if bracket_badge.floor %} <span class="deck-bracket-floor">≥{{ bracket_badge.floor }}</span>{% endif %}{% if bracket_badge.violation %} ⚠{% endif %}{% if bracket_badge.stale %} <span class="deck-bracket-stale">⟳</span>{% endif %}</a>
             {% endif %}
           </h2>
           <p class="muted">{{ deck.format or 'Unspecified format' }}</p>
