@@ -23,6 +23,7 @@ from sqlalchemy.orm import Session, joinedload
 from app import sort_spec
 from app.bracket_v2_service import (
     estimate_bracket_v2,
+    gc_list_version,
     load_persisted_estimate,
     persist_estimate,
 )
@@ -673,7 +674,9 @@ def deck_detail_page(
                 "violation": bool(
                     deck.declared_bracket and _floor and deck.declared_bracket < _floor
                 ),
-                "stale": _cs["stale"],
+                # #123 — stale also when the GC list moved since evaluation
+                "stale": _cs["stale"]
+                or bool(_est and _est["rules_version"] != gc_list_version(session)),
             }
 
     # v3.27.9: bracket_v2 estimator no longer runs on the request path. The

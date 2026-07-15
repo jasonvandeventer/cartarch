@@ -21,9 +21,10 @@ from __future__ import annotations
 import hashlib
 import json
 
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from app.bracket_v2_service import estimate_bracket_v2, persist_estimate
+from app.bracket_v2_service import estimate_bracket_v2, gc_list_version, persist_estimate
 from app.deck_service import compute_deck_combos, resolved_deck_rows
 from app.models import Deck, DeckCombo
 from app.timeutil import utc_now
@@ -49,6 +50,15 @@ def refresh_stale_deck_combos(session: Session, limit: int = 3) -> int:
     existing: dict[int, DeckCombo] = {dc.deck_id: dc for dc in session.query(DeckCombo).all()}
     decks = session.query(Deck).order_by(Deck.id.asc()).all()
     refreshed = 0
+    # #123 — the GC-list version participates in staleness: an estimate whose
+    # rules_version predates the current list stamp is stale even when the
+    # decklist fingerprint is fresh. One query for the current stamp, one for
+    # the per-deck estimate stamps (no per-deck queries).
+    current_gc_version = gc_list_version(session)
+    est_versions: dict[int, str] = {
+        r[0]: r[1]
+        for r in session.execute(text("SELECT deck_id, rules_version FROM deck_bracket_estimates"))
+    }
     for deck in decks:
         if refreshed >= limit:
             break
@@ -58,6 +68,26 @@ def refresh_stale_deck_combos(session: Session, limit: int = 3) -> int:
         fp = deck_combo_fingerprint(rows)
         row = existing.get(deck.id)
         if row is not None and row.fingerprint == fp:
+            # Decklist fresh. If the GC list moved since this deck's estimate,
+            # re-floor from the PERSISTED combos — zero network either way.
+            est_version = est_versions.get(deck.id)
+            if est_version is not None and est_version != current_gc_version:
+                try:
+                    combos = json.loads(row.payload)
+                except ValueError:
+                    combos = None
+                try:
+                    estimate = estimate_bracket_v2(session, deck, deck.user_id, combos=combos)
+                    persist_estimate(session, deck.id, estimate)
+                    refreshed += 1
+                    print(
+                        f"[combo-refresh] re-floored deck={deck.id} "
+                        f"(GC list {est_version} -> {current_gc_version})",
+                        flush=True,
+                    )
+                except Exception as exc:  # noqa: BLE001 — daemon must keep walking
+                    session.rollback()
+                    print(f"[combo-refresh] GC re-floor failed deck={deck.id}: {exc}", flush=True)
             continue  # fresh — zero network
 
         combos = compute_deck_combos(rows)

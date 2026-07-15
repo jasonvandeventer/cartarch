@@ -33,6 +33,12 @@ if TYPE_CHECKING:
 
 RULES_VERSION = "1.0.0"
 
+# #123 — the Game Changers LIST is versioned separately from the bracket-rules
+# structure above: date-real stamps ('2026-02-09' = the original official
+# list). gc_list_version() is the current stamp; floor records carry it, and
+# an estimate whose stamp differs is stale (the daemon re-floors it).
+GC_LIST_BASE_VERSION = "2026-02-09"
+
 # ---------------------------------------------------------------------------
 # Auto-tagging rules (oracle text → primary tags)
 # ---------------------------------------------------------------------------
@@ -231,6 +237,25 @@ class BracketEstimate:
     floor_bracket: int | None = None
 
 
+def gc_list_version(session: Session) -> str:
+    """Current Game Changers list version (ISO date string).
+
+    MAX over active rows' rules_version AND all date_removed stamps — the
+    latter so a removals-only sync still bumps the version (nothing active
+    would carry the new date otherwise). ISO strings compare correctly.
+    """
+    row = session.execute(
+        text(
+            "SELECT MAX(CASE WHEN active THEN rules_version END), MAX(date_removed)"
+            " FROM game_changer_cards"
+        )
+    ).first()
+    candidates = [
+        c for c in ((row[0] if row else None), (str(row[1]) if row and row[1] else None)) if c
+    ]
+    return max(candidates) if candidates else GC_LIST_BASE_VERSION
+
+
 def _load_rules(session: Session) -> dict[int, dict]:
     rows = session.execute(
         text(
@@ -292,14 +317,15 @@ def _gather_deck_signals(session: Session, deck_storage_location_id: int, user_i
     for card_id, tag in tag_rows:
         tagged_cards.setdefault(tag, []).append(name_by_id[card_id])
 
+    # #123 — list currency lives in the ``active`` flag (date_added /
+    # date_removed carry the history); rows keep their original date-real
+    # rules_version stamp, so filtering by version would drop older adds.
     gc_rows = session.execute(
         text(
             "SELECT card_name FROM game_changer_cards "
-            "WHERE active AND rules_version = :v AND card_name IN ("
-            + ",".join(f":n{i}" for i in range(len(rows)))
-            + ")"
+            "WHERE active AND card_name IN (" + ",".join(f":n{i}" for i in range(len(rows))) + ")"
         ),
-        {"v": RULES_VERSION, **{f"n{i}": r[1] for i, r in enumerate(rows)}},
+        {f"n{i}": r[1] for i, r in enumerate(rows)},
     ).fetchall()
     game_changers = sorted({r[0] for r in gc_rows})
 
@@ -495,7 +521,9 @@ def estimate_bracket_v1(
         mechanics_bracket=bracket,
         final_bracket=bracket,
         findings=findings,
-        rules_version=RULES_VERSION,
+        # #123 — floor records carry the date-real GC LIST version (staleness
+        # key); the bracket-rules structure version stays internal.
+        rules_version=gc_list_version(session),
     )
 
 
