@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import re
 
-from sqlalchemy import bindparam, func, or_, text
+from sqlalchemy import Float, and_, bindparam, cast, func, or_, select, text
 from sqlalchemy.orm import Session, joinedload
 
 from app.audit_service import log_transaction
@@ -4220,3 +4220,225 @@ def delete_deck(session: Session, deck_id: int, user_id: int, *, commit: bool = 
     if commit:
         session.commit()
     return True
+
+
+# --- #119: Add-tab name grouping + server-side printing resolution -----------
+
+_FINISH_PRICE_COL = {"normal": "price_usd", "foil": "price_usd_foil", "etched": "price_usd_etched"}
+
+# Layouts/set_types the Add search should never surface (matches Scryfall's
+# default "no extras" search posture; tokens have their own inventory, #120).
+_ADD_SEARCH_EXCLUDED_LAYOUTS = ("token", "double_faced_token", "emblem", "art_series")
+_ADD_SEARCH_EXCLUDED_SET_TYPES = ("token", "memorabilia")
+
+
+def _sc_not_extra():
+    from app.legacy_tables import scryfall_cards as sc
+
+    return and_(
+        or_(sc.c.layout.is_(None), sc.c.layout.notin_(_ADD_SEARCH_EXCLUDED_LAYOUTS)),
+        or_(sc.c.set_type.is_(None), sc.c.set_type.notin_(_ADD_SEARCH_EXCLUDED_SET_TYPES)),
+    )
+
+
+def _sc_price(finish: str):
+    """scryfall_cards price for a finish as a nullable float ('' → NULL)."""
+    from app.legacy_tables import scryfall_cards as sc
+
+    col = sc.c[_FINISH_PRICE_COL.get(finish, "price_usd")]
+    return cast(func.nullif(col, ""), Float)
+
+
+def grouped_card_search(
+    session: Session, query: str, *, finish: str = "normal", limit: int = 25
+) -> list[dict]:
+    """#119 — Add-tab default: ONE row per unique card name over scryfall_cards.
+
+    Name grouping IS oracle grouping for searchable cards (a card name
+    uniquely identifies its oracle text), so no oracle_id column is needed.
+    Each group row carries its cheapest printing for the selected finish
+    (null/empty prices sort last, so an unpriced name still gets an image)
+    and the printing count for the expand affordance.
+    """
+    from app.legacy_tables import scryfall_cards as sc
+
+    q = query.strip()
+    if len(q) < 2:
+        return []
+
+    price = _sc_price(finish)
+    rn = (
+        func.row_number()
+        .over(
+            partition_by=sc.c.name,
+            order_by=(price.is_(None), price, sc.c.scryfall_id),
+        )
+        .label("rn")
+    )
+    inner = (
+        select(
+            sc.c.name,
+            sc.c.scryfall_id,
+            sc.c.set_code,
+            sc.c.collector_number,
+            sc.c.image_url,
+            price.label("from_price"),
+            func.count().over(partition_by=sc.c.name).label("printings"),
+            rn,
+        )
+        .where(
+            sc.c.name.ilike(f"%{q}%"),
+            # Arena Alchemy rebalances ("A-Sol Ring") are digital-only and
+            # unpriceable in paper — they'd surface as junk groups.
+            sc.c.name.notlike("A-%"),
+            _sc_not_extra(),
+        )
+        .subquery()
+    )
+    rows = (
+        session.execute(select(inner).where(inner.c.rn == 1).order_by(inner.c.name).limit(limit))
+        .mappings()
+        .all()
+    )
+    return [
+        {
+            "name": r["name"],
+            "scryfall_id": r["scryfall_id"],
+            "set_code": r["set_code"],
+            "collector_number": r["collector_number"],
+            "image_url": r["image_url"],
+            "from_price": r["from_price"],
+            "printings": r["printings"],
+        }
+        for r in rows
+    ]
+
+
+def _owned_loose_row(
+    session: Session,
+    user_id: int,
+    *,
+    prefer_finish: str,
+    name: str | None = None,
+    card_id: int | None = None,
+) -> InventoryRow | None:
+    """An owned, physical (non-proxy), non-deck-resident copy — by card name
+    or by exact card. Prefers the radio finish but any finish qualifies
+    (#119 rule 2: an owned foil beats importing a nonfoil)."""
+    q = (
+        session.query(InventoryRow)
+        .join(Card, InventoryRow.card_id == Card.id)
+        .outerjoin(StorageLocation, InventoryRow.storage_location_id == StorageLocation.id)
+        .filter(
+            InventoryRow.user_id == user_id,
+            InventoryRow.is_proxy.is_(False),
+            or_(StorageLocation.id.is_(None), StorageLocation.type != "deck"),
+        )
+    )
+    if card_id is not None:
+        q = q.filter(InventoryRow.card_id == card_id)
+    else:
+        q = q.filter(Card.name == name)
+    rows = q.order_by(InventoryRow.id).all()
+    preferred = [r for r in rows if r.finish == prefer_finish]
+    return (preferred or rows)[0] if rows else None
+
+
+def resolve_add_printing(
+    session: Session, *, user_id: int, deck: Deck, name: str, finish: str
+) -> dict | None:
+    """#119 — server-side printing resolution for a name-level Add.
+
+    Rule order:
+      1. Variant-group printing identity: a printing of this card in a
+         sibling deck of this deck's variant group fixes WHICH printing —
+         never moves the sibling's copy; fulfillment falls through.
+      2. Owned loose copy (non-deck-resident, non-proxy) of any printing —
+         resolved to that copy's exact printing AND finish so the existing
+         reconciliation moves it. Ignores the finish radio.
+      3. Cheapest printing in all of Magic for the selected finish (null
+         prices excluded from the preference; unpriced-only names still
+         resolve, sorted last).
+
+    Returns None when the name isn't in scryfall_cards and nothing is owned.
+    """
+    from app.legacy_tables import scryfall_cards as sc
+
+    # Rule 1 — variant-group printing identity
+    if deck.variant_group_id is not None:
+        sibling_locs = [
+            loc_id
+            for (loc_id,) in session.query(Deck.storage_location_id)
+            .filter(
+                Deck.variant_group_id == deck.variant_group_id,
+                Deck.user_id == user_id,
+                Deck.id != deck.id,
+                Deck.storage_location_id.isnot(None),
+            )
+            .all()
+        ]
+        if sibling_locs:
+            sibling_row = (
+                session.query(InventoryRow)
+                .join(Card, InventoryRow.card_id == Card.id)
+                .options(joinedload(InventoryRow.card))
+                .filter(
+                    InventoryRow.user_id == user_id,
+                    InventoryRow.storage_location_id.in_(sibling_locs),
+                    Card.name == name,
+                )
+                .order_by(InventoryRow.id)
+                .first()
+            )
+            if sibling_row:
+                loose = _owned_loose_row(
+                    session, user_id, card_id=sibling_row.card_id, prefer_finish=finish
+                )
+                chosen = loose.finish if loose else finish
+                return {
+                    "scryfall_id": sibling_row.card.scryfall_id,
+                    "finish": chosen,
+                    "rule": "variant",
+                    "set_code": sibling_row.card.set_code,
+                    "collector_number": sibling_row.card.collector_number,
+                    "price": None,
+                    "finish_differs": chosen != finish,
+                }
+
+    # Rule 2 — owned loose copy, finish radio ignored
+    loose = _owned_loose_row(session, user_id, name=name, prefer_finish=finish)
+    if loose:
+        return {
+            "scryfall_id": loose.card.scryfall_id,
+            "finish": loose.finish,
+            "rule": "owned",
+            "set_code": loose.card.set_code,
+            "collector_number": loose.card.collector_number,
+            "price": None,
+            "finish_differs": loose.finish != finish,
+        }
+
+    # Rule 3 — cheapest printing for the selected finish
+    price = _sc_price(finish)
+    fallback = func.coalesce(price, _sc_price("normal"), _sc_price("foil"), _sc_price("etched"))
+    row = (
+        session.execute(
+            select(sc.c.scryfall_id, sc.c.set_code, sc.c.collector_number, price.label("p"))
+            .where(sc.c.name == name, _sc_not_extra())
+            .order_by(price.is_(None), price, fallback.is_(None), fallback, sc.c.scryfall_id)
+            .limit(1)
+        )
+        .mappings()
+        .first()
+    )
+    if not row:
+        return None
+    return {
+        "scryfall_id": row["scryfall_id"],
+        "finish": finish,
+        "rule": "cheapest",
+        "set_code": row["set_code"],
+        "collector_number": row["collector_number"],
+        "price": row["p"],
+        "finish_differs": False,
+    }
