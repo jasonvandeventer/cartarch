@@ -1,5 +1,17 @@
 [
   {
+    "version": "4.11.9",
+    "date": "2026-07-14",
+    "added": [
+      "Bracket, reframed: you declare your deck's bracket (1-5, or leave it undeclared — the app never picks for you), and the deck's contents impose a verified floor on what you can declare. The bracket page shows the floor's derivation citing exact cards (Game Changers, mass land denial, two-card combos), advisory signals clearly badged as advisory, and a violation warning listing exactly what to cut when a declaration sits below the floor. Deck chips show declared + floor at a glance."
+    ],
+    "refined": [],
+    "resolved": [
+      "The untrusted blended bracket score (power score, confidence percentages, mechanics/intent synthesis) no longer appears anywhere — every bracket assertion is now auditable."
+    ],
+    "archivist_note": "v4.11.9 = #121 (program spec A-1). Schema: decks.declared_bracket + deck_bracket_estimates.floor_bracket (Alembic c9d0e1f2a3b4, additive nullable — PreSync hook applies on deploy; FIRST MIGRATION-BEARING RELEASE since v4.11.0). Floor = pure function over hard findings: GC >=4 -> 4, 1-3 -> 3; MLD -> 4; two-card combo -> 3, early -> 4; else 2 (floor 1 not computable). Earliness rule of record: Spellbook find-my-combos bracketTag (R=Ruthless=early; enum R/S/P/O/C/E/B verified vs their OpenAPI 2026-07-14), fallback proxy combined MV <= 6 for pre-tag persisted payloads; _parse_combo now carries bracket_tag + mana_value_needed (_COMBO_CACHE_VERSION 2). deck_bracket_findings unchanged as evidence table; GC/MLD messages name every card; new two_card_combo_detected findings. Advisory (tutor/fast-mana/free-interaction/extra-turn/combo-role) never raises the floor. Bracket page intent survey retired (amendment 4: declared_bracket is the owner-intent store; /intent route + columns remain). /bracket/refresh feeds floor from persisted combos (local read). Blend columns (score, confidence floats) linger one release, unread."
+  },
+  {
     "version": "4.11.8",
     "date": "2026-07-14",
     "added": [
