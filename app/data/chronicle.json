@@ -1,5 +1,15 @@
 [
   {
+    "version": "4.11.14",
+    "date": "2026-07-15",
+    "added": [],
+    "refined": [
+      "The card-intelligence Phase 0 validation is now evidence-first. Before any conclusions, the report reconciles deployment state (production vs. `main` vs. latest release, with commit SHA, image digest, and migration head), maps every requirement to concrete code, test, or schema evidence under a defined evidence hierarchy, and profiles identity fields for real data-quality risks rather than row counts. The predetermined `oracle_id` first PR is replaced by a ranked first-increment recommendation, and closure of #122 stays contingent on human review."
+    ],
+    "resolved": [],
+    "archivist_note": "The original plan had the right intent — inspect the system and decide on evidence — but it prematurely concluded on architecture, naming a mandatory first PR and assuming a schema before the repository had been read. That is how a validation report quietly becomes an implementation order aimed at a deployment state nobody confirmed. The revisions turn every conclusion back into a hypothesis and pin it to a reconciled baseline, so the report describes the system as it actually is and leaves the first build step to be chosen, not assumed."
+  },
+  {
     "version": "4.11.13",
     "date": "2026-07-15",
     "added": [],
