@@ -857,7 +857,7 @@
          .end-game-modal is display:none inline (toggled to flex), so the
          content is absent from browser-find until the modal is opened. #}
       {% if items and (bulk_storage or bulk_decks) %}
-        <div id="bulk-move-modal" class="end-game-modal" style="display:none"
+        <div id="bulk-move-modal" class="end-game-modal" data-dismiss style="display:none"
              role="dialog" aria-labelledby="bulk-move-title" aria-hidden="true">
           <div class="end-game-inner">
             <h3 id="bulk-move-title" style="margin:0 0 0.75rem">Bulk Move</h3>
@@ -914,7 +914,7 @@
         </div>
       {% endif %}
       {% if items %}
-        <div id="bulk-delete-modal" class="end-game-modal" style="display:none"
+        <div id="bulk-delete-modal" class="end-game-modal" data-dismiss style="display:none"
              role="dialog" aria-labelledby="bulk-delete-title" aria-hidden="true">
           <div class="end-game-inner">
             <h3 id="bulk-delete-title" style="margin:0 0 0.75rem">Bulk Delete</h3>

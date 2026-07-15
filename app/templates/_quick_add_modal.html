@@ -5,7 +5,7 @@
    Posts to /locations/{id}/add-card, which swaps #location-card-list (+ an
    out-of-band hero-stats refresh) without a full page reload. #}
 {% set quickadd_locations = locations | selectattr("type", "ne", "root") | selectattr("type", "ne", "deck") | list %}
-<div id="quick-add-modal" class="end-game-modal" style="display:none">
+<div id="quick-add-modal" class="end-game-modal" data-dismiss style="display:none">
   <div class="end-game-inner">
     <h3 style="margin:0 0 0.75rem">Quick add a card</h3>
     <form id="loc-add-card-form"

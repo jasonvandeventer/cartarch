@@ -198,7 +198,7 @@
   {% if is_owner %}
     {# #114 — post-finalization result edit. Pre-filled with current values; posts
        to the same /end route (safe re-run); the route logs a result_edit event. #}
-    <div id="edit-result-modal"
+    <div id="edit-result-modal" data-dismiss
          style="display:none;position:fixed;inset:0;z-index:900;background:rgba(0,0,0,0.6);
                 align-items:flex-start;justify-content:center;overflow-y:auto;padding:2rem 1rem">
       <div class="panel" style="max-width:640px;width:100%;margin-top:2rem">

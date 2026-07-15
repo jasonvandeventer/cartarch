@@ -4,7 +4,7 @@
    the panel is hidden entirely. #}
 {% if review_tag_items %}
   <section class="panel review-tags-panel">
-    <details class="review-tags-details">
+    <details class="review-tags-details js-dismiss">
       <summary class="review-tags-summary">
         <span class="review-tags-summary-label">Review auto-suggested tags</span>
         <span class="review-tags-summary-count">{{ review_tag_items | length }} card{{ "" if review_tag_items | length == 1 else "s" }}</span>

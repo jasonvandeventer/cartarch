@@ -140,7 +140,7 @@ onerror="this.onerror=null; this.src='{{ scryfall_image_fallback(scryfall_id, si
         {% endif %}
       </div>
       {% if show_collection_actions %}
-        <details class="card-actions-drawer">
+        <details class="card-actions-drawer js-dismiss">
           <summary>Actions</summary>
           <div class="card-actions-body">
             <form action="/inventory/rows/{{ item.id }}/remove"
@@ -341,10 +341,10 @@ onerror="this.onerror=null; this.src='{{ scryfall_image_fallback(scryfall_id, si
             {% endfor %}
           </div>
         {% endif %}
-        <details class="card-actions-drawer">
+        <details class="card-actions-drawer js-dismiss">
           <summary>Actions</summary>
           <div class="card-actions-body">
-            <details class="tag-editor-details">
+            <details class="tag-editor-details js-dismiss">
               <summary class="tag-editor-summary">
                 {% if row_tags %}
                   Edit Tags
@@ -426,7 +426,7 @@ onerror="this.onerror=null; this.src='{{ scryfall_image_fallback(scryfall_id, si
               <input type="hidden" name="deck_id" value="{{ deck.id }}">
               <input type="hidden" name="deck_row_id" value="{{ item.id }}">
               {% if use_drawer_sorter and item.role != 'commander' %}
-                <details class="return-details">
+                <details class="return-details js-dismiss">
                   <summary class="return-summary">Remove from Deck</summary>
                   <div class="deck-item-actions" style="margin-top: 0.45rem">
                     <input type="text" name="drawer" placeholder="Drawer override">

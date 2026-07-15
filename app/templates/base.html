@@ -453,6 +453,79 @@
         };
       })();
     </script>
+    <script>
+      /* #118 — desktop dismissal (outside click + Escape), opt-in.
+         Tier 1: <details class="js-dismiss"> popovers close on outside click
+         or Escape; single-open falls out of the outside-click rule (the click
+         that opens B lands outside A). Inert while the mobile-popover backdrop
+         owns dismissal — open panels are portaled to <body>, so containment
+         checks would lie there.
+         Tier 2: modal overlays tagged data-dismiss close on backdrop click
+         (target === overlay) or Escape only while pristine. Any input/change
+         inside marks the modal dirty until it is next shown; explicit close
+         buttons are unaffected.
+         ponytail: dirty modals silently ignore Esc/backdrop — upgrade to a
+         discard-confirm prompt if players find it confusing. */
+      (function () {
+        function mobileOwns() {
+          return document.body.classList.contains('mobile-popover-open');
+        }
+        function openPopovers() {
+          return document.querySelectorAll('details.js-dismiss[open]');
+        }
+        function closeModal(m) {
+          m.style.display = 'none';
+          if (m.hasAttribute('aria-hidden')) m.setAttribute('aria-hidden', 'true');
+        }
+
+        // Dirty tracking: user edits mark the modal; showing it again resets.
+        function markDirty(e) {
+          var m = e.target.closest && e.target.closest('[data-dismiss]');
+          if (m) m.__dirty = true;
+        }
+        document.addEventListener('input', markDirty, true);
+        document.addEventListener('change', markDirty, true);
+        var shownObserver = new MutationObserver(function (records) {
+          records.forEach(function (r) {
+            if (r.target.style.display !== 'none') r.target.__dirty = false;
+          });
+        });
+        function observeModals() {
+          document.querySelectorAll('[data-dismiss]').forEach(function (m) {
+            if (m.__dismissWired) return;
+            m.__dismissWired = true;
+            shownObserver.observe(m, { attributes: true, attributeFilter: ['style'] });
+          });
+        }
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', observeModals);
+        } else {
+          observeModals();
+        }
+
+        document.addEventListener('click', function (e) {
+          if (!mobileOwns()) {
+            openPopovers().forEach(function (d) {
+              if (!d.contains(e.target)) d.open = false;
+            });
+          }
+          if (e.target instanceof Element &&
+              e.target.hasAttribute('data-dismiss') && !e.target.__dirty) {
+            closeModal(e.target);
+          }
+        });
+
+        document.addEventListener('keydown', function (e) {
+          if (e.key !== 'Escape') return;
+          if (!mobileOwns()) {
+            openPopovers().forEach(function (d) { d.open = false; });
+          }
+          document.querySelectorAll('[data-dismiss]').forEach(function (m) {
+            if (m.style.display !== 'none' && !m.__dirty) closeModal(m);
+          });
+        });
+      })();
+    </script>
     {% set path = request.url.path if request else '/' %}
     {% if current_user %}
       <nav class="bottom-nav" aria-label="Primary mobile navigation">
