@@ -1965,18 +1965,22 @@ def list_decks(session: Session, user_id: int) -> list[Deck]:
     # #103 Phase B — persisted bracket + combo-fingerprint maps, ONE query each
     # (never estimated on the request path). Local import: combo_refresh_service
     # imports from this module, so top-level would cycle.
+    from app.bracket_v2_service import gc_list_version
     from app.combo_refresh_service import deck_combo_fingerprint
     from app.models import DeckCombo
 
     _deck_ids = [d.id for d in decks]
-    _est_map: dict[int, int] = {}
+    _est_map: dict[int, dict] = {}
     _fp_map: dict[int, str] = {}
+    # #123 — GC-list version participates in staleness alongside the decklist
+    # fingerprint; one query for the whole render.
+    _gc_ver = gc_list_version(session)
     if _deck_ids:
         _est_map = {
-            r[0]: {"final": r[1], "floor": r[2]}
+            r[0]: {"final": r[1], "floor": r[2], "rules_version": r[3]}
             for r in session.execute(
                 text(
-                    "SELECT deck_id, final_bracket, floor_bracket "
+                    "SELECT deck_id, final_bracket, floor_bracket, rules_version "
                     "FROM deck_bracket_estimates WHERE deck_id IN :ids"
                 ).bindparams(bindparam("ids", expanding=True)),
                 {"ids": _deck_ids},
@@ -2059,7 +2063,11 @@ def list_decks(session: Session, user_id: int) -> list[Deck]:
             and deck.declared_bracket < deck.bracket_floor
         )
         _fp = _fp_map.get(deck.id)
-        deck.bracket_stale = _fp is None or _fp != deck_combo_fingerprint(_analytics_rows)
+        deck.bracket_stale = (
+            _fp is None
+            or _fp != deck_combo_fingerprint(_analytics_rows)
+            or bool(_est and _est.get("rules_version") != _gc_ver)
+        )
 
         # issue: per-deck Total Value (own rows only — inbound variant shares
         # excluded, so a card is never double-counted across sibling builds).
