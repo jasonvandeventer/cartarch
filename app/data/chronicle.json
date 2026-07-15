@@ -1,5 +1,17 @@
 [
   {
+    "version": "4.11.7",
+    "date": "2026-07-14",
+    "added": [
+      "Move tokens to token inventory: a preview-and-approve migration on the Tokens page relocates token cards that landed in your main collection (per-row opt-out, quantities merge, locations carry over), and future CSV imports now route detected tokens straight to token inventory with their own line on the import result screen."
+    ],
+    "refined": [],
+    "resolved": [
+      "Dropdowns, popovers, and modals across the app now close on outside click and Escape. Modals with unsaved edits refuse accidental dismissal so entered form state (game results, notes) can't be destroyed by a stray click."
+    ],
+    "archivist_note": "v4.11.7 = the two SaintWacko Discord reports (#118, #120). #118: one shared opt-in dismissal mechanism in base.html — details.js-dismiss popovers (16 surfaces) close on outside click/Esc, data-dismiss modal overlays (9) close only while pristine (input/change marks dirty until next shown; games.html's bespoke unguarded notes-modal handlers removed). #120: token predicate = layout IN (token, double_faced_token, emblem) OR set_type='token' over the cards cache; /tokens/migrate previews + create-or-merges into token_inventory keyed on (user, scryfall_id) with token_migration transaction logs; persist_import_rows routes matching rows to token_inventory and reports token_routed_count/quantity through both wrappers and all three result renders. DFC back faces stay NULL in v1; pre-backfill NULL layout/set_type rows aren't detected (preview says so)."
+  },
+  {
     "version": "4.11.6",
     "date": "2026-07-14",
     "added": [],
