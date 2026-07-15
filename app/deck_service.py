@@ -3791,6 +3791,12 @@ def pull_card_to_deck(
     if not row or not deck or not deck.storage_location_id or row.quantity < quantity:
         return False
 
+    # issue #134 — proxy-aware merge key. A real copy must NEVER merge into a
+    # proxy row: that leaves is_proxy=True, so build_brew_buylist keeps reading
+    # the card as unowned (owned=0/missing) even though it was pulled in. Match
+    # the source row's proxy state so real→real and proxy→proxy only; a real
+    # pull into a proxy-holding deck consumes the proxy below instead.
+    source_is_proxy = bool(row.is_proxy)
     existing_deck_row = (
         session.query(InventoryRow)
         .filter(
@@ -3799,6 +3805,7 @@ def pull_card_to_deck(
             InventoryRow.finish == row.finish,
             InventoryRow.storage_location_id == deck.storage_location_id,
             InventoryRow.is_pending.is_(False),
+            InventoryRow.is_proxy.is_(source_is_proxy),
         )
         .first()
     )
@@ -3824,6 +3831,7 @@ def pull_card_to_deck(
             drawer=None,
             slot=None,
             is_pending=False,
+            is_proxy=source_is_proxy,
             tags=row.tags,
             created_at=utc_now(),
             updated_at=utc_now(),
@@ -3841,6 +3849,34 @@ def pull_card_to_deck(
         # its shares stay valid. No-op for the common non-deck source row.
         delete_shares_for_inventory_row(session, row.id)
         session.delete(row)
+
+    # issue #134 — consume the proxy. Pulling a REAL copy into a deck holding a
+    # proxy of the same printing fulfills that proxy (same intent as
+    # materialize_brew): decrement it by the incoming quantity, delete at zero.
+    # Leaving the proxy standing beside the new real row would put two copies of
+    # one card in a singleton deck — a different shape of the same corruption.
+    if not source_is_proxy:
+        from app.inventory_service import clean_inventory_row_references  # local: avoid cycle
+
+        proxy_row = (
+            session.query(InventoryRow)
+            .filter(
+                InventoryRow.user_id == user_id,
+                InventoryRow.card_id == existing_deck_row.card_id,
+                InventoryRow.finish == existing_deck_row.finish,
+                InventoryRow.storage_location_id == deck.storage_location_id,
+                InventoryRow.is_pending.is_(False),
+                InventoryRow.is_proxy.is_(True),
+            )
+            .first()
+        )
+        if proxy_row is not None:
+            proxy_row.quantity -= quantity
+            proxy_row.updated_at = utc_now()
+            if proxy_row.quantity <= 0:
+                delete_shares_for_inventory_row(session, proxy_row.id)
+                clean_inventory_row_references(session, [proxy_row.id])
+                session.delete(proxy_row)
 
     log_transaction(
         session=session,

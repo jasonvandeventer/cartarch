@@ -182,6 +182,42 @@ def test_perrow_existing_brew_proxies_unowned_moves_owned():
     assert _rows_at(s, box.id) == []
 
 
+def test_perrow_move_owned_consumes_existing_proxy():
+    """Issue #134, through the import/reconciliation entry point. The brew
+    already holds a PROXY of the card; importing the owned real copy pulls it in
+    (move path → pull_card_to_deck) and must CONSUME the proxy, not merge onto
+    it. Pre-fix the real copy merged into the proxy row (is_proxy stayed True,
+    qty 2) and the buy-list kept the card as missing."""
+    sm = _fresh()
+    s = sm()
+    u = _user(s)
+    brew = deck_service.create_deck(s, u.id, "MyBrew", is_brew=True)
+    box = _loc(s, u.id, "Box")
+    card = _card(s, "Smothering Tithe")
+    _place(s, u.id, card, brew.storage_location_id, qty=1, proxy=True)  # pre-existing proxy
+    _place(s, u.id, card, box.id, qty=1, proxy=False)  # owned real copy
+    s.commit()
+
+    c = _client(sm, u)
+    try:
+        r = c.post(
+            "/import/commit",
+            data=_perrow_form(
+                [(card, "MyBrew")],
+                [("MyBrew", brew.storage_location_id, "")],
+            ),
+        )
+        assert r.status_code == 200, r.text
+    finally:
+        _clear_overrides()
+
+    rows = _rows_at(s, brew.storage_location_id)
+    assert len(rows) == 1  # proxy consumed, single real row
+    assert rows[0].is_proxy is False
+    assert rows[0].quantity == 1
+    assert _rows_at(s, box.id) == []  # owned copy moved
+
+
 # --------------------------------------------------------------------------- #
 # 4b — per-row import into a NON-brew deck: bypass path unchanged, no proxies
 # --------------------------------------------------------------------------- #

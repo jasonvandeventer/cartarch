@@ -1,5 +1,15 @@
 [
   {
+    "version": "4.11.11",
+    "date": "2026-07-15",
+    "added": [],
+    "refined": [],
+    "resolved": [
+      "Acquiring a card your brew was holding as a proxy now correctly marks it owned: pulling or importing the real copy into the deck consumes the proxy instead of silently stacking onto it, so the buy-list no longer lists cards you already have."
+    ],
+    "archivist_note": "v4.11.11 = #134 (proxy lifecycle). pull_card_to_deck's merge key was is_proxy-blind, so a real copy pulled into a brew merged onto the proxy row (is_proxy stayed True; build_brew_buylist kept reading owned=0/missing). Fix: proxy-aware merge key (real->real, proxy->proxy; created deck rows carry the source's is_proxy) PLUS consume-the-proxy semantics — decrement the deck's proxy of the same (card_id, finish) by the pulled quantity and delete at zero (delete_shares_for_inventory_row + clean_inventory_row_references), matching materialize_brew's intent; a surviving proxy beside the new real row would be two copies of one card in a singleton deck. Second is_proxy-blind site closed: _commit_deck_import_with_reconciliation's auto-merge keyed on (card_id, finish) -> now (card_id, finish, is_proxy). The Add-tab owned-copy move (#119) already routes through pull_card_to_deck, so it's covered by the same fix. Tests: tests/test_pull_proxy_lifecycle.py (consume / multi-proxy shrink / excess / finish-mismatch no-cross-consume / real-row merge regression) + an import-path integration case in tests/test_import_brew_proxy.py. Suite 960 green. No schema, no migration. Latent pre-fix corruption (proxy rows that already absorbed real copies) is tracked for a preview-then-approve data-correction sweep in #136."
+  },
+  {
     "version": "4.11.10",
     "date": "2026-07-14",
     "added": [

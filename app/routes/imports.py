@@ -944,14 +944,18 @@ def _commit_deck_import_with_reconciliation(
                 )
                 .all()
             )
-            existing_by_key: dict[tuple[int, str], InventoryRow] = {
-                (r.card_id, r.finish): r for r in existing_deck_rows
+            # issue #134 — key includes is_proxy so a real row never merges into
+            # a proxy row (or vice-versa); real→real and proxy→proxy only. A real
+            # copy acquired into a proxy-holding deck arrives via the move path
+            # (pull_card_to_deck), which consumes the proxy there.
+            existing_by_key: dict[tuple[int, str, bool], InventoryRow] = {
+                (r.card_id, r.finish, r.is_proxy): r for r in existing_deck_rows
             }
             rows_to_place: list[int] = []
             merged_row_ids: set[int] = set()
             now_ts = utc_now()
             for new_row in new_pending_rows:
-                key = (new_row.card_id, new_row.finish)
+                key = (new_row.card_id, new_row.finish, new_row.is_proxy)
                 existing = existing_by_key.get(key)
                 if existing is None:
                     rows_to_place.append(new_row.id)
