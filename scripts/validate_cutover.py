@@ -173,7 +173,7 @@ def check_boolean_landmine() -> bool:
 
 def check_sequence_sanity() -> bool:
     print("\n[4] SEQUENCE SANITY — insert+rollback probe on cards (MAX+1, no collision)")
-    from datetime import datetime
+    from datetime import UTC, datetime
 
     cards = Base.metadata.tables["cards"]
     with engine.connect() as p:
@@ -187,7 +187,7 @@ def check_sequence_sanity() -> bool:
                     name="__cutover_seqprobe__",
                     set_code="XXX",
                     collector_number="0",
-                    updated_at=datetime(2026, 1, 1),
+                    updated_at=datetime(2026, 1, 1, tzinfo=UTC),
                 )
                 .returning(cards.c.id)
             ).scalar()

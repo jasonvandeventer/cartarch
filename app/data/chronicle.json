@@ -1,5 +1,15 @@
 [
   {
+    "version": "4.11.13",
+    "date": "2026-07-15",
+    "added": [],
+    "refined": [],
+    "resolved": [
+      "Build-gate fix for the v4.11.12 timezone flip — no user-facing change."
+    ],
+    "archivist_note": "v4.11.13 = CI-gate hotfix for v4.11.12 (#130). Enabling ruff DTZ in v4.11.12 was verified against app/ tests/ alembic/ but CI runs `ruff check .` over the WHOLE repo and flagged a naive datetime literal in scripts/validate_cutover.py:190 (a cutover-probe INSERT sentinel), failing the lint gate — so v4.11.12 built NO image and never deployed (prod stayed v4.11.11). Fix: updated_at=datetime(2026, 1, 1) -> datetime(2026, 1, 1, tzinfo=UTC). No app-code, model, or migration change; the whole #130 flip rides in v4.11.12's records. Lesson: the DTZ enablement should have been validated with `ruff check .` (CI's scope), not a path subset."
+  },
+  {
     "version": "4.11.12",
     "date": "2026-07-15",
     "added": [],
