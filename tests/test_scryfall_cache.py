@@ -460,7 +460,7 @@ def test_card_construction_on_cache_miss():
       * the v3.36.1 additions ``loyalty`` / ``defense`` ARE real Card columns
         — they survive the strip and land on the constructed Card.
     """
-    from datetime import datetime
+    from datetime import UTC, datetime
 
     from app.models import Card
 
@@ -482,10 +482,10 @@ def test_card_construction_on_cache_miss():
         failed += 1
 
     try:
-        pw = Card(**card_constructor_kwargs(pw_payload), updated_at=datetime.utcnow())
-        battle = Card(**card_constructor_kwargs(battle_payload), updated_at=datetime.utcnow())
-        creature = Card(**card_constructor_kwargs(creature_payload), updated_at=datetime.utcnow())
-        mdfc = Card(**card_constructor_kwargs(mdfc_payload), updated_at=datetime.utcnow())
+        pw = Card(**card_constructor_kwargs(pw_payload), updated_at=datetime.now(UTC))
+        battle = Card(**card_constructor_kwargs(battle_payload), updated_at=datetime.now(UTC))
+        creature = Card(**card_constructor_kwargs(creature_payload), updated_at=datetime.now(UTC))
+        mdfc = Card(**card_constructor_kwargs(mdfc_payload), updated_at=datetime.now(UTC))
     except TypeError as exc:
         raise AssertionError(f"Card(**payload) raised TypeError: {exc}") from exc
 

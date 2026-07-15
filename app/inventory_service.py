@@ -4,7 +4,7 @@ import json
 import logging
 import re
 from collections.abc import Iterable
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 
 from sqlalchemy import Float as SAFloat
 from sqlalchemy import and_, case, cast, func, not_, or_, select, text, tuple_
@@ -1871,7 +1871,7 @@ def update_inventory_location(
     row.drawer = (drawer or "").strip() or None
     row.slot = (slot or "").strip() or None
     row.is_pending = row.drawer is None or row.slot is None
-    row.updated_at = datetime.now(UTC)
+    row.updated_at = utc_now()
 
     if row.drawer:
         location = (
@@ -1940,7 +1940,7 @@ def move_inventory_row_to_location(
         raise ValueError("Storage location not found.")
 
     old_location = row.storage_location.name if row.storage_location else "unassigned"
-    now = datetime.now(UTC)
+    now = utc_now()
 
     existing = (
         session.query(InventoryRow)
@@ -2310,7 +2310,7 @@ def place_imported_rows(
         .filter(InventoryRow.id.in_(row_ids), InventoryRow.user_id == user_id)
         .all()
     )
-    now = datetime.now(UTC)
+    now = utc_now()
     for row in rows:
         existing = (
             session.query(InventoryRow)

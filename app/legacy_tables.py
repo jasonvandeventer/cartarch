@@ -42,9 +42,6 @@ PK becomes ``SERIAL`` regardless).
 from __future__ import annotations
 
 from sqlalchemy import (
-    TIMESTAMP as SA_TIMESTAMP,
-)
-from sqlalchemy import (
     Boolean,
     Column,
     Date,
@@ -61,7 +58,7 @@ from sqlalchemy import (
     true,
 )
 
-from app.db import Base
+from app.db import Base, UTCDateTime
 
 metadata = Base.metadata
 
@@ -77,7 +74,7 @@ card_tags = Table(
     Column("tag", String(64), nullable=False),
     Column("confidence", String(16), nullable=False, server_default=text("'medium'")),
     Column("source", String(32), nullable=False, server_default=text("'oracle_text_rule'")),
-    Column("last_reviewed", SA_TIMESTAMP, server_default=text("CURRENT_TIMESTAMP")),
+    Column("last_reviewed", UTCDateTime, server_default=text("CURRENT_TIMESTAMP")),
     UniqueConstraint("card_id", "tag"),
     Index("ix_card_tags_card", "card_id"),
     Index("ix_card_tags_tag", "tag"),
@@ -113,7 +110,7 @@ deck_bracket_estimates = Table(
     Column("intent_bracket", Integer),
     Column("final_bracket", Integer, nullable=False),
     Column("score", Float),
-    Column("generated_at", SA_TIMESTAMP, server_default=text("CURRENT_TIMESTAMP")),
+    Column("generated_at", UTCDateTime, server_default=text("CURRENT_TIMESTAMP")),
     Column("rules_version", String(32), nullable=False),
     # Appended later via ALTER TABLE (present in the snapshot).
     Column("confidence_tagging_coverage", Float),

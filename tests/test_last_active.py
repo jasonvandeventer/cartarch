@@ -14,7 +14,7 @@ the 5-minute throttle window can be crossed deterministically (no real sleeping
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from sqlalchemy.orm import sessionmaker
@@ -38,7 +38,7 @@ def clock(monkeypatch):
     """A controllable ``utc_now`` for app.dependencies. Mutate ``clock.now``."""
 
     class Clock:
-        now = datetime(2026, 6, 25, 12, 0, 0)
+        now = datetime(2026, 6, 25, 12, 0, 0, tzinfo=UTC)  # #130 — utc_now() is aware
 
     c = Clock()
     monkeypatch.setattr(dependencies, "utc_now", lambda: c.now)
@@ -124,7 +124,7 @@ def test_last_signed_in_at_untouched(isolated_sessionmaker, clock):
         u = User(
             username="both@example.com",
             password_hash="x",
-            last_signed_in_at=datetime(2020, 1, 1, 0, 0, 0),
+            last_signed_in_at=datetime(2020, 1, 1, 0, 0, 0, tzinfo=UTC),
         )
         s.add(u)
         s.commit()
@@ -136,4 +136,4 @@ def test_last_signed_in_at_untouched(isolated_sessionmaker, clock):
 
     reloaded = _load(isolated_sessionmaker, uid)
     assert reloaded.last_active_at == clock.now
-    assert reloaded.last_signed_in_at == datetime(2020, 1, 1, 0, 0, 0)
+    assert reloaded.last_signed_in_at == datetime(2020, 1, 1, 0, 0, 0, tzinfo=UTC)

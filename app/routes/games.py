@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import json
 import secrets
-from datetime import datetime
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import JSONResponse, RedirectResponse
@@ -287,7 +287,10 @@ def manual_log_create(
     :func:`log_game`, which owns the security guards (deck ownership, playgroup
     access, opponent bounds) — a violation raises ValueError → 400."""
     try:
-        played_at = datetime.strptime(played_date.strip(), "%Y-%m-%d")
+        # #130 — attach UTC: this feeds the tz-aware played_at (timestamptz).
+        # The date is a user-entered day; midnight UTC preserves the prior
+        # naive-UTC-stored instant.
+        played_at = datetime.strptime(played_date.strip(), "%Y-%m-%d").replace(tzinfo=UTC)
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid date format") from None
 

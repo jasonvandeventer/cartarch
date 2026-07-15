@@ -1,5 +1,15 @@
 [
   {
+    "version": "4.11.12",
+    "date": "2026-07-15",
+    "added": [],
+    "refined": [],
+    "resolved": [
+      "Timestamps across the app are now timezone-aware UTC end to end (Postgres timestamptz), removing the naive/aware ambiguity so dates and times compute and display correctly everywhere."
+    ],
+    "archivist_note": "v4.11.12 = #130 (the deferred v3.36.13 single-flip-point). utc_now() flipped naive->aware (datetime.now(UTC)); a new UTCDateTime TypeDecorator (impl timestamptz) re-attaches UTC on read so SQLite tests read aware exactly like prod psycopg does — kills the naive-vs-aware TypeError class at the type boundary rather than at every call site. Migration e1f2a3b4c5d6 converts 49 naive columns to timestamptz via USING col AT TIME ZONE 'UTC' (enumerated from information_schema at runtime, idempotent); 1 pre-existing tz column skipped (deck_card_shares.created_at, #27). UTC-convention proven against prod 2026-07-15: deck_bracket_estimates.generated_at read 13:04 UTC at a ~09:45 Central wall-clock moment — a local-Central reading would be in the future (impossible), so naive stored values ARE UTC and the conversion needs no offset correction. 9-site straggler sweep: 8 datetime.now(UTC) bypasses routed through timeutil + 1 naive strptime made aware, plus audit_service datetime.min -> aware, editorial filter strptime -> date.fromisoformat, gc_sync date.today -> utc_now().date(). ruff DTZ (flake8-datetimez) enabled to lock the door — production DTZ-clean; tests keep only DTZ001 (naive fixtures bind-normalize) while every other DTZ rule stays active. Deploy note (honest): PreSync applies the migration BEFORE the pod swap, so the outgoing naive-code pod briefly serves aware timestamptz reads — its display filter and aware-vs-aware math tolerate that, but auth-adjacent naive-vs-aware comparisons (login throttle, reset expiry, last-active) can TypeError for the sub-two-minute window (~9 users, self-healing at swap); the new code never sees naive columns. Suite 970 green. Prod behavior unchanged (psycopg already returned aware for timestamptz)."
+  },
+  {
     "version": "4.11.11",
     "date": "2026-07-15",
     "added": [],

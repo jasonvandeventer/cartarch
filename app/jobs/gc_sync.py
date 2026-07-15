@@ -99,9 +99,8 @@ def apply_game_changer_sync(session: Session, scryfall_names: list[str], *, toda
 
 
 def main(apply: bool = False) -> None:
-    from datetime import date
-
     from app.db import SessionLocal
+    from app.timeutil import utc_now
 
     names = fetch_gamechanger_names()
     if names is None:
@@ -121,7 +120,7 @@ def main(apply: bool = False) -> None:
         if not apply:
             print("[gc-sync] report only — pass --apply to write", flush=True)
             return
-        result = apply_game_changer_sync(session, names, today=date.today().isoformat())
+        result = apply_game_changer_sync(session, names, today=utc_now().date().isoformat())
         if result["applied"]:
             print(
                 f"[gc-sync] applied; new rules_version {result['rules_version']} — "

@@ -7,7 +7,7 @@ import re
 import secrets
 import subprocess
 from collections.abc import Generator
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from urllib.parse import urlparse
 from zoneinfo import ZoneInfo
 
@@ -227,9 +227,9 @@ _LOCAL_TZ = ZoneInfo("America/Chicago")
 def format_local_datetime(dt: datetime | None, fmt: str = "%Y-%m-%d") -> str:
     if dt is None:
         return ""
-    # Naive-UTC → aware-UTC → Chicago. ``replace(tzinfo=UTC)`` on an
-    # already-aware datetime would overwrite the existing tz, but the
-    # project only ever stores naive UTC, so this is safe.
+    # #130: values are aware UTC now (the UTCDateTime type), so the astimezone
+    # below converts straight to Chicago. The naive guard is kept for any legacy
+    # naive datetime that still reaches here — it's treated as UTC.
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=UTC)
     return dt.astimezone(_LOCAL_TZ).strftime(fmt)
@@ -258,7 +258,7 @@ def format_editorial_date(value) -> str:
         d = value.date()
     else:
         try:
-            d = datetime.strptime(str(value), "%Y-%m-%d").date()
+            d = date.fromisoformat(str(value))
         except (ValueError, TypeError):
             return str(value)
     return d.strftime("%-d %B %Y")  # "21 May 2026"
@@ -401,7 +401,7 @@ def _classify_session_cookie(request: Request) -> dict:
 
     secret = os.getenv("SESSION_SECRET_KEY", "dev-only-change-me")
     signer = TimestampSigner(secret)
-    now = datetime.now(UTC)
+    now = utc_now()
     cls = "bad_signature"
     skew: int | None = None
     try:
@@ -837,9 +837,10 @@ def _stamp_last_active(user: User) -> None:
     it is NULL or older than ``LAST_ACTIVE_THROTTLE``. This is correct across
     restarts and multiple replicas (the throttle state IS the persisted row),
     unlike the single-pod in-memory throttles in ``login_throttle`` /
-    ``password_reset_service``. Naive-UTC throughout — ``utc_now()`` for both
-    the comparison and the stored value (a tz-aware ``datetime.now(UTC)`` would
-    raise ``TypeError`` subtracting the naive stored value).
+    ``password_reset_service``. Aware-UTC throughout (#130) — ``utc_now()`` is
+    aware and ``last_active_at`` reads back aware (the ``UTCDateTime`` type), so
+    the comparison is aware-vs-aware in both prod (timestamptz) and the SQLite
+    test suite.
 
     **Isolated transaction** — the update runs in its OWN short-lived
     ``SessionLocal()`` (the ``_pending_count_for`` precedent), never on the

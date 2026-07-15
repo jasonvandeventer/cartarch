@@ -17,11 +17,20 @@ select = [
   "I",
   "UP",
   "B",
+  "DTZ",
 ]
 ignore = [
   "E501",
   "B008"
 ]
+
+[tool.ruff.lint.per-file-ignores]
+# Test fixtures legitimately construct naive datetime literals (the UTCDateTime
+# column type bind-normalizes them to UTC on write), and two #130 tests pass
+# naive input on purpose to exercise the naive→UTC guard. Every other DTZ rule
+# (utcnow, bare now(), naive strptime, date.today) stays active on tests; only
+# the naive-constructor rule is relaxed here. Production code stays DTZ-strict.
+"tests/*" = ["DTZ001"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

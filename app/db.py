@@ -8,10 +8,40 @@ from __future__ import annotations
 
 import os
 import threading
+from datetime import UTC
 from pathlib import Path
 
-from sqlalchemy import create_engine, event
+from sqlalchemy import DateTime, TypeDecorator, create_engine, event
 from sqlalchemy.orm import Session, declarative_base, sessionmaker
+
+
+class UTCDateTime(TypeDecorator):
+    """Timezone-aware UTC datetime, uniform across dialects (#130).
+
+    ``impl`` is ``timestamptz`` on Postgres, so prod reads are already aware and
+    both hooks below are no-ops there. SQLite (the test suite) has no tz type and
+    hands back *naive* datetimes, so ``process_result_value`` re-attaches UTC —
+    every read is aware in prod AND tests, killing the naive-vs-aware ``TypeError``
+    class at the type boundary instead of at every call site. Bind normalizes a
+    stray naive value to UTC as belt-and-suspenders. Naive stored values are UTC
+    by the project's long-standing convention (see the #130 migration docstring).
+
+    Used by every datetime column — ORM (``models.py``) and Core (``legacy_tables``).
+    """
+
+    impl = DateTime(timezone=True)
+    cache_ok = True
+
+    def process_bind_param(self, value, dialect):
+        if value is not None and value.tzinfo is None:
+            return value.replace(tzinfo=UTC)
+        return value
+
+    def process_result_value(self, value, dialect):
+        if value is not None and value.tzinfo is None:
+            return value.replace(tzinfo=UTC)
+        return value
+
 
 DATA_DIR = Path(os.getenv("DATA_DIR", "/data"))
 # Renamed 2026-07-06 (mana_archive -> cartarch). Existing local dev DBs need:

@@ -38,7 +38,9 @@ from __future__ import annotations
 
 import threading
 from collections import OrderedDict
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
+
+from app.timeutil import utc_now
 
 # Policy — change here if it changes. 5 failures per 15 minutes per key;
 # the 6th attempt within the window is throttled.
@@ -96,7 +98,7 @@ def is_login_throttled(username: str, client_ip: str | None) -> bool:
     anything — only a confirmed failure (``record_failed_login``) counts —
     and never inserts a tracking key, so probing can't exhaust memory.
     """
-    now = datetime.now(UTC)
+    now = utc_now()
     with _fail_lock:
         user_count = _pruned_count(_username_key(username), now)
         ip_count = _pruned_count(_ip_key(client_ip), now)
@@ -116,7 +118,7 @@ def _record_one(key: str, now: datetime) -> None:
 
 def record_failed_login(username: str, client_ip: str | None) -> None:
     """Record a failed login against both the username and IP counters."""
-    now = datetime.now(UTC)
+    now = utc_now()
     with _fail_lock:
         _record_one(_username_key(username), now)
         _record_one(_ip_key(client_ip), now)

@@ -62,7 +62,7 @@ import os
 import secrets
 import threading
 from collections import defaultdict
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 
 import requests
 from sqlalchemy.orm import Session
@@ -103,7 +103,7 @@ def _check_and_record_rate_limit(key: str) -> bool:
     via the module lock (multiple daemon threads or concurrent
     requests could otherwise race on the list mutation).
     """
-    now = datetime.now(UTC)
+    now = utc_now()
     with _rate_lock:
         log = _rate_log[key]
         cutoff = now - RESET_RATE_LIMIT_WINDOW

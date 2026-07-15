@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
@@ -1118,7 +1118,7 @@ def list_auditable_locations(session: Session, user_id: int) -> list[dict]:
         key=lambda d: (
             0 if d["last_audited_at"] is None else 1,  # never-audited first
             -d["card_count"] if d["last_audited_at"] is None else 0,  # then biggest pile
-            d["last_audited_at"] or datetime.min,  # then stalest first
+            d["last_audited_at"] or datetime.min.replace(tzinfo=UTC),  # then stalest first
         )
     )
     return out
