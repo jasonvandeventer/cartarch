@@ -1,5 +1,15 @@
 [
   {
+    "version": "4.11.8",
+    "date": "2026-07-14",
+    "added": [
+      "The deck page's Add tab now shows one row per unique card instead of every printing — each with the cheapest printing's image and a 'from $X.XX' price for your selected finish, plus a ▸ expander when you do want a specific printing. Adding from a collapsed row picks the printing for you: a printing already in the deck's variant group wins, then a copy you own (even in another finish), then the cheapest printing in all of Magic — and a toast tells you exactly what happened."
+    ],
+    "refined": [],
+    "resolved": [],
+    "archivist_note": "v4.11.8 = #119 (builds on #87's Add tab). Grouping: GET /decks/api/card-autocomplete-grouped — window-function (row_number per name ordered price-nulls-last) over the LOCAL scryfall_cards mirror, no request-path network; name grouping IS oracle grouping so no oracle_id column; Arena A-% names and token/emblem/art_series layouts excluded; 13-17ms on the full 116k-row mirror. Resolution: POST add-card accepts card_name; resolve_add_printing (deck_service) applies variant-identity > owned-loose (non-proxy, non-deck-resident, resolved to that copy's exact printing AND finish so reconciliation moves it; radio ignored) > cheapest-for-finish, then funnels through the unchanged _commit_deck_import_with_reconciliation. Toast via X-Add-Resolution response header. Expand reuses the live-Scryfall per-printing endpoint with an exact-name query; specific-printing adds unchanged."
+  },
+  {
     "version": "4.11.7",
     "date": "2026-07-14",
     "added": [
