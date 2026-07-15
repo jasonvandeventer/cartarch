@@ -1,5 +1,15 @@
 [
   {
+    "version": "4.11.10",
+    "date": "2026-07-14",
+    "added": [
+      "The Game Changers list is now date-versioned and syncable: a manual sync job compares the app's list against Scryfall's official mirror and applies adds/removes without ever rewriting history. When the official list changes, every deck's bracket floor automatically re-evaluates in the background — no manual re-runs."
+    ],
+    "refined": [],
+    "resolved": [],
+    "archivist_note": "v4.11.10 = #123 (program spec A-2; pairs with v4.11.9's #121). Alembic d0e1f2a3b4c5 (data-only: game_changer_cards '1.0.0' -> '2026-02-09'; PreSync applies). gc_list_version() = MAX(active rules_version, all date_removed) so removals-only syncs still bump. Floor records stamp the list version; GC lookup keys on active. Daemon: estimate stamp != current version -> re-floor from PERSISTED combos (zero Spellbook calls); pre-#121 '1.0.0' estimates go stale once, backfilling floor_bracket. Chips fold version drift into ⟳. Sync: python -m app.jobs.gc_sync (report / --apply; descriptive UA per v4.6.4). List currency verified at ship time: Scryfall 53 GCs, prod 53/53 zero delta."
+  },
+  {
     "version": "4.11.9",
     "date": "2026-07-14",
     "added": [
