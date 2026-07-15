@@ -1,0 +1,80 @@
+{% from "_macros.html" import editorial_eyebrow %}
+{% extends "base.html" %}
+{% block content %}
+  {# #120 — one-time migration of token printings that landed in the main
+     collection (ManaBox-style CSV imports include tokens). Preview + per-row
+     opt-out; nothing mutates until Approve — the Physical Audit Mode pattern. #}
+  <section class="panel page-hero">
+    <div>
+      {{ editorial_eyebrow("Collection · Tokens · Migrate") }}
+      <h2 class="panel-title">Move tokens to token inventory</h2>
+      <p class="pagehead-tagline">
+        These collection rows are token or emblem printings. Approving moves
+        them into your token inventory — quantities merge into any token you
+        already track, and storage locations carry over.
+      </p>
+    </div>
+  </section>
+
+  {% if rows %}
+    <section class="panel">
+      <form method="post" action="/tokens/migrate">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th></th>
+                <th>Card</th>
+                <th>Printing</th>
+                <th>Finish</th>
+                <th>Qty</th>
+                <th>Current location</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in rows %}
+                <tr>
+                  <td>
+                    <input type="checkbox" name="row_id" value="{{ row.id }}" checked>
+                  </td>
+                  <td>{{ row.card.name }}</td>
+                  <td>{{ row.card.set_code | upper }} #{{ row.card.collector_number }}</td>
+                  <td>{{ row.finish }}</td>
+                  <td>{{ row.quantity }}</td>
+                  <td>
+                    {% if row.storage_location %}
+                      {{ row.storage_location.name }}
+                    {% elif row.is_pending %}
+                      Pending
+                    {% else %}
+                      —
+                    {% endif %}
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <p class="muted small-text" style="margin-top: 0.75rem">
+          Token inventory doesn't track prices, so your collection value will
+          drop by the moved tokens' prices. Uncheck any row to keep it in the
+          collection. Token printings imported before the layout data backfill
+          may not be detected here — re-run after the next import if a token
+          is missing.
+        </p>
+        <div style="display: flex; gap: 0.75rem; margin-top: 0.75rem">
+          <button type="submit">Move selected to token inventory</button>
+          <a href="/tokens"><button type="button" class="ghost-button">Cancel</button></a>
+        </div>
+      </form>
+    </section>
+  {% else %}
+    <section class="panel">
+      <p class="muted">
+        No token printings found in your collection — everything token-shaped
+        already lives in <a href="/tokens">token inventory</a>.
+      </p>
+    </section>
+  {% endif %}
+{% endblock %}

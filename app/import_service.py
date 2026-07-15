@@ -37,6 +37,7 @@ from app.scryfall import (
     fetch_card_by_set_and_number,
 )
 from app.timeutil import utc_now
+from app.token_service import is_token_card, upsert_token_from_card
 
 # Matches the trailing (SET) or [SET] and optional collector number on a list line.
 # SET must be 2–6 alphanumeric chars to distinguish from long parenthetical phrases.
@@ -626,6 +627,8 @@ def persist_import_rows(
 
     imported_count = 0
     total_quantity = 0
+    token_routed_count = 0
+    token_routed_quantity = 0
     failed_rows: list[dict[str, Any]] = []
     imported_row_ids: list[int] = []
     batch = create_import_batch(
@@ -684,6 +687,8 @@ def persist_import_rows(
         return {
             "imported_count": 0,
             "total_quantity": 0,
+            "token_routed_count": 0,
+            "token_routed_quantity": 0,
             "failed_rows": failed_rows,
             "batch_id": batch.id,
             "imported_row_ids": [],
@@ -837,6 +842,34 @@ def persist_import_rows(
         # any existing placed copy.
         resolved_loc_id = line_to_location_id.get(row.get("line_number"))
 
+        # #120 — token printings (layout token/double_faced_token/emblem, or a
+        # token set) route to token_inventory, never inventory_rows. Without
+        # this, ManaBox-style CSVs keep regenerating token rows in the main
+        # collection on every import. Logged directly (tokens have no
+        # InventoryRow for the audit payload) and reported separately.
+        if is_token_card(card.layout, card.set_type):
+            upsert_token_from_card(
+                session,
+                user_id=user_id,
+                card=card,
+                quantity=qty,
+                storage_location_id=resolved_loc_id,
+            )
+            log_transaction(
+                session=session,
+                user_id=user_id,
+                event_type="import",
+                card_id=card.id,
+                finish=finish,
+                quantity_delta=qty,
+                destination_location="token_inventory",
+                batch_id=batch.id,
+                note=f"Imported from row {row.get('line_number')} (routed to token inventory)",
+            )
+            token_routed_count += 1
+            token_routed_quantity += qty
+            continue
+
         if resolved_loc_id:
             target_row = InventoryRow(
                 user_id=user_id,
@@ -965,6 +998,8 @@ def persist_import_rows(
     return {
         "imported_count": imported_count,
         "total_quantity": total_quantity,
+        "token_routed_count": token_routed_count,
+        "token_routed_quantity": token_routed_quantity,
         "failed_rows": failed_rows,
         "batch_id": batch.id,
         "imported_row_ids": imported_row_ids,

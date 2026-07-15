@@ -910,6 +910,8 @@ def _commit_deck_import_with_reconciliation(
     # Run the existing import path for everything that didn't get moved.
     new_imported_count = 0
     new_total_quantity = 0
+    token_routed_count = 0
+    token_routed_quantity = 0
     merged_count = 0
     failed_rows: list[dict] = []
     batch_id = None
@@ -918,6 +920,8 @@ def _commit_deck_import_with_reconciliation(
         result = persist_import_rows(session, new_import_rows, filename=filename, user_id=user_id)
         new_imported_count = result["imported_count"]
         new_total_quantity = result.get("total_quantity", new_imported_count)
+        token_routed_count = result.get("token_routed_count", 0)
+        token_routed_quantity = result.get("token_routed_quantity", 0)
         failed_rows = result["failed_rows"]
         batch_id = result["batch_id"]
         imported_row_ids = result.get("imported_row_ids", [])
@@ -999,6 +1003,8 @@ def _commit_deck_import_with_reconciliation(
     return {
         "imported_count": new_imported_count,
         "total_quantity": new_total_quantity,
+        "token_routed_count": token_routed_count,
+        "token_routed_quantity": token_routed_quantity,
         "moved_count": moved_count,
         "shared_count": shared_count,
         "merged_count": merged_count,
@@ -1150,6 +1156,8 @@ def _commit_collection_import_with_reconciliation(
     # Run the existing import path for everything that didn't get skipped.
     imported_count = 0
     total_quantity = 0
+    token_routed_count = 0
+    token_routed_quantity = 0
     failed_rows: list[dict] = []
     batch_id = None
     imported_row_ids: list[int] = []
@@ -1158,6 +1166,8 @@ def _commit_collection_import_with_reconciliation(
         result = persist_import_rows(session, new_import_rows, filename=filename, user_id=user_id)
         imported_count = result["imported_count"]
         total_quantity = result.get("total_quantity", imported_count)
+        token_routed_count = result.get("token_routed_count", 0)
+        token_routed_quantity = result.get("token_routed_quantity", 0)
         failed_rows = result["failed_rows"]
         batch_id = result["batch_id"]
         imported_row_ids = result.get("imported_row_ids", [])
@@ -1180,6 +1190,8 @@ def _commit_collection_import_with_reconciliation(
     return {
         "imported_count": imported_count,
         "total_quantity": total_quantity,
+        "token_routed_count": token_routed_count,
+        "token_routed_quantity": token_routed_quantity,
         "skipped_count": skipped_count,
         "failed_rows": failed_rows,
         "stale_match_rows": stale_match_rows,
@@ -1461,6 +1473,8 @@ async def import_commit(
                 "merged_count": merged_count + brew_merged,
                 "shared_count": brew_shared,
                 "skipped_count": 0,
+                "token_routed_count": result.get("token_routed_count", 0),
+                "token_routed_quantity": result.get("token_routed_quantity", 0),
                 "stale_match_rows": stale_match_rows,
                 "failed_rows": result["failed_rows"] + brew_failed,
                 "batch_id": result["batch_id"] or brew_batch_id,
@@ -1565,6 +1579,8 @@ async def import_commit(
             "merged_count": merged_count,
             "shared_count": result.get("shared_count", 0),
             "skipped_count": skipped_count,
+            "token_routed_count": result.get("token_routed_count", 0),
+            "token_routed_quantity": result.get("token_routed_quantity", 0),
             "stale_match_rows": stale_match_rows,
             "failed_rows": result["failed_rows"],
             "batch_id": result["batch_id"],
@@ -1890,6 +1906,8 @@ async def manual_import_commit(
             "merged_count": merged_count,
             "shared_count": result.get("shared_count", 0),
             "skipped_count": skipped_count,
+            "token_routed_count": result.get("token_routed_count", 0),
+            "token_routed_quantity": result.get("token_routed_quantity", 0),
             "stale_match_rows": stale_match_rows,
             "failed_rows": result["failed_rows"],
             "batch_id": result["batch_id"],
