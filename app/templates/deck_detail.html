@@ -544,6 +544,7 @@
             hx-swap="innerHTML">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
         <input type="hidden" id="deck-add-scryfall-id" name="scryfall_id" value="">
+        <input type="hidden" id="deck-add-card-name" name="card_name" value="">
         <label for="deck-add-name-input" class="add-card-label">Card name</label>
         <div class="add-card-input-row">
           <input type="text"
@@ -1009,6 +1010,7 @@
         if (!form) return;
         var nameInput = document.getElementById('deck-add-name-input');
         var hiddenId = document.getElementById('deck-add-scryfall-id');
+        var hiddenName = document.getElementById('deck-add-card-name');
         var qtyInput = document.getElementById('deck-add-qty');
         var resultsEl = document.getElementById('deck-add-results');
         var submitBtn = document.getElementById('deck-add-submit');
@@ -1021,6 +1023,7 @@
 
         function resetSelection() {
           hiddenId.value = '';
+          hiddenName.value = '';
           submitBtn.disabled = true;
           form.dataset.selectedPrinting = '';
           searchToken++;  // #53: discard any in-flight autocomplete response
@@ -1028,6 +1031,7 @@
 
         function selectPrinting(card) {
           hiddenId.value = card.scryfall_id || '';
+          hiddenName.value = '';
           nameInput.value =
             card.name +
             ' (' + (card.set_code || '').toUpperCase() +
@@ -1039,12 +1043,93 @@
           searchToken++;  // #53: a pre-selection fetch must not repopulate results
         }
 
-        function renderResults(items) {
+        // #119 — a collapsed (name-level) pick: the server resolves the
+        // printing (variant identity > owned copy > cheapest for finish).
+        function selectGroup(item) {
+          hiddenName.value = item.name || '';
+          hiddenId.value = '';
+          nameInput.value = item.name || '';
+          submitBtn.disabled = !hiddenName.value;
+          form.dataset.selectedPrinting = '1';
+          resultsEl.innerHTML = '';
+          statusEl.textContent = '';
+          searchToken++;
+        }
+
+        function currentFinish() {
+          var r = form.querySelector('input[name="finish"]:checked');
+          return r ? r.value : 'normal';
+        }
+
+        // #119 — default results: one row per unique card name, cheapest
+        // printing's image + "from $X.XX", with a printings expander (the
+        // unchanged specific-printing flow lives behind it).
+        function renderGrouped(items) {
+          if (!items || !items.length) {
+            resultsEl.innerHTML = '<p class="muted small-text" style="margin: 0.4rem 0 0">No cards matched.</p>';
+            return;
+          }
+          resultsEl.innerHTML = items.map(function (c, i) {
+            var img = c.image_url
+              ? '<img src="' + c.image_url + '" alt="" loading="lazy">'
+              : '<div class="add-card-result-noimg"></div>';
+            var price = (c.from_price !== null && c.from_price !== undefined)
+              ? 'from $' + Number(c.from_price).toFixed(2)
+              : 'no price data';
+            var n = c.printings || 1;
+            return (
+              '<div class="add-card-result add-card-result-group" data-idx="' + i + '" role="option">' +
+              img +
+              '<div class="add-card-result-meta">' +
+                '<strong>' + (c.name || '') + '</strong>' +
+                '<span class="muted">' + price + '</span>' +
+              '</div>' +
+              '<button type="button" class="add-card-result-expand" data-idx="' + i + '" ' +
+                'title="Show all printings">\u25b8 ' + n + ' printing' + (n === 1 ? '' : 's') + '</button>' +
+              '</div>'
+            );
+          }).join('');
+          resultsEl.querySelectorAll('.add-card-result-group').forEach(function (rowEl) {
+            rowEl.addEventListener('click', function () {
+              selectGroup(items[parseInt(rowEl.dataset.idx, 10)]);
+            });
+          });
+          resultsEl.querySelectorAll('.add-card-result-expand').forEach(function (btn) {
+            btn.addEventListener('click', function (e) {
+              e.stopPropagation();
+              expandPrintings(items[parseInt(btn.dataset.idx, 10)].name);
+            });
+          });
+        }
+
+        // #119 — expand: all printings of one name via the existing
+        // per-printing endpoint (exact-name Scryfall query). Picking one is
+        // the unchanged specific-printing add.
+        function expandPrintings(name) {
+          var myToken = ++searchToken;
+          statusEl.textContent = 'Loading printings\u2026';
+          fetch('/decks/api/card-autocomplete?q=' + encodeURIComponent('!"' + name + '"'))
+            .then(function (r) { return r.ok ? r.json() : []; })
+            .then(function (data) {
+              if (myToken !== searchToken) return;
+              statusEl.textContent = '';
+              renderResults(data, name);
+            })
+            .catch(function () {
+              if (myToken !== searchToken) return;
+              statusEl.textContent = '';
+            });
+        }
+
+        function renderResults(items, expandedName) {
           if (!items || !items.length) {
             resultsEl.innerHTML = '<p class="muted small-text" style="margin: 0.4rem 0 0">No cards matched on Scryfall.</p>';
             return;
           }
-          resultsEl.innerHTML = items.map(function (c, i) {
+          var back = expandedName
+            ? '<button type="button" class="add-card-result add-card-result-back">\u25c2 Back to all results</button>'
+            : '';
+          resultsEl.innerHTML = back + items.map(function (c, i) {
             var img = c.image_uri_small
               ? '<img src="' + c.image_uri_small + '" alt="" loading="lazy">'
               : '<div class="add-card-result-noimg"></div>';
@@ -1061,6 +1146,13 @@
             );
           }).join('');
           resultsEl.querySelectorAll('.add-card-result').forEach(function (btn) {
+            if (btn.classList.contains('add-card-result-back')) {
+              btn.addEventListener('click', function () {
+                lastQuery = '';
+                nameInput.dispatchEvent(new Event('input'));
+              });
+              return;
+            }
             btn.addEventListener('click', function () {
               var idx = parseInt(btn.dataset.idx, 10);
               selectPrinting(items[idx]);
@@ -1088,19 +1180,31 @@
           var sentQuery = q;
           acTimer = setTimeout(function () {
             statusEl.textContent = 'Searching…';
-            fetch('/decks/api/card-autocomplete?q=' + encodeURIComponent(q))
+            fetch('/decks/api/card-autocomplete-grouped?q=' + encodeURIComponent(q) +
+                  '&finish=' + encodeURIComponent(currentFinish()))
               .then(function (r) { return r.ok ? r.json() : []; })
               .then(function (data) {
                 // #53: drop superseded/stale responses (out-of-order or post-edit).
                 if (myToken !== searchToken || nameInput.value.trim() !== sentQuery) return;
                 statusEl.textContent = '';
-                renderResults(data);
+                renderGrouped(data);
               })
               .catch(function () {
                 if (myToken !== searchToken) return;
                 statusEl.textContent = '';
               });
           }, 200);
+        });
+
+        // #119 — the from-price is per-finish; changing the radio re-runs
+        // the grouped search when results are showing.
+        form.querySelectorAll('input[name="finish"]').forEach(function (radio) {
+          radio.addEventListener('change', function () {
+            if (lastQuery && !form.dataset.selectedPrinting) {
+              lastQuery = '';
+              nameInput.dispatchEvent(new Event('input'));
+            }
+          });
         });
 
         // Block Enter from submitting unless a printing is selected.
@@ -1118,8 +1222,18 @@
             resultsEl.innerHTML = '';
             lastQuery = '';
             resetSelection();
-            statusEl.textContent = 'Added.';
-            setTimeout(function () { statusEl.textContent = ''; }, 1500);
+            // #119 — the server states what a name-level add resolved to
+            // (printing, source, finish note); nothing about it is silent.
+            var toast = 'Added.';
+            var hold = 1500;
+            try {
+              var header = evt.detail.xhr.getResponseHeader('X-Add-Resolution');
+              if (header) { toast = JSON.parse(header); hold = 6000; }
+            } catch (err) { /* fall back to the plain toast */ }
+            statusEl.textContent = toast;
+            setTimeout(function () {
+              if (statusEl.textContent === toast) statusEl.textContent = '';
+            }, hold);
           }
         });
 

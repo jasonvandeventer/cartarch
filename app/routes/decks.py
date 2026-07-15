@@ -59,6 +59,7 @@ from app.deck_service import (
     get_row_tag_details,
     get_row_tags,
     group_deck_items,
+    grouped_card_search,
     inbound_shared_rows_for_deck,
     list_decks,
     list_user_printings_for_card,
@@ -68,6 +69,7 @@ from app.deck_service import (
     outbound_share_map,
     own_deck_card_options,
     pull_card_to_deck,
+    resolve_add_printing,
     resolved_deck_rows,
     return_card_from_deck,
     set_row_tags,
@@ -1373,11 +1375,28 @@ def decks_card_autocomplete(
     return JSONResponse(autocomplete_cards_for_add(q, limit=50))
 
 
+@router.get("/decks/api/card-autocomplete-grouped")
+def decks_card_autocomplete_grouped(
+    q: str = "",
+    finish: str = "normal",
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+):
+    """#119 — Add-tab default results: one row per unique card name.
+
+    Grouped over the local scryfall_cards mirror (no network); each row
+    carries the cheapest printing for the selected finish ("from $X.XX"),
+    its image, and the printing count for the expand affordance.
+    """
+    return JSONResponse(grouped_card_search(session, q, finish=normalize_finish(finish)))
+
+
 @router.post("/decks/{deck_id}/add-card")
 async def decks_add_card(
     request: Request,
     deck_id: int,
-    scryfall_id: str = Form(...),
+    scryfall_id: str = Form(""),
+    card_name: str = Form(""),
     finish: str = Form("normal"),
     quantity: int = Form(1),
     session: Session = Depends(get_db_session),
@@ -1404,11 +1423,28 @@ async def decks_add_card(
         raise HTTPException(status_code=404, detail="Deck not found")
 
     scryfall_id = scryfall_id.strip()
-    if not scryfall_id:
-        raise HTTPException(status_code=400, detail="scryfall_id is required")
-
     quantity = max(1, min(int(quantity), 99))
     finish_normalized = normalize_finish(finish)
+
+    # #119 — name-level add from a collapsed Add-tab row: resolve the
+    # printing server-side (variant-group identity > owned loose copy >
+    # cheapest for the selected finish). A specific-printing add
+    # (scryfall_id present) is unchanged.
+    resolution = None
+    if not scryfall_id and card_name.strip():
+        resolution = resolve_add_printing(
+            session,
+            user_id=current_user.id,
+            deck=deck,
+            name=card_name.strip(),
+            finish=finish_normalized,
+        )
+        if not resolution:
+            raise HTTPException(status_code=404, detail="Card not found")
+        scryfall_id = resolution["scryfall_id"]
+        finish_normalized = resolution["finish"]
+    if not scryfall_id:
+        raise HTTPException(status_code=400, detail="scryfall_id or card_name is required")
 
     parsed_rows = [
         {
@@ -1452,6 +1488,26 @@ async def decks_add_card(
         filename="add-card",
     )
 
+    # #119 — nothing about a name-level resolution is silent: the toast says
+    # which printing resolved, from where, and flags a finish that differs
+    # from the radio. Sent as a response header the Add-tab JS surfaces.
+    toast = None
+    if resolution:
+        printing = (
+            f"{(resolution['set_code'] or '?').upper()} #{resolution['collector_number'] or '?'}"
+        )
+        if action in ("move_existing", "move_existing_plus_new") and rc["matches"]:
+            src = rc["matches"][0]["location_name"]
+            toast = f"Added {printing} — moved from {src}"
+        elif resolution["rule"] == "variant":
+            toast = f"Added {printing} — imported, matches your variant group's printing"
+        elif resolution["rule"] == "cheapest" and resolution["price"] is not None:
+            toast = f"Added {printing} — imported cheapest, ${resolution['price']:.2f}"
+        else:
+            toast = f"Added {printing} — imported"
+        if resolution["finish_differs"]:
+            toast += f" ({resolution['finish']} — differs from selected finish)"
+
     if request.headers.get("HX-Request"):
         items, _value, _count = _build_deck_card_items(
             session, deck, current_user.id, search="", sort="name", direction="asc"
@@ -1469,6 +1525,8 @@ async def decks_add_card(
             },
         )
         response.headers["HX-Push-Url"] = f"/decks/{deck_id}"
+        if toast:
+            response.headers["X-Add-Resolution"] = json.dumps(toast)
         return response
 
     return RedirectResponse(url=f"/decks/{deck_id}", status_code=303)

@@ -2520,6 +2520,32 @@ td {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* #119 — collapsed (one-row-per-name) results: the row is a div (a button
+   can't nest the expand button); meta grows so the expander hugs the right. */
+.add-card-result-group .add-card-result-meta {
+  flex: 1 1 auto;
+}
+.add-card-result-expand {
+  flex: 0 0 auto;
+  padding: 0.25rem 0.5rem;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+  color: inherit;
+  font-size: 0.8rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.add-card-result-expand:hover,
+.add-card-result-expand:focus-visible {
+  border-color: #4a90e2;
+  outline: none;
+}
+.add-card-result-back {
+  justify-content: center;
+  min-height: 36px;
+  font-size: 0.85rem;
+}
 .add-card-actions {
   display: flex;
   gap: 0.75rem;
