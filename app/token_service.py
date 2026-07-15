@@ -8,10 +8,11 @@ inventory_rows.
 
 from __future__ import annotations
 
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session, joinedload
 
-from app.models import DeckTokenRequirement, TokenInventory
+from app.audit_service import log_transaction
+from app.models import Card, DeckTokenRequirement, InventoryRow, TokenInventory
 from app.timeutil import utc_now
 
 
@@ -468,3 +469,134 @@ def total_token_count(session: Session, user_id: int) -> int:
         .scalar()
         or 0
     )
+
+
+# --- #120: token cards that landed in the main collection --------------------
+
+TOKEN_LAYOUTS = ("token", "double_faced_token", "emblem")
+
+
+def is_token_card(layout: str | None, set_type: str | None) -> bool:
+    """A Scryfall printing that belongs in token_inventory, not inventory_rows."""
+    return (layout or "") in TOKEN_LAYOUTS or (set_type or "") == "token"
+
+
+def _subtype_from_type_line(type_line: str | None) -> str | None:
+    """'Token Artifact — Treasure' → 'Treasure' (tail after the last em-dash)."""
+    if not type_line or "—" not in type_line:
+        return None
+    return type_line.rsplit("—", 1)[1].strip() or None
+
+
+def upsert_token_from_card(
+    session: Session,
+    *,
+    user_id: int,
+    card: Card,
+    quantity: int,
+    storage_location_id: int | None = None,
+) -> TokenInventory:
+    """Create-or-merge a token_inventory row from a cards-cache printing.
+
+    Keyed on (user_id, scryfall_id): a merge sums quantity and keeps the
+    existing row's location (fills it only when unset). No commit — callers
+    own the transaction. DFC back faces stay NULL in v1 (the cards cache
+    carries no face data); is_double_sided is still set from layout.
+    """
+    existing = (
+        session.query(TokenInventory)
+        .filter(
+            TokenInventory.user_id == user_id,
+            TokenInventory.scryfall_id == card.scryfall_id,
+        )
+        .first()
+    )
+    if existing:
+        existing.quantity += quantity
+        if storage_location_id and not existing.storage_location_id:
+            existing.storage_location_id = storage_location_id
+        existing.updated_at = utc_now()
+        return existing
+
+    token = TokenInventory(
+        user_id=user_id,
+        name=card.name,
+        type_line=card.type_line,
+        subtype=_subtype_from_type_line(card.type_line),
+        quantity=quantity,
+        set_code=card.set_code,
+        collector_number=card.collector_number,
+        scryfall_id=card.scryfall_id,
+        image_url=card.image_url,
+        is_double_sided=(card.layout or "") == "double_faced_token",
+        storage_location_id=storage_location_id,
+    )
+    session.add(token)
+    return token
+
+
+def find_migratable_token_rows(session: Session, user_id: int) -> list[InventoryRow]:
+    """The user's inventory rows whose printing is a token/emblem.
+
+    Cache rows predating the layout/set_type backfill have NULL in both
+    columns and won't match — the migration preview makes that visible
+    rather than silently guessing.
+    """
+    return (
+        session.query(InventoryRow)
+        .join(Card, InventoryRow.card_id == Card.id)
+        .options(joinedload(InventoryRow.card), joinedload(InventoryRow.storage_location))
+        .filter(
+            InventoryRow.user_id == user_id,
+            or_(Card.layout.in_(TOKEN_LAYOUTS), Card.set_type == "token"),
+        )
+        .order_by(Card.name, Card.set_code)
+        .all()
+    )
+
+
+def migrate_rows_to_token_inventory(session: Session, *, user_id: int, row_ids: list[int]) -> dict:
+    """Move approved inventory rows into token_inventory (#120 part A).
+
+    Per row: create-or-merge the token (summing quantity, carrying the
+    location), log through the transaction path, delete the inventory row.
+    Only ids that (still) match the token predicate and belong to the user
+    move — stale or foreign ids are skipped, not errors.
+    """
+    if not row_ids:
+        return {"moved_rows": 0, "moved_quantity": 0}
+
+    candidates = {r.id: r for r in find_migratable_token_rows(session, user_id)}
+    moved_rows = 0
+    moved_quantity = 0
+    for rid in row_ids:
+        row = candidates.get(rid)
+        if not row:
+            continue
+        upsert_token_from_card(
+            session,
+            user_id=user_id,
+            card=row.card,
+            quantity=row.quantity,
+            storage_location_id=row.storage_location_id,
+        )
+        log_transaction(
+            session=session,
+            user_id=user_id,
+            event_type="token_migration",
+            card_id=row.card_id,
+            finish=row.finish,
+            quantity_delta=-row.quantity,
+            source_location=(
+                str(row.storage_location_id) if row.storage_location_id else "pending"
+            ),
+            destination_location="token_inventory",
+            inventory_row_id=row.id,
+            note=f"Moved to token inventory ({row.card.name})",
+        )
+        moved_rows += 1
+        moved_quantity += row.quantity
+        session.delete(row)
+
+    session.commit()
+    return {"moved_rows": moved_rows, "moved_quantity": moved_quantity}

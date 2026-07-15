@@ -56,6 +56,16 @@
           <div class="muted small-text">already in your collection</div>
         </div>
       {% endif %}
+      {% set _tokens = token_routed_quantity if token_routed_quantity is defined else 0 %}
+      {% if _tokens > 0 %}
+        {# #120 — token printings never land in inventory_rows; they route to
+           token_inventory at import time and get their own result line. #}
+        <div class="stat-card compact">
+          <div class="stat-label">Tokens routed</div>
+          <div class="stat-number">{{ _tokens }}</div>
+          <div class="muted small-text">to <a href="/tokens">token inventory</a></div>
+        </div>
+      {% endif %}
       <div class="stat-card compact">
         <div class="stat-label">Failed rows</div>
         <div class="stat-number">{{ failed_rows|length }}</div>

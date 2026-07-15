@@ -29,7 +29,23 @@
         <p class="tokens-stat-line"><strong>{{ total_count }}</strong>total tokens</p>
         <a href="/tokens/new" class="btn-like">+ New Token</a>
         <a href="/tokens/bulk-add" class="btn-like btn-like-muted">Bulk Add</a>
+        <a href="/tokens/migrate" class="btn-like btn-like-muted">Move from collection</a>
       </div>
+      {% if migrated and migrated != "0" %}
+        {# #120 — completion summary. Token inventory has no price column, so
+           the collection-value dip is stated instead of left mysterious. #}
+        <p class="muted" style="margin-top: 0.5rem">
+          Moved <strong>{{ migrated }}</strong>
+          {{ "row" if migrated == "1" else "rows" }}
+          ({{ migrated_qty }} {{ "copy" if migrated_qty == "1" else "copies" }})
+          from your collection into token inventory. Your collection value
+          drops by those tokens' prices — token inventory is not price-tracked.
+        </p>
+      {% elif migrated == "0" %}
+        <p class="muted" style="margin-top: 0.5rem">
+          Nothing moved — no rows were selected.
+        </p>
+      {% endif %}
     </div>
   </section>
 

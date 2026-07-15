@@ -44,8 +44,10 @@ from app.token_service import (
     deck_requirement_exists_for_name,
     delete_deck_token_requirement,
     delete_token,
+    find_migratable_token_rows,
     list_token_subtypes,
     list_tokens,
+    migrate_rows_to_token_inventory,
     parse_bulk_token_lines,
     resolve_token_inventory_id_by_name,
     total_token_count,
@@ -319,6 +321,8 @@ def tokens_page(
     subtype: str = "",
     location: str = "",
     double_sided: str = "",
+    migrated: str = "",
+    migrated_qty: str = "",
     session: Session = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
 ):
@@ -350,8 +354,46 @@ def tokens_page(
             "subtypes": list_token_subtypes(session, current_user.id),
             "locations": list_locations(session, current_user.id),
             "total_count": total_token_count(session, current_user.id),
+            "migrated": migrated,
+            "migrated_qty": migrated_qty,
             "current_user": current_user,
         },
+    )
+
+
+@router.get("/tokens/migrate")
+def tokens_migrate_preview(
+    request: Request,
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+):
+    """#120 — preview of collection rows detected as token printings.
+
+    Read-only: nothing mutates until the user approves the POST below.
+    """
+    rows = find_migratable_token_rows(session, current_user.id)
+    return render(
+        request,
+        "tokens_migrate.html",
+        {
+            "title": "Move tokens to token inventory",
+            "rows": rows,
+            "current_user": current_user,
+        },
+    )
+
+
+@router.post("/tokens/migrate")
+def tokens_migrate_commit(
+    row_id: list[int] = Form([]),
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+    _: None = CsrfRequired,
+):
+    result = migrate_rows_to_token_inventory(session, user_id=current_user.id, row_ids=row_id)
+    return RedirectResponse(
+        url=(f"/tokens?migrated={result['moved_rows']}&migrated_qty={result['moved_quantity']}"),
+        status_code=303,
     )
 
 
