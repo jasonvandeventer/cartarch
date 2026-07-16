@@ -3851,28 +3851,63 @@ def pull_card_to_deck(
         session.delete(row)
 
     # issue #134 — consume the proxy. Pulling a REAL copy into a deck holding a
-    # proxy of the same printing fulfills that proxy (same intent as
+    # proxy of the same card fulfills that proxy (same intent as
     # materialize_brew): decrement it by the incoming quantity, delete at zero.
     # Leaving the proxy standing beside the new real row would put two copies of
     # one card in a singleton deck — a different shape of the same corruption.
+    #
+    # Consume by ORACLE IDENTITY (card name), NOT printing+finish. A proxy means
+    # "I don't own this card", so owning ANY printing or finish of it fulfills the
+    # placeholder. #134's first cut keyed on card_id+finish, which left the proxy
+    # standing whenever the acquired copy was a different printing or finish —
+    # e.g. proxy Sol Ring (ltr) + acquired real Sol Ring (c21) → 2 copies of a
+    # singleton, buy-list still reading "buy one". This mirrors `materialize_brew`
+    # (which already consumes by name) and the brew matcher's stated rule that
+    # foil is a preference, never a reason to proxy.
+    #
+    # NOTE the deliberate asymmetry with the merge key above: MERGE stays exact on
+    # (card_id, finish) — a foil row and a normal row are genuinely distinct
+    # inventory — while CONSUME is oracle-level. Merging across finish would
+    # corrupt row identity; consuming across finish is the whole point.
     if not source_is_proxy:
         from app.inventory_service import clean_inventory_row_references  # local: avoid cycle
 
-        proxy_row = (
+        card_name = session.query(Card.name).filter(Card.id == existing_deck_row.card_id).scalar()
+        proxy_rows = (
             session.query(InventoryRow)
+            .join(Card, InventoryRow.card_id == Card.id)
             .filter(
                 InventoryRow.user_id == user_id,
-                InventoryRow.card_id == existing_deck_row.card_id,
-                InventoryRow.finish == existing_deck_row.finish,
+                Card.name == card_name,
                 InventoryRow.storage_location_id == deck.storage_location_id,
                 InventoryRow.is_pending.is_(False),
                 InventoryRow.is_proxy.is_(True),
             )
-            .first()
+            .all()
+            if card_name
+            else []
         )
-        if proxy_row is not None:
-            proxy_row.quantity -= quantity
+        # Deterministic consume order: the closest placeholder first (exact
+        # printing+finish, then same printing, then any other printing of the
+        # card), tie-broken by id so repeated runs agree.
+        proxy_rows.sort(
+            key=lambda p: (
+                0
+                if (p.card_id == existing_deck_row.card_id and p.finish == existing_deck_row.finish)
+                else 1
+                if p.card_id == existing_deck_row.card_id
+                else 2,
+                p.id,
+            )
+        )
+        remaining = quantity
+        for proxy_row in proxy_rows:
+            if remaining <= 0:
+                break
+            take = min(remaining, int(proxy_row.quantity))
+            proxy_row.quantity -= take
             proxy_row.updated_at = utc_now()
+            remaining -= take
             if proxy_row.quantity <= 0:
                 delete_shares_for_inventory_row(session, proxy_row.id)
                 clean_inventory_row_references(session, [proxy_row.id])

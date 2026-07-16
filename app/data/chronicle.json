@@ -1,5 +1,15 @@
 [
   {
+    "version": "4.11.16",
+    "date": "2026-07-16",
+    "added": [],
+    "refined": [],
+    "resolved": [
+      "Buying a card your brew was proxying now retires the proxy, even when the copy you bought is a different printing or finish than the placeholder. Before, the deck kept both — two copies of a card in a singleton deck — and the buy-list went on asking you to buy something already sitting in the deck."
+    ],
+    "archivist_note": "A proxy in a brew is a note that reads \"I don't own this yet.\" The previous fix retired that note only when the card you bought matched the placeholder exactly — same printing, same finish — which is not how buying cards works. You find a copy, and it is the copy that was there. So the note stayed pinned next to the real card it was standing in for, the deck quietly held two of a card it is only allowed one of, and the shopping list kept recommending a purchase already made. The rule now matches the intent it always had: the note is about the card, not the particular version of it, and any copy retires it. Which printing you own still matters everywhere it should — the deck holds the one you actually bought, and a foil stays a foil."
+  },
+  {
     "version": "4.11.15",
     "date": "2026-07-16",
     "added": [
