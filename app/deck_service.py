@@ -90,7 +90,15 @@ def matches_draw(oracle: str) -> bool:
 
 _REMOVAL_RE = re.compile(
     r"(?:destroy|exile) target (?:\w+ ){0,4}(?:creature|artifact|enchantment|planeswalker|permanent|land|nonbasic land|nonland permanent)\b"
-    r"|counter target (?:spell|activated ability|triggered ability)"
+    # Same `(?:\w+ ){0,4}` construct as the destroy/exile clause above, for the same
+    # reason: the qualifier sits between "target" and the noun. The old form required
+    # the noun to be ADJACENT to "target", so it matched "Counter target spell" but
+    # missed every qualified counter — "Counter target CREATURE spell", "…NONCREATURE
+    # spell", "…INSTANT OR SORCERY spell" — leaving those cards with no role at all.
+    # It also listed "activated ability" and "triggered ability" separately, so it
+    # missed the combined "Counter target ACTIVATED OR TRIGGERED ability" shape.
+    # Collapsing both nouns to `(?:spell|ability)` behind the qualifier covers all of it.
+    r"|counter target (?:\w+ ){0,4}(?:spell|ability)"
     r"|return target (?:\w+ ){0,4}(?:creature|permanent|nonland permanent)\b.{0,40}\bto (?:its )?owner'?s? hand"
     r"|\bdeals? \d+ damage to (?:target|any target)"
     r"|target (?:creature|permanent) gets -[\dXx]+/-[\dXx]+"

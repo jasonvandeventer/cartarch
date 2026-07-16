@@ -414,3 +414,102 @@ def test_matches_ramp_non_land_self_reduction_directly():
         matches_ramp_non_land("This spell costs {7} less to cast if it targets a spell.") is False
     )
     assert matches_ramp_non_land("Blue spells you cast cost {1} less to cast.") is True
+
+
+# ── Qualified counterspells: the _REMOVAL_RE counter clause needed the noun to
+#    be ADJACENT to "target", so every qualified counter had NO role at all.
+#    Widened with the same `(?:\w+ ){0,4}` construct the destroy/exile clause on
+#    the line above already uses. Oracle text verbatim from the live DB.
+
+
+@pytest.mark.parametrize(
+    "oracle,type_line",
+    [
+        pytest.param("Counter target creature spell.", "Instant", id="creature-spell"),
+        pytest.param("Counter target noncreature spell.", "Instant", id="noncreature-spell"),
+        pytest.param(
+            "Counter target noncreature spell unless its controller pays {2}.",
+            "Instant",
+            id="spell-pierce-noncreature-unless",
+        ),
+        pytest.param(
+            "Counter target instant or sorcery spell unless its controller pays {1}.",
+            "Creature — Bird",
+            id="judges-familiar-instant-or-sorcery",
+        ),
+        pytest.param(
+            "Counter target artifact or enchantment spell.", "Instant", id="annul-artifact-or-ench"
+        ),
+        pytest.param("Counter target instant spell.", "Instant", id="dispel-instant"),
+        pytest.param("Counter target blue spell.", "Enchantment", id="gainsay-colour-qualified"),
+        pytest.param(
+            "Counter target loyalty ability of a planeswalker.", "Instant", id="loyalty-ability"
+        ),
+        pytest.param(
+            "Flash\nWhen this creature enters, counter target artifact or creature spell.",
+            "Creature — Shark",
+            id="greatshark-etb-counter",
+        ),
+    ],
+)
+def test_qualified_counter_target_is_removal(oracle, type_line):
+    """A qualifier between "target" and the noun must not cost the card its role."""
+    assert "Removal" in roles(oracle, type_line)
+
+
+def test_counter_activated_or_triggered_ability_is_removal():
+    """The COMBINED shape. The old clause listed "activated ability" and "triggered
+    ability" separately, so the "activated OR triggered ability" wording matched
+    neither and the card got no role. Brokers Confluence / Adric.
+    """
+    assert "Removal" in roles("Counter target activated or triggered ability.", "Instant")
+
+
+def test_negate_gains_removal_role():
+    """Named regression — Negate had NO role before the widening (owned card)."""
+    assert roles("Counter target noncreature spell.", "Instant") == ["Removal"]
+
+
+def test_brokers_confluence_gains_removal_role():
+    """Named regression — owned card, the activated-or-triggered shape."""
+    got = roles(
+        "Choose three. You may choose the same mode more than once.\n"
+        "• Counter target activated or triggered ability.\n"
+        "• Draw a card.\n"
+        "• Target player mills three cards.",
+        "Instant",
+    )
+    assert "Removal" in got
+
+
+def test_plain_counter_target_spell_still_removal():
+    """Regression: the unqualified form the old clause DID match must still match."""
+    assert "Removal" in roles("Counter target spell.", "Instant")
+    assert "Removal" in roles("Counter target activated ability.", "Instant")
+    assert "Removal" in roles("Counter target triggered ability.", "Instant")
+
+
+@pytest.mark.parametrize(
+    "oracle,type_line",
+    [
+        # "counter" as a +1/+1 counter, not countermagic — must NOT become Removal.
+        pytest.param(
+            "Put a +1/+1 counter on target creature you control.", "Instant", id="plus-one-counter"
+        ),
+        pytest.param(
+            "Proliferate. (Choose any number of permanents and/or players with counters on them.)",
+            "Sorcery",
+            id="proliferate-counters",
+        ),
+        pytest.param(
+            "Remove a counter from target permanent you control.", "Instant", id="remove-a-counter"
+        ),
+    ],
+)
+def test_counter_widening_does_not_match_plus_one_counters(oracle, type_line):
+    """The widening must not turn +1/+1-counter text into countermagic.
+
+    `counter target` requires the two words ADJACENT, so "counter ON target" and
+    "counter FROM target" cannot match. This pins that.
+    """
+    assert "Removal" not in roles(oracle, type_line)
