@@ -42,6 +42,18 @@ _RAMP_NON_LAND_RE = re.compile(
     # token-grant text upstream prevents Sifter-of-Skulls-style false positives.
     r"|\badds? [^.]{0,60}\{[wubrgcxs\d]\}"
     r"|creates? .{0,30}\btreasure tokens?\b"
+    # Cost reduction is ramp only when it cheapens something OTHER than this card.
+    # The subject is NOT constrained here on purpose — `_SELF_COST_REDUCTION_RE`
+    # below removes the self-reduction phrasing first, so whatever still matches is
+    # reducing another spell. Constraining the subject in the pattern instead (e.g.
+    # `spells?[^.]{0,60}costs? \{\d+\} less`) was measured and REJECTED: it drops
+    # real reducers whose subject is in a previous sentence or >60 chars away —
+    # granted affinity ("…the next noncreature spell you cast has affinity for
+    # artifacts. (It costs {1} less to cast…)" — Don & Raph, Pearl-Ear, Saheeli,
+    # Memnarchitect), "Your commander costs {1} less to cast" (Myth Unbound), and
+    # long subjects (Kindly Cognician). Counts on the live DB: subject-constrained
+    # keeps 82/85 owned and 236/255 bulk — i.e. it loses 3 owned + 20 bulk true
+    # positives to block false ones the strip already handles.
     r"|costs? \{\d+\} less to cast"
     r"|play (?:a |an |\w+ )?additional lands?\b"
     r"|put (?:a |an? |up to \w+ )?(?:basic )?lands? cards? from your hand onto the battlefield"
@@ -217,13 +229,41 @@ _HATE_RE = re.compile(
 # 'Sacrifice this creature: Add {C}.'" puts mana production in the TOKEN's text,
 # not the parent. Strip quoted granted abilities before checking ramp.
 _QUOTED_ABILITY_RE = re.compile(r'"[^"]+"')
+# SELF cost-reduction — the card discounting ITSELF, which is not ramp: it
+# accelerates nothing, it just costs less. Stripped before the ramp check for the
+# same reason quoted token abilities are (both put non-ramp text where a ramp
+# pattern would otherwise match). This strip — not a narrower ramp pattern — is
+# what makes `costs {N} less to cast` mean "some OTHER spell got cheaper".
+#
+# Covers the bare form ("This spell costs {7} less to cast if…" — Not of This
+# World, Blasphemous Act, Tolarian Terror, Bolt Bend, Lookout's Dispersal), the
+# "this card" wording (Sojourner's Enforcermite, Unclaimed Tanadon), AND every
+# affinity/spectacle-style REMINDER text, which spells the phrase out inside
+# parentheses ("Affinity for artifacts (This spell costs {1} less to cast for each
+# artifact you control.)" — Emry, Sapling Nursery). Reminder text is unquoted, so
+# _QUOTED_ABILITY_RE never reached it.
+#
+# KNOWN RESIDUE: a card that self-references by NAME ("Gingerbehemoth costs {2}
+# less to cast") still reads as ramp. Catching it needs the card's name threaded
+# into `matches_ramp_non_land`, which takes oracle text only. Measured on the live
+# DB: 0 owned cards, 2 in the whole bulk cache (Gingerbehemoth, Believe in the
+# Cleave) — not worth a signature change on every caller.
+_SELF_COST_REDUCTION_RE = re.compile(
+    r"this (?:spell|card) costs \{\d+\} less to cast", re.IGNORECASE
+)
 
 
 def matches_ramp_non_land(oracle: str) -> bool:
-    """True if oracle has a non-land-tutor ramp pattern, ignoring quoted token abilities."""
+    """True if oracle has a non-land-tutor ramp pattern.
+
+    Ignores quoted token abilities (the granted ability belongs to the token, not
+    this card) and SELF cost-reduction (a card cheapening itself is a discount, not
+    acceleration — see `_SELF_COST_REDUCTION_RE`).
+    """
     if not oracle:
         return False
     cleaned = _QUOTED_ABILITY_RE.sub("", oracle)
+    cleaned = _SELF_COST_REDUCTION_RE.sub("", cleaned)
     return bool(_RAMP_NON_LAND_RE.search(cleaned))
 
 

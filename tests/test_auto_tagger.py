@@ -222,3 +222,195 @@ def test_pattern_c_conditional_tap_to_draw_is_engine():
         "colorless Eldrazi creature token."
     )
     assert "Engine" in roles(idol_of_oblivion, "Artifact")
+
+
+# ── SELF cost-reduction is not Ramp (the "Not of This World" false positive) ──
+#
+# `_RAMP_NON_LAND_RE` used to carry a bare `costs? \{\d+\} less to cast`, which
+# matched a card cheapening ITSELF. That is a discount on one spell, not mana
+# acceleration. Because `suggest_card_roles` appends Ramp FIRST, a false Ramp
+# landed at roles[0] and MASKED the card's real role downstream
+# (classify_role_subtype reads roles[0]) — so a counterspell read as
+# "Ramp / expensive_ramp". Oracle text below is verbatim from the live DB.
+
+_SELF_REDUCERS = [
+    pytest.param(
+        "Counter target spell or ability that targets a permanent you control.\n"
+        "This spell costs {7} less to cast if it targets a spell or ability that targets "
+        "a creature you control with power 7 or greater.",
+        "Instant",
+        "Removal",
+        id="not-of-this-world-counterspell",
+    ),
+    pytest.param(
+        "This spell costs {1} less to cast for each creature on the battlefield.\n"
+        "Blasphemous Act deals 13 damage to each creature.",
+        "Sorcery",
+        "Wipe",
+        id="blasphemous-act-wipe",
+    ),
+    pytest.param(
+        "This spell costs {1} less to cast for each instant and sorcery card in your graveyard.\n"
+        "Ward {2} (Whenever this creature becomes the target of a spell or ability an opponent "
+        "controls, counter it unless that player pays {2}.)",
+        "Creature — Serpent",
+        None,
+        id="tolarian-terror-creature",
+    ),
+    pytest.param(
+        "This spell costs {3} less to cast if you control a creature with power 4 or greater.\n"
+        "Change the target of target spell or ability with a single target.",
+        "Instant",
+        None,
+        id="bolt-bend-redirect",
+    ),
+]
+
+
+@pytest.mark.parametrize("oracle,type_line,expected_role", _SELF_REDUCERS)
+def test_self_cost_reduction_is_not_ramp(oracle, type_line, expected_role):
+    """A card that discounts ITSELF is not ramp — it accelerates nothing."""
+    got = roles(oracle, type_line)
+    assert "Ramp" not in got, f"self-reducer wrongly tagged Ramp: {got}"
+    if expected_role:
+        assert expected_role in got
+        assert got[0] == expected_role, (
+            f"roles[0] must be the real role, not a masked one — got {got}. "
+            "classify_role_subtype reads roles[0]."
+        )
+
+
+@pytest.mark.parametrize(
+    "oracle,type_line",
+    [
+        # Affinity REMINDER text spells the self-reduction out in parentheses.
+        # It is unquoted, so _QUOTED_ABILITY_RE never reached it.
+        pytest.param(
+            "Affinity for artifacts (This spell costs {1} less to cast for each artifact you "
+            "control.)\nWhen Emry enters, mill four cards.",
+            "Legendary Creature — Merfolk Wizard",
+            id="emry-affinity-reminder",
+        ),
+        pytest.param(
+            "Affinity for Forests (This spell costs {1} less to cast for each Forest you "
+            "control.)\nLandfall — Whenever a land you control enters, create a 3/4 green "
+            "Treefolk creature token with reach.",
+            "Enchantment",
+            id="sapling-nursery-affinity-reminder",
+        ),
+    ],
+)
+def test_affinity_reminder_text_is_not_ramp(oracle, type_line):
+    assert "Ramp" not in roles(oracle, type_line)
+
+
+@pytest.mark.parametrize(
+    "oracle,type_line",
+    [
+        # Reduces OTHER spells → genuinely ramp. Must NOT regress.
+        pytest.param(
+            "Each spell you cast that's red or green costs {1} less to cast.",
+            "Creature — Goblin Shaman",
+            id="goblin-anarchomancer",
+        ),
+        pytest.param("Blue spells you cast cost {1} less to cast.", "Artifact", id="medallion"),
+        pytest.param(
+            "As this artifact enters, choose artifact, creature, enchantment, instant, or "
+            "sorcery.\nSpells you cast of the chosen type cost {1} less to cast.",
+            "Artifact",
+            id="cloud-key",
+        ),
+        pytest.param(
+            "As this artifact enters, choose a creature type.\n"
+            "Creature spells you cast of the chosen type cost {1} less to cast.",
+            "Artifact",
+            id="heralds-horn",
+        ),
+    ],
+)
+def test_other_spell_cost_reduction_is_still_ramp(oracle, type_line):
+    """Real cost-reduction ramp reduces OTHER spells — these must stay Ramp."""
+    assert "Ramp" in roles(oracle, type_line)
+
+
+@pytest.mark.parametrize(
+    "oracle,type_line",
+    [
+        # GRANTED affinity: the reducer's subject sits in a PREVIOUS sentence, so
+        # any subject-constrained pattern (`spells?[^.]{0,60}costs? \{N\} less`)
+        # cannot reach it and silently drops these. Verbatim from the live DB.
+        pytest.param(
+            "Menace\nWhenever Don & Raph attack, the next noncreature spell you cast this "
+            "turn has affinity for artifacts. (It costs {1} less to cast for each artifact "
+            "you control.)",
+            "Legendary Creature — Rat Ninja",
+            id="don-and-raph-grants-affinity",
+        ),
+        pytest.param(
+            "Lifelink\nEnchantment spells you cast have affinity for Auras. (They cost {1} "
+            "less to cast for each Aura you control.)",
+            "Legendary Creature — Fox Advisor",
+            id="pearl-ear-grants-affinity",
+        ),
+        # Subject >60 chars from the reduction — same failure mode.
+        pytest.param(
+            "Spells you cast that refer to artifacts or Contraptions in their rules text "
+            "cost {1} less to cast.",
+            "Creature — Human Wizard",
+            id="kindly-cognician-long-subject",
+        ),
+        # Not the word "spell" at all, but unambiguously reduces another card.
+        pytest.param(
+            "Your commander costs {1} less to cast for each time it's been cast from the "
+            "command zone this game.",
+            "Enchantment",
+            id="myth-unbound-commander",
+        ),
+    ],
+)
+def test_granted_and_distant_subject_reducers_stay_ramp(oracle, type_line):
+    """Regression guard for the rejected subject-constrained pattern.
+
+    These reduce OTHER spells and are real ramp, but their subject is in a prior
+    sentence or far from the reduction clause. Constraining the subject inside the
+    ramp regex loses them: measured on the live DB it kept 82/85 owned and 236/255
+    bulk cards, i.e. it dropped 3 owned + 20 bulk TRUE positives to block false
+    ones that `_SELF_COST_REDUCTION_RE` already removes. The strip does the work.
+    """
+    assert "Ramp" in roles(oracle, type_line)
+
+
+@pytest.mark.parametrize(
+    "oracle,type_line",
+    [
+        pytest.param(
+            "Affinity for Affinity (This card costs {1} less to cast for each ...)",
+            "Artifact Creature",
+            id="this-card-wording",
+        ),
+        pytest.param(
+            "If you're on the Mirran team, this card costs {1} less to cast.",
+            "Artifact Creature — Beast",
+            id="unclaimed-tanadon-this-card",
+        ),
+    ],
+)
+def test_this_card_self_reduction_is_not_ramp(oracle, type_line):
+    """Self-reduction phrased "this card" (not "this spell") is still not ramp."""
+    assert "Ramp" not in roles(oracle, type_line)
+
+
+def test_self_reduction_does_not_mask_a_real_reducer_on_the_same_card():
+    """Stripping self-reduction must not blind the check to a REAL reducer."""
+    oracle = (
+        "This spell costs {2} less to cast if you control a Pirate.\n"
+        "Artifact spells you cast cost {1} less to cast."
+    )
+    assert "Ramp" in roles(oracle, "Artifact")
+
+
+def test_matches_ramp_non_land_self_reduction_directly():
+    assert (
+        matches_ramp_non_land("This spell costs {7} less to cast if it targets a spell.") is False
+    )
+    assert matches_ramp_non_land("Blue spells you cast cost {1} less to cast.") is True

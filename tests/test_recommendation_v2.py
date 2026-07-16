@@ -920,3 +920,64 @@ def test_analysis_route_renders_upgrades(db, user, client):
     assert "Upgrade suggestions" in resp.text
     assert "Guardian Idol" in resp.text
     assert "No owned cards match this need" in resp.text
+
+
+# --- v1-tagger false Ramp masking the real role (playgroup bug, 2026-07-16) ----
+#
+# `classify_role_subtype` reads roles[0], and `suggest_card_roles` appends Ramp
+# FIRST. So a false Ramp from the v1 tagger's self-cost-reduction bug did not just
+# add a wrong tag — it MASKED the correctly-detected role. These pin the fix at the
+# classifier, which is where the user actually saw it ("Analyze Deck tags Not of
+# This World as Ramp / expensive_ramp"). Oracle text verbatim from the live DB.
+
+
+def test_not_of_this_world_is_not_ramp_expensive_ramp():
+    """The reported bug: a counterspell classified as Ramp / expensive_ramp.
+
+    cmc 8 >= 5, so once the false Ramp won roles[0] the classifier fell straight
+    to the expensive_ramp branch.
+    """
+    card = c(
+        "Not of This World",
+        "Counter target spell or ability that targets a permanent you control.\n"
+        "This spell costs {7} less to cast if it targets a spell or ability that targets "
+        "a creature you control with power 7 or greater.",
+        tl="Instant",
+        cmc=8.0,
+    )
+    broad, subtype, _conf = classify_role_subtype(card, COLORLESS)
+    assert (broad, subtype) != ("Ramp", "expensive_ramp")
+    assert broad != "Ramp"
+
+
+def test_lookouts_dispersal_classifies_as_removal_not_ramp():
+    """Regression named in the bug report: was Ramp+Removal, read as Ramp."""
+    card = c(
+        "Lookout's Dispersal",
+        "This spell costs {1} less to cast if you control a Pirate.\n"
+        "Counter target spell unless its controller pays {4}.",
+        tl="Instant",
+        cmc=3.0,
+    )
+    broad, _subtype, _conf = classify_role_subtype(card, COLORLESS)
+    assert broad == "Removal", f"expected Removal, got {broad}"
+
+
+def test_bolt_bend_is_not_ramp():
+    """Was Ramp+Synergy, read as Ramp."""
+    card = c(
+        "Bolt Bend",
+        "This spell costs {3} less to cast if you control a creature with power 4 or greater.\n"
+        "Change the target of target spell or ability with a single target.",
+        tl="Instant",
+        cmc=4.0,
+    )
+    broad, _subtype, _conf = classify_role_subtype(card, COLORLESS)
+    assert broad != "Ramp"
+
+
+def test_real_cost_reducer_still_classifies_as_ramp():
+    """Guard the other direction — a Medallion must stay Ramp/cost_reduction."""
+    card = c(*SAPPHIRE_MEDALLION[:1], oracle=SAPPHIRE_MEDALLION[1], cmc=SAPPHIRE_MEDALLION[2])
+    broad, _subtype, _conf = classify_role_subtype(card, COLORLESS)
+    assert broad == "Ramp"
