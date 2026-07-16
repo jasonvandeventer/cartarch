@@ -14,6 +14,7 @@
      label, count, unique, subgroups (only populated for Creature when
      group_by='type'), rows.
 #}
+{% from "_macros.html" import deck_actions_body %}
 <section class="deck-list-view">
   {% for group in deck_card_groups %}
     <article class="deck-list-group">
@@ -112,6 +113,24 @@
                       hx-get="/decks/{{ deck.id }}/rows/{{ item.id }}/printings-modal"
                       hx-target="#switch-printing-modal-host"
                       hx-swap="innerHTML">⇄</button>
+              {# The full action set the grid view offers, in the same
+                 details-kebab the Collection list rows already use (its CSS is
+                 generic — reused rather than duplicated under a deck-* name).
+                 ponytail: a plain <details> popover, not a custom right-click
+                 context menu — swap it for one only if the kebab proves too
+                 cramped in practice.
+                 ponytail: rendering every row's actions inline costs ~690 KB of
+                 HTML on a 100-card deck (259 KB -> 946 KB), which is the weight
+                 grid view already ships (965 KB). If list view needs its old
+                 lightness back, hx-get the body on first `toggle` from a
+                 per-row actions fragment — the same on-demand pattern
+                 printings-modal already uses. #}
+              <details class="collection-row-kebab js-dismiss">
+                <summary class="collection-row-kebab-summary" aria-label="Card actions">⋮</summary>
+                <div class="collection-row-kebab-body">
+                  {{ deck_actions_body(item, csrf_token, deck, use_drawer_sorter, locations) }}
+                </div>
+              </details>
               {% endif %}
             </span>
           </li>

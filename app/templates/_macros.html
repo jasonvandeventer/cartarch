@@ -50,6 +50,137 @@ onerror="this.onerror=null; this.src='{{ scryfall_image_fallback(scryfall_id, si
          loading="lazy">
   {% endif %}
 {% endmacro %}
+{% macro deck_actions_body(item, csrf_token, deck, use_drawer_sorter=false, locations=none) %}
+  {# The deck-card action set. Shared by the grid view's Actions drawer
+     (inventory_card, below) and the list view's row kebab in
+     _deck_card_list_text.html — one definition so the two views can't
+     drift apart on which actions a deck card offers. #}
+  {% set row_tags = item.get('tags', []) %}
+  {% set suggestions = item.get('suggested_tags', []) %}
+          <div class="card-actions-body">
+            <details class="tag-editor-details js-dismiss">
+              <summary class="tag-editor-summary">
+                {% if row_tags %}
+                  Edit Tags
+                {% else %}
+                  Add Tags
+                {% endif %}
+              </summary>
+              <form action="/decks/rows/{{ item.id }}/tags"
+                    method="post"
+                    class="tag-editor-form">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <input type="hidden" name="deck_id" value="{{ deck.id }}">
+                <div class="tag-editor-grid">
+                  {% for tag in card_role_tags %}
+                    {% set checked = tag in row_tags %}
+                    {% set suggested = tag in suggestions and not checked %}
+                    <label class="tag-checkbox{% if suggested %} tag-suggested{% endif %}">
+                      <input type="checkbox"
+                             name="tags"
+                             value="{{ tag }}"
+                             {% if checked %}checked{% endif %}>
+                      {{ tag }}
+                      {% if suggested %}✦{% endif %}
+                    </label>
+                  {% endfor %}
+                </div>
+                <button type="submit" class="tag-save-btn">Save</button>
+              </form>
+            </details>
+            <form action="/decks/rows/{{ item.id }}/toggle-commander"
+                  method="post"
+                  class="inline-form">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+              <input type="hidden" name="deck_id" value="{{ deck.id }}">
+              <button type="submit">
+                {% if item.role == 'commander' %}
+                  Remove Commander
+                {% else %}
+                  Mark as Commander
+                {% endif %}
+              </button>
+            </form>
+            {# In-place card edit affordances (v3.21.0). Switch-printing
+               loads a modal listing every printing of this card name;
+               basic-land rows also get +/- quantity controls so users
+               don't have to delete-and-re-add to bump a Plains count. #}
+            <button type="button"
+                    class="inline-form"
+                    hx-get="/decks/{{ deck.id }}/rows/{{ item.id }}/printings-modal"
+                    hx-target="#switch-printing-modal-host"
+                    hx-swap="innerHTML">Switch Printing</button>
+            {% set _tl = (item.card.type_line or '')|lower %}
+            {% if 'basic' in _tl and (
+              'plains' in _tl or 'island' in _tl or 'swamp' in _tl
+              or 'mountain' in _tl or 'forest' in _tl or 'wastes' in _tl) %}
+              <form method="post"
+                    class="inline-form basic-qty-form"
+                    action="/decks/{{ deck.id }}/rows/{{ item.id }}/bump-qty"
+                    hx-post="/decks/{{ deck.id }}/rows/{{ item.id }}/bump-qty"
+                    hx-target="#deck-card-list"
+                    hx-swap="innerHTML">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <input type="hidden" name="delta" value="-1">
+                <button type="submit" aria-label="Decrement quantity">−1</button>
+              </form>
+              <form method="post"
+                    class="inline-form basic-qty-form"
+                    action="/decks/{{ deck.id }}/rows/{{ item.id }}/bump-qty"
+                    hx-post="/decks/{{ deck.id }}/rows/{{ item.id }}/bump-qty"
+                    hx-target="#deck-card-list"
+                    hx-swap="innerHTML">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <input type="hidden" name="delta" value="1">
+                <button type="submit" aria-label="Increment quantity">+1</button>
+              </form>
+            {% endif %}
+            <form action="/decks/return" method="post" class="return-form">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+              <input type="hidden" name="deck_id" value="{{ deck.id }}">
+              <input type="hidden" name="deck_row_id" value="{{ item.id }}">
+              {% if use_drawer_sorter and item.role != 'commander' %}
+                <details class="return-details js-dismiss">
+                  <summary class="return-summary">Remove from Deck</summary>
+                  <div class="deck-item-actions" style="margin-top: 0.45rem">
+                    <input type="text" name="drawer" placeholder="Drawer override">
+                    <input type="text" name="slot" placeholder="Slot override">
+                    <button type="submit">Confirm Remove</button>
+                  </div>
+                  <p class="muted" style="margin: 0.2rem 0 0">Leave blank to send to Pending.</p>
+                </details>
+              {% else %}
+                <button type="submit">Remove from Deck</button>
+              {% endif %}
+            </form>
+            {% if locations %}
+              {% set storage_locs = locations | selectattr("type", "ne", "root") | rejectattr("type", "equalto", "deck") | list %}
+              {% set deck_locs = locations | selectattr("type", "equalto", "deck") | rejectattr("id", "equalto", deck.storage_location_id) | list %}
+              {% if storage_locs or deck_locs %}
+                <form action="/inventory/rows/{{ item.id }}/move"
+                      method="post"
+                      class="inline-form"
+                      style="flex-wrap: wrap">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                  <select name="location_id" required>
+                    {% if storage_locs %}
+                      <optgroup label="Storage Locations">
+                        {% for loc in storage_locs %}<option value="{{ loc.id }}">{{ loc.name }} ({{ loc.type }})</option>{% endfor %}
+                      </optgroup>
+                    {% endif %}
+                    {% if deck_locs %}
+                      <optgroup label="Decks">
+                        {% for loc in deck_locs %}<option value="{{ loc.id }}">{{ loc.name }}</option>{% endfor %}
+                      </optgroup>
+                    {% endif %}
+                  </select>
+                  <button type="submit">Move to Location</button>
+                </form>
+              {% endif %}
+            {% endif %}
+          </div>
+{% endmacro %}
+
 {% macro inventory_card(item, csrf_token,
   show_collection_actions=false,
   show_location_label=false,
@@ -324,8 +455,6 @@ onerror="this.onerror=null; this.src='{{ scryfall_image_fallback(scryfall_id, si
             {% endif %}
           </div>
         {% endif %}
-        {% set row_tags = item.get('tags', []) %}
-        {% set suggestions = item.get('suggested_tags', []) %}
         {# tag_details carries the v3.22.0 structured form ({tag, confidence,
            source}); the older `tags` string list is kept alongside for the
            tag-editor checkbox state below. Only the deck-detail item
@@ -343,128 +472,7 @@ onerror="this.onerror=null; this.src='{{ scryfall_image_fallback(scryfall_id, si
         {% endif %}
         <details class="card-actions-drawer js-dismiss">
           <summary>Actions</summary>
-          <div class="card-actions-body">
-            <details class="tag-editor-details js-dismiss">
-              <summary class="tag-editor-summary">
-                {% if row_tags %}
-                  Edit Tags
-                {% else %}
-                  Add Tags
-                {% endif %}
-              </summary>
-              <form action="/decks/rows/{{ item.id }}/tags"
-                    method="post"
-                    class="tag-editor-form">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                <input type="hidden" name="deck_id" value="{{ deck.id }}">
-                <div class="tag-editor-grid">
-                  {% for tag in card_role_tags %}
-                    {% set checked = tag in row_tags %}
-                    {% set suggested = tag in suggestions and not checked %}
-                    <label class="tag-checkbox{% if suggested %} tag-suggested{% endif %}">
-                      <input type="checkbox"
-                             name="tags"
-                             value="{{ tag }}"
-                             {% if checked %}checked{% endif %}>
-                      {{ tag }}
-                      {% if suggested %}✦{% endif %}
-                    </label>
-                  {% endfor %}
-                </div>
-                <button type="submit" class="tag-save-btn">Save</button>
-              </form>
-            </details>
-            <form action="/decks/rows/{{ item.id }}/toggle-commander"
-                  method="post"
-                  class="inline-form">
-              <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-              <input type="hidden" name="deck_id" value="{{ deck.id }}">
-              <button type="submit">
-                {% if item.role == 'commander' %}
-                  Remove Commander
-                {% else %}
-                  Mark as Commander
-                {% endif %}
-              </button>
-            </form>
-            {# In-place card edit affordances (v3.21.0). Switch-printing
-               loads a modal listing every printing of this card name;
-               basic-land rows also get +/- quantity controls so users
-               don't have to delete-and-re-add to bump a Plains count. #}
-            <button type="button"
-                    class="inline-form"
-                    hx-get="/decks/{{ deck.id }}/rows/{{ item.id }}/printings-modal"
-                    hx-target="#switch-printing-modal-host"
-                    hx-swap="innerHTML">Switch Printing</button>
-            {% set _tl = (item.card.type_line or '')|lower %}
-            {% if 'basic' in _tl and (
-              'plains' in _tl or 'island' in _tl or 'swamp' in _tl
-              or 'mountain' in _tl or 'forest' in _tl or 'wastes' in _tl) %}
-              <form method="post"
-                    class="inline-form basic-qty-form"
-                    action="/decks/{{ deck.id }}/rows/{{ item.id }}/bump-qty"
-                    hx-post="/decks/{{ deck.id }}/rows/{{ item.id }}/bump-qty"
-                    hx-target="#deck-card-list"
-                    hx-swap="innerHTML">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                <input type="hidden" name="delta" value="-1">
-                <button type="submit" aria-label="Decrement quantity">−1</button>
-              </form>
-              <form method="post"
-                    class="inline-form basic-qty-form"
-                    action="/decks/{{ deck.id }}/rows/{{ item.id }}/bump-qty"
-                    hx-post="/decks/{{ deck.id }}/rows/{{ item.id }}/bump-qty"
-                    hx-target="#deck-card-list"
-                    hx-swap="innerHTML">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                <input type="hidden" name="delta" value="1">
-                <button type="submit" aria-label="Increment quantity">+1</button>
-              </form>
-            {% endif %}
-            <form action="/decks/return" method="post" class="return-form">
-              <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-              <input type="hidden" name="deck_id" value="{{ deck.id }}">
-              <input type="hidden" name="deck_row_id" value="{{ item.id }}">
-              {% if use_drawer_sorter and item.role != 'commander' %}
-                <details class="return-details js-dismiss">
-                  <summary class="return-summary">Remove from Deck</summary>
-                  <div class="deck-item-actions" style="margin-top: 0.45rem">
-                    <input type="text" name="drawer" placeholder="Drawer override">
-                    <input type="text" name="slot" placeholder="Slot override">
-                    <button type="submit">Confirm Remove</button>
-                  </div>
-                  <p class="muted" style="margin: 0.2rem 0 0">Leave blank to send to Pending.</p>
-                </details>
-              {% else %}
-                <button type="submit">Remove from Deck</button>
-              {% endif %}
-            </form>
-            {% if locations %}
-              {% set storage_locs = locations | selectattr("type", "ne", "root") | rejectattr("type", "equalto", "deck") | list %}
-              {% set deck_locs = locations | selectattr("type", "equalto", "deck") | rejectattr("id", "equalto", deck.storage_location_id) | list %}
-              {% if storage_locs or deck_locs %}
-                <form action="/inventory/rows/{{ item.id }}/move"
-                      method="post"
-                      class="inline-form"
-                      style="flex-wrap: wrap">
-                  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                  <select name="location_id" required>
-                    {% if storage_locs %}
-                      <optgroup label="Storage Locations">
-                        {% for loc in storage_locs %}<option value="{{ loc.id }}">{{ loc.name }} ({{ loc.type }})</option>{% endfor %}
-                      </optgroup>
-                    {% endif %}
-                    {% if deck_locs %}
-                      <optgroup label="Decks">
-                        {% for loc in deck_locs %}<option value="{{ loc.id }}">{{ loc.name }}</option>{% endfor %}
-                      </optgroup>
-                    {% endif %}
-                  </select>
-                  <button type="submit">Move to Location</button>
-                </form>
-              {% endif %}
-            {% endif %}
-          </div>
+          {{ deck_actions_body(item, csrf_token, deck, use_drawer_sorter, locations) }}
         </details>
       {% endif %}
     </div>

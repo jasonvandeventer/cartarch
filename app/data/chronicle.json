@@ -1,5 +1,18 @@
 [
   {
+    "version": "4.11.15",
+    "date": "2026-07-16",
+    "added": [
+      "Deck list view now reaches every card action the grid view offers. Each row carries a menu with tags, commander, switch printing, remove from deck, and move to location — the same set, from the same source, so the two views can no longer disagree about what you can do to a card."
+    ],
+    "refined": [],
+    "resolved": [
+      "The commander no longer escapes its panel and joins the deck list. Sorting, searching, or regrouping a deck used to shuffle it in among the other cards; it now stays where it belongs no matter how the list is rearranged.",
+      "Adding a card while reading a deck in list view no longer snaps you back to grid view."
+    ],
+    "archivist_note": "Three complaints, one habit. The deck page can redraw its card list without reloading the page, and each of the several paths that trigger that redraw had been taught, separately, how to assemble the list. Every one of them forgot something different — two forgot that the commander belongs in its own panel, a third forgot which view you were reading in. None of this was visible until you rearranged a list and watched your commander wander into it. The repair was to stop teaching each path its own version of the answer and let them all ask the same one; the fix is smaller than the bugs it closes, which is usually the sign that the cause was found rather than the symptom."
+  },
+  {
     "version": "4.11.14",
     "date": "2026-07-15",
     "added": [],

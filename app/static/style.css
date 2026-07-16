@@ -7114,6 +7114,26 @@ table.dmtx .dmtx-rowhead {
   font-size: 0.95rem;
 }
 
+/* Deck list rows reuse the Collection row's kebab (.collection-row-kebab) for
+   the full action set, so only the trigger needs resizing to match the 22px
+   buttons beside it. The dropdown body's own styling carries over as-is. */
+.deck-list-row .collection-row-kebab-summary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  line-height: 1;
+}
+.deck-list-row .collection-row-kebab-body {
+  font-size: 0.85rem;
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
 /* Grid-view basic-land qty form: same compact button shape inside the
    existing card-actions-drawer's card-actions-body. */
 .card-actions-body .basic-qty-form button {

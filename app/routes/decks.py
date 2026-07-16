@@ -390,6 +390,19 @@ def _build_review_tag_items(rows: list) -> list[dict]:
     return out
 
 
+def _split_commanders(items: list[dict]) -> tuple[list[dict], list[dict]]:
+    """Split `_build_deck_card_items` output into (commanders, deck_cards).
+
+    Every caller that renders the deck card list needs this split — the
+    commander has its own panel and must never appear in the main list. It
+    lives here so the full-page render and the HTMX partials can't drift
+    (they did: the partials rendered the raw list, so re-sorting made the
+    commander appear among the deck cards).
+    """
+    commanders = [i for i in items if i["role"] == "commander"]
+    return commanders, [i for i in items if i["role"] != "commander"]
+
+
 def _build_deck_card_items(
     session: Session,
     deck: Deck,
@@ -694,8 +707,7 @@ def deck_detail_page(
         _health_names = set(health[health_filter]["cards"])
         items = [i for i in items if i["card"].name in _health_names]
 
-    commanders = [i for i in items if i["role"] == "commander"]
-    deck_cards = [i for i in items if i["role"] != "commander"]
+    commanders, deck_cards = _split_commanders(items)
 
     # Derive color identity from all commanders (supports partner pairs)
     _identity_letters: set[str] = set()
@@ -863,6 +875,7 @@ def _deck_cards_partial_response(
     items, _, _ = _build_deck_card_items(
         session, deck, current_user.id, search="", sort="name", direction="asc"
     )
+    _, items = _split_commanders(items)
     use_drawer_sorter = has_sortable_setup(session, current_user.id)
     return render(
         request,
@@ -923,6 +936,7 @@ def deck_cards_partial(
         session.commit()
 
     items, _, _ = _build_deck_card_items(session, deck, current_user.id, search, sort, direction)
+    _, items = _split_commanders(items)
     use_drawer_sorter = has_sortable_setup(session, current_user.id)
     response = render(
         request,
@@ -1522,21 +1536,10 @@ async def decks_add_card(
             toast += f" ({resolution['finish']} — differs from selected finish)"
 
     if request.headers.get("HX-Request"):
-        items, _value, _count = _build_deck_card_items(
-            session, deck, current_user.id, search="", sort="name", direction="asc"
-        )
-        use_drawer_sorter = has_sortable_setup(session, current_user.id)
-        response = render(
-            request,
-            "_deck_card_list.html",
-            {
-                "deck": deck,
-                "items": items,
-                "commanders": [],
-                "use_drawer_sorter": use_drawer_sorter,
-                "locations": list_locations(session, user_id=current_user.id),
-            },
-        )
+        # Reuse the shared partial renderer rather than re-assembling the
+        # context here: this site used to omit view_mode/group_by, so adding a
+        # card while in list view silently swapped the user back to grid.
+        response = _deck_cards_partial_response(request, session, current_user, deck_id)
         response.headers["HX-Push-Url"] = f"/decks/{deck_id}"
         if toast:
             response.headers["X-Add-Resolution"] = json.dumps(toast)
