@@ -1,5 +1,16 @@
 [
   {
+    "version": "4.11.17",
+    "date": "2026-07-16",
+    "added": [],
+    "refined": [],
+    "resolved": [
+      "Cards that make themselves cheaper are no longer mistaken for ramp. \"This spell costs {7} less to cast\" is a discount on one spell, not acceleration — but the tagger counted it as ramp all the same, so counterspells and board wipes were filed as ramp and quietly padded a deck's ramp count. 326 cards across the card pool were affected. Reported by SaintWacko, whose Not of This World — a counterspell — was being called expensive ramp. Tags already saved against your cards were written by the old reading and are being corrected in a follow-up pass, so a card you have tagged may take a little longer to catch up.",
+      "Counterspells that name what they counter are recognized again. \"Counter target creature spell\", \"Counter target noncreature spell\", \"Counter target activated or triggered ability\" — the tagger expected the word it was looking for to come immediately after \"target\", so every counterspell with a qualifier in between matched nothing and came back with no role at all. 27 cards in the collection get their role back."
+    ],
+    "archivist_note": "Two unrelated repairs, filed apart and shipped together because they were found on the same afternoon. The first was reported: a player looked at a counterspell labelled expensive ramp and said, plainly, that it was not ramp. He was right, and the fault ran wider than his card — anything that discounted itself was being read as though it accelerated something. The second was never reported by anyone, because its symptom was an absence: a counterspell with a qualifier in its text simply came back with no role at all, and a card that says nothing about itself attracts no complaints. It was found only because the first bug sent someone reading the same few lines. They share a neighbourhood in the code and nothing else, and we have left them as two."
+  },
+  {
     "version": "4.11.16",
     "date": "2026-07-16",
     "added": [],
