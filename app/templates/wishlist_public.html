@@ -15,14 +15,23 @@
       {% if owner_name %}{{ owner_name }}'s wishlist{% else %}Shared wishlist{% endif %}
     </h1>
     <p class="wishlist-public-meta">{{ view.count }} card{{ '' if view.count == 1 else 's' }} wanted</p>
+    {% if view.viewer_owns %}
+      <p class="wishlist-public-owned-summary">You own {{ view.owned_count }} of these {{ view.count }}.</p>
+    {% endif %}
   </header>
 
   {% if view.cards %}
     <ul class="wishlist-public-list">
       {% for it in view.cards %}
-        <li class="wishlist-public-row">
+        <li class="wishlist-public-row{% if it.owned %} wl-owned{% endif %}">
           <span class="wl-name">{{ it.name }}</span>
           {% if it.specific_printing %}<span class="wl-printing">specific printing</span>{% endif %}
+          {% if it.owned %}
+            <span class="wl-owned-badge">you own {{ it.owned }}</span>
+            {% if it.locations %}
+              <span class="wl-owned-where">{% for l in it.locations %}{{ l.quantity }}× {{ l.label }}{% if not loop.last %} · {% endif %}{% endfor %}</span>
+            {% endif %}
+          {% endif %}
         </li>
       {% endfor %}
     </ul>

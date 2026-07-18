@@ -11966,6 +11966,31 @@ table.dmtx .dmtx-rowhead {
   margin-top: 0.3rem;
   padding-left: 0.4rem;
 }
+/* #147 — viewer-side ownership: cards on a shared wishlist the viewer already owns. */
+.wl-owned-badge {
+  font-size: 0.72rem;
+  color: var(--ok, #3fb950);
+  border: 1px solid var(--ok, #3fb950);
+  border-radius: 999px;
+  padding: 0 0.4rem;
+  margin-left: 0.35rem;
+  white-space: nowrap;
+}
+.wishlist-public-row.wl-owned {
+  border-left: 3px solid var(--ok, #3fb950);
+}
+.wl-owned .wl-name {
+  color: var(--ok, #3fb950);
+}
+.wishlist-public-owned-summary {
+  font-size: 0.85rem;
+  color: var(--ok, #3fb950);
+  margin: 0.2rem 0 0;
+}
+.wl-owned-where {
+  font-size: 0.72rem;
+  color: var(--muted, var(--text-dim));
+}
 .watchlist-lede em {
   color: var(--text);
   font-style: italic;

@@ -156,11 +156,14 @@
             <summary class="wl-member-summary">
               <strong>{{ row.sharer.display_name or row.sharer.username }}</strong>
               <span class="muted">· {{ row.view.count }} card{{ 's' if row.view.count != 1 else '' }}</span>
+              {% if row.view.viewer_owns and row.view.owned_count %}
+                <span class="wl-owned-badge">you own {{ row.view.owned_count }}</span>
+              {% endif %}
             </summary>
             {% if row.view.cards %}
               <ul class="wl-member-cards">
                 {% for it in row.view.cards %}
-                  <li>{{ it.name }}{% if it.specific_printing %} <span class="muted">(specific printing)</span>{% endif %}</li>
+                  <li{% if it.owned %} class="wl-owned"{% endif %}>{{ it.name }}{% if it.specific_printing %} <span class="muted">(specific printing)</span>{% endif %}{% if it.owned %} <span class="wl-owned-badge">you own {{ it.owned }}</span>{% if it.locations %} <span class="wl-owned-where">{% for l in it.locations %}{{ l.quantity }}× {{ l.label }}{% if not loop.last %} · {% endif %}{% endfor %}</span>{% endif %}{% endif %}</li>
                 {% endfor %}
               </ul>
             {% else %}

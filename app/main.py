@@ -87,6 +87,7 @@ from app.sorter_rule_service import has_sortable_setup
 from app.timeutil import utc_now
 from app.watchlist_service import (
     add_to_watchlist,
+    annotate_wishlist_ownership,
     build_public_wishlist_view,
     generate_wishlist_share_token,
     get_user_by_wishlist_token,
@@ -1091,6 +1092,9 @@ def public_wishlist_view(
     if not owner:
         raise HTTPException(status_code=404, detail="Wishlist not found")
     view = build_public_wishlist_view(session, owner.id)
+    # #147 — a logged-in viewer sees which cards they already own (their own data).
+    if viewer is not None:
+        annotate_wishlist_ownership(session, viewer.id, view)
     owner_name = owner.display_name  # display_name only — username is the email
     return render(
         request,

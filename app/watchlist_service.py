@@ -499,6 +499,43 @@ def build_public_wishlist_view(session: Session, user_id: int) -> dict:
     return {"cards": out, "count": len(out)}
 
 
+def annotate_wishlist_ownership(session: Session, viewer_user_id: int, view: dict) -> dict:
+    """#147 — annotate a names-only wishlist view with the VIEWER's own ownership.
+
+    Each owned card gains ``owned`` (count of the viewer's REAL copies of that name —
+    proxies excluded, counted EVERYWHERE incl. decks/pending, the "do I own this?"
+    semantics of ``name_owned_counts``) plus ``locations`` — a per-location breakdown
+    ``[{"label", "quantity"}]`` (full drawer/deck/binder/box label, tradeable copies
+    first) so the viewer sees WHERE their copies are. The view gains ``owned_count``
+    (distinct wishlist cards owned ≥1) + ``viewer_owns=True`` (template signal). Reuses
+    the /decklist checker's ``name_owned_counts`` + ``owned_inventory_for_names`` — no
+    new ownership definition. The wishlist OWNER's data is untouched; this adds only the
+    viewer's own numbers (their data, safe to show them). Mutates and returns ``view``."""
+    from app.decklist_service import name_owned_counts, owned_inventory_for_names
+
+    names = [c["name"] for c in view["cards"]]
+    counts = name_owned_counts(session, viewer_user_id, names=names, exclude_proxies=True)
+    detail = owned_inventory_for_names(session, viewer_user_id, names, exclude_proxies=True)
+    owned_distinct = 0
+    for c in view["cards"]:
+        key = (c["name"] or "").lower()
+        n = counts.get(key, 0)
+        c["owned"] = n
+        # Merge the per-printing rows into a per-location tally, preserving the
+        # tradeable-first order owned_inventory_for_names already sorted them into.
+        locs: dict[str, int] = {}
+        for r in detail.get(key, []):
+            locs[r["storage_location_full_label"]] = (
+                locs.get(r["storage_location_full_label"], 0) + r["quantity"]
+            )
+        c["locations"] = [{"label": lbl, "quantity": q} for lbl, q in locs.items()]
+        if n:
+            owned_distinct += 1
+    view["viewer_owns"] = True
+    view["owned_count"] = owned_distinct
+    return view
+
+
 def _is_member(session: Session, user_id: int, playgroup_id: int) -> bool:
     return (
         session.query(PlaygroupMember.id)
@@ -568,6 +605,9 @@ def list_wishlist_shares_for_playgroup(
     )
     out = []
     for s in shares:
-        out.append({"sharer": s.user, "view": build_public_wishlist_view(session, s.user_id)})
+        # #147 — annotate each co-member's wishlist with the VIEWER's own ownership.
+        view = build_public_wishlist_view(session, s.user_id)
+        annotate_wishlist_ownership(session, viewer_user_id, view)
+        out.append({"sharer": s.user, "view": view})
     out.sort(key=lambda r: (r["sharer"].display_name or r["sharer"].username or "").lower())
     return out

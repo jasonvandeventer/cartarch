@@ -1,5 +1,15 @@
 [
   {
+    "version": "4.11.28",
+    "date": "2026-07-18",
+    "added": [
+      "When you open a wishlist someone shared with you — either their public link or a playgroup member's list — Cartarch now marks the cards you already own, shows WHERE your copies are (e.g. \"2× Binder · Mythics · 1× Deck · Atraxa\"), and tallies \"you own 8 of 20\" at the top. It's the fast answer to \"do I have anything off their list I could trade or gift, and where is it?\" without cross-checking by hand. Proxies don't count as owned. Anyone viewing without an account sees the plain names-only page, unchanged; the ownership marks are your own numbers and appear only when you're signed in. Follow-up to the wishlist sharing, requested by Alex."
+    ],
+    "refined": [],
+    "resolved": [],
+    "archivist_note": "A shared wishlist answers \"what do you want\"; the natural next question is \"what of it do I already have.\" We could answer it the same way the deck checker does — the ownership lookup was already written and battle-tested — so this was a matter of pointing an existing tool at a new page rather than inventing anything. The one careful line: the owner's page stays exactly as private as it was, because the marks we add are the viewer's own collection, never a peek into someone else's."
+  },
+  {
     "version": "4.11.27",
     "date": "2026-07-18",
     "added": [

@@ -9,7 +9,7 @@ from __future__ import annotations
 import itertools
 
 from app import watchlist_service as ws
-from app.models import Card, PlaygroupMember, User, WatchlistItem, WishlistShare
+from app.models import Card, InventoryRow, PlaygroupMember, User, WatchlistItem, WishlistShare
 from app.playgroup_service import create_playgroup
 
 _seq = itertools.count(1)
@@ -118,6 +118,94 @@ def test_share_playgroup_ids_for_owner_picker(db, user):
     assert ws.list_wishlist_share_playgroup_ids(db, user.id) == set()
     ws.share_wishlist_to_playgroup(db, user.id, pg.id)
     assert ws.list_wishlist_share_playgroup_ids(db, user.id) == {pg.id}
+
+
+# --------------------------------------------------------------------------- #
+# #147 — viewer-side ownership annotation
+# --------------------------------------------------------------------------- #
+
+
+def _own(db, user_id, card, qty=1, is_proxy=False, location_id=None):
+    db.add(
+        InventoryRow(
+            card_id=card.id,
+            user_id=user_id,
+            quantity=qty,
+            finish="normal",
+            is_proxy=is_proxy,
+            is_pending=False,
+            storage_location_id=location_id,
+        )
+    )
+    db.flush()
+
+
+def _location(db, user_id, name, type_="binder"):
+    from app.models import StorageLocation
+
+    loc = StorageLocation(user_id=user_id, name=name, type=type_, mode="managed")
+    db.add(loc)
+    db.flush()
+    return loc
+
+
+def test_annotate_ownership_counts_real_copies_only(db, user):
+    owner = user
+    viewer = _user(db, "Viewer")
+    rhystic = _card(db, "Rhystic Study")
+    sol = _card(db, "Sol Ring")
+    _card(db, "Cyclonic Rift")  # on wishlist, viewer owns none
+    _watch_name(db, owner.id, "Rhystic Study")
+    _watch_name(db, owner.id, "Sol Ring")
+    _watch_name(db, owner.id, "Cyclonic Rift")
+    _own(db, viewer.id, rhystic, qty=2)  # owns 2 real
+    _own(db, viewer.id, sol, is_proxy=True)  # proxy → not owned
+    db.commit()
+
+    view = ws.build_public_wishlist_view(db, owner.id)
+    ws.annotate_wishlist_ownership(db, viewer.id, view)
+
+    by_name = {i["name"]: i for i in view["cards"]}
+    assert by_name["Rhystic Study"]["owned"] == 2
+    assert by_name["Sol Ring"]["owned"] == 0  # proxy excluded
+    assert by_name["Cyclonic Rift"]["owned"] == 0
+    assert view["viewer_owns"] is True
+    assert view["owned_count"] == 1  # one distinct wishlist card owned
+
+
+def test_annotate_ownership_includes_locations(db, user):
+    owner = user
+    viewer = _user(db, "Viewer")
+    rhystic = _card(db, "Rhystic Study")
+    binder = _location(db, viewer.id, "Mythics", "binder")
+    _watch_name(db, owner.id, "Rhystic Study")
+    _own(db, viewer.id, rhystic, qty=2, location_id=binder.id)  # 2 in the binder
+    _own(db, viewer.id, rhystic, qty=1, location_id=None)  # 1 unassigned
+    db.commit()
+
+    view = ws.build_public_wishlist_view(db, owner.id)
+    ws.annotate_wishlist_ownership(db, viewer.id, view)
+    card = view["cards"][0]
+    assert card["owned"] == 3
+    locs = {loc["label"]: loc["quantity"] for loc in card["locations"]}
+    assert locs == {"Binder · Mythics": 2, "Unassigned": 1}
+
+
+def test_playgroup_wishlist_annotated_for_viewer(db, user):
+    owner = user
+    member = _user(db, "Bob")
+    rhystic = _card(db, "Rhystic Study")
+    pg = create_playgroup(db, owner.id, "Pod")
+    _member(db, pg.id, member.id)
+    _watch_name(db, owner.id, "Rhystic Study")
+    ws.share_wishlist_to_playgroup(db, owner.id, pg.id)
+    _own(db, member.id, rhystic, qty=1)  # the VIEWER (member) owns it
+    db.commit()
+
+    seen = ws.list_wishlist_shares_for_playgroup(db, member.id, pg.id)
+    view = seen[0]["view"]
+    assert view["owned_count"] == 1
+    assert view["cards"][0]["owned"] == 1
 
 
 # --------------------------------------------------------------------------- #
