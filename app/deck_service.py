@@ -28,11 +28,14 @@ from app.timeutil import utc_now
 # trigger Ramp. Includes basic-land subtype words so cards like Nature's Lore and
 # Three Visits are detected even when "land" doesn't appear directly.
 _RAMP_LAND_RE = re.compile(
-    # #139 — accept "searches their library" (group ramp: Collective Voyage's
-    # "Each player searches their library for … basic land cards") alongside the
-    # common "search your library". `search(?:es)?` + `(?:your|their)` keeps every
-    # prior "search your library for … land" match (Cultivate, Nature's Lore).
-    r"search(?:es)? (?:your|their) library for .{0,60}\b(?:land|forest|island|plains|mountain|swamp)\b",
+    # NOTE (#139): a "search their library" broadening for group ramp (Collective
+    # Voyage) was tried and REVERTED — it false-positived every removal / land-
+    # destruction card whose drawback lets the OPPONENT search for a basic land
+    # (Path to Exile, Assassin's Trophy, Field of Ruin, Ghost Quarter, …). "each
+    # player searches" (group, includes you) vs "that player/its controller
+    # searches" (opponent) is controller-scope reasoning the regex can't do — it
+    # belongs to the #124 rules-aware epic. Stays "search your library".
+    r"search your library for .{0,60}\b(?:land|forest|island|plains|mountain|swamp)\b",
     re.IGNORECASE,
 )
 # Mana acceleration patterns that don't search libraries. Gated to non-land cards at

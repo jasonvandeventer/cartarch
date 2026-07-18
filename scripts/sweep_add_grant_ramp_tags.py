@@ -5,10 +5,11 @@ BACKGROUND
     mana ability GRANTED to permanents you control (Cryptolith Rite:
     `Creatures you control have "{T}: Add …"`; Bootleggers' Stash: `Lands you
     control have "… Create a Treasure token."`) read as non-ramp — a systematic
-    false NEGATIVE. It also missed group land-ramp phrased as "searches their
-    library" (Collective Voyage). #139 fixed the tagger; deck health / role
-    suggestions recompute LIVE so they are already correct, but tag CHIPS persisted
-    on already-imported rows stay stale until re-derived. This sweeps them.
+    false NEGATIVE. #139 fixed the tagger (grant-to-you-control only; a "searches
+    their library" land broadening was reverted — it false-positived opponent-search
+    removal like Path to Exile). Deck health / role suggestions recompute LIVE so
+    they are already correct, but tag CHIPS persisted on already-imported rows stay
+    stale until re-derived. This sweeps them.
 
     Users were hand-adding `source:user` Ramp to some of these (5 rows) — this
     aligns the auto tags so they stop having to.
@@ -17,10 +18,10 @@ SCOPE — narrow, mirrors sweep_false_ramp_tags.py's attribution discipline
     A row gets Ramp ADDED only when ALL hold:
       1. the FIXED tagger derives Ramp for the card (`"Ramp" in suggest_card_roles`), AND
       2. the row's persisted tags DON'T already include Ramp, AND
-      3. the new detection is WHY it now qualifies — a "you control" mana grant, or
-         a "searches their library for … land" the old "search your library" rule
-         missed. (Condition 3 keeps the sweep to exactly what #139 changed; a card
-         missing Ramp for any other reason is a different issue, untouched.)
+      3. the new detection is WHY it now qualifies — a "you control" mana grant.
+         (Condition 3 keeps the sweep to exactly what #139 changed; a card missing
+         Ramp for any other reason is a different issue, untouched. The land-tutor
+         broadening was reverted, so group ramp is not swept — deferred to #124.)
     Existing tags are preserved; the added entry is `source:auto, confidence:medium`.
     Rows that already carry Ramp (incl. the 5 hand-applied `source:user` ones) are
     a no-op — nothing is overwritten.
@@ -41,14 +42,12 @@ USAGE
 from __future__ import annotations
 
 import argparse
-import re
 
 from sqlalchemy.orm import Session
 
 import app.legacy_tables  # noqa: F401 — registers raw tables on Base.metadata
 from app.db import SessionLocal
 from app.deck_service import (
-    _RAMP_LAND_RE,
     _grants_mana_to_your_board,
     add_auto_tags,
     get_row_tag_details,
@@ -56,20 +55,13 @@ from app.deck_service import (
 )
 from app.models import Card, InventoryRow
 
-# The pre-#139 land-tutor rule ("search your library …"). A card attributable to
-# the #139 land broadening matches the new _RAMP_LAND_RE but NOT this.
-_OLD_RAMP_LAND_RE = re.compile(
-    r"search your library for .{0,60}\b(?:land|forest|island|plains|mountain|swamp)\b",
-    re.IGNORECASE,
-)
-
 
 def _attributable_to_139(card: Card) -> bool:
-    """True if the card newly-qualifies as ramp BECAUSE of the #139 change."""
-    oracle = card.oracle_text or ""
-    if _grants_mana_to_your_board(oracle):
-        return True
-    return bool(_RAMP_LAND_RE.search(oracle)) and not bool(_OLD_RAMP_LAND_RE.search(oracle))
+    """True if the card newly-qualifies as ramp BECAUSE of the #139 change — a mana
+    ability granted to permanents you control. (The land-tutor broadening was
+    reverted after it false-positived opponent-searches-for-a-basic-land removal
+    cards; group ramp stays deferred to #124.)"""
+    return _grants_mana_to_your_board(card.oracle_text or "")
 
 
 def plan(session: Session) -> list[dict]:

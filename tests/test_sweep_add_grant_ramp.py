@@ -60,6 +60,8 @@ def test_plan_adds_ramp_only_to_attributable_untagged_rows(monkeypatch, tmp_path
     crypto = _card(
         s, "Cryptolith Rite", 'Creatures you control have "{T}: Add one mana of any color."'
     )
+    # #124-deferred: "each player searches their library" group ramp is NOT swept
+    # (the land broadening was reverted — it false-positived opponent-search removal).
     voyage = _card(
         s,
         "Collective Voyage",
@@ -85,7 +87,7 @@ def test_plan_adds_ramp_only_to_attributable_untagged_rows(monkeypatch, tmp_path
 
     targets = {t["row_id"] for t in plan(s)}
     assert r_crypto.id in targets  # "you control" grant
-    assert r_voyage.id in targets  # searches their library
+    assert r_voyage.id not in targets  # group ramp deferred to #124 (land broadening reverted)
     assert r_solring.id not in targets  # ramp, but not a #139 case
     assert r_already.id not in targets  # already has Ramp — no-op
 
