@@ -326,14 +326,13 @@ class InventoryRow(Base):
 
 class Deck(Base):
     __tablename__ = "decks"
-    # DELIBERATE DOCUMENTED DELTA (Gate #4): prod's schema carries a legacy
-    # ``CREATE UNIQUE INDEX ix_decks_name ON decks(name)`` — global-unique deck
-    # name, a single-user-era artifact. The correct multi-user scope is per-user
-    # unique, which this constraint encodes; prod's globally-unique data trivially
-    # satisfies the looser predicate (zero migration risk). This is the roadmap's
-    # "v4 table rebuild drops the legacy decks.name auto-index" cleanup landing —
-    # post-cutover it lets the v3.30.18/v3.30.20 cross_user_deck_conflict
-    # workarounds be removed.
+    # Deck names are unique PER USER (the correct multi-user scope). The
+    # pre-v3.1.0 single-tenant ``UNIQUE INDEX`` on ``decks.name`` (global-unique)
+    # died at the v4 Postgres cutover — the Alembic baseline (489afd0e62f9)
+    # defines only this compound constraint and a NON-unique ``ix_decks_name``.
+    # #133 removed the v3.30.18/v3.30.20 ``cross_user_deck_conflict`` workarounds
+    # that guarded the old global-unique index; ``ix_decks_name`` remains only as
+    # a plain lookup index.
     __table_args__ = (UniqueConstraint("user_id", "name", name="uq_decks_user_name"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)

@@ -16,7 +16,6 @@ import time
 from typing import Any
 
 from sqlalchemy import func
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.audit_service import create_import_batch, log_transaction
@@ -1090,34 +1089,13 @@ def resolve_location_names(
     for loc in locations:
         by_name.setdefault((loc.name or "").strip().lower(), []).append(loc)
 
-    # v3.30.20 — batched cross-user Deck.name lookup for the legacy
-    # decks.name UNIQUE auto-index (the pre-v3.1.0 single-tenant
-    # constraint v3.30.18 ships a defensive try/except for). ONE query
-    # for every distinct missing name in the batch — captures every
-    # owner-of-that-name across ALL users. The preview surfaces this
-    # at the auto-create panel so the user sees the conflict BEFORE
-    # clicking commit, instead of the v3.30.18 fallback silently skipping
-    # the row at commit time. The try/except fallback stays — defense
-    # in depth for tampered form submissions or future unique-constraint
-    # shapes we don't know about. When v4's table rebuild drops the
-    # legacy auto-index, this entire pre-warn block (and the per-resolution
-    # cross_user_deck_conflict field) becomes unnecessary and should be
-    # removed alongside the try/except fallback.
-    missing_names_lower = [
-        (e.get("name") or "").strip().lower()
-        for e in distinct_entries
-        if (e.get("name") or "").strip() and (e.get("name") or "").strip().lower() not in by_name
-    ]
-    deck_name_owners: dict[str, list[int]] = {}
-    if missing_names_lower:
-        conflict_rows = (
-            session.query(Deck.name, Deck.user_id)
-            .filter(func.lower(Deck.name).in_(missing_names_lower))
-            .all()
-        )
-        for deck_name, owner_id in conflict_rows:
-            key = (deck_name or "").strip().lower()
-            deck_name_owners.setdefault(key, []).append(owner_id)
+    # #133 — the pre-v3.1.0 legacy ``decks.name`` UNIQUE auto-index (the
+    # single-tenant constraint) died at the v4 Postgres cutover; the model now
+    # carries only the compound ``uq_decks_user_name (user_id, name)``. The
+    # v3.30.20 cross-user Deck.name pre-warn (and its ``cross_user_deck_conflict``
+    # field) plus the v3.30.18 try/except fallback in ``auto_create_locations``
+    # were removed here — a name owned by another user no longer blocks
+    # ``create_deck``.
 
     # v3.30.17 — batched lookup of decks paired with deck-type
     # StorageLocations in the user's set. Surfaces in the preview as the
@@ -1179,21 +1157,6 @@ def resolve_location_names(
                 if paired is not None:
                     existing_deck_name = paired.name
 
-        # v3.30.20 — cross-user Deck.name conflict flag. True iff some
-        # OTHER user on this server owns a deck with this name; the
-        # legacy decks.name UNIQUE auto-index (pre-v3.1.0, present on
-        # installs that pre-date the multi-user migration) would block
-        # `create_deck` for this name. Only meaningful for "missing"
-        # resolutions: clean/ambiguous match against the current user's
-        # own SLs/decks first, so the cross-user check doesn't apply.
-        # Owners equal to the current user are filtered out (their own
-        # Deck is the canonical reuse case, handled by
-        # auto_create_locations' per-user existing-Deck check).
-        cross_user_deck_conflict = False
-        if status == "missing":
-            owners = deck_name_owners.get(key, [])
-            cross_user_deck_conflict = any(owner_id != user_id for owner_id in owners)
-
         out.append(
             {
                 "name": raw_name,
@@ -1205,7 +1168,6 @@ def resolve_location_names(
                 "csv_type_for_create": csv_type_for_create,
                 "csv_type_explicit": csv_type_explicit,
                 "existing_deck_name": existing_deck_name,
-                "cross_user_deck_conflict": cross_user_deck_conflict,
             }
         )
     return out
@@ -1304,35 +1266,17 @@ def auto_create_locations(
                 # through to target_location_id like an unresolved name.
                 # User can clean up the orphaned Deck separately.
                 continue
-            # v3.30.17.2 — try create_deck with IntegrityError fallback.
-            # The per-user check above handles the canonical
-            # uq_decks_user_name (user_id, name) constraint case. But
-            # installs that pre-date v3.1.0 carry a LEGACY auto-index
-            # `sqlite_autoindex_decks_1` left over from when Deck.name
-            # was declared `unique=True, index=True` (single-tenant
-            # assumption). v3.1.0 switched the model to the compound
-            # (user_id, name) UniqueConstraint but did not drop the
-            # legacy auto-index — SQLite cannot drop an inline-UNIQUE
-            # auto-index without a full table rebuild, deferred to v4.
-            # On those installs, calling create_deck for a name that
-            # ANY other user already owns triggers the legacy constraint
-            # ("UNIQUE constraint failed: decks.name") and 500s. The
-            # try/except catches that case (and any other unique-
-            # constraint shape we don't know about); rollback restores
-            # the session for subsequent rows in the import; the
-            # resolution is skipped so the row falls through to
-            # target_location_id. Self-heals when v4's table rebuild
-            # drops the legacy constraint.
-            try:
-                new_deck = create_deck(
-                    session,
-                    user_id=user_id,
-                    name=name,
-                    is_brew=bool(name_to_is_brew.get(name.lower())),
-                )
-            except IntegrityError:
-                session.rollback()
-                continue
+            # #133 — the per-user check above handles the only live constraint,
+            # uq_decks_user_name (user_id, name). The pre-v3.1.0 legacy
+            # decks.name UNIQUE auto-index that a name owned by ANOTHER user
+            # used to trip died at the v4 cutover, so the v3.30.18 try/except
+            # IntegrityError fallback around this call was removed.
+            new_deck = create_deck(
+                session,
+                user_id=user_id,
+                name=name,
+                is_brew=bool(name_to_is_brew.get(name.lower())),
+            )
             # create_deck always pairs a StorageLocation — storage_location_id
             # is non-None by construction.
             if new_deck.storage_location_id is not None:
