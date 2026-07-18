@@ -24,6 +24,7 @@ from app.models import (
     User,
     VariantGroup,
     WatchlistItem,
+    WishlistShare,
 )
 
 router = APIRouter(prefix="/admin")
@@ -239,6 +240,11 @@ def delete_user(
     # users' Shares targeting playgroups the deleted user owned and
     # transferred stay — the new owner keeps that audience.
     session.query(Share).filter(Share.user_id == user_id).delete(synchronize_session=False)
+    # #146 — the deleted user's wishlist shares (their token is on the User row,
+    # dropped with it; these are the playgroup-share rows).
+    session.query(WishlistShare).filter(WishlistShare.user_id == user_id).delete(
+        synchronize_session=False
+    )
     for user_showcase in session.query(Showcase).filter(Showcase.user_id == user_id).all():
         session.delete(user_showcase)
     session.flush()

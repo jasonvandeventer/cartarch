@@ -1,5 +1,15 @@
 [
   {
+    "version": "4.11.27",
+    "date": "2026-07-18",
+    "added": [
+      "You can share your wishlist now — two ways. From the Wishlist page you can create a public link that anyone can open (no account needed), or turn on visibility for any playgroup you're in, so your fellow members see it right on the playgroup page. Either way, viewers see only the card names: your notes, target prices, and what you already own stay private. Revoke the public link or stop sharing with a playgroup any time. Requested by Alex."
+    ],
+    "refined": [],
+    "resolved": [],
+    "archivist_note": "The interesting constraint on a shared wishlist is what it must NOT reveal. A wishlist doubles as a budget (the target prices) and a quiet map of what you already have (the ownership counts) — none of which is anyone else's business just because you want to tell them which cards you're after. So the shared view is built from a short list of allowed fields, and on the fully-public link even your name is only shown if you set a display name, never the email you sign in with."
+  },
+  {
     "version": "4.11.26",
     "date": "2026-07-18",
     "added": [],

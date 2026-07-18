@@ -87,8 +87,15 @@ from app.sorter_rule_service import has_sortable_setup
 from app.timeutil import utc_now
 from app.watchlist_service import (
     add_to_watchlist,
+    build_public_wishlist_view,
+    generate_wishlist_share_token,
+    get_user_by_wishlist_token,
     list_watchlist,
+    list_wishlist_share_playgroup_ids,
     remove_from_watchlist,
+    revoke_wishlist_share_token,
+    share_wishlist_to_playgroup,
+    unshare_wishlist_from_playgroup,
     update_note,
     update_target_price,
 )
@@ -1041,6 +1048,15 @@ def watchlist_page(
     current_user: User = Depends(get_current_user),
 ):
     items = list_watchlist(session, current_user.id)
+    # #146 — wishlist-sharing controls: the public token + the user's playgroups
+    # with which ones the wishlist is currently shared to (for the picker).
+    from app.playgroup_service import list_playgroups_for_user
+
+    shared_ids = list_wishlist_share_playgroup_ids(session, current_user.id)
+    my_playgroups = [
+        {**pg, "wishlist_shared": pg["playgroup"].id in shared_ids}
+        for pg in list_playgroups_for_user(session, current_user.id)
+    ]
     # Inline add-by-search outcome (?wl=added|dup&name=...) set by the
     # from_search branch of /watchlist/add — surfaces a one-line notice.
     return render(
@@ -1050,10 +1066,92 @@ def watchlist_page(
             "title": "Wishlist",
             "items": items,
             "current_user": current_user,
+            "wishlist_share_token": current_user.wishlist_share_token,
+            "my_playgroups": my_playgroups,
             "wl_outcome": request.query_params.get("wl", ""),
             "wl_name": request.query_params.get("name", ""),
         },
     )
+
+
+# ── #146 Wishlist sharing ────────────────────────────────────────
+
+
+@app.get("/w/{token}")
+def public_wishlist_view(
+    request: Request,
+    token: str,
+    session: Session = Depends(get_db_session),
+    viewer: User | None = Depends(get_optional_current_user),
+):
+    """PUBLIC (no auth) read-only wishlist. Loads STRICTLY by token; missing/revoked
+    → 404. Names-only projection — no owner data beyond the display name (never the
+    username/email)."""
+    owner = get_user_by_wishlist_token(session, token)
+    if not owner:
+        raise HTTPException(status_code=404, detail="Wishlist not found")
+    view = build_public_wishlist_view(session, owner.id)
+    owner_name = owner.display_name  # display_name only — username is the email
+    return render(
+        request,
+        "wishlist_public.html",
+        {
+            "title": (f"{owner_name}'s wishlist" if owner_name else "Shared wishlist"),
+            "owner_name": owner_name,
+            "view": view,
+            "current_user": viewer,
+        },
+    )
+
+
+@app.post("/watchlist/share")
+def watchlist_share(
+    request: Request,
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+    _: None = CsrfRequired,
+):
+    """(Re)generate the public wishlist share link."""
+    generate_wishlist_share_token(session, current_user.id)
+    return RedirectResponse(url="/watchlist", status_code=303)
+
+
+@app.post("/watchlist/unshare")
+def watchlist_unshare(
+    request: Request,
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+    _: None = CsrfRequired,
+):
+    """Revoke the public wishlist share link (/w/{token} 404s at once)."""
+    revoke_wishlist_share_token(session, current_user.id)
+    return RedirectResponse(url="/watchlist", status_code=303)
+
+
+@app.post("/watchlist/share-playgroup")
+def watchlist_share_playgroup(
+    request: Request,
+    playgroup_id: int = Form(...),
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+    _: None = CsrfRequired,
+):
+    """Share the wishlist to a playgroup the user belongs to (membership-gated)."""
+    share_wishlist_to_playgroup(session, current_user.id, playgroup_id)
+    return RedirectResponse(url="/watchlist", status_code=303)
+
+
+@app.post("/watchlist/unshare-playgroup")
+def watchlist_unshare_playgroup(
+    request: Request,
+    playgroup_id: int = Form(...),
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+    _: None = CsrfRequired,
+):
+    """Stop sharing the wishlist to a playgroup."""
+    unshare_wishlist_from_playgroup(session, current_user.id, playgroup_id)
+    return RedirectResponse(url="/watchlist", status_code=303)
 
 
 # ---------------------------------------------------------------------------

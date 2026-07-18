@@ -14,6 +14,77 @@
     </p>
   </section>
 
+  {# #146 — share your wishlist. Names-only for viewers (notes/prices/ownership
+     stay private). Two surfaces: a public unguessable link and per-playgroup
+     visibility. #}
+  <section class="panel watchlist-share-panel">
+    <h3 class="panel-title">Share your wishlist</h3>
+    <p class="muted" style="margin-top: 0">Viewers see only the card names — your notes, target prices, and what you own stay private.</p>
+
+    <div class="wl-share-block">
+      {% if wishlist_share_token %}
+        <p class="wl-share-label">Public link — anyone with it can view, no account needed:</p>
+        <div class="wl-share-linkrow">
+          <input id="wl-share-url" class="wl-share-url" type="text" readonly
+                 data-share-path="/w/{{ wishlist_share_token }}" value="/w/{{ wishlist_share_token }}">
+          <button type="button" class="btn-like" onclick="copyWishlistUrl(this)">Copy</button>
+        </div>
+        <div class="wl-share-actions">
+          <form method="post" action="/watchlist/share" style="display:inline">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <button type="submit" title="Generate a new link; the current one stops working.">Regenerate</button>
+          </form>
+          <form method="post" action="/watchlist/unshare" style="display:inline">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <button type="submit" onclick="return confirm('Revoke the public link? Anyone using it will lose access.');">Revoke</button>
+          </form>
+        </div>
+      {% else %}
+        <p class="wl-share-label">No public link yet.</p>
+        <form method="post" action="/watchlist/share">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <button type="submit" class="btn-like">Create public link</button>
+        </form>
+      {% endif %}
+    </div>
+
+    {% if my_playgroups %}
+      <div class="wl-share-block">
+        <p class="wl-share-label">Show in a playgroup:</p>
+        <ul class="wl-share-pglist">
+          {% for pg in my_playgroups %}
+            <li>
+              <span class="wl-share-pgname">{{ pg.playgroup.name }}</span>
+              <form method="post"
+                    action="/watchlist/{{ 'unshare-playgroup' if pg.wishlist_shared else 'share-playgroup' }}"
+                    style="display:inline">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <input type="hidden" name="playgroup_id" value="{{ pg.playgroup.id }}">
+                <button type="submit" class="btn-like">{{ 'Stop sharing' if pg.wishlist_shared else 'Share' }}</button>
+              </form>
+            </li>
+          {% endfor %}
+        </ul>
+      </div>
+    {% endif %}
+  </section>
+  <script>
+    // #146 — copy the absolute public wishlist URL.
+    function copyWishlistUrl(btn) {
+      var i = document.getElementById('wl-share-url');
+      var full = location.origin + i.dataset.sharePath;
+      i.value = full;
+      i.select();
+      (navigator.clipboard ? navigator.clipboard.writeText(full) : Promise.reject())
+        .then(function () { btn.textContent = 'Copied!'; setTimeout(function () { btn.textContent = 'Copy'; }, 1500); })
+        .catch(function () { document.execCommand('copy'); });
+    }
+    (function () {
+      var i = document.getElementById('wl-share-url');
+      if (i) i.value = location.origin + i.dataset.sharePath;
+    })();
+  </script>
+
   {# Add-by-search (v3.39.x): the PRIMARY way to add a Wishlist card — works for
      a brand-new account that owns nothing (Sets is empty then, so card-detail
      was unreachable). Reuses the deck-builder autocomplete

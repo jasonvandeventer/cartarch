@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+
+{#
+  #146 — public read-only wishlist page, rendered for ANYONE (no account) from
+  GET /w/{token}. Names-only projection (build_public_wishlist_view): card names
+  + an optional "specific printing" hint. NO note, target/current price, or
+  ownership counts. The owner's NAME is their display_name only — never the
+  username (which is their email), so a public link can't leak PII.
+#}
+
+{% block content %}
+<section class="wishlist-public">
+  <header class="wishlist-public-header">
+    <h1 class="wishlist-public-title">
+      {% if owner_name %}{{ owner_name }}'s wishlist{% else %}Shared wishlist{% endif %}
+    </h1>
+    <p class="wishlist-public-meta">{{ view.count }} card{{ '' if view.count == 1 else 's' }} wanted</p>
+  </header>
+
+  {% if view.cards %}
+    <ul class="wishlist-public-list">
+      {% for it in view.cards %}
+        <li class="wishlist-public-row">
+          <span class="wl-name">{{ it.name }}</span>
+          {% if it.specific_printing %}<span class="wl-printing">specific printing</span>{% endif %}
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p class="wishlist-public-empty">This wishlist is empty.</p>
+  {% endif %}
+
+  <footer class="wishlist-public-footer">
+    Shared via <a href="/">Cartarch</a> — a self-hosted Magic: The Gathering collection manager.
+  </footer>
+</section>
+{% endblock %}

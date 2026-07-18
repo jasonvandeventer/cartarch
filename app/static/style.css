@@ -11857,6 +11857,115 @@ table.dmtx .dmtx-rowhead {
 .watchlist-hero {
   margin-top: 1rem;
 }
+
+/* #146 — wishlist sharing (owner controls on /watchlist) */
+.wl-share-block {
+  margin-top: 0.7rem;
+}
+.wl-share-label {
+  margin: 0 0 0.35rem;
+  font-size: 0.85rem;
+  color: var(--muted, var(--text-dim));
+}
+.wl-share-linkrow {
+  display: flex;
+  gap: 0.4rem;
+  margin-bottom: 0.4rem;
+  max-width: 480px;
+}
+.wl-share-url {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 0.35rem 0.5rem;
+  font-size: 0.8rem;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text);
+}
+.wl-share-actions {
+  display: flex;
+  gap: 0.4rem;
+}
+.wl-share-pglist {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.3rem;
+  max-width: 480px;
+}
+.wl-share-pglist li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  padding: 0.3rem 0.5rem;
+  border-radius: 6px;
+  background: var(--panel-2);
+}
+
+/* #146 — public wishlist page + playgroup members' wishlists */
+.wishlist-public {
+  max-width: 720px;
+  margin: 0 auto;
+}
+.wishlist-public-header {
+  padding-bottom: 0.6rem;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid var(--border);
+}
+.wishlist-public-title {
+  margin: 0 0 0.25rem;
+}
+.wishlist-public-meta {
+  margin: 0;
+  color: var(--muted, var(--text-dim));
+}
+.wishlist-public-list,
+.wl-member-cards {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.25rem;
+}
+.wishlist-public-row {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  padding: 0.3rem 0.5rem;
+  border-radius: 6px;
+  background: var(--panel-2);
+}
+.wl-name {
+  font-weight: 500;
+}
+.wl-printing {
+  font-size: 0.72rem;
+  color: var(--muted, var(--text-dim));
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0 0.4rem;
+}
+.wishlist-public-footer {
+  margin-top: 1.6rem;
+  padding-top: 0.8rem;
+  border-top: 1px solid var(--border);
+  font-size: 0.82rem;
+  color: var(--muted, var(--text-dim));
+}
+.wl-member-item {
+  margin-bottom: 0.4rem;
+}
+.wl-member-summary {
+  cursor: pointer;
+  padding: 0.3rem 0;
+}
+.wl-member-cards {
+  margin-top: 0.3rem;
+  padding-left: 0.4rem;
+}
 .watchlist-lede em {
   color: var(--text);
   font-style: italic;

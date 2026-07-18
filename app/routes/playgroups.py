@@ -141,6 +141,10 @@ def playgroups_detail(
     # already established by ``get_playgroup_detail`` above; the
     # ``list_shares_for_playgroup`` membership check is belt-and-suspenders.
     shares = share_service.list_shares_for_playgroup(session, current_user.id, playgroup_id)
+    # #146 — co-members' shared wishlists (names-only). Same membership gate.
+    from app.watchlist_service import list_wishlist_shares_for_playgroup
+
+    member_wishlists = list_wishlist_shares_for_playgroup(session, current_user.id, playgroup_id)
     return render(
         request,
         "playgroup_detail.html",
@@ -151,6 +155,7 @@ def playgroups_detail(
             "viewer_role": detail["viewer_role"],
             "members": detail["members"],
             "shares": shares,
+            "member_wishlists": member_wishlists,
             "error": error,
             "success": success,
         },

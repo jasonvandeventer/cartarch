@@ -64,6 +64,11 @@ class User(Base):
     # #99 — opt-in to watchlist price-alert emails (a card crossing target_price).
     # Default off; NULL for existing rows (no backfill), treated as off.
     price_alerts_enabled: Mapped[bool | None] = mapped_column(Boolean, nullable=True, default=False)
+    # #146 — public read-only wishlist share link (same token-as-toggle shape as
+    # Deck.share_token, #143): an unguessable secrets.token_urlsafe; presence =
+    # the wishlist is publicly viewable at /w/{token}, NULL = private. Revoke =
+    # NULL (link 404s at once). Nullable + UNIQUE so a token maps to one user.
+    wishlist_share_token: Mapped[str | None] = mapped_column(String(64), nullable=True, unique=True)
 
     inventory_rows: Mapped[list[InventoryRow]] = relationship(back_populates="user")
     decks: Mapped[list[Deck]] = relationship(back_populates="user")
@@ -1296,6 +1301,37 @@ class Share(Base):
 
     user: Mapped[User] = relationship()
     showcase: Mapped[Showcase] = relationship()
+    playgroup: Mapped[Playgroup] = relationship()
+
+
+class WishlistShare(Base):
+    """One act of exposing a user's WISHLIST (watchlist) to one playgroup, read-only.
+
+    #146 — mirrors :class:`Share` (the Showcase→playgroup share) but for the whole
+    wishlist: one wishlist per user, so the unique pair is ``(user_id, playgroup_id)``
+    (a user shared to N playgroups = N rows). Ephemeral — un-sharing hard-deletes the
+    row. The co-member view is a names-only projection (no note / target price /
+    ownership). The SEPARATE public-link path is ``User.wishlist_share_token``.
+
+    Playgroup-lifecycle cleanup mirrors Share (wired in ``playgroup_service.py``):
+    ``delete_playgroup`` deletes rows targeting that playgroup; ``leave_playgroup`` /
+    ``remove_member`` delete the departing user's rows for that playgroup. The admin
+    user-deletion cascade deletes the user's rows (``user_id`` denormalized for it).
+    """
+
+    __tablename__ = "wishlist_shares"
+    __table_args__ = (
+        UniqueConstraint("user_id", "playgroup_id", name="uq_wishlist_shares_user_playgroup"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    playgroup_id: Mapped[int] = mapped_column(
+        ForeignKey("playgroups.id"), nullable=False, index=True
+    )
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utc_now, nullable=False)
+
+    user: Mapped[User] = relationship()
     playgroup: Mapped[Playgroup] = relationship()
 
 

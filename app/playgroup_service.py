@@ -28,7 +28,7 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.models import Game, Playgroup, PlaygroupMember, Share, Trade, User
+from app.models import Game, Playgroup, PlaygroupMember, Share, Trade, User, WishlistShare
 
 # Service-layer canonical role enum (the v3.27.2 / v3.27.3 pattern, no
 # DB CHECK constraint). v3.29.0 ships two roles; the enum can widen
@@ -386,6 +386,11 @@ def leave_playgroup(session: Session, user_id: int, playgroup_id: int) -> tuple[
         Share.user_id == user_id,
         Share.playgroup_id == playgroup_id,
     ).delete(synchronize_session=False)
+    # #146 — same for the leaving user's wishlist share to this playgroup.
+    session.query(WishlistShare).filter(
+        WishlistShare.user_id == user_id,
+        WishlistShare.playgroup_id == playgroup_id,
+    ).delete(synchronize_session=False)
     # v3.29.2 — auto-abandon pending trades involving the leaving user
     # scoped to this playgroup (§10). The user is leaving the audience;
     # any in-flight proposal where they are a party in this playgroup
@@ -409,6 +414,9 @@ def leave_playgroup(session: Session, user_id: int, playgroup_id: int) -> tuple[
         session.query(Share).filter(Share.playgroup_id == playgroup_id).delete(
             synchronize_session=False
         )
+        session.query(WishlistShare).filter(WishlistShare.playgroup_id == playgroup_id).delete(
+            synchronize_session=False
+        )  # #146
         # v3.29.2 — auto-abandon pending trades scoped to this playgroup
         # (any party — the playgroup itself is going away). Terminal
         # trades keep their snapshots but lose the live playgroup_id.
@@ -449,6 +457,11 @@ def remove_member(
     session.query(Share).filter(
         Share.user_id == target_user_id,
         Share.playgroup_id == playgroup_id,
+    ).delete(synchronize_session=False)
+    # #146 — same for the removed member's wishlist share to this playgroup.
+    session.query(WishlistShare).filter(
+        WishlistShare.user_id == target_user_id,
+        WishlistShare.playgroup_id == playgroup_id,
     ).delete(synchronize_session=False)
     # v3.29.2 — auto-abandon pending trades involving the removed
     # member scoped to this playgroup (§10). They've been kicked from
@@ -586,6 +599,9 @@ def delete_playgroup(
     session.query(Share).filter(Share.playgroup_id == playgroup_id).delete(
         synchronize_session=False
     )
+    session.query(WishlistShare).filter(WishlistShare.playgroup_id == playgroup_id).delete(
+        synchronize_session=False
+    )  # #146
     # v3.29.2 — auto-abandon pending trades scoped to this playgroup;
     # SET-NULL ``playgroup_id`` on terminal trades to preserve the
     # historical record (the *_name_at_trade snapshots survive). The
@@ -659,6 +675,9 @@ def handle_user_deletion(session: Session, user_id: int) -> None:
             session.query(Share).filter(Share.playgroup_id == pg_id).delete(
                 synchronize_session=False
             )
+            session.query(WishlistShare).filter(WishlistShare.playgroup_id == pg_id).delete(
+                synchronize_session=False
+            )  # #146
             # v3.29.2 — auto-abandon pending trades scoped to this
             # playgroup; SET-NULL terminal trades' ``playgroup_id`` to
             # preserve the historical record. Mirrors the

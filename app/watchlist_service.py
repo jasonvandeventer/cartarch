@@ -29,10 +29,12 @@ dashboard tiles already use). No request-path network calls.
 
 from __future__ import annotations
 
+import secrets
+
 from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
-from app.models import Card, InventoryRow, WatchlistItem
+from app.models import Card, InventoryRow, PlaygroupMember, User, WatchlistItem, WishlistShare
 from app.timeutil import utc_now
 
 
@@ -429,3 +431,143 @@ def is_name_watched(session: Session, user_id: int, card_name: str) -> bool:
         .first()
         is not None
     )
+
+
+# ── #146 Wishlist sharing ────────────────────────────────────────
+# Two read-only surfaces over the SAME names-only projection: a public
+# unguessable-token link (User.wishlist_share_token, token-as-toggle like the
+# #143 deck share) and per-playgroup visibility (WishlistShare, mirroring the
+# Showcase→playgroup Share). The projection hides note / target price / current
+# price / ownership counts — a gift-registry, not the owner's private view.
+
+# Card fields the shared wishlist may expose — NO note/price/ownership.
+_PUBLIC_WISHLIST_CARD_FIELDS = ("scryfall_id", "image_url")
+
+
+def generate_wishlist_share_token(session: Session, user_id: int) -> str | None:
+    """(Re)generate the user's public wishlist token. Returns it, or None if no
+    such user. Regenerating invalidates the old link."""
+    user = session.get(User, user_id)
+    if not user:
+        return None
+    user.wishlist_share_token = secrets.token_urlsafe(16)
+    session.commit()
+    return user.wishlist_share_token
+
+
+def revoke_wishlist_share_token(session: Session, user_id: int) -> bool:
+    """Clear the user's public wishlist token (the /w/{token} link 404s at once)."""
+    user = session.get(User, user_id)
+    if not user:
+        return False
+    user.wishlist_share_token = None
+    session.commit()
+    return True
+
+
+def get_user_by_wishlist_token(session: Session, token: str) -> User | None:
+    """The ONLY public lookup — strictly by token. Empty/None never matches."""
+    if not token:
+        return None
+    return session.query(User).filter(User.wishlist_share_token == token).first()
+
+
+def build_public_wishlist_view(session: Session, user_id: int) -> dict:
+    """Sanitized names-only wishlist for a shared view (#146).
+
+    Each item: display_name, specific_printing (bool — the owner watched one
+    printing), and (for a printing-specific watch) scryfall_id/image_url for a
+    thumbnail. NO note, target/current price, or ownership counts. Ordered by
+    name so the list reads like a gift registry."""
+    items = (
+        session.query(WatchlistItem)
+        .options(joinedload(WatchlistItem.card))
+        .filter(WatchlistItem.user_id == user_id)
+        .all()
+    )
+    out: list[dict] = []
+    for it in items:
+        card = it.card  # None for name-only watches
+        name = (card.name if card else it.card_name) or ""
+        entry = {"name": name, "specific_printing": it.card_id is not None}
+        for f in _PUBLIC_WISHLIST_CARD_FIELDS:
+            entry[f] = getattr(card, f, None) if card else None
+        out.append(entry)
+    out.sort(key=lambda e: (e["name"] or "").lower())
+    # key is "cards" not "items": Jinja2 resolves `view.items` to the dict.items()
+    # method, not a key named "items" (same gotcha as group_deck_items' `rows`).
+    return {"cards": out, "count": len(out)}
+
+
+def _is_member(session: Session, user_id: int, playgroup_id: int) -> bool:
+    return (
+        session.query(PlaygroupMember.id)
+        .filter(
+            PlaygroupMember.playgroup_id == playgroup_id,
+            PlaygroupMember.user_id == user_id,
+        )
+        .first()
+        is not None
+    )
+
+
+def share_wishlist_to_playgroup(
+    session: Session, user_id: int, playgroup_id: int
+) -> WishlistShare | None:
+    """Share the user's wishlist to a playgroup they belong to. Idempotent (returns
+    the existing row on the unique pair); None if the user isn't a member."""
+    if not _is_member(session, user_id, playgroup_id):
+        return None
+    existing = (
+        session.query(WishlistShare)
+        .filter(WishlistShare.user_id == user_id, WishlistShare.playgroup_id == playgroup_id)
+        .first()
+    )
+    if existing:
+        return existing
+    share = WishlistShare(user_id=user_id, playgroup_id=playgroup_id)
+    session.add(share)
+    session.commit()
+    return share
+
+
+def unshare_wishlist_from_playgroup(session: Session, user_id: int, playgroup_id: int) -> bool:
+    """Stop sharing the user's wishlist to a playgroup. Returns True if a row was removed."""
+    deleted = (
+        session.query(WishlistShare)
+        .filter(WishlistShare.user_id == user_id, WishlistShare.playgroup_id == playgroup_id)
+        .delete(synchronize_session=False)
+    )
+    if deleted:
+        session.commit()
+    return bool(deleted)
+
+
+def list_wishlist_share_playgroup_ids(session: Session, user_id: int) -> set[int]:
+    """Playgroup ids the user has shared their wishlist to (for the owner picker)."""
+    return {
+        pid
+        for (pid,) in session.query(WishlistShare.playgroup_id).filter(
+            WishlistShare.user_id == user_id
+        )
+    }
+
+
+def list_wishlist_shares_for_playgroup(
+    session: Session, viewer_user_id: int, playgroup_id: int
+) -> list[dict]:
+    """Co-members' shared wishlists for a playgroup — [{sharer, view}]. Empty if the
+    viewer isn't a member (membership gate, mirroring list_shares_for_playgroup)."""
+    if not _is_member(session, viewer_user_id, playgroup_id):
+        return []
+    shares = (
+        session.query(WishlistShare)
+        .options(joinedload(WishlistShare.user))
+        .filter(WishlistShare.playgroup_id == playgroup_id)
+        .all()
+    )
+    out = []
+    for s in shares:
+        out.append({"sharer": s.user, "view": build_public_wishlist_view(session, s.user_id)})
+    out.sort(key=lambda r: (r["sharer"].display_name or r["sharer"].username or "").lower())
+    return out

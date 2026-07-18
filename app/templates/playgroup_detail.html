@@ -145,6 +145,35 @@
     {% endif %}
   </section>
 
+  {# ── #146 Members' wishlists — names-only (notes / prices / ownership hidden) ── #}
+  <section class="panel">
+    <h3 class="panel-title">Members' wishlists</h3>
+    {% if member_wishlists %}
+      <p class="muted">Cards members are hunting — names only. Handy for gifts and trade prep.</p>
+      <div class="wl-member-list">
+        {% for row in member_wishlists %}
+          <details class="wl-member-item">
+            <summary class="wl-member-summary">
+              <strong>{{ row.sharer.display_name or row.sharer.username }}</strong>
+              <span class="muted">· {{ row.view.count }} card{{ 's' if row.view.count != 1 else '' }}</span>
+            </summary>
+            {% if row.view.cards %}
+              <ul class="wl-member-cards">
+                {% for it in row.view.cards %}
+                  <li>{{ it.name }}{% if it.specific_printing %} <span class="muted">(specific printing)</span>{% endif %}</li>
+                {% endfor %}
+              </ul>
+            {% else %}
+              <p class="muted">Their wishlist is empty.</p>
+            {% endif %}
+          </details>
+        {% endfor %}
+      </div>
+    {% else %}
+      <p class="muted">No member has shared their wishlist with this playgroup yet. Share yours from the <a href="/watchlist">Wishlist</a> page.</p>
+    {% endif %}
+  </section>
+
   {# ── Owner controls (rename/notes, transfer, delete) ── #}
   {% if is_owner %}
     <section class="panel">
