@@ -156,6 +156,8 @@ def test_public_route_200_and_404(client, db, user):
     body = page.text
     assert "Gruul Smash" in body and "Ruric Thar" in body
     assert "$" not in body  # no prices on the public page
+    # #143 — color-identity pips render (RG deck → R + G mana SVGs in the header)
+    assert "/static/mana/R.svg" in body and "/static/mana/G.svg" in body
 
     # bad token 404s
     assert client.get("/d/does-not-exist").status_code == 404

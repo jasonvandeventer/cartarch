@@ -1,5 +1,4 @@
 {% extends "base.html" %}
-{% from "_macros.html" import mana_pips %}
 
 {#
   #143 — public read-only deck share page. Rendered for ANYONE (no account) from
@@ -23,7 +22,18 @@
   <header class="deck-public-header">
     <h1 class="deck-public-title">{{ view.name }}</h1>
     <div class="deck-public-meta">
-      {% if view.color_identity %}<span class="deck-public-pips">{{ mana_pips(view.color_identity) }}</span>{% endif %}
+      {% if view.color_identity %}
+        {# color_identity is a concatenated string ("WB"); render per-letter. The
+           shared mana_pips macro does colors.split() (expects "W B") so it can't
+           be used here without spacing the string — a per-char loop is simpler. #}
+        <span class="deck-public-pips">
+          {% for letter in ['W', 'U', 'B', 'R', 'G'] %}
+            {% if letter in view.color_identity %}
+              <img src="/static/mana/{{ letter }}.svg" alt="{{ letter }}" class="mana-pip" loading="lazy">
+            {% endif %}
+          {% endfor %}
+        </span>
+      {% endif %}
       {% if view.format %}<span class="deck-public-format">{{ view.format }}</span>{% endif %}
       <span class="deck-public-count">{{ view.total_cards }} cards</span>
     </div>
