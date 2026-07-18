@@ -1,5 +1,15 @@
 [
   {
+    "version": "4.11.19",
+    "date": "2026-07-17",
+    "added": [],
+    "refined": [],
+    "resolved": [
+      "Cards you don't own in a brew deck no longer leak into your collection. When you add an unowned card to a brew, it's created as a proxy placeholder — but that placeholder used to show up in your collection like something you owned, and if the card left the deck it turned into a real owned copy you never had. Now a brew placeholder stays put in its deck: it's kept out of your collection list, counts, exports, and pill totals; it can't be moved out, showcased, or offered in a trade; and if you delete it from the deck it's simply discarded rather than fabricated into an owned card. Real cards and physical proxies you actually own are completely unaffected. Reported by SaintWacko."
+    ],
+    "archivist_note": "The tell was subtle — a brew is meant to be a wish-list you can playtest, so the cards in it that you don't own shouldn't quietly pad your real collection. They had been ordinary inventory rows all along, which is why they wandered where they didn't belong. Rather than re-plumb how deck cards are stored, we drew one line — a proxy sitting in a brew deck is a placeholder, not a possession — and taught every door it might slip through to recognize it."
+  },
+  {
     "version": "4.11.18",
     "date": "2026-07-17",
     "added": [],

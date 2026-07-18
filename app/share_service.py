@@ -191,6 +191,11 @@ def add_rows_to_showcase(
         query = query.filter(InventoryRow.id.in_(row_ids))
     elif location_id is not None:
         query = query.filter(InventoryRow.storage_location_id == location_id)
+    # #140 — brew placeholders never enter a Showcase, even with include_proxies
+    # on: that opt-in is for physical proxies you own, not unowned brew cards.
+    from app.inventory_service import brew_placeholder_exclusion
+
+    query = query.filter(brew_placeholder_exclusion(user_id))
     rows = query.all()
     existing_ids = {
         row_id
@@ -408,11 +413,18 @@ def add_showcase_item(
     ``quantity_offered`` clamps to >= 1 (negative/zero coerced to 1).
     """
     row = (
-        session.query(InventoryRow.id)
+        session.query(InventoryRow)
         .filter(InventoryRow.id == inventory_row_id, InventoryRow.user_id == user_id)
         .first()
     )
     if row is None:
+        return None
+    # #140 — a brew placeholder is an unowned card that lives only in its deck;
+    # it can't be offered in a Showcase (per-card add is an explicit choice, so
+    # reject rather than silently skip).
+    from app.inventory_service import is_brew_placeholder_row
+
+    if is_brew_placeholder_row(session, row):
         return None
     qty = max(1, int(quantity_offered or 1))
     if showcase_id:

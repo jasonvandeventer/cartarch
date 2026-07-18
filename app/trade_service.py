@@ -313,6 +313,12 @@ def create_trade(
         )
         if inv is None:
             raise ValueError("Offered item references a card you don't own.")
+        # #140 — a brew placeholder is an unowned proxy that exists only in its
+        # deck; it can't be offered in a trade.
+        from app.inventory_service import is_brew_placeholder_row
+
+        if is_brew_placeholder_row(session, inv):
+            raise ValueError("You can't offer a brew placeholder in a trade.")
         qty = max(1, int(raw.get("quantity") or 1))
         if qty > inv.quantity:
             raise ValueError(f"Offered quantity {qty} exceeds your held quantity ({inv.quantity}).")

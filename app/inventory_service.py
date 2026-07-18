@@ -1410,6 +1410,61 @@ def get_collection_facet_counts(
     }
 
 
+# --- Brew placeholder scoping (#140) -------------------------------------
+# A "brew placeholder" is an ``is_proxy`` InventoryRow whose storage location
+# belongs to an ``is_brew`` deck — a card the user does NOT own, existing only
+# in the context of that deck. Such rows must not appear in the collection
+# index/exports, must not be movable out of their deck (a move would leak an
+# unowned card into the collection / drawer 6), must not be returned as a real
+# pending row when their deck slot is cleared, and must not be attachable to a
+# Showcase or Trade. ``is_brew`` is ORM-only (models.py), so these stay plain
+# ORM queries. One definition, reused by every call site (no inline drift).
+
+
+def brew_deck_location_ids_subquery(user_id: int):
+    """Scalar subquery of ``storage_location_id``s belonging to the user's
+    BREW decks. A brew placeholder is an ``is_proxy`` row whose location is in
+    here (#140)."""
+    from app.models import Deck
+
+    return select(Deck.storage_location_id).where(
+        Deck.user_id == user_id,
+        Deck.is_brew.is_(True),
+        Deck.storage_location_id.isnot(None),
+    )
+
+
+def brew_placeholder_exclusion(user_id: int):
+    """SQLAlchemy boolean that is True for rows that are NOT brew placeholders —
+    pass to ``.filter()`` to drop them from a collection-scoped query (#140)."""
+    return not_(
+        and_(
+            InventoryRow.is_proxy.is_(True),
+            InventoryRow.storage_location_id.in_(brew_deck_location_ids_subquery(user_id)),
+        )
+    )
+
+
+def is_brew_placeholder_row(session: Session, row: InventoryRow) -> bool:
+    """True if ``row`` is an unowned brew placeholder (#140): an ``is_proxy`` row
+    living in a brew deck's location. Barred from moving out of its deck and from
+    Showcase/Trade attachment; released (not returned) when its deck slot clears."""
+    from app.models import Deck
+
+    if not row.is_proxy or row.storage_location_id is None:
+        return False
+    return (
+        session.query(Deck.id)
+        .filter(
+            Deck.user_id == row.user_id,
+            Deck.is_brew.is_(True),
+            Deck.storage_location_id == row.storage_location_id,
+        )
+        .first()
+        is not None
+    )
+
+
 def build_collection_filter_query(
     session: Session,
     user_id: int,
@@ -1488,6 +1543,12 @@ def build_collection_filter_query(
             )
         elif location_id:
             base_query = base_query.filter(InventoryRow.storage_location_id == location_id)
+
+    # #140 — brew placeholders are not collection rows: drop them from the grid,
+    # CSV/JSON exports, and bulk-action id resolution (every consumer inherits
+    # this single filter). Owned rows, real deck cards, and non-brew deck proxies
+    # are untouched.
+    base_query = base_query.filter(brew_placeholder_exclusion(user_id))
 
     return base_query
 
@@ -1772,6 +1833,10 @@ def get_inventory_row_stats(
     elif location_id:
         query = query.filter(InventoryRow.storage_location_id == location_id)
 
+    # #140 — keep the Overview pills consistent with the grid, which hides brew
+    # placeholders via build_collection_filter_query.
+    query = query.filter(brew_placeholder_exclusion(user_id))
+
     rows = query.all()
 
     # v3.27.10 prereq 2: headline aggregates count PLACED cards only;
@@ -1930,6 +1995,12 @@ def move_inventory_row_to_location(
     )
     if not row:
         raise ValueError("Inventory row not found.")
+
+    # #140 — a brew placeholder exists only in the context of its deck; moving it
+    # out (e.g. the sorter routing a proxy to drawer 6) would leak an unowned card
+    # into the collection. Materialize the deck instead to turn it into a real row.
+    if is_brew_placeholder_row(session, row):
+        raise ValueError("A brew placeholder can't be moved out of its deck.")
 
     new_location = (
         session.query(StorageLocation)

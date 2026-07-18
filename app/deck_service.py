@@ -4163,6 +4163,20 @@ def return_card_from_deck(
     if not deck:
         return False
 
+    # #140 — a brew placeholder (an is_proxy row in an is_brew deck) represents a
+    # card the user does NOT own. Returning it would fabricate ownership: the
+    # pending row created below defaults is_proxy=False, so a proxy leaks into the
+    # collection as a real card. Discard it outright instead — the same "disband,
+    # not destroy" rule delete_deck applies to proxy rows, FK-safe.
+    if deck.is_brew and deck_row.is_proxy:
+        from app.inventory_service import clean_inventory_row_references
+
+        delete_shares_for_inventory_row(session, deck_row.id)
+        clean_inventory_row_references(session, [deck_row.id])
+        session.delete(deck_row)
+        session.commit()
+        return True
+
     normalized_drawer = drawer.strip() or None
     normalized_slot = slot.strip() or None
 
