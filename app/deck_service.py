@@ -28,7 +28,11 @@ from app.timeutil import utc_now
 # trigger Ramp. Includes basic-land subtype words so cards like Nature's Lore and
 # Three Visits are detected even when "land" doesn't appear directly.
 _RAMP_LAND_RE = re.compile(
-    r"search your library for .{0,60}\b(?:land|forest|island|plains|mountain|swamp)\b",
+    # #139 — accept "searches their library" (group ramp: Collective Voyage's
+    # "Each player searches their library for … basic land cards") alongside the
+    # common "search your library". `search(?:es)?` + `(?:your|their)` keeps every
+    # prior "search your library for … land" match (Cultivate, Nature's Lore).
+    r"search(?:es)? (?:your|their) library for .{0,60}\b(?:land|forest|island|plains|mountain|swamp)\b",
     re.IGNORECASE,
 )
 # Mana acceleration patterns that don't search libraries. Gated to non-land cards at
@@ -260,16 +264,37 @@ _SELF_COST_REDUCTION_RE = re.compile(
     r"this (?:spell|card) costs \{\d+\} less to cast", re.IGNORECASE
 )
 
+# #139 — a mana ability GRANTED to permanents YOU CONTROL is real ramp
+# (Cryptolith Rite: `Creatures you control have "{T}: Add …"`; Bootleggers' Stash:
+# `Lands you control have "… Create a Treasure token."`). The blanket
+# `_QUOTED_ABILITY_RE` strip below would hide it. The scope word "you control" is
+# the discriminator that keeps this from re-opening the false positives the strip
+# exists for: a token grant ("… token. It has \"…\""), a removal aura ("Enchanted
+# creature has \"…\"" / "Enchant creature an opponent controls"), and an equip
+# grant ("Equipped creature … has \"…\"") are NOT "you control have", so they stay
+# suppressed. The granted ability itself must be a mana ability — reuse
+# `_RAMP_NON_LAND_RE` on the quoted text so the mana-production vocabulary never
+# drifts from the main pattern.
+_GRANT_YOU_CONTROL_RE = re.compile(r'\byou control (?:have|has|gains?) ("[^"]*")', re.IGNORECASE)
+
+
+def _grants_mana_to_your_board(oracle: str) -> bool:
+    """True if the card grants a mana ability to permanents the controller owns."""
+    return any(_RAMP_NON_LAND_RE.search(m.group(1)) for m in _GRANT_YOU_CONTROL_RE.finditer(oracle))
+
 
 def matches_ramp_non_land(oracle: str) -> bool:
     """True if oracle has a non-land-tutor ramp pattern.
 
     Ignores quoted token abilities (the granted ability belongs to the token, not
     this card) and SELF cost-reduction (a card cheapening itself is a discount, not
-    acceleration — see `_SELF_COST_REDUCTION_RE`).
+    acceleration — see `_SELF_COST_REDUCTION_RE`) — EXCEPT a mana ability granted to
+    permanents you control, which IS ramp (#139, checked before the strip).
     """
     if not oracle:
         return False
+    if _grants_mana_to_your_board(oracle):
+        return True
     cleaned = _QUOTED_ABILITY_RE.sub("", oracle)
     cleaned = _SELF_COST_REDUCTION_RE.sub("", cleaned)
     return bool(_RAMP_NON_LAND_RE.search(cleaned))

@@ -1,5 +1,15 @@
 [
   {
+    "version": "4.11.20",
+    "date": "2026-07-18",
+    "added": [],
+    "refined": [],
+    "resolved": [
+      "Cards that give your other permanents a mana ability now count as ramp. Cryptolith Rite ('Creatures you control have \"tap: Add one mana of any color\"') and Bootleggers' Stash are textbook ramp, but the tagger skipped the quoted granted ability wholesale — a rule that correctly ignores a token's own mana ability (Sifter of Skulls) and a mana ability handed to an opponent's creature by a removal aura (Utopia Vow). Now the phrase 'you control' is the tell: a mana ability granted to permanents you control counts, while token abilities and opponent-facing auras still don't. Group land-ramp phrased as 'each player searches their library' (Collective Voyage) is recognized too. Deck-health ramp counts update immediately; the tag chips on cards you already own are being brought in line in a follow-up pass. Reported by SaintWacko, who had been hand-tagging these one at a time."
+    ],
+    "archivist_note": "A quiet false negative is harder to notice than a false positive — nothing looks wrong, a real ramp card just isn't counted — and the tell was that people had started fixing it by hand, one card at a time, without saying anything. The fix hangs on two words: 'you control' is the difference between a mana ability you get to use and one that belongs to a token or an opponent's creature. Reading who the mana is actually for is the whole game."
+  },
+  {
     "version": "4.11.19",
     "date": "2026-07-17",
     "added": [],
