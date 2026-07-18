@@ -35,6 +35,7 @@ from app.deck_service import (
     DECK_VIEW_MODES,
     add_auto_tags,
     assign_deck_variant_group,
+    build_public_deck_view,
     bump_deck_row_quantity,
     compute_consistency,
     compute_dead_cards,
@@ -53,8 +54,10 @@ from app.deck_service import (
     edit_deck_goal,
     extract_commander_themes,
     find_inventory_matches_for_deck_import,
+    generate_deck_share_token,
     get_card_legality,
     get_deck,
+    get_deck_by_share_token,
     get_inbound_shares_for_deck,
     get_outbound_shares_for_deck,
     get_row_tag_details,
@@ -73,6 +76,7 @@ from app.deck_service import (
     resolve_add_printing,
     resolved_deck_rows,
     return_card_from_deck,
+    revoke_deck_share_token,
     set_row_tags,
     share_card_to_deck,
     suggest_card_roles,
@@ -86,6 +90,7 @@ from app.dependencies import (
     CsrfRequired,
     get_current_user,
     get_db_session,
+    get_optional_current_user,
     render,
     safe_redirect_url,
 )
@@ -551,6 +556,56 @@ def _untracked_auto_tokens_from_cache(
             continue
         out.append(t)
     return out
+
+
+# ── #143 Public deck share links ────────────────────────────────
+
+
+@router.get("/d/{token}")
+def public_deck_view(
+    request: Request,
+    token: str,
+    session: Session = Depends(get_db_session),
+    viewer: User | None = Depends(get_optional_current_user),
+):
+    """PUBLIC (no auth) read-only deck view. Loads strictly by share_token; a
+    missing/revoked token 404s. The context is a SANITIZED projection — no owner
+    data ever reaches the template (see build_public_deck_view)."""
+    deck = get_deck_by_share_token(session, token)
+    if not deck:
+        raise HTTPException(status_code=404, detail="Deck not found")
+    view = build_public_deck_view(session, deck)
+    return render(
+        request,
+        "deck_public.html",
+        {"title": view["name"], "view": view, "current_user": viewer},
+    )
+
+
+@router.post("/decks/{deck_id}/share")
+async def decks_share(
+    request: Request,
+    deck_id: int,
+    _csrf: None = CsrfRequired,
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+):
+    """Owner-only: (re)generate the deck's public share token, then back to detail."""
+    generate_deck_share_token(session, deck_id=deck_id, user_id=current_user.id)
+    return RedirectResponse(url=f"/decks/{deck_id}", status_code=303)
+
+
+@router.post("/decks/{deck_id}/unshare")
+async def decks_unshare(
+    request: Request,
+    deck_id: int,
+    _csrf: None = CsrfRequired,
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+):
+    """Owner-only: revoke the public share link (NULL the token → /d/{token} 404s)."""
+    revoke_deck_share_token(session, deck_id=deck_id, user_id=current_user.id)
+    return RedirectResponse(url=f"/decks/{deck_id}", status_code=303)
 
 
 @router.get("/decks/{deck_id}")

@@ -34,6 +34,59 @@
             <a href="/decks/{{ deck.id }}/analysis" class="btn-like">Analyze deck</a>
             <a href="/decks/{{ deck.id }}/export" class="btn-like">Export</a>
             <a href="/decks/{{ deck.id }}/export?format=json" class="btn-like">Export JSON</a>
+            {# #143 — public read-only share link. The whole deck page is owner-only
+               (get_deck is owner-scoped), so no is_owner gate is needed here. #}
+            <details class="deck-share-details js-dismiss">
+              <summary class="btn-like deck-share-summary">Share</summary>
+              <div class="deck-share-panel">
+                {% if deck.share_token %}
+                  <p class="deck-share-hint">Anyone with this link can view a read-only copy of this deck (prices &amp; ownership hidden). No account needed.</p>
+                  <div class="deck-share-linkrow">
+                    <input id="deck-share-url" class="deck-share-url" type="text" readonly
+                           data-share-path="/d/{{ deck.share_token }}" value="/d/{{ deck.share_token }}">
+                    <button type="button" class="btn-like" onclick="copyDeckShareUrl(this)">Copy</button>
+                  </div>
+                  <div class="deck-share-actions">
+                    <form action="/decks/{{ deck.id }}/share" method="post" style="display:inline">
+                      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                      <button type="submit" title="Generate a new link; the current one stops working.">Regenerate</button>
+                    </form>
+                    <form action="/decks/{{ deck.id }}/unshare" method="post" style="display:inline">
+                      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                      <button type="submit"
+                              onclick="return confirm('Revoke the public link? Anyone using it will lose access.');">Revoke</button>
+                    </form>
+                  </div>
+                {% else %}
+                  <p class="deck-share-hint">Create an unguessable link to share a read-only view of this deck with anyone — no account needed. Prices and ownership stay hidden.</p>
+                  <form action="/decks/{{ deck.id }}/share" method="post">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                    <button type="submit" class="btn-like">Create public link</button>
+                  </form>
+                {% endif %}
+              </div>
+            </details>
+            <script>
+              // #143 — copy the FULL absolute share URL (origin + path) to clipboard.
+              function copyDeckShareUrl(btn) {
+                var input = document.getElementById('deck-share-url');
+                var full = location.origin + input.dataset.sharePath;
+                input.value = full;
+                input.select();
+                (navigator.clipboard
+                  ? navigator.clipboard.writeText(full)
+                  : Promise.reject()
+                ).then(function () {
+                  btn.textContent = 'Copied!';
+                  setTimeout(function () { btn.textContent = 'Copy'; }, 1500);
+                }).catch(function () { document.execCommand('copy'); });
+              }
+              // show the absolute URL on load so the owner sees the real link
+              (function () {
+                var i = document.getElementById('deck-share-url');
+                if (i) i.value = location.origin + i.dataset.sharePath;
+              })();
+            </script>
             {# #87 feedback — Grid/List view toggle lives in the header now,
                not buried in the search pane's Deck tab. Same POST + Referer
                round-trip as before. #}

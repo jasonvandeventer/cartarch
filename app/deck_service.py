@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import re
+import secrets
 
 from sqlalchemy import Float, and_, bindparam, cast, func, or_, select, text
 from sqlalchemy.orm import Session, joinedload
@@ -2234,6 +2235,129 @@ def get_deck(session: Session, deck_id: int, user_id: int) -> Deck | None:
         )
         .first()
     )
+
+
+# ── Public deck share links (#143) ──────────────────────────────
+# An unguessable `share_token` publishes a deck read-only at /d/{token} for
+# anyone (no account). The token IS the toggle: generate = publish, revoke = NULL
+# (link 404s immediately). generate/revoke are owner-scoped (via get_deck);
+# get_deck_by_share_token is the ONLY public entry and looks up strictly by token.
+
+# Whitelist of Card fields the public view may expose — NO price/ownership/notes.
+_PUBLIC_CARD_FIELDS = (
+    "name",
+    "mana_cost",
+    "type_line",
+    "cmc",
+    "colors",
+    "color_identity",
+    "rarity",
+    "scryfall_id",
+    "image_url",
+)
+_PUBLIC_TYPE_ORDER = (
+    "Creature",
+    "Planeswalker",
+    "Instant",
+    "Sorcery",
+    "Artifact",
+    "Enchantment",
+    "Battle",
+    "Land",
+    "Other",
+)
+
+
+def generate_deck_share_token(session: Session, deck_id: int, user_id: int) -> str | None:
+    """Owner-scoped: (re)generate the deck's public share token. Returns the token,
+    or None if the deck isn't owned by user_id. Regenerating invalidates the old link."""
+    deck = get_deck(session, deck_id=deck_id, user_id=user_id)
+    if not deck:
+        return None
+    deck.share_token = secrets.token_urlsafe(16)
+    session.commit()
+    return deck.share_token
+
+
+def revoke_deck_share_token(session: Session, deck_id: int, user_id: int) -> bool:
+    """Owner-scoped: clear the deck's share token (the public link 404s at once)."""
+    deck = get_deck(session, deck_id=deck_id, user_id=user_id)
+    if not deck:
+        return False
+    deck.share_token = None
+    session.commit()
+    return True
+
+
+def get_deck_by_share_token(session: Session, token: str) -> Deck | None:
+    """The ONLY public lookup — strictly by token. Empty/None token never matches."""
+    if not token:
+        return None
+    return (
+        session.query(Deck)
+        .options(joinedload(Deck.storage_location))
+        .filter(Deck.share_token == token)
+        .first()
+    )
+
+
+def _group_public_cards(cards: list[dict]) -> list[dict]:
+    """Bucket sanitized card dicts by primary type, in _PUBLIC_TYPE_ORDER, names sorted."""
+    buckets: dict[str, list[dict]] = {}
+    for it in cards:
+        head = (it.get("type_line") or "").split("—")[0].split("//")[0].lower()
+        cat = next((t for t in _PUBLIC_TYPE_ORDER[:-1] if t.lower() in head), "Other")
+        buckets.setdefault(cat, []).append(it)
+    groups = []
+    for cat in _PUBLIC_TYPE_ORDER:
+        items = buckets.get(cat)
+        if items:
+            items.sort(key=lambda i: (i.get("name") or "").lower())
+            groups.append({"label": cat, "count": sum(i["quantity"] for i in items), "rows": items})
+    return groups
+
+
+def build_public_deck_view(session: Session, deck: Deck) -> dict:
+    """Sanitized read-only view model for the public share page (#143).
+
+    Own rows only (no variant-group shares), projected to _PUBLIC_CARD_FIELDS —
+    NO price, ownership, proxy, tags, notes, goals, bracket, or intent. Commander
+    rows are split out; color identity is computed from the cards' union."""
+    rows = []
+    if deck.storage_location_id:
+        rows = (
+            session.query(InventoryRow)
+            .options(joinedload(InventoryRow.card))
+            .filter(
+                InventoryRow.user_id == deck.user_id,
+                InventoryRow.storage_location_id == deck.storage_location_id,
+            )
+            .all()
+        )
+
+    commanders: list[dict] = []
+    cards: list[dict] = []
+    identity: set[str] = set()
+    for r in rows:
+        card = r.card
+        if not card:
+            continue
+        item = {"quantity": r.quantity}
+        item.update({f: getattr(card, f, None) for f in _PUBLIC_CARD_FIELDS})
+        identity.update(card.color_identity or "")
+        (commanders if r.role == "commander" else cards).append(item)
+
+    commanders.sort(key=lambda i: (i.get("name") or "").lower())
+    total = sum(i["quantity"] for i in cards) + sum(i["quantity"] for i in commanders)
+    return {
+        "name": deck.name,
+        "format": deck.format,
+        "blurb": deck.blurb,
+        "color_identity": "".join(c for c in "WUBRG" if c in identity),
+        "commanders": commanders,
+        "groups": _group_public_cards(cards),
+        "total_cards": total,
+    }
 
 
 # ── Variant groups (v3.33.0) ────────────────────────────────────

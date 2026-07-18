@@ -1,5 +1,15 @@
 [
   {
+    "version": "4.11.22",
+    "date": "2026-07-18",
+    "added": [
+      "Share a deck with anyone — no account required. On a deck's page, open 'Share' and create a public link; anyone you send it to sees a clean, read-only copy of the decklist (grouped by card type, with the commander and color identity up top). Prices, what you own vs. proxy, tags, and your private notes are all hidden — only the deck's blurb comes along. The link is a long unguessable code, so a deck stays private until you make one, and 'Revoke' turns it off instantly (or 'Regenerate' rolls a fresh link and retires the old one). Requested by SaintWacko."
+    ],
+    "refined": [],
+    "resolved": [],
+    "archivist_note": "The quiet discipline here is what the shared page does NOT contain. A collection manager knows a lot about your cards you'd never want a stranger to see — what each is worth, which ones you're only proxying, your working notes — so the public view is built from a short allow-list of fields rather than by hiding things one at a time. What's on the page is exactly what was chosen to be there, and nothing arrives by accident."
+  },
+  {
     "version": "4.11.21",
     "date": "2026-07-18",
     "added": [],

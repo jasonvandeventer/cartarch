@@ -376,6 +376,12 @@ class Deck(Base):
     # against this column, so pgloader's default BOOLEAN→boolean map is correct
     # at v4 with no cast-file entry (the v7/v8 blueprint boolean lesson).
     is_brew: Mapped[bool] = mapped_column(default=False)
+    # #143 — public read-only share link. An unguessable token
+    # (`secrets.token_urlsafe`); presence = the deck is publicly viewable at
+    # `/d/{token}` by anyone (no account), NULL = private. The token IS the toggle:
+    # generating one publishes, clearing it (revoke) invalidates the link
+    # immediately. Nullable + UNIQUE so a token maps to exactly one deck.
+    share_token: Mapped[str | None] = mapped_column(String(64), nullable=True, unique=True)
 
     storage_location: Mapped[StorageLocation | None] = relationship()
     user: Mapped[User] = relationship(back_populates="decks")
