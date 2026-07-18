@@ -7132,6 +7132,15 @@ table.dmtx .dmtx-rowhead {
   font-size: 0.85rem;
   max-height: 70vh;
   overflow-y: auto;
+  /* #145 — the rows live in a CSS multi-column container (.deck-list-rows),
+     where a position:absolute popover has a broken containing block in
+     Chromium (`position:relative` on the kebab does NOT establish it, so the
+     menu resolves against the whole multicol box: full-column-width and
+     detached from its ⋮ trigger). position:fixed escapes multicol entirely;
+     deck_detail.html's toggle handler sets left/top to sit under the trigger.
+     `right:auto` so only `left` drives horizontal (base rule sets right:0). */
+  position: fixed;
+  right: auto;
 }
 
 /* Grid-view basic-land qty form: same compact button shape inside the

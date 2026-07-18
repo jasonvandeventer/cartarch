@@ -1,5 +1,15 @@
 [
   {
+    "version": "4.11.18",
+    "date": "2026-07-17",
+    "added": [],
+    "refined": [],
+    "resolved": [
+      "The card actions menu works again in a deck's list view. Opening the \"⋮\" menu on a card in list mode had started landing the menu in the wrong place — floating over other cards instead of under the button you clicked — so it looked like nothing happened and the Switch printing option seemed to vanish. It now opens neatly beneath its card, with every action present, and no longer shoves the surrounding list around when it appears. Reported by SaintWacko."
+    ],
+    "archivist_note": "A tidy one. The list view packs cards into newspaper-style columns to fit more on screen, and that column layout quietly disagreed with how the actions menu figured out where to appear — the two features were each fine alone and only misbehaved together. We pinned the menu to float above the page rather than live inside the columns, and it snaps back to where your finger expects it."
+  },
+  {
     "version": "4.11.17",
     "date": "2026-07-16",
     "added": [],

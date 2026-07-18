@@ -1420,6 +1420,52 @@
       })();
       </script>
       <script>
+      /* #145 — deck list-view actions menu positioning.
+         The list rows live in a CSS multi-column container (.deck-list-rows).
+         A position:absolute popover inside multicol has a BROKEN containing
+         block in Chromium — `position:relative` on the kebab doesn't establish
+         it, so the menu resolves against the whole multicol box: it renders
+         full-column-width, detached from its ⋮ trigger, floating over other
+         rows ("clicking does nothing"). The CSS pins these bodies to
+         position:fixed (escaping multicol); this JS places them at their
+         trigger on open. Collection-list kebabs are unaffected (not multicol).
+         Delegated at document CAPTURE so it survives HTMX swaps of
+         #deck-card-list AND catches the non-bubbling `toggle` event.
+         ponytail: reposition reads layout per scroll event while a menu is
+         open — one small element, negligible; close-on-scroll instead if a
+         very long deck ever janks. */
+      (function () {
+        var SEL = '.deck-list-row .collection-row-kebab';
+        function place(d) {
+          var body = d.querySelector('.collection-row-kebab-body');
+          var summary = d.querySelector('summary');
+          if (!body || !summary) return;
+          var s = summary.getBoundingClientRect();
+          body.style.visibility = 'hidden'; // avoid a flash at the pre-placed spot
+          var bw = body.offsetWidth, bh = body.offsetHeight;
+          var left = Math.min(s.right - bw, window.innerWidth - bw - 8);
+          if (left < 8) left = 8; // clamp to viewport
+          var top = (s.bottom + bh + 8 <= window.innerHeight)
+            ? s.bottom + 4
+            : Math.max(8, s.top - bh - 4); // flip up if no room below
+          body.style.left = left + 'px';
+          body.style.top = top + 'px';
+          body.style.visibility = '';
+        }
+        document.addEventListener('toggle', function (e) {
+          var d = e.target;
+          if (d.open && d.matches && d.matches(SEL)) place(d);
+        }, true);
+        // Keep an open menu pinned to its trigger while the page moves.
+        function reposition() {
+          var d = document.querySelector(SEL + '[open]');
+          if (d) place(d);
+        }
+        window.addEventListener('scroll', reposition, true);
+        window.addEventListener('resize', reposition);
+      })();
+      </script>
+      <script>
       /* Switch-printing modal open/close (v3.21.0).
 
          Open: an HTMX-loaded fragment lands in #switch-printing-modal-host;
