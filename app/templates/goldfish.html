@@ -78,6 +78,24 @@
           <input type="number" id="gf-input-look" class="gf-input-num" min="1" max="20" value="3">
           <button type="button" id="gf-btn-look" class="gf-btn">Look at top N</button>
         </span>
+        {# #142 — dice roller + coin flip. A <details class="js-dismiss"> so #118's
+           shared outside-click/Escape dismissal closes it (no bespoke handler).
+           The last result lives in the summary, so it stays visible when closed.
+           Client-only; no state/persistence, gameFingerprint() untouched. #}
+        <details class="js-dismiss gf-dice">
+          <summary class="gf-btn gf-dice-summary" title="Roll dice / flip a coin">
+            🎲 <span class="gf-dice-result" id="gf-dice-result">—</span>
+          </summary>
+          <div class="gf-dice-menu">
+            <button type="button" class="gf-btn gf-btn-small gf-dice-btn" data-die="4">d4</button>
+            <button type="button" class="gf-btn gf-btn-small gf-dice-btn" data-die="6">d6</button>
+            <button type="button" class="gf-btn gf-btn-small gf-dice-btn" data-die="8">d8</button>
+            <button type="button" class="gf-btn gf-btn-small gf-dice-btn" data-die="10">d10</button>
+            <button type="button" class="gf-btn gf-btn-small gf-dice-btn" data-die="12">d12</button>
+            <button type="button" class="gf-btn gf-btn-small gf-dice-btn" data-die="20">d20</button>
+            <button type="button" class="gf-btn gf-btn-small gf-dice-btn" data-die="coin">🪙 Coin</button>
+          </div>
+        </details>
         <span class="gf-control-group">
           <label class="gf-control-label">Life</label>
           <button type="button" class="gf-btn gf-btn-small" data-life-delta="-1">−1</button>

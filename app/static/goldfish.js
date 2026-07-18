@@ -2583,6 +2583,24 @@
     const n = parseInt(document.getElementById("gf-input-look").value, 10) || 3;
     lookAtTopN(Math.max(1, Math.min(20, n)));
   });
+  // #142 — dice roller + coin flip. Ephemeral display-only: no state mutation, no
+  // render(), gameFingerprint() untouched. The dropdown is a <details js-dismiss>,
+  // so #118's shared dismissal closes it; the result lives in the summary so it's
+  // visible without reopening.
+  const diceResult = document.getElementById("gf-dice-result");
+  document.querySelectorAll(".gf-dice-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const die = btn.dataset.die;
+      let text;
+      if (die === "coin") {
+        text = Math.random() < 0.5 ? "Heads" : "Tails";
+      } else {
+        const sides = parseInt(die, 10);
+        text = "d" + sides + " → " + (Math.floor(Math.random() * sides) + 1);
+      }
+      if (diceResult) diceResult.textContent = text;
+    });
+  });
   document.querySelectorAll("[data-life-delta]").forEach((btn) => {
     btn.addEventListener("click", () => {
       const d = parseInt(btn.dataset.lifeDelta, 10) || 0;

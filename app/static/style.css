@@ -13147,6 +13147,46 @@ table.dmtx .dmtx-rowhead {
 }
 .gf-btn-small { padding: 0.25rem 0.5rem; font-size: 12px; }
 
+/* #142 — dice roller + coin flip popover */
+.gf-dice {
+  position: relative;
+  display: inline-block;
+}
+.gf-dice-summary {
+  cursor: pointer;
+  list-style: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+.gf-dice-summary::-webkit-details-marker {
+  display: none;
+}
+.gf-dice-result {
+  min-width: 4.5ch;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+.gf-dice-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 30;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  width: max-content;
+  max-width: 220px;
+  padding: 0.5rem;
+  background: var(--panel, #13161c);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: var(--shadow);
+}
+.gf-dice-btn {
+  min-width: 3ch;
+}
+
 .gf-readout-row {
   display: flex;
   flex-wrap: wrap;

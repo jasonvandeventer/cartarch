@@ -1,5 +1,15 @@
 [
   {
+    "version": "4.11.24",
+    "date": "2026-07-18",
+    "added": [
+      "The goldfish playtester now has a dice roller and a coin flip. A small '🎲' dropdown in the controls offers d4, d6, d8, d10, d12, d20 and a coin; click one and the result shows right on the trigger, so the last roll stays visible without reopening the menu. It closes the same way every other popover does — click away or press Escape. Requested by SaintWacko."
+    ],
+    "refined": [],
+    "resolved": [],
+    "archivist_note": null
+  },
+  {
     "version": "4.11.23",
     "date": "2026-07-18",
     "added": [],
