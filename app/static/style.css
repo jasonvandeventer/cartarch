@@ -14018,6 +14018,9 @@ body.gf-mode { overflow: hidden; }
    .gf-board-panel was a side-by-side board+preview grid in a normal
    panel; here we keep the same 1fr/240px columns but flex into the
    fullscreen frame. */
+/* #141 — the card preview moved INTO the board's right rail, so the board-panel
+   is a single column (was `1fr 240px` board+preview). Combined with the right
+   rail holding preview+command, this reclaims ~200px of centre width. */
 .gf-app .gf-board-panel {
   flex: 1 1 auto;
   background: transparent;
@@ -14026,16 +14029,28 @@ body.gf-mode { overflow: hidden; }
   border-radius: 0;
   min-height: 0;
   display: grid;
-  grid-template-columns: 1fr 240px;
+  grid-template-columns: 1fr;
   gap: 0.75rem;
   overflow: hidden;
 }
 .gf-app .gf-board {
   display: grid;
-  grid-template-columns: 160px 1fr 160px;
+  /* narrow left rail (Library/Graveyard/Exile) | wide centre | right rail
+     (Preview + Command). Centre = width − 150 − 210 ≈ +200px vs the old
+     160|1fr|160 + a separate 240px preview column. */
+  grid-template-columns: 150px 1fr 210px;
   gap: 0.75rem;
   min-height: 0;
   height: 100%;
+}
+/* Right rail: preview keeps its card-shaped size at the top, Command fills the
+   rest. */
+.gf-app .gf-rail-right .gf-preview {
+  flex: 0 0 auto;
+}
+.gf-app .gf-rail-right .gf-zone-pile {
+  flex: 1 1 auto;
+  min-height: 0;
 }
 .gf-app .gf-board-main {
   display: flex;

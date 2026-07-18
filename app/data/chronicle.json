@@ -1,5 +1,15 @@
 [
   {
+    "version": "4.11.26",
+    "date": "2026-07-18",
+    "added": [],
+    "refined": [
+      "The goldfish playtester's board reclaims its wasted whitespace. The card preview, which used to sit in its own column on the right, now shares the right rail with the command zone, and the graveyard moved over to the left rail beside the library and exile. With both sides pinned to narrow rails, the battlefield in the middle gets roughly a card and a half wider before you need to scroll. Narrow screens are unchanged. Layout from a mockup by SaintWacko."
+    ],
+    "resolved": [],
+    "archivist_note": null
+  },
+  {
     "version": "4.11.25",
     "date": "2026-07-18",
     "added": [

@@ -130,6 +130,10 @@
 
     <div class="gf-board-panel">
       <div class="gf-board">
+        {# #141 — mockup layout: left rail stacks Library / Graveyard / Exile so
+           the right side collapses to one rail (preview + command), freeing the
+           centre for a wider battlefield. Zones are referenced by id in
+           goldfish.js, so moving them in the DOM is safe. #}
         <aside class="gf-rail gf-rail-left">
           <div class="gf-zone gf-zone-pile" data-zone="library">
             <div class="gf-zone-head"><span class="gf-zone-name">Library</span><span class="gf-zone-count" id="gf-count-library">0</span></div>
@@ -138,6 +142,10 @@
                 <span class="gf-card-back-glyph">§</span>
               </div>
             </div>
+          </div>
+          <div class="gf-zone gf-zone-pile" data-zone="graveyard">
+            <div class="gf-zone-head"><span class="gf-zone-name">Graveyard</span><span class="gf-zone-count" id="gf-count-graveyard">0</span></div>
+            <div class="gf-pile" id="gf-pile-graveyard" data-zone-drop="graveyard"></div>
           </div>
           <div class="gf-zone gf-zone-pile" data-zone="exile">
             <div class="gf-zone-head"><span class="gf-zone-name">Exile</span><span class="gf-zone-count" id="gf-count-exile">0</span></div>
@@ -196,22 +204,19 @@
         </div>
 
         <aside class="gf-rail gf-rail-right">
+          {# Card preview moved into the right rail (top) — it was a separate 240px
+             column; folding it in with Command is what reclaims the width. #}
+          <aside class="gf-preview" id="gf-preview" aria-live="polite">
+            <div class="gf-preview-frame" id="gf-preview-frame">
+              <div class="gf-preview-empty">Hover or click any card to inspect it here.</div>
+            </div>
+          </aside>
           <div class="gf-zone gf-zone-pile" data-zone="command">
             <div class="gf-zone-head"><span class="gf-zone-name">Command</span><span class="gf-zone-count" id="gf-count-command">0</span></div>
             <div class="gf-pile" id="gf-pile-command" data-zone-drop="command"></div>
           </div>
-          <div class="gf-zone gf-zone-pile" data-zone="graveyard">
-            <div class="gf-zone-head"><span class="gf-zone-name">Graveyard</span><span class="gf-zone-count" id="gf-count-graveyard">0</span></div>
-            <div class="gf-pile" id="gf-pile-graveyard" data-zone-drop="graveyard"></div>
-          </div>
         </aside>
       </div>
-
-      <aside class="gf-preview" id="gf-preview" aria-live="polite">
-        <div class="gf-preview-frame" id="gf-preview-frame">
-          <div class="gf-preview-empty">Hover or click any card to inspect it here.</div>
-        </div>
-      </aside>
     </div>
 
     {# Legacy static element retained per v3.30.0 Fix 2 — left in DOM with the
