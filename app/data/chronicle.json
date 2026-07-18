@@ -1,5 +1,17 @@
 [
   {
+    "version": "4.11.25",
+    "date": "2026-07-18",
+    "added": [
+      "You can add cards from a brew's buy-list straight to your wishlist. Each 'To buy' and 'Partially owned' section now has a '+ wishlist all' button, and every card in those sections has its own '+ wishlist' — one tap and it's tracked. Cards already on your wishlist are simply skipped (the wishlist tracks a card once, so nothing gets duplicated), and a small banner tells you how many were added. Requested by SaintWacko."
+    ],
+    "refined": [
+      "Internal cleanup: removed a batch of dead code that guarded a database constraint retired in the v4 Postgres move (the old cross-user deck-name conflict handling). No visible change."
+    ],
+    "resolved": [],
+    "archivist_note": null
+  },
+  {
     "version": "4.11.24",
     "date": "2026-07-18",
     "added": [

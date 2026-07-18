@@ -268,6 +268,37 @@ def add_to_watchlist(
     return item
 
 
+def add_names_to_watchlist(session: Session, user_id: int, names: list[str]) -> dict[str, int]:
+    """Idempotently add printing-agnostic (``card_name``) watches for ``names``.
+
+    #144 — the deck buy-list "add to wishlist" bulk/per-card action. The watchlist
+    has NO quantity (one row per name per user, partial-unique index), so this is a
+    SKIP-duplicates add: a name already watched (or repeated in ``names``) is
+    counted as skipped, never a second row and never an increment. Existing watches
+    are pre-checked in ONE query so no per-name IntegrityError/rollback is needed.
+    Returns ``{"added", "skipped"}``. Commits once at the end.
+    """
+    normalized = [n for n in (_normalize_card_name(r) for r in names) if n]
+    already = {
+        row[0]
+        for row in session.query(WatchlistItem.card_name).filter(
+            WatchlistItem.user_id == user_id,
+            WatchlistItem.card_name.isnot(None),
+        )
+    }
+    added = 0
+    seen: set[str] = set()
+    for name in normalized:
+        if name in already or name in seen:
+            continue
+        seen.add(name)
+        add_to_watchlist(session, user_id, card_name=name)
+        added += 1
+    if added:
+        session.commit()
+    return {"added": added, "skipped": len(normalized) - added}
+
+
 def remove_from_watchlist(session: Session, user_id: int, watchlist_id: int) -> bool:
     """Delete one watchlist row. Returns True if a row was deleted.
 

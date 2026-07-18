@@ -111,6 +111,7 @@ from app.scryfall import autocomplete_cards_for_add, fetch_card_printings
 from app.sorter_rule_service import has_sortable_setup
 from app.timeutil import utc_now
 from app.token_service import deck_token_status, list_tokens
+from app.watchlist_service import add_names_to_watchlist
 
 router = APIRouter()
 
@@ -606,6 +607,29 @@ async def decks_unshare(
     """Owner-only: revoke the public share link (NULL the token → /d/{token} 404s)."""
     revoke_deck_share_token(session, deck_id=deck_id, user_id=current_user.id)
     return RedirectResponse(url=f"/decks/{deck_id}", status_code=303)
+
+
+@router.post("/decks/{deck_id}/wishlist")
+async def decks_wishlist(
+    request: Request,
+    deck_id: int,
+    card_name: list[str] = Form(default=[]),
+    _csrf: None = CsrfRequired,
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+):
+    """#144 — add buy-list card name(s) to the watchlist (printing-agnostic,
+    idempotent skip-duplicates). One name for a per-card add, many for a whole
+    section. Redirects back to the deck with an added/skipped banner. Owner-scoped
+    via get_deck; a non-owner deck id is a no-op redirect (no watches written)."""
+    deck = get_deck(session, deck_id=deck_id, user_id=current_user.id)
+    if not deck:
+        return RedirectResponse(url="/decks", status_code=303)
+    result = add_names_to_watchlist(session, current_user.id, card_name)
+    return RedirectResponse(
+        url=f"/decks/{deck_id}?wl_added={result['added']}&wl_skipped={result['skipped']}",
+        status_code=303,
+    )
 
 
 @router.get("/decks/{deck_id}")

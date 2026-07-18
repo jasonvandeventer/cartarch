@@ -1,5 +1,24 @@
 {% extends "base.html" %}
 {% from "_macros.html" import inventory_card, mana_pips, editorial_eyebrow, img_fallback %}
+
+{# #144 — buy-list "add to wishlist" forms. Separate <form>s (never nested) so a
+   whole-section add and per-row adds coexist. Idempotent skip-duplicates
+   server-side; the button is always visible (touch-friendly, no hover gate). #}
+{% macro wishlist_all_form(deck, entries, csrf_token) %}
+  <form method="post" action="/decks/{{ deck.id }}/wishlist" class="brew-wishlist-form brew-wishlist-all">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    {% for e in entries %}<input type="hidden" name="card_name" value="{{ e.name }}">{% endfor %}
+    <button type="submit" class="brew-wishlist-btn" title="Add every card in this section to your wishlist">+ wishlist all</button>
+  </form>
+{% endmacro %}
+{% macro wishlist_row_form(deck, name, csrf_token) %}
+  <form method="post" action="/decks/{{ deck.id }}/wishlist" class="brew-wishlist-form brew-wishlist-row">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <input type="hidden" name="card_name" value="{{ name }}">
+    <button type="submit" class="brew-wishlist-btn" title="Add to wishlist">+ wishlist</button>
+  </form>
+{% endmacro %}
+
 {% block content %}
   <section class="panel hero-panel compact-hero">
     {% if deck %}
@@ -214,20 +233,34 @@
         <span>{{ bl.missing|length }} to buy</span>
         {% if bl.owned_elsewhere %}<span>{{ bl.owned_elsewhere|length }} in other decks</span>{% endif %}
       </div>
+      {# #144 — add-to-wishlist outcome banner (from the ?wl_added/?wl_skipped
+         redirect). The watchlist has no quantity, so adds are skip-duplicates. #}
+      {% set _wl_added = request.query_params.get('wl_added') %}
+      {% if _wl_added is not none %}
+        {% set _wl_skipped = request.query_params.get('wl_skipped') or '0' %}
+        <p class="brew-wishlist-banner">
+          Added {{ _wl_added }} card{{ '' if _wl_added == '1' else 's' }} to your
+          <a href="/watchlist">wishlist</a>{% if _wl_skipped != '0' %} ({{ _wl_skipped }} already on it){% endif %}.
+        </p>
+      {% endif %}
       {% if bl.missing or bl.partial or bl.owned_elsewhere %}
         {% if bl.missing %}
-          <h4 class="brew-buylist-sub">To buy ({{ bl.missing|length }})</h4>
+          <h4 class="brew-buylist-sub">To buy ({{ bl.missing|length }})
+            {{ wishlist_all_form(deck, bl.missing, csrf_token) }}
+          </h4>
           <ul class="brew-buylist-list">
             {% for e in bl.missing %}
-              <li><span class="brew-buylist-qty">{{ e.wanted }}×</span> {{ e.name }}</li>
+              <li><span class="brew-buylist-qty">{{ e.wanted }}×</span> {{ e.name }}{{ wishlist_row_form(deck, e.name, csrf_token) }}</li>
             {% endfor %}
           </ul>
         {% endif %}
         {% if bl.partial %}
-          <h4 class="brew-buylist-sub">Partially owned ({{ bl.partial|length }})</h4>
+          <h4 class="brew-buylist-sub">Partially owned ({{ bl.partial|length }})
+            {{ wishlist_all_form(deck, bl.partial, csrf_token) }}
+          </h4>
           <ul class="brew-buylist-list">
             {% for e in bl.partial %}
-              <li><span class="brew-buylist-qty">{{ e.wanted }}×</span> {{ e.name }} <span class="muted">— own {{ e.owned }} of {{ e.wanted }}</span></li>
+              <li><span class="brew-buylist-qty">{{ e.wanted }}×</span> {{ e.name }} <span class="muted">— own {{ e.owned }} of {{ e.wanted }}</span>{{ wishlist_row_form(deck, e.name, csrf_token) }}</li>
             {% endfor %}
           </ul>
         {% endif %}

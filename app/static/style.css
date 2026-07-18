@@ -14989,6 +14989,9 @@ body.gf-mode { overflow: hidden; }
   min-width: 0;
 }
 .brew-buylist-sub {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
   margin: 0.7rem 0 0.3rem;
   font-size: 0.85rem;
   font-weight: 700;
@@ -15004,11 +15007,49 @@ body.gf-mode { overflow: hidden; }
   gap: 0.25rem;
 }
 .brew-buylist-list li {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
   padding: 0.3rem 0.5rem;
   border-radius: 6px;
   background: var(--panel-2);
   color: var(--text);
   font-size: 0.92rem;
+}
+/* #144 — add-to-wishlist controls on the buy-list. Always visible (touch-
+   friendly). The per-row form pushes to the right; the section-level one sits
+   inline in the header. */
+.brew-wishlist-form {
+  display: inline;
+  margin: 0;
+}
+.brew-buylist-list li .brew-wishlist-row {
+  margin-left: auto;
+}
+.brew-wishlist-btn {
+  padding: 0.1rem 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--brand-gold, #c9a23b);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.brew-wishlist-btn:hover {
+  background: var(--panel);
+  border-color: var(--brand-gold, #c9a23b);
+}
+.brew-wishlist-banner {
+  margin: 0.4rem 0 0.6rem;
+  padding: 0.4rem 0.6rem;
+  border-radius: 6px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  font-size: 0.85rem;
 }
 .brew-buylist-qty {
   display: inline-block;
