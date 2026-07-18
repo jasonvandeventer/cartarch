@@ -1,5 +1,15 @@
 [
   {
+    "version": "4.11.29",
+    "date": "2026-07-18",
+    "added": [
+      "The goldfish playtester got a cleaner board. The battlefield is now two open zones — Battlefield up top for your permanents and a dedicated Lands zone below it — instead of the five auto-sorted boxes, so the table reads at a glance. The mana pool is now docked into the right rail (under Command) as a tidy stack of W/U/B/R/G/C rows rather than a floating widget, and the Command area gained a Cast counter with an automatic commander-tax readout (tax = 2 × times cast). Layout from a community mockup by SaintWacko."
+    ],
+    "refined": [],
+    "resolved": [],
+    "archivist_note": null
+  },
+  {
     "version": "4.11.28",
     "date": "2026-07-18",
     "added": [

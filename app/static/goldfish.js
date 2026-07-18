@@ -105,11 +105,8 @@
     deckName: "",
     library: [],
     hand: [],
-    bfCreatures: [],
+    bfMain: [],
     bfLands: [],
-    bfArtEnc: [],
-    bfPwBattle: [],
-    bfOther: [],
     graveyard: [],
     exile: [],
     command: [],
@@ -130,6 +127,9 @@
     manaPool: { W: 0, U: 0, B: 0, R: 0, G: 0, C: 0 },
     activeMenu: null,
     activeManaPicker: null,
+    // Commander cast counter (goldfish mockup rework). Session-only, like every
+    // other goldfish state field (no persistence). Commander tax = 2 × casts.
+    commanderCast: 0,
     activeCounterPanel: null, // v3.30.5 — { node, body, instId } when open
     libraryBrowseOpen: false,
     modalContext: null,
@@ -156,11 +156,8 @@
     state.library = [];
     state.command = [];
     state.hand = [];
-    state.bfCreatures = [];
+    state.bfMain = [];
     state.bfLands = [];
-    state.bfArtEnc = [];
-    state.bfPwBattle = [];
-    state.bfOther = [];
     state.graveyard = [];
     state.exile = [];
     state.instanceSeq = 1;
@@ -231,51 +228,30 @@
   const ZONE_LISTS = {
     library: () => state.library,
     hand: () => state.hand,
-    "bf-creatures": () => state.bfCreatures,
+    "bf-main": () => state.bfMain,
     "bf-lands": () => state.bfLands,
-    "bf-artenc": () => state.bfArtEnc,
-    "bf-pwbattle": () => state.bfPwBattle,
-    "bf-other": () => state.bfOther,
     graveyard: () => state.graveyard,
     exile: () => state.exile,
     command: () => state.command,
   };
 
-  const BATTLEFIELD_REGION_KEYS = new Set([
-    "bf-creatures",
-    "bf-lands",
-    "bf-artenc",
-    "bf-pwbattle",
-    "bf-other",
-  ]);
+  const BATTLEFIELD_REGION_KEYS = new Set(["bf-main", "bf-lands"]);
 
-  // v3.30.x — human labels for the five battlefield regions (B3 PART A).
-  // Drives the "Move to region…" sub-menu; the insertion order is the
-  // display order. Keys are BATTLEFIELD_REGION_KEYS members.
+  // Human labels for the two battlefield zones. Drives the "Move to
+  // region…" sub-menu; insertion order is display order.
   const REGION_LABELS = {
-    "bf-creatures": "Creatures",
+    "bf-main": "Battlefield",
     "bf-lands": "Lands",
-    "bf-artenc": "Artifacts & Enchantments",
-    "bf-pwbattle": "Planeswalkers & Battles",
-    "bf-other": "Other",
   };
 
   /**
-   * Classify a card into a battlefield region by type_line, strict
-   * priority Creature → Planeswalker/Battle → Artifact/Enchantment →
-   * Land → Other. First match wins. An artifact-creature returns
-   * "bf-creatures" (creature wins — the player's mental model in play).
-   * A mana rock returns "bf-artenc" — regions are by card *type*, not
-   * by function; the function-aware path needs the deferred
-   * Card.produced_mana migration.
+   * Classify a card into a battlefield zone: lands go to "bf-lands",
+   * everything else to "bf-main". Single land-vs-nonland split (matches
+   * the goldfish mockup) — uses the same kindOf() authority as row
+   * routing, so a creature-land (Dryad Arbor) lands with the lands.
    */
   function classifyRegion(card) {
-    const tl = ((card && card.type_line) || "").toLowerCase();
-    if (tl.includes("creature")) return "bf-creatures";
-    if (tl.includes("planeswalker") || tl.includes("battle")) return "bf-pwbattle";
-    if (tl.includes("artifact") || tl.includes("enchantment")) return "bf-artenc";
-    if (tl.includes("land")) return "bf-lands";
-    return "bf-other";
+    return kindOf(card) === "land" ? "bf-lands" : "bf-main";
   }
 
   function findInstance(id) {
@@ -456,13 +432,7 @@
   }
 
   function allBattlefieldInstances() {
-    return [
-      ...state.bfCreatures,
-      ...state.bfLands,
-      ...state.bfArtEnc,
-      ...state.bfPwBattle,
-      ...state.bfOther,
-    ];
+    return [...state.bfMain, ...state.bfLands];
   }
 
   function drawN(n) {
@@ -482,6 +452,7 @@
     // does NOT touch opponentLife.
     state.opponentLife = state.opponentStart;
     state.turn = 1;
+    state.commanderCast = 0;
     clearManaPool();
     drawN(7);
     refreshOpeningHandReadout();
@@ -695,11 +666,13 @@
     root.id = "gf-mana-pool";
     root.innerHTML =
       '<div class="gf-mp-head">' +
-      '  <span class="gf-mp-title">Mana pool</span>' +
-      '  <button type="button" class="gf-mp-clear" title="Clear pool">Clear</button>' +
+      '  <span class="gf-mp-title">Mana</span>' +
+      '  <button type="button" class="gf-mp-clear" title="Clear pool" aria-label="Clear pool">×</button>' +
       "</div>" +
       '<div class="gf-mp-pips" id="gf-mp-pips"></div>';
-    document.body.appendChild(root);
+    // Dock into the right rail (mockup layout) when present; fall back to a
+    // floating widget on any surface without the dock.
+    (document.getElementById("gf-mana-dock") || document.body).appendChild(root);
     document.getElementById("gf-mp-pips").innerHTML = MANA_COLORS.map(
       (c) =>
         '<div class="gf-mp-pip gf-mp-' +
@@ -737,6 +710,25 @@
       const el = document.getElementById("gf-mp-val-" + c);
       if (el) el.textContent = String(state.manaPool[c]);
     }
+  }
+
+  // Commander cast counter + tax (tax = 2 × casts, generic). Session-only.
+  function adjustCommanderCast(delta) {
+    state.commanderCast = Math.max(0, state.commanderCast + delta);
+    renderCommandCast();
+  }
+  function renderCommandCast() {
+    const val = document.getElementById("gf-cast-val");
+    if (val) val.textContent = String(state.commanderCast);
+    const tax = document.getElementById("gf-cast-tax");
+    if (tax) tax.textContent = "tax +" + state.commanderCast * 2;
+  }
+  function wireCommandCastControls() {
+    const dec = document.getElementById("gf-cast-dec");
+    const inc = document.getElementById("gf-cast-inc");
+    if (dec) dec.addEventListener("click", () => adjustCommanderCast(-1));
+    if (inc) inc.addEventListener("click", () => adjustCommanderCast(1));
+    renderCommandCast();
   }
 
   function openManaPicker(anchor, colors) {
@@ -843,14 +835,12 @@
     document.getElementById("gf-count-command").textContent = String(state.command.length);
 
     renderHand();
-    renderBattlefieldRegion("creatures", "bf-creatures", state.bfCreatures);
+    renderBattlefieldRegion("main", "bf-main", state.bfMain);
     renderBattlefieldRegion("lands", "bf-lands", state.bfLands);
-    renderBattlefieldRegion("artenc", "bf-artenc", state.bfArtEnc);
-    renderBattlefieldRegion("pwbattle", "bf-pwbattle", state.bfPwBattle);
-    renderBattlefieldRegion("other", "bf-other", state.bfOther);
     renderPile("graveyard", state.graveyard);
     renderPile("exile", state.exile);
     renderPile("command", state.command);
+    renderCommandCast();
   }
 
   function renderHand() {
@@ -1514,8 +1504,8 @@
 
   // Stamp a Loyalty/Defense counter on a permanent ENTERING the battlefield,
   // keyed off CARD TYPE (type_line), NOT region — so a non-planeswalker
-  // manually moved into bf-pwbattle never gets a Loyalty counter, and a
-  // planeswalker re-zoned to any region still carries one. STAMP-IF-ABSENT:
+  // manually moved between zones never gets a Loyalty counter, and a
+  // planeswalker re-zoned to any zone still carries one. STAMP-IF-ABSENT:
   // only set the counter when it is not already present, so a re-render,
   // tap, or any later manual +/- is never reset to the printed value
   // (manual edits are sacred). NULL / non-numeric → silently skip; the
@@ -1771,13 +1761,7 @@
    *  PW/Battle → Other). */
   function childrenOf(hostId) {
     const out = [];
-    const arrs = [
-      state.bfCreatures,
-      state.bfLands,
-      state.bfArtEnc,
-      state.bfPwBattle,
-      state.bfOther,
-    ];
+    const arrs = [state.bfMain, state.bfLands];
     for (const list of arrs) {
       for (const inst of list) {
         if (inst.attachedTo === hostId) out.push(inst);
@@ -1860,13 +1844,7 @@
     // (one-level rule).
     if (childrenOf(childInst.id).length > 0) return [];
     const out = [];
-    const arrs = [
-      state.bfCreatures,
-      state.bfLands,
-      state.bfArtEnc,
-      state.bfPwBattle,
-      state.bfOther,
-    ];
+    const arrs = [state.bfMain, state.bfLands];
     for (const list of arrs) {
       for (const host of list) {
         if (host.id === childInst.id) continue;
@@ -2056,23 +2034,13 @@
     if (!detected) return null;
     const spec = {
       name: detected.token_name,
-      // v3.30.10 — unknown-token fallback discipline. type_line drives
-      // classifyRegion's bucket; a missing value used to fall back to
-      // "Token Creature" (the v3.30.7 custom-token form's default), which
-      // ALWAYS routes to bf-creatures — that was exactly the v3.30.8 bug
-      // (Food/Treasure/Clue tokens landing in Creatures because the
-      // DeckTokenRequirement → TokenInventory join yielded null). With
-      // v3.30.10's panels-cache enrichment in app/routes/goldfish.py,
-      // the payload now usually CARRIES a real type_line ("Token Artifact
-      // — Food", etc.) so this fallback only fires for the residual case
-      // where neither a TokenInventory link nor a panels-cache hit
-      // exists. In that residual case, defaulting to "Token Creature" is
-      // a false assertion that re-creates the bug — better to be honest
-      // and let classifyRegion fall through to bf-other. The bare
-      // string "Token" matches no classifyRegion keyword (creature /
-      // planeswalker / battle / artifact / enchantment / land) so the
-      // classifier's final fallthrough → bf-other. Unknown tokens land
-      // in Other honestly rather than in Creatures falsely.
+      // Unknown-token fallback discipline. type_line drives classifyRegion's
+      // land-vs-nonland split; a missing value falls back to the bare string
+      // "Token" (NOT "Token Creature" — the panels-cache usually supplies a
+      // real type_line, and asserting Creature on the residual miss was the
+      // v3.30.8 bug). "Token" contains no "land", so classifyRegion routes it
+      // to the Battlefield zone (bf-main), which is the honest default for an
+      // unknown non-land permanent.
       typeLine: detected.type_line || "Token",
       // TokenInventory does not store P/T or colors today. Empty
       // strings → no P/T badge renders (v3.30.7's gating), no
@@ -2707,6 +2675,7 @@
 
   // ── Boot ──────────────────────────────────────────────────────
   buildManaPoolWidget();
+  wireCommandCastControls();
   newGame();
   // v3.30.8 — render the deck-token quick-add buttons from
   // payload.tokens. Runs after newGame() (which has no dependency

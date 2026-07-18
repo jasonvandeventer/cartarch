@@ -154,43 +154,22 @@
         </aside>
 
         <div class="gf-board-main">
-          {# v3.30.1 — five type-based battlefield regions. Auto-arranged via
-             classifyRegion(card.type_line) using the priority Creature →
-             Planeswalker/Battle → Artifact/Enchantment → Land → Other.
-             An artifact creature lands in Creatures (creature wins). A
-             mana rock stays in Artifacts & Enchantments — region is by
-             card *type*, not by function. Supersedes v3.30.0's 2-row
-             Lands/Permanents split. #}
+          {# Two-zone battlefield (goldfish mockup): non-lands → Battlefield,
+             lands → Lands, split by classifyRegion(card) via kindOf(). Zones
+             are referenced by id in goldfish.js, so the DOM arrangement is
+             free to change. #}
           <div class="gf-battlefield" id="gf-battlefield" data-zone-drop="battlefield">
-            <div class="gf-bf-region gf-bf-creatures"
-                 id="gf-region-creatures"
-                 data-region="creatures"
+            <div class="gf-bf-region gf-bf-main"
+                 id="gf-region-main"
+                 data-region="main"
                  data-zone-drop="battlefield">
-              <div class="gf-bf-region-label">Creatures</div>
+              <div class="gf-bf-region-label">Battlefield</div>
             </div>
             <div class="gf-bf-region gf-bf-lands"
                  id="gf-region-lands"
                  data-region="lands"
                  data-zone-drop="battlefield">
               <div class="gf-bf-region-label">Lands</div>
-            </div>
-            <div class="gf-bf-region gf-bf-artenc"
-                 id="gf-region-artenc"
-                 data-region="artenc"
-                 data-zone-drop="battlefield">
-              <div class="gf-bf-region-label">Artifacts &amp; Enchantments</div>
-            </div>
-            <div class="gf-bf-region gf-bf-pwbattle"
-                 id="gf-region-pwbattle"
-                 data-region="pwbattle"
-                 data-zone-drop="battlefield">
-              <div class="gf-bf-region-label">Planeswalkers &amp; Battles</div>
-            </div>
-            <div class="gf-bf-region gf-bf-other"
-                 id="gf-region-other"
-                 data-region="other"
-                 data-zone-drop="battlefield">
-              <div class="gf-bf-region-label">Other</div>
             </div>
           </div>
 
@@ -214,7 +193,18 @@
           <div class="gf-zone gf-zone-pile" data-zone="command">
             <div class="gf-zone-head"><span class="gf-zone-name">Command</span><span class="gf-zone-count" id="gf-count-command">0</span></div>
             <div class="gf-pile" id="gf-pile-command" data-zone-drop="command"></div>
+            {# Commander cast counter + tax (tax = 2 × casts). Session-only. #}
+            <div class="gf-cast">
+              <span class="gf-cast-label">Cast</span>
+              <button type="button" class="gf-cast-btn" id="gf-cast-dec" aria-label="Decrement commander casts">−</button>
+              <span class="gf-cast-val" id="gf-cast-val">0</span>
+              <button type="button" class="gf-cast-btn" id="gf-cast-inc" aria-label="Increment commander casts">+</button>
+              <span class="gf-cast-tax" id="gf-cast-tax">tax +0</span>
+            </div>
           </div>
+          {# Mana pool docks here (goldfish.js appends the widget into this
+             container; it floats bottom-right on surfaces without the dock). #}
+          <div class="gf-mana-dock" id="gf-mana-dock"></div>
         </aside>
       </div>
     </div>
