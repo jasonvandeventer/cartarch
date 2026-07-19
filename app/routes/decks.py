@@ -34,6 +34,7 @@ from app.deck_service import (
     DECK_GROUP_BY_OPTIONS,
     DECK_VIEW_MODES,
     add_auto_tags,
+    add_card_to_considering,
     assign_deck_variant_group,
     build_public_deck_view,
     bump_deck_row_quantity,
@@ -51,6 +52,7 @@ from app.deck_service import (
     deck_goal_stats,
     delete_deck,
     delete_deck_goal,
+    demote_to_considering,
     edit_deck_goal,
     extract_commander_themes,
     find_inventory_matches_for_deck_import,
@@ -65,6 +67,7 @@ from app.deck_service import (
     group_deck_items,
     grouped_card_search,
     inbound_shared_rows_for_deck,
+    list_considering_rows,
     list_decks,
     list_user_printings_for_card,
     list_variant_groups,
@@ -72,7 +75,9 @@ from app.deck_service import (
     move_deck_goal,
     outbound_share_map,
     own_deck_card_options,
+    promote_from_considering,
     pull_card_to_deck,
+    remove_from_considering,
     resolve_add_printing,
     resolved_deck_rows,
     return_card_from_deck,
@@ -100,6 +105,7 @@ from app.inventory_service import (
     apply_collection_search_filters,
     bulk_delete_inventory_rows,
     get_location_label,
+    get_or_create_card,
     list_inventory_rows,
     move_inventory_row_to_location,
     resort_collection,
@@ -850,12 +856,19 @@ def deck_detail_page(
     # this page just renders the unified list + per-card Unshare. Export still
     # reads `get_inbound_shares_for_deck` directly (a separate seam).
 
+    # #148 — the Considering holding area (own separate location; excluded from the
+    # deck's own rows/counts/stats by construction).
+    _considering_groups, _considering_total = (
+        _build_considering_items(session, deck, current_user.id) if deck else ([], 0)
+    )
     return render(
         request,
         "deck_detail.html",
         {
             "title": deck.name if deck else "Deck",
             "deck": deck,
+            "considering_groups": _considering_groups,
+            "considering_total": _considering_total,
             "variant_group": deck.variant_group if deck else None,
             "variant_siblings": variant_siblings,
             "brew_buylist": brew_buylist,
@@ -1616,6 +1629,174 @@ async def decks_add_card(
             response.headers["X-Add-Resolution"] = json.dumps(toast)
         return response
 
+    return RedirectResponse(url=f"/decks/{deck_id}", status_code=303)
+
+
+# --------------------------------------------------------------------------- #
+# #148 — the "Considering" holding area (rendered below the deck card list)
+# --------------------------------------------------------------------------- #
+
+_CONSIDERING_TYPE_ORDER = [
+    "Creature",
+    "Instant",
+    "Sorcery",
+    "Artifact",
+    "Enchantment",
+    "Planeswalker",
+    "Battle",
+    "Land",
+    "Other",
+]
+
+
+def _considering_type_group(card) -> str:
+    """Coarse card-type bucket for grouping the Considering list (the type word(s)
+    before the em-dash — same idea as the deck rollup, kept simple/self-contained)."""
+    tl = (getattr(card, "type_line", "") or "").split("—")[0].split("//")[0].lower()
+    for t in (
+        "creature",
+        "instant",
+        "sorcery",
+        "artifact",
+        "enchantment",
+        "planeswalker",
+        "battle",
+        "land",
+    ):
+        if t in tl:
+            return t.capitalize()
+    return "Other"
+
+
+def _build_considering_items(session, deck, user_id):
+    """(grouped_items, total_qty) for the Considering section. Each item carries
+    the row, card, quantity, and is_proxy (the ownership signal: proxy = a
+    placeholder for a card you don't own, real = an owned copy staged here)."""
+    rows = list_considering_rows(session, deck, user_id)
+    groups: dict[str, list] = {}
+    total = 0
+    for r in rows:
+        total += r.quantity
+        item = {"row": r, "card": r.card, "quantity": r.quantity, "is_proxy": r.is_proxy}
+        groups.setdefault(_considering_type_group(r.card), []).append(item)
+    ordered = [
+        (g, sorted(groups[g], key=lambda i: (i["card"].name or "").lower()))
+        for g in _CONSIDERING_TYPE_ORDER
+        if g in groups
+    ]
+    return ordered, total
+
+
+def _considering_section_response(request: Request, session, current_user, deck) -> HTMLResponse:
+    ordered, total = _build_considering_items(session, deck, current_user.id)
+    return render(
+        request,
+        "_considering_section.html",
+        {"deck": deck, "considering_groups": ordered, "considering_total": total},
+    )
+
+
+@router.post("/decks/{deck_id}/considering/add")
+async def decks_considering_add(
+    request: Request,
+    deck_id: int,
+    scryfall_id: str = Form(""),
+    card_name: str = Form(""),
+    finish: str = Form("normal"),
+    quantity: int = Form(1),
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+    _: None = CsrfRequired,
+):
+    """Add a card to the deck's Considering area. Owned copies are pulled in; on a
+    brew deck an unowned card becomes a placeholder; on a non-brew deck an unowned
+    add is refused (scope #148). HTMX → the re-rendered section; else 303."""
+    deck = get_deck(session, deck_id=deck_id, user_id=current_user.id)
+    if not deck:
+        raise HTTPException(status_code=404, detail="Deck not found")
+
+    scryfall_id = scryfall_id.strip()
+    finish_normalized = normalize_finish(finish)
+    quantity = max(1, min(int(quantity), 99))
+    if not scryfall_id and card_name.strip():
+        resolution = resolve_add_printing(
+            session,
+            user_id=current_user.id,
+            deck=deck,
+            name=card_name.strip(),
+            finish=finish_normalized,
+        )
+        if not resolution:
+            raise HTTPException(status_code=404, detail="Card not found")
+        scryfall_id = resolution["scryfall_id"]
+        finish_normalized = resolution["finish"]
+    if not scryfall_id:
+        raise HTTPException(status_code=400, detail="scryfall_id or card_name is required")
+
+    card = get_or_create_card(session, scryfall_id)
+    if not card:
+        raise HTTPException(status_code=404, detail="Card not found")
+
+    result = add_card_to_considering(
+        session, current_user.id, deck.id, card.id, finish_normalized, quantity
+    )
+    if request.headers.get("HX-Request"):
+        response = _considering_section_response(request, session, current_user, deck)
+        if result == "not_owned":
+            response.headers["X-Considering-Msg"] = json.dumps(
+                "You don't own that card — mark this deck as a brew to stage unowned cards."
+            )
+        return response
+    return RedirectResponse(url=f"/decks/{deck_id}", status_code=303)
+
+
+@router.post("/decks/{deck_id}/considering/{row_id}/promote")
+async def decks_considering_promote(
+    request: Request,
+    deck_id: int,
+    row_id: int,
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+    _: None = CsrfRequired,
+):
+    """Promote a Considering row into the deck's main list. Crosses zones (both the
+    deck list and the section change) so it does a full 303 re-render."""
+    promote_from_considering(session, current_user.id, row_id)
+    return RedirectResponse(url=f"/decks/{deck_id}", status_code=303)
+
+
+@router.post("/decks/{deck_id}/considering/{row_id}/remove")
+async def decks_considering_remove(
+    request: Request,
+    deck_id: int,
+    row_id: int,
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+    _: None = CsrfRequired,
+):
+    """Remove a row from Considering (placeholder discarded, real returned to
+    collection). HTMX → the re-rendered section; else 303."""
+    remove_from_considering(session, current_user.id, row_id)
+    if request.headers.get("HX-Request"):
+        deck = get_deck(session, deck_id=deck_id, user_id=current_user.id)
+        if not deck:
+            raise HTTPException(status_code=404, detail="Deck not found")
+        return _considering_section_response(request, session, current_user, deck)
+    return RedirectResponse(url=f"/decks/{deck_id}", status_code=303)
+
+
+@router.post("/decks/{deck_id}/rows/{row_id}/demote")
+async def decks_row_demote(
+    request: Request,
+    deck_id: int,
+    row_id: int,
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+    _: None = CsrfRequired,
+):
+    """Demote a deck main-list row into the deck's Considering area (full 303
+    re-render — both the deck list and the section change)."""
+    demote_to_considering(session, current_user.id, row_id)
     return RedirectResponse(url=f"/decks/{deck_id}", status_code=303)
 
 

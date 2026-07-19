@@ -1,0 +1,63 @@
+{# #148 — the deck's "Considering" holding area. Rendered below the deck card
+   list on deck_detail.html and returned standalone by the considering add/remove
+   HTMX endpoints (root id = hx-target). Cards here are SEPARATE from the deck:
+   they never count toward deck size / stats / legality / goldfish / exports /
+   the public share page (they live in a different StorageLocation). #}
+<section id="considering-section" class="panel considering-section">
+  <details class="considering-details"{% if considering_total %} open{% endif %}>
+    <summary class="considering-summary">
+      <span class="deck-detail-section-mark">§</span>
+      Considering
+      <span class="considering-count">({{ considering_total }})</span>
+    </summary>
+
+    {% if considering_groups %}
+      <p class="muted small-text considering-hint">
+        A holding area for cards you're evaluating — kept out of the deck's counts,
+        stats, exports, and share page until you promote them.
+      </p>
+      {% for group_name, group_items in considering_groups %}
+        <div class="considering-group">
+          <h4 class="considering-group-title">{{ group_name }} ({{ group_items | length }})</h4>
+          <ul class="considering-list">
+            {% for item in group_items %}
+              <li class="considering-row">
+                <span class="considering-card-name">
+                  <a href="/cards/{{ item.card.id }}">{{ item.card.name }}</a>
+                  {% if item.quantity > 1 %}<span class="muted">×{{ item.quantity }}</span>{% endif %}
+                  {% if item.card.set_code %}
+                    <span class="muted small-text">{{ item.card.set_code | upper }}{% if item.card.collector_number %} #{{ item.card.collector_number }}{% endif %}</span>
+                  {% endif %}
+                </span>
+                {% if item.is_proxy %}
+                  <span class="considering-badge considering-badge-unowned" title="You don't own this card">Placeholder</span>
+                {% else %}
+                  <span class="considering-badge considering-badge-owned" title="You own this card">Owned</span>
+                {% endif %}
+                <span class="considering-row-actions">
+                  <form method="post" action="/decks/{{ deck.id }}/considering/{{ item.row.id }}/promote" class="considering-inline-form">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                    <button type="submit" class="considering-btn considering-btn-promote" title="Move into the deck">→ Deck</button>
+                  </form>
+                  <form method="post" action="/decks/{{ deck.id }}/considering/{{ item.row.id }}/remove"
+                        class="considering-inline-form"
+                        hx-post="/decks/{{ deck.id }}/considering/{{ item.row.id }}/remove"
+                        hx-target="#considering-section"
+                        hx-swap="outerHTML">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                    <button type="submit" class="considering-btn considering-btn-remove" title="Remove from Considering">✕</button>
+                  </form>
+                </span>
+              </li>
+            {% endfor %}
+          </ul>
+        </div>
+      {% endfor %}
+    {% else %}
+      <p class="muted considering-empty">
+        Nothing here yet. Use <strong>+ Considering</strong> in the Add panel above to stage
+        cards you're evaluating{% if not deck.is_brew %} (you must own them — mark this deck as a brew to stage unowned cards){% endif %}.
+      </p>
+    {% endif %}
+  </details>
+</section>

@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session, joinedload
 from app.models import Deck, InventoryRow, StorageLocation
 from app.pricing import effective_price
 
-VALID_LOCATION_TYPES = {"root", "drawer", "binder", "box", "deck", "other"}
+VALID_LOCATION_TYPES = {"root", "drawer", "binder", "box", "deck", "considering", "other"}
 
 # v3.26.2 — per-location sorter modes. Validated at this layer (matches the
 # existing VALID_LOCATION_TYPES pattern; no DB-level CHECK constraint).
@@ -51,10 +51,16 @@ def is_sortable_source(location: StorageLocation) -> bool:
 
 
 def list_locations(session: Session, user_id: int) -> list[StorageLocation]:
+    # #148 — "considering" locations are per-deck internal holding areas, managed
+    # only via the deck's Considering section (not the Locations page or any
+    # move-destination dropdown). Excluding them here keeps them out of every
+    # list_locations consumer in one place (they never appear as a move target,
+    # so a card can't be manually moved into/out of Considering, bypassing the
+    # promote/demote flow and the #140 placeholder guard).
     return (
         session.query(StorageLocation)
         .options(joinedload(StorageLocation.parent))
-        .filter(StorageLocation.user_id == user_id)
+        .filter(StorageLocation.user_id == user_id, StorageLocation.type != "considering")
         .order_by(
             StorageLocation.parent_id.nullsfirst(), StorageLocation.sort_order, StorageLocation.name
         )

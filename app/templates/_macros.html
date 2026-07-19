@@ -153,8 +153,14 @@ onerror="this.onerror=null; this.src='{{ scryfall_image_fallback(scryfall_id, si
                 <button type="submit">Remove from Deck</button>
               {% endif %}
             </form>
+            {# #148 — move this card to the deck's Considering area (out of the deck
+               proper, but still attached to it for evaluation). #}
+            <form action="/decks/{{ deck.id }}/rows/{{ item.id }}/demote" method="post" class="inline-form">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+              <button type="submit" title="Move to this deck's Considering area">Move to Considering</button>
+            </form>
             {% if locations %}
-              {% set storage_locs = locations | selectattr("type", "ne", "root") | rejectattr("type", "equalto", "deck") | list %}
+              {% set storage_locs = locations | selectattr("type", "ne", "root") | rejectattr("type", "equalto", "deck") | rejectattr("type", "equalto", "considering") | list %}
               {% set deck_locs = locations | selectattr("type", "equalto", "deck") | rejectattr("id", "equalto", deck.storage_location_id) | list %}
               {% if storage_locs or deck_locs %}
                 <form action="/inventory/rows/{{ item.id }}/move"

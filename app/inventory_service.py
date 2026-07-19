@@ -7,7 +7,7 @@ from collections.abc import Iterable
 from datetime import datetime, timedelta
 
 from sqlalchemy import Float as SAFloat
-from sqlalchemy import and_, case, cast, func, not_, or_, select, text, tuple_
+from sqlalchemy import and_, case, cast, func, not_, or_, select, text, tuple_, union
 from sqlalchemy.orm import Session, joinedload
 
 from app import sort_spec
@@ -1422,15 +1422,24 @@ def get_collection_facet_counts(
 
 
 def brew_deck_location_ids_subquery(user_id: int):
-    """Scalar subquery of ``storage_location_id``s belonging to the user's
-    BREW decks. A brew placeholder is an ``is_proxy`` row whose location is in
-    here (#140)."""
+    """Subquery of location ids belonging to the user's BREW decks — BOTH the
+    deck's own location AND its Considering location (#148). A brew placeholder is
+    an ``is_proxy`` row whose location is in here (#140); a brew's Considering
+    placeholders live in the considering location, so they must be covered too, or
+    they would leak into the collection as real cards."""
     from app.models import Deck
 
-    return select(Deck.storage_location_id).where(
-        Deck.user_id == user_id,
-        Deck.is_brew.is_(True),
-        Deck.storage_location_id.isnot(None),
+    return union(
+        select(Deck.storage_location_id.label("loc_id")).where(
+            Deck.user_id == user_id,
+            Deck.is_brew.is_(True),
+            Deck.storage_location_id.isnot(None),
+        ),
+        select(Deck.considering_location_id.label("loc_id")).where(
+            Deck.user_id == user_id,
+            Deck.is_brew.is_(True),
+            Deck.considering_location_id.isnot(None),
+        ),
     )
 
 
@@ -1458,7 +1467,12 @@ def is_brew_placeholder_row(session: Session, row: InventoryRow) -> bool:
         .filter(
             Deck.user_id == row.user_id,
             Deck.is_brew.is_(True),
-            Deck.storage_location_id == row.storage_location_id,
+            or_(
+                Deck.storage_location_id == row.storage_location_id,
+                # #148 — a placeholder in a brew's Considering location is just as
+                # much an unowned card; it must not be movable out to the collection.
+                Deck.considering_location_id == row.storage_location_id,
+            ),
         )
         .first()
         is not None

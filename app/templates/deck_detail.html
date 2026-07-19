@@ -669,6 +669,14 @@
              aria-live="polite"></div>
         <div class="add-card-actions">
           <button type="submit" id="deck-add-submit" class="add-card-submit" disabled>Add</button>
+          {# #148 — same resolved card, into the Considering area instead of the deck.
+             Own hx-post/target; includes this form's fields; enabled in lockstep. #}
+          <button type="button" id="deck-add-considering-submit" class="add-card-submit add-card-submit-secondary"
+                  hx-post="/decks/{{ deck.id }}/considering/add"
+                  hx-include="#deck-add-card-form"
+                  hx-target="#considering-section"
+                  hx-swap="outerHTML"
+                  disabled>+ Considering</button>
           <span id="deck-add-status" class="muted small-text" aria-live="polite"></span>
         </div>
       </form>
@@ -810,6 +818,9 @@
           </section>
         {% endif %}
       </div>
+      {# #148 — the Considering holding area, rendered below the deck's own card
+         list (both view modes). Its own hx-target for in-place add/remove. #}
+      {% include "_considering_section.html" %}
       <div id="deck-lazy-panels" class="lazy-loading-panels">
         <div class="lazy-loading">Loading panels…</div>
       </div>
@@ -1103,7 +1114,10 @@
         var qtyInput = document.getElementById('deck-add-qty');
         var resultsEl = document.getElementById('deck-add-results');
         var submitBtn = document.getElementById('deck-add-submit');
+        var considerBtn = document.getElementById('deck-add-considering-submit');  // #148
         var statusEl = document.getElementById('deck-add-status');
+        // #148 — keep the "+ Considering" button enabled in lockstep with Add.
+        function syncAddButtons() { if (considerBtn) considerBtn.disabled = submitBtn.disabled; }
         var acTimer = null;
         var lastQuery = '';
         // #53: monotonic generation guard for the autocomplete fetch. Duplicated
@@ -1114,6 +1128,7 @@
           hiddenId.value = '';
           hiddenName.value = '';
           submitBtn.disabled = true;
+          syncAddButtons();
           form.dataset.selectedPrinting = '';
           searchToken++;  // #53: discard any in-flight autocomplete response
         }
@@ -1126,6 +1141,7 @@
             ' (' + (card.set_code || '').toUpperCase() +
             ' #' + (card.collector_number || '') + ')';
           submitBtn.disabled = !hiddenId.value;
+          syncAddButtons();
           form.dataset.selectedPrinting = '1';
           resultsEl.innerHTML = '';
           statusEl.textContent = '';
@@ -1139,6 +1155,7 @@
           hiddenId.value = '';
           nameInput.value = item.name || '';
           submitBtn.disabled = !hiddenName.value;
+          syncAddButtons();
           form.dataset.selectedPrinting = '1';
           resultsEl.innerHTML = '';
           statusEl.textContent = '';

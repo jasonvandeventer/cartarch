@@ -3714,7 +3714,9 @@ def _get_loose_source_rows(
             InventoryRow.quantity > 0,
             or_(
                 InventoryRow.storage_location_id.is_(None),
-                StorageLocation.type != "deck",
+                # #148 — a deck's Considering row is committed to that deck's
+                # evaluation, NOT loose/consumable (same reason a deck row isn't).
+                StorageLocation.type.notin_(("deck", "considering")),
             ),
         )
         .with_for_update(of=InventoryRow)
@@ -4388,6 +4390,367 @@ def return_card_from_deck(
     return True
 
 
+# --------------------------------------------------------------------------- #
+# #148 — the deck "Considering" holding area (a dedicated per-deck location)
+# --------------------------------------------------------------------------- #
+
+CONSIDERING_LOCATION_TYPE = "considering"
+
+
+def get_or_create_considering_location(session: Session, deck: Deck) -> StorageLocation:
+    """The deck's "Considering" StorageLocation, lazily created on first use.
+
+    ``type="considering"`` (so it is never treated as a deck or a normal
+    collection location) and ``mode="manual"`` (NOT a sortable source, so the
+    drawer sorter never scoops owned reals back out of it — the same reason the
+    Bulk location is manual)."""
+    if deck.considering_location_id:
+        loc = session.get(StorageLocation, deck.considering_location_id)
+        if loc is not None:
+            return loc
+    loc = StorageLocation(
+        user_id=deck.user_id,
+        name=f"{deck.name} · Considering",
+        type=CONSIDERING_LOCATION_TYPE,
+        mode="manual",
+    )
+    session.add(loc)
+    session.flush()
+    deck.considering_location_id = loc.id
+    return loc
+
+
+def list_considering_rows(session: Session, deck: Deck, user_id: int) -> list[InventoryRow]:
+    """Placed rows in the deck's Considering area ([] if none/never created)."""
+    if not deck.considering_location_id:
+        return []
+    return (
+        session.query(InventoryRow)
+        .options(joinedload(InventoryRow.card))
+        .filter(
+            InventoryRow.user_id == user_id,
+            InventoryRow.storage_location_id == deck.considering_location_id,
+            InventoryRow.is_pending.is_(False),
+        )
+        .all()
+    )
+
+
+def considering_count(session: Session, deck: Deck, user_id: int) -> int:
+    """Total quantity in the deck's Considering area (0 if none)."""
+    if not deck.considering_location_id:
+        return 0
+    total = (
+        session.query(func.coalesce(func.sum(InventoryRow.quantity), 0))
+        .filter(
+            InventoryRow.user_id == user_id,
+            InventoryRow.storage_location_id == deck.considering_location_id,
+            InventoryRow.is_pending.is_(False),
+        )
+        .scalar()
+    )
+    return int(total or 0)
+
+
+def _considering_row_of(
+    session: Session, location_id: int, user_id: int, card_id: int, finish: str, *, is_proxy: bool
+):
+    return (
+        session.query(InventoryRow)
+        .filter(
+            InventoryRow.user_id == user_id,
+            InventoryRow.storage_location_id == location_id,
+            InventoryRow.card_id == card_id,
+            InventoryRow.finish == finish,
+            InventoryRow.is_proxy.is_(is_proxy),
+            InventoryRow.is_pending.is_(False),
+        )
+        .first()
+    )
+
+
+def _consume_loose_real(
+    session: Session, user_id: int, card_id: int, finish: str, quantity: int
+) -> int:
+    """Consume up to ``quantity`` owned REAL (non-proxy) loose copies of a printing.
+
+    Loose = pending or a non-deck/non-considering location (``_get_loose_source_rows``
+    already excludes both). Deletes a source row that hits 0 (FK-safe). Returns the
+    number of copies actually consumed."""
+    from app.inventory_service import clean_inventory_row_references
+
+    need = quantity
+    for r in _get_loose_source_rows(session, user_id, card_id, finish):
+        if need <= 0:
+            break
+        if r.is_proxy:
+            continue  # a physical proxy is not an "owned real" copy for this purpose
+        take = min(need, r.quantity)
+        r.quantity -= take
+        need -= take
+        if r.quantity <= 0:
+            clean_inventory_row_references(session, [r.id])
+            session.delete(r)
+        else:
+            r.updated_at = utc_now()
+    return quantity - need
+
+
+def _place_into_considering(
+    session: Session,
+    considering: StorageLocation,
+    card_id: int,
+    finish: str,
+    quantity: int,
+    *,
+    is_proxy: bool,
+) -> InventoryRow:
+    """Increment or create a considering row of the given proxy-state."""
+    row = _considering_row_of(
+        session, considering.id, considering.user_id, card_id, finish, is_proxy=is_proxy
+    )
+    if row is not None:
+        row.quantity += quantity
+        row.updated_at = utc_now()
+        return row
+    row = InventoryRow(
+        user_id=considering.user_id,
+        card_id=card_id,
+        storage_location_id=considering.id,
+        finish=finish,
+        quantity=quantity,
+        is_proxy=is_proxy,
+        is_pending=False,
+    )
+    session.add(row)
+    session.flush()
+    return row
+
+
+def add_card_to_considering(
+    session: Session,
+    user_id: int,
+    deck_id: int,
+    card_id: int,
+    finish: str = "normal",
+    quantity: int = 1,
+) -> bool | str:
+    """Add a card to a deck's Considering area.
+
+    Owned real loose copies are pulled in (real considering row). Any shortfall
+    is a placeholder — but ONLY on a brew deck (scope decision #148: placeholders
+    are brew-only). On a non-brew deck a shortfall with no owned copy is refused.
+
+    Returns True on success, or a string reason: "no_deck", "bad_quantity",
+    "not_owned" (non-brew, nothing owned to add)."""
+    if quantity < 1:
+        return "bad_quantity"
+    deck = get_deck(session, deck_id=deck_id, user_id=user_id)
+    if not deck:
+        return "no_deck"
+
+    owned = _consume_loose_real(session, user_id, card_id, finish, quantity)
+    shortfall = quantity - owned
+    if owned == 0 and shortfall > 0 and not deck.is_brew:
+        return "not_owned"  # nothing owned + can't placeholder on a non-brew deck
+
+    considering = get_or_create_considering_location(session, deck)
+    if owned > 0:
+        _place_into_considering(session, considering, card_id, finish, owned, is_proxy=False)
+        log_transaction(
+            session=session,
+            user_id=user_id,
+            event_type="add_to_considering",
+            card_id=card_id,
+            finish=finish,
+            quantity_delta=owned,
+            source_location="collection",
+            destination_location=f"considering:{deck.name}",
+            note=f"Added {owned} owned to Considering of deck {deck.name}",
+            flush=False,
+        )
+    if shortfall > 0 and deck.is_brew:
+        _place_into_considering(session, considering, card_id, finish, shortfall, is_proxy=True)
+        log_transaction(
+            session=session,
+            user_id=user_id,
+            event_type="add_to_considering",
+            card_id=card_id,
+            finish=finish,
+            quantity_delta=0,
+            source_location=None,
+            destination_location=f"considering:{deck.name}",
+            note=f"Added {shortfall} placeholder(s) to Considering of brew {deck.name}",
+            flush=False,
+        )
+    session.commit()
+    return True
+
+
+def _move_row_to_location_merged(
+    session: Session, row: InventoryRow, target_location_id: int
+) -> InventoryRow:
+    """Move ``row`` to ``target_location_id``; if a placed row of the same
+    ``(card_id, finish, is_proxy)`` already lives there, merge into it and delete
+    ``row`` (FK-safe). Used for promote/demote between a deck's main + considering
+    locations — a direct reassignment that bypasses the collection move guard,
+    since the row stays within the same deck's world."""
+    existing = (
+        session.query(InventoryRow)
+        .filter(
+            InventoryRow.user_id == row.user_id,
+            InventoryRow.card_id == row.card_id,
+            InventoryRow.finish == row.finish,
+            InventoryRow.is_proxy.is_(row.is_proxy),
+            InventoryRow.storage_location_id == target_location_id,
+            InventoryRow.is_pending.is_(False),
+            InventoryRow.id != row.id,
+        )
+        .first()
+    )
+    if existing is not None:
+        from app.inventory_service import clean_inventory_row_references
+
+        existing.quantity += row.quantity
+        existing.updated_at = utc_now()
+        clean_inventory_row_references(session, [row.id])
+        session.delete(row)
+        return existing
+    row.storage_location_id = target_location_id
+    row.drawer = None
+    row.slot = None
+    row.is_pending = False
+    row.updated_at = utc_now()
+    return row
+
+
+def promote_from_considering(session: Session, user_id: int, row_id: int) -> bool:
+    """Move a Considering row into the deck's main list (merge-aware)."""
+    row = (
+        session.query(InventoryRow)
+        .filter(InventoryRow.id == row_id, InventoryRow.user_id == user_id)
+        .first()
+    )
+    if not row or not row.storage_location_id:
+        return False
+    deck = (
+        session.query(Deck)
+        .filter(Deck.user_id == user_id, Deck.considering_location_id == row.storage_location_id)
+        .first()
+    )
+    if not deck or not deck.storage_location_id:
+        return False
+    _move_row_to_location_merged(session, row, deck.storage_location_id)
+    log_transaction(
+        session=session,
+        user_id=user_id,
+        event_type="promote_from_considering",
+        card_id=row.card_id,
+        finish=row.finish,
+        quantity_delta=0,
+        source_location=f"considering:{deck.name}",
+        destination_location=f"deck:{deck.name}",
+        note=f"Promoted from Considering into deck {deck.name}",
+        flush=False,
+    )
+    session.commit()
+    return True
+
+
+def demote_to_considering(session: Session, user_id: int, row_id: int) -> bool:
+    """Move a deck main-list row into the deck's Considering area (merge-aware)."""
+    row = (
+        session.query(InventoryRow)
+        .filter(InventoryRow.id == row_id, InventoryRow.user_id == user_id)
+        .first()
+    )
+    if not row or not row.storage_location_id:
+        return False
+    deck = (
+        session.query(Deck)
+        .filter(Deck.user_id == user_id, Deck.storage_location_id == row.storage_location_id)
+        .first()
+    )
+    if not deck:
+        return False
+    considering = get_or_create_considering_location(session, deck)
+    row.role = None  # considering is not the deck — a demoted commander loses the role
+    _move_row_to_location_merged(session, row, considering.id)
+    log_transaction(
+        session=session,
+        user_id=user_id,
+        event_type="demote_to_considering",
+        card_id=row.card_id,
+        finish=row.finish,
+        quantity_delta=0,
+        source_location=f"deck:{deck.name}",
+        destination_location=f"considering:{deck.name}",
+        note=f"Demoted from deck {deck.name} to Considering",
+        flush=False,
+    )
+    session.commit()
+    return True
+
+
+def _disband_considering_rows(
+    session: Session, user_id: int, deck: Deck, rows: list[InventoryRow]
+) -> None:
+    """Disband Considering rows (shared by remove-one + delete_deck): a brew
+    placeholder (proxy in a brew) is DISCARDED (FK-safe); a real row RETURNS to
+    the collection as pending. Mirrors return_card_from_deck / delete_deck's
+    "disband, not destroy" rule. Caller commits."""
+    from app.inventory_service import clean_inventory_row_references
+
+    discard_ids = [r.id for r in rows if r.is_proxy and deck.is_brew]
+    if discard_ids:
+        clean_inventory_row_references(session, discard_ids)
+    for row in rows:
+        if row.is_proxy and deck.is_brew:
+            delete_shares_for_inventory_row(session, row.id)
+            session.delete(row)
+            continue
+        row.storage_location_id = None
+        row.is_pending = True
+        row.drawer = None
+        row.slot = None
+        row.updated_at = utc_now()
+        log_transaction(
+            session=session,
+            user_id=user_id,
+            event_type="return_from_deck",
+            card_id=row.card_id,
+            finish=row.finish,
+            quantity_delta=row.quantity,
+            source_location=f"considering:{deck.name}",
+            destination_location="collection",
+            inventory_row_id=row.id,
+            note=f"Returned to collection from Considering of deck {deck.name}",
+            flush=False,
+        )
+
+
+def remove_from_considering(session: Session, user_id: int, row_id: int) -> bool:
+    """Remove one row from a deck's Considering area (disband rules)."""
+    row = (
+        session.query(InventoryRow)
+        .options(joinedload(InventoryRow.card))
+        .filter(InventoryRow.id == row_id, InventoryRow.user_id == user_id)
+        .first()
+    )
+    if not row or not row.storage_location_id:
+        return False
+    deck = (
+        session.query(Deck)
+        .filter(Deck.user_id == user_id, Deck.considering_location_id == row.storage_location_id)
+        .first()
+    )
+    if not deck:
+        return False
+    _disband_considering_rows(session, user_id, deck, [row])
+    session.commit()
+    return True
+
+
 def delete_deck(session: Session, deck_id: int, user_id: int, *, commit: bool = True) -> bool:
     deck = get_deck(session, deck_id=deck_id, user_id=user_id)
     if not deck:
@@ -4518,6 +4881,23 @@ def delete_deck(session: Session, deck_id: int, user_id: int, *, commit: bool = 
 
         if location:
             session.delete(location)
+
+    # #148 — disband the Considering area the same way (placeholders discarded,
+    # real rows returned to pending) and drop its location.
+    if deck.considering_location_id:
+        considering_rows = (
+            session.query(InventoryRow)
+            .filter(
+                InventoryRow.user_id == user_id,
+                InventoryRow.storage_location_id == deck.considering_location_id,
+            )
+            .all()
+        )
+        _disband_considering_rows(session, user_id, deck, considering_rows)
+        considering_loc = session.get(StorageLocation, deck.considering_location_id)
+        deck.considering_location_id = None  # clear the FK before the location goes
+        if considering_loc is not None and considering_loc.user_id == user_id:
+            session.delete(considering_loc)
 
     # Delete the deck
     session.delete(deck)

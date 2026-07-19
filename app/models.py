@@ -386,8 +386,25 @@ class Deck(Base):
     # generating one publishes, clearing it (revoke) invalidates the link
     # immediately. Nullable + UNIQUE so a token maps to exactly one deck.
     share_token: Mapped[str | None] = mapped_column(String(64), nullable=True, unique=True)
+    # #148 — the deck's optional "Considering" holding area: a dedicated per-deck
+    # StorageLocation (type="considering") for cards being evaluated while brewing,
+    # SEPARATE from the deck proper. Lazily created on first add
+    # (get_or_create_considering_location). NULL = no considering area yet. Because
+    # considering rows live in THIS location — NOT deck.storage_location_id — every
+    # "cards in this deck" query auto-EXCLUDES them (counts / stats / legality /
+    # goldfish / exports / public share): considering is opt-IN per surface, the
+    # safe default given there is no single deck-cards choke-point. ondelete="SET
+    # NULL" documents v4 intent; SQLite doesn't enforce it, so delete_deck disbands
+    # the considering rows and drops the location explicitly.
+    considering_location_id: Mapped[int | None] = mapped_column(
+        ForeignKey("storage_locations.id", ondelete="SET NULL"), nullable=True, index=True
+    )
 
-    storage_location: Mapped[StorageLocation | None] = relationship()
+    # Two FKs from decks -> storage_locations (storage_location_id +
+    # considering_location_id, #148), so this relationship must name its FK.
+    storage_location: Mapped[StorageLocation | None] = relationship(
+        foreign_keys=[storage_location_id]
+    )
     user: Mapped[User] = relationship(back_populates="decks")
     variant_group: Mapped[VariantGroup | None] = relationship(back_populates="decks")
     # issue #46 — per-deck goals (custom ordered "what this deck is trying to
