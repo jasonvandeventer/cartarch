@@ -1,5 +1,15 @@
 [
   {
+    "version": "4.11.31",
+    "date": "2026-07-18",
+    "added": [
+      "Decks now have a \"Considering\" section — a holding area for cards you're weighing while you brew, kept separate from the deck itself. Stage cards you own, or (on a brew) unowned placeholders, see at a glance which you already have, and promote a card into the deck or set it aside with one click. Considering cards never count toward your deck's size, stats, legality, exports, the playtester, or its public share page until you promote them — so you can pile up ideas without skewing anything. Requested by SaintWacko."
+    ],
+    "refined": [],
+    "resolved": [],
+    "archivist_note": null
+  },
+  {
     "version": "4.11.30",
     "date": "2026-07-18",
     "added": [],
