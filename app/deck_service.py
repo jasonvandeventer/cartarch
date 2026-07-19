@@ -4880,6 +4880,13 @@ def delete_deck(session: Session, deck_id: int, user_id: int, *, commit: bool = 
         )
 
         if location:
+            # Clear the FK before the location goes. On PG (FKs enforced) the
+            # considering-disband block below runs a query that autoflushes this
+            # pending delete BEFORE the deck itself is deleted; without nulling
+            # the ref first that flush violates decks_storage_location_id_fkey
+            # (the deck still points at the location). #148 caught this on PG18;
+            # SQLite (FKs off) hid it. Mirrors the considering-location handling.
+            deck.storage_location_id = None
             session.delete(location)
 
     # #148 — disband the Considering area the same way (placeholders discarded,
