@@ -1,5 +1,15 @@
 [
   {
+    "version": "4.11.30",
+    "date": "2026-07-18",
+    "added": [],
+    "refined": [],
+    "resolved": [
+      "Fixed the deck Grid/List view toggle getting stuck. If you had filtered or sorted a deck's card list, the page's web address quietly picked up your current view — and after that the Grid/List button stopped switching, until you reopened the deck from your deck list. View mode is now purely a saved preference, so the toggle always takes effect no matter what's in the URL. Reported by SaintWacko."
+    ],
+    "archivist_note": null
+  },
+  {
     "version": "4.11.29",
     "date": "2026-07-18",
     "added": [
