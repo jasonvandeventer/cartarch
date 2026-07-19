@@ -94,16 +94,16 @@ def test_commander_absent_from_card_list_on_full_page(client, deck_with_commande
 
 
 @pytest.mark.parametrize("sort", ["name", "cmc", "value"])
-@pytest.mark.parametrize("view", ["grid", "list"])
-def test_commander_absent_from_cards_partial(client, deck_with_commander, sort, view):
+def test_commander_absent_from_cards_partial(client, deck_with_commander, sort):
     """The reported bug: re-sorting via the partial leaked the commander in.
 
-    Covers both views and several sort keys — the partial is what the Apply
-    button hits.
+    Covers several sort keys — the partial is what the Apply button hits. The
+    commander split is view-independent (it runs before render), and view is no
+    longer a URL axis (#149), so this exercises it in one view.
     """
     resp = client.get(
         f"/decks/{deck_with_commander.id}/cards-partial",
-        params={"sort": sort, "direction": "asc", "view": view},
+        params={"sort": sort, "direction": "asc"},
     )
     assert resp.status_code == 200
     assert "Sol Ring" in resp.text
@@ -122,9 +122,12 @@ def test_commander_absent_from_add_card_partial(client, deck_with_commander, db)
     assert [i["card"].name for i in deck_cards] == ["Sol Ring"]
 
 
-def test_list_view_rows_expose_card_actions(client, deck_with_commander):
+def test_list_view_rows_expose_card_actions(client, deck_with_commander, db, user):
     """List view must reach the same actions grid view offers."""
-    resp = client.get(f"/decks/{deck_with_commander.id}", params={"view": "list"})
+    user.deck_view_mode = "list"  # view is a stored pref, not a URL param (#149)
+    db.add(user)
+    db.commit()
+    resp = client.get(f"/decks/{deck_with_commander.id}")
     assert resp.status_code == 200
     body = resp.text
     assert "deck-list-view" in body, "expected the list-view rendering"
@@ -159,10 +162,39 @@ def test_add_card_partial_honors_list_view_preference(client, deck_with_commande
 
 def test_grid_view_actions_unchanged_after_macro_extraction(client, deck_with_commander):
     """The drawer moved into a shared macro — grid must still render it."""
-    resp = client.get(f"/decks/{deck_with_commander.id}", params={"view": "grid"})
+    resp = client.get(f"/decks/{deck_with_commander.id}")  # pref defaults to grid
     assert resp.status_code == 200
     body = resp.text
     assert "card-actions-drawer" in body
     assert "/toggle-commander" in body
     assert "/decks/return" in body
     assert "Switch Printing" in body
+
+
+def test_stale_view_param_does_not_deadlock_toggle(client, deck_with_commander, db, user):
+    """#149: after toggling to Grid, a stale ?view=list left in the URL (pushed
+    there by the old search form's hidden `view` input) must neither pin the
+    render mode nor get written back into the stored pref — otherwise the toggle
+    deadlocks. Targets the two fixed seams directly (the toggle route itself is
+    unchanged); asserting the toggle POST's own persistence isn't possible in this
+    harness, where get_current_user and get_db_session are separate sessions.
+    """
+    user.deck_view_mode = "grid"  # the mode the user just toggled to
+    db.add(user)
+    db.commit()
+
+    # AC#1 — the deck GET is pref-authoritative: ?view=list is ignored -> grid.
+    page = client.get(f"/decks/{deck_with_commander.id}?view=list")
+    assert page.status_code == 200
+    assert "card-actions-drawer" in page.text
+    assert "deck-list-view" not in page.text
+
+    # AC#3 — cards-partial no longer back-writes the URL view into the pref, so a
+    # partial re-render carrying the stale ?view=list can't overwrite grid.
+    part = client.get(
+        f"/decks/{deck_with_commander.id}/cards-partial",
+        params={"view": "list", "sort": "name", "direction": "asc"},
+    )
+    assert part.status_code == 200
+    db.refresh(user)
+    assert user.deck_view_mode == "grid", "cards-partial must not overwrite the view pref (#149)"

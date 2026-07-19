@@ -641,18 +641,17 @@ def deck_detail_page(
     direction: str = "asc",
     collection_search: str = "",
     health_filter: str = "",
-    view: str = "",
     group: str = "",
     materialized: int = -1,
     remaining: int = 0,
     session: Session = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
 ):
-    # Resolve view mode + group axis: explicit query param wins over the
-    # user's persisted preference, which wins over the hardcoded defaults.
-    # The query-param path is what the HTMX toggle/group-by controls use to
-    # change view without an extra round-trip.
-    view_mode = view if view in DECK_VIEW_MODES else (current_user.deck_view_mode or "grid")
+    # View mode is a stored per-user preference — written ONLY by the Grid/List
+    # toggle (POST /account/deck-view-pref) — NOT a URL axis. Reading it from the
+    # URL let a stale ?view= pin the mode and deadlock the toggle (#149). Group-by
+    # IS a URL axis (the search-form select): query param over pref over default.
+    view_mode = current_user.deck_view_mode or "grid"
     group_by = group if group in DECK_GROUP_BY_OPTIONS else (current_user.deck_group_by or "type")
     deck = get_deck(session, deck_id=deck_id, user_id=current_user.id)
     items = []
@@ -979,7 +978,6 @@ def deck_cards_partial(
     search: str = "",
     sort: str = "name",
     direction: str = "asc",
-    view: str = "",
     group: str = "",
     session: Session = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
@@ -997,21 +995,16 @@ def deck_cards_partial(
     if not deck:
         raise HTTPException(status_code=404, detail="Deck not found")
 
-    view_mode = view if view in DECK_VIEW_MODES else (current_user.deck_view_mode or "grid")
+    view_mode = current_user.deck_view_mode or "grid"
     group_by = group if group in DECK_GROUP_BY_OPTIONS else (current_user.deck_group_by or "type")
 
-    # Side-effect persistence: if the URL explicitly carries a view/group
-    # value that differs from the user's saved preference, write it back.
-    # Means the group-by selector in the search form auto-persists on
-    # Apply, rather than the user having to find a separate "save" affordance.
-    pref_changed = False
-    if view in DECK_VIEW_MODES and current_user.deck_view_mode != view:
-        current_user.deck_view_mode = view
-        pref_changed = True
+    # Side-effect persistence: the group-by selector in the search form
+    # auto-persists on Apply. View mode is deliberately NOT written here — its
+    # sole writer is the Grid/List toggle. The old view back-write overwrote the
+    # value the toggle had just saved whenever a stale ?view= sat in the URL,
+    # keeping the toggle dead (#149).
     if group in DECK_GROUP_BY_OPTIONS and current_user.deck_group_by != group:
         current_user.deck_group_by = group
-        pref_changed = True
-    if pref_changed:
         session.commit()
 
     items, _, _ = _build_deck_card_items(session, deck, current_user.id, search, sort, direction)
@@ -1035,9 +1028,8 @@ def deck_cards_partial(
     # endpoint URL) so bookmarks / shares hit the real page on a cold visit.
     # `hx-push-url="true"` on the form would otherwise push /cards-partial?...
     # which only serves a fragment.
+    # view is intentionally omitted — it is a stored pref, not a URL axis (#149).
     qs_params = {"search": search, "sort": sort, "direction": direction}
-    if view in DECK_VIEW_MODES:
-        qs_params["view"] = view
     if group in DECK_GROUP_BY_OPTIONS:
         qs_params["group"] = group
     qs = urlencode(qs_params)

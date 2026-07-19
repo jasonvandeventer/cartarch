@@ -768,7 +768,9 @@
            view this sorts WITHIN each group_by bucket (group_deck_items keeps
            input order per group); the Group select below is a separate axis. #}
         {% include "_sort_controls.html" %}
-        <input type="hidden" name="view" value="{{ view_mode }}">
+        {# #149 — no hidden `view` input: view mode is a stored pref, not a URL
+           axis. Baking it into the pushed URL let a stale ?view= deadlock the
+           Grid/List toggle. #}
         <select name="group" {% if view_mode != 'list' %}disabled{% endif %}>
           <option value="type" {% if group_by == 'type' %}selected{% endif %}>Group: Type</option>
           <option value="cmc" {% if group_by == 'cmc' %}selected{% endif %}>Group: Mana Value</option>
