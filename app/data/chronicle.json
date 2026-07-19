@@ -1,5 +1,15 @@
 [
   {
+    "version": "4.11.32",
+    "date": "2026-07-19",
+    "added": [],
+    "refined": [],
+    "resolved": [
+      "The goldfish playtester's board returns to its earlier layout. A recent change reorganized the battlefield into two zones with a docked mana pool and a commander-cast counter — but that was an accidental second take on a layout adjustment already shipped, and it over-corrected. This restores the intended single version: the card preview shares the right rail with the command zone, the graveyard sits on the left rail beside the library and exile, the battlefield is one open zone, and the mana pool returns to its floating widget."
+    ],
+    "archivist_note": "v4.11.32 reverts commit 8f8fee1 (v4.11.29). v4.11.29 was an accidental second application of the SaintWacko layout-mockup task already shipped in v4.11.26; the second pass over-corrected the layout. This revert restores the intended single application (the v4.11.26 layout). v4.11.30 (#149) and v4.11.31 (#148) landed after v4.11.29 and are preserved — the revert touched only the three goldfish files (goldfish.js, style.css, goldfish.html); the README and chronicle conflicts were resolved by keeping all history and appending this entry rather than deleting the v4.11.29 one."
+  },
+  {
     "version": "4.11.31",
     "date": "2026-07-18",
     "added": [

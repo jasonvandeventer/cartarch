@@ -13857,23 +13857,19 @@ table.dmtx .dmtx-rowhead {
   color: var(--brand-gold);
 }
 .gf-mp-pips {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
   gap: 0.3rem;
 }
 .gf-mp-pip {
   display: flex;
-  flex-direction: row;
+  flex-direction: column;
   align-items: center;
-  justify-content: space-between;
-  gap: 0.4rem;
-  padding: 0.25rem 0.45rem;
+  gap: 0.25rem;
+  padding: 0.3rem 0.2rem;
   background: var(--panel-2);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-}
-.gf-mp-sym {
-  flex: 0 0 auto;
 }
 .gf-mp-sym {
   font: 700 12px/1 "Montserrat", system-ui, sans-serif;
@@ -13910,70 +13906,6 @@ table.dmtx .dmtx-rowhead {
 .gf-mp-pip button:hover {
   border-color: var(--brand-gold);
   color: var(--brand-gold);
-}
-
-/* Mana pool docked into the right rail (goldfish mockup). The widget keeps
-   its fixed-position fallback (surfaces without #gf-mana-dock); inside the
-   dock it becomes a static, full-width panel at the bottom of the rail. */
-.gf-app .gf-mana-dock {
-  flex: 0 0 auto;
-}
-.gf-app .gf-mana-dock .gf-mana-pool {
-  position: static;
-  right: auto;
-  bottom: auto;
-  z-index: auto;
-  min-width: 0;
-  width: 100%;
-  box-shadow: none;
-}
-
-/* In the right rail the Command pile shares vertical space with the cast row
-   and the docked mana panel, so let it shrink instead of overflowing the short
-   zone (its 180px min-height would push the cast row out of view). */
-.gf-app .gf-rail-right .gf-pile {
-  min-height: 0;
-  flex: 1 1 auto;
-}
-
-/* Commander cast counter + tax, under the Command pile. */
-.gf-cast {
-  flex: 0 0 auto;
-  display: flex;
-  align-items: center;
-  gap: 0.35rem;
-  margin-top: 0.5rem;
-  font: 500 12px/1 "Montserrat", system-ui, sans-serif;
-  color: var(--text-dim);
-}
-.gf-cast-label {
-  font: italic 500 13px/1 "Newsreader", Georgia, serif;
-  color: var(--text);
-}
-.gf-cast-btn {
-  width: 20px;
-  height: 20px;
-  padding: 0;
-  background: var(--panel);
-  border: 1px solid var(--border);
-  color: var(--text-dim);
-  border-radius: var(--radius-sm);
-  font: 600 13px/1 "Montserrat", system-ui, sans-serif;
-  cursor: pointer;
-}
-.gf-cast-btn:hover {
-  border-color: var(--brand-gold);
-  color: var(--brand-gold);
-}
-.gf-cast-val {
-  min-width: 1.25rem;
-  text-align: center;
-  font: 600 13px/1 "Montserrat", system-ui, sans-serif;
-  color: var(--text);
-}
-.gf-cast-tax {
-  margin-left: auto;
-  color: var(--muted);
 }
 
 /* Mana picker popover (opens on a land's untapped→tapped transition).
@@ -14043,6 +13975,7 @@ table.dmtx .dmtx-rowhead {
     top: 0.5rem;
     min-width: 0;
   }
+  .gf-mp-pips { grid-template-columns: repeat(6, auto); }
 }
 
 /* ============================================================================
@@ -14260,17 +14193,18 @@ body.gf-mode { overflow: hidden; }
   min-height: 0;
 }
 
-/* Battlefield — two stacked zones (goldfish mockup): non-lands on top
-   (Battlefield), lands below (Lands). Override the v3.30.0 flex-column
-   rule with a single-column 2-row grid. */
+/* Battlefield — five type-based regions on a CSS grid that gives
+   Creatures the dominant area, Lands a wide secondary row, and the
+   three smaller regions a 3-column bottom row. Override the v3.30.0
+   .gf-battlefield flex-column rule with grid layout. */
 .gf-app .gf-battlefield {
   flex: 1 1 auto;
   display: grid;
-  grid-template-columns: 1fr;
-  grid-template-rows: 1.1fr 0.9fr;
+  grid-template-columns: 1.4fr 1fr 1fr;
+  grid-template-rows: 1.5fr 1fr;
   grid-template-areas:
-    "main"
-    "lands";
+    "creatures creatures pwbattle"
+    "lands     artenc    other";
   gap: 0.5rem;
   min-height: 0;
   padding: 0.5rem;
@@ -14291,8 +14225,11 @@ body.gf-mode { overflow: hidden; }
   overflow-y: auto;
   transition: border-color 0.15s, background 0.15s;
 }
-.gf-bf-main { grid-area: main; }
+.gf-bf-creatures { grid-area: creatures; }
 .gf-bf-lands { grid-area: lands; background: rgba(181, 138, 71, 0.03); }
+.gf-bf-artenc { grid-area: artenc; }
+.gf-bf-pwbattle { grid-area: pwbattle; }
+.gf-bf-other { grid-area: other; }
 
 .gf-bf-region-label {
   position: absolute;
@@ -14352,8 +14289,11 @@ body.gf-mode { overflow: hidden; }
     grid-template-columns: 1fr;
     grid-template-rows: auto;
     grid-template-areas:
-      "main"
-      "lands";
+      "creatures"
+      "lands"
+      "artenc"
+      "pwbattle"
+      "other";
   }
   .gf-mast-center { display: none; }
   .gf-readout-inline { margin-left: 0; }
