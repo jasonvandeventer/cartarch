@@ -724,6 +724,23 @@ def collection_export(
     # so the per-row card reads below are request-path-safe (no N+1, no network).
     rows = base_query.order_by(Card.name.asc()).all()
 
+    # #131 — Deck Format for deck-located rows. Export-only enrichment (like the
+    # Price/Colors columns — NOT an importer HEADER_ALIAS, so re-import ignores
+    # it). Deck.format is a per-deck attribute set via /decks; one batched query
+    # keyed by storage_location_id, no N+1 and no network on the request path.
+    deck_loc_ids = {
+        r.storage_location_id
+        for r in rows
+        if r.storage_location is not None and r.storage_location.type == "deck"
+    }
+    deck_format_by_loc: dict[int, str | None] = {}
+    if deck_loc_ids:
+        deck_format_by_loc = dict(
+            session.query(Deck.storage_location_id, Deck.format)
+            .filter(Deck.storage_location_id.in_(deck_loc_ids))
+            .all()
+        )
+
     if format == "json":
         # LLM-parseable variant — per-card gameplay metadata (persisted columns,
         # no Scryfall call) plus inventory context. Honors the same filter.
@@ -738,6 +755,11 @@ def collection_export(
                     "finish": row.finish or "normal",
                     "location": loc.name if loc else None,
                     "location_type": loc.type if loc else None,
+                    "deck_format": (
+                        deck_format_by_loc.get(row.storage_location_id)
+                        if loc is not None and loc.type == "deck"
+                        else None
+                    ),
                     "language": row.language or "en",
                     "role": row.role or None,
                     "tags": row.tags or None,
@@ -787,6 +809,8 @@ def collection_export(
             "Mana Cost",
             "Mana Value",
             "Rarity",
+            # #131 — export-only (no importer alias). Blank for non-deck rows.
+            "Deck Format",
         ]
     )
     for row in rows:
@@ -816,6 +840,11 @@ def collection_export(
                 card.mana_cost or "",
                 "" if card.cmc is None else f"{card.cmc:g}",
                 card.rarity or "",
+                (
+                    deck_format_by_loc.get(row.storage_location_id) or ""
+                    if loc is not None and loc.type == "deck"
+                    else ""
+                ),
             ]
         )
 

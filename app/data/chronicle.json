@@ -1,5 +1,18 @@
 [
   {
+    "version": "4.11.33",
+    "date": "2026-07-19",
+    "added": [
+      "Your collection CSV/JSON export now includes each deck card's format. Cards that live in a deck carry a \"Deck Format\" column (Commander, Modern, and so on); cards on a shelf or in a binder leave it blank."
+    ],
+    "refined": [
+      "Importing more copies of a card you already have no longer overwrites the note on the existing row. If both the existing row and the incoming one have notes, your original note is kept rather than replaced.",
+      "When an import spreads cards across several locations, the results page now lists them per place — \"12 cards at Binder · 3 cards at Deck: Atraxa\" — instead of a bare \"2 locations\"."
+    ],
+    "resolved": [],
+    "archivist_note": null
+  },
+  {
     "version": "4.11.32",
     "date": "2026-07-19",
     "added": [],

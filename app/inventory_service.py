@@ -627,7 +627,10 @@ def create_or_merge_inventory_row(
     if existing:
         existing.quantity += quantity
         existing.updated_at = utc_now()
-        if notes:
+        # #131 — preserve existing notes on merge; only fill when the row had
+        # none. Overwriting silently discarded whatever was there (quick-add is
+        # the main caller that passes notes).
+        if notes and not existing.notes:
             existing.notes = notes
         session.flush()
         return existing
@@ -710,7 +713,8 @@ def add_card_to_location(
     if existing is not None:
         existing.quantity += quantity
         existing.updated_at = now
-        if notes:
+        # #131 — preserve existing notes on merge (see create_or_merge_inventory_row).
+        if notes and not existing.notes:
             existing.notes = notes
         session.commit()
         return existing

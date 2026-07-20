@@ -1223,6 +1223,9 @@ async def import_commit(
     placed_in = None
     placed_in_url = "/pending"
     placed_in_kind = None
+    # #131 — per-location placement breakdown for multi-location imports.
+    # None (single-location / pending) → the template uses placed_in as before.
+    placement_breakdown: list[dict] | None = None
     moved_count = 0
     stale_match_rows: list[dict] = []
 
@@ -1419,7 +1422,14 @@ async def import_commit(
             # as the placed_in for the result page, with a "multiple
             # locations" hint when more than one was used. Brew-deck
             # destinations (issue #70) count as resolved locations too.
-            dest_loc_ids = set(placed_by_loc) | set(brew_rows_by_loc)
+            # #131 — count placed rows per destination (both the plain per-row
+            # placements and the brew-deck placements land here).
+            counts_by_loc: dict[int, int] = {}
+            for loc_id, ids in placed_by_loc.items():
+                counts_by_loc[loc_id] = counts_by_loc.get(loc_id, 0) + len(ids)
+            for loc_id, brs in brew_rows_by_loc.items():
+                counts_by_loc[loc_id] = counts_by_loc.get(loc_id, 0) + len(brs)
+            dest_loc_ids = set(counts_by_loc)
             first_loc_id = next(iter(dest_loc_ids))
             loc = get_location(session, location_id=first_loc_id, user_id=current_user.id)
             if len(dest_loc_ids) == 1 and loc:
@@ -1430,6 +1440,20 @@ async def import_commit(
                 placed_in = f"{len(dest_loc_ids)} locations"
                 placed_in_url = "/collection"
                 placed_in_kind = "multiple"
+                # #131 — surface "N cards at X · M cards at Y" instead of the bare
+                # "N locations" collapse. One get_location per distinct destination
+                # (bounded by the CSV's locations; local DB read, no network).
+                placement_breakdown = []
+                for loc_id, cnt in counts_by_loc.items():
+                    dloc = get_location(session, location_id=loc_id, user_id=current_user.id)
+                    placement_breakdown.append(
+                        {
+                            "name": dloc.name if dloc else "Unknown location",
+                            "url": f"/locations/{loc_id}" if dloc else "/collection",
+                            "count": cnt,
+                        }
+                    )
+                placement_breakdown.sort(key=lambda d: d["name"].lower())
 
         return render(
             request,
@@ -1451,6 +1475,7 @@ async def import_commit(
                 "placed_in": placed_in,
                 "placed_in_url": placed_in_url,
                 "placed_in_kind": placed_in_kind,
+                "placement_breakdown": placement_breakdown,
                 "current_user": current_user,
             },
         )

@@ -73,6 +73,17 @@
     </div>
     {% if _nothing_new %}
       <p class="muted" style="margin-top: 0.75rem;">Nothing new to import — every card was already in your collection.</p>
+    {% elif placement_breakdown %}
+      {# #131 — multi-location import: per-destination card counts. #}
+      <p class="muted" style="margin-top: 0.75rem;">Cards placed across
+        <strong>{{ placement_breakdown|length }}</strong> locations:</p>
+      <ul class="muted small-text">
+        {% for d in placement_breakdown %}
+          <li><strong>{{ d.count }}</strong>
+            {{ "card" if d.count == 1 else "cards" }} at
+            <a href="{{ d.url }}">{{ d.name }}</a></li>
+        {% endfor %}
+      </ul>
     {% elif placed_in %}
       <p class="muted" style="margin-top: 0.75rem;">
         {% if _moved > 0 or _merged > 0 or _skipped > 0 %}

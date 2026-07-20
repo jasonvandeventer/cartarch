@@ -24,7 +24,7 @@ from sqlalchemy.pool import StaticPool
 
 from app.db import Base
 from app.inventory_service import list_inventory_rows
-from app.models import Card, InventoryRow, StorageLocation, User
+from app.models import Card, Deck, InventoryRow, StorageLocation, User
 
 _seq = itertools.count(1)
 
@@ -101,6 +101,39 @@ def _client(sm, user):
 
 def _parse(response):
     return list(csv.DictReader(io.StringIO(response.text)))
+
+
+def test_export_deck_format_column():
+    # #131 — deck-located rows carry their deck's Format; non-deck rows are blank.
+    from app.dependencies import get_current_user, get_db_session
+
+    _engine, sm = _engine_sm()
+    s = sm()
+    u = _user(s)
+    binder = _loc(s, u.id, "My Binder")  # non-deck
+    deck_loc = _loc(s, u.id, "Atraxa", type_="deck")
+    s.add(Deck(user_id=u.id, name="Atraxa", storage_location_id=deck_loc.id, format="Commander"))
+    s.flush()
+    _row(s, u.id, _card(s, "Binder Card"), binder.id)
+    _row(s, u.id, _card(s, "Deck Card"), deck_loc.id)
+    s.commit()
+
+    client, app = _client(sm, u)
+    try:
+        r = client.get("/collection/export")
+        assert r.status_code == 200
+        rows = {row["Name"]: row for row in _parse(r)}
+        assert "Deck Format" in rows["Deck Card"]
+        assert rows["Deck Card"]["Deck Format"] == "Commander"
+        assert rows["Binder Card"]["Deck Format"] == ""
+
+        j = client.get("/collection/export?format=json").json()["cards"]
+        by_name = {c["name"]: c for c in j}
+        assert by_name["Deck Card"]["deck_format"] == "Commander"
+        assert by_name["Binder Card"]["deck_format"] is None
+    finally:
+        for dep in (get_db_session, get_current_user):
+            app.dependency_overrides.pop(dep, None)
 
 
 def test_export_honors_filter_and_matches_grid():

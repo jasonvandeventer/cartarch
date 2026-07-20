@@ -134,6 +134,29 @@ def test_merge_existing():
     assert failed == 0
 
 
+def test_merge_preserves_existing_notes():
+    # #131 — merging into a row that already has notes must NOT clobber them;
+    # a merge into a note-less row still fills them in.
+    s = _fresh_session()
+    u = _seed_user(s)
+    loc = _seed_location(s, u.id)
+    card = _seed_card(s)
+    common = dict(user_id=u.id, location_id=loc.id, scryfall_id=card.scryfall_id, finish="normal")
+    add_card_to_location(s, quantity=1, notes="original note", **common)
+    add_card_to_location(s, quantity=1, notes="second note", **common)
+    rows = _rows(s, u.id)
+    assert len(rows) == 1 and rows[0].quantity == 2
+    assert rows[0].notes == "original note"  # not clobbered by the second import
+
+    # And a note-less existing row gets filled by a later noted merge.
+    card2 = _seed_card(s)
+    c2 = dict(user_id=u.id, location_id=loc.id, scryfall_id=card2.scryfall_id, finish="normal")
+    add_card_to_location(s, quantity=1, **c2)  # no notes
+    add_card_to_location(s, quantity=1, notes="added later", **c2)
+    r2 = [r for r in _rows(s, u.id) if r.card_id == card2.id]
+    assert len(r2) == 1 and r2[0].notes == "added later"
+
+
 def test_distinct_fields_separate_rows():
     failed = 0
     s = _fresh_session()
