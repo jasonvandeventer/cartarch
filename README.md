@@ -11,9 +11,9 @@ Self-hosted web application for managing a physical Magic: The Gathering collect
 This is a production system, not a tutorial. It runs on a personal Kubernetes cluster serving real users, with the operational discipline that implies.
 
 - **900+ automated tests** with a CI release-record guard that blocks deployments from unverified commits
-- **Full CI/CD release pipeline**: git tag → GitHub Actions build → GHCR publish → ArgoCD Image Updater promotion → PreSync Alembic migration hook → expand-contract schema enforcement → post-deploy verify/soak job
+- **Full CI/CD release pipeline**: git tag → GitHub Actions build → GHCR publish → ArgoCD Image Updater promotion → PreSync Alembic migration hook → additive migrate-before-deploy discipline → post-deploy verify/soak job
 - **CloudNativePG PostgreSQL** with WAL archiving to R2 object storage; backup chain verified through completed full-restore drills
-- **Zero-downtime blue/green cluster migration** from k3s to Talos, including full data and state migration with validated cutover and rollback
+- **Blue/green cluster migration** from k3s to Talos with simultaneous SQLite-to-PostgreSQL data migration, zero data loss, and minimal planned downtime (announced write-freeze window + tunnel repoint)
 - **Production incident response**: root-caused and structurally prevented a pod-availability incident (synchronous I/O blocking the async handler under a single-writer DB transaction); postmortem documented
 - **Auth hardening**: OAuth-gated service exposure behind Cloudflare Access, timing-oracle-resistant registration/reset flows, NIST SP 800-63B-aligned password policy
 - **Self-hosted image mirror** (525,000+ card images) with daily automated price data ingest
