@@ -6,6 +6,22 @@ Self-hosted web application for managing a physical Magic: The Gathering collect
 
 ---
 
+## Engineering
+
+This is a production system, not a tutorial. It runs on a personal Kubernetes cluster serving real users, with the operational discipline that implies.
+
+- **900+ automated tests** with a CI release-record guard that blocks deployments from unverified commits
+- **Full CI/CD release pipeline**: git tag → GitHub Actions build → GHCR publish → ArgoCD Image Updater promotion → PreSync Alembic migration hook → expand-contract schema enforcement → post-deploy verify/soak job
+- **CloudNativePG PostgreSQL** with WAL archiving to R2 object storage; backup chain verified through completed full-restore drills
+- **Zero-downtime blue/green cluster migration** from k3s to Talos, including full data and state migration with validated cutover and rollback
+- **Production incident response**: root-caused and structurally prevented a pod-availability incident (synchronous I/O blocking the async handler under a single-writer DB transaction); postmortem documented
+- **Auth hardening**: OAuth-gated service exposure behind Cloudflare Access, timing-oracle-resistant registration/reset flows, NIST SP 800-63B-aligned password policy
+- **Self-hosted image mirror** (525,000+ card images) with daily automated price data ingest
+
+Platform infrastructure: [vanfreckle-platform](https://github.com/jasonvandeventer/vanfreckle-platform)
+
+---
+
 ## North Star
 
 Cartarch is the source of truth for the playgroup. Authoritative data about who owns what, what's in which deck, and how decks have performed in our games lives here. External services (Scryfall, Commander Spellbook, EDHREC) are integrated as enrichment for that data, not as replacements.
