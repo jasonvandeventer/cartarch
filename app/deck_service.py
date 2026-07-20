@@ -3993,6 +3993,19 @@ def pull_card_to_deck(
     if not row or not deck or not deck.storage_location_id or row.quantity < quantity:
         return False
 
+    # #27 residual — the source must be a LOOSE copy: pending (no location) or a
+    # non-deck/non-considering location. Pulling a deck-resident row would
+    # relocate it OUT from under that deck (a sibling variant build, or any
+    # deck) — the exact "deck-resident copies are never consumable" rule the
+    # switch-printing / reconciliation paths already enforce via
+    # `_get_loose_source_rows` (type NOT IN (deck, considering)). Without this,
+    # a crafted POST /decks/pull could corrupt another deck's list.
+    if row.storage_location is not None and row.storage_location.type in (
+        "deck",
+        "considering",
+    ):
+        return False
+
     # issue #134 — proxy-aware merge key. A real copy must NEVER merge into a
     # proxy row: that leaves is_proxy=True, so build_brew_buylist keeps reading
     # the card as unowned (owned=0/missing) even though it was pulled in. Match

@@ -1,5 +1,15 @@
 [
   {
+    "version": "4.11.34",
+    "date": "2026-07-19",
+    "added": [],
+    "refined": [],
+    "resolved": [
+      "Closed a way a deck's card list could be corrupted: a card already committed to one deck could be pulled into another, quietly emptying it out of the first. Pulling a card into a deck now only ever takes a loose copy from your collection, never one that's already living in another deck."
+    ],
+    "archivist_note": "v4.11.34 = two hygiene fixes off the reconciled Known-Problems list. (1) pull_card_to_deck now rejects a source InventoryRow whose location type is deck/considering — the #27 residual where POST /decks/pull was the one remaining path that could relocate a card out from under a sibling (or any) deck, since it fetched the row by id+user with no loose-source guard. Mirrors the type NOT IN (deck, considering) rule _get_loose_source_rows already enforces for switch-printing / reconciliation. (2) Deleted the ~190-line unreachable auth-CSRF cluster in dependencies.py (require_csrf_or_reissue / csrf_state / _classify_session_cookie / _classify_cross_site / _log_no_session + _SESSION_MAX_AGE) — superseded by require_preauth_csrf since #63, zero callers, ruff-clean so it had hidden for months. A third listed item — the Switch Printing full-width button — was found already resolved (the modal CSS was reworked; no auto-fit/stretch remains), so the stale Known-Problem entry was corrected rather than 'fixed'. Not user-facing beyond (1); no schema. Tests: pull-guard cases in test_pull_proxy_lifecycle.py; suite 1078 green."
+  },
+  {
     "version": "4.11.33",
     "date": "2026-07-19",
     "added": [

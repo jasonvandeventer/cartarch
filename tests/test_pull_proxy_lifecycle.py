@@ -356,3 +356,41 @@ def test_pull_partial_consumes_exact_printing_first():
     proxies = [r for r in rows if r.is_proxy]
     assert len(proxies) == 1, "exactly one proxy consumed by one real copy"
     assert proxies[0].card_id == a.id, "the exact-printing proxy (b) is consumed first"
+
+
+# --------------------------------------------------------------------------- #
+# #27 residual — /decks/pull must refuse a deck-resident source row
+# (pulling it would relocate it OUT from under the other deck).
+# --------------------------------------------------------------------------- #
+
+
+def test_pull_refuses_source_in_another_deck():
+    s = _fresh()()
+    u = _user(s)
+    deck_a = deck_service.create_deck(s, u.id, "A")
+    deck_b = deck_service.create_deck(s, u.id, "B")
+    sol = _card(s, "Sol Ring")
+    # A owned copy that already lives in deck B's location.
+    in_b = _place(s, u.id, sol, deck_b.storage_location_id, qty=1)
+    s.commit()
+
+    # Pulling B's card into A must be refused — no relocation.
+    assert deck_service.pull_card_to_deck(s, u.id, deck_a.id, in_b.id, 1) is False
+    still = s.query(InventoryRow).filter(InventoryRow.id == in_b.id).first()
+    assert still is not None
+    assert still.storage_location_id == deck_b.storage_location_id  # untouched
+    assert _deck_rows(s, deck_a.storage_location_id) == []  # nothing landed in A
+
+
+def test_pull_still_allows_loose_source():
+    # Control: a pending / non-deck loose copy still pulls normally.
+    s = _fresh()()
+    u = _user(s)
+    deck = deck_service.create_deck(s, u.id, "A")
+    box = _loc(s, u.id, "Box")
+    sol = _card(s, "Sol Ring")
+    loose = _place(s, u.id, sol, box.id, qty=1)
+    s.commit()
+
+    assert deck_service.pull_card_to_deck(s, u.id, deck.id, loose.id, 1) is True
+    assert len(_deck_rows(s, deck.storage_location_id)) == 1
