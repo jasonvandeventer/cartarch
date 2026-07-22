@@ -33,12 +33,13 @@ data-sort-avail="{{ avail }}"
 {% endif %}
 {%- endmacro %}
 
-{% macro pick_tools(grid_id) -%}
+{% macro pick_tools(grid_id, with_location=false) -%}
 <div class="trade-pick-tools">
   <label>Sort
     <select class="js-pick-sort" data-grid="{{ grid_id }}">
       <option value="">Default</option>
       <option value="name">Name</option>
+      {% if with_location %}<option value="loc">Location</option>{% endif %}
       <option value="cmc">Mana Value</option>
       <option value="set">Set</option>
       <option value="rarity">Rarity</option>
@@ -204,14 +205,15 @@ data-sort-avail="{{ avail }}"
         <h3 class="panel-title">Your cards (offered)</h3>
         <p class="muted">Pick items from your own placed inventory to offer in exchange.</p>
         {% if options.proposer_inventory %}
-          {{ pick_tools('offered-grid') }}
+          {{ pick_tools('offered-grid', with_location=true) }}
           <div class="trade-pick-grid" id="offered-grid">
             {% for inv in options.proposer_inventory %}
               <div class="trade-pick-item{% if inv.inventory_row_id in prefilled_offered_row_ids %} trade-pick-prefilled{% endif %}"
                    data-inventory-row-id="{{ inv.inventory_row_id }}"
                    data-available="{{ inv.quantity }}"
                    data-proxy="{{ '1' if inv.is_proxy else '0' }}"
-                   {{ pick_sort_attrs(inv.card, inv.finish, inv.quantity, inv.is_proxy) }}>
+                   {{ pick_sort_attrs(inv.card, inv.finish, inv.quantity, inv.is_proxy) }}
+                   data-sort-loc="{{ inv.location_label | lower }}">
                 <div class="trade-pick-card">
                   {{ pick_thumb(inv.card) }}
                   <div class="trade-pick-name">{{ inv.card.name }}{% if inv.is_proxy %} <span class="proxy-badge proxy-badge-warn" title="Proxy — carries no market value">PROXY</span>{% endif %}</div>
@@ -219,6 +221,7 @@ data-sort-avail="{{ avail }}"
                     {{ inv.card.set_code | upper }} #{{ inv.card.collector_number }} &middot;
                     {{ inv.finish | capitalize }} &middot;
                     you own {{ inv.quantity }} &middot; {{ pick_price(inv.card, inv.finish, inv.is_proxy) }}
+                    <span class="trade-pick-loc{% if inv.location_type == 'deck' %} is-deck{% endif %}">{{ inv.location_label }}</span>
                   </div>
                 </div>
                 <button type="button" class="btn-like trade-pick-add"

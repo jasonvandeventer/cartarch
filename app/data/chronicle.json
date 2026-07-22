@@ -1,5 +1,15 @@
 [
   {
+    "version": "4.11.40",
+    "date": "2026-07-22",
+    "added": [
+      "Your side of the trade form now shows where each card lives — \"Deck · Atraxa\", \"Binder · Mythics\", \"Drawer 2\" — with deck cards called out, plus a Location sort so they group together. Offering a card that's currently in a deck means taking that deck apart, and now you can see that before you offer it rather than after."
+    ],
+    "refined": [],
+    "resolved": [],
+    "archivist_note": "Only your own cards show a location. The other player's side shows the card and nothing else — where they keep their collection is theirs, and the trade form has never been able to see it."
+  },
+  {
     "version": "4.11.39",
     "date": "2026-07-22",
     "added": [

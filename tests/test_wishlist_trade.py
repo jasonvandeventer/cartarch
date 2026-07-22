@@ -228,3 +228,32 @@ def test_playgroup_view_flags_pending_and_never_leaks_who(db):
     # The public projection carries no pending signal at all (anonymous surface).
     public = ws.build_public_wishlist_view(db, owner.id)
     assert "trade_pending" not in public["cards"][0]
+
+
+def test_offered_inventory_carries_its_location(db):
+    """Each offered copy reports WHERE it lives, so a deck card is visible as
+    one before it's offered (SaintWacko, 2026-07-22).
+
+    Labels come from the decklist checker's shared builder — not a second
+    format — and the recipient's side gets none of this: their storage is
+    private, and the sanitized card projection is all that crosses.
+    """
+    owner, viewer, pg, rhystic, _row = _setup(db)
+    deck = _loc(db, viewer.id, "Atraxa", mode="manual", type_="deck")
+    _own(db, viewer.id, _card(db, "Cultivate"), location_id=deck.id)
+    _own(db, viewer.id, _card(db, "Llanowar Elves"), location_id=None)
+    db.commit()
+
+    opts = ts.get_construction_options(db, viewer.id, owner.id, pg.id)
+    by_label = {
+        it["card"].name: (it["location_label"], it["location_type"])
+        for it in opts["proposer_inventory"]
+    }
+    assert by_label["Cultivate"] == ("Deck · Atraxa", "deck")
+    assert by_label["Rhystic Study"] == ("Binder · Binder", "binder")
+    # Placed but unlocated reads as Unassigned, never a crash or empty string.
+    assert by_label["Llanowar Elves"] == ("Unassigned", "")
+
+    # The requested side exposes no location field at all.
+    for item in opts["recipient_share_items"]:
+        assert "location_label" not in item

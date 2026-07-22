@@ -76,6 +76,7 @@ from __future__ import annotations
 from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session, joinedload
 
+from app.decklist_service import _build_full_location_label
 from app.models import (
     Card,
     InventoryRow,
@@ -84,6 +85,7 @@ from app.models import (
     Share,
     Showcase,
     ShowcaseItem,
+    StorageLocation,
     Trade,
     TradeItem,
     User,
@@ -982,14 +984,33 @@ def get_construction_options(
             InventoryRow.is_pending.is_(False),
             InventoryRow.quantity > 0,
         )
-        .options(joinedload(InventoryRow.card))
+        .options(joinedload(InventoryRow.card), joinedload(InventoryRow.storage_location))
         .order_by(Card.name, InventoryRow.finish)
         .all()
     )
+    # Where each offered copy currently lives, so a card that would have to come
+    # out of a deck is obvious before it's offered. OFFERED SIDE ONLY — the
+    # recipient's locations are private and never leave the sanitized card
+    # projection. One batched parent fetch (locations are few even when the
+    # inventory is thousands of rows), then the SHARED label builder the
+    # decklist checker uses — not a second location-label format.
+    parent_ids = {
+        row.storage_location.parent_id
+        for row in inv_q
+        if row.storage_location is not None and row.storage_location.parent_id is not None
+    }
+    parent_chain: dict[int, StorageLocation] = {}
+    if parent_ids:
+        parent_chain = {
+            p.id: p
+            for p in session.query(StorageLocation).filter(StorageLocation.id.in_(parent_ids)).all()
+        }
+
     proposer_inventory: list[dict] = []
     for row in inv_q:
         if row.card is None:
             continue
+        loc = row.storage_location
         proposer_inventory.append(
             {
                 "inventory_row_id": row.id,
@@ -997,6 +1018,8 @@ def get_construction_options(
                 "finish": row.finish,
                 "quantity": row.quantity,
                 "is_proxy": bool(row.is_proxy),
+                "location_label": _build_full_location_label(loc, parent_chain),
+                "location_type": (loc.type or "other").lower() if loc is not None else "",
             }
         )
     return {

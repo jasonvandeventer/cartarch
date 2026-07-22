@@ -12641,6 +12641,17 @@ table.dmtx .dmtx-rowhead {
 .trade-pick-price {
   font-variant-numeric: tabular-nums;
 }
+/* Where an offered copy lives. Deck-located cards are called out because
+   offering one means taking a deck apart — the whole reason this is shown. */
+.trade-pick-loc {
+  display: block;
+  margin-top: 0.15rem;
+  font-size: 0.78rem;
+  color: var(--text-dim);
+}
+.trade-pick-loc.is-deck {
+  color: var(--brand-gold);
+}
 
 /* Picker sort + image-grid toggle. The thumb is display:none until the grid
    gets .is-visual — with loading="lazy" a non-rendered image is never fetched,
