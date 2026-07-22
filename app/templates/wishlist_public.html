@@ -18,6 +18,9 @@
     {% if view.viewer_owns %}
       <p class="wishlist-public-owned-summary">You own {{ view.owned_count }} of these {{ view.count }}.</p>
     {% endif %}
+    {% if view.can_propose and view.owned_count %}
+      <p><a class="btn-like" href="/trades/new?from_wishlist_user={{ view.owner_user_id }}">Propose a trade</a></p>
+    {% endif %}
   </header>
 
   {% if view.cards %}

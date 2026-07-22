@@ -141,7 +141,7 @@
         {% if options.proposer_inventory %}
           <div class="trade-pick-grid" id="offered-grid">
             {% for inv in options.proposer_inventory %}
-              <div class="trade-pick-item"
+              <div class="trade-pick-item{% if inv.inventory_row_id in prefilled_offered_row_ids %} trade-pick-prefilled{% endif %}"
                    data-inventory-row-id="{{ inv.inventory_row_id }}"
                    data-available="{{ inv.quantity }}"
                    data-proxy="{{ '1' if inv.is_proxy else '0' }}">
@@ -242,16 +242,25 @@
           updateProxyNotice();
         });
       });
+      // Offered Add is a TOGGLE (unlike the requested side, which has its own
+      // Remove buttons) — the wishlist entry prefills this side, so a card you
+      // didn't mean to offer has to be droppable.
       document.querySelectorAll('#offered-grid .trade-pick-add').forEach(function (btn) {
-        btn.addEventListener('click', function () {
-          var id = parseInt(btn.getAttribute('data-inventory-row-id'), 10);
-          var available = parseInt(btn.getAttribute('data-available'), 10) || 1;
-          if (!id) return;
-          offered.set(id, { quantity: Math.min(1, available) });
-          btn.disabled = true;
-          btn.textContent = 'Added';
+        var id = parseInt(btn.getAttribute('data-inventory-row-id'), 10);
+        var available = parseInt(btn.getAttribute('data-available'), 10) || 1;
+        if (!id) return;
+        function paint() {
+          btn.textContent = offered.has(id) ? 'Remove' : 'Add';
           updateProxyNotice();
+        }
+        btn.addEventListener('click', function () {
+          if (offered.has(id)) offered.delete(id);
+          else offered.set(id, { quantity: Math.min(1, available) });
+          paint();
         });
+        // Wishlist prefill (#146/#147 follow-up) — server marked the rows.
+        if (btn.closest('.trade-pick-prefilled')) offered.set(id, { quantity: Math.min(1, available) });
+        paint();
       });
       // Prefilled-item Remove + qty change handlers.
       document.querySelectorAll('#requested-grid .trade-pick-remove').forEach(function (btn) {

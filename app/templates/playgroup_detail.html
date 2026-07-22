@@ -160,10 +160,13 @@
                 <span class="wl-owned-badge">you own {{ row.view.owned_count }}</span>
               {% endif %}
             </summary>
+            {% if row.view.can_propose and row.view.owned_count %}
+              <p><a class="btn-like" href="/trades/new?from_wishlist_user={{ row.view.owner_user_id }}">Propose a trade</a></p>
+            {% endif %}
             {% if row.view.cards %}
               <ul class="wl-member-cards">
                 {% for it in row.view.cards %}
-                  <li{% if it.owned %} class="wl-owned"{% endif %}>{{ it.name }}{% if it.specific_printing %} <span class="muted">(specific printing)</span>{% endif %}{% if it.owned %} <span class="wl-owned-badge">you own {{ it.owned }}</span>{% if it.locations %} <span class="wl-owned-where">{% for l in it.locations %}{{ l.quantity }}× {{ l.label }}{% if not loop.last %} · {% endif %}{% endfor %}</span>{% endif %}{% endif %}</li>
+                  <li{% if it.owned %} class="wl-owned"{% endif %}>{{ it.name }}{% if it.specific_printing %} <span class="muted">(specific printing)</span>{% endif %}{% if it.trade_pending %} <span class="wl-pending-badge" title="Someone has already offered this card in a trade">[pending]</span>{% endif %}{% if it.owned %} <span class="wl-owned-badge">you own {{ it.owned }}</span>{% if it.locations %} <span class="wl-owned-where">{% for l in it.locations %}{{ l.quantity }}× {{ l.label }}{% if not loop.last %} · {% endif %}{% endfor %}</span>{% endif %}{% endif %}</li>
                 {% endfor %}
               </ul>
             {% else %}

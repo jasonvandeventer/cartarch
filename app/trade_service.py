@@ -1172,6 +1172,109 @@ __all__ = [
 ]
 
 
+# ---------------------------------------------------------------------------
+# Wishlist tie-in (#146/#147 follow-up — Alex, Discord 2026-07-22).
+# ---------------------------------------------------------------------------
+
+
+def wishlist_propose_targets(session: Session, proposer_user_id: int) -> dict[int, Playgroup]:
+    """owner_user_id -> Playgroup, for every co-member the proposer could trade with.
+
+    A wishlist owner is a valid target ONLY if they have an active Showcase Share
+    to a playgroup the proposer is also in — the C2 precheck ``create_trade``
+    enforces. Reuses ``get_construction_options``' candidate walk (one query), so
+    the button is hidden rather than 400ing on an owner with no Share (decision:
+    keep A6, land on the construction page). First playgroup wins when several
+    are shared.
+    """
+    targets: dict[int, Playgroup] = {}
+    for cand in get_construction_options(session, proposer_user_id, None, None)["recipients"]:
+        targets.setdefault(cand["user"].id, cand["playgroup"])
+    return targets
+
+
+def resolve_propose_from_wishlist(
+    session: Session,
+    proposer_user_id: int,
+    owner_user_id: int,
+) -> dict | None:
+    """Wishlist → trade entry: seed the OFFERED side from wishlist ∩ own inventory.
+
+    The mirror of :func:`resolve_propose_from_showcase_item` (which seeds the
+    requested side). Returns ``{recipient, playgroup, offered_row_ids}`` or None
+    when there is no shared playgroup in which the owner has an active Share.
+
+    ``offered_row_ids`` is the proposer's own placed, non-proxy, **tradeable**
+    (``mode in {managed, sink}``) rows whose card name the owner is watching —
+    reusing the #147 ownership definition verbatim (``owned_inventory_for_names``,
+    already tradeable-first sorted). Deck/display copies are deliberately NOT
+    prefilled; they remain addable by hand from the offered grid.
+
+    A6 is unchanged: the caller lands on the construction page with the offered
+    side prefilled and must still pick >= 1 requested item.
+    """
+    from app.decklist_service import owned_inventory_for_names
+    from app.watchlist_service import build_public_wishlist_view
+
+    if proposer_user_id == owner_user_id:
+        return None
+    playgroup = wishlist_propose_targets(session, proposer_user_id).get(owner_user_id)
+    if playgroup is None:
+        return None
+    names = [c["name"] for c in build_public_wishlist_view(session, owner_user_id)["cards"]]
+    detail = owned_inventory_for_names(session, proposer_user_id, names, exclude_proxies=True)
+    row_ids = [
+        r["row_id"]
+        for rows in detail.values()
+        for r in rows
+        if r["is_tradeable"] and not r["is_pending"]
+    ]
+    return {
+        "recipient": session.query(User).filter(User.id == owner_user_id).first(),
+        "playgroup": playgroup,
+        "offered_row_ids": row_ids,
+    }
+
+
+def pending_offer_names_for_playgroup(
+    session: Session,
+    playgroup_id: int,
+    owner_user_ids: list[int],
+) -> dict[int, set[str]]:
+    """owner_user_id -> lowercased card names already covered by an in-flight trade.
+
+    "In-flight" = a trade in this playgroup TO that owner, status ``proposed`` OR
+    ``accepted``, carrying that card on the OFFERED side. Accepted counts because
+    trades are recording-only (B1) — an accepted trade doesn't clear the wishlist
+    row, and that is exactly when "already being provided" matters most.
+
+    **Privacy: aggregate only.** No proposer identity, no quantity — and this is
+    the playgroup surface only; the anonymous ``/w/{token}`` page never gets it.
+    One query for the whole page (never per entry). Name comes from the terminal
+    snapshot when present, else the live Card (§10 cleanup can null ``card_id``).
+    """
+    out: dict[int, set[str]] = {}
+    if not owner_user_ids:
+        return out
+    rows = (
+        session.query(Trade.recipient_user_id, TradeItem.card_name_at_trade, Card.name)
+        .join(TradeItem, TradeItem.trade_id == Trade.id)
+        .outerjoin(Card, TradeItem.card_id == Card.id)
+        .filter(
+            Trade.playgroup_id == playgroup_id,
+            Trade.recipient_user_id.in_(owner_user_ids),
+            Trade.status.in_(("proposed", "accepted")),
+            TradeItem.side == "offered",
+        )
+        .all()
+    )
+    for owner_id, snapshot_name, live_name in rows:
+        name = snapshot_name or live_name
+        if name:
+            out.setdefault(owner_id, set()).add(name.lower())
+    return out
+
+
 # Reference imported for static-analysis cleanliness (and_ may be reintroduced
 # in future query shapes). Keeping the import documented avoids ruff F401
 # without a noqa comment.

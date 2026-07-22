@@ -1095,6 +1095,13 @@ def public_wishlist_view(
     # #147 — a logged-in viewer sees which cards they already own (their own data).
     if viewer is not None:
         annotate_wishlist_ownership(session, viewer.id, view)
+        # Trade tie-in: only when viewer + owner share a playgroup the owner has
+        # an active Showcase Share in (the C2 precheck) — else the button is
+        # hidden rather than dead. NO [pending] badge here: that is a playgroup-
+        # member signal and must never reach the anonymous public page.
+        from app.trade_service import wishlist_propose_targets
+
+        view["can_propose"] = owner.id in wishlist_propose_targets(session, viewer.id)
     owner_name = owner.display_name  # display_name only — username is the email
     return render(
         request,

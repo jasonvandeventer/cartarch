@@ -11976,6 +11976,16 @@ table.dmtx .dmtx-rowhead {
   margin-left: 0.35rem;
   white-space: nowrap;
 }
+/* Trade tie-in: aggregate "already being offered" flag. Playgroup surface only. */
+.wl-pending-badge {
+  font-size: 0.72rem;
+  color: var(--muted, #8b949e);
+  border: 1px dashed var(--muted, #8b949e);
+  border-radius: 999px;
+  padding: 0 0.4rem;
+  margin-left: 0.35rem;
+  white-space: nowrap;
+}
 .wishlist-public-row.wl-owned {
   border-left: 3px solid var(--ok, #3fb950);
 }

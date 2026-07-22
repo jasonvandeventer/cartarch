@@ -496,7 +496,9 @@ def build_public_wishlist_view(session: Session, user_id: int) -> dict:
     out.sort(key=lambda e: (e["name"] or "").lower())
     # key is "cards" not "items": Jinja2 resolves `view.items` to the dict.items()
     # method, not a key named "items" (same gotcha as group_deck_items' `rows`).
-    return {"cards": out, "count": len(out)}
+    # owner_user_id is the trade tie-in's target (the "Propose a trade" link);
+    # not rendered as content. Still names-only for card data.
+    return {"cards": out, "count": len(out), "owner_user_id": user_id}
 
 
 def annotate_wishlist_ownership(session: Session, viewer_user_id: int, view: dict) -> dict:
@@ -603,11 +605,22 @@ def list_wishlist_shares_for_playgroup(
         .filter(WishlistShare.playgroup_id == playgroup_id)
         .all()
     )
+    from app.trade_service import pending_offer_names_for_playgroup, wishlist_propose_targets
+
+    # Trade tie-in (#146/#147 follow-up). Both are resolved ONCE for the whole
+    # page, not per sharer or per entry: one candidate walk for the "Propose a
+    # trade" targets, one query for the [pending] coverage across every sharer.
+    targets = wishlist_propose_targets(session, viewer_user_id)
+    pending = pending_offer_names_for_playgroup(session, playgroup_id, [s.user_id for s in shares])
     out = []
     for s in shares:
         # #147 — annotate each co-member's wishlist with the VIEWER's own ownership.
         view = build_public_wishlist_view(session, s.user_id)
         annotate_wishlist_ownership(session, viewer_user_id, view)
+        covered = pending.get(s.user_id, set())
+        for c in view["cards"]:
+            c["trade_pending"] = (c["name"] or "").lower() in covered
+        view["can_propose"] = s.user_id in targets
         out.append({"sharer": s.user, "view": view})
     out.sort(key=lambda r: (r["sharer"].display_name or r["sharer"].username or "").lower())
     return out

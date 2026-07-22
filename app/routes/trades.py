@@ -87,6 +87,7 @@ def trades_inbox(
 def trades_new_page(
     request: Request,
     from_showcase_item: int | None = None,
+    from_wishlist_user: int | None = None,
     recipient_user_id: int | None = None,
     playgroup_id: int | None = None,
     session: Session = Depends(get_db_session),
@@ -109,6 +110,20 @@ def trades_new_page(
     pre_playgroup = None
     pre_locked = False
     prefilled_requested = []
+    prefilled_offered_row_ids: list[int] = []
+
+    # Wishlist entry (#146/#147 follow-up): mirror of the propose-from-share
+    # flow — locks the (recipient, playgroup) context and seeds the OFFERED
+    # side. A6 unchanged: the user still picks >= 1 requested item here.
+    if from_wishlist_user and not from_showcase_item:
+        resolved = trade_service.resolve_propose_from_wishlist(
+            session, current_user.id, from_wishlist_user
+        )
+        if resolved is not None:
+            pre_recipient = resolved["recipient"]
+            pre_playgroup = resolved["playgroup"]
+            pre_locked = True
+            prefilled_offered_row_ids = resolved["offered_row_ids"]
 
     if from_showcase_item:
         resolved = trade_service.resolve_propose_from_showcase_item(
@@ -160,6 +175,7 @@ def trades_new_page(
                 "pre_playgroup": pre_playgroup,
                 "options": opts,
                 "prefilled_requested": prefilled_requested,
+                "prefilled_offered_row_ids": prefilled_offered_row_ids,
                 "error": request.query_params.get("error"),
             },
         )
@@ -181,6 +197,7 @@ def trades_new_page(
             "pre_playgroup": pre_playgroup,
             "options": options,
             "prefilled_requested": prefilled_requested,
+            "prefilled_offered_row_ids": prefilled_offered_row_ids,
             "error": request.query_params.get("error"),
         },
     )
