@@ -12657,6 +12657,12 @@ table.dmtx .dmtx-rowhead {
 .trade-pick-thumb {
   display: none;
 }
+.trade-pick-item.is-filtered-out {
+  display: none;
+}
+.trade-pick-filter-note {
+  color: var(--brand-gold);
+}
 .trade-pick-grid.is-visual {
   grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
 }

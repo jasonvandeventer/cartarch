@@ -1,5 +1,15 @@
 [
   {
+    "version": "4.11.39",
+    "date": "2026-07-22",
+    "added": [
+      "A \"Picked only\" checkbox on the trade form's card pickers. Tick it and the list collapses to just the cards you've selected — most useful when a trade is started from someone's wishlist, which fills your side in automatically and previously left you scrolling your whole collection to weed out the ones you'd rather keep."
+    ],
+    "refined": [],
+    "resolved": [],
+    "archivist_note": "The filter re-applies when you tick it, not continuously — so removing a card leaves the row where it is instead of making it disappear under your cursor. Hiding a card never un-picks it; it is only a view."
+  },
+  {
     "version": "4.11.38",
     "date": "2026-07-22",
     "added": [

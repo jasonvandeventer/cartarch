@@ -53,6 +53,10 @@ data-sort-avail="{{ avail }}"
   <label class="trade-pick-visual-toggle">
     <input type="checkbox" class="js-pick-visual" data-grid="{{ grid_id }}"> Card images
   </label>
+  <label class="trade-pick-visual-toggle">
+    <input type="checkbox" class="js-pick-only" data-grid="{{ grid_id }}"> Picked only
+  </label>
+  <span class="trade-pick-filter-note" data-grid="{{ grid_id }}"></span>
 </div>
 {%- endmacro %}
 
@@ -444,6 +448,34 @@ data-sort-avail="{{ avail }}"
         sel.addEventListener('change', run);
         sel.addEventListener('input', run);
       });
+      // "Picked only" — collapses a grid to just what's currently selected, so
+      // a wishlist-prefilled offer can be pruned without scrolling a whole
+      // collection. Deliberately a SNAPSHOT: it re-filters when you toggle it,
+      // NOT on every selection change, so un-picking a card doesn't make the
+      // row vanish out from under the click that un-picked it.
+      function applyOnlyPicked(box) {
+        var grid = gridOf(box);
+        if (!grid) return;
+        var isOffered = grid.id === 'offered-grid';
+        var map = isOffered ? offered : requested;
+        var attr = isOffered ? 'data-inventory-row-id' : 'data-showcase-item-id';
+        var note = document.querySelector('.trade-pick-filter-note[data-grid="' + grid.id + '"]');
+        if (box.checked && map.size === 0) {
+          // Filtering to nothing would just look like a broken page.
+          box.checked = false;
+          if (note) note.textContent = 'Nothing picked yet.';
+          return;
+        }
+        if (note) note.textContent = '';
+        grid.querySelectorAll('.trade-pick-item').forEach(function (el) {
+          var keep = !box.checked || map.has(parseInt(el.getAttribute(attr), 10));
+          el.classList.toggle('is-filtered-out', !keep);
+        });
+      }
+      document.querySelectorAll('.js-pick-only').forEach(function (box) {
+        box.addEventListener('change', function () { applyOnlyPicked(box); });
+      });
+
       function applyVisual(box) {
         var grid = gridOf(box);
         if (grid) grid.classList.toggle('is-visual', box.checked);
@@ -459,6 +491,7 @@ data-sort-avail="{{ avail }}"
         applySort(sel.getAttribute('data-grid'));
       });
       document.querySelectorAll('.js-pick-visual').forEach(applyVisual);
+      document.querySelectorAll('.js-pick-only').forEach(applyOnlyPicked);
 
       form.addEventListener('submit', function (e) {
         serialize();
