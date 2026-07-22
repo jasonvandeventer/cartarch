@@ -15,10 +15,12 @@ from fastapi import Depends, Form, HTTPException, Request, status
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
+from app import sort_spec
 from app.db import SessionLocal
 from app.deck_service import CARD_ROLE_TAGS
 from app.inventory_service import FINISH_OPTIONS
 from app.models import InventoryRow, StorageLocation, User
+from app.pricing import effective_price
 from app.timeutil import utc_now
 
 logger = logging.getLogger(__name__)
@@ -163,6 +165,14 @@ def scryfall_image_fallback(scryfall_id: str, size: str = "normal", face: str = 
 
 templates.env.globals["mirror_image_url"] = mirror_image_url
 templates.env.globals["scryfall_image_fallback"] = scryfall_image_fallback
+
+# Sort keys for surfaces that sort client-side (the trade construction picker —
+# a page reload would drop the in-progress selection, so its sort is JS over
+# pre-rendered data-sort-* attributes). The VALUES still come from the one
+# sort_spec / pricing source, emitted server-side, so no rank or price rule is
+# duplicated in JS.
+templates.env.globals["rarity_rank"] = sort_spec.rarity_rank
+templates.env.globals["effective_price"] = effective_price
 
 
 # Resolved relative to this module, NOT the process cwd — so the hash is found

@@ -1,5 +1,50 @@
-{% from "_macros.html" import editorial_eyebrow %}
+{% from "_macros.html" import editorial_eyebrow, img_fallback %}
 {% extends "base.html" %}
+
+{# Sort keys for the client-side picker sort. Values come from sort_spec /
+   pricing (registered as Jinja globals) so the rarity rank + finish-aware price
+   are NOT re-implemented in JS — only the comparison is. Sort is client-side
+   here (not the shared ?sort= param) because a reload would drop the
+   in-progress selection, which lives only in the page's JS Maps. #}
+{% macro pick_sort_attrs(card, finish, avail, is_proxy) -%}
+data-sort-name="{{ (card.name or '') | lower }}"
+data-sort-cmc="{{ '' if card.cmc is none else card.cmc }}"
+data-sort-set="{{ card.set_code or '' }} {{ card.collector_number or '' }}"
+data-sort-rarity="{{ rarity_rank(card.rarity) }}"
+data-sort-price="{{ 0 if is_proxy else effective_price(card, finish) }}"
+data-sort-avail="{{ avail }}"
+{%- endmacro %}
+
+{% macro pick_thumb(card) -%}
+{% if card.image_url and card.scryfall_id %}
+  <img class="trade-pick-thumb" src="{{ mirror_image_url(card.scryfall_id) }}"
+       {{ img_fallback(card.scryfall_id) }} alt="{{ card.name }}" loading="lazy">
+{% endif %}
+{%- endmacro %}
+
+{% macro pick_tools(grid_id) -%}
+<div class="trade-pick-tools">
+  <label>Sort
+    <select class="js-pick-sort" data-grid="{{ grid_id }}">
+      <option value="">Default</option>
+      <option value="name">Name</option>
+      <option value="cmc">Mana Value</option>
+      <option value="set">Set</option>
+      <option value="rarity">Rarity</option>
+      <option value="price">Price</option>
+      <option value="avail">Quantity Available</option>
+    </select>
+  </label>
+  <select class="js-pick-dir" data-grid="{{ grid_id }}" aria-label="Sort direction">
+    <option value="asc">Ascending</option>
+    <option value="desc">Descending</option>
+  </select>
+  <label class="trade-pick-visual-toggle">
+    <input type="checkbox" class="js-pick-visual" data-grid="{{ grid_id }}"> Card images
+  </label>
+</div>
+{%- endmacro %}
+
 {% block content %}
   {# v3.29.2 — trade construction page. Two initiation modes feed this:
      - Standalone /trades/new: recipient+playgroup picker first, then
@@ -82,14 +127,17 @@
       <section class="panel">
         <h3 class="panel-title">Their cards (requested)</h3>
         <p class="muted">Pick items from <strong>{{ pre_recipient.display_name or pre_recipient.username }}</strong>'s Showcase that's shared with <em>{{ pre_playgroup.name }}</em>. Toggle to add &mdash; quantities default to available, click to override.</p>
+        {{ pick_tools('requested-grid') }}
         <div class="trade-pick-grid" id="requested-grid">
           {% set seen_pre = [] %}
           {% for it in prefilled_requested %}
             <div class="trade-pick-item trade-pick-prefilled"
                  data-showcase-item-id="{{ it.showcase_item_id }}"
                  data-available="{{ it.available }}"
-                 data-proxy="{{ '1' if it.is_proxy else '0' }}">
+                 data-proxy="{{ '1' if it.is_proxy else '0' }}"
+                 {{ pick_sort_attrs(it.card, it.finish, it.available, it.is_proxy) }}>
               <div class="trade-pick-card">
+                {{ pick_thumb(it.card) }}
                 <div class="trade-pick-name">{{ it.card.name }}{% if it.is_proxy %} <span class="proxy-badge proxy-badge-warn" title="Proxy — carries no market value">PROXY</span>{% endif %}</div>
                 <div class="trade-pick-meta">
                   {{ it.card.set_code | upper }} #{{ it.card.collector_number }} &middot;
@@ -114,8 +162,10 @@
               <div class="trade-pick-item"
                    data-showcase-item-id="{{ share_item.showcase_item_id }}"
                    data-available="{{ share_item.available }}"
-                   data-proxy="{{ '1' if share_item.is_proxy else '0' }}">
+                   data-proxy="{{ '1' if share_item.is_proxy else '0' }}"
+                   {{ pick_sort_attrs(share_item.card, share_item.finish, share_item.available, share_item.is_proxy) }}>
                 <div class="trade-pick-card">
+                  {{ pick_thumb(share_item.card) }}
                   <div class="trade-pick-name">{{ share_item.card.name }}{% if share_item.is_proxy %} <span class="proxy-badge proxy-badge-warn" title="Proxy — carries no market value">PROXY</span>{% endif %}</div>
                   <div class="trade-pick-meta">
                     {{ share_item.card.set_code | upper }} #{{ share_item.card.collector_number }} &middot;
@@ -139,13 +189,16 @@
         <h3 class="panel-title">Your cards (offered)</h3>
         <p class="muted">Pick items from your own placed inventory to offer in exchange.</p>
         {% if options.proposer_inventory %}
+          {{ pick_tools('offered-grid') }}
           <div class="trade-pick-grid" id="offered-grid">
             {% for inv in options.proposer_inventory %}
               <div class="trade-pick-item{% if inv.inventory_row_id in prefilled_offered_row_ids %} trade-pick-prefilled{% endif %}"
                    data-inventory-row-id="{{ inv.inventory_row_id }}"
                    data-available="{{ inv.quantity }}"
-                   data-proxy="{{ '1' if inv.is_proxy else '0' }}">
+                   data-proxy="{{ '1' if inv.is_proxy else '0' }}"
+                   {{ pick_sort_attrs(inv.card, inv.finish, inv.quantity, inv.is_proxy) }}>
                 <div class="trade-pick-card">
+                  {{ pick_thumb(inv.card) }}
                   <div class="trade-pick-name">{{ inv.card.name }}{% if inv.is_proxy %} <span class="proxy-badge proxy-badge-warn" title="Proxy — carries no market value">PROXY</span>{% endif %}</div>
                   <div class="trade-pick-meta">
                     {{ inv.card.set_code | upper }} #{{ inv.card.collector_number }} &middot;
@@ -277,6 +330,53 @@
           var id = parseInt(input.getAttribute('data-showcase-item-id'), 10);
           var qty = parseInt(input.value, 10) || 1;
           if (requested.has(id)) requested.set(id, { quantity: qty });
+        });
+      });
+
+      // Picker sort + image-grid toggle. Sorting is DOM reordering only — the
+      // selection Maps are keyed on ids, so reordering never disturbs a pick
+      // (which is why this is client-side: a ?sort= reload would drop them).
+      var NUMERIC = { cmc: 1, price: 1, avail: 1, rarity: 1 };
+      function sortGrid(grid, key, dir) {
+        if (!grid) return;
+        var items = Array.prototype.slice.call(grid.querySelectorAll('.trade-pick-item'));
+        if (!key) return;
+        var mul = dir === 'desc' ? -1 : 1;
+        function val(el) {
+          var raw = el.getAttribute('data-sort-' + key);
+          if (!NUMERIC[key]) return (raw || '').toLowerCase();
+          var n = parseFloat(raw);
+          // Missing / zero price + missing mana value sort last either way,
+          // matching sort_spec's nulls-last rule.
+          return isNaN(n) || (key === 'price' && n === 0) ? null : n;
+        }
+        items.sort(function (a, b) {
+          var av = val(a), bv = val(b);
+          if (av === null && bv === null) return 0;
+          if (av === null) return 1;
+          if (bv === null) return -1;
+          if (av < bv) return -1 * mul;
+          if (av > bv) return 1 * mul;
+          // Stable tiebreak on name, same as the server-side spec.
+          var an = a.getAttribute('data-sort-name') || '';
+          var bn = b.getAttribute('data-sort-name') || '';
+          return an < bn ? -1 : an > bn ? 1 : 0;
+        });
+        items.forEach(function (el) { grid.appendChild(el); });
+      }
+      function gridOf(el) { return document.getElementById(el.getAttribute('data-grid')); }
+      function applySort(gridId) {
+        var sel = document.querySelector('.js-pick-sort[data-grid="' + gridId + '"]');
+        var dir = document.querySelector('.js-pick-dir[data-grid="' + gridId + '"]');
+        sortGrid(document.getElementById(gridId), sel ? sel.value : '', dir ? dir.value : 'asc');
+      }
+      document.querySelectorAll('.js-pick-sort, .js-pick-dir').forEach(function (sel) {
+        sel.addEventListener('change', function () { applySort(sel.getAttribute('data-grid')); });
+      });
+      document.querySelectorAll('.js-pick-visual').forEach(function (box) {
+        box.addEventListener('change', function () {
+          var grid = gridOf(box);
+          if (grid) grid.classList.toggle('is-visual', box.checked);
         });
       });
 

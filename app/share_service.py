@@ -759,6 +759,10 @@ def get_share_view(
 # derived from any field outside this whitelist.
 _SHARE_CARD_FIELDS = (
     "id",
+    # Public reference data (same posture as _PUBLIC_CARD_FIELDS on the deck
+    # share view) — the image mirror builds its src from it, so omitting it made
+    # every projected card render a broken <img> pointing at ".../normal.jpg".
+    "scryfall_id",
     "name",
     "set_code",
     "set_name",
