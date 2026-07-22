@@ -1,5 +1,18 @@
 [
   {
+    "version": "4.11.35",
+    "date": "2026-07-22",
+    "added": [
+      "A \"Propose a trade\" button on a shared wishlist. Open someone's wishlist, and if you already own cards they're after, the trade form opens with those cards filled in on your side — you just pick what you'd like back from their Showcase. Only copies that are actually free to trade get filled in; anything sitting in a deck stays put unless you add it yourself.",
+      "A [pending] tag on wishlist entries a playgroup member has already offered in a trade, so nobody spends an evening tracking down a card someone else is already bringing. It shows that a card is covered — never who is covering it, and never on a public wishlist link."
+    ],
+    "refined": [
+      "On the trade form, cards on your side of the deal can now be un-picked as easily as picked."
+    ],
+    "resolved": [],
+    "archivist_note": "The trade tie-in that both wishlist releases deferred, requested by Alex. Two decisions shaped it. The first: a wishlist-seeded proposal is one-sided by nature, and trades here have always required something on both sides. We kept that rule rather than inventing a gift path — the button seeds your half and leaves the asking to you. The second: the [pending] tag deliberately widens what a third party can see, so we drew the line at aggregate. Covered, not covered-by-whom, and never on a link anyone can open. Both parts reuse machinery already in place — the ownership matching came free from the wishlist release before it, and the badge costs one query per page. No schema change."
+  },
+  {
     "version": "4.11.34",
     "date": "2026-07-19",
     "added": [],
