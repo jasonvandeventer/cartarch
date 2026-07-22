@@ -1,0 +1,23 @@
+{# Shared colour + type facet selects (v4.12.1).
+
+   The client-side companion to app/card_filters.py: these two <select>s feed
+   list-filter.js, which compares them against each row's server-emitted
+   data-colors / data-types attributes. Client-side on every surface that uses
+   it — the trade picker must not reload (its selection lives only in the page's
+   JS), and the wishlist lists are bounded and already rendered.
+
+   Params:
+     target : the CSS selector for the rows to filter (must match the name
+              input's data-list-filter-target on the same surface, so the
+              criteria compose instead of fighting)
+#}
+<select data-list-facet="colors" data-list-filter-target="{{ target }}" aria-label="Filter by colour">
+  {% for value, label in color_filter_options %}
+    <option value="{{ value }}">{{ label }}</option>
+  {% endfor %}
+</select>
+<select data-list-facet="types" data-list-filter-target="{{ target }}" aria-label="Filter by card type">
+  {% for value, label in type_filter_options %}
+    <option value="{{ value }}">{{ label }}</option>
+  {% endfor %}
+</select>

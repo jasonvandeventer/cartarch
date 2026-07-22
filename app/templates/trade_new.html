@@ -13,6 +13,8 @@ data-sort-set="{{ card.set_code or '' }} {{ card.collector_number or '' }}"
 data-sort-rarity="{{ rarity_rank(card.rarity) }}"
 data-sort-price="{{ 0 if is_proxy else effective_price(card, finish) }}"
 data-sort-avail="{{ avail }}"
+{% set facets = card_filter_tokens(card) %}data-colors="{{ facets[0] }}" data-types="{{ facets[1] }}"
+data-filter-text="{{ card.name }}"
 {%- endmacro %}
 
 {# Per-card price in the picker. Same finish-aware effective_price the trade
@@ -57,6 +59,11 @@ data-sort-avail="{{ avail }}"
   <label class="trade-pick-visual-toggle">
     <input type="checkbox" class="js-pick-only" data-grid="{{ grid_id }}"> Picked only
   </label>
+  {% set target = '#' + grid_id + ' .trade-pick-item' %}
+  {% include "_card_facets.html" with context %}
+  <input type="search" class="trade-pick-namebox" placeholder="Filter by name…"
+         aria-label="Filter by card name"
+         data-list-filter data-list-filter-target="{{ target }}">
   <span class="trade-pick-filter-note" data-grid="{{ grid_id }}"></span>
 </div>
 {%- endmacro %}
@@ -259,6 +266,7 @@ data-sort-avail="{{ avail }}"
     </form>
   {% endif %}
 
+  <script src="/static/list-filter.js?v={{ static_v('list-filter.js') }}"></script>
   <script>
     (function () {
       // Trade construction JS. Tracks selected items per side via Maps

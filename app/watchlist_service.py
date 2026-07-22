@@ -34,6 +34,7 @@ import secrets
 from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
+from app.card_filters import card_filter_tokens, color_filter_token, type_filter_token
 from app.models import Card, InventoryRow, PlaygroupMember, User, WatchlistItem, WishlistShare
 from app.timeutil import utc_now
 
@@ -159,9 +160,19 @@ def list_watchlist(session: Session, user_id: int) -> list[dict]:
     # IN-filter is cheap; we then fold to per-name min in Python.
     name_watch_names = sorted({item.card_name for item in items if item.card_name})
     name_lowest: dict[str, float | None] = {}
+    name_traits: dict[str, tuple[str, str]] = {}
     if name_watch_names:
         printings = session.query(Card).filter(Card.name.in_(name_watch_names)).all()
         for card in printings:
+            # Colour/type for a NAME watch (which has no Card of its own) — taken
+            # from any printing of that name, since both are shared across
+            # printings. Rides the query already fetching printings for the price
+            # floor, so this costs no extra round trip.
+            if card.name not in name_traits:
+                name_traits[card.name] = (
+                    color_filter_token(card.color_identity),
+                    type_filter_token(card.type_line),
+                )
             per_card_min = _min_finish_price(card)
             if per_card_min is None:
                 continue
@@ -177,6 +188,7 @@ def list_watchlist(session: Session, user_id: int) -> list[dict]:
             # v3.28.11 — printing-specific: min across the three finishes
             # on the joined Card. Zero extra queries (card is joinedload-ed).
             current_min_price = _min_finish_price(item.card)
+            card_colors, card_types = card_filter_tokens(item.card)
             target_met = (
                 target_price is not None
                 and current_min_price is not None
@@ -196,12 +208,15 @@ def list_watchlist(session: Session, user_id: int) -> list[dict]:
                     "target_price": target_price,
                     "current_min_price": current_min_price,
                     "target_met": target_met,
+                    "filter_colors": card_colors,
+                    "filter_types": card_types,
                 }
             )
         elif item.card_name is not None:
             placed, pending = _ownership_for_card_name(session, user_id, item.card_name)
             # v3.28.11 — printing-agnostic: lowest across all printings.
             current_min_price = name_lowest.get(item.card_name)
+            card_colors, card_types = name_traits.get(item.card_name, ("", ""))
             target_met = (
                 target_price is not None
                 and current_min_price is not None
@@ -221,6 +236,8 @@ def list_watchlist(session: Session, user_id: int) -> list[dict]:
                     "target_price": target_price,
                     "current_min_price": current_min_price,
                     "target_met": target_met,
+                    "filter_colors": card_colors,
+                    "filter_types": card_types,
                 }
             )
         # Defensive: a row with neither column populated would be invalid
@@ -441,7 +458,12 @@ def is_name_watched(session: Session, user_id: int, card_name: str) -> bool:
 # price / ownership counts — a gift-registry, not the owner's private view.
 
 # Card fields the shared wishlist may expose — NO note/price/ownership.
-_PUBLIC_WISHLIST_CARD_FIELDS = ("scryfall_id", "image_url")
+# color_identity/type_line join the list in v4.12.1 to drive the viewer-side
+# colour/type filter: they are PUBLIC card reference data (the viewer already
+# has the card's name and can look either up), so this widens what is filterable
+# without widening what is private. scryfall_id must always ride along with
+# image_url — see the projection rule in CLAUDE.md.
+_PUBLIC_WISHLIST_CARD_FIELDS = ("scryfall_id", "image_url", "color_identity", "type_line")
 
 
 def generate_wishlist_share_token(session: Session, user_id: int) -> str | None:
@@ -485,6 +507,18 @@ def build_public_wishlist_view(session: Session, user_id: int) -> dict:
         .filter(WatchlistItem.user_id == user_id)
         .all()
     )
+    # Colour/type for NAME-only watches, resolved from any printing of that name
+    # in ONE batched query (both are shared across printings). Same shape as
+    # list_watchlist's price-floor fold — never a per-row lookup.
+    name_only = sorted({it.card_name for it in items if it.card_id is None and it.card_name})
+    name_traits: dict[str, tuple[str, str]] = {}
+    if name_only:
+        for card in session.query(Card).filter(Card.name.in_(name_only)).all():
+            name_traits.setdefault(
+                card.name,
+                (color_filter_token(card.color_identity), type_filter_token(card.type_line)),
+            )
+
     out: list[dict] = []
     for it in items:
         card = it.card  # None for name-only watches
@@ -492,6 +526,11 @@ def build_public_wishlist_view(session: Session, user_id: int) -> dict:
         entry = {"name": name, "specific_printing": it.card_id is not None}
         for f in _PUBLIC_WISHLIST_CARD_FIELDS:
             entry[f] = getattr(card, f, None) if card else None
+        colors, types = (
+            card_filter_tokens(card) if card else name_traits.get(it.card_name or "", ("", ""))
+        )
+        entry["filter_colors"] = colors
+        entry["filter_types"] = types
         out.append(entry)
     out.sort(key=lambda e: (e["name"] or "").lower())
     # key is "cards" not "items": Jinja2 resolves `view.items` to the dict.items()

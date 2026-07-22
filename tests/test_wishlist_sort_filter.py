@@ -103,3 +103,6 @@ def test_sort_params_reach_the_page(client, db, user):
     assert 'name="show"' in body
     assert 'data-list-filter-target="#watchlist-table tbody tr"' in body
     assert "list-filter.js" in body
+    # Colour + type facets ride the same target, so the three criteria compose
+    # in one engine instead of clobbering each other's `hidden`.
+    assert 'data-list-facet="colors"' in body and 'data-list-facet="types"' in body

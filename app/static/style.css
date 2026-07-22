@@ -1,3 +1,12 @@
+/* The UA's `[hidden] { display: none }` loses to ANY class rule that sets a
+   display (flex/grid/block/table-row), so an element the JS hides with
+   `el.hidden = true` can stay visible. That has bitten this codebase before
+   (see .gf-context-menu below). One global rule, so `hidden` always means
+   hidden — every instant-filter surface depends on it. */
+[hidden] {
+  display: none !important;
+}
+
 /* ============================================================================
    Responsive breakpoints
    ----------------------------------------------------------------------------
@@ -15939,5 +15948,20 @@ body.cmp-lobby-body { height: auto; min-height: 100dvh; overflow-y: auto; }
 }
 .watchlist-search {
   margin-left: auto;
+  min-width: 12rem;
+}
+
+/* Shared instant colour/type/name filter bar (v4.12.1) — wishlist page, public
+   wishlist, playgroup members' wishlists. Sits below any server-side Apply
+   toolbar; these controls take effect as you change them. */
+.wl-filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.8rem;
+  font-size: 0.88rem;
+}
+.wl-filter-bar input[type="search"] {
   min-width: 12rem;
 }

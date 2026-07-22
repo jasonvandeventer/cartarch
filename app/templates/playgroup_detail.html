@@ -149,6 +149,12 @@
   <section class="panel">
     <h3 class="panel-title">Members' wishlists</h3>
     {% if member_wishlists %}
+      {% set target = ".wl-member-cards > li" %}
+      <div class="wl-filter-bar">
+        {% include "_card_facets.html" with context %}
+        <input type="search" placeholder="Filter by name…" aria-label="Filter wishlists by card name"
+               data-list-filter data-list-filter-target="{{ target }}">
+      </div>
       <p class="muted">Cards members are hunting — names only. Handy for gifts and trade prep.</p>
       <div class="wl-member-list">
         {% for row in member_wishlists %}
@@ -166,7 +172,9 @@
             {% if row.view.cards %}
               <ul class="wl-member-cards">
                 {% for it in row.view.cards %}
-                  <li{% if it.owned %} class="wl-owned"{% endif %}>{{ it.name }}{% if it.specific_printing %} <span class="muted">(specific printing)</span>{% endif %}{% if it.trade_pending %} <span class="wl-pending-badge" title="Someone has already offered this card in a trade">[pending]</span>{% endif %}{% if it.owned %} <span class="wl-owned-badge">you own {{ it.owned }}</span>{% if it.locations %} <span class="wl-owned-where">{% for l in it.locations %}{{ l.quantity }}× {{ l.label }}{% if not loop.last %} · {% endif %}{% endfor %}</span>{% endif %}{% endif %}</li>
+                  <li{% if it.owned %} class="wl-owned"{% endif %}
+                     data-filter-text="{{ it.name }}"
+                     data-colors="{{ it.filter_colors }}" data-types="{{ it.filter_types }}">{{ it.name }}{% if it.specific_printing %} <span class="muted">(specific printing)</span>{% endif %}{% if it.trade_pending %} <span class="wl-pending-badge" title="Someone has already offered this card in a trade">[pending]</span>{% endif %}{% if it.owned %} <span class="wl-owned-badge">you own {{ it.owned }}</span>{% if it.locations %} <span class="wl-owned-where">{% for l in it.locations %}{{ l.quantity }}× {{ l.label }}{% if not loop.last %} · {% endif %}{% endfor %}</span>{% endif %}{% endif %}</li>
                 {% endfor %}
               </ul>
             {% else %}
@@ -178,6 +186,7 @@
     {% else %}
       <p class="muted">No member has shared their wishlist with this playgroup yet. Share yours from the <a href="/watchlist">Wishlist</a> page.</p>
     {% endif %}
+    <script src="/static/list-filter.js?v={{ static_v('list-filter.js') }}"></script>
   </section>
 
   {# ── Owner controls (rename/notes, transfer, delete) ── #}

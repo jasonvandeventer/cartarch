@@ -24,9 +24,19 @@
   </header>
 
   {% if view.cards %}
+    {% set target = ".wishlist-public-list > li" %}
+    <div class="wl-filter-bar">
+      {% include "_card_facets.html" with context %}
+      <input type="search" placeholder="Filter by name…" aria-label="Filter wishlist by card name"
+             data-list-filter data-list-filter-target="{{ target }}"
+             data-list-filter-empty="#wl-public-no-match">
+    </div>
+    <p id="wl-public-no-match" class="muted" hidden>No cards match that filter.</p>
     <ul class="wishlist-public-list">
       {% for it in view.cards %}
-        <li class="wishlist-public-row{% if it.owned %} wl-owned{% endif %}">
+        <li class="wishlist-public-row{% if it.owned %} wl-owned{% endif %}"
+            data-filter-text="{{ it.name }}"
+            data-colors="{{ it.filter_colors }}" data-types="{{ it.filter_types }}">
           <span class="wl-name">{{ it.name }}</span>
           {% if it.specific_printing %}<span class="wl-printing">specific printing</span>{% endif %}
           {% if it.owned %}
@@ -41,6 +51,8 @@
   {% else %}
     <p class="wishlist-public-empty">This wishlist is empty.</p>
   {% endif %}
+
+  <script src="/static/list-filter.js?v={{ static_v('list-filter.js') }}"></script>
 
   <footer class="wishlist-public-footer">
     Shared via <a href="/">Cartarch</a> — a self-hosted Magic: The Gathering collection manager.

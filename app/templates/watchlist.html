@@ -114,6 +114,7 @@
          (shared _sort_controls partial + sort_spec, so they behave like every
          other sorted list); the by-name box is the existing client-side
          list-filter.js — instant, and the wishlist is a bounded list. #}
+      {% set target = "#watchlist-table tbody tr" %}
       <form method="get" action="/watchlist" class="watchlist-toolbar">
         <span class="watchlist-toolbar-group">Sort {% include "_sort_controls.html" %}</span>
         <label>Show
@@ -125,13 +126,19 @@
           </select>
         </label>
         <button type="submit" class="btn-like">Apply</button>
+      </form>
+      {# Instant filters live OUTSIDE the Apply form on purpose: they take effect
+         as you change them, and being inside would imply they need Apply (and
+         they carry no name=, so a submit would silently reset them). #}
+      <div class="wl-filter-bar">
+        {% include "_card_facets.html" with context %}
         <input type="search" class="watchlist-search" placeholder="Filter by name…"
                aria-label="Filter wishlist by card name"
                data-list-filter
-               data-list-filter-target="#watchlist-table tbody tr"
+               data-list-filter-target="{{ target }}"
                data-list-filter-empty="#watchlist-filter-empty">
-      </form>
-      <p id="watchlist-filter-empty" class="muted" hidden>No wishlist cards match that name.</p>
+      </div>
+      <p id="watchlist-filter-empty" class="muted" hidden>No wishlist cards match those filters.</p>
       <script src="/static/list-filter.js?v={{ static_v('list-filter.js') }}"></script>
       {% if not items %}
         <p class="muted">Nothing on your wishlist matches that filter. <a href="/watchlist">Show everything</a>.</p>
@@ -153,6 +160,7 @@
           <tbody>
             {% for item in items %}
               <tr data-filter-text="{{ item.display_name }}"
+                  data-colors="{{ item.filter_colors }}" data-types="{{ item.filter_types }}"
                   {% if item.target_met %}class="watchlist-row-target-met"{% endif %}>
                 <td>
                   {% if item.identity_mode == 'card' %}

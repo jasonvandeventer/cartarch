@@ -1,5 +1,15 @@
 [
   {
+    "version": "4.12.1",
+    "date": "2026-07-22",
+    "added": [
+      "Colour and card-type filters everywhere the wishlist and trades show cards: your own wishlist, a shared wishlist link, the members' wishlists on a playgroup page, and both sides of the trade proposal form. Pick a colour, a type, or both, and the list narrows as you choose — no page reload, and it stacks with the name box and everything else already on screen."
+    ],
+    "refined": [],
+    "resolved": [],
+    "archivist_note": "\"Green\" here means cards that are green, which is a different question from the one the Collection's colour pips answer — those show what you could cast in a deck of those colours, so they include colourless cards. Both are right for their own surface, and they are kept deliberately distinct. Colourless and Multicolour are their own choices rather than something you have to infer."
+  },
+  {
     "version": "4.12.0",
     "date": "2026-07-22",
     "added": [

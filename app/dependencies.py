@@ -15,7 +15,7 @@ from fastapi import Depends, Form, HTTPException, Request, status
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
-from app import sort_spec
+from app import card_filters, sort_spec
 from app.db import SessionLocal
 from app.deck_service import CARD_ROLE_TAGS
 from app.inventory_service import FINISH_OPTIONS
@@ -171,6 +171,11 @@ templates.env.globals["scryfall_image_fallback"] = scryfall_image_fallback
 # pre-rendered data-sort-* attributes). The VALUES still come from the one
 # sort_spec / pricing source, emitted server-side, so no rank or price rule is
 # duplicated in JS.
+# Colour/type facet options — Jinja globals so the shared _card_facets.html
+# partial never has to be passed them by every route that includes it.
+templates.env.globals["color_filter_options"] = card_filters.COLOR_FILTER_OPTIONS
+templates.env.globals["type_filter_options"] = card_filters.TYPE_FILTER_OPTIONS
+templates.env.globals["card_filter_tokens"] = card_filters.card_filter_tokens
 templates.env.globals["rarity_rank"] = sort_spec.rarity_rank
 templates.env.globals["effective_price"] = effective_price
 
