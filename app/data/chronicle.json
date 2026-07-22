@@ -1,5 +1,17 @@
 [
   {
+    "version": "4.12.0",
+    "date": "2026-07-22",
+    "added": [
+      "Sorting and filtering on the Wishlist. Sort by name, current price, target price, date added, or how many copies you own; narrow the list to cards whose target price has been met, cards you don't own yet, or ones you already do; and filter by name as you type."
+    ],
+    "refined": [],
+    "resolved": [
+      "Card images on a completed trade were rendering as blank frames. The record kept for a finished trade was missing the one identifier the image server needs, so every card came up empty. Fixed — and the card view now falls back to a clean placeholder rather than a broken frame if an image can't be built."
+    ],
+    "archivist_note": "Both items came from SaintWacko on the same afternoon. The image bug is the second of its kind in a week — the same field missing from a different copy of the same idea — so alongside the fix we made the card view refuse to draw an image it can't actually build. A blank frame is worse than no frame: it looks like the card is missing rather than the picture."
+  },
+  {
     "version": "4.11.40",
     "date": "2026-07-22",
     "added": [

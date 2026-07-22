@@ -203,7 +203,13 @@ onerror="this.onerror=null; this.src='{{ scryfall_image_fallback(scryfall_id, si
      (Collection / Locations / Decks keep the neutral badge + market price). #}
   <article class="inventory-card inventory-card-compact">
     <div class="inventory-card-media">
-      {% if item.card.image_url %}
+      {# Guard on BOTH: the mirror src is built from scryfall_id, so a card-like
+         object that exposes image_url but not scryfall_id (the sanitized
+         projections) would otherwise render an <img> pointing at ".../normal.jpg"
+         — a blank frame instead of the clean placeholder. Jinja turns the missing
+         attribute into Undefined rather than erroring, so this must be guarded,
+         not assumed. #}
+      {% if item.card.image_url and item.card.scryfall_id %}
         <a href="/cards/{{ item.card.id }}">
           <img class="inventory-thumb"
                src="{{ mirror_image_url(item.card.scryfall_id) }}"

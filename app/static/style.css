@@ -15919,3 +15919,25 @@ body.cmp-lobby-body { height: auto; min-height: 100dvh; overflow-y: auto; }
 .considering-btn { font-size: 0.75rem; padding: 0.1rem 0.5rem; }
 .considering-empty { margin: 0.5rem 0 0; }
 .add-card-submit-secondary { background: transparent; }
+
+/* Wishlist sort/filter toolbar (2026-07-22). Sort + Show are query params
+   (server-side, shared sort_spec); the name box is the client-side
+   list-filter.js the Showcases/Shares indexes already use. */
+.watchlist-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.8rem;
+  font-size: 0.88rem;
+}
+.watchlist-toolbar label,
+.watchlist-toolbar-group {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.watchlist-search {
+  margin-left: auto;
+  min-width: 12rem;
+}

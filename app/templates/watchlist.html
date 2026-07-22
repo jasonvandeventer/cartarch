@@ -108,10 +108,36 @@
     </form>
   </section>
 
-  {% if items %}
+  {% if items or show != 'all' %}
     <section class="panel">
+      {# Sort + filter (SaintWacko, 2026-07-22). Sort/filter are query params
+         (shared _sort_controls partial + sort_spec, so they behave like every
+         other sorted list); the by-name box is the existing client-side
+         list-filter.js — instant, and the wishlist is a bounded list. #}
+      <form method="get" action="/watchlist" class="watchlist-toolbar">
+        <span class="watchlist-toolbar-group">Sort {% include "_sort_controls.html" %}</span>
+        <label>Show
+          <select name="show">
+            <option value="all" {% if show == 'all' %}selected{% endif %}>Everything</option>
+            <option value="target_met" {% if show == 'target_met' %}selected{% endif %}>Target price met</option>
+            <option value="unowned" {% if show == 'unowned' %}selected{% endif %}>Not owned yet</option>
+            <option value="owned" {% if show == 'owned' %}selected{% endif %}>Already owned</option>
+          </select>
+        </label>
+        <button type="submit" class="btn-like">Apply</button>
+        <input type="search" class="watchlist-search" placeholder="Filter by name…"
+               aria-label="Filter wishlist by card name"
+               data-list-filter
+               data-list-filter-target="#watchlist-table tbody tr"
+               data-list-filter-empty="#watchlist-filter-empty">
+      </form>
+      <p id="watchlist-filter-empty" class="muted" hidden>No wishlist cards match that name.</p>
+      <script src="/static/list-filter.js?v={{ static_v('list-filter.js') }}"></script>
+      {% if not items %}
+        <p class="muted">Nothing on your wishlist matches that filter. <a href="/watchlist">Show everything</a>.</p>
+      {% endif %}
       <div class="table-wrap">
-        <table class="stacking-table watchlist-table">
+        <table id="watchlist-table" class="stacking-table watchlist-table">
           <thead>
             <tr>
               <th>Card</th>
@@ -126,7 +152,8 @@
           </thead>
           <tbody>
             {% for item in items %}
-              <tr {% if item.target_met %}class="watchlist-row-target-met"{% endif %}>
+              <tr data-filter-text="{{ item.display_name }}"
+                  {% if item.target_met %}class="watchlist-row-target-met"{% endif %}>
                 <td>
                   {% if item.identity_mode == 'card' %}
                     <a href="/cards/{{ item.card.id }}">{{ item.display_name }}</a>

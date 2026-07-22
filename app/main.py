@@ -30,6 +30,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from starlette.middleware.sessions import SessionMiddleware
 
+from app import sort_spec
 from app.auth import hash_password, validate_password_strength
 from app.dashboard_service import get_dashboard_data
 from app.db import SessionLocal, checkpoint_and_dispose, init_db, shutdown_event
@@ -1045,10 +1046,27 @@ def register_page(request: Request):
 @app.get("/watchlist")
 def watchlist_page(
     request: Request,
+    sort: str = "added",
+    direction: str = "desc",
+    show: str = "all",
     session: Session = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
 ):
     items = list_watchlist(session, current_user.id)
+    # Sort + filter (SaintWacko, 2026-07-22). The list is fully materialized and
+    # unpaginated, so both run in Python over the already-loaded dicts — no query
+    # change, no N+1. Sort goes through the shared sort_spec so direction /
+    # nulls-last / the stable tiebreaker mean the same here as everywhere else;
+    # the by-name search stays client-side (list-filter.js), same as the other
+    # name-filtered lists. An unknown `show` value falls through to "all" rather
+    # than showing an empty page.
+    if show == "target_met":
+        items = [it for it in items if it["target_met"]]
+    elif show == "unowned":
+        items = [it for it in items if not it["placed_count"] and not it["pending_count"]]
+    elif show == "owned":
+        items = [it for it in items if it["placed_count"] or it["pending_count"]]
+    items = sort_spec.sort_wishlist_items(items, sort, direction)
     # #146 — wishlist-sharing controls: the public token + the user's playgroups
     # with which ones the wishlist is currently shared to (for the picker).
     from app.playgroup_service import list_playgroups_for_user
@@ -1066,6 +1084,10 @@ def watchlist_page(
         {
             "title": "Wishlist",
             "items": items,
+            "sort": sort,
+            "direction": direction,
+            "show": show,
+            "sort_options": sort_spec.WISHLIST_SORT_OPTIONS,
             "current_user": current_user,
             "wishlist_share_token": current_user.wishlist_share_token,
             "my_playgroups": my_playgroups,

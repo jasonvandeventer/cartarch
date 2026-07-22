@@ -243,6 +243,48 @@ ROW_SORT_KEYS = {
 }
 
 
+# --- Wishlist sorting (Python) -----------------------------------------------
+# Operates on the dicts built by watchlist_service.list_watchlist (keys:
+# display_name, current_min_price, target_price, placed_count, pending_count,
+# added_at, id). A wishlist row is NOT a card list — it can be a name-only watch
+# with no Card at all — so it gets its own key set rather than being forced
+# through CARD_SORT_OPTIONS (no mana value / colour / rarity to sort by).
+WISHLIST_SORT_OPTIONS: list[tuple[str, str]] = [
+    ("added", "Date Added"),
+    ("name", "Name"),
+    ("price", "Current Price"),
+    ("target", "Target Price"),
+    ("owned", "Owned Count"),
+]
+
+WISHLIST_SORT_KEYS = {
+    "added": (lambda it: it.get("added_at"), False),
+    "name": (lambda it: (it.get("display_name") or "").lower(), False),
+    # Same nulls-last rule as everywhere else: an un-priced card must not lead a
+    # descending price sort just because its value reads as zero.
+    "price": (lambda it: _price_or_none(it.get("current_min_price")), True),
+    "target": (lambda it: _price_or_none(it.get("target_price")), True),
+    "owned": (lambda it: (it.get("placed_count") or 0) + (it.get("pending_count") or 0), False),
+}
+
+
+def sort_wishlist_items(items: list[dict], sort: str, direction: str) -> list[dict]:
+    """Sort watchlist item dicts. Unknown keys leave the input order untouched
+    (the query's ``added_at desc``)."""
+    direction = normalize_direction(direction)
+    spec = WISHLIST_SORT_KEYS.get(sort)
+    if spec is None:
+        return items
+    primary, nulls_last = spec
+    return _stable_sort(
+        items,
+        primary,
+        nulls_last,
+        reverse=(direction == "desc"),
+        tiebreak=lambda it: ((it.get("display_name") or "").lower(), it["id"]),
+    )
+
+
 def sort_inventory_rows(rows: list, sort: str, direction: str) -> list:
     """Sort a materialized list of InventoryRow objects by the shared spec.
 

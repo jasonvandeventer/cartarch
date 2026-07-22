@@ -257,3 +257,33 @@ def test_offered_inventory_carries_its_location(db):
     # The requested side exposes no location field at all.
     for item in opts["recipient_share_items"]:
         assert "location_label" not in item
+
+
+def test_completed_trade_items_keep_their_scryfall_id(db):
+    """A terminal (completed) trade must still render card ART.
+
+    Regression, reported by SaintWacko 2026-07-22: the post-terminal
+    ``_SnapshotCardProjection`` exposed ``image_url`` but NOT ``scryfall_id``,
+    and the templates guard on the former while building the mirror src from
+    the latter — so every card on a completed trade rendered as a blank frame.
+    Jinja converts the missing attribute to Undefined instead of raising, which
+    is why the projection's "fails loudly" contract did not catch it. Same class
+    of bug as the ``_SHARE_CARD_FIELDS`` omission fixed in v4.11.36.
+    """
+    owner, viewer, pg, _rhystic, viewer_row = _setup(db)
+    si = db.query(ShowcaseItem).first()
+    trade = _propose(db, viewer, owner, pg, viewer_row, si.id)
+    db.commit()
+
+    ts.transition_trade(db, trade.id, owner.id, "accepted")
+    db.commit()
+
+    view = ts.get_trade_detail(db, trade.id, owner.id)
+    items = view["offered_items"] + view["requested_items"]
+    assert items, "a completed trade should still project its items"
+    for item in items:
+        card = item["card"]
+        # The pair is load-bearing together: an image_url with no scryfall_id
+        # builds ".../normal.jpg" and 404s.
+        assert card.scryfall_id, f"{card.name} lost its scryfall_id"
+        assert card.image_url is None or card.scryfall_id

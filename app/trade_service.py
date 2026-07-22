@@ -697,6 +697,15 @@ class _SnapshotCardProjection:
         return getattr(self._live_card, "image_url", None) if self._live_card else None
 
     @property
+    def scryfall_id(self) -> str | None:
+        # REQUIRED alongside image_url, never separately: the templates guard on
+        # image_url but build the <img> src from mirror_image_url(scryfall_id).
+        # Without this property the attribute raised AttributeError, which Jinja
+        # silently turns into Undefined -> an empty id -> ".../normal.jpg" 404 ->
+        # every card on a completed trade rendered as a blank frame.
+        return getattr(self._live_card, "scryfall_id", None) if self._live_card else None
+
+    @property
     def rarity(self) -> str | None:
         return getattr(self._live_card, "rarity", None) if self._live_card else None
 
