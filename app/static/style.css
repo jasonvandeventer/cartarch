@@ -12608,6 +12608,40 @@ table.dmtx .dmtx-rowhead {
   color: var(--text);
   border-radius: var(--radius-sm);
 }
+/* Live trade balance. Sticks to the bottom of the viewport so it stays readable
+   while scrolling a few hundred pick rows — that's the whole point of it. */
+.trade-balance {
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 1.2rem;
+  flex-wrap: wrap;
+  padding: 0.6rem 0.9rem;
+  margin: 0.6rem 0;
+  background: var(--panel-2);
+  border: 1px solid var(--brand-gold);
+  border-radius: var(--radius-sm);
+  font-size: 0.9rem;
+}
+.trade-balance-side strong {
+  font-variant-numeric: tabular-nums;
+}
+.trade-balance-diff {
+  margin-left: auto;
+  color: var(--text-dim);
+}
+.trade-balance-diff.is-even {
+  color: var(--brand-gold);
+}
+.trade-balance-diff.is-uneven {
+  color: var(--text);
+}
+.trade-pick-price {
+  font-variant-numeric: tabular-nums;
+}
+
 /* Picker sort + image-grid toggle. The thumb is display:none until the grid
    gets .is-visual — with loading="lazy" a non-rendered image is never fetched,
    so list mode costs nothing. */

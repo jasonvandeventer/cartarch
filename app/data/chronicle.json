@@ -1,5 +1,15 @@
 [
   {
+    "version": "4.11.38",
+    "date": "2026-07-22",
+    "added": [
+      "Prices on the trade proposal form. Every card in both pickers now shows what it's worth, and a running total at the bottom of the page tracks both sides as you pick — \"You give $41.00 · You get $38.50\" — with a note when the two sides are within a dollar of each other. Proxies count as nothing, and a card we have no price for says so rather than showing $0.00."
+    ],
+    "refined": [],
+    "resolved": [],
+    "archivist_note": "Proposed trades already showed a per-side total once they were sent; what was missing was seeing the numbers while you build one, which is when they can still change your mind. The totals bar sticks to the bottom of the window so it stays with you through a few hundred cards. It is guidance, not a rule — nothing stops you sending a lopsided offer, and there are plenty of good reasons to."
+  },
+  {
     "version": "4.11.37",
     "date": "2026-07-22",
     "added": [],

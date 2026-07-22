@@ -15,6 +15,17 @@ data-sort-price="{{ 0 if is_proxy else effective_price(card, finish) }}"
 data-sort-avail="{{ avail }}"
 {%- endmacro %}
 
+{# Per-card price in the picker. Same finish-aware effective_price the trade
+   detail page totals with, and the same three-branch convention the showcase
+   tiles use: proxy -> $0, priced -> $X.XX, uncached (0.0) -> neutral "no price"
+   (never "$0.00", which would read as free). #}
+{% macro pick_price(card, finish, is_proxy) -%}
+{% if is_proxy %}<span class="proxy-price-note">$0 (proxy)</span>
+{%- else %}{% set p = effective_price(card, finish) %}
+{%- if p %}<span class="trade-pick-price">${{ '%.2f' | format(p) }}</span>
+{%- else %}<span class="muted">— no price</span>{% endif %}{% endif %}
+{%- endmacro %}
+
 {% macro pick_thumb(card) -%}
 {% if card.image_url and card.scryfall_id %}
   <img class="trade-pick-thumb" src="{{ mirror_image_url(card.scryfall_id) }}"
@@ -142,7 +153,7 @@ data-sort-avail="{{ avail }}"
                 <div class="trade-pick-meta">
                   {{ it.card.set_code | upper }} #{{ it.card.collector_number }} &middot;
                   {{ it.finish | capitalize }} &middot;
-                  available {{ it.available }}{% if it.is_proxy %} &middot; <span class="proxy-price-note">$0 (proxy)</span>{% endif %}
+                  available {{ it.available }} &middot; {{ pick_price(it.card, it.finish, it.is_proxy) }}
                 </div>
               </div>
               <div class="trade-pick-controls">
@@ -170,7 +181,7 @@ data-sort-avail="{{ avail }}"
                   <div class="trade-pick-meta">
                     {{ share_item.card.set_code | upper }} #{{ share_item.card.collector_number }} &middot;
                     {{ share_item.finish | capitalize }} &middot;
-                    available {{ share_item.available }}{% if share_item.is_proxy %} &middot; <span class="proxy-price-note">$0 (proxy)</span>{% endif %}
+                    available {{ share_item.available }} &middot; {{ pick_price(share_item.card, share_item.finish, share_item.is_proxy) }}
                   </div>
                 </div>
                 <button type="button" class="btn-like trade-pick-add"
@@ -203,7 +214,7 @@ data-sort-avail="{{ avail }}"
                   <div class="trade-pick-meta">
                     {{ inv.card.set_code | upper }} #{{ inv.card.collector_number }} &middot;
                     {{ inv.finish | capitalize }} &middot;
-                    you own {{ inv.quantity }}{% if inv.is_proxy %} &middot; <span class="proxy-price-note">$0 (proxy)</span>{% endif %}
+                    you own {{ inv.quantity }} &middot; {{ pick_price(inv.card, inv.finish, inv.is_proxy) }}
                   </div>
                 </div>
                 <button type="button" class="btn-like trade-pick-add"
@@ -221,6 +232,16 @@ data-sort-avail="{{ avail }}"
         <h3 class="panel-title">Note (optional)</h3>
         <textarea name="proposer_note" rows="3" placeholder="A short note for the recipient — context, deadlines, dealer's choice on which finish, whatever."></textarea>
       </section>
+
+
+      {# Live balance of the two sides while you pick. Same finish-aware prices
+         the trade detail page totals with; proxies count as $0 (ADR
+         proxy-valuation). Guidance only — nothing validates against it. #}
+      <div class="trade-balance" id="trade-balance">
+        <span class="trade-balance-side">You give <strong id="trade-balance-offered">$0.00</strong></span>
+        <span class="trade-balance-side">You get <strong id="trade-balance-requested">$0.00</strong></span>
+        <span class="trade-balance-diff" id="trade-balance-diff">Pick cards on both sides to compare.</span>
+      </div>
 
       <section class="panel">
         <div class="trade-new-submit">
@@ -260,6 +281,50 @@ data-sort-avail="{{ avail }}"
       function updateProxyNotice() {
         var panel = document.getElementById('trade-proxy-notice-panel');
         if (panel) panel.style.display = anyProxySelected() ? '' : 'none';
+        updateBalance();
+      }
+
+      // Live per-side value while picking, so you can aim for an even trade.
+      // Reads the SAME server-rendered data-sort-price the sort uses (finish-
+      // aware effective_price; 0 for proxies) — no price rule in JS.
+      function sideTotal(map, gridId, attr) {
+        var grid = document.getElementById(gridId);
+        if (!grid) return 0;
+        var sum = 0;
+        map.forEach(function (v, id) {
+          var el = grid.querySelector('.trade-pick-item[' + attr + '="' + id + '"]');
+          if (el) sum += (parseFloat(el.getAttribute('data-sort-price')) || 0) * (v.quantity || 1);
+        });
+        return sum;
+      }
+      function money(n) { return '$' + n.toFixed(2); }
+      function updateBalance() {
+        var give = sideTotal(offered, 'offered-grid', 'data-inventory-row-id');
+        var get = sideTotal(requested, 'requested-grid', 'data-showcase-item-id');
+        var giveEl = document.getElementById('trade-balance-offered');
+        var getEl = document.getElementById('trade-balance-requested');
+        var diffEl = document.getElementById('trade-balance-diff');
+        if (!giveEl || !getEl || !diffEl) return;
+        giveEl.textContent = money(give);
+        getEl.textContent = money(get);
+        if (offered.size === 0 && requested.size === 0) {
+          diffEl.textContent = 'Pick cards on both sides to compare.';
+          diffEl.className = 'trade-balance-diff';
+          return;
+        }
+        // Round to cents first so float noise can't push an exact $1.00 gap
+        // over the threshold. Within a dollar reads as even — card prices
+        // aren't precise enough to treat small change as a real difference.
+        var delta = Math.round((give - get) * 100) / 100;
+        if (Math.abs(delta) <= 1) {
+          diffEl.textContent = 'Even — within ' + money(Math.abs(delta));
+          diffEl.className = 'trade-balance-diff is-even';
+        } else {
+          diffEl.textContent = delta > 0
+            ? money(delta) + ' in their favour'
+            : money(-delta) + ' in your favour';
+          diffEl.className = 'trade-balance-diff is-uneven';
+        }
       }
 
       // Pre-fill requested from server-rendered prefilled rows.
@@ -330,6 +395,7 @@ data-sort-avail="{{ avail }}"
           var id = parseInt(input.getAttribute('data-showcase-item-id'), 10);
           var qty = parseInt(input.value, 10) || 1;
           if (requested.has(id)) requested.set(id, { quantity: qty });
+          updateBalance();
         });
       });
 
