@@ -1,5 +1,18 @@
 [
   {
+    "version": "4.11.36",
+    "date": "2026-07-22",
+    "added": [
+      "The trade form's card pickers can now be sorted — by name, mana value, set, rarity, price, or how many are available — on both sides of the deal. Sorting is instant and never disturbs what you've already picked.",
+      "A \"Card images\" toggle on the same pickers, so you can see what each card actually does instead of reading a list of names."
+    ],
+    "refined": [],
+    "resolved": [
+      "Card images on shared Showcases were rendering broken. They now load properly."
+    ],
+    "archivist_note": "A small quality-of-life pass on the trade construction page, asked for by SaintWacko — picking cards out of a few hundred names sorted only by when they were added is a chore, and names alone don't tell you what a card does. Sorting here is done in the browser rather than by reloading the page, which is a departure from every other sorted list in the app: the picks you've made on this page live only in the page itself until you send the proposal, so a reload would quietly throw them away. The sort values still come from the same one place the rest of the app sorts by. Looking into it turned up an unrelated bug — the read-only card view used on shared Showcases had been leaving out the one field the image server needs, so those images had been silently broken. Fixed in the same pass."
+  },
+  {
     "version": "4.11.35",
     "date": "2026-07-22",
     "added": [
