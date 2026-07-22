@@ -1,5 +1,15 @@
 [
   {
+    "version": "4.11.37",
+    "date": "2026-07-22",
+    "added": [],
+    "refined": [],
+    "resolved": [
+      "The new sort control on the trade form could look broken after a page reload: the browser puts your last choice back in the dropdown, but the list stayed in its original order. The sort is now applied as the page loads, so what the dropdown says is always what you see."
+    ],
+    "archivist_note": null
+  },
+  {
     "version": "4.11.36",
     "date": "2026-07-22",
     "added": [

@@ -371,14 +371,28 @@ data-sort-avail="{{ avail }}"
         sortGrid(document.getElementById(gridId), sel ? sel.value : '', dir ? dir.value : 'asc');
       }
       document.querySelectorAll('.js-pick-sort, .js-pick-dir').forEach(function (sel) {
-        sel.addEventListener('change', function () { applySort(sel.getAttribute('data-grid')); });
+        function run() { applySort(sel.getAttribute('data-grid')); }
+        // Both events: every modern browser fires them for a <select>, but the
+        // sort is idempotent, so listening twice costs nothing and removes any
+        // "which event does this browser fire" doubt.
+        sel.addEventListener('change', run);
+        sel.addEventListener('input', run);
       });
+      function applyVisual(box) {
+        var grid = gridOf(box);
+        if (grid) grid.classList.toggle('is-visual', box.checked);
+      }
       document.querySelectorAll('.js-pick-visual').forEach(function (box) {
-        box.addEventListener('change', function () {
-          var grid = gridOf(box);
-          if (grid) grid.classList.toggle('is-visual', box.checked);
-        });
+        box.addEventListener('change', function () { applyVisual(box); });
       });
+      // Apply whatever the controls currently say, at boot. On a reload (or a
+      // back-navigation) the browser RESTORES the previous <select>/checkbox
+      // values without firing `change` — so without this the dropdown reads
+      // "Name" while the grid sits in server order, and the feature looks dead.
+      document.querySelectorAll('.js-pick-sort').forEach(function (sel) {
+        applySort(sel.getAttribute('data-grid'));
+      });
+      document.querySelectorAll('.js-pick-visual').forEach(applyVisual);
 
       form.addEventListener('submit', function (e) {
         serialize();
