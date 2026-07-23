@@ -14,11 +14,11 @@ from __future__ import annotations
 
 import uvicorn
 from fastapi import FastAPI, Form, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from deckbooks import editing, services
+from deckbooks import briefing, editing, services
 from deckbooks.config import BASE_DIR, DECKBOOK_ID
 from deckbooks.models import DECISION_STATUSES, VALID_FINISHES
 from deckbooks.repository import exists
@@ -90,6 +90,17 @@ def card_detail(request: Request, deck_card_id: str):
     return templates.TemplateResponse(
         "deckbook/card_detail.html", _ctx(request, active="collection", card=view)
     )
+
+
+@app.get("/card/{deck_card_id}/briefing", response_class=PlainTextResponse)
+def card_briefing(deck_card_id: str):
+    """Markdown briefing to hand a model (ChatGPT) for a printing recommendation:
+    the card's decision + every printing's metadata + Scryfall links. text/plain
+    so it copies cleanly."""
+    text = briefing.card_briefing(deck_card_id)
+    if text is None:
+        return PlainTextResponse("Card not found in this deckbook.", status_code=404)
+    return PlainTextResponse(text)
 
 
 @app.post("/card/{deck_card_id}/decision")

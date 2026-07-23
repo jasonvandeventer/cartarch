@@ -79,3 +79,21 @@ def test_unknown_card_and_bad_values_do_not_crash(tmp_path, monkeypatch):
     card = next(c for c in repository.load_cards("osha-violation") if c["deck_card_id"] == sid)
     assert card["decision"]["status"] == "pending"  # normalized
     assert card["acquisition"]["price_paid"] is None
+
+
+def test_card_briefing_lists_printings_and_criteria(tmp_path, monkeypatch):
+    """The ChatGPT briefing carries the aesthetic criteria + every printing +
+    the selection rule, so a model reasons over data, not screenshots."""
+    from deckbooks import briefing
+    from deckbooks.tests.test_foundation import _isolate
+
+    _isolate(tmp_path, monkeypatch)
+    initialize(refresh=False)
+    text = briefing.card_briefing("28180667-cc1e-4f64-9a69-00425ef85ba0")  # Arcane Signet
+    assert text is not None
+    assert "Aesthetic pillars" in text and "Selection rule" in text
+    assert "Every official printing" in text and "scryfall.com/card/" in text
+    # The ask must steer away from rarity/price defaults.
+    assert "do" in text.lower() and "rarest" in text.lower()
+    # Unknown card → None (route turns it into a 404).
+    assert briefing.card_briefing("nope") is None

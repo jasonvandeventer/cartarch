@@ -118,7 +118,12 @@
   </div>
 
   {% if card.candidates %}
-    <div class="section-title">Printing comparison — every official printing</div>
+    <div class="section-title">Printing comparison — every official printing
+      <button type="button" class="db-briefing-btn"
+              data-briefing="/card/{{ card.deck_card_id }}/briefing">Copy briefing for ChatGPT</button>
+      <a class="db-briefing-link" href="/card/{{ card.deck_card_id }}/briefing" target="_blank" rel="noopener">view</a>
+    </div>
+    <p class="db-briefing-hint muted-dim">Paste the copied text into ChatGPT (or any model) for a printing recommendation — it includes every printing's set, finish, price, treatment, and Scryfall link.</p>
     <div class="db-candidates">
       {% for c in card.candidates %}
         <div class="db-candidate {{ c.mark or '' }}">
@@ -156,4 +161,22 @@
 
   <p style="margin-top:2rem"><a href="/collection">← Back to the collection</a></p>
 </div>
+<script>
+  // Copy the LLM briefing to the clipboard (falls back to opening it if the
+  // clipboard API is unavailable, e.g. over plain http from another device).
+  document.querySelectorAll('.db-briefing-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      fetch(btn.dataset.briefing).then(function (r) { return r.text(); }).then(function (text) {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(text).then(function () {
+            btn.textContent = 'Copied ✓';
+            setTimeout(function () { btn.textContent = 'Copy briefing for ChatGPT'; }, 1800);
+          }).catch(function () { window.open(btn.dataset.briefing, '_blank'); });
+        } else {
+          window.open(btn.dataset.briefing, '_blank');
+        }
+      });
+    });
+  });
+</script>
 {% endblock %}

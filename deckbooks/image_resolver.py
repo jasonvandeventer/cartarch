@@ -18,6 +18,7 @@ renderable URL at request time, so no server path is ever persisted.
 
 from __future__ import annotations
 
+import json
 import sqlite3
 from dataclasses import dataclass
 
@@ -110,6 +111,58 @@ def get_printings(scryfall_ids: list[str]) -> dict[str, PrintingMeta]:
             f"SELECT {_META_COLS} FROM scryfall_cards WHERE scryfall_id IN ({placeholders})", ids
         ).fetchall()
     return {r["scryfall_id"]: _row_to_meta(r) for r in rows}
+
+
+def list_printings_detailed(name: str) -> list[dict]:
+    """Every printing of a name with the fields an LLM needs to reason about
+    which one fits the deck: set, collector, rarity, per-finish prices (→ which
+    finishes exist + budget), frame treatment, full-art flag, and a Scryfall
+    link. Offline (local cache); used by the ChatGPT briefing export."""
+    if not name:
+        return []
+    cols = (
+        "set_code, set_name, collector_number, rarity, price_usd, price_usd_foil, "
+        "price_usd_etched, frame_effects, full_art"
+    )
+    with _connect() as conn:
+        rows = conn.execute(
+            f"SELECT {cols} FROM scryfall_cards WHERE name = ? AND name NOT LIKE 'A-%' "
+            "ORDER BY set_code, collector_number",
+            (name,),
+        ).fetchall()
+    out = []
+    for r in rows:
+        try:
+            frames = [f for f in json.loads(r["frame_effects"] or "[]") if f]
+        except (TypeError, ValueError):
+            frames = []
+        finishes = [
+            label
+            for label, col in (
+                ("normal", "price_usd"),
+                ("foil", "price_usd_foil"),
+                ("etched", "price_usd_etched"),
+            )
+            if r[col]
+        ]
+        treatments = frames + (["full art"] if r["full_art"] else [])
+        out.append(
+            {
+                "set_code": r["set_code"],
+                "set_name": r["set_name"],
+                "collector_number": r["collector_number"],
+                "rarity": r["rarity"],
+                "prices": {
+                    "normal": r["price_usd"],
+                    "foil": r["price_usd_foil"],
+                    "etched": r["price_usd_etched"],
+                },
+                "finishes": finishes or ["normal"],
+                "treatments": treatments,
+                "scryfall_url": f"https://scryfall.com/card/{r['set_code']}/{r['collector_number']}",
+            }
+        )
+    return out
 
 
 def list_printings_for_name(name: str) -> list[PrintingMeta]:

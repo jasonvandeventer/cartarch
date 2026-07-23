@@ -525,6 +525,23 @@ a { color: var(--moss-deep); }
 }
 .db-candidate-actions button { padding: 0.22rem 0.5rem; font-size: 0.64rem; border-radius: 6px; }
 
+.db-briefing-btn {
+  font-family: inherit;
+  cursor: pointer;
+  margin-left: 1rem;
+  border: 1px solid var(--bronze);
+  border-radius: 999px;
+  background: var(--ink-band);
+  color: var(--gold-soft);
+  padding: 0.3rem 0.9rem;
+  font-size: 0.74rem;
+  letter-spacing: 0.04em;
+  vertical-align: middle;
+}
+.db-briefing-btn:hover { background: var(--wood-2); }
+.db-briefing-link { font-size: 0.74rem; margin-left: 0.5rem; }
+.db-briefing-hint { font-size: 0.82rem; margin: 0.2rem 0 0.6rem; }
+
 .section-title {
   font-family: var(--display);
   color: var(--moss-deep);
