@@ -125,14 +125,18 @@ def select_printing(
     finish: str = Form("normal"),
     role: str = Form("selected"),
 ):
-    """One-click 'make this the definitive / museum printing' from the candidate
-    browser. role ∈ {selected, museum}."""
+    """One-click 'make this the definitive / museum / current printing' from the
+    candidate browser. role ∈ {selected, museum, current}."""
     if not exists(DECKBOOK_ID):
         return RedirectResponse("/", status_code=303)
-    key = "museum" if role == "museum" else "selected"
-    editing.update_decision(
-        deck_card_id, {f"{key}_scryfall_id": scryfall_id, f"{key}_finish": finish}
-    )
+    if role == "current":
+        # Preserve the existing finish (editing.py handles it) — don't force normal.
+        editing.update_decision(deck_card_id, {"current_scryfall_id": scryfall_id})
+    else:
+        key = "museum" if role == "museum" else "selected"
+        editing.update_decision(
+            deck_card_id, {f"{key}_scryfall_id": scryfall_id, f"{key}_finish": finish}
+        )
     return RedirectResponse(f"/card/{deck_card_id}?saved=1", status_code=303)
 
 

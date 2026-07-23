@@ -103,6 +103,16 @@ def update_decision(deck_card_id: str, form: dict[str, Any]) -> dict:
             line.strip() for line in (form.get("reasoning") or "").splitlines() if line.strip()
         ]
 
+    # The CURRENT (physical) copy in the deck — what you actually own/ordered.
+    # Distinct from the selected/museum decision. Changing the printing preserves
+    # the existing finish unless a new one is given (people rarely change finish
+    # when correcting which printing they hold).
+    if form.get("current_scryfall_id"):
+        existing_finish = (card.get("current_printing") or {}).get("finish") or "normal"
+        card["current_printing"] = _printing(
+            form.get("current_scryfall_id"), form.get("current_finish") or existing_finish
+        )
+
     if form.get("selected_scryfall_id") is not None:
         decision["selected_printing"] = _printing(
             form.get("selected_scryfall_id"), form.get("selected_finish")

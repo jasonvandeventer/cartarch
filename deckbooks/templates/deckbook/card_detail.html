@@ -135,6 +135,11 @@
           <div class="db-candidate-actions">
             <form method="post" action="/card/{{ card.deck_card_id }}/select-printing">
               <input type="hidden" name="scryfall_id" value="{{ c.meta.scryfall_id }}">
+              <input type="hidden" name="role" value="current">
+              <button type="submit" title="This is the copy I own / ordered">My copy</button>
+            </form>
+            <form method="post" action="/card/{{ card.deck_card_id }}/select-printing">
+              <input type="hidden" name="scryfall_id" value="{{ c.meta.scryfall_id }}">
               <input type="hidden" name="role" value="selected">
               <button type="submit" title="Make this the definitive deck copy">Definitive</button>
             </form>

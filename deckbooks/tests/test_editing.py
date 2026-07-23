@@ -97,3 +97,17 @@ def test_card_briefing_lists_printings_and_criteria(tmp_path, monkeypatch):
     assert "do" in text.lower() and "rarest" in text.lower()
     # Unknown card → None (route turns it into a 404).
     assert briefing.card_briefing("nope") is None
+
+
+def test_set_current_printing_preserves_finish(tmp_path, monkeypatch):
+    """Setting 'My copy' changes the physical printing but keeps the finish
+    unless a new one is given (correcting the printing, not the finish)."""
+    from deckbooks import editing, repository
+    from deckbooks.tests.test_foundation import _isolate
+
+    _isolate(tmp_path, monkeypatch)
+    initialize(refresh=False)
+    sol = "e5ba8c01-b6f5-486d-b300-cbae2c2b5edf"  # Sol Ring, seeded as foil
+    editing.update_decision(sol, {"current_scryfall_id": "some-other-print"})
+    card = next(c for c in repository.load_cards("osha-violation") if c["deck_card_id"] == sol)
+    assert card["current_printing"] == {"scryfall_id": "some-other-print", "finish": "foil"}
