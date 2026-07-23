@@ -66,7 +66,7 @@ def overview(request: Request):
 @app.get("/collection", response_class=HTMLResponse)
 def collection(request: Request):
     return _needs_init(request) or templates.TemplateResponse(
-        "deckbook/gallery.html", _ctx(request, active="collection", cards=services.gallery())
+        "deckbook/gallery.html", _ctx(request, active="collection", chapters=services.chapters())
     )
 
 

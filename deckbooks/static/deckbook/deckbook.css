@@ -575,6 +575,51 @@ a { color: var(--moss-deep); }
 .db-seal-dot { color: var(--moss); font-weight: 700; }
 .db-order-dot { color: var(--bronze); }
 
+/* ── Collection chapters (#8) ────────────────────────────────────────────── */
+.db-chapter-section { margin-bottom: 2.6rem; }
+.db-chapter-divider {
+  display: flex;
+  align-items: center;
+  gap: 1.4rem;
+  margin: 2.4rem 0 1.4rem;
+}
+.db-chapter-rule {
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(184, 137, 75, 0.7), transparent);
+}
+.db-chapter-plate {
+  text-align: center;
+  min-width: 260px;
+  padding: 0.4rem 1.4rem;
+}
+.db-chapter-num {
+  color: var(--bronze);
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+.db-chapter-title {
+  font-family: var(--display);
+  color: var(--moss-deep);
+  font-size: 1.9rem;
+  margin: 0.15rem 0 0.2rem;
+  letter-spacing: 0.03em;
+}
+.db-chapter-flavor {
+  margin: 0.1rem 0 0.35rem;
+  font-style: italic;
+  color: var(--text-dim);
+  font-size: 0.98rem;
+}
+.db-chapter-tally {
+  color: var(--bronze);
+  font-size: 0.74rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
 /* ── Gallery: wax seal on finalized plates ───────────────────────────────── */
 .db-thumb-wrap { position: relative; }
 .db-tile.is-sealed { border-color: var(--gold); }

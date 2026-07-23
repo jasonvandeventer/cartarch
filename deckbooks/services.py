@@ -13,6 +13,9 @@ from deckbooks import image_resolver, repository
 from deckbooks.config import DECKBOOK_ID
 from deckbooks.models import (
     CATEGORY_ORDER,
+    CHAPTER_FLAVOR,
+    CHAPTER_SEQUENCE,
+    ROMAN,
     category_for_role,
     curation_complete,
     deck_copy_complete,
@@ -95,6 +98,34 @@ def _gallery_key(card: dict) -> tuple:
     # a curated volume, not raw import order.
     role_rank = 0 if card.get("role") == "Commander" else 1
     return (role_rank, 0 if curation_complete(card) else 1, card.get("card_name", "").lower())
+
+
+def chapters() -> list[dict]:
+    """The Collection as an ordered book of chapters (#8): the hydrated cards
+    grouped by category, in reading order, each with a numeral + flavor line and
+    its own completion tally. Empty categories are skipped; any unexpected
+    category still appears (after the known sequence) rather than vanishing."""
+    buckets: dict[str, list[dict]] = {}
+    for c in gallery():  # already commander-first / finalized-first / name-sorted
+        buckets.setdefault(c["category"], []).append(c)
+
+    ordered = list(CHAPTER_SEQUENCE) + [k for k in buckets if k not in CHAPTER_SEQUENCE]
+    out: list[dict] = []
+    for cat in ordered:
+        cards = buckets.get(cat)
+        if not cards:
+            continue
+        out.append(
+            {
+                "name": cat,
+                "numeral": ROMAN[len(out)] if len(out) < len(ROMAN) else str(len(out) + 1),
+                "flavor": CHAPTER_FLAVOR.get(cat, ""),
+                "cards": cards,
+                "count": len(cards),
+                "done": sum(1 for x in cards if x["curation_complete"]),
+            }
+        )
+    return out
 
 
 def card_detail(deck_card_id: str) -> dict | None:

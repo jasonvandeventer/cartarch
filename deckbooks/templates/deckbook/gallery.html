@@ -1,44 +1,63 @@
 {% from "components/card_image.html" import card_image %}
 {% from "components/badges.html" import status_badge, flag_badges %}
 {% extends "deckbook/base.html" %}
-{% block title %}Card Catalog — {{ deckbook.name }}{% endblock %}
+{% block title %}The Collection — {{ deckbook.name }}{% endblock %}
+
+{% macro plate(card) -%}
+  <a class="db-tile {% if card.role == 'Commander' %}is-commander{% endif %}{% if card.curation_complete %} is-sealed{% endif %}"
+     href="/card/{{ card.deck_card_id }}">
+    <div class="db-thumb-wrap">
+      {{ card_image(card.display, "db-thumb", card.card_name) }}
+      {% if card.curation_complete %}
+        <span class="db-wax-seal" title="Curator approved">
+          <span class="db-wax-glyph">&#10022;</span>
+          <span class="db-wax-text">Curator<br>Approved</span>
+        </span>
+      {% endif %}
+    </div>
+    <div class="db-tile-body">
+      <div class="db-tile-name">{{ card.card_name }}</div>
+      <div class="db-tile-meta">
+        {{ card.role }}
+        {% if card.display and card.display.meta %}
+          · {{ card.display.meta.set_code | upper }} #{{ card.display.meta.collector_number }}
+          {% if card.display.finish and card.display.finish != 'normal' %}· {{ card.display.finish | capitalize }}{% endif %}
+        {% endif %}
+      </div>
+      <div class="db-tile-tags">{{ status_badge(card.decision.status) }} {{ flag_badges(card) }}</div>
+    </div>
+  </a>
+{%- endmacro %}
+
 {% block body %}
 <div class="db-page">
   <div class="db-chapter">
     <div class="db-eyebrow">The Collection</div>
     <h1>The current and definitive printing for every card</h1>
-    <p>Each plate leads with the finalized selection where one exists, otherwise the copy in the deck today.</p>
+    <p>Organised as chapters — the way the deck actually reads. Each plate leads with the finalized selection where one exists.</p>
   </div>
 
-  <div class="db-gallery">
-    {% for card in cards %}
-      <a class="db-tile {% if card.role == 'Commander' %}is-commander{% endif %}{% if card.curation_complete %} is-sealed{% endif %}"
-         href="/card/{{ card.deck_card_id }}">
-        <div class="db-thumb-wrap">
-          {{ card_image(card.display, "db-thumb", card.card_name) }}
-          {% if card.curation_complete %}
-            <span class="db-wax-seal" title="Curator approved">
-              <span class="db-wax-glyph">&#10022;</span>
-              <span class="db-wax-text">Curator<br>Approved</span>
-            </span>
-          {% endif %}
-        </div>
-        <div class="db-tile-body">
-          <div class="db-tile-name">{{ card.card_name }}</div>
-          <div class="db-tile-meta">
-            {{ card.role }}
-            {% if card.display and card.display.meta %}
-              · {{ card.display.meta.set_code | upper }} #{{ card.display.meta.collector_number }}
-              {% if card.display.finish and card.display.finish != 'normal' %}· {{ card.display.finish | capitalize }}{% endif %}
-            {% endif %}
-          </div>
-          <div class="db-tile-tags">
-            {{ status_badge(card.decision.status) }}
-            {{ flag_badges(card) }}
+  {% for chapter in chapters %}
+    <section class="db-chapter-section">
+      {# Chapter divider — a title page between sections of the book. #}
+      <div class="db-chapter-divider">
+        <span class="db-chapter-rule"></span>
+        <div class="db-chapter-plate">
+          <div class="db-chapter-num">Chapter {{ chapter.numeral }}</div>
+          <h2 class="db-chapter-title">{{ chapter.name }}</h2>
+          {% if chapter.flavor %}<p class="db-chapter-flavor">{{ chapter.flavor }}</p>{% endif %}
+          <div class="db-chapter-tally">
+            {{ chapter.count }} card{{ 's' if chapter.count != 1 }}
+            · {{ chapter.done }} finalized
           </div>
         </div>
-      </a>
-    {% endfor %}
-  </div>
+        <span class="db-chapter-rule"></span>
+      </div>
+
+      <div class="db-gallery">
+        {% for card in chapter.cards %}{{ plate(card) }}{% endfor %}
+      </div>
+    </section>
+  {% endfor %}
 </div>
 {% endblock %}
