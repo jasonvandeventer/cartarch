@@ -1,0 +1,161 @@
+"""Read-side services: hydrate card records with printing metadata + images,
+and DERIVE progress metrics from stored state (never hard-coded — Section 15.2).
+
+Everything here is pure over the JSON records + the offline scryfall_cards
+cache; no network, no writes.
+"""
+
+from __future__ import annotations
+
+from typing import Any
+
+from deckbooks import image_resolver, repository
+from deckbooks.config import DECKBOOK_ID
+from deckbooks.models import (
+    CATEGORY_ORDER,
+    category_for_role,
+    curation_complete,
+    deck_copy_complete,
+    has_museum_piece,
+    is_proxy_candidate,
+    is_upgrade_target,
+)
+
+
+def get_deckbook() -> dict:
+    return repository.load_deckbook(DECKBOOK_ID)
+
+
+def _all_cards() -> list[dict]:
+    return repository.load_cards(DECKBOOK_ID)
+
+
+def active_cards() -> list[dict]:
+    """Cards physically in the deck (excludes removed + on-order)."""
+    return [c for c in _all_cards() if c.get("status") == "active"]
+
+
+def visible_cards() -> list[dict]:
+    """Everything the book shows: deck cards + on-order research entries."""
+    return [c for c in _all_cards() if c.get("status") != "removed"]
+
+
+# ── Image hydration ─────────────────────────────────────────────────────────
+
+
+def _printing_view(printing: dict | None) -> dict | None:
+    """Turn a stored {scryfall_id, finish} into a render-ready view: the mirror
+    image URL + onerror fallback + cached metadata. None stays None."""
+    if not printing or not printing.get("scryfall_id"):
+        return None
+    sid = printing["scryfall_id"]
+    meta = image_resolver.get_printing(sid)
+    return {
+        "scryfall_id": sid,
+        "finish": printing.get("finish"),
+        "image_url": image_resolver.mirror_image_url(sid),
+        "image_fallback": image_resolver.scryfall_api_fallback(sid),
+        "has_image": bool(meta and meta.image_url),
+        "meta": meta,
+    }
+
+
+def _display_printing(card: dict) -> dict | None:
+    """Which printing the gallery/detail leads with: the finalized selection if
+    there is one, else the current physical printing."""
+    decision = card.get("decision", {})
+    if decision.get("finalized") and decision.get("selected_printing"):
+        return decision["selected_printing"]
+    return card.get("current_printing")
+
+
+def hydrate(card: dict) -> dict:
+    """A card record + everything a tile/detail needs to render."""
+    return {
+        **card,
+        "category": category_for_role(card.get("role")),
+        "curation_complete": curation_complete(card),
+        "deck_copy_complete": deck_copy_complete(card),
+        "is_upgrade": is_upgrade_target(card),
+        "is_proxy": is_proxy_candidate(card),
+        "has_museum": has_museum_piece(card),
+        "display": _printing_view(_display_printing(card)),
+        "current_view": _printing_view(card.get("current_printing")),
+        "selected_view": _printing_view(card.get("decision", {}).get("selected_printing")),
+        "museum_view": _printing_view(card.get("decision", {}).get("museum_printing")),
+    }
+
+
+def gallery() -> list[dict]:
+    return [hydrate(c) for c in sorted(visible_cards(), key=_gallery_key)]
+
+
+def _gallery_key(card: dict) -> tuple:
+    # Commander first, then finalized cards, then by name — the book reads like
+    # a curated volume, not raw import order.
+    role_rank = 0 if card.get("role") == "Commander" else 1
+    return (role_rank, 0 if curation_complete(card) else 1, card.get("card_name", "").lower())
+
+
+def card_detail(deck_card_id: str) -> dict | None:
+    card = next((c for c in _all_cards() if c.get("deck_card_id") == deck_card_id), None)
+    if card is None:
+        return None
+    view = hydrate(card)
+    # Candidate printings for the comparison browser — every cached printing of
+    # this name, each with its image + whether it's the current/selected/museum.
+    marks = {
+        (card.get("current_printing") or {}).get("scryfall_id"): "current",
+        (card["decision"].get("selected_printing") or {}).get("scryfall_id"): "selected",
+        (card["decision"].get("museum_printing") or {}).get("scryfall_id"): "museum",
+    }
+    candidates = []
+    for meta in image_resolver.list_printings_for_name(card["card_name"]):
+        candidates.append(
+            {
+                "meta": meta,
+                "image_url": image_resolver.mirror_image_url(meta.scryfall_id),
+                "image_fallback": image_resolver.scryfall_api_fallback(meta.scryfall_id),
+                "mark": marks.get(meta.scryfall_id),
+            }
+        )
+    view["candidates"] = candidates
+    view["revisions"] = [
+        r for r in repository.load_revisions(DECKBOOK_ID) if r.get("deck_card_id") == deck_card_id
+    ]
+    return view
+
+
+# ── Progress metrics (derived) ──────────────────────────────────────────────
+
+
+def progress() -> dict[str, Any]:
+    cards = _all_cards()
+    deck = [c for c in cards if c.get("status") == "active"]
+    shown = [c for c in cards if c.get("status") != "removed"]
+    total = len(deck)
+    curated = sum(1 for c in deck if curation_complete(c))
+    copies = sum(1 for c in deck if deck_copy_complete(c))
+
+    # Per-category rollup (the PDF's dashboard rows).
+    cats: dict[str, dict[str, int]] = {k: {"done": 0, "total": 0} for k in CATEGORY_ORDER}
+    for c in deck:
+        cat = category_for_role(c.get("role"))
+        bucket = cats.setdefault(cat, {"done": 0, "total": 0})
+        bucket["total"] += 1
+        if curation_complete(c):
+            bucket["done"] += 1
+
+    return {
+        "total": total,
+        "curated": curated,
+        "curated_pct": round(100 * curated / total) if total else 0,
+        "deck_copies_complete": copies,
+        "installed": sum(1 for c in deck if c.get("acquisition", {}).get("installed")),
+        "owned": sum(1 for c in deck if c.get("acquisition", {}).get("target_owned")),
+        "decisions_remaining": sum(1 for c in shown if not curation_complete(c)),
+        "upgrade_targets": sum(1 for c in shown if is_upgrade_target(c)),
+        "proxy_candidates": sum(1 for c in shown if is_proxy_candidate(c)),
+        "museum_pieces": sum(1 for c in shown if has_museum_piece(c)),
+        "categories": [{"name": k, **cats[k]} for k in CATEGORY_ORDER if cats[k]["total"]],
+    }

@@ -1,0 +1,10 @@
+{% extends "deckbook/base.html" %}
+{% block chrome %}{% endblock %}
+{% block title %}Deckbook not initialized{% endblock %}
+{% block body %}
+<div class="db-notice">
+  <h1 style="font-family: var(--display); color: var(--moss-deep);">The book hasn't been bound yet</h1>
+  <p>Seed the OSHA Violation deckbook from your local Cartarch data, then reload:</p>
+  <code>python -m deckbooks.init_deck</code>
+</div>
+{% endblock %}

@@ -1,0 +1,36 @@
+{% from "components/card_image.html" import card_image %}
+{% from "components/badges.html" import status_badge, flag_badges %}
+{% extends "deckbook/base.html" %}
+{% block title %}Card Catalog — {{ deckbook.name }}{% endblock %}
+{% block body %}
+<div class="db-page">
+  <div class="db-chapter">
+    <div class="db-eyebrow">Card Catalog</div>
+    <h1>The current and definitive printing for every card</h1>
+    <p>Each tile leads with the finalized selection where one exists, otherwise the copy in the deck today.</p>
+  </div>
+
+  <div class="db-gallery">
+    {% for card in cards %}
+      <a class="db-tile {% if card.role == 'Commander' %}is-commander{% endif %}"
+         href="/card/{{ card.deck_card_id }}">
+        {{ card_image(card.display, "db-thumb", card.card_name) }}
+        <div class="db-tile-body">
+          <div class="db-tile-name">{{ card.card_name }}</div>
+          <div class="db-tile-meta">
+            {{ card.role }}
+            {% if card.display and card.display.meta %}
+              · {{ card.display.meta.set_code | upper }} #{{ card.display.meta.collector_number }}
+              {% if card.display.finish and card.display.finish != 'normal' %}· {{ card.display.finish | capitalize }}{% endif %}
+            {% endif %}
+          </div>
+          <div class="db-tile-tags">
+            {{ status_badge(card.decision.status) }}
+            {{ flag_badges(card) }}
+          </div>
+        </div>
+      </a>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

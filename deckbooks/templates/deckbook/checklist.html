@@ -1,0 +1,42 @@
+{% from "components/badges.html" import status_badge %}
+{% extends "deckbook/base.html" %}
+{% block title %}Acquisition Checklist — {{ deckbook.name }}{% endblock %}
+{% macro check(ok) %}<span class="db-check {{ '' if ok else 'no' }}">{{ '✓' if ok else '·' }}</span>{% endmacro %}
+{% block body %}
+<div class="db-page">
+  <div class="db-chapter">
+    <div class="db-eyebrow">Acquisition Ledger</div>
+    <h1>Every card, every decision, at a glance</h1>
+    <p>Separate facts, not one completion checkbox: finalized, owned, installed, proxy, museum.</p>
+  </div>
+
+  {# Instant name filter — plain JS, no dependency (this is a standalone app). #}
+  <input class="db-filter" id="db-filter" type="search" placeholder="Filter by card name…"
+         aria-label="Filter by card name">
+  <div class="db-panel" style="overflow-x:auto">
+    <table class="db-table" id="db-checklist">
+      <thead>
+        <tr>
+          <th>Card</th><th>Role</th><th>Status</th><th>Final</th><th>Owned</th>
+          <th>Installed</th><th>Proxy</th><th>Museum</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for card in cards %}
+          <tr data-name="{{ card.card_name | lower }}">
+            <td><a href="/card/{{ card.deck_card_id }}">{{ card.card_name }}</a></td>
+            <td>{{ card.role }}</td>
+            <td>{{ status_badge(card.decision.status) }}</td>
+            <td>{{ check(card.curation_complete) }}</td>
+            <td>{{ check(card.acquisition.target_owned) }}</td>
+            <td>{{ check(card.acquisition.installed) }}</td>
+            <td>{{ check(card.is_proxy) }}</td>
+            <td>{{ check(card.has_museum) }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+<script src="/static/deckbook/deckbook.js"></script>
+{% endblock %}

@@ -1,0 +1,13 @@
+{# Render a card image from a hydrated printing view {image_url, image_fallback,
+   has_image, meta}. Serves the mirror URL with a Scryfall onerror fallback —
+   exactly the app's contract. A missing printing → a labelled placeholder,
+   never a broken frame. Params: view, cls (css class), alt. #}
+{% macro card_image(view, cls, alt) -%}
+  {% if view and view.has_image %}
+    <img class="{{ cls }}" src="{{ view.image_url }}"
+         onerror="this.onerror=null; this.src='{{ view.image_fallback }}'"
+         alt="{{ alt }}" loading="lazy">
+  {% else %}
+    <div class="{{ cls }} placeholder">{{ alt or 'Image unavailable' }}</div>
+  {% endif %}
+{%- endmacro %}

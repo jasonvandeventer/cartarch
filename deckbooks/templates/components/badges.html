@@ -1,0 +1,11 @@
+{# Status badge + the optional museum/proxy/finalized flags for a hydrated card. #}
+{% macro status_badge(status) -%}
+  <span class="db-badge {{ status }}">{{ status | replace('_', ' ') }}</span>
+{%- endmacro %}
+
+{% macro flag_badges(card) -%}
+  {% if card.curation_complete %}<span class="db-badge finalized">Finalized</span>{% endif %}
+  {% if card.has_museum %}<span class="db-badge museum">Museum</span>{% endif %}
+  {% if card.is_proxy %}<span class="db-badge proxy">Proxy</span>{% endif %}
+  {% if card.is_upgrade %}<span class="db-badge upgrade">Upgrade</span>{% endif %}
+{%- endmacro %}

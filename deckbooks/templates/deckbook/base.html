@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}OSHA Violation — Deckbook{% endblock %}</title>
+  <link rel="stylesheet" href="/static/deckbook/deckbook.css">
+</head>
+<body>
+  {% block chrome %}
+  <nav class="db-nav">
+    <span class="brand">The Definitive Commander Collection</span>
+    <span class="spacer"></span>
+    <a href="/">Cover</a>
+    <a href="/overview">Overview</a>
+    <a href="/gallery">Gallery</a>
+    <a href="/checklist">Checklist</a>
+  </nav>
+  {% endblock %}
+  {% block body %}{% endblock %}
+</body>
+</html>

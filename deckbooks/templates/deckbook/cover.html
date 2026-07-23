@@ -1,0 +1,22 @@
+{% from "components/card_image.html" import card_image %}
+{% extends "deckbook/base.html" %}
+{% block chrome %}{% endblock %}
+{% block title %}{{ deckbook.name }} — Deckbook{% endblock %}
+{% block body %}
+<div class="db-cover">
+  <div class="db-cover-frame">
+    <div class="collection-line">The Definitive Commander Collection</div>
+    <h1>{{ deckbook.name }}</h1>
+    <p class="commander-name">{{ deckbook.commander_names | join(", ") }}</p>
+    {% if commander and commander.display %}
+      {{ card_image(commander.display, "cover-hero", deckbook.commander_names[0]) }}
+    {% endif %}
+    <p class="subtitle">{{ deckbook.subtitle }}</p>
+    <p class="edition">
+      {{ deckbook.edition.name }} · Revision {{ deckbook.edition.revision }}
+      · Working collector catalog, Volume I
+    </p>
+    <a class="enter" href="/overview">Open the book →</a>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,416 @@
+/* OSHA Violation Deckbook — a premium collector's volume, not a CRUD dashboard.
+   Palette (deck identity): warm bronze, weathered wood, moss green, parchment,
+   rune-light gold. Dark "cover / chapter head" bands over parchment body pages,
+   matching the concept PDF. */
+
+:root {
+  --bronze: #b8894b;
+  --gold: #d9b25f;
+  --gold-soft: #e8cf93;
+  --moss: #55663f;
+  --moss-deep: #3d4a2c;
+  --wood: #2a2118;
+  --wood-2: #342a1e;
+  --ink-band: #211a12; /* near-black chapter band */
+  --ink-band-2: #2b2117;
+  --parchment: #e8dcc2;
+  --parchment-2: #ddceac;
+  --parchment-card: #d8c8a4;
+  --text: #2c2418;
+  --text-dim: #6b5d45;
+  --text-on-dark: #e7dcc4;
+  --text-on-dark-dim: #a8977a;
+  --shadow: 0 6px 20px rgba(30, 22, 12, 0.28);
+  --radius: 14px;
+  --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+  --display: "Iowan Old Style", Georgia, serif;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--parchment);
+  color: var(--text);
+  font-family: var(--serif);
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+a { color: var(--moss-deep); }
+
+/* ── Chrome: a slim gilt nav bar ─────────────────────────────────────────── */
+.db-nav {
+  display: flex;
+  align-items: center;
+  gap: 1.4rem;
+  padding: 0.7rem 2rem;
+  background: var(--ink-band);
+  border-bottom: 2px solid var(--bronze);
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
+.db-nav .brand {
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-size: 0.72rem;
+  color: var(--gold);
+}
+.db-nav a {
+  color: var(--text-on-dark-dim);
+  text-decoration: none;
+  font-size: 0.82rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.db-nav a:hover, .db-nav a.active { color: var(--gold-soft); }
+.db-nav .spacer { flex: 1; }
+
+.db-page { max-width: 1180px; margin: 0 auto; padding: 2.4rem 2rem 4rem; }
+
+/* Chapter header band — dark, gilt, sits above parchment content. */
+.db-chapter {
+  background: linear-gradient(180deg, var(--ink-band), var(--ink-band-2));
+  border: 1px solid var(--bronze);
+  border-radius: var(--radius);
+  padding: 1.6rem 2rem;
+  margin-bottom: 2rem;
+  box-shadow: var(--shadow);
+}
+.db-eyebrow {
+  color: var(--bronze);
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+.db-chapter h1 {
+  color: var(--gold);
+  font-family: var(--display);
+  font-size: 2.1rem;
+  margin: 0.3rem 0 0.2rem;
+  letter-spacing: 0.02em;
+}
+.db-chapter p { color: var(--text-on-dark-dim); margin: 0.2rem 0 0; font-style: italic; }
+
+.db-panel {
+  background: var(--parchment-2);
+  border: 1px solid rgba(120, 96, 56, 0.35);
+  border-radius: var(--radius);
+  padding: 1.4rem 1.6rem;
+  margin-bottom: 1.4rem;
+}
+
+/* ── Cover ────────────────────────────────────────────────────────────────── */
+.db-cover {
+  min-height: 100vh;
+  background: radial-gradient(120% 90% at 50% 0%, #2b2117 0%, var(--ink-band) 60%, #17110b 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem 1.5rem;
+}
+.db-cover-frame {
+  border: 2px solid var(--bronze);
+  border-radius: 6px;
+  max-width: 760px;
+  width: 100%;
+  padding: 3.5rem 3rem 3rem;
+  text-align: center;
+  position: relative;
+}
+.db-cover .collection-line {
+  color: var(--bronze);
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+.db-cover h1 {
+  color: var(--gold);
+  font-family: var(--display);
+  font-size: 4rem;
+  letter-spacing: 0.05em;
+  margin: 2rem 0 0.6rem;
+  line-height: 1.02;
+}
+.db-cover .commander-name { color: var(--gold-soft); font-size: 1.5rem; margin: 0; }
+.db-cover .cover-hero {
+  width: 300px;
+  max-width: 72%;
+  margin: 2.4rem auto;
+  border-radius: 4.75% / 3.5%;
+  box-shadow: 0 10px 34px rgba(0, 0, 0, 0.55);
+  border: 1px solid rgba(217, 178, 95, 0.5);
+  display: block;
+}
+.db-cover .subtitle {
+  color: var(--text-on-dark-dim);
+  font-style: italic;
+  margin: 1.6rem auto 0.4rem;
+  max-width: 30rem;
+}
+.db-cover .edition { color: var(--text-dim); font-size: 0.8rem; letter-spacing: 0.06em; }
+.db-cover .enter {
+  display: inline-block;
+  margin-top: 2rem;
+  padding: 0.7rem 1.8rem;
+  border: 1px solid var(--bronze);
+  border-radius: 999px;
+  color: var(--gold-soft);
+  text-decoration: none;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  font-size: 0.78rem;
+}
+.db-cover .enter:hover { background: rgba(217, 178, 95, 0.12); }
+
+/* ── Overview dashboard ──────────────────────────────────────────────────── */
+.db-overview-grid {
+  display: grid;
+  grid-template-columns: minmax(220px, 300px) 1fr;
+  gap: 2rem;
+  align-items: start;
+}
+.db-dial {
+  background: var(--ink-band);
+  border: 1px solid var(--bronze);
+  border-radius: var(--radius);
+  padding: 2rem 1rem;
+  text-align: center;
+  color: var(--text-on-dark);
+}
+.db-dial .ring {
+  width: 190px;
+  height: 190px;
+  margin: 0 auto;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  /* conic progress filled from a data attr via inline style */
+}
+.db-dial .ring .inner {
+  width: 150px;
+  height: 150px;
+  border-radius: 50%;
+  background: var(--ink-band);
+  display: grid;
+  place-items: center;
+}
+.db-dial .pct { font-size: 2.6rem; color: var(--gold); font-family: var(--display); }
+.db-dial .sub { color: var(--text-on-dark-dim); font-size: 0.82rem; }
+
+.db-cat-row { margin-bottom: 1.15rem; }
+.db-cat-row .label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.86rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  margin-bottom: 0.35rem;
+}
+.db-cat-row .label b { color: var(--text); }
+.db-bar {
+  height: 12px;
+  background: rgba(90, 70, 40, 0.25);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.db-bar > span {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, var(--bronze), var(--gold));
+  border-radius: 999px;
+}
+
+.db-stat-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 0.8rem;
+  margin-top: 1.6rem;
+}
+.db-stat {
+  background: var(--parchment-card);
+  border: 1px solid rgba(120, 96, 56, 0.35);
+  border-radius: 10px;
+  padding: 0.9rem 1rem;
+  text-align: center;
+}
+.db-stat .n { font-size: 1.7rem; font-family: var(--display); color: var(--moss-deep); }
+.db-stat .k {
+  font-size: 0.68rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+/* ── Gallery ─────────────────────────────────────────────────────────────── */
+.db-gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 1.4rem;
+}
+.db-tile {
+  background: var(--parchment-card);
+  border: 1px solid rgba(120, 96, 56, 0.4);
+  border-radius: 12px;
+  overflow: hidden;
+  text-decoration: none;
+  color: var(--text);
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+.db-tile:hover { transform: translateY(-3px); box-shadow: var(--shadow); }
+.db-tile.is-commander { border-color: var(--gold); box-shadow: 0 0 0 1px var(--gold) inset; }
+.db-thumb {
+  width: 100%;
+  aspect-ratio: 5 / 7;
+  object-fit: cover;
+  background: var(--wood);
+  display: block;
+}
+.db-thumb.placeholder {
+  display: grid;
+  place-items: center;
+  color: var(--text-on-dark-dim);
+  font-size: 0.75rem;
+  text-align: center;
+  padding: 1rem;
+}
+.db-tile-body { padding: 0.7rem 0.8rem 0.9rem; }
+.db-tile-name { font-weight: 600; font-size: 0.98rem; line-height: 1.2; }
+.db-tile-meta { color: var(--text-dim); font-size: 0.76rem; margin-top: 0.2rem; }
+.db-tile-tags { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-top: 0.5rem; }
+
+/* ── Status + flag badges ────────────────────────────────────────────────── */
+.db-badge {
+  font-size: 0.64rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 0.16rem 0.5rem;
+  border-radius: 999px;
+  font-weight: 700;
+  border: 1px solid transparent;
+}
+.db-badge.keep { background: var(--moss); color: #f0f4e6; }
+.db-badge.upgrade { background: var(--gold); color: #2c2210; }
+.db-badge.proxy { background: var(--bronze); color: #241a0e; }
+.db-badge.museum { background: #7a5a2e; color: var(--gold-soft); }
+.db-badge.research { background: #6a5836; color: var(--gold-soft); }
+.db-badge.pending { background: rgba(90, 70, 40, 0.25); color: var(--text-dim); }
+.db-badge.finalized { background: var(--moss-deep); color: var(--gold-soft); }
+.db-badge.ghost { background: transparent; border-color: rgba(120, 96, 56, 0.5); color: var(--text-dim); }
+
+/* ── Checklist ───────────────────────────────────────────────────────────── */
+.db-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+.db-table th {
+  text-align: left;
+  padding: 0.6rem 0.7rem;
+  color: var(--text-dim);
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  border-bottom: 2px solid rgba(120, 96, 56, 0.4);
+}
+.db-table td { padding: 0.55rem 0.7rem; border-bottom: 1px solid rgba(120, 96, 56, 0.22); }
+.db-table tr:hover td { background: rgba(120, 96, 56, 0.1); }
+.db-table a { text-decoration: none; font-weight: 600; }
+.db-check { color: var(--moss-deep); font-weight: 700; }
+.db-check.no { color: rgba(120, 96, 56, 0.5); }
+.db-filter {
+  padding: 0.5rem 0.8rem;
+  border: 1px solid rgba(120, 96, 56, 0.5);
+  border-radius: 999px;
+  background: var(--parchment);
+  font-family: inherit;
+  min-width: 16rem;
+  margin-bottom: 1rem;
+}
+
+/* ── Card detail ─────────────────────────────────────────────────────────── */
+.db-detail-grid { display: grid; grid-template-columns: 300px 1fr; gap: 2rem; align-items: start; }
+.db-detail-art {
+  width: 100%;
+  border-radius: 4.75% / 3.5%;
+  box-shadow: var(--shadow);
+  border: 1px solid rgba(217, 178, 95, 0.4);
+}
+.db-compare { display: grid; grid-template-columns: 1fr 1fr; gap: 1.4rem; margin: 1rem 0; }
+.db-compare figure { margin: 0; text-align: center; }
+.db-compare img { width: 100%; border-radius: 4.75% / 3.5%; box-shadow: var(--shadow); }
+.db-compare.selected img { border: 2px solid var(--moss); }
+.db-compare.museum img { border: 2px solid var(--gold); }
+.db-compare figcaption { margin-top: 0.5rem; font-size: 0.82rem; color: var(--text-dim); }
+.db-compare figcaption b { display: block; color: var(--text); letter-spacing: 0.06em; }
+
+.db-verdict {
+  background: var(--parchment-card);
+  border-left: 4px solid var(--bronze);
+  border-radius: 8px;
+  padding: 1.2rem 1.4rem;
+  margin: 1.2rem 0;
+  font-size: 1.02rem;
+}
+.db-reasoning { margin: 0.6rem 0 0; padding-left: 1.2rem; }
+.db-reasoning li { margin: 0.3rem 0; }
+
+.db-accession { list-style: none; padding: 0; margin: 0.6rem 0; }
+.db-accession li { padding: 0.35rem 0; display: flex; gap: 0.6rem; align-items: baseline; }
+.db-accession .box { color: var(--moss-deep); font-weight: 700; width: 1.4rem; }
+.db-accession .box.no { color: rgba(120, 96, 56, 0.55); }
+
+.db-candidates {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 0.9rem;
+}
+.db-candidate { text-align: center; font-size: 0.74rem; color: var(--text-dim); }
+.db-candidate img {
+  width: 100%;
+  border-radius: 5% / 3.6%;
+  border: 1px solid rgba(120, 96, 56, 0.4);
+}
+.db-candidate.current img { border-color: var(--moss); }
+.db-candidate.selected img { border: 2px solid var(--moss); }
+.db-candidate.museum img { border: 2px solid var(--gold); }
+.db-candidate .mark { font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; }
+
+.db-history { border-left: 2px solid var(--bronze); padding-left: 1rem; }
+.db-history li { margin-bottom: 0.6rem; }
+.db-history .when { color: var(--text-dim); font-size: 0.78rem; }
+
+.db-notice {
+  max-width: 640px;
+  margin: 5rem auto;
+  background: var(--parchment-2);
+  border: 1px solid var(--bronze);
+  border-radius: var(--radius);
+  padding: 2rem;
+  text-align: center;
+}
+.db-notice code {
+  display: inline-block;
+  background: var(--ink-band);
+  color: var(--gold-soft);
+  padding: 0.4rem 0.8rem;
+  border-radius: 6px;
+  margin-top: 0.6rem;
+}
+
+.section-title {
+  font-family: var(--display);
+  color: var(--moss-deep);
+  font-size: 1.3rem;
+  margin: 1.8rem 0 0.8rem;
+  border-bottom: 1px solid rgba(120, 96, 56, 0.35);
+  padding-bottom: 0.3rem;
+}
+
+@media (max-width: 820px) {
+  .db-overview-grid, .db-detail-grid { grid-template-columns: 1fr; }
+  .db-cover h1 { font-size: 2.6rem; }
+}

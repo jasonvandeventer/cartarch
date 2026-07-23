@@ -48,6 +48,10 @@ ignore_decorators = ["@app.*", "@router.*", "@*.get", "@*.post", "@*.put", "@*.d
 
 [tool.deptry]
 ignore = []
+# deckbooks/ is the local Deckbook prototype; its tests use pytest (a dev dep),
+# but deptry only auto-detects the top-level tests/ as a test dir, so it flags
+# the prototype's test file as prod code. Exclude just that dir.
+extend_exclude = ["deckbooks/tests"]
 
 [tool.deptry.per_rule_ignores]
 DEP002 = ["uvicorn", "jinja2", "python-multipart", "itsdangerous", "psycopg"]

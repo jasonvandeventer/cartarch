@@ -1,0 +1,101 @@
+{% from "components/card_image.html" import card_image %}
+{% from "components/badges.html" import status_badge, flag_badges %}
+{% extends "deckbook/base.html" %}
+{% block title %}{{ card.card_name }} — {{ deckbook.name }}{% endblock %}
+{% macro box(ok) %}<span class="box {{ '' if ok else 'no' }}">[{{ 'X' if ok else ' ' }}]</span>{% endmacro %}
+{% block body %}
+<div class="db-page">
+  <div class="db-chapter">
+    <div class="db-eyebrow">Decision Dossier{% if card.status == 'on_order' %} · On order{% endif %}</div>
+    <h1>{{ card.card_name }}</h1>
+    <p>{{ card.role }} · {{ status_badge(card.decision.status) }} {{ flag_badges(card) }}</p>
+  </div>
+
+  <div class="db-detail-grid">
+    <div>
+      {{ card_image(card.display, "db-detail-art", card.card_name) }}
+    </div>
+    <div>
+      {# Side-by-side finalists when there's a museum/selected alternate. #}
+      {% if card.museum_view %}
+        <div class="section-title">Definitive vs. dream treatment</div>
+        <div class="db-compare-wrap">
+          <div class="db-compare selected">
+            <figure>
+              {{ card_image(card.selected_view or card.current_view, "", card.card_name) }}
+              <figcaption><b>Current / Definitive</b>
+                {% set p = card.selected_view or card.current_view %}
+                {% if p and p.meta %}{{ p.meta.set_code | upper }} #{{ p.meta.collector_number }}{% endif %}
+                {% if p and p.finish %}· {{ p.finish | capitalize }}{% endif %}
+              </figcaption>
+            </figure>
+          </div>
+          <div class="db-compare museum">
+            <figure>
+              {{ card_image(card.museum_view, "", card.card_name) }}
+              <figcaption><b>Museum / Proxy</b>
+                {% if card.museum_view.meta %}{{ card.museum_view.meta.set_code | upper }} #{{ card.museum_view.meta.collector_number }}{% endif %}
+                {% if card.museum_view.finish %}· {{ card.museum_view.finish | capitalize }}{% endif %}
+              </figcaption>
+            </figure>
+          </div>
+        </div>
+      {% endif %}
+
+      {% if card.decision.verdict %}
+        <div class="db-verdict">
+          <b>Curator's verdict.</b> {{ card.decision.verdict }}
+          {% if card.decision.reasoning %}
+            <ul class="db-reasoning">
+              {% for r in card.decision.reasoning %}<li>{{ r }}</li>{% endfor %}
+            </ul>
+          {% endif %}
+        </div>
+      {% else %}
+        <div class="db-verdict" style="color: var(--text-dim)">
+          No decision recorded yet. This card is in the
+          <b>{{ card.decision.status | replace('_',' ') }}</b> stage — compare the printings below.
+        </div>
+      {% endif %}
+
+      <div class="section-title">Accession checklist</div>
+      <ul class="db-accession">
+        <li>{{ box(card.decision.finalized) }} Definitive decision recorded</li>
+        <li>{{ box(card.acquisition.target_owned) }} Selected printing owned</li>
+        <li>{{ box(card.acquisition.installed) }} Installed in the physical deck</li>
+        <li>{{ box(card.acquisition.source_recorded) }} Acquisition source recorded</li>
+        {% if card.is_proxy %}
+          <li>{{ box(card.decision.proxy_candidate.printed) }} Proxy printed (optional)</li>
+        {% endif %}
+      </ul>
+    </div>
+  </div>
+
+  {% if card.candidates %}
+    <div class="section-title">Printing comparison — every official printing</div>
+    <div class="db-candidates">
+      {% for c in card.candidates %}
+        <div class="db-candidate {{ c.mark or '' }}">
+          <img src="{{ c.image_url }}" loading="lazy"
+               onerror="this.onerror=null; this.src='{{ c.image_fallback }}'"
+               alt="{{ c.meta.name }} — {{ c.meta.set_code | upper }}">
+          <div>{{ c.meta.set_code | upper }} #{{ c.meta.collector_number }}</div>
+          {% if c.mark %}<div class="mark">{{ c.mark }}</div>{% endif %}
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  {% if card.revisions %}
+    <div class="section-title">Revision history</div>
+    <ul class="db-history">
+      {% for r in card.revisions %}
+        <li><span class="when">{{ r.changed_at }}</span> — {{ r.change_type | replace('_',' ') }}:
+          {{ r.reason }}</li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+
+  <p style="margin-top:2rem"><a href="/gallery">← Back to the catalog</a></p>
+</div>
+{% endblock %}
