@@ -1,56 +1,38 @@
-{% from "components/badges.html" import status_badge %}
 {% extends "deckbook/base.html" %}
 {% block title %}The Ledger — {{ deckbook.name }}{% endblock %}
-{# Museum-register status marks, not yes/no checkmarks: a card has several
-   independent facts, so each cell is a filled/empty disc, and the leading
-   column is the overall deck-copy state (complete / partial / none). #}
-{% macro mark(ok) %}<span class="db-mark {{ 'on' if ok else 'off' }}">{{ '●' if ok else '○' }}</span>{% endmacro %}
-{% macro state(card) %}
-  {% set done = card.deck_copy_complete %}
-  {% set any = card.acquisition.target_owned or card.acquisition.installed or card.curation_complete %}
-  {% if done %}<span class="db-state full" title="Complete">●</span>
-  {% elif any %}<span class="db-state partial" title="Partial">◐</span>
-  {% else %}<span class="db-state none" title="Not started">○</span>{% endif %}
-{% endmacro %}
 {% block body %}
 <div class="db-page">
   <div class="db-chapter">
-    <div class="db-eyebrow">The Ledger</div>
-    <h1>Provenance for every card</h1>
-    <p>Not chores to tick off — a record of what is decided, owned, installed, and documented.</p>
+    <div class="db-eyebrow">The Ledger · Acquisition</div>
+    <h1>What to buy, proxy, and design</h1>
+    <p>The path to the deck's finest form — grouped by action, each list cheapest first.</p>
   </div>
 
-  <input class="db-filter" id="db-filter" type="search" placeholder="Filter by card name…"
-         aria-label="Filter by card name">
-  <p class="db-legend"><span class="db-state full">●</span> Complete
-     <span class="db-state partial">◐</span> Partial
-     <span class="db-state none">○</span> Not started</p>
-  <div class="db-panel" style="overflow-x:auto">
-    <table class="db-table" id="db-checklist">
-      <thead>
-        <tr>
-          <th></th><th>Card</th><th>Role</th><th>Status</th><th>Final</th><th>Owned</th>
-          <th>Installed</th><th>Documented</th><th>Proxy</th><th>Museum</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for card in cards %}
-          <tr data-name="{{ card.card_name | lower }}">
-            <td>{{ state(card) }}</td>
-            <td><a href="/card/{{ card.deck_card_id }}">{{ card.card_name }}</a></td>
-            <td>{{ card.role }}</td>
-            <td>{{ status_badge(card.decision.status) }}</td>
-            <td>{{ mark(card.curation_complete) }}</td>
-            <td>{{ mark(card.acquisition.target_owned) }}</td>
-            <td>{{ mark(card.acquisition.installed) }}</td>
-            <td>{{ mark(card.acquisition.source_recorded) }}</td>
-            <td>{{ mark(card.is_proxy) }}</td>
-            <td>{{ mark(card.has_museum) }}</td>
-          </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
+  {% for s in sections %}
+    <section class="db-ledger-section">
+      <div class="db-ledger-head">
+        <h2>{{ s.title }}</h2>
+        <span class="db-ledger-hint">{{ s.hint }}</span>
+        <span class="db-ledger-meta">{{ s.count }} card{{ 's' if s.count != 1 }}{% if s.show_price and s.subtotal %} · {{ s.subtotal_display }}{% endif %}</span>
+      </div>
+      {% if s.cards %}
+        <ul class="db-ledger-list">
+          {% for c in s.cards %}
+            <li>
+              <a class="db-ledger-name" href="/card/{{ c.deck_card_id }}">{{ c.card_name }}</a>
+              <span class="db-ledger-set">
+                {% if c.ledger_view and c.ledger_view.meta %}{{ c.ledger_view.meta.set_code | upper }} #{{ c.ledger_view.meta.collector_number }}{% endif %}
+              </span>
+              <span class="db-ledger-price">
+                {% if c.ledger_price %}${{ '%.2f' | format(c.ledger_price) }}{% elif s.show_price %}<span class="muted">—</span>{% else %}<span class="db-ledger-custom">custom</span>{% endif %}
+              </span>
+            </li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <p class="db-ledger-empty">Nothing here yet.</p>
+      {% endif %}
+    </section>
+  {% endfor %}
 </div>
-<script src="/static/deckbook/deckbook.js"></script>
 {% endblock %}

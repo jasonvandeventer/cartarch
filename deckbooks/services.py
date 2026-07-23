@@ -188,6 +188,71 @@ def museum_wall() -> dict:
     return {"cards": cards, "totals": totals, "total": len(cards)}
 
 
+# The Ledger is an acquisition action-list: what to buy, proxy, or design to
+# complete the deck's finest form. Ordered groups; each sorted cheapest-first.
+_LEDGER_SECTIONS = (
+    ("buy", "To Buy", "Museum pieces you'll purchase", True),
+    ("get_proxy", "To Get Proxies For", "An official printing exists — proxy it (over $100)", True),
+    (
+        "design_proxy",
+        "To Design Proxies For",
+        "No official printing — a custom OSHA treatment",
+        False,
+    ),
+    ("lands", "Lands", "The mana base", True),
+)
+
+
+def ledger() -> dict:
+    """Group the deck into the four acquisition actions, each priced and sorted
+    by price ascending (unpriced/custom last). Lands are pulled out as their own
+    group; non-land cards with no Museum action (no-edition / awaiting) are
+    omitted — the Ledger shows only what needs doing."""
+    groups: dict[str, list[dict]] = {k: [] for k, *_ in _LEDGER_SECTIONS}
+    for c in (hydrate(x) for x in visible_cards()):
+        state = c.get("museum_state")
+        if c.get("role") == "Land":
+            key, view = "lands", (c.get("museum_view") or c.get("display"))
+        elif state == "chosen" and not c.get("is_custom_proxy"):
+            key, view = "buy", c.get("museum_view")
+        elif state == "chosen" and c.get("is_custom_proxy"):
+            key, view = "get_proxy", c.get("museum_view")
+        elif state == "custom_proxy":
+            key, view = "design_proxy", c.get("display")  # bespoke — no official price
+        else:
+            continue  # no_edition / awaiting → not an acquisition action
+        c["ledger_view"] = view
+        c["ledger_price"] = None if key == "design_proxy" else (view or {}).get("price")
+        groups[key].append(c)
+
+    for lst in groups.values():
+        lst.sort(
+            key=lambda c: (
+                c["ledger_price"] is None,
+                c["ledger_price"] or 0.0,
+                c["card_name"].lower(),
+            )
+        )
+
+    sections = []
+    for key, title, hint, show_price in _LEDGER_SECTIONS:
+        cards = groups[key]
+        subtotal = sum(c["ledger_price"] for c in cards if c["ledger_price"] is not None)
+        sections.append(
+            {
+                "key": key,
+                "title": title,
+                "hint": hint,
+                "show_price": show_price,
+                "cards": cards,
+                "count": len(cards),
+                "subtotal_display": f"${subtotal:,.2f}",
+                "subtotal": subtotal,
+            }
+        )
+    return {"sections": sections}
+
+
 def card_detail(deck_card_id: str) -> dict | None:
     card = next((c for c in _all_cards() if c.get("deck_card_id") == deck_card_id), None)
     if card is None:

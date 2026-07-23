@@ -73,7 +73,7 @@ def collection(request: Request):
 @app.get("/ledger", response_class=HTMLResponse)
 def ledger(request: Request):
     return _needs_init(request) or templates.TemplateResponse(
-        "deckbook/checklist.html", _ctx(request, active="ledger", cards=services.gallery())
+        "deckbook/checklist.html", _ctx(request, active="ledger", **services.ledger())
     )
 
 
