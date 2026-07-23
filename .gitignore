@@ -11,6 +11,11 @@ data/
 # and runtime state at /data; the app's static content must still be tracked.
 !app/data/
 !app/data/**
+# deckbooks/ prototype: its data (deckbook.json / decisions.json / revisions.json)
+# is curation work, not runtime state — track it so it's backed up, same reasoning
+# as app/data/ above (the bare ``data/`` rule would otherwise swallow it).
+!deckbooks/data/
+!deckbooks/data/**
 dev-data/
 backups/
 .claude/scheduled_tasks.lock

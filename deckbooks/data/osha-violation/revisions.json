@@ -1,0 +1,15 @@
+[
+  {
+    "deck_card_id": "31e4b7a1-b377-49d2-a92e-4bcb0db35f16",
+    "card_name": "Bello, Bard of the Brambles",
+    "revision": 1,
+    "changed_at": "2026-07-23",
+    "change_type": "decision_finalized",
+    "previous": null,
+    "current": {
+      "status": "keep",
+      "selected_scryfall_id": "31e4b7a1-b377-49d2-a92e-4bcb0db35f16"
+    },
+    "reason": "Initial Deckbook curation decision"
+  }
+]
