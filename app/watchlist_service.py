@@ -36,6 +36,7 @@ from sqlalchemy.orm import Session, joinedload
 
 from app.card_filters import card_filter_tokens, color_filter_token, type_filter_token
 from app.models import Card, InventoryRow, PlaygroupMember, User, WatchlistItem, WishlistShare
+from app.pricing import bulk_cache_min_price_by_id
 from app.timeutil import utc_now
 
 
@@ -180,6 +181,56 @@ def list_watchlist(session: Session, user_id: int) -> list[dict]:
             if cur is None or per_card_min < cur:
                 name_lowest[card.name] = per_card_min
 
+        # A NAME watch for a card the user doesn't own has no `cards` row, so the
+        # loop above found no price OR traits for it. Fall back to the daily
+        # `scryfall_cards` bulk cache (every printing of every card) — the whole
+        # reason that cache exists. MTGJSON/`cards` stays authoritative for names
+        # it DID cover; this only fills the gap. One indexed query for the
+        # still-missing names, folding price + colour/type together.
+        gap = [n for n in name_watch_names if n not in name_lowest or n not in name_traits]
+        if gap:
+            from app.legacy_tables import scryfall_cards as sc
+            from app.pricing import _least_price
+
+            cache_rows = session.execute(
+                sc.select()
+                .with_only_columns(
+                    sc.c.name,
+                    sc.c.price_usd,
+                    sc.c.price_usd_foil,
+                    sc.c.price_usd_etched,
+                    sc.c.color_identity,
+                    sc.c.type_line,
+                )
+                .where(sc.c.name.in_(gap))
+            ).all()
+            for r in cache_rows:
+                if r.name not in name_traits:
+                    name_traits[r.name] = (
+                        color_filter_token(r.color_identity),
+                        type_filter_token(r.type_line),
+                    )
+                p = _least_price(r.price_usd, r.price_usd_foil, r.price_usd_etched)
+                if p is None:
+                    continue
+                cur = name_lowest.get(r.name)
+                if cur is None or p < cur:
+                    name_lowest[r.name] = p
+
+    # Printing-SPECIFIC watches whose `cards` row carries no MTGJSON price yet
+    # (never ingested / not covered) fall back to the same daily cache, keyed by
+    # that exact printing's scryfall_id. Batched: one query for every unpriced
+    # card-mode watch, so no per-row lookup.
+    unpriced_ids = [
+        item.card.scryfall_id
+        for item in items
+        if item.card_id is not None
+        and item.card is not None
+        and item.card.scryfall_id
+        and _min_finish_price(item.card) is None
+    ]
+    id_price_fallback = bulk_cache_min_price_by_id(session, unpriced_ids) if unpriced_ids else {}
+
     out: list[dict] = []
     for item in items:
         target_price = item.target_price
@@ -187,7 +238,10 @@ def list_watchlist(session: Session, user_id: int) -> list[dict]:
             placed, pending = _ownership_for_card_id(session, user_id, item.card_id)
             # v3.28.11 — printing-specific: min across the three finishes
             # on the joined Card. Zero extra queries (card is joinedload-ed).
-            current_min_price = _min_finish_price(item.card)
+            # Falls back to the bulk cache when the Card has no MTGJSON price.
+            current_min_price = _min_finish_price(item.card) or id_price_fallback.get(
+                item.card.scryfall_id
+            )
             card_colors, card_types = card_filter_tokens(item.card)
             target_met = (
                 target_price is not None

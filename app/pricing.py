@@ -7,6 +7,9 @@ JSON values. The rest of the app should consume normalized floats.
 from __future__ import annotations
 
 import json
+from collections.abc import Iterable
+
+from sqlalchemy.orm import Session
 
 from app.models import Card
 
@@ -82,6 +85,89 @@ def parse_price(value: str | None) -> float:
         return float(value or 0)
     except (TypeError, ValueError):
         return 0.0
+
+
+# ── scryfall_cards bulk-cache price fallback ────────────────────────────────
+# The `cards` table (and therefore `effective_price` / the MTGJSON `card_prices`
+# ingest) only covers cards a user actually TOUCHED — owned, imported, or
+# decked. `scryfall_cards` is the daily Scryfall bulk cache and holds a price
+# for EVERY printing, which is the whole point of that cache: it lets a surface
+# show a price for a card nobody owns yet (a wishlist hunt is the motivating
+# case). These two helpers are the batched, request-path-safe bridge (one IN
+# query, no per-row network — the request-path network invariant); MTGJSON stays
+# authoritative WHERE it has a value, and this only fills the gap it leaves.
+#
+# The per-printing "cheapest finish" and per-name min are folded in PYTHON, not
+# SQL: SQLite has no `least()`/`greatest()`, and emulating it engine-agnostically
+# is uglier than the fold. The row set is bounded (wishlist names × printings),
+# so this is the same shape as list_watchlist's existing price fold.
+
+
+def _least_price(*raws: str | None) -> float | None:
+    """Lowest parseable price across the given finish strings; None if all are
+    NULL/empty/unparseable ('' and None both mean "no price for this finish")."""
+    vals = [parse_price(r) for r in raws if r]
+    vals = [v for v in vals if v > 0]
+    return min(vals) if vals else None
+
+
+def bulk_cache_min_price_by_name(session: Session, names: Iterable[str]) -> dict[str, float]:
+    """Cheapest printing (any finish) per card NAME, from the bulk cache.
+
+    One indexed ``name IN (...)`` query over every printing of the requested
+    names (never a full-table scan of the ~100k-row cache), folded to a per-name
+    min in Python; a name with no priced printing is simply absent (caller
+    renders "no price"). Keyed by the EXACT name the caller passed — the watch's
+    stored ``card_name`` is the Scryfall-canonical form, the same exact-case the
+    cache stores, so the ``ix_scryfall_cards_name`` index applies. Used for
+    printing-agnostic ("any printing") wishlist watches, which have no Card row.
+    """
+    from app.legacy_tables import scryfall_cards as sc
+
+    wanted = {n for n in names if n and n.strip()}
+    if not wanted:
+        return {}
+    rows = session.execute(
+        sc.select()
+        .with_only_columns(sc.c.name, sc.c.price_usd, sc.c.price_usd_foil, sc.c.price_usd_etched)
+        .where(sc.c.name.in_(wanted))
+    ).all()
+    out: dict[str, float] = {}
+    for r in rows:
+        p = _least_price(r.price_usd, r.price_usd_foil, r.price_usd_etched)
+        if p is None:
+            continue
+        cur = out.get(r.name)
+        if cur is None or p < cur:
+            out[r.name] = p
+    return out
+
+
+def bulk_cache_min_price_by_id(session: Session, scryfall_ids: Iterable[str]) -> dict[str, float]:
+    """Cheapest finish for each exact printing (by scryfall_id), from the cache.
+
+    The by-id counterpart of the name helper: used for a printing-SPECIFIC
+    wishlist watch whose Card row exists but carries no MTGJSON price yet, so it
+    still shows the daily-cached number for that exact printing.
+    """
+    from app.legacy_tables import scryfall_cards as sc
+
+    wanted = {i for i in scryfall_ids if i}
+    if not wanted:
+        return {}
+    rows = session.execute(
+        sc.select()
+        .with_only_columns(
+            sc.c.scryfall_id, sc.c.price_usd, sc.c.price_usd_foil, sc.c.price_usd_etched
+        )
+        .where(sc.c.scryfall_id.in_(wanted))
+    ).all()
+    out: dict[str, float] = {}
+    for r in rows:
+        p = _least_price(r.price_usd, r.price_usd_foil, r.price_usd_etched)
+        if p is not None:
+            out[r.scryfall_id] = p
+    return out
 
 
 def effective_price(card: Card, finish: str) -> float:

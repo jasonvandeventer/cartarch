@@ -1,5 +1,15 @@
 [
   {
+    "version": "4.12.2",
+    "date": "2026-07-23",
+    "added": [],
+    "refined": [],
+    "resolved": [
+      "The Current price column on your Wishlist was blank for cards you don't own — which is most of a wishlist. It now shows the cheapest current price from the daily card-price cache, so any-printing wishlist entries display a price whether or not you own a copy."
+    ],
+    "archivist_note": "The app keeps a full local copy of card prices, refreshed daily — and one of the main reasons it exists is exactly this: to price a card you're hunting but don't own yet. The Wishlist just wasn't consulting it for those rows. Owned cards were never affected; their prices come from the more precise source and still do."
+  },
+  {
     "version": "4.12.1",
     "date": "2026-07-22",
     "added": [

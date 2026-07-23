@@ -29,6 +29,7 @@ from sqlalchemy import create_engine  # noqa: E402
 from sqlalchemy.orm import sessionmaker  # noqa: E402
 
 from app.db import Base  # noqa: E402
+from app.legacy_tables import metadata as _legacy_metadata  # noqa: E402
 
 # Set TEST_DATABASE_URL to a Postgres URL to run the WHOLE suite against Postgres
 # (the v4 dual-backend equivalence gate). Unset → the temp-FILE SQLite behaviour
@@ -46,7 +47,9 @@ def _make_test_engine(tmp_path, filename, *, fk_on):
     if TEST_DATABASE_URL:
         engine = create_engine(TEST_DATABASE_URL, pool_pre_ping=True)
         Base.metadata.drop_all(engine)  # clean slate (shared PG database)
+        _legacy_metadata.drop_all(engine)
         Base.metadata.create_all(engine)
+        _legacy_metadata.create_all(engine)
         return engine
 
     engine = create_engine(
@@ -63,6 +66,7 @@ def _make_test_engine(tmp_path, filename, *, fk_on):
             cur.close()
 
     Base.metadata.create_all(engine)
+    _legacy_metadata.create_all(engine)
     return engine
 
 

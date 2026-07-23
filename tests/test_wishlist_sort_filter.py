@@ -106,3 +106,43 @@ def test_sort_params_reach_the_page(client, db, user):
     # Colour + type facets ride the same target, so the three criteria compose
     # in one engine instead of clobbering each other's `hidden`.
     assert 'data-list-facet="colors"' in body and 'data-list-facet="types"' in body
+
+
+def test_current_price_falls_back_to_the_bulk_cache(db, user):
+    """The Current column for a card you don't own comes from the daily
+    scryfall_cards bulk cache — the `cards`/MTGJSON path only covers owned cards
+    (SaintWacko, 2026-07-22). Two cases: an any-printing (name-only) watch with
+    no Card row at all, and a printing-specific watch whose Card row has no
+    MTGJSON price yet."""
+    from sqlalchemy import text
+
+    from app.models import Card, WatchlistItem
+    from app.watchlist_service import list_watchlist
+
+    # Name-only watch: no Card row exists for it anywhere.
+    db.add(WatchlistItem(user_id=user.id, card_name="Nylea, God of the Hunt"))
+    # Printing-specific watch whose Card row carries NO price columns.
+    unpriced = Card(
+        scryfall_id="np-1", name="Thunderfoot Baloth", set_code="c14", collector_number="5"
+    )
+    db.add(unpriced)
+    db.commit()
+    db.add(WatchlistItem(user_id=user.id, card_id=unpriced.id))
+    db.commit()
+
+    # Seed the bulk cache with prices for both — two printings for the name watch
+    # (the cheaper one must win) and the exact printing for the id watch.
+    db.execute(
+        text(
+            "INSERT INTO scryfall_cards (scryfall_id, name, price_usd, price_usd_foil,"
+            " price_usd_etched) VALUES "
+            "('n-1','Nylea, God of the Hunt','5.00','12.00',''),"
+            "('n-2','Nylea, God of the Hunt','3.50','',''),"
+            "('np-1','Thunderfoot Baloth','2.25','','')"
+        )
+    )
+    db.commit()
+
+    by_name = {r["display_name"]: r for r in list_watchlist(db, user.id)}
+    assert by_name["Nylea, God of the Hunt"]["current_min_price"] == 3.50
+    assert by_name["Thunderfoot Baloth"]["current_min_price"] == 2.25
