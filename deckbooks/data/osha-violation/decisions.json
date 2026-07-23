@@ -1087,19 +1087,12 @@
         "scryfall_id": "109dee37-5de5-40fa-9405-8645be6c5076",
         "finish": "normal"
       },
-      "museum_printing": {
-        "scryfall_id": "109dee37-5de5-40fa-9405-8645be6c5076",
-        "finish": "normal"
-      },
-      "proxy_candidate": {
-        "scryfall_id": "109dee37-5de5-40fa-9405-8645be6c5076",
-        "desired": false,
-        "printed": false
-      },
+      "museum_printing": null,
+      "proxy_candidate": null,
       "verdict": null,
       "reasoning": [],
-      "no_museum_edition": true,
-      "custom_proxy_candidate": false
+      "no_museum_edition": false,
+      "custom_proxy_candidate": true
     },
     "acquisition": {
       "target_owned": true,
