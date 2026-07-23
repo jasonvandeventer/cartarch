@@ -39,7 +39,7 @@
       </figure>
       <figure class="db-plate museum">
         {{ card_image(card.museum_view, "db-plate-img", card.card_name) }}
-        {{ plaque(card.museum_view, 'Museum Piece' + (' · Proxy' if card.is_proxy else '')) }}
+        {{ plaque(card.museum_view, "Museum (Collector's Pick)" + (' · Proxy' if card.is_proxy else '')) }}
       </figure>
     </section>
     {% set detail_body_only = true %}

@@ -85,13 +85,38 @@ def card_briefing(deck_card_id: str) -> str | None:
         )
     lines.append("")
 
-    lines.append("## What I'd like help with")
-    lines.append(
-        "Recommend the single **definitive printing** for the physical deck, and "
-        "optionally a **museum / proxy candidate**, given the deck's aesthetic pillars "
-        "and palette above. Explain your reasoning briefly. Per the selection rule, do "
-        "NOT default to the rarest, newest, or most expensive printing — fit and budget "
-        "matter more. Note the finish (normal/foil/etched) you'd choose."
-    )
+    lines.append(_RECOMMENDATION_POLICY)
     lines.append("")
     return "\n".join(lines)
+
+
+# Deckbook Printing Recommendation Policy v2 — the two recommendations optimize
+# for DIFFERENT goals and are deliberately NOT reconciled. Encoded here so every
+# briefing asks the model the same way. See deckbooks/PRINTING_POLICY.md.
+_RECOMMENDATION_POLICY = """\
+## Your task — two independent recommendations
+
+Recommend **two** printings for this card. They optimise for **different goals**
+and must **not** be reconciled into one — sometimes they match, often they differ.
+Pick from the table above; name the exact set + collector number and the finish.
+
+### 1. Definitive printing
+*"What version should a player reasonably acquire for THIS deck?"*
+Optimise for: deck theme / narrative, artwork appropriateness, cohesion with the
+other cards, readability, availability, and cost / value — the best balance of
+aesthetics and practicality. A player should be able to assemble the **whole deck**
+from Definitive picks without unreasonable expense. Do **not** default to the
+rarest, newest, or most expensive printing.
+*Curator's note:* explain why this printing belongs in THIS deck.
+
+### 2. Museum (Collector's Pick)
+*"If budget and practicality were irrelevant, what is the most beautiful or
+collectible expression of this card?"*
+Optimise for: visual impact, premium treatment, collectibility, artistic
+execution, and prestige. **Ignore deck theme.** It may be a Secret Lair, a
+Universes Beyond card, a serialised version, a Masterpiece, a raised foil, or an
+expensive promo — whatever is the most desirable presentation of the card. This is
+an aspirational target that may be **proxied** in the deck while the original stays
+protected in a collection.
+*Curator's note:* explain why it is the pinnacle of this card as an object of
+collection."""
