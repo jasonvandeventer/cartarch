@@ -1331,15 +1331,8 @@
       "finalized": true,
       "finalized_at": "2026-07-23",
       "selected_printing": null,
-      "museum_printing": {
-        "scryfall_id": "4b0c5d14-4fab-4034-a2d3-0d851ef67cbd",
-        "finish": "foil"
-      },
-      "proxy_candidate": {
-        "scryfall_id": "4b0c5d14-4fab-4034-a2d3-0d851ef67cbd",
-        "desired": false,
-        "printed": false
-      },
+      "museum_printing": null,
+      "proxy_candidate": null,
       "verdict": null,
       "reasoning": [],
       "custom_proxy_candidate": true,
@@ -2183,15 +2176,8 @@
       "finalized": true,
       "finalized_at": "2026-07-23",
       "selected_printing": null,
-      "museum_printing": {
-        "scryfall_id": "e750d55d-d5e8-4abe-99cf-f6b8ba86cf16",
-        "finish": "foil"
-      },
-      "proxy_candidate": {
-        "scryfall_id": "e750d55d-d5e8-4abe-99cf-f6b8ba86cf16",
-        "desired": false,
-        "printed": false
-      },
+      "museum_printing": null,
+      "proxy_candidate": null,
       "verdict": null,
       "reasoning": [],
       "custom_proxy_candidate": true,
