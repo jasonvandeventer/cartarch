@@ -74,12 +74,22 @@
     },
     "status": "active",
     "decision": {
-      "status": "research",
+      "status": "upgrade",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
-      "museum_printing": null,
-      "proxy_candidate": null,
+      "selected_printing": {
+        "scryfall_id": "741218da-de09-4603-8409-b4b646909ffa",
+        "finish": "normal"
+      },
+      "museum_printing": {
+        "scryfall_id": "36333600-7c9c-4dc2-ba5a-dacd039716ea",
+        "finish": "normal"
+      },
+      "proxy_candidate": {
+        "scryfall_id": "36333600-7c9c-4dc2-ba5a-dacd039716ea",
+        "desired": false,
+        "printed": false
+      },
       "verdict": null,
       "reasoning": []
     },
@@ -343,7 +353,7 @@
       "scryfall_id": "bdf2d103-8614-4cc1-be90-a8b331eff0d2",
       "finish": "normal"
     },
-    "status": "active",
+    "status": "removed",
     "decision": {
       "status": "pending",
       "finalized": false,
