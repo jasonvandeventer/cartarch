@@ -56,14 +56,16 @@ def _printing_view(printing: dict | None) -> dict | None:
     if not printing or not printing.get("scryfall_id"):
         return None
     sid = printing["scryfall_id"]
+    finish = printing.get("finish")
     meta = image_resolver.get_printing(sid)
     return {
         "scryfall_id": sid,
-        "finish": printing.get("finish"),
+        "finish": finish,
         "image_url": image_resolver.mirror_image_url(sid),
         "image_fallback": image_resolver.scryfall_api_fallback(sid),
         "has_image": bool(meta and meta.image_url),
         "meta": meta,
+        "price": meta.price(finish) if meta else None,
     }
 
 
@@ -151,19 +153,28 @@ def museum_wall() -> dict:
         )
     )
 
-    # Price the chosen Collector's Picks (finish-aware) from the local cache in
-    # ONE batched query — the cost to assemble the deck's finest form.
-    chosen = [c for c in cards if c.get("museum_state") == "chosen" and c.get("museum_view")]
-    price_map = image_resolver.get_prices([c["museum_view"]["scryfall_id"] for c in chosen])
-    cost = 0.0
-    priced = 0
-    for c in chosen:
-        mv = c["museum_view"]
-        p = image_resolver.price_for(price_map.get(mv["scryfall_id"], {}), mv.get("finish"))
+    # Acquisition cost of the Collector's Picks. A pick also flagged as a custom
+    # proxy candidate will be PROXIED, not bought, so it's excluded from the buy
+    # total (its market value is tracked separately as "saved by proxying").
+    # Prices ride on the hydrated view (from the cache; no extra query).
+    cost = proxied_cost = 0.0
+    priced = unpriced = proxied = 0
+    for c in cards:
+        if c.get("museum_state") != "chosen" or not c.get("museum_view"):
+            continue
+        p = c["museum_view"].get("price")
         c["museum_price"] = p
+        if c.get("is_custom_proxy"):
+            c["proxied"] = True
+            proxied += 1
+            if p is not None:
+                proxied_cost += p
+            continue
         if p is not None:
             cost += p
             priced += 1
+        else:
+            unpriced += 1
 
     totals = {"chosen": 0, "custom_proxy": 0, "no_edition": 0, "awaiting": 0}
     for c in cards:
@@ -171,7 +182,9 @@ def museum_wall() -> dict:
     totals["cost"] = cost
     totals["cost_display"] = f"${cost:,.2f}"
     totals["priced"] = priced
-    totals["unpriced"] = len(chosen) - priced
+    totals["unpriced"] = unpriced
+    totals["proxied"] = proxied
+    totals["proxied_cost_display"] = f"${proxied_cost:,.2f}"
     return {"cards": cards, "totals": totals, "total": len(cards)}
 
 

@@ -812,6 +812,10 @@ a { color: var(--moss-deep); }
   font-variant-numeric: tabular-nums;
 }
 .db-museum-price .muted { color: var(--text-on-dark-dim); font-size: 0.74rem; }
+.db-proxied-note { color: var(--moss); font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.06em; margin-left: 0.3rem; }
+/* Per-printing prices surfaced across surfaces (plaques, candidates, tiles). */
+.db-plaque-price { color: var(--gold-soft) !important; font-variant-numeric: tabular-nums; }
+.db-candidate-price { color: var(--gold-soft); font-variant-numeric: tabular-nums; font-size: 0.72rem; }
 
 /* ── Ledger: museum status marks ─────────────────────────────────────────── */
 .db-mark.on { color: var(--moss-deep); }

@@ -206,7 +206,7 @@
     },
     "status": "active",
     "decision": {
-      "status": "keep",
+      "status": "proxy",
       "finalized": true,
       "finalized_at": "2026-07-22",
       "selected_printing": {
@@ -228,7 +228,9 @@
         "It fits the deck's warm, storied Bloomburrow visual identity.",
         "The premium raised foil does not improve gameplay.",
         "Its cost would consume budget better spent across the rest of the deck."
-      ]
+      ],
+      "custom_proxy_candidate": true,
+      "no_museum_edition": false
     },
     "acquisition": {
       "target_owned": true,
@@ -684,7 +686,8 @@
         "printed": false
       },
       "verdict": null,
-      "reasoning": []
+      "reasoning": [],
+      "custom_proxy_candidate": true
     },
     "acquisition": {
       "target_owned": true,
@@ -955,7 +958,8 @@
         "printed": false
       },
       "verdict": null,
-      "reasoning": []
+      "reasoning": [],
+      "custom_proxy_candidate": true
     },
     "acquisition": {
       "target_owned": true,
@@ -2056,7 +2060,8 @@
         "printed": false
       },
       "verdict": null,
-      "reasoning": []
+      "reasoning": [],
+      "custom_proxy_candidate": true
     },
     "acquisition": {
       "target_owned": true,
@@ -2726,7 +2731,8 @@
         "printed": false
       },
       "verdict": null,
-      "reasoning": []
+      "reasoning": [],
+      "custom_proxy_candidate": true
     },
     "acquisition": {
       "target_owned": true,
@@ -3121,7 +3127,8 @@
         "printed": false
       },
       "verdict": null,
-      "reasoning": []
+      "reasoning": [],
+      "custom_proxy_candidate": true
     },
     "acquisition": {
       "target_owned": true,

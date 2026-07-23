@@ -16,8 +16,9 @@
         <span class="await"><b>{{ totals.awaiting }}</b> awaiting review</span>
       </div>
       <div class="db-museum-cost">
-        To acquire every Collector's Pick: <strong>{{ totals.cost_display }}</strong>
-        {% if totals.unpriced %}<span class="db-museum-cost-note">({{ totals.priced }} of {{ totals.chosen }} priced; {{ totals.unpriced }} have no cached price)</span>{% endif %}
+        To acquire the Collector's Picks you'll buy: <strong>{{ totals.cost_display }}</strong>
+        {% if totals.proxied %}<span class="db-museum-cost-note">{{ totals.proxied }} pick{{ 's' if totals.proxied != 1 }} over $100 proxied instead — {{ totals.proxied_cost_display }} in market value excluded</span>{% endif %}
+        {% if totals.unpriced %}<span class="db-museum-cost-note">({{ totals.unpriced }} to-buy pick{{ 's' if totals.unpriced != 1 }} have no cached price)</span>{% endif %}
       </div>
     </header>
 
@@ -39,6 +40,7 @@
               </span>
               <span class="db-museum-price">
                 {% if card.museum_price %}${{ '%.2f' | format(card.museum_price) }}{% else %}<span class="muted">— no price</span>{% endif %}
+                {% if card.proxied %}<span class="db-proxied-note">proxied — excluded</span>{% endif %}
               </span>
               <span class="db-museum-tag">Collector's Pick</span>
               {% if card.is_custom_proxy %}<span class="db-museum-tag proxy">Custom Proxy Candidate</span>{% endif %}

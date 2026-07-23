@@ -61,6 +61,9 @@ class PrintingMeta:
     type_line: str | None
     image_url: str | None  # Scryfall CDN URL — the app's "has an image" signal
     layout: str | None  # transform/mdfc/split/adventure → whether a back face exists
+    price_usd: str | None
+    price_usd_foil: str | None
+    price_usd_etched: str | None
 
     @property
     def has_back_face(self) -> bool:
@@ -71,10 +74,22 @@ class PrintingMeta:
             "art_series",
         }
 
+    def price(self, finish: str = "normal") -> float | None:
+        """Best-effort USD price for this printing at a finish (see price_for)."""
+        return price_for(
+            {
+                "normal": self.price_usd,
+                "foil": self.price_usd_foil,
+                "etched": self.price_usd_etched,
+            },
+            finish,
+        )
 
-# Card layouts Scryfall renders as two physical faces (front + back image).
+
+# Field order must match PrintingMeta (positional construction in _row_to_meta).
 _META_COLS = (
-    "scryfall_id, name, set_code, set_name, collector_number, rarity, type_line, image_url, layout"
+    "scryfall_id, name, set_code, set_name, collector_number, rarity, type_line, "
+    "image_url, layout, price_usd, price_usd_foil, price_usd_etched"
 )
 
 

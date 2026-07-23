@@ -22,6 +22,7 @@
         {% if card.display and card.display.meta %}
           · {{ card.display.meta.set_code | upper }} #{{ card.display.meta.collector_number }}
           {% if card.display.finish and card.display.finish != 'normal' %}· {{ card.display.finish | capitalize }}{% endif %}
+          {% if card.display.price %}· ${{ '%.2f' | format(card.display.price) }}{% endif %}
         {% endif %}
       </div>
       <div class="db-tile-tags">{{ status_badge(card.decision.status) }} {{ flag_badges(card) }}</div>

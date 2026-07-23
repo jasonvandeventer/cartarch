@@ -13,6 +13,7 @@
       <span class="db-plaque-line">Collector #{{ view.meta.collector_number }}</span>
       <span class="db-plaque-line">{{ (view.finish or 'normal') | capitalize }}</span>
       {% if view.meta.rarity %}<span class="db-plaque-line">{{ view.meta.rarity | capitalize }}</span>{% endif %}
+      {% if view.price %}<span class="db-plaque-line db-plaque-price">${{ '%.2f' | format(view.price) }}</span>{% endif %}
     {% endif %}
   </figcaption>
 {%- endmacro %}
@@ -139,6 +140,8 @@
                onerror="this.onerror=null; this.src='{{ c.image_fallback }}'"
                alt="{{ c.meta.name }} — {{ c.meta.set_code | upper }}">
           <div>{{ c.meta.set_code | upper }} #{{ c.meta.collector_number }}</div>
+          {% set cp = c.meta.price() %}
+          {% if cp %}<div class="db-candidate-price">${{ '%.2f' | format(cp) }}</div>{% endif %}
           {% if c.mark %}<div class="mark">{{ c.mark }}</div>{% endif %}
           <div class="db-candidate-actions">
             <form method="post" action="/card/{{ card.deck_card_id }}/select-printing">
