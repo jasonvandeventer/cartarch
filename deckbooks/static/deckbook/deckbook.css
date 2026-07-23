@@ -667,6 +667,95 @@ a { color: var(--moss-deep); }
   font-weight: 700;
 }
 
+/* ── The Museum: a dark gallery wall of Collector's Picks ────────────────── */
+.db-museum {
+  /* Dark exhibit hall — deliberately unlike the parchment Collection. */
+  background-color: #140f0a;
+  background-image:
+    radial-gradient(120% 80% at 50% -10%, rgba(60,46,28,0.5), transparent 60%),
+    repeating-linear-gradient(52deg, rgba(0,0,0,0.25) 0 3px, rgba(255,255,255,0.008) 3px 6px);
+  min-height: calc(100vh - 50px);
+}
+.db-museum-head { text-align: center; margin-bottom: 2rem; }
+.db-museum-head h1 {
+  font-family: var(--display);
+  color: var(--gold);
+  font-size: 2.1rem;
+  margin: 0.3rem 0 0.3rem;
+}
+.db-museum-head p { color: var(--text-on-dark-dim); font-style: italic; max-width: 40rem; margin: 0 auto; }
+.db-museum-head .db-eyebrow { color: var(--bronze); }
+
+.db-museum-wall {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 2rem 1.6rem;
+}
+.db-museum-piece {
+  text-decoration: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.7rem;
+  transition: transform 0.14s ease;
+}
+.db-museum-piece:hover { transform: translateY(-4px); }
+.db-museum-frame {
+  display: block;
+  padding: 8px;
+  border-radius: 6px;
+  /* A brass picture frame; picks glow, un-picked are quiet pewter. */
+  background: linear-gradient(150deg, #3a2c18, #6a5228 45%, #2c2114);
+  box-shadow: 0 10px 26px rgba(0,0,0,0.6);
+  border: 1px solid rgba(217,178,95,0.25);
+}
+.db-museum-piece.has-pick .db-museum-frame {
+  background: linear-gradient(150deg, #7c5f26, var(--gold) 48%, #6a4f1f);
+  box-shadow: 0 12px 30px rgba(0,0,0,0.62), 0 0 22px rgba(217,178,95,0.28);
+}
+.db-museum-piece.is-commander .db-museum-frame { padding: 11px; }
+.db-museum-img {
+  width: 100%;
+  display: block;
+  border-radius: 4.4% / 3.2%;
+}
+.db-museum-img.placeholder {
+  aspect-ratio: 5 / 7;
+  display: grid;
+  place-items: center;
+  background: #241b12;
+  color: var(--text-on-dark-dim);
+  font-size: 0.72rem;
+  text-align: center;
+  padding: 1rem;
+}
+/* Un-picked pieces sit quietly until chosen. */
+.db-museum-piece:not(.has-pick) .db-museum-img { filter: grayscale(0.35) brightness(0.82); }
+.db-museum-plate { text-align: center; max-width: 15rem; }
+.db-museum-name { display: block; color: var(--gold-soft); font-family: var(--display); font-size: 1rem; }
+.db-museum-set { display: block; color: var(--text-on-dark-dim); font-size: 0.76rem; font-style: italic; }
+.db-museum-tag {
+  display: inline-block;
+  margin-top: 0.3rem;
+  color: #241a0e;
+  background: var(--gold);
+  border-radius: 999px;
+  padding: 0.08rem 0.6rem;
+  font-size: 0.6rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-weight: 700;
+}
+.db-museum-await {
+  display: block;
+  margin-top: 0.2rem;
+  color: var(--text-on-dark-dim);
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  opacity: 0.7;
+}
+
 /* ── Ledger: museum status marks ─────────────────────────────────────────── */
 .db-mark.on { color: var(--moss-deep); }
 .db-mark.off { color: rgba(120, 96, 56, 0.4); }

@@ -128,6 +128,22 @@ def chapters() -> list[dict]:
     return out
 
 
+def museum_wall() -> dict:
+    """The whole deck in its Museum (Collector's Pick) form — each card shown as
+    its chosen museum printing, or its current copy (faded, 'awaiting a pick')
+    where none is chosen yet. Commander first, then the cards that HAVE a pick,
+    then the rest — so the finished exhibit leads."""
+    cards = [hydrate(c) for c in visible_cards()]
+    cards.sort(
+        key=lambda c: (
+            0 if c.get("role") == "Commander" else 1,
+            0 if c.get("museum_view") else 1,
+            c.get("card_name", "").lower(),
+        )
+    )
+    return {"cards": cards, "with_pick": sum(1 for c in cards if c.get("museum_view"))}
+
+
 def card_detail(deck_card_id: str) -> dict | None:
     card = next((c for c in _all_cards() if c.get("deck_card_id") == deck_card_id), None)
     if card is None:

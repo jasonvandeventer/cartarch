@@ -77,6 +77,13 @@ def ledger(request: Request):
     )
 
 
+@app.get("/museum", response_class=HTMLResponse)
+def museum(request: Request):
+    return _needs_init(request) or templates.TemplateResponse(
+        "deckbook/museum.html", _ctx(request, active="museum", **services.museum_wall())
+    )
+
+
 @app.get("/card/{deck_card_id}", response_class=HTMLResponse)
 def card_detail(request: Request, deck_card_id: str):
     guard = _needs_init(request)
