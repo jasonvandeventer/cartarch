@@ -150,9 +150,28 @@ def museum_wall() -> dict:
             c.get("card_name", "").lower(),
         )
     )
+
+    # Price the chosen Collector's Picks (finish-aware) from the local cache in
+    # ONE batched query — the cost to assemble the deck's finest form.
+    chosen = [c for c in cards if c.get("museum_state") == "chosen" and c.get("museum_view")]
+    price_map = image_resolver.get_prices([c["museum_view"]["scryfall_id"] for c in chosen])
+    cost = 0.0
+    priced = 0
+    for c in chosen:
+        mv = c["museum_view"]
+        p = image_resolver.price_for(price_map.get(mv["scryfall_id"], {}), mv.get("finish"))
+        c["museum_price"] = p
+        if p is not None:
+            cost += p
+            priced += 1
+
     totals = {"chosen": 0, "custom_proxy": 0, "no_edition": 0, "awaiting": 0}
     for c in cards:
         totals[c.get("museum_state", "awaiting")] += 1
+    totals["cost"] = cost
+    totals["cost_display"] = f"${cost:,.2f}"
+    totals["priced"] = priced
+    totals["unpriced"] = len(chosen) - priced
     return {"cards": cards, "totals": totals, "total": len(cards)}
 
 

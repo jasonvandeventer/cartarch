@@ -165,6 +165,58 @@ def list_printings_detailed(name: str) -> list[dict]:
     return out
 
 
+def get_prices(scryfall_ids: list[str]) -> dict[str, dict]:
+    """Batched per-printing USD prices from the cache:
+    ``{scryfall_id: {"normal", "foil", "etched"}}`` (string values, may be None)."""
+    ids = [i for i in scryfall_ids if i]
+    if not ids:
+        return {}
+    ph = ",".join("?" * len(ids))
+    with _connect() as conn:
+        rows = conn.execute(
+            f"SELECT scryfall_id, price_usd, price_usd_foil, price_usd_etched "
+            f"FROM scryfall_cards WHERE scryfall_id IN ({ph})",
+            ids,
+        ).fetchall()
+    return {
+        r["scryfall_id"]: {
+            "normal": r["price_usd"],
+            "foil": r["price_usd_foil"],
+            "etched": r["price_usd_etched"],
+        }
+        for r in rows
+    }
+
+
+# Finish → the price columns to try, most-specific first (a foil with no foil
+# price falls back to the normal price, etc.).
+_FINISH_FALLBACK = {
+    "normal": ("normal",),
+    "foil": ("foil", "normal"),
+    "etched": ("etched", "foil", "normal"),
+}
+
+
+def price_for(prices: dict, finish: str) -> float | None:
+    """Best-effort USD price for a printing, or None if wholly unpriced.
+
+    Prefers the recorded finish, then falls back to ANY available finish — a
+    Collector's Pick recorded as "normal" is often a foil-only Secret Lair /
+    Special Guest, and the acquisition cost is whatever finish you can actually
+    buy. Finish-specific prices (when present) still win, so a card whose finish
+    IS priced is never over-counted with a pricier finish."""
+    chain = list(_FINISH_FALLBACK.get((finish or "normal").lower(), ("normal",)))
+    chain += [f for f in ("normal", "foil", "etched") if f not in chain]
+    for key in chain:
+        raw = prices.get(key)
+        if raw:
+            try:
+                return float(raw)
+            except (TypeError, ValueError):
+                continue
+    return None
+
+
 def list_printings_for_name(name: str) -> list[PrintingMeta]:
     """Every cached printing of a card NAME — the candidate-comparison source.
 

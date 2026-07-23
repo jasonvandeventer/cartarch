@@ -792,6 +792,26 @@ a { color: var(--moss-deep); }
 }
 .db-museum-totals b { color: var(--gold-soft); font-family: var(--display); font-size: 1.05rem; }
 .db-museum-totals .await b { color: var(--text-on-dark-dim); }
+.db-museum-cost {
+  margin-top: 0.9rem;
+  color: var(--text-on-dark-dim);
+  font-size: 0.98rem;
+}
+.db-museum-cost strong {
+  color: var(--gold);
+  font-family: var(--display);
+  font-size: 1.5rem;
+  letter-spacing: 0.02em;
+}
+.db-museum-cost-note { display: block; font-size: 0.74rem; font-style: italic; opacity: 0.8; margin-top: 0.15rem; }
+.db-museum-price {
+  display: block;
+  margin-top: 0.25rem;
+  color: var(--gold-soft);
+  font-size: 0.86rem;
+  font-variant-numeric: tabular-nums;
+}
+.db-museum-price .muted { color: var(--text-on-dark-dim); font-size: 0.74rem; }
 
 /* ── Ledger: museum status marks ─────────────────────────────────────────── */
 .db-mark.on { color: var(--moss-deep); }
