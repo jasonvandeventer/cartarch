@@ -13,20 +13,21 @@ one-line "run init" prompt rather than crashing.
 from __future__ import annotations
 
 import uvicorn
-from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse
+from fastapi import FastAPI, Form, Request
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from deckbooks import services
+from deckbooks import editing, services
 from deckbooks.config import BASE_DIR, DECKBOOK_ID
-from deckbooks.models import DECISION_STATUSES
+from deckbooks.models import DECISION_STATUSES, VALID_FINISHES
 from deckbooks.repository import exists
 
 app = FastAPI(title="Cartarch Deckbooks (prototype)")
 app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 templates.env.globals["statuses"] = DECISION_STATUSES
+templates.env.globals["finishes"] = VALID_FINISHES
 
 
 def _ctx(request: Request, **extra) -> dict:
@@ -78,6 +79,39 @@ def card_detail(request: Request, deck_card_id: str):
     if view is None:
         return templates.TemplateResponse("deckbook/not_found.html", _ctx(request), status_code=404)
     return templates.TemplateResponse("deckbook/card_detail.html", _ctx(request, card=view))
+
+
+@app.post("/card/{deck_card_id}/decision")
+async def edit_decision(request: Request, deck_card_id: str):
+    """Apply a card-detail edit. Plain HTML form POST (no framework), so the
+    prototype works with JS off; redirects back to the card (PRG). Unknown
+    fields are ignored; a bad value normalizes rather than erroring."""
+    if not exists(DECKBOOK_ID):
+        return RedirectResponse("/", status_code=303)
+    form = dict(await request.form())
+    try:
+        editing.update_decision(deck_card_id, form)
+    except editing.CardNotFound:
+        return RedirectResponse("/gallery", status_code=303)
+    return RedirectResponse(f"/card/{deck_card_id}?saved=1", status_code=303)
+
+
+@app.post("/card/{deck_card_id}/select-printing")
+def select_printing(
+    deck_card_id: str,
+    scryfall_id: str = Form(...),
+    finish: str = Form("normal"),
+    role: str = Form("selected"),
+):
+    """One-click 'make this the definitive / museum printing' from the candidate
+    browser. role ∈ {selected, museum}."""
+    if not exists(DECKBOOK_ID):
+        return RedirectResponse("/", status_code=303)
+    key = "museum" if role == "museum" else "selected"
+    editing.update_decision(
+        deck_card_id, {f"{key}_scryfall_id": scryfall_id, f"{key}_finish": finish}
+    )
+    return RedirectResponse(f"/card/{deck_card_id}?saved=1", status_code=303)
 
 
 def _commander_view() -> dict | None:

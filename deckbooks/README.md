@@ -68,16 +68,24 @@ Decision statuses: `pending · research · keep · upgrade · proxy · museum ·
 not_applicable`. Museum and proxy are separate flags, not statuses — a card can
 be `keep` while also flagging a museum/proxy printing.
 
-## Current state (this milestone)
+## Current state
 
-Read-only volume: **cover · overview dashboard · gallery · checklist · card
-detail** (with the definitive-vs-museum comparison and the printing browser).
-Bello is finalized (BLC #1 foil deck copy; BLC #101 raised-foil *Imagine:
-Critters* museum/proxy); Arcane Signet, Greater Good, Mana Reflection, and
-Akroma's Memorial (on order) seed the research queue; the other 83 cards are
-`pending`.
+**Cover · overview dashboard · gallery · checklist · card detail** (with the
+definitive-vs-museum comparison and the printing browser), **plus editing**:
 
-**Not yet built (next milestone):** editing (status / checkbox / printing
-selection → finalize → revision). The data model, repository, and revision log
-already support it; only the write routes + forms remain. See
-`INTEGRATION.md` for the Cartarch-integration boundary.
+- On any card, set status / verdict / reasoning, toggle the acquisition
+  checkboxes (owned / installed / source / proxy), and **Finalize** — which
+  stamps the date and appends a revision.
+- Pick the definitive or museum printing straight from the comparison browser
+  (a one-click form per printing).
+- All edits are plain HTML form POSTs → `303` redirect (PRG), so it works with
+  JS off. Progress metrics on the dashboard update from the stored decisions;
+  edits survive a restart (they're in `decisions.json` / `revisions.json`).
+
+Seed state: Bello finalized (BLC #1 foil deck copy; BLC #101 raised-foil
+*Imagine: Critters* museum/proxy); Arcane Signet, Greater Good, Mana Reflection,
+and Akroma's Memorial (on order) in the research queue; the other 83 `pending`.
+
+**Deferred (not blocking):** collection-aware ownership, a shareable URL, PDF
+export, multi-deckbook management. See `INTEGRATION.md` for the Cartarch
+boundary — none of these change the data model.

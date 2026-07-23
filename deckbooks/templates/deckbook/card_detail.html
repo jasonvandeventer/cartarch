@@ -11,6 +11,10 @@
     <p>{{ card.role }} · {{ status_badge(card.decision.status) }} {{ flag_badges(card) }}</p>
   </div>
 
+  {% if request.query_params.get('saved') %}
+    <div class="db-saved">✓ Decision saved.</div>
+  {% endif %}
+
   <div class="db-detail-grid">
     <div>
       {{ card_image(card.display, "db-detail-art", card.card_name) }}
@@ -68,6 +72,44 @@
           <li>{{ box(card.decision.proxy_candidate.printed) }} Proxy printed (optional)</li>
         {% endif %}
       </ul>
+
+      {# ── Edit: a plain HTML form (works JS-off), POST → PRG redirect ── #}
+      <details class="db-edit" {% if not card.curation_complete %}open{% endif %}>
+        <summary>Edit this decision</summary>
+        <form method="post" action="/card/{{ card.deck_card_id }}/decision" class="db-form">
+          <label>Status
+            <select name="status">
+              {% for s in statuses %}
+                <option value="{{ s }}" {% if s == card.decision.status %}selected{% endif %}>{{ s | replace('_',' ') }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <label>Curator's verdict
+            <textarea name="verdict" rows="3" placeholder="Why this printing?">{{ card.decision.verdict or '' }}</textarea>
+          </label>
+          <label>Reasoning <span class="hint">(one point per line)</span>
+            <textarea name="reasoning" rows="4">{{ card.decision.reasoning | join('\n') }}</textarea>
+          </label>
+
+          <fieldset>
+            <legend>Acquisition</legend>
+            <label class="cb"><input type="checkbox" name="target_owned" value="1" {% if card.acquisition.target_owned %}checked{% endif %}> Owned</label>
+            <label class="cb"><input type="checkbox" name="installed" value="1" {% if card.acquisition.installed %}checked{% endif %}> Installed</label>
+            <label class="cb"><input type="checkbox" name="source_recorded" value="1" {% if card.acquisition.source_recorded %}checked{% endif %}> Source recorded</label>
+            {% if card.museum_view %}
+              <label class="cb"><input type="checkbox" name="proxy_desired" value="1" {% if card.is_proxy %}checked{% endif %}> Proxy desired</label>
+              <label class="cb"><input type="checkbox" name="proxy_printed" value="1" {% if card.decision.proxy_candidate and card.decision.proxy_candidate.printed %}checked{% endif %}> Proxy printed</label>
+            {% endif %}
+            <label>Source <input type="text" name="source" value="{{ card.acquisition.source or '' }}" placeholder="TCGplayer, LGS…"></label>
+            <label>Price paid <input type="text" name="price_paid" value="{{ card.acquisition.price_paid or '' }}" placeholder="0.00"></label>
+          </fieldset>
+
+          <div class="db-form-actions">
+            <label class="cb finalize"><input type="checkbox" name="finalize" value="1" {% if card.curation_complete %}checked{% endif %}> Finalize this decision</label>
+            <button type="submit">Save decision</button>
+          </div>
+        </form>
+      </details>
     </div>
   </div>
 
@@ -81,6 +123,18 @@
                alt="{{ c.meta.name }} — {{ c.meta.set_code | upper }}">
           <div>{{ c.meta.set_code | upper }} #{{ c.meta.collector_number }}</div>
           {% if c.mark %}<div class="mark">{{ c.mark }}</div>{% endif %}
+          <div class="db-candidate-actions">
+            <form method="post" action="/card/{{ card.deck_card_id }}/select-printing">
+              <input type="hidden" name="scryfall_id" value="{{ c.meta.scryfall_id }}">
+              <input type="hidden" name="role" value="selected">
+              <button type="submit" title="Make this the definitive deck copy">Definitive</button>
+            </form>
+            <form method="post" action="/card/{{ card.deck_card_id }}/select-printing">
+              <input type="hidden" name="scryfall_id" value="{{ c.meta.scryfall_id }}">
+              <input type="hidden" name="role" value="museum">
+              <button type="submit" title="Flag as museum / proxy candidate">Museum</button>
+            </form>
+          </div>
         </div>
       {% endfor %}
     </div>

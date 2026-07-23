@@ -26,6 +26,10 @@ DECISION_STATUSES = (
 )
 DEFAULT_STATUS = "pending"
 
+# The three finishes a printing can be recorded in (matches the app's
+# inventory finish tokens). An unknown value normalizes to "normal".
+VALID_FINISHES = ("normal", "foil", "etched")
+
 # Section 17 — reuse Cartarch's role vocabulary shape. The deck data carries no
 # per-card roles, so init derives a rough role from the type line (editable
 # later); these are the curated CATEGORIES the dashboard rolls up into, matching

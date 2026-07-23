@@ -401,6 +401,83 @@ a { color: var(--moss-deep); }
   margin-top: 0.6rem;
 }
 
+/* ── Editing ─────────────────────────────────────────────────────────────── */
+.db-saved {
+  background: var(--moss);
+  color: #f0f4e6;
+  border-radius: 8px;
+  padding: 0.6rem 1rem;
+  margin-bottom: 1.2rem;
+  font-weight: 600;
+}
+.db-edit {
+  margin-top: 1.4rem;
+  border: 1px solid rgba(120, 96, 56, 0.4);
+  border-radius: 10px;
+  background: var(--parchment-card);
+}
+.db-edit > summary {
+  cursor: pointer;
+  padding: 0.7rem 1rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-size: 0.78rem;
+  color: var(--moss-deep);
+}
+.db-form { padding: 0 1rem 1rem; display: flex; flex-direction: column; gap: 0.8rem; }
+.db-form label { display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.84rem; color: var(--text-dim); }
+.db-form label.cb { flex-direction: row; align-items: center; gap: 0.45rem; color: var(--text); }
+.db-form .hint { font-style: italic; opacity: 0.8; }
+.db-form input[type="text"], .db-form select, .db-form textarea {
+  font-family: inherit;
+  font-size: 0.92rem;
+  padding: 0.45rem 0.6rem;
+  border: 1px solid rgba(120, 96, 56, 0.5);
+  border-radius: 7px;
+  background: var(--parchment);
+  color: var(--text);
+}
+.db-form textarea { resize: vertical; }
+.db-form fieldset {
+  border: 1px solid rgba(120, 96, 56, 0.35);
+  border-radius: 8px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem 1rem;
+  padding: 0.7rem 1rem 1rem;
+}
+.db-form fieldset legend { font-size: 0.72rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-dim); padding: 0 0.4rem; }
+.db-form-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.8rem;
+  border-top: 1px solid rgba(120, 96, 56, 0.3);
+  padding-top: 0.8rem;
+}
+.db-form-actions .finalize { font-weight: 600; }
+.db-form button, .db-candidate-actions button {
+  font-family: inherit;
+  cursor: pointer;
+  border: 1px solid var(--bronze);
+  border-radius: 999px;
+  background: var(--moss-deep);
+  color: var(--gold-soft);
+  padding: 0.5rem 1.3rem;
+  letter-spacing: 0.06em;
+  font-size: 0.82rem;
+}
+.db-form button:hover, .db-candidate-actions button:hover { background: var(--moss); }
+.db-candidate-actions {
+  display: flex;
+  gap: 0.3rem;
+  margin-top: 0.4rem;
+  justify-content: center;
+}
+.db-candidate-actions button { padding: 0.22rem 0.5rem; font-size: 0.64rem; border-radius: 6px; }
+
 .section-title {
   font-family: var(--display);
   color: var(--moss-deep);
