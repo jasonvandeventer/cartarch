@@ -1451,5 +1451,117 @@
       "selected_scryfall_id": "15fd218c-3e14-4b82-9e03-16a0fad1b530"
     },
     "reason": "decision revised"
+  },
+  {
+    "deck_card_id": "debe9258-209a-44cb-99e9-49affd02aa32",
+    "card_name": "Greater Good",
+    "revision": 2,
+    "changed_at": "2026-07-23",
+    "change_type": "decision_revised",
+    "previous": {
+      "status": "upgrade",
+      "selected_scryfall_id": "f935e21d-f20c-4f73-92b6-e2e2ea8841af"
+    },
+    "current": {
+      "status": "upgrade",
+      "selected_scryfall_id": "f935e21d-f20c-4f73-92b6-e2e2ea8841af"
+    },
+    "reason": "decision revised"
+  },
+  {
+    "deck_card_id": "109dee37-5de5-40fa-9405-8645be6c5076",
+    "card_name": "Garruk's Packleader",
+    "revision": 2,
+    "changed_at": "2026-07-23",
+    "change_type": "decision_revised",
+    "previous": {
+      "status": "pending",
+      "selected_scryfall_id": "109dee37-5de5-40fa-9405-8645be6c5076"
+    },
+    "current": {
+      "status": "pending",
+      "selected_scryfall_id": "109dee37-5de5-40fa-9405-8645be6c5076"
+    },
+    "reason": "decision revised"
+  },
+  {
+    "deck_card_id": "3c9ac089-6962-48fd-bf67-f041ece27fa9",
+    "card_name": "Sanctum Weaver",
+    "revision": 3,
+    "changed_at": "2026-07-23",
+    "change_type": "decision_revised",
+    "previous": {
+      "status": "pending",
+      "selected_scryfall_id": "15fd218c-3e14-4b82-9e03-16a0fad1b530"
+    },
+    "current": {
+      "status": "pending",
+      "selected_scryfall_id": "15fd218c-3e14-4b82-9e03-16a0fad1b530"
+    },
+    "reason": "decision revised"
+  },
+  {
+    "deck_card_id": "ed38da33-c230-4eec-b7c7-3b0c5cdf727a",
+    "card_name": "Decimate",
+    "revision": 2,
+    "changed_at": "2026-07-23",
+    "change_type": "decision_revised",
+    "previous": {
+      "status": "pending",
+      "selected_scryfall_id": "ad3fc84d-dbae-40a2-bb95-abedbc83c0cd"
+    },
+    "current": {
+      "status": "pending",
+      "selected_scryfall_id": "ad3fc84d-dbae-40a2-bb95-abedbc83c0cd"
+    },
+    "reason": "decision revised"
+  },
+  {
+    "deck_card_id": "d863ff4a-c79f-4018-ac20-f40ad1fcfb36",
+    "card_name": "Mana Reflection",
+    "revision": 2,
+    "changed_at": "2026-07-23",
+    "change_type": "decision_revised",
+    "previous": {
+      "status": "keep",
+      "selected_scryfall_id": null
+    },
+    "current": {
+      "status": "keep",
+      "selected_scryfall_id": null
+    },
+    "reason": "decision revised"
+  },
+  {
+    "deck_card_id": "819f30d8-6277-4811-b2c9-f78bc8f86fe7",
+    "card_name": "Selvala, Heart of the Wilds",
+    "revision": 3,
+    "changed_at": "2026-07-23",
+    "change_type": "decision_revised",
+    "previous": {
+      "status": "keep",
+      "selected_scryfall_id": null
+    },
+    "current": {
+      "status": "keep",
+      "selected_scryfall_id": null
+    },
+    "reason": "decision revised"
+  },
+  {
+    "deck_card_id": "607157a4-4fe8-46b9-86e1-0a30f040116b",
+    "card_name": "Leyline of Abundance",
+    "revision": 2,
+    "changed_at": "2026-07-23",
+    "change_type": "decision_revised",
+    "previous": {
+      "status": "keep",
+      "selected_scryfall_id": null
+    },
+    "current": {
+      "status": "keep",
+      "selected_scryfall_id": null
+    },
+    "reason": "decision revised"
   }
 ]
