@@ -114,3 +114,39 @@ def test_set_current_printing_preserves_finish(tmp_path, monkeypatch):
     editing.update_decision(sol, {"current_scryfall_id": "some-other-print"})
     card = next(c for c in repository.load_cards("osha-violation") if c["deck_card_id"] == sol)
     assert card["current_printing"] == {"scryfall_id": "some-other-print", "finish": "foil"}
+
+
+def test_museum_states_and_no_edition_clears_picks(tmp_path, monkeypatch):
+    """The four Museum states, and that 'no separate edition' is exclusive —
+    it clears any official pick / proxy so the card can't be both."""
+    from deckbooks import editing, repository, services
+    from deckbooks.models import museum_state
+    from deckbooks.tests.test_foundation import _isolate
+
+    _isolate(tmp_path, monkeypatch)
+    initialize(refresh=False)
+    cards = {c["card_name"]: c for c in repository.load_cards("osha-violation")}
+
+    arcane = cards["Arcane Signet"]["deck_card_id"]
+    sol = cards["Sol Ring"]["deck_card_id"]
+
+    # custom proxy (no official pick) → 'custom_proxy'
+    editing.update_decision(arcane, {"custom_proxy_candidate": "1"})
+    a = next(c for c in repository.load_cards("osha-violation") if c["deck_card_id"] == arcane)
+    assert museum_state(a) == "custom_proxy"
+
+    # no separate edition clears any official pick + proxy → 'no_edition'
+    editing.update_decision(sol, {"museum_scryfall_id": "x", "museum_finish": "foil"})
+    editing.update_decision(sol, {"no_museum_edition": "1"})
+    s = next(c for c in repository.load_cards("osha-violation") if c["deck_card_id"] == sol)
+    assert s["decision"]["museum_printing"] is None
+    assert museum_state(s) == "no_edition"
+
+    # totals count only official picks as chosen; states tracked separately.
+    t = services.museum_wall()["totals"]
+    assert t["custom_proxy"] >= 1 and t["no_edition"] >= 1
+    # Bello keeps its official pick → still 'chosen', not awaiting.
+    bello = next(
+        c for c in repository.load_cards("osha-violation") if c["card_name"].startswith("Bello")
+    )
+    assert museum_state(bello) == "chosen"

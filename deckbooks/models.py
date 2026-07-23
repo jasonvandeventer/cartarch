@@ -130,3 +130,32 @@ def is_proxy_candidate(card: dict[str, Any]) -> bool:
 
 def has_museum_piece(card: dict[str, Any]) -> bool:
     return bool((card.get("decision", {}).get("museum_printing") or {}).get("scryfall_id"))
+
+
+def is_custom_proxy(card: dict[str, Any]) -> bool:
+    """Reviewed and selected for a bespoke OSHA Violation custom proxy (distinct
+    from proxying an official printing)."""
+    return bool(card.get("decision", {}).get("custom_proxy_candidate"))
+
+
+def is_no_museum_edition(card: dict[str, Any]) -> bool:
+    """Reviewed; the Definitive printing is sufficient — no separate Museum
+    edition or custom proxy is wanted."""
+    return bool(card.get("decision", {}).get("no_museum_edition"))
+
+
+# The Museum-page state for a card. Only "chosen" counts toward the Museum
+# total; a card may be BOTH chosen and a custom-proxy candidate (the official
+# image still leads, with an extra badge — see is_custom_proxy). The reviewed
+# states are NOT "awaiting": "awaiting" means no Museum decision has been made.
+def museum_state(card: dict[str, Any]) -> str:
+    if has_museum_piece(card):
+        return "chosen"
+    if is_custom_proxy(card):
+        return "custom_proxy"
+    if is_no_museum_edition(card):
+        return "no_edition"
+    return "awaiting"
+
+
+MUSEUM_STATE_RANK = {"chosen": 0, "custom_proxy": 1, "no_edition": 2, "awaiting": 3}

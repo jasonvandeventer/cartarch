@@ -131,6 +131,19 @@ def update_decision(deck_card_id: str, form: dict[str, Any]) -> dict:
         decision["proxy_candidate"]["desired"] = _truthy(form.get("proxy_desired"))
         decision["proxy_candidate"]["printed"] = _truthy(form.get("proxy_printed"))
 
+    # Museum review states (custom OSHA proxy vs. no separate edition). Only
+    # touched when the field is present, so a decision edit that omits them
+    # leaves the state alone. "No separate edition" is exclusive — it means
+    # nothing separate is wanted, so it clears any official pick + proxy flag.
+    if "custom_proxy_candidate" in form:
+        decision["custom_proxy_candidate"] = _truthy(form.get("custom_proxy_candidate"))
+    if "no_museum_edition" in form:
+        decision["no_museum_edition"] = _truthy(form.get("no_museum_edition"))
+        if decision["no_museum_edition"]:
+            decision["museum_printing"] = None
+            decision["proxy_candidate"] = None
+            decision["custom_proxy_candidate"] = False
+
     # Acquisition checkboxes + provenance.
     for flag in ("target_owned", "installed", "source_recorded"):
         if flag in form:

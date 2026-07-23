@@ -108,6 +108,14 @@
             <label>Source <input type="text" name="source" value="{{ card.acquisition.source or '' }}" placeholder="TCGplayer, LGS…"></label>
             <label>Price paid <input type="text" name="price_paid" value="{{ card.acquisition.price_paid or '' }}" placeholder="0.00"></label>
           </fieldset>
+
+          <fieldset>
+            <legend>Museum review</legend>
+            <input type="hidden" name="custom_proxy_candidate" value="0">
+            <label class="cb"><input type="checkbox" name="custom_proxy_candidate" value="1" {% if card.is_custom_proxy %}checked{% endif %}> Custom proxy candidate (bespoke OSHA treatment)</label>
+            <input type="hidden" name="no_museum_edition" value="0">
+            <label class="cb"><input type="checkbox" name="no_museum_edition" value="1" {% if card.is_no_edition %}checked{% endif %}> No separate Museum edition (Definitive is enough)</label>
+          </fieldset>
           <div class="db-form-actions">
             <label class="cb finalize"><input type="checkbox" name="finalize" value="1" {% if card.curation_complete %}checked{% endif %}> Finalize this decision</label>
             <button type="submit">Seal decision</button>

@@ -1131,5 +1131,325 @@
       "selected_scryfall_id": "acf73032-96b6-4550-ad33-622932b394d9"
     },
     "reason": "decision finalized"
+  },
+  {
+    "deck_card_id": "5a9d47cc-157b-4070-ae00-da1c5d7b94de",
+    "card_name": "Unnatural Growth",
+    "revision": 1,
+    "changed_at": "2026-07-23",
+    "change_type": "decision_finalized",
+    "previous": {
+      "status": "pending",
+      "selected_scryfall_id": "6f32f0e3-9ff6-4e86-b7ec-24f6cee998b2"
+    },
+    "current": {
+      "status": "upgrade",
+      "selected_scryfall_id": "6f32f0e3-9ff6-4e86-b7ec-24f6cee998b2"
+    },
+    "reason": "decision finalized"
+  },
+  {
+    "deck_card_id": "604a6feb-0586-479c-a7b9-60abe9a13eb1",
+    "card_name": "Warstorm Surge",
+    "revision": 1,
+    "changed_at": "2026-07-23",
+    "change_type": "decision_finalized",
+    "previous": {
+      "status": "pending",
+      "selected_scryfall_id": null
+    },
+    "current": {
+      "status": "keep",
+      "selected_scryfall_id": null
+    },
+    "reason": "decision finalized"
+  },
+  {
+    "deck_card_id": "243b460e-e67a-40d7-a874-a61fdb011c5a",
+    "card_name": "Big Score",
+    "revision": 2,
+    "changed_at": "2026-07-23",
+    "change_type": "decision_revised",
+    "previous": {
+      "status": "pending",
+      "selected_scryfall_id": "c7b698a1-dff1-413f-ba4f-0298c686999a"
+    },
+    "current": {
+      "status": "pending",
+      "selected_scryfall_id": "c7b698a1-dff1-413f-ba4f-0298c686999a"
+    },
+    "reason": "decision revised"
+  },
+  {
+    "deck_card_id": "243b460e-e67a-40d7-a874-a61fdb011c5a",
+    "card_name": "Big Score",
+    "revision": 3,
+    "changed_at": "2026-07-23",
+    "change_type": "decision_revised",
+    "previous": {
+      "status": "pending",
+      "selected_scryfall_id": "c7b698a1-dff1-413f-ba4f-0298c686999a"
+    },
+    "current": {
+      "status": "upgrade",
+      "selected_scryfall_id": "c7b698a1-dff1-413f-ba4f-0298c686999a"
+    },
+    "reason": "decision revised"
+  },
+  {
+    "deck_card_id": "c10525b5-067c-4a30-a069-875f11f2ff19",
+    "card_name": "Bootleggers' Stash",
+    "revision": 2,
+    "changed_at": "2026-07-23",
+    "change_type": "decision_revised",
+    "previous": {
+      "status": "upgrade",
+      "selected_scryfall_id": "e32eb60a-14ac-4ea9-a4c5-6597194af0c1"
+    },
+    "current": {
+      "status": "upgrade",
+      "selected_scryfall_id": "e32eb60a-14ac-4ea9-a4c5-6597194af0c1"
+    },
+    "reason": "decision revised"
+  },
+  {
+    "deck_card_id": "c10525b5-067c-4a30-a069-875f11f2ff19",
+    "card_name": "Bootleggers' Stash",
+    "revision": 3,
+    "changed_at": "2026-07-23",
+    "change_type": "decision_revised",
+    "previous": {
+      "status": "upgrade",
+      "selected_scryfall_id": "e32eb60a-14ac-4ea9-a4c5-6597194af0c1"
+    },
+    "current": {
+      "status": "upgrade",
+      "selected_scryfall_id": "e32eb60a-14ac-4ea9-a4c5-6597194af0c1"
+    },
+    "reason": "decision revised"
+  },
+  {
+    "deck_card_id": "2fb8dace-c604-40fc-bbd4-5add5deb041a",
+    "card_name": "Alchemist's Talent",
+    "revision": 2,
+    "changed_at": "2026-07-23",
+    "change_type": "decision_revised",
+    "previous": {
+      "status": "keep",
+      "selected_scryfall_id": null
+    },
+    "current": {
+      "status": "keep",
+      "selected_scryfall_id": null
+    },
+    "reason": "decision revised"
+  },
+  {
+    "deck_card_id": "83c64ec3-ad6d-45d8-a44a-fd557d1ad2bf",
+    "card_name": "Berserkers' Onslaught",
+    "revision": 2,
+    "changed_at": "2026-07-23",
+    "change_type": "decision_revised",
+    "previous": {
+      "status": "keep",
+      "selected_scryfall_id": null
+    },
+    "current": {
+      "status": "keep",
+      "selected_scryfall_id": null
+    },
+    "reason": "decision revised"
+  },
+  {
+    "deck_card_id": "7a050532-1e75-4212-acb0-ec740378af10",
+    "card_name": "Chaos Warp",
+    "revision": 2,
+    "changed_at": "2026-07-23",
+    "change_type": "decision_revised",
+    "previous": {
+      "status": "pending",
+      "selected_scryfall_id": "94ba4278-c63e-49b4-bf60-16dfe5c70a0b"
+    },
+    "current": {
+      "status": "pending",
+      "selected_scryfall_id": "94ba4278-c63e-49b4-bf60-16dfe5c70a0b"
+    },
+    "reason": "decision revised"
+  },
+  {
+    "deck_card_id": "3213bfee-c0a0-49a2-9080-cdaa09b414c5",
+    "card_name": "Echoing Assault",
+    "revision": 2,
+    "changed_at": "2026-07-23",
+    "change_type": "decision_revised",
+    "previous": {
+      "status": "upgrade",
+      "selected_scryfall_id": "7110406b-72ac-4e59-aa9f-903510e352a3"
+    },
+    "current": {
+      "status": "upgrade",
+      "selected_scryfall_id": "7110406b-72ac-4e59-aa9f-903510e352a3"
+    },
+    "reason": "decision revised"
+  },
+  {
+    "deck_card_id": "d8d7ac51-450e-473e-93e1-3fa9b3b6e2d4",
+    "card_name": "Grumgully, the Generous",
+    "revision": 2,
+    "changed_at": "2026-07-23",
+    "change_type": "decision_revised",
+    "previous": {
+      "status": "keep",
+      "selected_scryfall_id": null
+    },
+    "current": {
+      "status": "keep",
+      "selected_scryfall_id": null
+    },
+    "reason": "decision revised"
+  },
+  {
+    "deck_card_id": "48494ef9-5eb3-4b55-ad1d-b32bbed89ca5",
+    "card_name": "Wildsear, Scouring Maw",
+    "revision": 2,
+    "changed_at": "2026-07-23",
+    "change_type": "decision_revised",
+    "previous": {
+      "status": "upgrade",
+      "selected_scryfall_id": "817ab66e-8e64-47db-832a-2cf9a28dbd17"
+    },
+    "current": {
+      "status": "upgrade",
+      "selected_scryfall_id": "817ab66e-8e64-47db-832a-2cf9a28dbd17"
+    },
+    "reason": "decision revised"
+  },
+  {
+    "deck_card_id": "821f01e4-082e-424a-ae77-4053da893eb2",
+    "card_name": "Thickest in the Thicket",
+    "revision": 2,
+    "changed_at": "2026-07-23",
+    "change_type": "decision_revised",
+    "previous": {
+      "status": "upgrade",
+      "selected_scryfall_id": "acf73032-96b6-4550-ad33-622932b394d9"
+    },
+    "current": {
+      "status": "upgrade",
+      "selected_scryfall_id": "acf73032-96b6-4550-ad33-622932b394d9"
+    },
+    "reason": "decision revised"
+  },
+  {
+    "deck_card_id": "1512eddf-7a24-4f0a-967f-85e51cc08907",
+    "card_name": "Sunbird's Invocation",
+    "revision": 2,
+    "changed_at": "2026-07-23",
+    "change_type": "decision_revised",
+    "previous": {
+      "status": "pending",
+      "selected_scryfall_id": null
+    },
+    "current": {
+      "status": "pending",
+      "selected_scryfall_id": null
+    },
+    "reason": "decision revised"
+  },
+  {
+    "deck_card_id": "a5f3ab82-2a24-4c6c-bdd9-f2bd5adca144",
+    "card_name": "Starstorm",
+    "revision": 2,
+    "changed_at": "2026-07-23",
+    "change_type": "decision_revised",
+    "previous": {
+      "status": "pending",
+      "selected_scryfall_id": null
+    },
+    "current": {
+      "status": "pending",
+      "selected_scryfall_id": null
+    },
+    "reason": "decision revised"
+  },
+  {
+    "deck_card_id": "033b1ee0-494f-4881-8bdf-f9436d58fd66",
+    "card_name": "Spine of Ish Sah",
+    "revision": 2,
+    "changed_at": "2026-07-23",
+    "change_type": "decision_revised",
+    "previous": {
+      "status": "pending",
+      "selected_scryfall_id": null
+    },
+    "current": {
+      "status": "pending",
+      "selected_scryfall_id": null
+    },
+    "reason": "decision revised"
+  },
+  {
+    "deck_card_id": "d27e64ba-5501-4212-b0b6-2a47f64d226a",
+    "card_name": "Sandwurm Convergence",
+    "revision": 2,
+    "changed_at": "2026-07-23",
+    "change_type": "decision_revised",
+    "previous": {
+      "status": "keep",
+      "selected_scryfall_id": null
+    },
+    "current": {
+      "status": "keep",
+      "selected_scryfall_id": null
+    },
+    "reason": "decision revised"
+  },
+  {
+    "deck_card_id": "fe3e7dd2-b66d-4218-9fde-f84bec26b7bf",
+    "card_name": "Ruby, Daring Tracker",
+    "revision": 2,
+    "changed_at": "2026-07-23",
+    "change_type": "decision_revised",
+    "previous": {
+      "status": "keep",
+      "selected_scryfall_id": null
+    },
+    "current": {
+      "status": "keep",
+      "selected_scryfall_id": null
+    },
+    "reason": "decision revised"
+  },
+  {
+    "deck_card_id": "299f81b5-20eb-465b-bd36-2acd80a4f37c",
+    "card_name": "Rain of Riches",
+    "revision": 2,
+    "changed_at": "2026-07-23",
+    "change_type": "decision_revised",
+    "previous": {
+      "status": "upgrade",
+      "selected_scryfall_id": "c78e9aaa-806a-47a7-8b43-d9bb959bb0c1"
+    },
+    "current": {
+      "status": "upgrade",
+      "selected_scryfall_id": "c78e9aaa-806a-47a7-8b43-d9bb959bb0c1"
+    },
+    "reason": "decision revised"
+  },
+  {
+    "deck_card_id": "3c9ac089-6962-48fd-bf67-f041ece27fa9",
+    "card_name": "Sanctum Weaver",
+    "revision": 2,
+    "changed_at": "2026-07-23",
+    "change_type": "decision_revised",
+    "previous": {
+      "status": "pending",
+      "selected_scryfall_id": "15fd218c-3e14-4b82-9e03-16a0fad1b530"
+    },
+    "current": {
+      "status": "pending",
+      "selected_scryfall_id": "15fd218c-3e14-4b82-9e03-16a0fad1b530"
+    },
+    "reason": "decision revised"
   }
 ]

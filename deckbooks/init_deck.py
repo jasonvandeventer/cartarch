@@ -115,6 +115,8 @@ def _empty_decision() -> dict:
         "proxy_candidate": None,
         "verdict": None,
         "reasoning": [],
+        "custom_proxy_candidate": False,
+        "no_museum_edition": False,
     }
 
 

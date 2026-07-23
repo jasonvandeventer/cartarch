@@ -15,13 +15,17 @@ from deckbooks.models import (
     CATEGORY_ORDER,
     CHAPTER_FLAVOR,
     CHAPTER_SEQUENCE,
+    MUSEUM_STATE_RANK,
     ROMAN,
     category_for_role,
     curation_complete,
     deck_copy_complete,
     has_museum_piece,
+    is_custom_proxy,
+    is_no_museum_edition,
     is_proxy_candidate,
     is_upgrade_target,
+    museum_state,
 )
 
 
@@ -82,6 +86,9 @@ def hydrate(card: dict) -> dict:
         "is_upgrade": is_upgrade_target(card),
         "is_proxy": is_proxy_candidate(card),
         "has_museum": has_museum_piece(card),
+        "museum_state": museum_state(card),
+        "is_custom_proxy": is_custom_proxy(card),
+        "is_no_edition": is_no_museum_edition(card),
         "display": _printing_view(_display_printing(card)),
         "current_view": _printing_view(card.get("current_printing")),
         "selected_view": _printing_view(card.get("decision", {}).get("selected_printing")),
@@ -129,19 +136,24 @@ def chapters() -> list[dict]:
 
 
 def museum_wall() -> dict:
-    """The whole deck in its Museum (Collector's Pick) form — each card shown as
-    its chosen museum printing, or its current copy (faded, 'awaiting a pick')
-    where none is chosen yet. Commander first, then the cards that HAVE a pick,
-    then the rest — so the finished exhibit leads."""
+    """The whole deck in its Museum form, in FOUR states (see models.museum_state):
+    chosen (an official Collector's Pick), custom_proxy (a bespoke OSHA proxy),
+    no_edition (reviewed — Definitive is enough), awaiting (not yet reviewed).
+    Commander first, then by state rank, then name — so the finished exhibit
+    leads and un-reviewed cards trail. Totals count each state separately; only
+    'chosen' counts as an official Museum pick."""
     cards = [hydrate(c) for c in visible_cards()]
     cards.sort(
         key=lambda c: (
             0 if c.get("role") == "Commander" else 1,
-            0 if c.get("museum_view") else 1,
+            MUSEUM_STATE_RANK.get(c.get("museum_state"), 9),
             c.get("card_name", "").lower(),
         )
     )
-    return {"cards": cards, "with_pick": sum(1 for c in cards if c.get("museum_view"))}
+    totals = {"chosen": 0, "custom_proxy": 0, "no_edition": 0, "awaiting": 0}
+    for c in cards:
+        totals[c.get("museum_state", "awaiting")] += 1
+    return {"cards": cards, "totals": totals, "total": len(cards)}
 
 
 def card_detail(deck_card_id: str) -> dict | None:

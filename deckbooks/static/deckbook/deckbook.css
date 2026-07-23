@@ -709,9 +709,15 @@ a { color: var(--moss-deep); }
   box-shadow: 0 10px 26px rgba(0,0,0,0.6);
   border: 1px solid rgba(217,178,95,0.25);
 }
-.db-museum-piece.has-pick .db-museum-frame {
+.db-museum-piece.state-chosen .db-museum-frame {
   background: linear-gradient(150deg, #7c5f26, var(--gold) 48%, #6a4f1f);
   box-shadow: 0 12px 30px rgba(0,0,0,0.62), 0 0 22px rgba(217,178,95,0.28);
+}
+/* Custom proxy candidate — a distinct moss/verdigris frame (a bespoke object,
+   not an official gilt printing). */
+.db-museum-piece.state-custom_proxy .db-museum-frame {
+  background: repeating-linear-gradient(135deg, #3d4a2c 0 8px, #55663f 8px 16px);
+  box-shadow: 0 12px 28px rgba(0,0,0,0.6), 0 0 18px rgba(85,102,63,0.35);
 }
 .db-museum-piece.is-commander .db-museum-frame { padding: 11px; }
 .db-museum-img {
@@ -729,8 +735,10 @@ a { color: var(--moss-deep); }
   text-align: center;
   padding: 1rem;
 }
-/* Un-picked pieces sit quietly until chosen. */
-.db-museum-piece:not(.has-pick) .db-museum-img { filter: grayscale(0.35) brightness(0.82); }
+/* Not-yet-official pieces sit quietly; awaiting-review is the most muted. */
+.db-museum-piece.state-custom_proxy .db-museum-img { filter: brightness(0.9); }
+.db-museum-piece.state-no_edition .db-museum-img { filter: grayscale(0.5) brightness(0.72); }
+.db-museum-piece.state-awaiting .db-museum-img { filter: grayscale(0.55) brightness(0.62); }
 .db-museum-plate { text-align: center; max-width: 15rem; }
 .db-museum-name { display: block; color: var(--gold-soft); font-family: var(--display); font-size: 1rem; }
 .db-museum-set { display: block; color: var(--text-on-dark-dim); font-size: 0.76rem; font-style: italic; }
@@ -746,6 +754,18 @@ a { color: var(--moss-deep); }
   text-transform: uppercase;
   font-weight: 700;
 }
+.db-museum-tag.proxy { background: var(--moss); color: #eef4e2; margin-left: 0.25rem; }
+.db-museum-note {
+  display: inline-block;
+  margin-top: 0.3rem;
+  color: var(--text-on-dark-dim);
+  border: 1px solid rgba(168,151,122,0.4);
+  border-radius: 999px;
+  padding: 0.08rem 0.6rem;
+  font-size: 0.6rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
 .db-museum-await {
   display: block;
   margin-top: 0.2rem;
@@ -753,8 +773,19 @@ a { color: var(--moss-deep); }
   font-size: 0.7rem;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  opacity: 0.7;
+  opacity: 0.6;
 }
+.db-museum-totals {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.4rem 1.4rem;
+  margin-top: 1rem;
+  color: var(--text-on-dark-dim);
+  font-size: 0.84rem;
+}
+.db-museum-totals b { color: var(--gold-soft); font-family: var(--display); font-size: 1.05rem; }
+.db-museum-totals .await b { color: var(--text-on-dark-dim); }
 
 /* ── Ledger: museum status marks ─────────────────────────────────────────── */
 .db-mark.on { color: var(--moss-deep); }

@@ -9,6 +9,8 @@
 {% macro flag_badges(card) -%}
   {% if card.curation_complete %}<span class="db-badge finalized">Finalized</span>{% endif %}
   {% if card.has_museum %}<span class="db-badge museum">Museum</span>{% endif %}
+  {% if card.is_custom_proxy %}<span class="db-badge proxy">Custom Proxy</span>{% endif %}
+  {% if card.is_no_edition %}<span class="db-badge ghost">No Museum Edition</span>{% endif %}
   {% if card.is_proxy %}<span class="db-badge proxy">Proxy</span>{% endif %}
   {% if card.is_upgrade %}<span class="db-badge upgrade">Upgrade</span>{% endif %}
 {%- endmacro %}
