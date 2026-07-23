@@ -3,6 +3,20 @@
 {% extends "deckbook/base.html" %}
 {% block title %}{{ card.card_name }} — {{ deckbook.name }}{% endblock %}
 {% macro box(ok) %}<span class="box {{ '' if ok else 'no' }}">[{{ 'X' if ok else ' ' }}]</span>{% endmacro %}
+
+{# Museum-placard for a printing view: the placard beside a painting. #}
+{% macro plaque(view, label) -%}
+  <figcaption class="db-plaque">
+    <span class="db-plaque-label">{{ label }}</span>
+    {% if view and view.meta %}
+      <span class="db-plaque-set">{{ view.meta.set_name or view.meta.set_code | upper }}</span>
+      <span class="db-plaque-line">Collector #{{ view.meta.collector_number }}</span>
+      <span class="db-plaque-line">{{ (view.finish or 'normal') | capitalize }}</span>
+      {% if view.meta.rarity %}<span class="db-plaque-line">{{ view.meta.rarity | capitalize }}</span>{% endif %}
+    {% endif %}
+  </figcaption>
+{%- endmacro %}
+
 {% block body %}
 <div class="db-page">
   <div class="db-chapter">
@@ -12,43 +26,36 @@
   </div>
 
   {% if request.query_params.get('saved') %}
-    <div class="db-saved">✓ Decision saved.</div>
+    <div class="db-wax-confirm"><span class="db-wax-confirm-seal">&#10022;</span> Decision sealed.</div>
   {% endif %}
 
-  <div class="db-detail-grid">
-    <div>
-      {{ card_image(card.display, "db-detail-art", card.card_name) }}
-    </div>
-    <div>
-      {# Side-by-side finalists when there's a museum/selected alternate. #}
-      {% if card.museum_view %}
-        <div class="section-title">Definitive vs. dream treatment</div>
-        <div class="db-compare-wrap">
-          <div class="db-compare selected">
-            <figure>
-              {{ card_image(card.selected_view or card.current_view, "", card.card_name) }}
-              <figcaption><b>Current / Definitive</b>
-                {% set p = card.selected_view or card.current_view %}
-                {% if p and p.meta %}{{ p.meta.set_code | upper }} #{{ p.meta.collector_number }}{% endif %}
-                {% if p and p.finish %}· {{ p.finish | capitalize }}{% endif %}
-              </figcaption>
-            </figure>
-          </div>
-          <div class="db-compare museum">
-            <figure>
-              {{ card_image(card.museum_view, "", card.card_name) }}
-              <figcaption><b>Museum / Proxy</b>
-                {% if card.museum_view.meta %}{{ card.museum_view.meta.set_code | upper }} #{{ card.museum_view.meta.collector_number }}{% endif %}
-                {% if card.museum_view.finish %}· {{ card.museum_view.finish | capitalize }}{% endif %}
-              </figcaption>
-            </figure>
-          </div>
-        </div>
-      {% endif %}
+  {% if card.museum_view %}
+    {# Two plates, genuinely side by side — the page says "compare these". #}
+    <section class="db-plates">
+      <figure class="db-plate selected">
+        {{ card_image(card.selected_view or card.current_view, "db-plate-img", card.card_name) }}
+        {{ plaque(card.selected_view or card.current_view,
+                  'Definitive Printing' if card.curation_complete else 'Current Printing') }}
+      </figure>
+      <figure class="db-plate museum">
+        {{ card_image(card.museum_view, "db-plate-img", card.card_name) }}
+        {{ plaque(card.museum_view, 'Museum Piece' + (' · Proxy' if card.is_proxy else '')) }}
+      </figure>
+    </section>
+    {% set detail_body_only = true %}
+  {% endif %}
 
+  <div class="{% if not card.museum_view %}db-detail-grid{% endif %}">
+    {% if not card.museum_view %}
+      <figure class="db-solo-plate">
+        {{ card_image(card.display, "db-detail-art", card.card_name) }}
+        {{ plaque(card.display, 'Definitive Printing' if card.curation_complete else 'Current Printing') }}
+      </figure>
+    {% endif %}
+    <div>
       {% if card.decision.verdict %}
         <div class="db-verdict">
-          <b>Curator's verdict.</b> {{ card.decision.verdict }}
+          <b>Curatorial Notes.</b> {{ card.decision.verdict }}
           {% if card.decision.reasoning %}
             <ul class="db-reasoning">
               {% for r in card.decision.reasoning %}<li>{{ r }}</li>{% endfor %}
@@ -58,7 +65,7 @@
       {% else %}
         <div class="db-verdict" style="color: var(--text-dim)">
           No decision recorded yet. This card is in the
-          <b>{{ card.decision.status | replace('_',' ') }}</b> stage — compare the printings below.
+          <b>{{ status_badge(card.decision.status) }}</b> stage — compare the printings below.
         </div>
       {% endif %}
 
@@ -73,7 +80,6 @@
         {% endif %}
       </ul>
 
-      {# ── Edit: a plain HTML form (works JS-off), POST → PRG redirect ── #}
       <details class="db-edit" {% if not card.curation_complete %}open{% endif %}>
         <summary>Edit this decision</summary>
         <form method="post" action="/card/{{ card.deck_card_id }}/decision" class="db-form">
@@ -84,13 +90,12 @@
               {% endfor %}
             </select>
           </label>
-          <label>Curator's verdict
+          <label>Curatorial notes
             <textarea name="verdict" rows="3" placeholder="Why this printing?">{{ card.decision.verdict or '' }}</textarea>
           </label>
           <label>Reasoning <span class="hint">(one point per line)</span>
             <textarea name="reasoning" rows="4">{{ card.decision.reasoning | join('\n') }}</textarea>
           </label>
-
           <fieldset>
             <legend>Acquisition</legend>
             <label class="cb"><input type="checkbox" name="target_owned" value="1" {% if card.acquisition.target_owned %}checked{% endif %}> Owned</label>
@@ -103,10 +108,9 @@
             <label>Source <input type="text" name="source" value="{{ card.acquisition.source or '' }}" placeholder="TCGplayer, LGS…"></label>
             <label>Price paid <input type="text" name="price_paid" value="{{ card.acquisition.price_paid or '' }}" placeholder="0.00"></label>
           </fieldset>
-
           <div class="db-form-actions">
             <label class="cb finalize"><input type="checkbox" name="finalize" value="1" {% if card.curation_complete %}checked{% endif %}> Finalize this decision</label>
-            <button type="submit">Save decision</button>
+            <button type="submit">Seal decision</button>
           </div>
         </form>
       </details>
@@ -150,6 +154,6 @@
     </ul>
   {% endif %}
 
-  <p style="margin-top:2rem"><a href="/gallery">← Back to the catalog</a></p>
+  <p style="margin-top:2rem"><a href="/collection">← Back to the collection</a></p>
 </div>
 {% endblock %}

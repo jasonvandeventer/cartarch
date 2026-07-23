@@ -159,3 +159,50 @@ def progress() -> dict[str, Any]:
         "museum_pieces": sum(1 for c in shown if has_museum_piece(c)),
         "categories": [{"name": k, **cats[k]} for k in CATEGORY_ORDER if cats[k]["total"]],
     }
+
+
+def research_queue() -> list[dict]:
+    """The open decisions the curator should act on next — every card still in
+    the `research` stage (in-deck or on order), hydrated for a thumbnail."""
+    q = [c for c in visible_cards() if c.get("decision", {}).get("status") == "research"]
+    q.sort(key=lambda c: c.get("card_name", "").lower())
+    return [hydrate(c) for c in q]
+
+
+def recently_finalized(limit: int = 6) -> list[dict]:
+    """The most recently finalized cards, newest first, from the revision log —
+    so the overview shows momentum, not just a percentage."""
+    revs = [
+        r
+        for r in repository.load_revisions(DECKBOOK_ID)
+        if r.get("change_type") == "decision_finalized"
+    ]
+    # Newest first; dedup to the latest finalize per card.
+    revs.sort(key=lambda r: (r.get("changed_at", ""), r.get("revision", 0)), reverse=True)
+    seen: set[str] = set()
+    cards_by_id = {c["deck_card_id"]: c for c in _all_cards()}
+    out: list[dict] = []
+    for r in revs:
+        cid = r.get("deck_card_id")
+        if cid in seen or cid not in cards_by_id:
+            continue
+        seen.add(cid)
+        out.append({**hydrate(cards_by_id[cid]), "finalized_on": r.get("changed_at")})
+        if len(out) >= limit:
+            break
+    return out
+
+
+def on_order() -> list[dict]:
+    """Cards acquired but not yet installed (the acquisition-ledger feed)."""
+    return [hydrate(c) for c in _all_cards() if c.get("status") == "on_order"]
+
+
+def overview() -> dict:
+    """Everything the dashboard needs: the stats PLUS the 'what next' feeds."""
+    return {
+        "progress": progress(),
+        "research_queue": research_queue(),
+        "recently_finalized": recently_finalized(),
+        "on_order": on_order(),
+    }

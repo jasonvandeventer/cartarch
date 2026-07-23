@@ -30,8 +30,13 @@ templates.env.globals["statuses"] = DECISION_STATUSES
 templates.env.globals["finishes"] = VALID_FINISHES
 
 
-def _ctx(request: Request, **extra) -> dict:
-    return {"request": request, "deckbook": services.get_deckbook(), **extra}
+def _ctx(request: Request, active: str = "", **extra) -> dict:
+    return {
+        "request": request,
+        "deckbook": services.get_deckbook(),
+        "active": active,
+        **extra,
+    }
 
 
 def _needs_init(request: Request) -> HTMLResponse | None:
@@ -45,28 +50,30 @@ def _needs_init(request: Request) -> HTMLResponse | None:
 @app.get("/", response_class=HTMLResponse)
 def cover(request: Request):
     return _needs_init(request) or templates.TemplateResponse(
-        "deckbook/cover.html", _ctx(request, commander=_commander_view())
+        "deckbook/cover.html", _ctx(request, active="cover", commander=_commander_view())
     )
 
 
 @app.get("/overview", response_class=HTMLResponse)
 def overview(request: Request):
     return _needs_init(request) or templates.TemplateResponse(
-        "deckbook/overview.html", _ctx(request, progress=services.progress())
+        "deckbook/overview.html", _ctx(request, active="overview", **services.overview())
     )
 
 
-@app.get("/gallery", response_class=HTMLResponse)
-def gallery(request: Request):
+# "Collection" (was /gallery) and "Ledger" (was /checklist) — the museum-register
+# naming the deck's identity calls for.
+@app.get("/collection", response_class=HTMLResponse)
+def collection(request: Request):
     return _needs_init(request) or templates.TemplateResponse(
-        "deckbook/gallery.html", _ctx(request, cards=services.gallery())
+        "deckbook/gallery.html", _ctx(request, active="collection", cards=services.gallery())
     )
 
 
-@app.get("/checklist", response_class=HTMLResponse)
-def checklist(request: Request):
+@app.get("/ledger", response_class=HTMLResponse)
+def ledger(request: Request):
     return _needs_init(request) or templates.TemplateResponse(
-        "deckbook/checklist.html", _ctx(request, cards=services.gallery())
+        "deckbook/checklist.html", _ctx(request, active="ledger", cards=services.gallery())
     )
 
 
@@ -77,8 +84,12 @@ def card_detail(request: Request, deck_card_id: str):
         return guard
     view = services.card_detail(deck_card_id)
     if view is None:
-        return templates.TemplateResponse("deckbook/not_found.html", _ctx(request), status_code=404)
-    return templates.TemplateResponse("deckbook/card_detail.html", _ctx(request, card=view))
+        return templates.TemplateResponse(
+            "deckbook/not_found.html", _ctx(request, active="collection"), status_code=404
+        )
+    return templates.TemplateResponse(
+        "deckbook/card_detail.html", _ctx(request, active="collection", card=view)
+    )
 
 
 @app.post("/card/{deck_card_id}/decision")

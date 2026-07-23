@@ -1,37 +1,51 @@
 {% from "components/badges.html" import status_badge %}
 {% extends "deckbook/base.html" %}
-{% block title %}Acquisition Checklist — {{ deckbook.name }}{% endblock %}
-{% macro check(ok) %}<span class="db-check {{ '' if ok else 'no' }}">{{ '✓' if ok else '·' }}</span>{% endmacro %}
+{% block title %}The Ledger — {{ deckbook.name }}{% endblock %}
+{# Museum-register status marks, not yes/no checkmarks: a card has several
+   independent facts, so each cell is a filled/empty disc, and the leading
+   column is the overall deck-copy state (complete / partial / none). #}
+{% macro mark(ok) %}<span class="db-mark {{ 'on' if ok else 'off' }}">{{ '●' if ok else '○' }}</span>{% endmacro %}
+{% macro state(card) %}
+  {% set done = card.deck_copy_complete %}
+  {% set any = card.acquisition.target_owned or card.acquisition.installed or card.curation_complete %}
+  {% if done %}<span class="db-state full" title="Complete">●</span>
+  {% elif any %}<span class="db-state partial" title="Partial">◐</span>
+  {% else %}<span class="db-state none" title="Not started">○</span>{% endif %}
+{% endmacro %}
 {% block body %}
 <div class="db-page">
   <div class="db-chapter">
-    <div class="db-eyebrow">Acquisition Ledger</div>
-    <h1>Every card, every decision, at a glance</h1>
-    <p>Separate facts, not one completion checkbox: finalized, owned, installed, proxy, museum.</p>
+    <div class="db-eyebrow">The Ledger</div>
+    <h1>Provenance for every card</h1>
+    <p>Not chores to tick off — a record of what is decided, owned, installed, and documented.</p>
   </div>
 
-  {# Instant name filter — plain JS, no dependency (this is a standalone app). #}
   <input class="db-filter" id="db-filter" type="search" placeholder="Filter by card name…"
          aria-label="Filter by card name">
+  <p class="db-legend"><span class="db-state full">●</span> Complete
+     <span class="db-state partial">◐</span> Partial
+     <span class="db-state none">○</span> Not started</p>
   <div class="db-panel" style="overflow-x:auto">
     <table class="db-table" id="db-checklist">
       <thead>
         <tr>
-          <th>Card</th><th>Role</th><th>Status</th><th>Final</th><th>Owned</th>
-          <th>Installed</th><th>Proxy</th><th>Museum</th>
+          <th></th><th>Card</th><th>Role</th><th>Status</th><th>Final</th><th>Owned</th>
+          <th>Installed</th><th>Documented</th><th>Proxy</th><th>Museum</th>
         </tr>
       </thead>
       <tbody>
         {% for card in cards %}
           <tr data-name="{{ card.card_name | lower }}">
+            <td>{{ state(card) }}</td>
             <td><a href="/card/{{ card.deck_card_id }}">{{ card.card_name }}</a></td>
             <td>{{ card.role }}</td>
             <td>{{ status_badge(card.decision.status) }}</td>
-            <td>{{ check(card.curation_complete) }}</td>
-            <td>{{ check(card.acquisition.target_owned) }}</td>
-            <td>{{ check(card.acquisition.installed) }}</td>
-            <td>{{ check(card.is_proxy) }}</td>
-            <td>{{ check(card.has_museum) }}</td>
+            <td>{{ mark(card.curation_complete) }}</td>
+            <td>{{ mark(card.acquisition.target_owned) }}</td>
+            <td>{{ mark(card.acquisition.installed) }}</td>
+            <td>{{ mark(card.acquisition.source_recorded) }}</td>
+            <td>{{ mark(card.is_proxy) }}</td>
+            <td>{{ mark(card.has_museum) }}</td>
           </tr>
         {% endfor %}
       </tbody>

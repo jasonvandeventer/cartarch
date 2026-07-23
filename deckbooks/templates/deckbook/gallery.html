@@ -5,16 +5,24 @@
 {% block body %}
 <div class="db-page">
   <div class="db-chapter">
-    <div class="db-eyebrow">Card Catalog</div>
+    <div class="db-eyebrow">The Collection</div>
     <h1>The current and definitive printing for every card</h1>
-    <p>Each tile leads with the finalized selection where one exists, otherwise the copy in the deck today.</p>
+    <p>Each plate leads with the finalized selection where one exists, otherwise the copy in the deck today.</p>
   </div>
 
   <div class="db-gallery">
     {% for card in cards %}
-      <a class="db-tile {% if card.role == 'Commander' %}is-commander{% endif %}"
+      <a class="db-tile {% if card.role == 'Commander' %}is-commander{% endif %}{% if card.curation_complete %} is-sealed{% endif %}"
          href="/card/{{ card.deck_card_id }}">
-        {{ card_image(card.display, "db-thumb", card.card_name) }}
+        <div class="db-thumb-wrap">
+          {{ card_image(card.display, "db-thumb", card.card_name) }}
+          {% if card.curation_complete %}
+            <span class="db-wax-seal" title="Curator approved">
+              <span class="db-wax-glyph">&#10022;</span>
+              <span class="db-wax-text">Curator<br>Approved</span>
+            </span>
+          {% endif %}
+        </div>
         <div class="db-tile-body">
           <div class="db-tile-name">{{ card.card_name }}</div>
           <div class="db-tile-meta">

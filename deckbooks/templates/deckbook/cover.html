@@ -7,16 +7,21 @@
   <div class="db-cover-frame">
     <div class="collection-line">The Definitive Commander Collection</div>
     <h1>{{ deckbook.name }}</h1>
+    <div class="db-ornament" aria-hidden="true"><span>&#9672;</span></div>
     <p class="commander-name">{{ deckbook.commander_names | join(", ") }}</p>
     {% if commander and commander.display %}
       {{ card_image(commander.display, "cover-hero", deckbook.commander_names[0]) }}
     {% endif %}
-    <p class="subtitle">{{ deckbook.subtitle }}</p>
+    {# The subtitle as an opening epigraph — the first line of the novel. #}
+    <blockquote class="db-epigraph">
+      Animated relics. Ancient enchantments.<br>
+      <em>Absolutely no regard for workplace safety.</em>
+    </blockquote>
     <p class="edition">
-      {{ deckbook.edition.name }} · Revision {{ deckbook.edition.revision }}
-      · Working collector catalog, Volume I
+      {{ deckbook.edition.name }} &middot; Revision {{ deckbook.edition.revision }}
+      &middot; Working collector catalog, Volume I
     </p>
-    <a class="enter" href="/overview">Open the book →</a>
+    <a class="enter" href="/overview">Open the book &rarr;</a>
   </div>
 </div>
 {% endblock %}

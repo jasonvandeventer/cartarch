@@ -1,6 +1,9 @@
-{# Status badge + the optional museum/proxy/finalized flags for a hydrated card. #}
+{# Status badge + the optional museum/proxy/finalized flags for a hydrated card.
+   Labels are action-framed where that reads better than the raw status:
+   research → "Needs Review" (the actual next step). #}
+{% set _STATUS_LABEL = {'research': 'Needs Review', 'not_applicable': 'N/A'} %}
 {% macro status_badge(status) -%}
-  <span class="db-badge {{ status }}">{{ status | replace('_', ' ') }}</span>
+  <span class="db-badge {{ status }}">{{ _STATUS_LABEL.get(status, status | replace('_', ' ')) }}</span>
 {%- endmacro %}
 
 {% macro flag_badges(card) -%}

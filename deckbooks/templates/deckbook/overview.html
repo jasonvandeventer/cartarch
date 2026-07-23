@@ -1,3 +1,4 @@
+{% from "components/card_image.html" import card_image %}
 {% extends "deckbook/base.html" %}
 {% block title %}Curation Status — {{ deckbook.name }}{% endblock %}
 {% block body %}
@@ -41,6 +42,55 @@
         <b>Museum</b> — notable collectible only. Numbers are computed from the stored decisions.
       </p>
     </div>
+  </div>
+
+  {# ── "What should I do next?" — the dashboard, not just statistics ── #}
+  <div class="db-next-grid">
+    <section class="db-panel">
+      <div class="db-panel-head"><span class="db-eyebrow-dark">Research Queue</span>
+        <span class="db-count">{{ research_queue | length }} open</span></div>
+      {% if research_queue %}
+        <ol class="db-queue">
+          {% for c in research_queue %}
+            <li>
+              <a href="/card/{{ c.deck_card_id }}">
+                {{ card_image(c.display, "db-queue-thumb", c.card_name) }}
+                <span class="db-queue-name">{{ c.card_name }}
+                  {% if c.status == 'on_order' %}<span class="db-tag">on order</span>{% endif %}
+                </span>
+                <span class="db-queue-cta">Review &rarr;</span>
+              </a>
+            </li>
+          {% endfor %}
+        </ol>
+      {% else %}
+        <p class="muted-dim">Every card has been decided. The book is complete.</p>
+      {% endif %}
+    </section>
+
+    <section class="db-panel">
+      <div class="db-panel-head"><span class="db-eyebrow-dark">Recently Finalized</span></div>
+      {% if recently_finalized %}
+        <ul class="db-finalized">
+          {% for c in recently_finalized %}
+            <li><a href="/card/{{ c.deck_card_id }}"><span class="db-seal-dot">&#10003;</span>
+              <span>{{ c.card_name }}</span>
+              <span class="when">{{ c.finalized_on }}</span></a></li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <p class="muted-dim">No decisions finalized yet.</p>
+      {% endif %}
+      {% if on_order %}
+        <div class="db-panel-head" style="margin-top:1.2rem"><span class="db-eyebrow-dark">On Order</span></div>
+        <ul class="db-finalized">
+          {% for c in on_order %}
+            <li><a href="/card/{{ c.deck_card_id }}"><span class="db-order-dot">&#9679;</span>
+              <span>{{ c.card_name }}</span><span class="when">awaiting arrival</span></a></li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+    </section>
   </div>
 </div>
 {% endblock %}
