@@ -283,6 +283,7 @@ def build_deckbook(deckbook_id: str, cfg: dict) -> dict:
             "updated_at": _today(),
         },
         "identity": cfg["identity"],
+        "cover": cfg.get("cover"),  # per-deck cover palette (None → default parchment theme)
     }
 
 

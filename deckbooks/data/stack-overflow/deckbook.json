@@ -36,5 +36,12 @@
       "stormglass violet"
     ],
     "selection_rule": "Rarity alone never determines the definitive printing."
+  },
+  "cover": {
+    "glow": "#16406e",
+    "base": "#070b16",
+    "edge": "#3f8fd6",
+    "title": "#7fd4ff",
+    "soft": "#ff8a63"
   }
 }

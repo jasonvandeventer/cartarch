@@ -173,9 +173,9 @@ a { color: var(--moss-deep); }
   min-height: 100vh;
   /* Warm radial glow + a faint linen/wood grain (repeating diagonal threads),
      so the dark cover reads as bound cloth, not a flat modern hero. */
-  background-color: var(--ink-band);
+  background-color: var(--cv-band, var(--ink-band));
   background-image:
-    radial-gradient(120% 90% at 50% 0%, rgba(60, 46, 28, 0.85) 0%, rgba(33, 26, 18, 0.9) 60%, #17110b 100%),
+    var(--cv-radial, radial-gradient(120% 90% at 50% 0%, rgba(60, 46, 28, 0.85) 0%, rgba(33, 26, 18, 0.9) 60%, #17110b 100%)),
     repeating-linear-gradient(52deg, rgba(0,0,0,0.14) 0 2px, rgba(255,255,255,0.012) 2px 4px);
   display: flex;
   align-items: center;

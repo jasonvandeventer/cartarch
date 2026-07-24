@@ -36,5 +36,12 @@
       "signet-wax crimson"
     ],
     "selection_rule": "Rarity alone never determines the definitive printing."
+  },
+  "cover": {
+    "glow": "#2a2620",
+    "base": "#0a0908",
+    "edge": "#b09553",
+    "title": "#efe9db",
+    "soft": "#c99a4a"
   }
 }

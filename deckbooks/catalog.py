@@ -16,6 +16,13 @@ BOOKS: dict[str, dict] = {
         "subtitle": (
             "Animated relics. Ancient enchantments. Absolutely no regard for workplace safety."
         ),
+        "cover": {
+            "glow": "#3c2e1c",
+            "base": "#14100a",
+            "edge": "#a9832f",
+            "title": "#e2b750",
+            "soft": "#d8c48a",
+        },
         "identity": {
             "mission": (
                 "Bello awakens forgotten relics and ancient enchantments into enormous, "
@@ -52,6 +59,13 @@ BOOKS: dict[str, dict] = {
         "name": "Second Breakfast",
         "commander_names": ["Frodo, Adventurous Hobbit", "Sam, Loyal Attendant"],
         "subtitle": "Two hobbits, one Ring, and absolutely no skipping meals.",
+        "cover": {
+            "glow": "#5c3f18",
+            "base": "#120d07",
+            "edge": "#b98a3c",
+            "title": "#f0cf7a",
+            "soft": "#cdb784",
+        },
         "identity": {
             "mission": (
                 "A Food deck that keeps a full larder and a low profile. Second Breakfast "
@@ -93,6 +107,13 @@ BOOKS: dict[str, dict] = {
         "name": "Containment Failure",
         "commander_names": ["Blech, Loafing Pest"],
         "subtitle": "The specimens have breached containment — and every drop of life makes them bigger.",
+        "cover": {
+            "glow": "#2b4417",
+            "base": "#0a0c07",
+            "edge": "#6f8b3a",
+            "title": "#a7d24a",
+            "soft": "#c2cf7e",
+        },
         "identity": {
             "mission": (
                 "A Golgari swarm of Blech's favored vermin — Pests, Bats, Insects, Snakes, and "
@@ -135,6 +156,13 @@ BOOKS: dict[str, dict] = {
         "name": "DNR",
         "commander_names": ["Anti-Venom, Horrifying Healer"],
         "subtitle": "Do Not Resuscitate — there won't be a need. Nothing that hits you lands where it's aimed.",
+        "cover": {
+            "glow": "#2b3742",
+            "base": "#0b0e12",
+            "edge": "#7f8d99",
+            "title": "#e9eff3",
+            "soft": "#57e0a0",
+        },
         "identity": {
             "mission": (
                 "A mono-white invulnerability engine. Every point of damage aimed at you is "
@@ -179,6 +207,13 @@ BOOKS: dict[str, dict] = {
         "name": "Severance Package",
         "commander_names": ["Teysa Karlov"],
         "subtitle": "Every departure comes with benefits. We're letting them go — and cashing in.",
+        "cover": {
+            "glow": "#2a2620",
+            "base": "#0a0908",
+            "edge": "#b09553",
+            "title": "#efe9db",
+            "soft": "#c99a4a",
+        },
         "identity": {
             "mission": (
                 "An Orzhov aristocrats machine. Staff up with expendable creatures and tokens, "
@@ -221,6 +256,13 @@ BOOKS: dict[str, dict] = {
         "name": "Stack Overflow",
         "commander_names": ["Melek, Izzet Paragon"],
         "subtitle": "Response to your response. Nobody's quite sure what resolves next — that's the point.",
+        "cover": {
+            "glow": "#16406e",
+            "base": "#070b16",
+            "edge": "#3f8fd6",
+            "title": "#7fd4ff",
+            "soft": "#ff8a63",
+        },
         "identity": {
             "mission": (
                 "An Izzet spellslinger built around the stack itself. Copies, redirections, "

@@ -37,5 +37,12 @@
       "ale-brown parchment"
     ],
     "selection_rule": "Rarity alone never determines the definitive printing."
+  },
+  "cover": {
+    "glow": "#5c3f18",
+    "base": "#120d07",
+    "edge": "#b98a3c",
+    "title": "#f0cf7a",
+    "soft": "#cdb784"
   }
 }

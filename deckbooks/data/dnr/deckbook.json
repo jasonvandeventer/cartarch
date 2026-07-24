@@ -36,5 +36,12 @@
       "consecrated gold"
     ],
     "selection_rule": "Rarity alone never determines the definitive printing."
+  },
+  "cover": {
+    "glow": "#2b3742",
+    "base": "#0b0e12",
+    "edge": "#7f8d99",
+    "title": "#e9eff3",
+    "soft": "#57e0a0"
   }
 }

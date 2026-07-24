@@ -3,7 +3,11 @@
 {% block chrome %}{% endblock %}
 {% block title %}{{ deckbook.name }} — Deckbook{% endblock %}
 {% block body %}
-<div class="db-cover">
+{% set cv = deckbook.cover %}
+<div class="db-cover"{% if cv %} style="
+  --cv-band: {{ cv.base }};
+  --cv-radial: radial-gradient(120% 95% at 50% 0%, {{ cv.glow }} 0%, {{ cv.base }} 72%);
+  --bronze: {{ cv.edge }}; --gold: {{ cv.title }}; --gold-soft: {{ cv.soft }};"{% endif %}>
   <div class="db-cover-frame">
     <div class="collection-line">The Definitive Commander Collection</div>
     <h1>{{ deckbook.name }}</h1>

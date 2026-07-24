@@ -36,5 +36,12 @@
       "specimen-jar glass"
     ],
     "selection_rule": "Rarity alone never determines the definitive printing."
+  },
+  "cover": {
+    "glow": "#2b4417",
+    "base": "#0a0c07",
+    "edge": "#6f8b3a",
+    "title": "#a7d24a",
+    "soft": "#c2cf7e"
   }
 }
