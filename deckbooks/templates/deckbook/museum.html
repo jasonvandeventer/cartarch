@@ -5,20 +5,17 @@
 <div class="db-museum">
   <div class="db-page">
     <header class="db-museum-head">
-      <div class="db-eyebrow">The Museum · Collector's Picks</div>
+      <div class="db-eyebrow">The Museum · Destination Printings</div>
       <h1>{{ deckbook.name }} — in its finest form</h1>
-      <p>If budget and practicality were irrelevant: the most beautiful, collectible
-         expression of every card.</p>
+      <p>The deck as a binder in its destination form: the printing you're working
+         toward for every card.</p>
       <div class="db-museum-totals">
-        <span><b>{{ totals.chosen }}</b> Collector's Picks</span>
-        <span><b>{{ totals.custom_proxy }}</b> custom proxy candidates</span>
-        <span><b>{{ totals.no_edition }}</b> no separate edition</span>
-        <span class="await"><b>{{ totals.awaiting }}</b> awaiting review</span>
+        <span><b>{{ totals.chosen }}</b> destinations chosen</span>
+        <span class="await"><b>{{ totals.awaiting }}</b> awaiting a choice</span>
       </div>
       <div class="db-museum-cost">
-        To acquire the Collector's Picks you'll buy: <strong>{{ totals.cost_display }}</strong>
-        {% if totals.proxied %}<span class="db-museum-cost-note">{{ totals.proxied }} pick{{ 's' if totals.proxied != 1 }} over $100 proxied instead — {{ totals.proxied_cost_display }} in market value excluded</span>{% endif %}
-        {% if totals.unpriced %}<span class="db-museum-cost-note">({{ totals.unpriced }} to-buy pick{{ 's' if totals.unpriced != 1 }} have no cached price)</span>{% endif %}
+        To acquire every Destination printing: <strong>{{ totals.cost_display }}</strong>
+        {% if totals.unpriced %}<span class="db-museum-cost-note">({{ totals.unpriced }} destination{{ 's' if totals.unpriced != 1 }} have no cached price)</span>{% endif %}
       </div>
     </header>
 
@@ -40,16 +37,10 @@
               </span>
               <span class="db-museum-price">
                 {% if card.museum_price %}${{ '%.2f' | format(card.museum_price) }}{% else %}<span class="muted">— no price</span>{% endif %}
-                {% if card.proxied %}<span class="db-proxied-note">proxied — excluded</span>{% endif %}
               </span>
-              <span class="db-museum-tag">Collector's Pick</span>
-              {% if card.is_custom_proxy %}<span class="db-museum-tag proxy">Custom Proxy Candidate</span>{% endif %}
-            {% elif st == 'custom_proxy' %}
-              <span class="db-museum-tag proxy">Custom Proxy Candidate</span>
-            {% elif st == 'no_edition' %}
-              <span class="db-museum-note">No Separate Museum Edition</span>
+              <span class="db-museum-tag">Destination</span>
             {% else %}
-              <span class="db-museum-await">Awaiting Review</span>
+              <span class="db-museum-await">Awaiting a Destination</span>
             {% endif %}
           </span>
         </a>

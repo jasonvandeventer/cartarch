@@ -569,11 +569,19 @@ a { color: var(--moss-deep); }
 .db-form button:hover, .db-candidate-actions button:hover { background: var(--moss); }
 .db-candidate-actions {
   display: flex;
-  gap: 0.3rem;
+  flex-direction: column;
+  gap: 0.25rem;
   margin-top: 0.4rem;
-  justify-content: center;
+  width: 100%;
 }
-.db-candidate-actions button { padding: 0.22rem 0.5rem; font-size: 0.64rem; border-radius: 6px; }
+.db-candidate-actions button,
+.db-candidate-actions .db-finish-pick {
+  width: 100%;
+  padding: 0.28rem 0.4rem;
+  font-size: 0.7rem;
+  border-radius: 6px;
+}
+.db-finish-pick { font-family: inherit; text-transform: capitalize; }
 
 .db-briefing-btn {
   font-family: inherit;

@@ -15,7 +15,6 @@ from deckbooks.models import (
     CATEGORY_ORDER,
     CHAPTER_FLAVOR,
     CHAPTER_SEQUENCE,
-    MUSEUM_STATE_RANK,
     ROMAN,
     category_for_role,
     curation_complete,
@@ -138,53 +137,47 @@ def chapters() -> list[dict]:
 
 
 def museum_wall() -> dict:
-    """The whole deck in its Museum form, in FOUR states (see models.museum_state):
-    chosen (an official Collector's Pick), custom_proxy (a bespoke OSHA proxy),
-    no_edition (reviewed — Definitive is enough), awaiting (not yet reviewed).
-    Commander first, then by state rank, then name — so the finished exhibit
-    leads and un-reviewed cards trail. Totals count each state separately; only
-    'chosen' counts as an official Museum pick."""
+    """The whole deck as a binder in its DESTINATION form — each card shown as the
+    printing you're working toward (its Destination), or 'awaiting' when none is
+    chosen yet. Commander first, then chosen before awaiting, then name. Cost =
+    what it takes to acquire every chosen Destination (prices ride on the hydrated
+    view — no extra query)."""
     cards = [hydrate(c) for c in visible_cards()]
+    for c in cards:
+        dest = c.get("selected_view")
+        c["museum_state"] = "chosen" if dest else "awaiting"
+        c["museum_view"] = dest or c.get("display")
+        c["museum_price"] = (dest or {}).get("price") if dest else None
     cards.sort(
         key=lambda c: (
             0 if c.get("role") == "Commander" else 1,
-            MUSEUM_STATE_RANK.get(c.get("museum_state"), 9),
+            0 if c.get("museum_state") == "chosen" else 1,
             c.get("card_name", "").lower(),
         )
     )
 
-    # Acquisition cost of the Collector's Picks. A pick also flagged as a custom
-    # proxy candidate will be PROXIED, not bought, so it's excluded from the buy
-    # total (its market value is tracked separately as "saved by proxying").
-    # Prices ride on the hydrated view (from the cache; no extra query).
-    cost = proxied_cost = 0.0
-    priced = unpriced = proxied = 0
+    cost = 0.0
+    chosen = awaiting = priced = unpriced = 0
     for c in cards:
-        if c.get("museum_state") != "chosen" or not c.get("museum_view"):
+        if c["museum_state"] != "chosen":
+            awaiting += 1
             continue
-        p = c["museum_view"].get("price")
-        c["museum_price"] = p
-        if c.get("is_custom_proxy"):
-            c["proxied"] = True
-            proxied += 1
-            if p is not None:
-                proxied_cost += p
-            continue
+        chosen += 1
+        p = c["museum_price"]
         if p is not None:
             cost += p
             priced += 1
         else:
             unpriced += 1
 
-    totals = {"chosen": 0, "custom_proxy": 0, "no_edition": 0, "awaiting": 0}
-    for c in cards:
-        totals[c.get("museum_state", "awaiting")] += 1
-    totals["cost"] = cost
-    totals["cost_display"] = f"${cost:,.2f}"
-    totals["priced"] = priced
-    totals["unpriced"] = unpriced
-    totals["proxied"] = proxied
-    totals["proxied_cost_display"] = f"${proxied_cost:,.2f}"
+    totals = {
+        "chosen": chosen,
+        "awaiting": awaiting,
+        "cost": cost,
+        "cost_display": f"${cost:,.2f}",
+        "priced": priced,
+        "unpriced": unpriced,
+    }
     return {"cards": cards, "totals": totals, "total": len(cards)}
 
 

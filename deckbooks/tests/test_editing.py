@@ -143,9 +143,12 @@ def test_museum_states_and_no_edition_clears_picks(tmp_path, monkeypatch):
     assert s["decision"]["museum_printing"] is None
     assert museum_state(s) == "no_edition"
 
-    # totals count only official picks as chosen; states tracked separately.
+    # museum_wall now renders the DESTINATION (selected) printing as the binder,
+    # so its totals are chosen/awaiting only — the museum-pick states above still
+    # come from models.museum_state (a separate per-card decision function).
     t = services.museum_wall()["totals"]
-    assert t["custom_proxy"] >= 1 and t["no_edition"] >= 1
+    assert "custom_proxy" not in t and "no_edition" not in t
+    assert t["chosen"] >= 1  # Bello has a selected/destination printing
     # Bello keeps its official pick → still 'chosen', not awaiting.
     bello = next(
         c for c in repository.load_cards("osha-violation") if c["card_name"].startswith("Bello")
