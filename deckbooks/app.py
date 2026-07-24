@@ -170,12 +170,14 @@ def select_printing(
     finish: str = Form("normal"),
     role: str = Form("selected"),
 ):
-    """One-click 'make this the definitive / museum / current printing'."""
+    """One-click 'make this the current / destination printing' (finish-aware)."""
     if not _known(book) or not exists(book):
         return RedirectResponse("/", status_code=303)
     use_book(book)
     if role == "current":
-        editing.update_decision(deck_card_id, {"current_scryfall_id": scryfall_id})
+        editing.update_decision(
+            deck_card_id, {"current_scryfall_id": scryfall_id, "current_finish": finish}
+        )
     else:
         key = "museum" if role == "museum" else "selected"
         editing.update_decision(

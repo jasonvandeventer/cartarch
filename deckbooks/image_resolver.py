@@ -66,6 +66,21 @@ class PrintingMeta:
     price_usd_etched: str | None
 
     @property
+    def finishes(self) -> list[str]:
+        """Finishes this printing exists in, derived from which price column is
+        populated (same rule as list_printings_detailed). Never empty."""
+        out = [
+            label
+            for label, v in (
+                ("normal", self.price_usd),
+                ("foil", self.price_usd_foil),
+                ("etched", self.price_usd_etched),
+            )
+            if v
+        ]
+        return out or ["normal"]
+
+    @property
     def has_back_face(self) -> bool:
         return (self.layout or "") in {
             "transform",
@@ -95,6 +110,33 @@ _META_COLS = (
 
 def _row_to_meta(row: sqlite3.Row) -> PrintingMeta:
     return PrintingMeta(*[row[c] for c in _META_COLS.replace(" ", "").split(",")])
+
+
+# Digital-only printings (Arena / MTGO) have no paper copy to own or acquire, so
+# every acquirable-printing list excludes them. set_type covers the Alchemy and
+# MTGO-Treasure-Chest families; the set-code list catches Arena starter / MTGO
+# exclusive sets that otherwise share an ordinary set_type. "A-…" names are the
+# Alchemy rebalances. One fragment so both query functions filter identically.
+_DIGITAL_SET_TYPES = ("alchemy", "treasure_chest")
+_DIGITAL_SET_CODES = (
+    "ana",
+    "anb",
+    "and",
+    "oana",
+    "xana",
+    "mtgo",
+    "pmtg1",
+    "me1",
+    "me2",
+    "me3",
+    "me4",
+)
+_PAPER_ONLY_SQL = (
+    " AND name NOT LIKE 'A-%'"
+    f" AND coalesce(set_type,'') NOT IN ({','.join('?' * len(_DIGITAL_SET_TYPES))})"
+    f" AND lower(set_code) NOT IN ({','.join('?' * len(_DIGITAL_SET_CODES))})"
+)
+_PAPER_ONLY_PARAMS = (*_DIGITAL_SET_TYPES, *_DIGITAL_SET_CODES)
 
 
 def _connect() -> sqlite3.Connection:
@@ -141,9 +183,9 @@ def list_printings_detailed(name: str) -> list[dict]:
     )
     with _connect() as conn:
         rows = conn.execute(
-            f"SELECT {cols} FROM scryfall_cards WHERE name = ? AND name NOT LIKE 'A-%' "
+            f"SELECT {cols} FROM scryfall_cards WHERE name = ?{_PAPER_ONLY_SQL} "
             "ORDER BY set_code, collector_number",
-            (name,),
+            (name, *_PAPER_ONLY_PARAMS),
         ).fetchall()
     out = []
     for r in rows:
@@ -244,8 +286,8 @@ def list_printings_for_name(name: str) -> list[PrintingMeta]:
     with _connect() as conn:
         rows = conn.execute(
             f"SELECT {_META_COLS} FROM scryfall_cards "
-            "WHERE name = ? AND name NOT LIKE 'A-%' "
+            f"WHERE name = ?{_PAPER_ONLY_SQL} "
             "ORDER BY set_code, collector_number",
-            (name,),
+            (name, *_PAPER_ONLY_PARAMS),
         ).fetchall()
     return [_row_to_meta(r) for r in rows]

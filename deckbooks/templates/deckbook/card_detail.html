@@ -30,27 +30,27 @@
     <div class="db-wax-confirm"><span class="db-wax-confirm-seal">&#10022;</span> Decision sealed.</div>
   {% endif %}
 
-  {% if card.museum_view %}
-    {# Two plates, genuinely side by side — the page says "compare these". #}
+  {% if card.selected_view %}
+    {# Current on the left, the destination upgrade on the right. The Museum
+       (binder) view of the deck lives on its own page. #}
     <section class="db-plates">
-      <figure class="db-plate selected">
-        {{ card_image(card.selected_view or card.current_view, "db-plate-img", card.card_name) }}
-        {{ plaque(card.selected_view or card.current_view,
-                  'Destination Printing' if card.curation_complete else 'Current Printing') }}
+      <figure class="db-plate current">
+        {{ card_image(card.current_view or card.selected_view, "db-plate-img", card.card_name) }}
+        {{ plaque(card.current_view or card.selected_view, "Current Printing") }}
       </figure>
-      <figure class="db-plate museum">
-        {{ card_image(card.museum_view, "db-plate-img", card.card_name) }}
-        {{ plaque(card.museum_view, "Museum (Collector's Pick)" + (' · Proxy' if card.is_proxy else '')) }}
+      <figure class="db-plate destination">
+        {{ card_image(card.selected_view, "db-plate-img", card.card_name) }}
+        {{ plaque(card.selected_view, "Destination Printing") }}
       </figure>
     </section>
     {% set detail_body_only = true %}
   {% endif %}
 
-  <div class="{% if not card.museum_view %}db-detail-grid{% endif %}">
-    {% if not card.museum_view %}
+  <div class="{% if not card.selected_view %}db-detail-grid{% endif %}">
+    {% if not card.selected_view %}
       <figure class="db-solo-plate">
         {{ card_image(card.display, "db-detail-art", card.card_name) }}
-        {{ plaque(card.display, 'Destination Printing' if card.curation_complete else 'Current Printing') }}
+        {{ plaque(card.display, "Current Printing") }}
       </figure>
     {% endif %}
     <div>
@@ -150,23 +150,21 @@
           {% set cp = c.meta.price() %}
           {% if cp %}<div class="db-candidate-price">${{ '%.2f' | format(cp) }}</div>{% endif %}
           {% if c.mark %}<div class="mark">{{ c.mark }}</div>{% endif %}
-          <div class="db-candidate-actions">
-            <form method="post" action="/{{ book }}/card/{{ card.deck_card_id }}/select-printing">
-              <input type="hidden" name="scryfall_id" value="{{ c.meta.scryfall_id }}">
-              <input type="hidden" name="role" value="current">
-              <button type="submit" title="This is the copy I own / ordered">My copy</button>
-            </form>
-            <form method="post" action="/{{ book }}/card/{{ card.deck_card_id }}/select-printing">
-              <input type="hidden" name="scryfall_id" value="{{ c.meta.scryfall_id }}">
-              <input type="hidden" name="role" value="selected">
-              <button type="submit" title="Make this the destination printing">Destination</button>
-            </form>
-            <form method="post" action="/{{ book }}/card/{{ card.deck_card_id }}/select-printing">
-              <input type="hidden" name="scryfall_id" value="{{ c.meta.scryfall_id }}">
-              <input type="hidden" name="role" value="museum">
-              <button type="submit" title="Flag as museum / proxy candidate">Museum</button>
-            </form>
-          </div>
+          <form method="post" action="/{{ book }}/card/{{ card.deck_card_id }}/select-printing"
+                class="db-candidate-actions">
+            <input type="hidden" name="scryfall_id" value="{{ c.meta.scryfall_id }}">
+            {% if c.meta.finishes | length > 1 %}
+              <select name="finish" aria-label="Finish" class="db-finish-pick">
+                {% for f in c.meta.finishes %}<option value="{{ f }}">{{ f }}</option>{% endfor %}
+              </select>
+            {% else %}
+              <input type="hidden" name="finish" value="{{ c.meta.finishes[0] }}">
+            {% endif %}
+            <button type="submit" name="role" value="current"
+                    title="The copy I own / ordered, in this finish">Current</button>
+            <button type="submit" name="role" value="selected"
+                    title="The version I want to acquire, in this finish">Destination</button>
+          </form>
         </div>
       {% endfor %}
     </div>

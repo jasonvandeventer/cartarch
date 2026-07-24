@@ -1078,7 +1078,7 @@
     "role": "Commander",
     "current_printing": {
       "scryfall_id": "328df403-7428-4b17-bdd1-9759fc0f32d8",
-      "finish": "normal"
+      "finish": "foil"
     },
     "status": "active",
     "decision": {
@@ -1086,7 +1086,7 @@
       "finalized": true,
       "finalized_at": "2026-07-24",
       "selected_printing": {
-        "scryfall_id": "95ed1ff5-a0a6-4fe0-94d2-e3675226db52",
+        "scryfall_id": "a223c85f-3952-40d0-88d4-d5c3e8cd864d",
         "finish": "normal"
       },
       "museum_printing": {
@@ -2456,7 +2456,7 @@
       "finalized": true,
       "finalized_at": "2026-07-24",
       "selected_printing": {
-        "scryfall_id": "601402f4-8647-4c41-9a0f-63d10ce89d02",
+        "scryfall_id": "cfdfa303-2578-455b-929c-a217a0261bb3",
         "finish": "normal"
       },
       "museum_printing": {

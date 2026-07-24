@@ -941,6 +941,8 @@ a { color: var(--moss-deep); }
 }
 .db-plate.selected .db-plate-img { border: 3px solid var(--moss); }
 .db-plate.museum .db-plate-img { border: 3px solid var(--gold); }
+.db-plate.current .db-plate-img { border: 3px solid var(--parchment-2); }
+.db-plate.destination .db-plate-img { border: 3px solid var(--gold); }
 .db-plaque {
   display: inline-block;
   text-align: left;
