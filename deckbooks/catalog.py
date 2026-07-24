@@ -92,11 +92,41 @@ BOOKS: dict[str, dict] = {
         "deck_name": "Containment Failure",
         "name": "Containment Failure",
         "commander_names": ["Blech, Loafing Pest"],
-        "subtitle": "A Golgari Commander deck.",
+        "subtitle": "The specimens have breached containment — and every drop of life makes them bigger.",
         "identity": {
-            "mission": "",
-            "pillars": [],
-            "palette": [],
+            "mission": (
+                "A Golgari swarm of Blech's favored vermin — Pests, Bats, Insects, Snakes, and "
+                "Spiders. Flood the board wide, then turn incidental lifegain into Blech's "
+                "signal: every point of life gained puts a +1/+1 counter on the whole brood at "
+                "once, until a table of harmless, ignorable creepy-crawlies erupts into an "
+                "oversized infestation. The deck should feel like a lab-leak in slow motion — "
+                "small specimens multiplying and swelling until containment fails."
+            ),
+            "pillars": [
+                {
+                    "name": "The Brood",
+                    "description": "Go wide with the five types Blech empowers — Pest, Bat, "
+                    "Insect, Snake, Spider. Quantity first; a board full of small, unassuming "
+                    "vermin.",
+                },
+                {
+                    "name": "Every Drop Counts",
+                    "description": "Incidental, repeatable lifegain is the trigger. Each life "
+                    "gained is another mass of +1/+1 counters across the whole swarm at once.",
+                },
+                {
+                    "name": "Containment Failure",
+                    "description": "The payoff: the brood grows past control. Trample, overrun, "
+                    "and go-tall-while-wide finishers turn the infestation lethal.",
+                },
+            ],
+            "palette": [
+                "biohazard green",
+                "swamp-rot black",
+                "carapace brown",
+                "spore yellow-green",
+                "specimen-jar glass",
+            ],
             "selection_rule": "Rarity alone never determines the definitive printing.",
         },
     },
