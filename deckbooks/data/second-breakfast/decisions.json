@@ -1,12 +1,12 @@
 [
   {
-    "deck_card_id": "2f5b4544-70d9-45ee-84a3-fa6253a53a82",
+    "deck_card_id": "c88eb33d-efba-4ad9-878f-f051079c9bce",
     "card_name": "Academy Manufactor",
     "quantity": 1,
     "role": "Enabler",
     "current_printing": {
       "scryfall_id": "c88eb33d-efba-4ad9-878f-f051079c9bce",
-      "finish": "normal"
+      "finish": "foil"
     },
     "status": "active",
     "decision": {
@@ -153,6 +153,40 @@
     "notes": []
   },
   {
+    "deck_card_id": "ad96343b-baac-428c-8270-fcffbbbe9fb8",
+    "card_name": "Aunt May",
+    "quantity": 1,
+    "role": "Threat",
+    "current_printing": {
+      "scryfall_id": "ad96343b-baac-428c-8270-fcffbbbe9fb8",
+      "finish": "normal"
+    },
+    "status": "active",
+    "decision": {
+      "status": "pending",
+      "finalized": false,
+      "finalized_at": null,
+      "selected_printing": null,
+      "museum_printing": null,
+      "proxy_candidate": null,
+      "verdict": null,
+      "reasoning": [],
+      "custom_proxy_candidate": false,
+      "no_museum_edition": false
+    },
+    "acquisition": {
+      "target_owned": true,
+      "installed": true,
+      "source_recorded": false,
+      "acquired_at": null,
+      "source": null,
+      "price_paid": null,
+      "condition": null,
+      "language": "en"
+    },
+    "notes": []
+  },
+  {
     "deck_card_id": "7f927f72-fc9b-444f-9e0e-78a5e8e7bcaa",
     "card_name": "Bagel and Schmear",
     "quantity": 1,
@@ -234,81 +268,6 @@
     "role": "Land",
     "current_printing": {
       "scryfall_id": "0cd9fc50-4930-45c8-8b58-19ba4bc22d62",
-      "finish": "normal"
-    },
-    "status": "active",
-    "decision": {
-      "status": "pending",
-      "finalized": false,
-      "finalized_at": null,
-      "selected_printing": null,
-      "museum_printing": null,
-      "proxy_candidate": null,
-      "verdict": null,
-      "reasoning": [],
-      "custom_proxy_candidate": false,
-      "no_museum_edition": false
-    },
-    "acquisition": {
-      "target_owned": true,
-      "installed": true,
-      "source_recorded": false,
-      "acquired_at": null,
-      "source": null,
-      "price_paid": null,
-      "condition": null,
-      "language": "en"
-    },
-    "notes": []
-  },
-  {
-    "deck_card_id": "65ebbff0-fbe6-4310-a33f-e00bb2534979",
-    "card_name": "Burnished Hart",
-    "quantity": 1,
-    "role": "Ramp",
-    "current_printing": {
-      "scryfall_id": "65ebbff0-fbe6-4310-a33f-e00bb2534979",
-      "finish": "normal"
-    },
-    "status": "active",
-    "decision": {
-      "status": "pending",
-      "finalized": true,
-      "finalized_at": "2026-07-24",
-      "selected_printing": null,
-      "museum_printing": {
-        "scryfall_id": "e72bfcae-b791-4a89-a41f-d5335a13f325",
-        "finish": "normal"
-      },
-      "proxy_candidate": {
-        "scryfall_id": "e72bfcae-b791-4a89-a41f-d5335a13f325",
-        "desired": false,
-        "printed": false
-      },
-      "verdict": null,
-      "reasoning": [],
-      "custom_proxy_candidate": false,
-      "no_museum_edition": false
-    },
-    "acquisition": {
-      "target_owned": true,
-      "installed": true,
-      "source_recorded": false,
-      "acquired_at": null,
-      "source": null,
-      "price_paid": null,
-      "condition": null,
-      "language": "en"
-    },
-    "notes": []
-  },
-  {
-    "deck_card_id": "8264f32c-0cfb-4233-9626-0cbb44a01a93",
-    "card_name": "Call for Unity",
-    "quantity": 1,
-    "role": "Utility",
-    "current_printing": {
-      "scryfall_id": "8264f32c-0cfb-4233-9626-0cbb44a01a93",
       "finish": "normal"
     },
     "status": "active",
@@ -480,50 +439,6 @@
     "notes": []
   },
   {
-    "deck_card_id": "6620b4a3-fa33-4bd7-9180-314919d8ea2a",
-    "card_name": "Commander's Sphere",
-    "quantity": 1,
-    "role": "Ramp",
-    "current_printing": {
-      "scryfall_id": "6620b4a3-fa33-4bd7-9180-314919d8ea2a",
-      "finish": "normal"
-    },
-    "status": "active",
-    "decision": {
-      "status": "pending",
-      "finalized": true,
-      "finalized_at": "2026-07-24",
-      "selected_printing": {
-        "scryfall_id": "0ad783ed-69b9-48b5-9610-4fa4d8f9a6e6",
-        "finish": "foil"
-      },
-      "museum_printing": {
-        "scryfall_id": "0ad783ed-69b9-48b5-9610-4fa4d8f9a6e6",
-        "finish": "normal"
-      },
-      "proxy_candidate": {
-        "scryfall_id": "0ad783ed-69b9-48b5-9610-4fa4d8f9a6e6",
-        "desired": false,
-        "printed": false
-      },
-      "verdict": null,
-      "reasoning": [],
-      "custom_proxy_candidate": false,
-      "no_museum_edition": false
-    },
-    "acquisition": {
-      "target_owned": true,
-      "installed": true,
-      "source_recorded": false,
-      "acquired_at": null,
-      "source": null,
-      "price_paid": null,
-      "condition": null,
-      "language": "en"
-    },
-    "notes": []
-  },
-  {
     "deck_card_id": "3217b813-7c21-473c-b65b-5766b0dc7803",
     "card_name": "Cultivate",
     "quantity": 1,
@@ -592,12 +507,12 @@
     "notes": []
   },
   {
-    "deck_card_id": "9898dd33-63fb-49d3-bea4-5346d6d56f30",
+    "deck_card_id": "43be1363-7e73-4862-b45f-07f490ab46be",
     "card_name": "Dryad of the Ilysian Grove",
     "quantity": 1,
     "role": "Ramp",
     "current_printing": {
-      "scryfall_id": "9898dd33-63fb-49d3-bea4-5346d6d56f30",
+      "scryfall_id": "43be1363-7e73-4862-b45f-07f490ab46be",
       "finish": "normal"
     },
     "status": "active",
@@ -639,40 +554,6 @@
     "role": "Interaction",
     "current_printing": {
       "scryfall_id": "13aab303-8693-4d67-87af-09188a3f617c",
-      "finish": "normal"
-    },
-    "status": "active",
-    "decision": {
-      "status": "pending",
-      "finalized": false,
-      "finalized_at": null,
-      "selected_printing": null,
-      "museum_printing": null,
-      "proxy_candidate": null,
-      "verdict": null,
-      "reasoning": [],
-      "custom_proxy_candidate": false,
-      "no_museum_edition": false
-    },
-    "acquisition": {
-      "target_owned": true,
-      "installed": true,
-      "source_recorded": false,
-      "acquired_at": null,
-      "source": null,
-      "price_paid": null,
-      "condition": null,
-      "language": "en"
-    },
-    "notes": []
-  },
-  {
-    "deck_card_id": "ff09be4d-bbcc-4c25-9df2-b3df07fca955",
-    "card_name": "Essence Warden",
-    "quantity": 1,
-    "role": "Payoff",
-    "current_printing": {
-      "scryfall_id": "ff09be4d-bbcc-4c25-9df2-b3df07fca955",
       "finish": "normal"
     },
     "status": "active",
@@ -1391,6 +1272,40 @@
     "notes": []
   },
   {
+    "deck_card_id": "8279d421-dd86-49d1-93f7-65f6046c542d",
+    "card_name": "Gyome, Master Chef",
+    "quantity": 1,
+    "role": "Threat",
+    "current_printing": {
+      "scryfall_id": "8279d421-dd86-49d1-93f7-65f6046c542d",
+      "finish": "normal"
+    },
+    "status": "active",
+    "decision": {
+      "status": "pending",
+      "finalized": false,
+      "finalized_at": null,
+      "selected_printing": null,
+      "museum_printing": null,
+      "proxy_candidate": null,
+      "verdict": null,
+      "reasoning": [],
+      "custom_proxy_candidate": false,
+      "no_museum_edition": false
+    },
+    "acquisition": {
+      "target_owned": true,
+      "installed": true,
+      "source_recorded": false,
+      "acquired_at": null,
+      "source": null,
+      "price_paid": null,
+      "condition": null,
+      "language": "en"
+    },
+    "notes": []
+  },
+  {
     "deck_card_id": "de5e6626-fb5a-45a4-bb8c-580980e0337e",
     "card_name": "Harmonize",
     "quantity": 1,
@@ -1975,6 +1890,40 @@
     "role": "Draw",
     "current_printing": {
       "scryfall_id": "c58623cb-8b49-470c-9622-dd6e09d47599",
+      "finish": "normal"
+    },
+    "status": "active",
+    "decision": {
+      "status": "pending",
+      "finalized": false,
+      "finalized_at": null,
+      "selected_printing": null,
+      "museum_printing": null,
+      "proxy_candidate": null,
+      "verdict": null,
+      "reasoning": [],
+      "custom_proxy_candidate": false,
+      "no_museum_edition": false
+    },
+    "acquisition": {
+      "target_owned": true,
+      "installed": true,
+      "source_recorded": false,
+      "acquired_at": null,
+      "source": null,
+      "price_paid": null,
+      "condition": null,
+      "language": "en"
+    },
+    "notes": []
+  },
+  {
+    "deck_card_id": "f4f2a818-9fd1-41db-967e-7d2c9b4e4c2f",
+    "card_name": "Oltec Matterweaver",
+    "quantity": 1,
+    "role": "Threat",
+    "current_printing": {
+      "scryfall_id": "f4f2a818-9fd1-41db-967e-7d2c9b4e4c2f",
       "finish": "normal"
     },
     "status": "active",
@@ -2795,6 +2744,40 @@
     "notes": []
   },
   {
+    "deck_card_id": "f87adc0a-813e-4afe-9e4e-c2d2202c3256",
+    "card_name": "Stridehangar Automaton",
+    "quantity": 1,
+    "role": "Threat",
+    "current_printing": {
+      "scryfall_id": "f87adc0a-813e-4afe-9e4e-c2d2202c3256",
+      "finish": "normal"
+    },
+    "status": "active",
+    "decision": {
+      "status": "pending",
+      "finalized": false,
+      "finalized_at": null,
+      "selected_printing": null,
+      "museum_printing": null,
+      "proxy_candidate": null,
+      "verdict": null,
+      "reasoning": [],
+      "custom_proxy_candidate": false,
+      "no_museum_edition": false
+    },
+    "acquisition": {
+      "target_owned": true,
+      "installed": true,
+      "source_recorded": false,
+      "acquired_at": null,
+      "source": null,
+      "price_paid": null,
+      "condition": null,
+      "language": "en"
+    },
+    "notes": []
+  },
+  {
     "deck_card_id": "6a918ba2-5f03-4024-999d-2d2942a1cac1",
     "card_name": "Sunpetal Grove",
     "quantity": 1,
@@ -3144,6 +3127,244 @@
       "finish": "normal"
     },
     "status": "active",
+    "decision": {
+      "status": "pending",
+      "finalized": false,
+      "finalized_at": null,
+      "selected_printing": null,
+      "museum_printing": null,
+      "proxy_candidate": null,
+      "verdict": null,
+      "reasoning": [],
+      "custom_proxy_candidate": false,
+      "no_museum_edition": false
+    },
+    "acquisition": {
+      "target_owned": true,
+      "installed": true,
+      "source_recorded": false,
+      "acquired_at": null,
+      "source": null,
+      "price_paid": null,
+      "condition": null,
+      "language": "en"
+    },
+    "notes": []
+  },
+  {
+    "deck_card_id": "2f5b4544-70d9-45ee-84a3-fa6253a53a82",
+    "card_name": "Academy Manufactor",
+    "quantity": 1,
+    "role": "Enabler",
+    "current_printing": {
+      "scryfall_id": "c88eb33d-efba-4ad9-878f-f051079c9bce",
+      "finish": "normal"
+    },
+    "status": "removed",
+    "decision": {
+      "status": "pending",
+      "finalized": false,
+      "finalized_at": null,
+      "selected_printing": {
+        "scryfall_id": "5f0d37b6-c092-439b-ba8e-e297ad35f155",
+        "finish": "normal"
+      },
+      "museum_printing": {
+        "scryfall_id": "5f0d37b6-c092-439b-ba8e-e297ad35f155",
+        "finish": "normal"
+      },
+      "proxy_candidate": {
+        "scryfall_id": "5f0d37b6-c092-439b-ba8e-e297ad35f155",
+        "desired": false,
+        "printed": false
+      },
+      "verdict": null,
+      "reasoning": [],
+      "custom_proxy_candidate": false,
+      "no_museum_edition": false
+    },
+    "acquisition": {
+      "target_owned": true,
+      "installed": true,
+      "source_recorded": false,
+      "acquired_at": null,
+      "source": null,
+      "price_paid": null,
+      "condition": null,
+      "language": "en"
+    },
+    "notes": []
+  },
+  {
+    "deck_card_id": "65ebbff0-fbe6-4310-a33f-e00bb2534979",
+    "card_name": "Burnished Hart",
+    "quantity": 1,
+    "role": "Ramp",
+    "current_printing": {
+      "scryfall_id": "65ebbff0-fbe6-4310-a33f-e00bb2534979",
+      "finish": "normal"
+    },
+    "status": "removed",
+    "decision": {
+      "status": "pending",
+      "finalized": true,
+      "finalized_at": "2026-07-24",
+      "selected_printing": null,
+      "museum_printing": {
+        "scryfall_id": "e72bfcae-b791-4a89-a41f-d5335a13f325",
+        "finish": "normal"
+      },
+      "proxy_candidate": {
+        "scryfall_id": "e72bfcae-b791-4a89-a41f-d5335a13f325",
+        "desired": false,
+        "printed": false
+      },
+      "verdict": null,
+      "reasoning": [],
+      "custom_proxy_candidate": false,
+      "no_museum_edition": false
+    },
+    "acquisition": {
+      "target_owned": true,
+      "installed": true,
+      "source_recorded": false,
+      "acquired_at": null,
+      "source": null,
+      "price_paid": null,
+      "condition": null,
+      "language": "en"
+    },
+    "notes": []
+  },
+  {
+    "deck_card_id": "8264f32c-0cfb-4233-9626-0cbb44a01a93",
+    "card_name": "Call for Unity",
+    "quantity": 1,
+    "role": "Utility",
+    "current_printing": {
+      "scryfall_id": "8264f32c-0cfb-4233-9626-0cbb44a01a93",
+      "finish": "normal"
+    },
+    "status": "removed",
+    "decision": {
+      "status": "pending",
+      "finalized": false,
+      "finalized_at": null,
+      "selected_printing": null,
+      "museum_printing": null,
+      "proxy_candidate": null,
+      "verdict": null,
+      "reasoning": [],
+      "custom_proxy_candidate": false,
+      "no_museum_edition": false
+    },
+    "acquisition": {
+      "target_owned": true,
+      "installed": true,
+      "source_recorded": false,
+      "acquired_at": null,
+      "source": null,
+      "price_paid": null,
+      "condition": null,
+      "language": "en"
+    },
+    "notes": []
+  },
+  {
+    "deck_card_id": "6620b4a3-fa33-4bd7-9180-314919d8ea2a",
+    "card_name": "Commander's Sphere",
+    "quantity": 1,
+    "role": "Ramp",
+    "current_printing": {
+      "scryfall_id": "6620b4a3-fa33-4bd7-9180-314919d8ea2a",
+      "finish": "normal"
+    },
+    "status": "removed",
+    "decision": {
+      "status": "pending",
+      "finalized": true,
+      "finalized_at": "2026-07-24",
+      "selected_printing": {
+        "scryfall_id": "0ad783ed-69b9-48b5-9610-4fa4d8f9a6e6",
+        "finish": "foil"
+      },
+      "museum_printing": {
+        "scryfall_id": "0ad783ed-69b9-48b5-9610-4fa4d8f9a6e6",
+        "finish": "normal"
+      },
+      "proxy_candidate": {
+        "scryfall_id": "0ad783ed-69b9-48b5-9610-4fa4d8f9a6e6",
+        "desired": false,
+        "printed": false
+      },
+      "verdict": null,
+      "reasoning": [],
+      "custom_proxy_candidate": false,
+      "no_museum_edition": false
+    },
+    "acquisition": {
+      "target_owned": true,
+      "installed": true,
+      "source_recorded": false,
+      "acquired_at": null,
+      "source": null,
+      "price_paid": null,
+      "condition": null,
+      "language": "en"
+    },
+    "notes": []
+  },
+  {
+    "deck_card_id": "9898dd33-63fb-49d3-bea4-5346d6d56f30",
+    "card_name": "Dryad of the Ilysian Grove",
+    "quantity": 1,
+    "role": "Ramp",
+    "current_printing": {
+      "scryfall_id": "9898dd33-63fb-49d3-bea4-5346d6d56f30",
+      "finish": "normal"
+    },
+    "status": "removed",
+    "decision": {
+      "status": "pending",
+      "finalized": true,
+      "finalized_at": "2026-07-24",
+      "selected_printing": null,
+      "museum_printing": {
+        "scryfall_id": "22e22287-21c5-4733-a527-b176fbf3725d",
+        "finish": "normal"
+      },
+      "proxy_candidate": {
+        "scryfall_id": "22e22287-21c5-4733-a527-b176fbf3725d",
+        "desired": false,
+        "printed": false
+      },
+      "verdict": null,
+      "reasoning": [],
+      "custom_proxy_candidate": false,
+      "no_museum_edition": false
+    },
+    "acquisition": {
+      "target_owned": true,
+      "installed": true,
+      "source_recorded": false,
+      "acquired_at": null,
+      "source": null,
+      "price_paid": null,
+      "condition": null,
+      "language": "en"
+    },
+    "notes": []
+  },
+  {
+    "deck_card_id": "ff09be4d-bbcc-4c25-9df2-b3df07fca955",
+    "card_name": "Essence Warden",
+    "quantity": 1,
+    "role": "Payoff",
+    "current_printing": {
+      "scryfall_id": "ff09be4d-bbcc-4c25-9df2-b3df07fca955",
+      "finish": "normal"
+    },
+    "status": "removed",
     "decision": {
       "status": "pending",
       "finalized": false,

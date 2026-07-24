@@ -19,6 +19,7 @@ from __future__ import annotations
 import argparse
 import datetime as _dt
 import sqlite3
+from collections import defaultdict
 
 from deckbooks import catalog
 from deckbooks import repository as repo
@@ -337,10 +338,18 @@ def _merge_preserving_decisions(
     pending. A previously-active card no longer in the deck is marked removed
     (never deleted — history is preserved). The Akroma on-order entry (not a
     deck row) is preserved as-is.
+
+    Name-fallback: when a card's physical printing changed (deck_card_id no
+    longer matches) but it's unambiguously the SAME card — exactly one new,
+    otherwise-unmatched deck row of that name — its curated DECISION (destination
+    / museum / verdict / role) is grafted onto the new printing, since a
+    Destination pick is a target independent of the printing currently held. The
+    1:1 guard keeps duplicate-name rows (basic lands) out of it.
     """
     by_id = {c["deck_card_id"]: c for c in existing}
     live_ids = {r["deck_card_id"] for r in deck_rows}
     out: list[dict] = []
+    new_by_name: dict[str, list[dict]] = defaultdict(list)
     for row in deck_rows:
         prior = by_id.get(row["deck_card_id"])
         if prior:
@@ -349,16 +358,30 @@ def _merge_preserving_decisions(
             prior["status"] = "active"
             out.append(prior)
         else:
-            out.append(row)  # newly discovered deck card, pending
-    # Carry forward non-deck entries (on-order) + mark vanished deck cards removed.
+            out.append(row)  # newly discovered deck card (pending, unless a carry lands below)
+            new_by_name[row["card_name"]].append(row)
+
+    def _curated(c: dict) -> bool:
+        d = c.get("decision") or {}
+        return bool(d.get("selected_printing") or d.get("museum_printing") or d.get("finalized"))
+
+    # Carry forward non-deck entries (on-order) + mark vanished deck cards removed,
+    # grafting a curated decision onto the same card's new printing when it's 1:1.
     for card in existing:
         if card["deck_card_id"] in live_ids:
             continue
         if card.get("status") == "on_order":
             out.append(card)
-        else:
-            card["status"] = "removed"
-            out.append(card)
+            continue
+        cands = new_by_name.get(card["card_name"], [])
+        if _curated(card) and len(cands) == 1 and not cands[0].get("_carried"):
+            cands[0]["decision"] = card["decision"]
+            cands[0]["role"] = card.get("role", cands[0].get("role"))
+            cands[0]["_carried"] = True
+        card["status"] = "removed"
+        out.append(card)
+    for r in out:
+        r.pop("_carried", None)
     return out
 
 

@@ -10,7 +10,7 @@ from __future__ import annotations
 
 BOOKS: dict[str, dict] = {
     "osha-violation": {
-        "deck_name": "Bello, Bard of the Brambles",
+        "deck_name": "OSHA Violation",
         "name": "OSHA Violation",
         "commander_names": ["Bello, Bard of the Brambles"],
         "subtitle": (
@@ -48,7 +48,7 @@ BOOKS: dict[str, dict] = {
         },
     },
     "second-breakfast": {
-        "deck_name": "Frodo, Adventurous Hobbit and Sam, Loyal Attendant",
+        "deck_name": "Second Breakfast",
         "name": "Second Breakfast",
         "commander_names": ["Frodo, Adventurous Hobbit", "Sam, Loyal Attendant"],
         "subtitle": "Two hobbits, one Ring, and absolutely no skipping meals.",

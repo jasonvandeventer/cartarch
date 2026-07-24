@@ -279,48 +279,6 @@
     "notes": []
   },
   {
-    "deck_card_id": "243b460e-e67a-40d7-a874-a61fdb011c5a",
-    "card_name": "Big Score",
-    "quantity": 1,
-    "role": "Interaction",
-    "current_printing": {
-      "scryfall_id": "243b460e-e67a-40d7-a874-a61fdb011c5a",
-      "finish": "normal"
-    },
-    "status": "active",
-    "decision": {
-      "status": "upgrade",
-      "finalized": true,
-      "finalized_at": "2026-07-23",
-      "selected_printing": {
-        "scryfall_id": "c7b698a1-dff1-413f-ba4f-0298c686999a",
-        "finish": "normal"
-      },
-      "museum_printing": {
-        "scryfall_id": "c7b698a1-dff1-413f-ba4f-0298c686999a",
-        "finish": "normal"
-      },
-      "proxy_candidate": {
-        "scryfall_id": "c7b698a1-dff1-413f-ba4f-0298c686999a",
-        "desired": false,
-        "printed": false
-      },
-      "verdict": null,
-      "reasoning": []
-    },
-    "acquisition": {
-      "target_owned": true,
-      "installed": true,
-      "source_recorded": false,
-      "acquired_at": null,
-      "source": null,
-      "price_paid": null,
-      "condition": null,
-      "language": "en"
-    },
-    "notes": []
-  },
-  {
     "deck_card_id": "fb01696a-855c-45af-804c-d41acb6496e1",
     "card_name": "Blasphemous Act",
     "quantity": 1,
@@ -413,7 +371,7 @@
       "scryfall_id": "bdf2d103-8614-4cc1-be90-a8b331eff0d2",
       "finish": "normal"
     },
-    "status": "removed",
+    "status": "active",
     "decision": {
       "status": "pending",
       "finalized": false,
@@ -659,49 +617,6 @@
     "notes": []
   },
   {
-    "deck_card_id": "f2c4f80e-84a0-463b-82c3-5c6503809351",
-    "card_name": "Doubling Season",
-    "quantity": 1,
-    "role": "Utility",
-    "current_printing": {
-      "scryfall_id": "f2c4f80e-84a0-463b-82c3-5c6503809351",
-      "finish": "normal"
-    },
-    "status": "active",
-    "decision": {
-      "status": "upgrade",
-      "finalized": true,
-      "finalized_at": "2026-07-23",
-      "selected_printing": {
-        "scryfall_id": "c7d7db76-0a0c-444f-96f1-559838450549",
-        "finish": "normal"
-      },
-      "museum_printing": {
-        "scryfall_id": "72a09233-fd48-4122-ac5f-55247430e023",
-        "finish": "normal"
-      },
-      "proxy_candidate": {
-        "scryfall_id": "20c9c856-af15-40b1-a799-1c2066df2099",
-        "desired": false,
-        "printed": false
-      },
-      "verdict": null,
-      "reasoning": [],
-      "custom_proxy_candidate": true
-    },
-    "acquisition": {
-      "target_owned": true,
-      "installed": true,
-      "source_recorded": false,
-      "acquired_at": null,
-      "source": null,
-      "price_paid": null,
-      "condition": null,
-      "language": "en"
-    },
-    "notes": []
-  },
-  {
     "deck_card_id": "3213bfee-c0a0-49a2-9080-cdaa09b414c5",
     "card_name": "Echoing Assault",
     "quantity": 1,
@@ -730,6 +645,74 @@
       },
       "verdict": null,
       "reasoning": []
+    },
+    "acquisition": {
+      "target_owned": true,
+      "installed": true,
+      "source_recorded": false,
+      "acquired_at": null,
+      "source": null,
+      "price_paid": null,
+      "condition": null,
+      "language": "en"
+    },
+    "notes": []
+  },
+  {
+    "deck_card_id": "f882aa63-d43c-4359-9de6-77231500a08e",
+    "card_name": "Eidolon of Blossoms",
+    "quantity": 1,
+    "role": "Threat",
+    "current_printing": {
+      "scryfall_id": "f882aa63-d43c-4359-9de6-77231500a08e",
+      "finish": "normal"
+    },
+    "status": "active",
+    "decision": {
+      "status": "pending",
+      "finalized": false,
+      "finalized_at": null,
+      "selected_printing": null,
+      "museum_printing": null,
+      "proxy_candidate": null,
+      "verdict": null,
+      "reasoning": [],
+      "custom_proxy_candidate": false,
+      "no_museum_edition": false
+    },
+    "acquisition": {
+      "target_owned": true,
+      "installed": true,
+      "source_recorded": false,
+      "acquired_at": null,
+      "source": null,
+      "price_paid": null,
+      "condition": null,
+      "language": "en"
+    },
+    "notes": []
+  },
+  {
+    "deck_card_id": "a9523a73-6b62-48ee-9775-cf1f3b6babb3",
+    "card_name": "Elven Chorus",
+    "quantity": 1,
+    "role": "Utility",
+    "current_printing": {
+      "scryfall_id": "a9523a73-6b62-48ee-9775-cf1f3b6babb3",
+      "finish": "normal"
+    },
+    "status": "active",
+    "decision": {
+      "status": "pending",
+      "finalized": false,
+      "finalized_at": null,
+      "selected_printing": null,
+      "museum_printing": null,
+      "proxy_candidate": null,
+      "verdict": null,
+      "reasoning": [],
+      "custom_proxy_candidate": false,
+      "no_museum_edition": false
     },
     "acquisition": {
       "target_owned": true,
@@ -1493,48 +1476,6 @@
     "notes": []
   },
   {
-    "deck_card_id": "bb27bd6f-dec5-4e05-b228-d606a03380ad",
-    "card_name": "Harmonize",
-    "quantity": 1,
-    "role": "Draw",
-    "current_printing": {
-      "scryfall_id": "bb27bd6f-dec5-4e05-b228-d606a03380ad",
-      "finish": "normal"
-    },
-    "status": "active",
-    "decision": {
-      "status": "pending",
-      "finalized": true,
-      "finalized_at": "2026-07-23",
-      "selected_printing": {
-        "scryfall_id": "9e1f1110-0919-49cd-8b5b-979b2744fd3c",
-        "finish": "normal"
-      },
-      "museum_printing": {
-        "scryfall_id": "cb853d72-9b29-4ea1-80db-da9e0b547ad5",
-        "finish": "normal"
-      },
-      "proxy_candidate": {
-        "scryfall_id": "cb853d72-9b29-4ea1-80db-da9e0b547ad5",
-        "desired": false,
-        "printed": false
-      },
-      "verdict": null,
-      "reasoning": []
-    },
-    "acquisition": {
-      "target_owned": true,
-      "installed": true,
-      "source_recorded": false,
-      "acquired_at": null,
-      "source": null,
-      "price_paid": null,
-      "condition": null,
-      "language": "en"
-    },
-    "notes": []
-  },
-  {
     "deck_card_id": "228ce785-033c-4973-89c7-4616a5b9c9d2",
     "card_name": "Hedron Archive",
     "quantity": 1,
@@ -1629,87 +1570,6 @@
       },
       "proxy_candidate": {
         "scryfall_id": "896f357e-38e6-4259-91bc-1c2e7119d1d5",
-        "desired": false,
-        "printed": false
-      },
-      "verdict": null,
-      "reasoning": []
-    },
-    "acquisition": {
-      "target_owned": true,
-      "installed": true,
-      "source_recorded": false,
-      "acquired_at": null,
-      "source": null,
-      "price_paid": null,
-      "condition": null,
-      "language": "en"
-    },
-    "notes": []
-  },
-  {
-    "deck_card_id": "607157a4-4fe8-46b9-86e1-0a30f040116b",
-    "card_name": "Leyline of Abundance",
-    "quantity": 1,
-    "role": "Utility",
-    "current_printing": {
-      "scryfall_id": "607157a4-4fe8-46b9-86e1-0a30f040116b",
-      "finish": "normal"
-    },
-    "status": "active",
-    "decision": {
-      "status": "keep",
-      "finalized": true,
-      "finalized_at": "2026-07-23",
-      "selected_printing": null,
-      "museum_printing": {
-        "scryfall_id": "607157a4-4fe8-46b9-86e1-0a30f040116b",
-        "finish": "normal"
-      },
-      "proxy_candidate": {
-        "scryfall_id": "607157a4-4fe8-46b9-86e1-0a30f040116b",
-        "desired": false,
-        "printed": false
-      },
-      "verdict": null,
-      "reasoning": []
-    },
-    "acquisition": {
-      "target_owned": true,
-      "installed": true,
-      "source_recorded": false,
-      "acquired_at": null,
-      "source": null,
-      "price_paid": null,
-      "condition": null,
-      "language": "en"
-    },
-    "notes": []
-  },
-  {
-    "deck_card_id": "c579956f-900a-4574-a68b-3c1d92ea67b6",
-    "card_name": "Lithoform Engine",
-    "quantity": 1,
-    "role": "Utility",
-    "current_printing": {
-      "scryfall_id": "c579956f-900a-4574-a68b-3c1d92ea67b6",
-      "finish": "normal"
-    },
-    "status": "active",
-    "decision": {
-      "status": "upgrade",
-      "finalized": true,
-      "finalized_at": "2026-07-23",
-      "selected_printing": {
-        "scryfall_id": "e3b02012-56b1-4386-936b-139480162e8f",
-        "finish": "normal"
-      },
-      "museum_printing": {
-        "scryfall_id": "e3b02012-56b1-4386-936b-139480162e8f",
-        "finish": "normal"
-      },
-      "proxy_candidate": {
-        "scryfall_id": "e3b02012-56b1-4386-936b-139480162e8f",
         "desired": false,
         "printed": false
       },
@@ -2048,6 +1908,40 @@
       "verdict": null,
       "reasoning": [],
       "custom_proxy_candidate": true
+    },
+    "acquisition": {
+      "target_owned": true,
+      "installed": true,
+      "source_recorded": false,
+      "acquired_at": null,
+      "source": null,
+      "price_paid": null,
+      "condition": null,
+      "language": "en"
+    },
+    "notes": []
+  },
+  {
+    "deck_card_id": "ce7785c2-0b3f-4952-8b2d-71fe73cf64e0",
+    "card_name": "Nature's Will",
+    "quantity": 1,
+    "role": "Utility",
+    "current_printing": {
+      "scryfall_id": "ce7785c2-0b3f-4952-8b2d-71fe73cf64e0",
+      "finish": "normal"
+    },
+    "status": "active",
+    "decision": {
+      "status": "pending",
+      "finalized": false,
+      "finalized_at": null,
+      "selected_printing": null,
+      "museum_printing": null,
+      "proxy_candidate": null,
+      "verdict": null,
+      "reasoning": [],
+      "custom_proxy_candidate": false,
+      "no_museum_edition": false
     },
     "acquisition": {
       "target_owned": true,
@@ -2572,40 +2466,6 @@
     "notes": []
   },
   {
-    "deck_card_id": "d27e64ba-5501-4212-b0b6-2a47f64d226a",
-    "card_name": "Sandwurm Convergence",
-    "quantity": 1,
-    "role": "Utility",
-    "current_printing": {
-      "scryfall_id": "d27e64ba-5501-4212-b0b6-2a47f64d226a",
-      "finish": "normal"
-    },
-    "status": "active",
-    "decision": {
-      "status": "keep",
-      "finalized": true,
-      "finalized_at": "2026-07-23",
-      "selected_printing": null,
-      "museum_printing": null,
-      "proxy_candidate": null,
-      "verdict": null,
-      "reasoning": [],
-      "custom_proxy_candidate": true,
-      "no_museum_edition": false
-    },
-    "acquisition": {
-      "target_owned": true,
-      "installed": true,
-      "source_recorded": false,
-      "acquired_at": null,
-      "source": null,
-      "price_paid": null,
-      "condition": null,
-      "language": "en"
-    },
-    "notes": []
-  },
-  {
     "deck_card_id": "819f30d8-6277-4811-b2c9-f78bc8f86fe7",
     "card_name": "Selvala, Heart of the Wilds",
     "quantity": 1,
@@ -2871,6 +2731,108 @@
       "proxy_candidate": null,
       "verdict": null,
       "reasoning": []
+    },
+    "acquisition": {
+      "target_owned": true,
+      "installed": true,
+      "source_recorded": false,
+      "acquired_at": null,
+      "source": null,
+      "price_paid": null,
+      "condition": null,
+      "language": "en"
+    },
+    "notes": []
+  },
+  {
+    "deck_card_id": "2332bc91-b0f2-4911-844d-d1cc915cd6c8",
+    "card_name": "The Ten Rings",
+    "quantity": 1,
+    "role": "Utility",
+    "current_printing": {
+      "scryfall_id": "2332bc91-b0f2-4911-844d-d1cc915cd6c8",
+      "finish": "foil"
+    },
+    "status": "active",
+    "decision": {
+      "status": "pending",
+      "finalized": false,
+      "finalized_at": null,
+      "selected_printing": null,
+      "museum_printing": null,
+      "proxy_candidate": null,
+      "verdict": null,
+      "reasoning": [],
+      "custom_proxy_candidate": false,
+      "no_museum_edition": false
+    },
+    "acquisition": {
+      "target_owned": true,
+      "installed": true,
+      "source_recorded": false,
+      "acquired_at": null,
+      "source": null,
+      "price_paid": null,
+      "condition": null,
+      "language": "en"
+    },
+    "notes": []
+  },
+  {
+    "deck_card_id": "24a14ac5-0b7e-4441-9963-782a7cda3f4a",
+    "card_name": "The Walls of Ba Sing Se",
+    "quantity": 1,
+    "role": "Threat",
+    "current_printing": {
+      "scryfall_id": "24a14ac5-0b7e-4441-9963-782a7cda3f4a",
+      "finish": "normal"
+    },
+    "status": "active",
+    "decision": {
+      "status": "pending",
+      "finalized": false,
+      "finalized_at": null,
+      "selected_printing": null,
+      "museum_printing": null,
+      "proxy_candidate": null,
+      "verdict": null,
+      "reasoning": [],
+      "custom_proxy_candidate": false,
+      "no_museum_edition": false
+    },
+    "acquisition": {
+      "target_owned": true,
+      "installed": true,
+      "source_recorded": false,
+      "acquired_at": null,
+      "source": null,
+      "price_paid": null,
+      "condition": null,
+      "language": "en"
+    },
+    "notes": []
+  },
+  {
+    "deck_card_id": "939b0bd0-24ea-45de-a2d3-37bbf6a3e6f9",
+    "card_name": "There and Back Again",
+    "quantity": 1,
+    "role": "Utility",
+    "current_printing": {
+      "scryfall_id": "939b0bd0-24ea-45de-a2d3-37bbf6a3e6f9",
+      "finish": "foil"
+    },
+    "status": "active",
+    "decision": {
+      "status": "pending",
+      "finalized": false,
+      "finalized_at": null,
+      "selected_printing": null,
+      "museum_printing": null,
+      "proxy_candidate": null,
+      "verdict": null,
+      "reasoning": [],
+      "custom_proxy_candidate": false,
+      "no_museum_edition": false
     },
     "acquisition": {
       "target_owned": true,
@@ -3157,13 +3119,13 @@
     "notes": []
   },
   {
-    "deck_card_id": "604a6feb-0586-479c-a7b9-60abe9a13eb1",
+    "deck_card_id": "80afdcf9-728e-4514-baa7-a373360094af",
     "card_name": "Warstorm Surge",
     "quantity": 1,
     "role": "Utility",
     "current_printing": {
       "scryfall_id": "80afdcf9-728e-4514-baa7-a373360094af",
-      "finish": "normal"
+      "finish": "foil"
     },
     "status": "active",
     "decision": {
@@ -3254,6 +3216,287 @@
       "selected_printing": null,
       "museum_printing": null,
       "proxy_candidate": null,
+      "verdict": null,
+      "reasoning": []
+    },
+    "acquisition": {
+      "target_owned": true,
+      "installed": true,
+      "source_recorded": false,
+      "acquired_at": null,
+      "source": null,
+      "price_paid": null,
+      "condition": null,
+      "language": "en"
+    },
+    "notes": []
+  },
+  {
+    "deck_card_id": "243b460e-e67a-40d7-a874-a61fdb011c5a",
+    "card_name": "Big Score",
+    "quantity": 1,
+    "role": "Interaction",
+    "current_printing": {
+      "scryfall_id": "243b460e-e67a-40d7-a874-a61fdb011c5a",
+      "finish": "normal"
+    },
+    "status": "removed",
+    "decision": {
+      "status": "upgrade",
+      "finalized": true,
+      "finalized_at": "2026-07-23",
+      "selected_printing": {
+        "scryfall_id": "c7b698a1-dff1-413f-ba4f-0298c686999a",
+        "finish": "normal"
+      },
+      "museum_printing": {
+        "scryfall_id": "c7b698a1-dff1-413f-ba4f-0298c686999a",
+        "finish": "normal"
+      },
+      "proxy_candidate": {
+        "scryfall_id": "c7b698a1-dff1-413f-ba4f-0298c686999a",
+        "desired": false,
+        "printed": false
+      },
+      "verdict": null,
+      "reasoning": []
+    },
+    "acquisition": {
+      "target_owned": true,
+      "installed": true,
+      "source_recorded": false,
+      "acquired_at": null,
+      "source": null,
+      "price_paid": null,
+      "condition": null,
+      "language": "en"
+    },
+    "notes": []
+  },
+  {
+    "deck_card_id": "f2c4f80e-84a0-463b-82c3-5c6503809351",
+    "card_name": "Doubling Season",
+    "quantity": 1,
+    "role": "Utility",
+    "current_printing": {
+      "scryfall_id": "f2c4f80e-84a0-463b-82c3-5c6503809351",
+      "finish": "normal"
+    },
+    "status": "removed",
+    "decision": {
+      "status": "upgrade",
+      "finalized": true,
+      "finalized_at": "2026-07-23",
+      "selected_printing": {
+        "scryfall_id": "c7d7db76-0a0c-444f-96f1-559838450549",
+        "finish": "normal"
+      },
+      "museum_printing": {
+        "scryfall_id": "72a09233-fd48-4122-ac5f-55247430e023",
+        "finish": "normal"
+      },
+      "proxy_candidate": {
+        "scryfall_id": "20c9c856-af15-40b1-a799-1c2066df2099",
+        "desired": false,
+        "printed": false
+      },
+      "verdict": null,
+      "reasoning": [],
+      "custom_proxy_candidate": true
+    },
+    "acquisition": {
+      "target_owned": true,
+      "installed": true,
+      "source_recorded": false,
+      "acquired_at": null,
+      "source": null,
+      "price_paid": null,
+      "condition": null,
+      "language": "en"
+    },
+    "notes": []
+  },
+  {
+    "deck_card_id": "bb27bd6f-dec5-4e05-b228-d606a03380ad",
+    "card_name": "Harmonize",
+    "quantity": 1,
+    "role": "Draw",
+    "current_printing": {
+      "scryfall_id": "bb27bd6f-dec5-4e05-b228-d606a03380ad",
+      "finish": "normal"
+    },
+    "status": "removed",
+    "decision": {
+      "status": "pending",
+      "finalized": true,
+      "finalized_at": "2026-07-23",
+      "selected_printing": {
+        "scryfall_id": "9e1f1110-0919-49cd-8b5b-979b2744fd3c",
+        "finish": "normal"
+      },
+      "museum_printing": {
+        "scryfall_id": "cb853d72-9b29-4ea1-80db-da9e0b547ad5",
+        "finish": "normal"
+      },
+      "proxy_candidate": {
+        "scryfall_id": "cb853d72-9b29-4ea1-80db-da9e0b547ad5",
+        "desired": false,
+        "printed": false
+      },
+      "verdict": null,
+      "reasoning": []
+    },
+    "acquisition": {
+      "target_owned": true,
+      "installed": true,
+      "source_recorded": false,
+      "acquired_at": null,
+      "source": null,
+      "price_paid": null,
+      "condition": null,
+      "language": "en"
+    },
+    "notes": []
+  },
+  {
+    "deck_card_id": "607157a4-4fe8-46b9-86e1-0a30f040116b",
+    "card_name": "Leyline of Abundance",
+    "quantity": 1,
+    "role": "Utility",
+    "current_printing": {
+      "scryfall_id": "607157a4-4fe8-46b9-86e1-0a30f040116b",
+      "finish": "normal"
+    },
+    "status": "removed",
+    "decision": {
+      "status": "keep",
+      "finalized": true,
+      "finalized_at": "2026-07-23",
+      "selected_printing": null,
+      "museum_printing": {
+        "scryfall_id": "607157a4-4fe8-46b9-86e1-0a30f040116b",
+        "finish": "normal"
+      },
+      "proxy_candidate": {
+        "scryfall_id": "607157a4-4fe8-46b9-86e1-0a30f040116b",
+        "desired": false,
+        "printed": false
+      },
+      "verdict": null,
+      "reasoning": []
+    },
+    "acquisition": {
+      "target_owned": true,
+      "installed": true,
+      "source_recorded": false,
+      "acquired_at": null,
+      "source": null,
+      "price_paid": null,
+      "condition": null,
+      "language": "en"
+    },
+    "notes": []
+  },
+  {
+    "deck_card_id": "c579956f-900a-4574-a68b-3c1d92ea67b6",
+    "card_name": "Lithoform Engine",
+    "quantity": 1,
+    "role": "Utility",
+    "current_printing": {
+      "scryfall_id": "c579956f-900a-4574-a68b-3c1d92ea67b6",
+      "finish": "normal"
+    },
+    "status": "removed",
+    "decision": {
+      "status": "upgrade",
+      "finalized": true,
+      "finalized_at": "2026-07-23",
+      "selected_printing": {
+        "scryfall_id": "e3b02012-56b1-4386-936b-139480162e8f",
+        "finish": "normal"
+      },
+      "museum_printing": {
+        "scryfall_id": "e3b02012-56b1-4386-936b-139480162e8f",
+        "finish": "normal"
+      },
+      "proxy_candidate": {
+        "scryfall_id": "e3b02012-56b1-4386-936b-139480162e8f",
+        "desired": false,
+        "printed": false
+      },
+      "verdict": null,
+      "reasoning": []
+    },
+    "acquisition": {
+      "target_owned": true,
+      "installed": true,
+      "source_recorded": false,
+      "acquired_at": null,
+      "source": null,
+      "price_paid": null,
+      "condition": null,
+      "language": "en"
+    },
+    "notes": []
+  },
+  {
+    "deck_card_id": "d27e64ba-5501-4212-b0b6-2a47f64d226a",
+    "card_name": "Sandwurm Convergence",
+    "quantity": 1,
+    "role": "Utility",
+    "current_printing": {
+      "scryfall_id": "d27e64ba-5501-4212-b0b6-2a47f64d226a",
+      "finish": "normal"
+    },
+    "status": "removed",
+    "decision": {
+      "status": "keep",
+      "finalized": true,
+      "finalized_at": "2026-07-23",
+      "selected_printing": null,
+      "museum_printing": null,
+      "proxy_candidate": null,
+      "verdict": null,
+      "reasoning": [],
+      "custom_proxy_candidate": true,
+      "no_museum_edition": false
+    },
+    "acquisition": {
+      "target_owned": true,
+      "installed": true,
+      "source_recorded": false,
+      "acquired_at": null,
+      "source": null,
+      "price_paid": null,
+      "condition": null,
+      "language": "en"
+    },
+    "notes": []
+  },
+  {
+    "deck_card_id": "604a6feb-0586-479c-a7b9-60abe9a13eb1",
+    "card_name": "Warstorm Surge",
+    "quantity": 1,
+    "role": "Utility",
+    "current_printing": {
+      "scryfall_id": "80afdcf9-728e-4514-baa7-a373360094af",
+      "finish": "normal"
+    },
+    "status": "removed",
+    "decision": {
+      "status": "keep",
+      "finalized": true,
+      "finalized_at": "2026-07-23",
+      "selected_printing": null,
+      "museum_printing": {
+        "scryfall_id": "80afdcf9-728e-4514-baa7-a373360094af",
+        "finish": "normal"
+      },
+      "proxy_candidate": {
+        "scryfall_id": "80afdcf9-728e-4514-baa7-a373360094af",
+        "desired": false,
+        "printed": false
+      },
       "verdict": null,
       "reasoning": []
     },
