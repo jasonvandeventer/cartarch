@@ -52,36 +52,36 @@ BOOKS: dict[str, dict] = {
         "name": "Second Breakfast",
         "commander_names": ["Frodo, Adventurous Hobbit", "Sam, Loyal Attendant"],
         "subtitle": "Two hobbits, one Ring, and absolutely no skipping meals.",
-        # A starting identity — edit to taste (say the word and I'll refine it).
         "identity": {
             "mission": (
-                "Two hobbits carry a burden far greater than themselves. The deck should "
-                "feel like the long walk to Mordor — quiet loyalty, mounting dread, and the "
-                "small acts of courage that matter most when all seems lost."
+                "A Food deck that keeps a full larder and a low profile. Second Breakfast "
+                "amasses value one small comfort at a time — Food, tokens, incremental "
+                "advantage — and never looks like the biggest threat at the table, until "
+                "the feast is laid and the game is already, quietly, won."
             ),
             "pillars": [
                 {
-                    "name": "The Fellowship",
-                    "description": "Loyalty and support — the cards that protect and lift the "
-                    "ones beside them.",
+                    "name": "A Full Larder",
+                    "description": "Food, treasures, and tokens that pile up unremarkably into "
+                    "an unstoppable pantry of resources.",
                 },
                 {
-                    "name": "The Long Road",
-                    "description": "The journey itself: lands, landscapes, and the miles between "
-                    "the Shire and the Mountain.",
+                    "name": "Beneath Notice",
+                    "description": "Never the scariest board. The deck thrives on being "
+                    "underestimated, unthreatening, and left well alone.",
                 },
                 {
-                    "name": "The Ring's Burden",
-                    "description": "Temptation, sacrifice, and the cost of carrying what no one "
-                    "should have to.",
+                    "name": "The Long Feast",
+                    "description": "Value compounds over time. Patience is the win condition — "
+                    "no single haymaker, just an inevitable, well-fed advantage.",
                 },
             ],
             "palette": [
-                "Shire green",
-                "wayfarer brown",
-                "Ring gold",
-                "Mordor ash",
-                "old parchment",
+                "golden crust",
+                "hearth ember",
+                "garden green",
+                "fresh butter",
+                "ale-brown parchment",
             ],
             "selection_rule": "Rarity alone never determines the definitive printing.",
         },
