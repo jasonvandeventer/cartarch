@@ -1,55 +1,11 @@
 [
   {
-    "deck_card_id": "2f5b4544-70d9-45ee-84a3-fa6253a53a82",
-    "card_name": "Academy Manufactor",
+    "deck_card_id": "f2e0f538-5825-47e9-883c-3ec6fd5b25ea",
+    "card_name": "Abyssal Harvester",
     "quantity": 1,
-    "role": "Enabler",
+    "role": "Threat",
     "current_printing": {
-      "scryfall_id": "c88eb33d-efba-4ad9-878f-f051079c9bce",
-      "finish": "normal"
-    },
-    "status": "active",
-    "decision": {
-      "status": "pending",
-      "finalized": false,
-      "finalized_at": null,
-      "selected_printing": {
-        "scryfall_id": "5f0d37b6-c092-439b-ba8e-e297ad35f155",
-        "finish": "normal"
-      },
-      "museum_printing": {
-        "scryfall_id": "5f0d37b6-c092-439b-ba8e-e297ad35f155",
-        "finish": "normal"
-      },
-      "proxy_candidate": {
-        "scryfall_id": "5f0d37b6-c092-439b-ba8e-e297ad35f155",
-        "desired": false,
-        "printed": false
-      },
-      "verdict": null,
-      "reasoning": [],
-      "custom_proxy_candidate": false,
-      "no_museum_edition": false
-    },
-    "acquisition": {
-      "target_owned": true,
-      "installed": true,
-      "source_recorded": false,
-      "acquired_at": null,
-      "source": null,
-      "price_paid": null,
-      "condition": null,
-      "language": "en"
-    },
-    "notes": []
-  },
-  {
-    "deck_card_id": "8101166d-03e1-4bc9-b50a-05743c02d653",
-    "card_name": "Access Tunnel",
-    "quantity": 1,
-    "role": "Land",
-    "current_printing": {
-      "scryfall_id": "8101166d-03e1-4bc9-b50a-05743c02d653",
+      "scryfall_id": "f2e0f538-5825-47e9-883c-3ec6fd5b25ea",
       "finish": "normal"
     },
     "status": "active",
@@ -78,12 +34,12 @@
     "notes": []
   },
   {
-    "deck_card_id": "7e798845-4d8a-46ea-8507-41edcb6c1f80",
-    "card_name": "Anguished Unmaking",
+    "deck_card_id": "b2496c4a-df03-4583-bd76-f98ed5cb61ee",
+    "card_name": "Arbiter of Woe",
     "quantity": 1,
-    "role": "Interaction",
+    "role": "Threat",
     "current_printing": {
-      "scryfall_id": "7e798845-4d8a-46ea-8507-41edcb6c1f80",
+      "scryfall_id": "b2496c4a-df03-4583-bd76-f98ed5cb61ee",
       "finish": "normal"
     },
     "status": "active",
@@ -112,203 +68,12 @@
     "notes": []
   },
   {
-    "deck_card_id": "4e92354d-c203-41e1-822d-8263fadd9eb3",
-    "card_name": "Arcane Signet",
-    "quantity": 1,
-    "role": "Ramp",
-    "current_printing": {
-      "scryfall_id": "4e92354d-c203-41e1-822d-8263fadd9eb3",
-      "finish": "normal"
-    },
-    "status": "active",
-    "decision": {
-      "status": "pending",
-      "finalized": true,
-      "finalized_at": "2026-07-24",
-      "selected_printing": null,
-      "museum_printing": {
-        "scryfall_id": "cf977357-e13d-4c67-ae53-397adf55131e",
-        "finish": "normal"
-      },
-      "proxy_candidate": {
-        "scryfall_id": "cf977357-e13d-4c67-ae53-397adf55131e",
-        "desired": false,
-        "printed": false
-      },
-      "verdict": null,
-      "reasoning": [],
-      "custom_proxy_candidate": false,
-      "no_museum_edition": false
-    },
-    "acquisition": {
-      "target_owned": true,
-      "installed": true,
-      "source_recorded": false,
-      "acquired_at": null,
-      "source": null,
-      "price_paid": null,
-      "condition": null,
-      "language": "en"
-    },
-    "notes": []
-  },
-  {
-    "deck_card_id": "7f927f72-fc9b-444f-9e0e-78a5e8e7bcaa",
-    "card_name": "Bagel and Schmear",
-    "quantity": 1,
-    "role": "Draw",
-    "current_printing": {
-      "scryfall_id": "7f927f72-fc9b-444f-9e0e-78a5e8e7bcaa",
-      "finish": "normal"
-    },
-    "status": "active",
-    "decision": {
-      "status": "pending",
-      "finalized": false,
-      "finalized_at": null,
-      "selected_printing": null,
-      "museum_printing": null,
-      "proxy_candidate": null,
-      "verdict": null,
-      "reasoning": [],
-      "custom_proxy_candidate": false,
-      "no_museum_edition": false
-    },
-    "acquisition": {
-      "target_owned": true,
-      "installed": true,
-      "source_recorded": false,
-      "acquired_at": null,
-      "source": null,
-      "price_paid": null,
-      "condition": null,
-      "language": "en"
-    },
-    "notes": []
-  },
-  {
-    "deck_card_id": "45835349-99c3-4071-95d1-7191110bfd9f",
-    "card_name": "Birds of Paradise",
-    "quantity": 1,
-    "role": "Ramp",
-    "current_printing": {
-      "scryfall_id": "45835349-99c3-4071-95d1-7191110bfd9f",
-      "finish": "normal"
-    },
-    "status": "active",
-    "decision": {
-      "status": "pending",
-      "finalized": true,
-      "finalized_at": "2026-07-24",
-      "selected_printing": null,
-      "museum_printing": {
-        "scryfall_id": "4c72e177-d95d-41df-91b3-4e489175b6aa",
-        "finish": "normal"
-      },
-      "proxy_candidate": {
-        "scryfall_id": "4c72e177-d95d-41df-91b3-4e489175b6aa",
-        "desired": false,
-        "printed": false
-      },
-      "verdict": null,
-      "reasoning": [],
-      "custom_proxy_candidate": false,
-      "no_museum_edition": false
-    },
-    "acquisition": {
-      "target_owned": true,
-      "installed": true,
-      "source_recorded": false,
-      "acquired_at": null,
-      "source": null,
-      "price_paid": null,
-      "condition": null,
-      "language": "en"
-    },
-    "notes": []
-  },
-  {
-    "deck_card_id": "0cd9fc50-4930-45c8-8b58-19ba4bc22d62",
-    "card_name": "Brushland",
-    "quantity": 1,
-    "role": "Land",
-    "current_printing": {
-      "scryfall_id": "0cd9fc50-4930-45c8-8b58-19ba4bc22d62",
-      "finish": "normal"
-    },
-    "status": "active",
-    "decision": {
-      "status": "pending",
-      "finalized": false,
-      "finalized_at": null,
-      "selected_printing": null,
-      "museum_printing": null,
-      "proxy_candidate": null,
-      "verdict": null,
-      "reasoning": [],
-      "custom_proxy_candidate": false,
-      "no_museum_edition": false
-    },
-    "acquisition": {
-      "target_owned": true,
-      "installed": true,
-      "source_recorded": false,
-      "acquired_at": null,
-      "source": null,
-      "price_paid": null,
-      "condition": null,
-      "language": "en"
-    },
-    "notes": []
-  },
-  {
-    "deck_card_id": "65ebbff0-fbe6-4310-a33f-e00bb2534979",
-    "card_name": "Burnished Hart",
-    "quantity": 1,
-    "role": "Ramp",
-    "current_printing": {
-      "scryfall_id": "65ebbff0-fbe6-4310-a33f-e00bb2534979",
-      "finish": "normal"
-    },
-    "status": "active",
-    "decision": {
-      "status": "pending",
-      "finalized": true,
-      "finalized_at": "2026-07-24",
-      "selected_printing": null,
-      "museum_printing": {
-        "scryfall_id": "e72bfcae-b791-4a89-a41f-d5335a13f325",
-        "finish": "normal"
-      },
-      "proxy_candidate": {
-        "scryfall_id": "e72bfcae-b791-4a89-a41f-d5335a13f325",
-        "desired": false,
-        "printed": false
-      },
-      "verdict": null,
-      "reasoning": [],
-      "custom_proxy_candidate": false,
-      "no_museum_edition": false
-    },
-    "acquisition": {
-      "target_owned": true,
-      "installed": true,
-      "source_recorded": false,
-      "acquired_at": null,
-      "source": null,
-      "price_paid": null,
-      "condition": null,
-      "language": "en"
-    },
-    "notes": []
-  },
-  {
-    "deck_card_id": "8264f32c-0cfb-4233-9626-0cbb44a01a93",
-    "card_name": "Call for Unity",
+    "deck_card_id": "87da5ad8-b35f-4f9c-b17a-bb2563cbc186",
+    "card_name": "Ashnod's Altar",
     "quantity": 1,
     "role": "Utility",
     "current_printing": {
-      "scryfall_id": "8264f32c-0cfb-4233-9626-0cbb44a01a93",
+      "scryfall_id": "87da5ad8-b35f-4f9c-b17a-bb2563cbc186",
       "finish": "normal"
     },
     "status": "active",
@@ -337,12 +102,216 @@
     "notes": []
   },
   {
-    "deck_card_id": "8529ffd4-9dbb-4d5b-8c96-9049da5952b7",
-    "card_name": "Canopy Vista",
+    "deck_card_id": "690ccdc7-6c43-4902-9d11-2f07b7a36b11",
+    "card_name": "Bartolomé del Presidio",
+    "quantity": 1,
+    "role": "Threat",
+    "current_printing": {
+      "scryfall_id": "690ccdc7-6c43-4902-9d11-2f07b7a36b11",
+      "finish": "normal"
+    },
+    "status": "active",
+    "decision": {
+      "status": "pending",
+      "finalized": false,
+      "finalized_at": null,
+      "selected_printing": null,
+      "museum_printing": null,
+      "proxy_candidate": null,
+      "verdict": null,
+      "reasoning": [],
+      "custom_proxy_candidate": false,
+      "no_museum_edition": false
+    },
+    "acquisition": {
+      "target_owned": true,
+      "installed": true,
+      "source_recorded": false,
+      "acquired_at": null,
+      "source": null,
+      "price_paid": null,
+      "condition": null,
+      "language": "en"
+    },
+    "notes": []
+  },
+  {
+    "deck_card_id": "3be363dc-70f0-4de3-b7de-5e4db2264883",
+    "card_name": "Bastion of Remembrance",
+    "quantity": 1,
+    "role": "Utility",
+    "current_printing": {
+      "scryfall_id": "3be363dc-70f0-4de3-b7de-5e4db2264883",
+      "finish": "normal"
+    },
+    "status": "active",
+    "decision": {
+      "status": "pending",
+      "finalized": false,
+      "finalized_at": null,
+      "selected_printing": null,
+      "museum_printing": null,
+      "proxy_candidate": null,
+      "verdict": null,
+      "reasoning": [],
+      "custom_proxy_candidate": false,
+      "no_museum_edition": false
+    },
+    "acquisition": {
+      "target_owned": true,
+      "installed": true,
+      "source_recorded": false,
+      "acquired_at": null,
+      "source": null,
+      "price_paid": null,
+      "condition": null,
+      "language": "en"
+    },
+    "notes": []
+  },
+  {
+    "deck_card_id": "18c59776-e1f1-4197-a128-db1d603f56b7",
+    "card_name": "Beseech the Mirror",
+    "quantity": 1,
+    "role": "Utility",
+    "current_printing": {
+      "scryfall_id": "18c59776-e1f1-4197-a128-db1d603f56b7",
+      "finish": "normal"
+    },
+    "status": "active",
+    "decision": {
+      "status": "pending",
+      "finalized": false,
+      "finalized_at": null,
+      "selected_printing": null,
+      "museum_printing": null,
+      "proxy_candidate": null,
+      "verdict": null,
+      "reasoning": [],
+      "custom_proxy_candidate": false,
+      "no_museum_edition": false
+    },
+    "acquisition": {
+      "target_owned": true,
+      "installed": true,
+      "source_recorded": false,
+      "acquired_at": null,
+      "source": null,
+      "price_paid": null,
+      "condition": null,
+      "language": "en"
+    },
+    "notes": []
+  },
+  {
+    "deck_card_id": "8b28572c-d2ba-4834-8630-3d82202ebb6f",
+    "card_name": "Black Market Connections",
+    "quantity": 1,
+    "role": "Utility",
+    "current_printing": {
+      "scryfall_id": "8b28572c-d2ba-4834-8630-3d82202ebb6f",
+      "finish": "normal"
+    },
+    "status": "active",
+    "decision": {
+      "status": "pending",
+      "finalized": false,
+      "finalized_at": null,
+      "selected_printing": null,
+      "museum_printing": null,
+      "proxy_candidate": null,
+      "verdict": null,
+      "reasoning": [],
+      "custom_proxy_candidate": false,
+      "no_museum_edition": false
+    },
+    "acquisition": {
+      "target_owned": true,
+      "installed": true,
+      "source_recorded": false,
+      "acquired_at": null,
+      "source": null,
+      "price_paid": null,
+      "condition": null,
+      "language": "en"
+    },
+    "notes": []
+  },
+  {
+    "deck_card_id": "11040ecd-3153-4029-b42b-1441bc51ec34",
+    "card_name": "Blasphemous Edict",
+    "quantity": 1,
+    "role": "Utility",
+    "current_printing": {
+      "scryfall_id": "11040ecd-3153-4029-b42b-1441bc51ec34",
+      "finish": "normal"
+    },
+    "status": "active",
+    "decision": {
+      "status": "pending",
+      "finalized": false,
+      "finalized_at": null,
+      "selected_printing": null,
+      "museum_printing": null,
+      "proxy_candidate": null,
+      "verdict": null,
+      "reasoning": [],
+      "custom_proxy_candidate": false,
+      "no_museum_edition": false
+    },
+    "acquisition": {
+      "target_owned": true,
+      "installed": true,
+      "source_recorded": false,
+      "acquired_at": null,
+      "source": null,
+      "price_paid": null,
+      "condition": null,
+      "language": "en"
+    },
+    "notes": []
+  },
+  {
+    "deck_card_id": "b5275d76-2947-4219-be21-614c7421614a",
+    "card_name": "Blood Artist",
+    "quantity": 1,
+    "role": "Threat",
+    "current_printing": {
+      "scryfall_id": "b5275d76-2947-4219-be21-614c7421614a",
+      "finish": "normal"
+    },
+    "status": "active",
+    "decision": {
+      "status": "pending",
+      "finalized": false,
+      "finalized_at": null,
+      "selected_printing": null,
+      "museum_printing": null,
+      "proxy_candidate": null,
+      "verdict": null,
+      "reasoning": [],
+      "custom_proxy_candidate": false,
+      "no_museum_edition": false
+    },
+    "acquisition": {
+      "target_owned": true,
+      "installed": true,
+      "source_recorded": false,
+      "acquired_at": null,
+      "source": null,
+      "price_paid": null,
+      "condition": null,
+      "language": "en"
+    },
+    "notes": []
+  },
+  {
+    "deck_card_id": "763fee38-68bf-4c2f-837f-bd5077138368",
+    "card_name": "Bojuka Bog",
     "quantity": 1,
     "role": "Land",
     "current_printing": {
-      "scryfall_id": "8529ffd4-9dbb-4d5b-8c96-9049da5952b7",
+      "scryfall_id": "763fee38-68bf-4c2f-837f-bd5077138368",
       "finish": "normal"
     },
     "status": "active",
@@ -371,12 +340,12 @@
     "notes": []
   },
   {
-    "deck_card_id": "72ab0422-eba0-4e1e-9626-ef31b836dcd2",
-    "card_name": "Chatterfang, Squirrel General",
+    "deck_card_id": "171a9a3f-6278-4921-9848-2b8459869d6c",
+    "card_name": "Bontu's Monument",
     "quantity": 1,
-    "role": "Enabler",
+    "role": "Utility",
     "current_printing": {
-      "scryfall_id": "72ab0422-eba0-4e1e-9626-ef31b836dcd2",
+      "scryfall_id": "171a9a3f-6278-4921-9848-2b8459869d6c",
       "finish": "normal"
     },
     "status": "active",
@@ -405,29 +374,22 @@
     "notes": []
   },
   {
-    "deck_card_id": "cf2fac9f-6749-4ca2-93c9-0dc068a220ec",
-    "card_name": "Chromatic Lantern",
+    "deck_card_id": "22a77543-749a-49d8-96f4-3458ae5dcd38",
+    "card_name": "Carrion Feeder",
     "quantity": 1,
-    "role": "Ramp",
+    "role": "Threat",
     "current_printing": {
-      "scryfall_id": "cf2fac9f-6749-4ca2-93c9-0dc068a220ec",
+      "scryfall_id": "22a77543-749a-49d8-96f4-3458ae5dcd38",
       "finish": "normal"
     },
     "status": "active",
     "decision": {
       "status": "pending",
-      "finalized": true,
-      "finalized_at": "2026-07-24",
+      "finalized": false,
+      "finalized_at": null,
       "selected_printing": null,
-      "museum_printing": {
-        "scryfall_id": "14d34e8d-6db5-429c-a956-f8f3bb8bb9cd",
-        "finish": "normal"
-      },
-      "proxy_candidate": {
-        "scryfall_id": "14d34e8d-6db5-429c-a956-f8f3bb8bb9cd",
-        "desired": false,
-        "printed": false
-      },
+      "museum_printing": null,
+      "proxy_candidate": null,
       "verdict": null,
       "reasoning": [],
       "custom_proxy_candidate": false,
@@ -446,12 +408,114 @@
     "notes": []
   },
   {
-    "deck_card_id": "5306a95e-fb18-463d-81a9-3c3b8121fc94",
+    "deck_card_id": "b65d2bc3-7f36-4c81-95da-a22c3a47b2e4",
+    "card_name": "Castle Ardenvale",
+    "quantity": 1,
+    "role": "Land",
+    "current_printing": {
+      "scryfall_id": "b65d2bc3-7f36-4c81-95da-a22c3a47b2e4",
+      "finish": "foil"
+    },
+    "status": "active",
+    "decision": {
+      "status": "pending",
+      "finalized": false,
+      "finalized_at": null,
+      "selected_printing": null,
+      "museum_printing": null,
+      "proxy_candidate": null,
+      "verdict": null,
+      "reasoning": [],
+      "custom_proxy_candidate": false,
+      "no_museum_edition": false
+    },
+    "acquisition": {
+      "target_owned": true,
+      "installed": true,
+      "source_recorded": false,
+      "acquired_at": null,
+      "source": null,
+      "price_paid": null,
+      "condition": null,
+      "language": "en"
+    },
+    "notes": []
+  },
+  {
+    "deck_card_id": "94b2b5b9-1227-4b4b-a229-c9804550f9b6",
+    "card_name": "Caves of Koilos",
+    "quantity": 1,
+    "role": "Land",
+    "current_printing": {
+      "scryfall_id": "94b2b5b9-1227-4b4b-a229-c9804550f9b6",
+      "finish": "normal"
+    },
+    "status": "active",
+    "decision": {
+      "status": "pending",
+      "finalized": false,
+      "finalized_at": null,
+      "selected_printing": null,
+      "museum_printing": null,
+      "proxy_candidate": null,
+      "verdict": null,
+      "reasoning": [],
+      "custom_proxy_candidate": false,
+      "no_museum_edition": false
+    },
+    "acquisition": {
+      "target_owned": true,
+      "installed": true,
+      "source_recorded": false,
+      "acquired_at": null,
+      "source": null,
+      "price_paid": null,
+      "condition": null,
+      "language": "en"
+    },
+    "notes": []
+  },
+  {
+    "deck_card_id": "347a7b0f-1239-4113-827c-aa67a6e0552e",
     "card_name": "Command Tower",
     "quantity": 1,
     "role": "Land",
     "current_printing": {
-      "scryfall_id": "5306a95e-fb18-463d-81a9-3c3b8121fc94",
+      "scryfall_id": "347a7b0f-1239-4113-827c-aa67a6e0552e",
+      "finish": "foil"
+    },
+    "status": "active",
+    "decision": {
+      "status": "pending",
+      "finalized": false,
+      "finalized_at": null,
+      "selected_printing": null,
+      "museum_printing": null,
+      "proxy_candidate": null,
+      "verdict": null,
+      "reasoning": [],
+      "custom_proxy_candidate": false,
+      "no_museum_edition": false
+    },
+    "acquisition": {
+      "target_owned": true,
+      "installed": true,
+      "source_recorded": false,
+      "acquired_at": null,
+      "source": null,
+      "price_paid": null,
+      "condition": null,
+      "language": "en"
+    },
+    "notes": []
+  },
+  {
+    "deck_card_id": "14fc0dfb-663a-4713-902e-96dbecc404b7",
+    "card_name": "Corpse Augur",
+    "quantity": 1,
+    "role": "Threat",
+    "current_printing": {
+      "scryfall_id": "14fc0dfb-663a-4713-902e-96dbecc404b7",
       "finish": "normal"
     },
     "status": "active",
@@ -480,56 +544,12 @@
     "notes": []
   },
   {
-    "deck_card_id": "6620b4a3-fa33-4bd7-9180-314919d8ea2a",
-    "card_name": "Commander's Sphere",
+    "deck_card_id": "cc7f2ce1-b442-4051-b1fe-90efde9bc181",
+    "card_name": "Demon's Disciple",
     "quantity": 1,
-    "role": "Ramp",
+    "role": "Threat",
     "current_printing": {
-      "scryfall_id": "6620b4a3-fa33-4bd7-9180-314919d8ea2a",
-      "finish": "normal"
-    },
-    "status": "active",
-    "decision": {
-      "status": "pending",
-      "finalized": true,
-      "finalized_at": "2026-07-24",
-      "selected_printing": {
-        "scryfall_id": "0ad783ed-69b9-48b5-9610-4fa4d8f9a6e6",
-        "finish": "foil"
-      },
-      "museum_printing": {
-        "scryfall_id": "0ad783ed-69b9-48b5-9610-4fa4d8f9a6e6",
-        "finish": "normal"
-      },
-      "proxy_candidate": {
-        "scryfall_id": "0ad783ed-69b9-48b5-9610-4fa4d8f9a6e6",
-        "desired": false,
-        "printed": false
-      },
-      "verdict": null,
-      "reasoning": [],
-      "custom_proxy_candidate": false,
-      "no_museum_edition": false
-    },
-    "acquisition": {
-      "target_owned": true,
-      "installed": true,
-      "source_recorded": false,
-      "acquired_at": null,
-      "source": null,
-      "price_paid": null,
-      "condition": null,
-      "language": "en"
-    },
-    "notes": []
-  },
-  {
-    "deck_card_id": "3217b813-7c21-473c-b65b-5766b0dc7803",
-    "card_name": "Cultivate",
-    "quantity": 1,
-    "role": "Ramp",
-    "current_printing": {
-      "scryfall_id": "3217b813-7c21-473c-b65b-5766b0dc7803",
+      "scryfall_id": "cc7f2ce1-b442-4051-b1fe-90efde9bc181",
       "finish": "normal"
     },
     "status": "active",
@@ -558,12 +578,12 @@
     "notes": []
   },
   {
-    "deck_card_id": "08033756-5fee-49c1-a968-9ed3e70cd571",
-    "card_name": "Dawn of Hope",
+    "deck_card_id": "652c3bbb-cac8-47ad-81de-41e954e17a29",
+    "card_name": "Doomed Traveler",
     "quantity": 1,
-    "role": "Draw",
+    "role": "Threat",
     "current_printing": {
-      "scryfall_id": "08033756-5fee-49c1-a968-9ed3e70cd571",
+      "scryfall_id": "652c3bbb-cac8-47ad-81de-41e954e17a29",
       "finish": "normal"
     },
     "status": "active",
@@ -592,53 +612,12 @@
     "notes": []
   },
   {
-    "deck_card_id": "9898dd33-63fb-49d3-bea4-5346d6d56f30",
-    "card_name": "Dryad of the Ilysian Grove",
+    "deck_card_id": "f8ecdf65-c6e6-4dac-899b-55cd80242629",
+    "card_name": "Eldrazi Monument",
     "quantity": 1,
-    "role": "Ramp",
+    "role": "Utility",
     "current_printing": {
-      "scryfall_id": "9898dd33-63fb-49d3-bea4-5346d6d56f30",
-      "finish": "normal"
-    },
-    "status": "active",
-    "decision": {
-      "status": "pending",
-      "finalized": true,
-      "finalized_at": "2026-07-24",
-      "selected_printing": null,
-      "museum_printing": {
-        "scryfall_id": "22e22287-21c5-4733-a527-b176fbf3725d",
-        "finish": "normal"
-      },
-      "proxy_candidate": {
-        "scryfall_id": "22e22287-21c5-4733-a527-b176fbf3725d",
-        "desired": false,
-        "printed": false
-      },
-      "verdict": null,
-      "reasoning": [],
-      "custom_proxy_candidate": false,
-      "no_museum_edition": false
-    },
-    "acquisition": {
-      "target_owned": true,
-      "installed": true,
-      "source_recorded": false,
-      "acquired_at": null,
-      "source": null,
-      "price_paid": null,
-      "condition": null,
-      "language": "en"
-    },
-    "notes": []
-  },
-  {
-    "deck_card_id": "13aab303-8693-4d67-87af-09188a3f617c",
-    "card_name": "Dusk // Dawn",
-    "quantity": 1,
-    "role": "Interaction",
-    "current_printing": {
-      "scryfall_id": "13aab303-8693-4d67-87af-09188a3f617c",
+      "scryfall_id": "f8ecdf65-c6e6-4dac-899b-55cd80242629",
       "finish": "normal"
     },
     "status": "active",
@@ -667,12 +646,46 @@
     "notes": []
   },
   {
-    "deck_card_id": "ff09be4d-bbcc-4c25-9df2-b3df07fca955",
-    "card_name": "Essence Warden",
+    "deck_card_id": "6f816d97-10f0-4d92-aa21-254754530554",
+    "card_name": "Elspeth, Sun's Champion",
     "quantity": 1,
-    "role": "Payoff",
+    "role": "Utility",
     "current_printing": {
-      "scryfall_id": "ff09be4d-bbcc-4c25-9df2-b3df07fca955",
+      "scryfall_id": "6f816d97-10f0-4d92-aa21-254754530554",
+      "finish": "foil"
+    },
+    "status": "active",
+    "decision": {
+      "status": "pending",
+      "finalized": false,
+      "finalized_at": null,
+      "selected_printing": null,
+      "museum_printing": null,
+      "proxy_candidate": null,
+      "verdict": null,
+      "reasoning": [],
+      "custom_proxy_candidate": false,
+      "no_museum_edition": false
+    },
+    "acquisition": {
+      "target_owned": true,
+      "installed": true,
+      "source_recorded": false,
+      "acquired_at": null,
+      "source": null,
+      "price_paid": null,
+      "condition": null,
+      "language": "en"
+    },
+    "notes": []
+  },
+  {
+    "deck_card_id": "5cf181ae-daa7-42f9-b667-5e679d80cf34",
+    "card_name": "Embalmed Ascendant",
+    "quantity": 1,
+    "role": "Threat",
+    "current_printing": {
+      "scryfall_id": "5cf181ae-daa7-42f9-b667-5e679d80cf34",
       "finish": "normal"
     },
     "status": "active",
@@ -701,12 +714,12 @@
     "notes": []
   },
   {
-    "deck_card_id": "e24ec4c1-5a28-450d-8e37-62a154749ee6",
-    "card_name": "Evolving Wilds",
+    "deck_card_id": "84701927-799f-4af4-85b8-389f903c5bc0",
+    "card_name": "Erebos, Bleak-Hearted",
     "quantity": 1,
-    "role": "Land",
+    "role": "Threat",
     "current_printing": {
-      "scryfall_id": "e24ec4c1-5a28-450d-8e37-62a154749ee6",
+      "scryfall_id": "84701927-799f-4af4-85b8-389f903c5bc0",
       "finish": "normal"
     },
     "status": "active",
@@ -735,12 +748,12 @@
     "notes": []
   },
   {
-    "deck_card_id": "a3120b65-f021-467e-bd9f-27329134a743",
+    "deck_card_id": "e6d8d98d-29b2-4ca2-bbda-4db2e8f6ae0b",
     "card_name": "Exotic Orchard",
     "quantity": 1,
     "role": "Land",
     "current_printing": {
-      "scryfall_id": "a3120b65-f021-467e-bd9f-27329134a743",
+      "scryfall_id": "e6d8d98d-29b2-4ca2-bbda-4db2e8f6ae0b",
       "finish": "normal"
     },
     "status": "active",
@@ -769,396 +782,12 @@
     "notes": []
   },
   {
-    "deck_card_id": "49aaf5db-9418-4b97-97da-736c674905d4",
-    "card_name": "Experimental Confectioner",
-    "quantity": 1,
-    "role": "Enabler",
-    "current_printing": {
-      "scryfall_id": "49aaf5db-9418-4b97-97da-736c674905d4",
-      "finish": "foil"
-    },
-    "status": "active",
-    "decision": {
-      "status": "pending",
-      "finalized": false,
-      "finalized_at": null,
-      "selected_printing": null,
-      "museum_printing": null,
-      "proxy_candidate": null,
-      "verdict": null,
-      "reasoning": [],
-      "custom_proxy_candidate": false,
-      "no_museum_edition": false
-    },
-    "acquisition": {
-      "target_owned": true,
-      "installed": true,
-      "source_recorded": false,
-      "acquired_at": null,
-      "source": null,
-      "price_paid": null,
-      "condition": null,
-      "language": "en"
-    },
-    "notes": []
-  },
-  {
-    "deck_card_id": "9d736aef-8c9b-43bf-8214-7cf0a0ee968f",
-    "card_name": "Faeburrow Elder",
-    "quantity": 1,
-    "role": "Ramp",
-    "current_printing": {
-      "scryfall_id": "9d736aef-8c9b-43bf-8214-7cf0a0ee968f",
-      "finish": "normal"
-    },
-    "status": "active",
-    "decision": {
-      "status": "pending",
-      "finalized": false,
-      "finalized_at": null,
-      "selected_printing": null,
-      "museum_printing": null,
-      "proxy_candidate": null,
-      "verdict": null,
-      "reasoning": [],
-      "custom_proxy_candidate": false,
-      "no_museum_edition": false
-    },
-    "acquisition": {
-      "target_owned": true,
-      "installed": true,
-      "source_recorded": false,
-      "acquired_at": null,
-      "source": null,
-      "price_paid": null,
-      "condition": null,
-      "language": "en"
-    },
-    "notes": []
-  },
-  {
-    "deck_card_id": "17c2250a-9af1-40de-9f09-7e8c7daec520",
-    "card_name": "Faramir, Field Commander",
-    "quantity": 1,
-    "role": "Draw",
-    "current_printing": {
-      "scryfall_id": "17c2250a-9af1-40de-9f09-7e8c7daec520",
-      "finish": "foil"
-    },
-    "status": "active",
-    "decision": {
-      "status": "pending",
-      "finalized": false,
-      "finalized_at": null,
-      "selected_printing": null,
-      "museum_printing": null,
-      "proxy_candidate": null,
-      "verdict": null,
-      "reasoning": [],
-      "custom_proxy_candidate": false,
-      "no_museum_edition": false
-    },
-    "acquisition": {
-      "target_owned": true,
-      "installed": true,
-      "source_recorded": false,
-      "acquired_at": null,
-      "source": null,
-      "price_paid": null,
-      "condition": null,
-      "language": "en"
-    },
-    "notes": []
-  },
-  {
-    "deck_card_id": "25b49eaa-13e7-4f4e-b0dc-56ebd28a4a22",
-    "card_name": "Farmer Cotton",
-    "quantity": 1,
-    "role": "Enabler",
-    "current_printing": {
-      "scryfall_id": "25b49eaa-13e7-4f4e-b0dc-56ebd28a4a22",
-      "finish": "normal"
-    },
-    "status": "active",
-    "decision": {
-      "status": "pending",
-      "finalized": false,
-      "finalized_at": null,
-      "selected_printing": null,
-      "museum_printing": null,
-      "proxy_candidate": null,
-      "verdict": null,
-      "reasoning": [],
-      "custom_proxy_candidate": false,
-      "no_museum_edition": false
-    },
-    "acquisition": {
-      "target_owned": true,
-      "installed": true,
-      "source_recorded": false,
-      "acquired_at": null,
-      "source": null,
-      "price_paid": null,
-      "condition": null,
-      "language": "en"
-    },
-    "notes": []
-  },
-  {
-    "deck_card_id": "d2f89cec-358c-41cd-af02-92d873902f06",
-    "card_name": "Farseek",
-    "quantity": 1,
-    "role": "Ramp",
-    "current_printing": {
-      "scryfall_id": "d2f89cec-358c-41cd-af02-92d873902f06",
-      "finish": "normal"
-    },
-    "status": "active",
-    "decision": {
-      "status": "pending",
-      "finalized": false,
-      "finalized_at": null,
-      "selected_printing": null,
-      "museum_printing": null,
-      "proxy_candidate": null,
-      "verdict": null,
-      "reasoning": [],
-      "custom_proxy_candidate": false,
-      "no_museum_edition": false
-    },
-    "acquisition": {
-      "target_owned": true,
-      "installed": true,
-      "source_recorded": false,
-      "acquired_at": null,
-      "source": null,
-      "price_paid": null,
-      "condition": null,
-      "language": "en"
-    },
-    "notes": []
-  },
-  {
-    "deck_card_id": "4c0b7345-7f42-4264-a7cb-733280326aca",
-    "card_name": "Fell the Mighty",
-    "quantity": 1,
-    "role": "Interaction",
-    "current_printing": {
-      "scryfall_id": "4c0b7345-7f42-4264-a7cb-733280326aca",
-      "finish": "normal"
-    },
-    "status": "active",
-    "decision": {
-      "status": "pending",
-      "finalized": false,
-      "finalized_at": null,
-      "selected_printing": null,
-      "museum_printing": null,
-      "proxy_candidate": null,
-      "verdict": null,
-      "reasoning": [],
-      "custom_proxy_candidate": false,
-      "no_museum_edition": false
-    },
-    "acquisition": {
-      "target_owned": true,
-      "installed": true,
-      "source_recorded": false,
-      "acquired_at": null,
-      "source": null,
-      "price_paid": null,
-      "condition": null,
-      "language": "en"
-    },
-    "notes": []
-  },
-  {
-    "deck_card_id": "cbe793e4-c034-4a22-929d-d743c0255bf1",
-    "card_name": "Forest",
-    "quantity": 3,
-    "role": "Land",
-    "current_printing": {
-      "scryfall_id": "cbe793e4-c034-4a22-929d-d743c0255bf1",
-      "finish": "normal"
-    },
-    "status": "active",
-    "decision": {
-      "status": "pending",
-      "finalized": false,
-      "finalized_at": null,
-      "selected_printing": null,
-      "museum_printing": null,
-      "proxy_candidate": null,
-      "verdict": null,
-      "reasoning": [],
-      "custom_proxy_candidate": false,
-      "no_museum_edition": false
-    },
-    "acquisition": {
-      "target_owned": true,
-      "installed": true,
-      "source_recorded": false,
-      "acquired_at": null,
-      "source": null,
-      "price_paid": null,
-      "condition": null,
-      "language": "en"
-    },
-    "notes": []
-  },
-  {
-    "deck_card_id": "07264de1-4322-4adb-8f08-c0aa236747c7",
-    "card_name": "Forest",
-    "quantity": 4,
-    "role": "Land",
-    "current_printing": {
-      "scryfall_id": "07264de1-4322-4adb-8f08-c0aa236747c7",
-      "finish": "normal"
-    },
-    "status": "active",
-    "decision": {
-      "status": "pending",
-      "finalized": false,
-      "finalized_at": null,
-      "selected_printing": null,
-      "museum_printing": null,
-      "proxy_candidate": null,
-      "verdict": null,
-      "reasoning": [],
-      "custom_proxy_candidate": false,
-      "no_museum_edition": false
-    },
-    "acquisition": {
-      "target_owned": true,
-      "installed": true,
-      "source_recorded": false,
-      "acquired_at": null,
-      "source": null,
-      "price_paid": null,
-      "condition": null,
-      "language": "en"
-    },
-    "notes": []
-  },
-  {
-    "deck_card_id": "85b184b1-5ce1-49c0-8173-2fa1fd26a75b",
-    "card_name": "Fortified Village",
-    "quantity": 1,
-    "role": "Land",
-    "current_printing": {
-      "scryfall_id": "85b184b1-5ce1-49c0-8173-2fa1fd26a75b",
-      "finish": "normal"
-    },
-    "status": "active",
-    "decision": {
-      "status": "pending",
-      "finalized": false,
-      "finalized_at": null,
-      "selected_printing": null,
-      "museum_printing": null,
-      "proxy_candidate": null,
-      "verdict": null,
-      "reasoning": [],
-      "custom_proxy_candidate": false,
-      "no_museum_edition": false
-    },
-    "acquisition": {
-      "target_owned": true,
-      "installed": true,
-      "source_recorded": false,
-      "acquired_at": null,
-      "source": null,
-      "price_paid": null,
-      "condition": null,
-      "language": "en"
-    },
-    "notes": []
-  },
-  {
-    "deck_card_id": "328df403-7428-4b17-bdd1-9759fc0f32d8",
-    "card_name": "Frodo, Adventurous Hobbit",
-    "quantity": 1,
-    "role": "Commander",
-    "current_printing": {
-      "scryfall_id": "328df403-7428-4b17-bdd1-9759fc0f32d8",
-      "finish": "foil"
-    },
-    "status": "active",
-    "decision": {
-      "status": "pending",
-      "finalized": true,
-      "finalized_at": "2026-07-24",
-      "selected_printing": {
-        "scryfall_id": "a223c85f-3952-40d0-88d4-d5c3e8cd864d",
-        "finish": "foil"
-      },
-      "museum_printing": {
-        "scryfall_id": "a223c85f-3952-40d0-88d4-d5c3e8cd864d",
-        "finish": "normal"
-      },
-      "proxy_candidate": {
-        "scryfall_id": "a223c85f-3952-40d0-88d4-d5c3e8cd864d",
-        "desired": false,
-        "printed": false
-      },
-      "verdict": null,
-      "reasoning": [],
-      "custom_proxy_candidate": false,
-      "no_museum_edition": false
-    },
-    "acquisition": {
-      "target_owned": true,
-      "installed": true,
-      "source_recorded": false,
-      "acquired_at": null,
-      "source": null,
-      "price_paid": null,
-      "condition": null,
-      "language": "en"
-    },
-    "notes": []
-  },
-  {
-    "deck_card_id": "6d08e637-c2b3-4b38-9b07-5bba1f13efc3",
-    "card_name": "Frodo, Sauron's Bane",
+    "deck_card_id": "41775788-2432-495a-8abd-6c8beaad3d27",
+    "card_name": "Fain, the Broker",
     "quantity": 1,
     "role": "Threat",
     "current_printing": {
-      "scryfall_id": "6d08e637-c2b3-4b38-9b07-5bba1f13efc3",
-      "finish": "foil"
-    },
-    "status": "active",
-    "decision": {
-      "status": "pending",
-      "finalized": false,
-      "finalized_at": null,
-      "selected_printing": null,
-      "museum_printing": null,
-      "proxy_candidate": null,
-      "verdict": null,
-      "reasoning": [],
-      "custom_proxy_candidate": false,
-      "no_museum_edition": false
-    },
-    "acquisition": {
-      "target_owned": true,
-      "installed": true,
-      "source_recorded": false,
-      "acquired_at": null,
-      "source": null,
-      "price_paid": null,
-      "condition": null,
-      "language": "en"
-    },
-    "notes": []
-  },
-  {
-    "deck_card_id": "50a2bca4-8bac-4b8d-970e-1f438c9ee6bb",
-    "card_name": "Fumigate",
-    "quantity": 1,
-    "role": "Interaction",
-    "current_printing": {
-      "scryfall_id": "50a2bca4-8bac-4b8d-970e-1f438c9ee6bb",
+      "scryfall_id": "41775788-2432-495a-8abd-6c8beaad3d27",
       "finish": "normal"
     },
     "status": "active",
@@ -1187,12 +816,12 @@
     "notes": []
   },
   {
-    "deck_card_id": "25e987d9-6a69-46af-bd9f-8e505fa721bb",
-    "card_name": "Ghost Quarter",
+    "deck_card_id": "d9afeade-c7a0-4c88-93c8-112774860e51",
+    "card_name": "Farewell",
     "quantity": 1,
-    "role": "Land",
+    "role": "Utility",
     "current_printing": {
-      "scryfall_id": "25e987d9-6a69-46af-bd9f-8e505fa721bb",
+      "scryfall_id": "d9afeade-c7a0-4c88-93c8-112774860e51",
       "finish": "normal"
     },
     "status": "active",
@@ -1221,12 +850,12 @@
     "notes": []
   },
   {
-    "deck_card_id": "0d6977e9-dd8d-4796-9fee-443a25757e09",
-    "card_name": "Gilded Goose",
+    "deck_card_id": "0991db5d-2aba-467f-9044-c11e024d5d43",
+    "card_name": "Final Act",
     "quantity": 1,
-    "role": "Ramp",
+    "role": "Utility",
     "current_printing": {
-      "scryfall_id": "0d6977e9-dd8d-4796-9fee-443a25757e09",
+      "scryfall_id": "0991db5d-2aba-467f-9044-c11e024d5d43",
       "finish": "normal"
     },
     "status": "active",
@@ -1255,284 +884,12 @@
     "notes": []
   },
   {
-    "deck_card_id": "96a5452c-f5ba-4ce3-a465-0ee20440b119",
-    "card_name": "Go for the Throat",
-    "quantity": 1,
-    "role": "Interaction",
-    "current_printing": {
-      "scryfall_id": "96a5452c-f5ba-4ce3-a465-0ee20440b119",
-      "finish": "normal"
-    },
-    "status": "active",
-    "decision": {
-      "status": "pending",
-      "finalized": false,
-      "finalized_at": null,
-      "selected_printing": null,
-      "museum_printing": null,
-      "proxy_candidate": null,
-      "verdict": null,
-      "reasoning": [],
-      "custom_proxy_candidate": false,
-      "no_museum_edition": false
-    },
-    "acquisition": {
-      "target_owned": true,
-      "installed": true,
-      "source_recorded": false,
-      "acquired_at": null,
-      "source": null,
-      "price_paid": null,
-      "condition": null,
-      "language": "en"
-    },
-    "notes": []
-  },
-  {
-    "deck_card_id": "e5a43cf0-60b3-4770-945c-41ee3ec54d5a",
-    "card_name": "Gollum, Obsessed Stalker",
-    "quantity": 1,
-    "role": "Threat",
-    "current_printing": {
-      "scryfall_id": "e5a43cf0-60b3-4770-945c-41ee3ec54d5a",
-      "finish": "normal"
-    },
-    "status": "active",
-    "decision": {
-      "status": "pending",
-      "finalized": false,
-      "finalized_at": null,
-      "selected_printing": null,
-      "museum_printing": null,
-      "proxy_candidate": null,
-      "verdict": null,
-      "reasoning": [],
-      "custom_proxy_candidate": false,
-      "no_museum_edition": false
-    },
-    "acquisition": {
-      "target_owned": true,
-      "installed": true,
-      "source_recorded": false,
-      "acquired_at": null,
-      "source": null,
-      "price_paid": null,
-      "condition": null,
-      "language": "en"
-    },
-    "notes": []
-  },
-  {
-    "deck_card_id": "89670a1b-a6f1-491d-bbb4-92e3382da653",
-    "card_name": "Gourmand's Talent",
-    "quantity": 1,
-    "role": "Enabler",
-    "current_printing": {
-      "scryfall_id": "89670a1b-a6f1-491d-bbb4-92e3382da653",
-      "finish": "normal"
-    },
-    "status": "active",
-    "decision": {
-      "status": "pending",
-      "finalized": false,
-      "finalized_at": null,
-      "selected_printing": null,
-      "museum_printing": null,
-      "proxy_candidate": null,
-      "verdict": null,
-      "reasoning": [],
-      "custom_proxy_candidate": false,
-      "no_museum_edition": false
-    },
-    "acquisition": {
-      "target_owned": true,
-      "installed": true,
-      "source_recorded": false,
-      "acquired_at": null,
-      "source": null,
-      "price_paid": null,
-      "condition": null,
-      "language": "en"
-    },
-    "notes": []
-  },
-  {
-    "deck_card_id": "07e81ace-4d75-4d79-ab99-c42288580def",
-    "card_name": "Graypelt Refuge",
-    "quantity": 1,
-    "role": "Land",
-    "current_printing": {
-      "scryfall_id": "07e81ace-4d75-4d79-ab99-c42288580def",
-      "finish": "normal"
-    },
-    "status": "active",
-    "decision": {
-      "status": "pending",
-      "finalized": false,
-      "finalized_at": null,
-      "selected_printing": null,
-      "museum_printing": null,
-      "proxy_candidate": null,
-      "verdict": null,
-      "reasoning": [],
-      "custom_proxy_candidate": false,
-      "no_museum_edition": false
-    },
-    "acquisition": {
-      "target_owned": true,
-      "installed": true,
-      "source_recorded": false,
-      "acquired_at": null,
-      "source": null,
-      "price_paid": null,
-      "condition": null,
-      "language": "en"
-    },
-    "notes": []
-  },
-  {
-    "deck_card_id": "de5e6626-fb5a-45a4-bb8c-580980e0337e",
-    "card_name": "Harmonize",
-    "quantity": 1,
-    "role": "Draw",
-    "current_printing": {
-      "scryfall_id": "de5e6626-fb5a-45a4-bb8c-580980e0337e",
-      "finish": "normal"
-    },
-    "status": "active",
-    "decision": {
-      "status": "pending",
-      "finalized": false,
-      "finalized_at": null,
-      "selected_printing": null,
-      "museum_printing": null,
-      "proxy_candidate": null,
-      "verdict": null,
-      "reasoning": [],
-      "custom_proxy_candidate": false,
-      "no_museum_edition": false
-    },
-    "acquisition": {
-      "target_owned": true,
-      "installed": true,
-      "source_recorded": false,
-      "acquired_at": null,
-      "source": null,
-      "price_paid": null,
-      "condition": null,
-      "language": "en"
-    },
-    "notes": []
-  },
-  {
-    "deck_card_id": "1269ca79-907e-4932-9e77-a9a5d2929060",
-    "card_name": "Hazel of the Rootbloom",
-    "quantity": 1,
-    "role": "Enabler",
-    "current_printing": {
-      "scryfall_id": "1269ca79-907e-4932-9e77-a9a5d2929060",
-      "finish": "normal"
-    },
-    "status": "active",
-    "decision": {
-      "status": "pending",
-      "finalized": false,
-      "finalized_at": null,
-      "selected_printing": null,
-      "museum_printing": null,
-      "proxy_candidate": null,
-      "verdict": null,
-      "reasoning": [],
-      "custom_proxy_candidate": false,
-      "no_museum_edition": false
-    },
-    "acquisition": {
-      "target_owned": true,
-      "installed": true,
-      "source_recorded": false,
-      "acquired_at": null,
-      "source": null,
-      "price_paid": null,
-      "condition": null,
-      "language": "en"
-    },
-    "notes": []
-  },
-  {
-    "deck_card_id": "52af8b70-a9c8-40d7-99da-fa51dc293688",
-    "card_name": "Hazel's Brewmaster",
-    "quantity": 1,
-    "role": "Enabler",
-    "current_printing": {
-      "scryfall_id": "52af8b70-a9c8-40d7-99da-fa51dc293688",
-      "finish": "normal"
-    },
-    "status": "active",
-    "decision": {
-      "status": "pending",
-      "finalized": false,
-      "finalized_at": null,
-      "selected_printing": null,
-      "museum_printing": null,
-      "proxy_candidate": null,
-      "verdict": null,
-      "reasoning": [],
-      "custom_proxy_candidate": false,
-      "no_museum_edition": false
-    },
-    "acquisition": {
-      "target_owned": true,
-      "installed": true,
-      "source_recorded": false,
-      "acquired_at": null,
-      "source": null,
-      "price_paid": null,
-      "condition": null,
-      "language": "en"
-    },
-    "notes": []
-  },
-  {
-    "deck_card_id": "66081fd3-2457-4602-96c4-3075ddfec1c2",
-    "card_name": "Ice Cream Kitty",
-    "quantity": 1,
-    "role": "Draw",
-    "current_printing": {
-      "scryfall_id": "66081fd3-2457-4602-96c4-3075ddfec1c2",
-      "finish": "normal"
-    },
-    "status": "active",
-    "decision": {
-      "status": "pending",
-      "finalized": false,
-      "finalized_at": null,
-      "selected_printing": null,
-      "museum_printing": null,
-      "proxy_candidate": null,
-      "verdict": null,
-      "reasoning": [],
-      "custom_proxy_candidate": false,
-      "no_museum_edition": false
-    },
-    "acquisition": {
-      "target_owned": true,
-      "installed": true,
-      "source_recorded": false,
-      "acquired_at": null,
-      "source": null,
-      "price_paid": null,
-      "condition": null,
-      "language": "en"
-    },
-    "notes": []
-  },
-  {
-    "deck_card_id": "465f803f-0e4a-41b4-9160-10f76c05188e",
+    "deck_card_id": "6b87b385-0ad9-4aa7-8a7e-c42b9c002a99",
     "card_name": "Idol of Oblivion",
     "quantity": 1,
-    "role": "Draw",
+    "role": "Utility",
     "current_printing": {
-      "scryfall_id": "465f803f-0e4a-41b4-9160-10f76c05188e",
+      "scryfall_id": "6b87b385-0ad9-4aa7-8a7e-c42b9c002a99",
       "finish": "normal"
     },
     "status": "active",
@@ -1561,12 +918,12 @@
     "notes": []
   },
   {
-    "deck_card_id": "62a7fc91-43c0-49be-ae14-d0a8efb3a185",
-    "card_name": "Isolated Chapel",
+    "deck_card_id": "a108b0e4-1b43-4659-9e91-facb0bd57ebb",
+    "card_name": "Insatiable Avarice",
     "quantity": 1,
-    "role": "Land",
+    "role": "Utility",
     "current_printing": {
-      "scryfall_id": "62a7fc91-43c0-49be-ae14-d0a8efb3a185",
+      "scryfall_id": "a108b0e4-1b43-4659-9e91-facb0bd57ebb",
       "finish": "normal"
     },
     "status": "active",
@@ -1595,12 +952,12 @@
     "notes": []
   },
   {
-    "deck_card_id": "40960e47-3065-485e-aede-29a62411034e",
-    "card_name": "Leyline of Hope",
+    "deck_card_id": "49d5d62b-72ed-446a-b280-ad04c38bdd0c",
+    "card_name": "Jadar, Ghoulcaller of Nephalia",
     "quantity": 1,
-    "role": "Payoff",
+    "role": "Threat",
     "current_printing": {
-      "scryfall_id": "40960e47-3065-485e-aede-29a62411034e",
+      "scryfall_id": "49d5d62b-72ed-446a-b280-ad04c38bdd0c",
       "finish": "normal"
     },
     "status": "active",
@@ -1629,12 +986,12 @@
     "notes": []
   },
   {
-    "deck_card_id": "6d67a523-bda9-4f8b-bd50-dc015f9b4b7a",
-    "card_name": "Lobelia, Defender of Bag End",
+    "deck_card_id": "434fe0a1-78d4-4f01-b467-3b2268849ed5",
+    "card_name": "Junji, the Midnight Sky",
     "quantity": 1,
-    "role": "Payoff",
+    "role": "Threat",
     "current_printing": {
-      "scryfall_id": "6d67a523-bda9-4f8b-bd50-dc015f9b4b7a",
+      "scryfall_id": "434fe0a1-78d4-4f01-b467-3b2268849ed5",
       "finish": "normal"
     },
     "status": "active",
@@ -1663,12 +1020,12 @@
     "notes": []
   },
   {
-    "deck_card_id": "d8f4d07b-2fc1-4d86-865b-b35526850c8e",
-    "card_name": "Maelstrom Pulse",
+    "deck_card_id": "034bfd23-8f10-4d98-9500-47d392531c69",
+    "card_name": "Leyline of the Void",
     "quantity": 1,
-    "role": "Interaction",
+    "role": "Utility",
     "current_printing": {
-      "scryfall_id": "d8f4d07b-2fc1-4d86-865b-b35526850c8e",
+      "scryfall_id": "034bfd23-8f10-4d98-9500-47d392531c69",
       "finish": "normal"
     },
     "status": "active",
@@ -1697,12 +1054,12 @@
     "notes": []
   },
   {
-    "deck_card_id": "885a3277-ef10-4dcf-ac63-eb8971cd627c",
-    "card_name": "Meriadoc Brandybuck",
+    "deck_card_id": "c5a4b212-bc60-4a58-b5f6-4012a3158785",
+    "card_name": "Luminous Broodmoth",
     "quantity": 1,
-    "role": "Enabler",
+    "role": "Threat",
     "current_printing": {
-      "scryfall_id": "885a3277-ef10-4dcf-ac63-eb8971cd627c",
+      "scryfall_id": "c5a4b212-bc60-4a58-b5f6-4012a3158785",
       "finish": "normal"
     },
     "status": "active",
@@ -1731,12 +1088,12 @@
     "notes": []
   },
   {
-    "deck_card_id": "56a66d3b-3308-4db7-8fc1-97bb85bdcbf3",
-    "card_name": "Merry, Warden of Isengard",
+    "deck_card_id": "5f70dafc-c638-4ec0-ab5b-62998f752720",
+    "card_name": "Marauding Blight-Priest",
     "quantity": 1,
-    "role": "Enabler",
+    "role": "Threat",
     "current_printing": {
-      "scryfall_id": "56a66d3b-3308-4db7-8fc1-97bb85bdcbf3",
+      "scryfall_id": "5f70dafc-c638-4ec0-ab5b-62998f752720",
       "finish": "normal"
     },
     "status": "active",
@@ -1765,12 +1122,80 @@
     "notes": []
   },
   {
-    "deck_card_id": "15f035df-784a-4dc8-b7f5-77139a4e6e99",
+    "deck_card_id": "3db59d06-a226-42b2-8f01-6b63a6eea83f",
+    "card_name": "Meathook Massacre II",
+    "quantity": 1,
+    "role": "Utility",
+    "current_printing": {
+      "scryfall_id": "3db59d06-a226-42b2-8f01-6b63a6eea83f",
+      "finish": "normal"
+    },
+    "status": "active",
+    "decision": {
+      "status": "pending",
+      "finalized": false,
+      "finalized_at": null,
+      "selected_printing": null,
+      "museum_printing": null,
+      "proxy_candidate": null,
+      "verdict": null,
+      "reasoning": [],
+      "custom_proxy_candidate": false,
+      "no_museum_edition": false
+    },
+    "acquisition": {
+      "target_owned": true,
+      "installed": true,
+      "source_recorded": false,
+      "acquired_at": null,
+      "source": null,
+      "price_paid": null,
+      "condition": null,
+      "language": "en"
+    },
+    "notes": []
+  },
+  {
+    "deck_card_id": "0c9e944b-98fa-4aea-825d-b8b8a9d7ed47",
+    "card_name": "Minthara, Merciless Soul",
+    "quantity": 1,
+    "role": "Threat",
+    "current_printing": {
+      "scryfall_id": "0c9e944b-98fa-4aea-825d-b8b8a9d7ed47",
+      "finish": "normal"
+    },
+    "status": "active",
+    "decision": {
+      "status": "pending",
+      "finalized": false,
+      "finalized_at": null,
+      "selected_printing": null,
+      "museum_printing": null,
+      "proxy_candidate": null,
+      "verdict": null,
+      "reasoning": [],
+      "custom_proxy_candidate": false,
+      "no_museum_edition": false
+    },
+    "acquisition": {
+      "target_owned": true,
+      "installed": true,
+      "source_recorded": false,
+      "acquired_at": null,
+      "source": null,
+      "price_paid": null,
+      "condition": null,
+      "language": "en"
+    },
+    "notes": []
+  },
+  {
+    "deck_card_id": "882747f9-b4fe-42be-8fe9-f871cd0779bd",
     "card_name": "Mirkwood Bats",
     "quantity": 1,
-    "role": "Payoff",
+    "role": "Threat",
     "current_printing": {
-      "scryfall_id": "15f035df-784a-4dc8-b7f5-77139a4e6e99",
+      "scryfall_id": "882747f9-b4fe-42be-8fe9-f871cd0779bd",
       "finish": "normal"
     },
     "status": "active",
@@ -1799,12 +1224,12 @@
     "notes": []
   },
   {
-    "deck_card_id": "000d913b-adc4-4075-83d9-4a510280c91e",
+    "deck_card_id": "439aea5f-c64c-4460-b473-b4bc2c82c048",
     "card_name": "Mortify",
     "quantity": 1,
-    "role": "Interaction",
+    "role": "Utility",
     "current_printing": {
-      "scryfall_id": "000d913b-adc4-4075-83d9-4a510280c91e",
+      "scryfall_id": "439aea5f-c64c-4460-b473-b4bc2c82c048",
       "finish": "normal"
     },
     "status": "active",
@@ -1833,12 +1258,12 @@
     "notes": []
   },
   {
-    "deck_card_id": "6bebaafc-2114-4e00-a7f1-cd43a8d92d18",
-    "card_name": "Murmuring Bosk",
+    "deck_card_id": "2ceaa7d0-0a71-48f9-a128-171c5351ac27",
+    "card_name": "Myriad Landscape",
     "quantity": 1,
     "role": "Land",
     "current_printing": {
-      "scryfall_id": "6bebaafc-2114-4e00-a7f1-cd43a8d92d18",
+      "scryfall_id": "2ceaa7d0-0a71-48f9-a128-171c5351ac27",
       "finish": "normal"
     },
     "status": "active",
@@ -1867,148 +1292,12 @@
     "notes": []
   },
   {
-    "deck_card_id": "408c1419-15b9-4a51-b391-3be0805ef64a",
-    "card_name": "Necroblossom Snarl",
+    "deck_card_id": "b70293ae-d50d-44bf-aaa3-689727056ec5",
+    "card_name": "Ogre Slumlord",
     "quantity": 1,
-    "role": "Land",
+    "role": "Threat",
     "current_printing": {
-      "scryfall_id": "408c1419-15b9-4a51-b391-3be0805ef64a",
-      "finish": "normal"
-    },
-    "status": "active",
-    "decision": {
-      "status": "pending",
-      "finalized": false,
-      "finalized_at": null,
-      "selected_printing": null,
-      "museum_printing": null,
-      "proxy_candidate": null,
-      "verdict": null,
-      "reasoning": [],
-      "custom_proxy_candidate": false,
-      "no_museum_edition": false
-    },
-    "acquisition": {
-      "target_owned": true,
-      "installed": true,
-      "source_recorded": false,
-      "acquired_at": null,
-      "source": null,
-      "price_paid": null,
-      "condition": null,
-      "language": "en"
-    },
-    "notes": []
-  },
-  {
-    "deck_card_id": "27f53bed-7075-4303-aa9e-fcca0a266e19",
-    "card_name": "Night of the Sweets' Revenge",
-    "quantity": 1,
-    "role": "Ramp",
-    "current_printing": {
-      "scryfall_id": "27f53bed-7075-4303-aa9e-fcca0a266e19",
-      "finish": "normal"
-    },
-    "status": "active",
-    "decision": {
-      "status": "pending",
-      "finalized": false,
-      "finalized_at": null,
-      "selected_printing": null,
-      "museum_printing": null,
-      "proxy_candidate": null,
-      "verdict": null,
-      "reasoning": [],
-      "custom_proxy_candidate": false,
-      "no_museum_edition": false
-    },
-    "acquisition": {
-      "target_owned": true,
-      "installed": true,
-      "source_recorded": false,
-      "acquired_at": null,
-      "source": null,
-      "price_paid": null,
-      "condition": null,
-      "language": "en"
-    },
-    "notes": []
-  },
-  {
-    "deck_card_id": "7de8ae91-7eaa-45e2-bf34-4bb797ffca00",
-    "card_name": "Night's Whisper",
-    "quantity": 1,
-    "role": "Draw",
-    "current_printing": {
-      "scryfall_id": "7de8ae91-7eaa-45e2-bf34-4bb797ffca00",
-      "finish": "normal"
-    },
-    "status": "active",
-    "decision": {
-      "status": "pending",
-      "finalized": false,
-      "finalized_at": null,
-      "selected_printing": null,
-      "museum_printing": null,
-      "proxy_candidate": null,
-      "verdict": null,
-      "reasoning": [],
-      "custom_proxy_candidate": false,
-      "no_museum_edition": false
-    },
-    "acquisition": {
-      "target_owned": true,
-      "installed": true,
-      "source_recorded": false,
-      "acquired_at": null,
-      "source": null,
-      "price_paid": null,
-      "condition": null,
-      "language": "en"
-    },
-    "notes": []
-  },
-  {
-    "deck_card_id": "c58623cb-8b49-470c-9622-dd6e09d47599",
-    "card_name": "Of Herbs and Stewed Rabbit",
-    "quantity": 1,
-    "role": "Draw",
-    "current_printing": {
-      "scryfall_id": "c58623cb-8b49-470c-9622-dd6e09d47599",
-      "finish": "normal"
-    },
-    "status": "active",
-    "decision": {
-      "status": "pending",
-      "finalized": false,
-      "finalized_at": null,
-      "selected_printing": null,
-      "museum_printing": null,
-      "proxy_candidate": null,
-      "verdict": null,
-      "reasoning": [],
-      "custom_proxy_candidate": false,
-      "no_museum_edition": false
-    },
-    "acquisition": {
-      "target_owned": true,
-      "installed": true,
-      "source_recorded": false,
-      "acquired_at": null,
-      "source": null,
-      "price_paid": null,
-      "condition": null,
-      "language": "en"
-    },
-    "notes": []
-  },
-  {
-    "deck_card_id": "d79e2780-94ae-41bb-af48-c63abc726fb5",
-    "card_name": "Path of Ancestry",
-    "quantity": 1,
-    "role": "Land",
-    "current_printing": {
-      "scryfall_id": "d79e2780-94ae-41bb-af48-c63abc726fb5",
+      "scryfall_id": "b70293ae-d50d-44bf-aaa3-689727056ec5",
       "finish": "normal"
     },
     "status": "active",
@@ -2040,43 +1329,9 @@
     "deck_card_id": "20298a61-2739-4254-b102-51a2a74b5ddc",
     "card_name": "Path to Exile",
     "quantity": 1,
-    "role": "Interaction",
+    "role": "Utility",
     "current_printing": {
       "scryfall_id": "20298a61-2739-4254-b102-51a2a74b5ddc",
-      "finish": "foil"
-    },
-    "status": "active",
-    "decision": {
-      "status": "pending",
-      "finalized": false,
-      "finalized_at": null,
-      "selected_printing": null,
-      "museum_printing": null,
-      "proxy_candidate": null,
-      "verdict": null,
-      "reasoning": [],
-      "custom_proxy_candidate": false,
-      "no_museum_edition": false
-    },
-    "acquisition": {
-      "target_owned": true,
-      "installed": true,
-      "source_recorded": false,
-      "acquired_at": null,
-      "source": null,
-      "price_paid": null,
-      "condition": null,
-      "language": "en"
-    },
-    "notes": []
-  },
-  {
-    "deck_card_id": "f5baee8d-88e7-4468-94a9-66ca8e2caf15",
-    "card_name": "Peregrin Took",
-    "quantity": 1,
-    "role": "Draw",
-    "current_printing": {
-      "scryfall_id": "f5baee8d-88e7-4468-94a9-66ca8e2caf15",
       "finish": "normal"
     },
     "status": "active",
@@ -2105,12 +1360,12 @@
     "notes": []
   },
   {
-    "deck_card_id": "a0a7a648-125a-4cf4-bf8b-e1773d8723ff",
-    "card_name": "Pippin, Warden of Isengard",
+    "deck_card_id": "c1b0377c-efd6-4fab-89f0-b219ca2c4c22",
+    "card_name": "Pawn of Ulamog",
     "quantity": 1,
-    "role": "Enabler",
+    "role": "Threat",
     "current_printing": {
-      "scryfall_id": "a0a7a648-125a-4cf4-bf8b-e1773d8723ff",
+      "scryfall_id": "c1b0377c-efd6-4fab-89f0-b219ca2c4c22",
       "finish": "normal"
     },
     "status": "active",
@@ -2139,12 +1394,12 @@
     "notes": []
   },
   {
-    "deck_card_id": "b03cf0bb-3207-4e8e-bb3f-e3e4367aa86e",
-    "card_name": "Pizza Face, Gastromancer",
+    "deck_card_id": "1ac61e84-94d6-4ff7-a00f-29de93f09a38",
+    "card_name": "Pitiless Plunderer",
     "quantity": 1,
-    "role": "Enabler",
+    "role": "Threat",
     "current_printing": {
-      "scryfall_id": "b03cf0bb-3207-4e8e-bb3f-e3e4367aa86e",
+      "scryfall_id": "1ac61e84-94d6-4ff7-a00f-29de93f09a38",
       "finish": "normal"
     },
     "status": "active",
@@ -2173,12 +1428,46 @@
     "notes": []
   },
   {
-    "deck_card_id": "5bb495cc-9908-455e-bec9-3993d595f4f9",
+    "deck_card_id": "7092aa38-4f05-4b18-b894-d55ca9fe9b15",
+    "card_name": "Plaguecrafter",
+    "quantity": 1,
+    "role": "Threat",
+    "current_printing": {
+      "scryfall_id": "7092aa38-4f05-4b18-b894-d55ca9fe9b15",
+      "finish": "normal"
+    },
+    "status": "active",
+    "decision": {
+      "status": "pending",
+      "finalized": false,
+      "finalized_at": null,
+      "selected_printing": null,
+      "museum_printing": null,
+      "proxy_candidate": null,
+      "verdict": null,
+      "reasoning": [],
+      "custom_proxy_candidate": false,
+      "no_museum_edition": false
+    },
+    "acquisition": {
+      "target_owned": true,
+      "installed": true,
+      "source_recorded": false,
+      "acquired_at": null,
+      "source": null,
+      "price_paid": null,
+      "condition": null,
+      "language": "en"
+    },
+    "notes": []
+  },
+  {
+    "deck_card_id": "9d4b8bde-412b-4d12-b296-7364c95e0510",
     "card_name": "Plains",
-    "quantity": 2,
+    "quantity": 11,
     "role": "Land",
     "current_printing": {
-      "scryfall_id": "5bb495cc-9908-455e-bec9-3993d595f4f9",
+      "scryfall_id": "9d4b8bde-412b-4d12-b296-7364c95e0510",
       "finish": "normal"
     },
     "status": "active",
@@ -2207,294 +1496,12 @@
     "notes": []
   },
   {
-    "deck_card_id": "f724ae86-b968-4f49-8267-c2c34c22f1b6",
-    "card_name": "Plains",
-    "quantity": 2,
-    "role": "Land",
-    "current_printing": {
-      "scryfall_id": "f724ae86-b968-4f49-8267-c2c34c22f1b6",
-      "finish": "normal"
-    },
-    "status": "active",
-    "decision": {
-      "status": "pending",
-      "finalized": false,
-      "finalized_at": null,
-      "selected_printing": null,
-      "museum_printing": null,
-      "proxy_candidate": null,
-      "verdict": null,
-      "reasoning": [],
-      "custom_proxy_candidate": false,
-      "no_museum_edition": false
-    },
-    "acquisition": {
-      "target_owned": true,
-      "installed": true,
-      "source_recorded": false,
-      "acquired_at": null,
-      "source": null,
-      "price_paid": null,
-      "condition": null,
-      "language": "en"
-    },
-    "notes": []
-  },
-  {
-    "deck_card_id": "a0b202d8-3c25-467e-86ed-6bea19bb869f",
-    "card_name": "Prize Pig",
-    "quantity": 1,
-    "role": "Payoff",
-    "current_printing": {
-      "scryfall_id": "a0b202d8-3c25-467e-86ed-6bea19bb869f",
-      "finish": "normal"
-    },
-    "status": "active",
-    "decision": {
-      "status": "pending",
-      "finalized": false,
-      "finalized_at": null,
-      "selected_printing": null,
-      "museum_printing": null,
-      "proxy_candidate": null,
-      "verdict": null,
-      "reasoning": [],
-      "custom_proxy_candidate": false,
-      "no_museum_edition": false
-    },
-    "acquisition": {
-      "target_owned": true,
-      "installed": true,
-      "source_recorded": false,
-      "acquired_at": null,
-      "source": null,
-      "price_paid": null,
-      "condition": null,
-      "language": "en"
-    },
-    "notes": []
-  },
-  {
-    "deck_card_id": "8ba35b71-070e-482f-8a48-615a39631719",
-    "card_name": "Prosperous Innkeeper",
-    "quantity": 1,
-    "role": "Ramp",
-    "current_printing": {
-      "scryfall_id": "8ba35b71-070e-482f-8a48-615a39631719",
-      "finish": "normal"
-    },
-    "status": "active",
-    "decision": {
-      "status": "pending",
-      "finalized": false,
-      "finalized_at": null,
-      "selected_printing": null,
-      "museum_printing": null,
-      "proxy_candidate": null,
-      "verdict": null,
-      "reasoning": [],
-      "custom_proxy_candidate": false,
-      "no_museum_edition": false
-    },
-    "acquisition": {
-      "target_owned": true,
-      "installed": true,
-      "source_recorded": false,
-      "acquired_at": null,
-      "source": null,
-      "price_paid": null,
-      "condition": null,
-      "language": "en"
-    },
-    "notes": []
-  },
-  {
-    "deck_card_id": "787eadf3-5005-4ae5-820f-4012a4d4e1a5",
-    "card_name": "Restless Cottage",
-    "quantity": 1,
-    "role": "Land",
-    "current_printing": {
-      "scryfall_id": "787eadf3-5005-4ae5-820f-4012a4d4e1a5",
-      "finish": "normal"
-    },
-    "status": "active",
-    "decision": {
-      "status": "pending",
-      "finalized": false,
-      "finalized_at": null,
-      "selected_printing": null,
-      "museum_printing": null,
-      "proxy_candidate": null,
-      "verdict": null,
-      "reasoning": [],
-      "custom_proxy_candidate": false,
-      "no_museum_edition": false
-    },
-    "acquisition": {
-      "target_owned": true,
-      "installed": true,
-      "source_recorded": false,
-      "acquired_at": null,
-      "source": null,
-      "price_paid": null,
-      "condition": null,
-      "language": "en"
-    },
-    "notes": []
-  },
-  {
-    "deck_card_id": "46b7f493-1b57-4b07-8510-30703282f879",
-    "card_name": "Revive the Shire",
-    "quantity": 1,
-    "role": "Recursion",
-    "current_printing": {
-      "scryfall_id": "46b7f493-1b57-4b07-8510-30703282f879",
-      "finish": "normal"
-    },
-    "status": "active",
-    "decision": {
-      "status": "pending",
-      "finalized": false,
-      "finalized_at": null,
-      "selected_printing": null,
-      "museum_printing": null,
-      "proxy_candidate": null,
-      "verdict": null,
-      "reasoning": [],
-      "custom_proxy_candidate": false,
-      "no_museum_edition": false
-    },
-    "acquisition": {
-      "target_owned": true,
-      "installed": true,
-      "source_recorded": false,
-      "acquired_at": null,
-      "source": null,
-      "price_paid": null,
-      "condition": null,
-      "language": "en"
-    },
-    "notes": []
-  },
-  {
-    "deck_card_id": "86438671-fdb8-4a82-b1e8-ef51fa4078df",
-    "card_name": "Rogue's Passage",
-    "quantity": 1,
-    "role": "Land",
-    "current_printing": {
-      "scryfall_id": "86438671-fdb8-4a82-b1e8-ef51fa4078df",
-      "finish": "normal"
-    },
-    "status": "active",
-    "decision": {
-      "status": "pending",
-      "finalized": false,
-      "finalized_at": null,
-      "selected_printing": null,
-      "museum_printing": null,
-      "proxy_candidate": null,
-      "verdict": null,
-      "reasoning": [],
-      "custom_proxy_candidate": false,
-      "no_museum_edition": false
-    },
-    "acquisition": {
-      "target_owned": true,
-      "installed": true,
-      "source_recorded": false,
-      "acquired_at": null,
-      "source": null,
-      "price_paid": null,
-      "condition": null,
-      "language": "en"
-    },
-    "notes": []
-  },
-  {
-    "deck_card_id": "75338f49-1f02-4333-87e4-5779ef14e688",
-    "card_name": "Rosie Cotton of South Lane",
-    "quantity": 1,
-    "role": "Enabler",
-    "current_printing": {
-      "scryfall_id": "75338f49-1f02-4333-87e4-5779ef14e688",
-      "finish": "normal"
-    },
-    "status": "active",
-    "decision": {
-      "status": "pending",
-      "finalized": false,
-      "finalized_at": null,
-      "selected_printing": null,
-      "museum_printing": null,
-      "proxy_candidate": null,
-      "verdict": null,
-      "reasoning": [],
-      "custom_proxy_candidate": false,
-      "no_museum_edition": false
-    },
-    "acquisition": {
-      "target_owned": true,
-      "installed": true,
-      "source_recorded": false,
-      "acquired_at": null,
-      "source": null,
-      "price_paid": null,
-      "condition": null,
-      "language": "en"
-    },
-    "notes": []
-  },
-  {
-    "deck_card_id": "687a2b76-3f05-4732-bd9b-513d06d16300",
-    "card_name": "Sam, Loyal Attendant",
-    "quantity": 1,
-    "role": "Commander",
-    "current_printing": {
-      "scryfall_id": "687a2b76-3f05-4732-bd9b-513d06d16300",
-      "finish": "foil"
-    },
-    "status": "active",
-    "decision": {
-      "status": "pending",
-      "finalized": true,
-      "finalized_at": "2026-07-24",
-      "selected_printing": {
-        "scryfall_id": "cfdfa303-2578-455b-929c-a217a0261bb3",
-        "finish": "foil"
-      },
-      "museum_printing": {
-        "scryfall_id": "cfdfa303-2578-455b-929c-a217a0261bb3",
-        "finish": "normal"
-      },
-      "proxy_candidate": {
-        "scryfall_id": "cfdfa303-2578-455b-929c-a217a0261bb3",
-        "desired": false,
-        "printed": false
-      },
-      "verdict": null,
-      "reasoning": [],
-      "custom_proxy_candidate": false,
-      "no_museum_edition": false
-    },
-    "acquisition": {
-      "target_owned": true,
-      "installed": true,
-      "source_recorded": false,
-      "acquired_at": null,
-      "source": null,
-      "price_paid": null,
-      "condition": null,
-      "language": "en"
-    },
-    "notes": []
-  },
-  {
-    "deck_card_id": "44c6a273-9307-432a-96f5-3e536da70f95",
-    "card_name": "Samwise the Stouthearted",
+    "deck_card_id": "eaea189c-9973-435e-975d-dc47a331b28a",
+    "card_name": "Plumb the Forbidden",
     "quantity": 1,
     "role": "Utility",
     "current_printing": {
-      "scryfall_id": "44c6a273-9307-432a-96f5-3e536da70f95",
+      "scryfall_id": "eaea189c-9973-435e-975d-dc47a331b28a",
       "finish": "normal"
     },
     "status": "active",
@@ -2523,12 +1530,114 @@
     "notes": []
   },
   {
-    "deck_card_id": "1aa64692-264f-4410-b62f-5aa8833c435c",
-    "card_name": "Sandsteppe Citadel",
+    "deck_card_id": "35e64605-8edb-4def-9522-765e90d1f0f3",
+    "card_name": "Popular Egotist",
+    "quantity": 1,
+    "role": "Threat",
+    "current_printing": {
+      "scryfall_id": "35e64605-8edb-4def-9522-765e90d1f0f3",
+      "finish": "normal"
+    },
+    "status": "active",
+    "decision": {
+      "status": "pending",
+      "finalized": false,
+      "finalized_at": null,
+      "selected_printing": null,
+      "museum_printing": null,
+      "proxy_candidate": null,
+      "verdict": null,
+      "reasoning": [],
+      "custom_proxy_candidate": false,
+      "no_museum_edition": false
+    },
+    "acquisition": {
+      "target_owned": true,
+      "installed": true,
+      "source_recorded": false,
+      "acquired_at": null,
+      "source": null,
+      "price_paid": null,
+      "condition": null,
+      "language": "en"
+    },
+    "notes": []
+  },
+  {
+    "deck_card_id": "bc537e6b-17bd-4908-a7b2-a4efa4f20c02",
+    "card_name": "Promise of Loyalty",
+    "quantity": 1,
+    "role": "Utility",
+    "current_printing": {
+      "scryfall_id": "bc537e6b-17bd-4908-a7b2-a4efa4f20c02",
+      "finish": "normal"
+    },
+    "status": "active",
+    "decision": {
+      "status": "pending",
+      "finalized": false,
+      "finalized_at": null,
+      "selected_printing": null,
+      "museum_printing": null,
+      "proxy_candidate": null,
+      "verdict": null,
+      "reasoning": [],
+      "custom_proxy_candidate": false,
+      "no_museum_edition": false
+    },
+    "acquisition": {
+      "target_owned": true,
+      "installed": true,
+      "source_recorded": false,
+      "acquired_at": null,
+      "source": null,
+      "price_paid": null,
+      "condition": null,
+      "language": "en"
+    },
+    "notes": []
+  },
+  {
+    "deck_card_id": "00566375-e976-4e96-b751-cf0430452c9c",
+    "card_name": "Reassembling Skeleton",
+    "quantity": 1,
+    "role": "Threat",
+    "current_printing": {
+      "scryfall_id": "00566375-e976-4e96-b751-cf0430452c9c",
+      "finish": "normal"
+    },
+    "status": "active",
+    "decision": {
+      "status": "pending",
+      "finalized": false,
+      "finalized_at": null,
+      "selected_printing": null,
+      "museum_printing": null,
+      "proxy_candidate": null,
+      "verdict": null,
+      "reasoning": [],
+      "custom_proxy_candidate": false,
+      "no_museum_edition": false
+    },
+    "acquisition": {
+      "target_owned": true,
+      "installed": true,
+      "source_recorded": false,
+      "acquired_at": null,
+      "source": null,
+      "price_paid": null,
+      "condition": null,
+      "language": "en"
+    },
+    "notes": []
+  },
+  {
+    "deck_card_id": "3afb2f16-4364-439e-a5ce-6598b351cb4c",
+    "card_name": "Reliquary Tower",
     "quantity": 1,
     "role": "Land",
     "current_printing": {
-      "scryfall_id": "1aa64692-264f-4410-b62f-5aa8833c435c",
+      "scryfall_id": "3afb2f16-4364-439e-a5ce-6598b351cb4c",
       "finish": "normal"
     },
     "status": "active",
@@ -2557,46 +1666,12 @@
     "notes": []
   },
   {
-    "deck_card_id": "2285b3a3-782e-4acd-bf32-cb116c27b883",
-    "card_name": "Savvy Hunter",
-    "quantity": 1,
-    "role": "Draw",
-    "current_printing": {
-      "scryfall_id": "2285b3a3-782e-4acd-bf32-cb116c27b883",
-      "finish": "normal"
-    },
-    "status": "active",
-    "decision": {
-      "status": "pending",
-      "finalized": false,
-      "finalized_at": null,
-      "selected_printing": null,
-      "museum_printing": null,
-      "proxy_candidate": null,
-      "verdict": null,
-      "reasoning": [],
-      "custom_proxy_candidate": false,
-      "no_museum_edition": false
-    },
-    "acquisition": {
-      "target_owned": true,
-      "installed": true,
-      "source_recorded": false,
-      "acquired_at": null,
-      "source": null,
-      "price_paid": null,
-      "condition": null,
-      "language": "en"
-    },
-    "notes": []
-  },
-  {
-    "deck_card_id": "25a62cf4-4432-4081-9f82-a984da1e04e2",
-    "card_name": "Scattered Groves",
+    "deck_card_id": "675213bb-28d7-460c-a4f3-950f5b9090af",
+    "card_name": "Restless Fortress",
     "quantity": 1,
     "role": "Land",
     "current_printing": {
-      "scryfall_id": "25a62cf4-4432-4081-9f82-a984da1e04e2",
+      "scryfall_id": "675213bb-28d7-460c-a4f3-950f5b9090af",
       "finish": "normal"
     },
     "status": "active",
@@ -2625,12 +1700,12 @@
     "notes": []
   },
   {
-    "deck_card_id": "475742a1-b390-44a0-9941-14582cb29980",
-    "card_name": "Scoured Barrens",
+    "deck_card_id": "975a2d50-4230-4f13-b54e-5e0d27c7261a",
+    "card_name": "Selfless Spirit",
     "quantity": 1,
-    "role": "Land",
+    "role": "Threat",
     "current_printing": {
-      "scryfall_id": "475742a1-b390-44a0-9941-14582cb29980",
+      "scryfall_id": "975a2d50-4230-4f13-b54e-5e0d27c7261a",
       "finish": "normal"
     },
     "status": "active",
@@ -2659,12 +1734,12 @@
     "notes": []
   },
   {
-    "deck_card_id": "cec71aaf-361f-40e0-aad8-bfa27a7f6838",
-    "card_name": "Shineshadow Snarl",
+    "deck_card_id": "78509763-4bb8-4030-b205-76917de75c57",
+    "card_name": "Serrated Scorpion",
     "quantity": 1,
-    "role": "Land",
+    "role": "Threat",
     "current_printing": {
-      "scryfall_id": "cec71aaf-361f-40e0-aad8-bfa27a7f6838",
+      "scryfall_id": "78509763-4bb8-4030-b205-76917de75c57",
       "finish": "normal"
     },
     "status": "active",
@@ -2693,12 +1768,46 @@
     "notes": []
   },
   {
-    "deck_card_id": "444b687f-2571-4c55-a497-d24b9e18bc0f",
-    "card_name": "Shire Shirriff",
+    "deck_card_id": "13a0913d-776b-4ef8-adef-8861349df2b5",
+    "card_name": "Shadowheart, Dark Justiciar",
     "quantity": 1,
-    "role": "Interaction",
+    "role": "Threat",
     "current_printing": {
-      "scryfall_id": "444b687f-2571-4c55-a497-d24b9e18bc0f",
+      "scryfall_id": "13a0913d-776b-4ef8-adef-8861349df2b5",
+      "finish": "foil"
+    },
+    "status": "active",
+    "decision": {
+      "status": "pending",
+      "finalized": false,
+      "finalized_at": null,
+      "selected_printing": null,
+      "museum_printing": null,
+      "proxy_candidate": null,
+      "verdict": null,
+      "reasoning": [],
+      "custom_proxy_candidate": false,
+      "no_museum_edition": false
+    },
+    "acquisition": {
+      "target_owned": true,
+      "installed": true,
+      "source_recorded": false,
+      "acquired_at": null,
+      "source": null,
+      "price_paid": null,
+      "condition": null,
+      "language": "en"
+    },
+    "notes": []
+  },
+  {
+    "deck_card_id": "f824d5b6-259b-467b-93b5-e93db8b15359",
+    "card_name": "Sifter of Skulls",
+    "quantity": 1,
+    "role": "Threat",
+    "current_printing": {
+      "scryfall_id": "f824d5b6-259b-467b-93b5-e93db8b15359",
       "finish": "normal"
     },
     "status": "active",
@@ -2727,12 +1836,12 @@
     "notes": []
   },
   {
-    "deck_card_id": "5805f64c-dd88-4e94-8f0a-a01dae67e3ba",
+    "deck_card_id": "e5ba8c01-b6f5-486d-b300-cbae2c2b5edf",
     "card_name": "Sol Ring",
     "quantity": 1,
     "role": "Ramp",
     "current_printing": {
-      "scryfall_id": "5805f64c-dd88-4e94-8f0a-a01dae67e3ba",
+      "scryfall_id": "e5ba8c01-b6f5-486d-b300-cbae2c2b5edf",
       "finish": "normal"
     },
     "status": "active",
@@ -2761,12 +1870,46 @@
     "notes": []
   },
   {
-    "deck_card_id": "a0629730-66d4-49bd-af16-25bb949b33fc",
+    "deck_card_id": "80812871-d9a7-40de-94a5-b854e55409db",
+    "card_name": "Soldevi Adnate",
+    "quantity": 1,
+    "role": "Threat",
+    "current_printing": {
+      "scryfall_id": "80812871-d9a7-40de-94a5-b854e55409db",
+      "finish": "normal"
+    },
+    "status": "active",
+    "decision": {
+      "status": "pending",
+      "finalized": false,
+      "finalized_at": null,
+      "selected_printing": null,
+      "museum_printing": null,
+      "proxy_candidate": null,
+      "verdict": null,
+      "reasoning": [],
+      "custom_proxy_candidate": false,
+      "no_museum_edition": false
+    },
+    "acquisition": {
+      "target_owned": true,
+      "installed": true,
+      "source_recorded": false,
+      "acquired_at": null,
+      "source": null,
+      "price_paid": null,
+      "condition": null,
+      "language": "en"
+    },
+    "notes": []
+  },
+  {
+    "deck_card_id": "0bd72802-8eab-4700-9bd2-d3997c17438f",
     "card_name": "Solemn Simulacrum",
     "quantity": 1,
-    "role": "Ramp",
+    "role": "Threat",
     "current_printing": {
-      "scryfall_id": "a0629730-66d4-49bd-af16-25bb949b33fc",
+      "scryfall_id": "0bd72802-8eab-4700-9bd2-d3997c17438f",
       "finish": "normal"
     },
     "status": "active",
@@ -2795,12 +1938,12 @@
     "notes": []
   },
   {
-    "deck_card_id": "6a918ba2-5f03-4024-999d-2d2942a1cac1",
-    "card_name": "Sunpetal Grove",
+    "deck_card_id": "17be11f2-f2db-40c4-8fc1-2ed7173f9a1a",
+    "card_name": "Staff of the Storyteller",
     "quantity": 1,
-    "role": "Land",
+    "role": "Utility",
     "current_printing": {
-      "scryfall_id": "6a918ba2-5f03-4024-999d-2d2942a1cac1",
+      "scryfall_id": "17be11f2-f2db-40c4-8fc1-2ed7173f9a1a",
       "finish": "normal"
     },
     "status": "active",
@@ -2829,13 +1972,47 @@
     "notes": []
   },
   {
-    "deck_card_id": "2a0fba6e-54d2-498c-83bc-41024307e608",
+    "deck_card_id": "28d5eee5-bab8-4a26-83cd-16a3c07fb7b6",
+    "card_name": "Sun Titan",
+    "quantity": 1,
+    "role": "Threat",
+    "current_printing": {
+      "scryfall_id": "28d5eee5-bab8-4a26-83cd-16a3c07fb7b6",
+      "finish": "normal"
+    },
+    "status": "active",
+    "decision": {
+      "status": "pending",
+      "finalized": false,
+      "finalized_at": null,
+      "selected_printing": null,
+      "museum_printing": null,
+      "proxy_candidate": null,
+      "verdict": null,
+      "reasoning": [],
+      "custom_proxy_candidate": false,
+      "no_museum_edition": false
+    },
+    "acquisition": {
+      "target_owned": true,
+      "installed": true,
+      "source_recorded": false,
+      "acquired_at": null,
+      "source": null,
+      "price_paid": null,
+      "condition": null,
+      "language": "en"
+    },
+    "notes": []
+  },
+  {
+    "deck_card_id": "e19e24a8-5a4f-4a2d-b8dd-eb92aac7be78",
     "card_name": "Swamp",
-    "quantity": 2,
+    "quantity": 16,
     "role": "Land",
     "current_printing": {
-      "scryfall_id": "2a0fba6e-54d2-498c-83bc-41024307e608",
-      "finish": "normal"
+      "scryfall_id": "e19e24a8-5a4f-4a2d-b8dd-eb92aac7be78",
+      "finish": "foil"
     },
     "status": "active",
     "decision": {
@@ -2863,46 +2040,12 @@
     "notes": []
   },
   {
-    "deck_card_id": "d86cd8fb-4ba7-4311-b0f3-b06fa112eda5",
-    "card_name": "Swamp",
-    "quantity": 2,
-    "role": "Land",
-    "current_printing": {
-      "scryfall_id": "d86cd8fb-4ba7-4311-b0f3-b06fa112eda5",
-      "finish": "normal"
-    },
-    "status": "active",
-    "decision": {
-      "status": "pending",
-      "finalized": false,
-      "finalized_at": null,
-      "selected_printing": null,
-      "museum_printing": null,
-      "proxy_candidate": null,
-      "verdict": null,
-      "reasoning": [],
-      "custom_proxy_candidate": false,
-      "no_museum_edition": false
-    },
-    "acquisition": {
-      "target_owned": true,
-      "installed": true,
-      "source_recorded": false,
-      "acquired_at": null,
-      "source": null,
-      "price_paid": null,
-      "condition": null,
-      "language": "en"
-    },
-    "notes": []
-  },
-  {
-    "deck_card_id": "c6563536-2751-4b09-8e28-23438eb32533",
+    "deck_card_id": "948cdb9d-adae-4161-a233-7f7d28b3e1a7",
     "card_name": "Swords to Plowshares",
     "quantity": 1,
-    "role": "Interaction",
+    "role": "Utility",
     "current_printing": {
-      "scryfall_id": "c6563536-2751-4b09-8e28-23438eb32533",
+      "scryfall_id": "948cdb9d-adae-4161-a233-7f7d28b3e1a7",
       "finish": "normal"
     },
     "status": "active",
@@ -2931,12 +2074,12 @@
     "notes": []
   },
   {
-    "deck_card_id": "47c922a8-28b7-4831-8314-2ce41762955f",
-    "card_name": "The Battle of Bywater",
+    "deck_card_id": "b945f8c2-acfc-4622-8e96-993921d58995",
+    "card_name": "Syr Konrad, the Grim",
     "quantity": 1,
-    "role": "Interaction",
+    "role": "Threat",
     "current_printing": {
-      "scryfall_id": "47c922a8-28b7-4831-8314-2ce41762955f",
+      "scryfall_id": "b945f8c2-acfc-4622-8e96-993921d58995",
       "finish": "normal"
     },
     "status": "active",
@@ -2965,46 +2108,12 @@
     "notes": []
   },
   {
-    "deck_card_id": "863ed552-dc6d-4910-b188-3cefc3ebf0ed",
-    "card_name": "The Gaffer",
-    "quantity": 1,
-    "role": "Draw",
-    "current_printing": {
-      "scryfall_id": "863ed552-dc6d-4910-b188-3cefc3ebf0ed",
-      "finish": "normal"
-    },
-    "status": "active",
-    "decision": {
-      "status": "pending",
-      "finalized": false,
-      "finalized_at": null,
-      "selected_printing": null,
-      "museum_printing": null,
-      "proxy_candidate": null,
-      "verdict": null,
-      "reasoning": [],
-      "custom_proxy_candidate": false,
-      "no_museum_edition": false
-    },
-    "acquisition": {
-      "target_owned": true,
-      "installed": true,
-      "source_recorded": false,
-      "acquired_at": null,
-      "source": null,
-      "price_paid": null,
-      "condition": null,
-      "language": "en"
-    },
-    "notes": []
-  },
-  {
-    "deck_card_id": "248ed7a6-982a-4ff4-ba9b-3c1f47e7605c",
-    "card_name": "The Shire",
+    "deck_card_id": "627eb62a-399d-4f2b-9ea1-73ce0396ba1c",
+    "card_name": "Temple of Silence",
     "quantity": 1,
     "role": "Land",
     "current_printing": {
-      "scryfall_id": "248ed7a6-982a-4ff4-ba9b-3c1f47e7605c",
+      "scryfall_id": "627eb62a-399d-4f2b-9ea1-73ce0396ba1c",
       "finish": "normal"
     },
     "status": "active",
@@ -3033,12 +2142,12 @@
     "notes": []
   },
   {
-    "deck_card_id": "995938ee-3ba7-42c9-9e0f-76b4a105f55e",
-    "card_name": "Tireless Provisioner",
+    "deck_card_id": "581a2da7-80d3-409a-8a6c-aa6e9ccc1568",
+    "card_name": "Teysa Karlov",
     "quantity": 1,
-    "role": "Ramp",
+    "role": "Commander",
     "current_printing": {
-      "scryfall_id": "995938ee-3ba7-42c9-9e0f-76b4a105f55e",
+      "scryfall_id": "581a2da7-80d3-409a-8a6c-aa6e9ccc1568",
       "finish": "normal"
     },
     "status": "active",
@@ -3067,12 +2176,12 @@
     "notes": []
   },
   {
-    "deck_card_id": "fe839cbc-7eae-4f86-be35-96542223347c",
-    "card_name": "Well of Lost Dreams",
+    "deck_card_id": "dc988247-1072-4e47-a656-8c5b1391dfca",
+    "card_name": "Toxic Deluge",
     "quantity": 1,
-    "role": "Draw",
+    "role": "Utility",
     "current_printing": {
-      "scryfall_id": "fe839cbc-7eae-4f86-be35-96542223347c",
+      "scryfall_id": "dc988247-1072-4e47-a656-8c5b1391dfca",
       "finish": "normal"
     },
     "status": "active",
@@ -3101,12 +2210,46 @@
     "notes": []
   },
   {
-    "deck_card_id": "c9d7acdf-1bce-4646-b3e2-7787b6d7a5f3",
-    "card_name": "Woodfall Primus",
+    "deck_card_id": "ae9009fa-4b52-422d-8ff3-f699089249d8",
+    "card_name": "Tragedy Feaster",
     "quantity": 1,
-    "role": "Interaction",
+    "role": "Threat",
     "current_printing": {
-      "scryfall_id": "c9d7acdf-1bce-4646-b3e2-7787b6d7a5f3",
+      "scryfall_id": "ae9009fa-4b52-422d-8ff3-f699089249d8",
+      "finish": "foil"
+    },
+    "status": "active",
+    "decision": {
+      "status": "pending",
+      "finalized": false,
+      "finalized_at": null,
+      "selected_printing": null,
+      "museum_printing": null,
+      "proxy_candidate": null,
+      "verdict": null,
+      "reasoning": [],
+      "custom_proxy_candidate": false,
+      "no_museum_edition": false
+    },
+    "acquisition": {
+      "target_owned": true,
+      "installed": true,
+      "source_recorded": false,
+      "acquired_at": null,
+      "source": null,
+      "price_paid": null,
+      "condition": null,
+      "language": "en"
+    },
+    "notes": []
+  },
+  {
+    "deck_card_id": "588332da-8ec5-49d1-a365-455beb7913a2",
+    "card_name": "Tragic Slip",
+    "quantity": 1,
+    "role": "Utility",
+    "current_printing": {
+      "scryfall_id": "588332da-8ec5-49d1-a365-455beb7913a2",
       "finish": "normal"
     },
     "status": "active",
@@ -3135,12 +2278,250 @@
     "notes": []
   },
   {
-    "deck_card_id": "fef40e37-f2fe-4162-a780-7ad109821bd3",
-    "card_name": "Woodland Cemetery",
+    "deck_card_id": "6854dc06-4845-4201-958b-2fdad3f7b64a",
+    "card_name": "Vampiric Rites",
+    "quantity": 1,
+    "role": "Utility",
+    "current_printing": {
+      "scryfall_id": "6854dc06-4845-4201-958b-2fdad3f7b64a",
+      "finish": "normal"
+    },
+    "status": "active",
+    "decision": {
+      "status": "pending",
+      "finalized": false,
+      "finalized_at": null,
+      "selected_printing": null,
+      "museum_printing": null,
+      "proxy_candidate": null,
+      "verdict": null,
+      "reasoning": [],
+      "custom_proxy_candidate": false,
+      "no_museum_edition": false
+    },
+    "acquisition": {
+      "target_owned": true,
+      "installed": true,
+      "source_recorded": false,
+      "acquired_at": null,
+      "source": null,
+      "price_paid": null,
+      "condition": null,
+      "language": "en"
+    },
+    "notes": []
+  },
+  {
+    "deck_card_id": "8bb2765f-4016-4e41-9db4-5ad463faceab",
+    "card_name": "Vashta Nerada",
+    "quantity": 1,
+    "role": "Threat",
+    "current_printing": {
+      "scryfall_id": "8bb2765f-4016-4e41-9db4-5ad463faceab",
+      "finish": "normal"
+    },
+    "status": "active",
+    "decision": {
+      "status": "pending",
+      "finalized": false,
+      "finalized_at": null,
+      "selected_printing": null,
+      "museum_printing": null,
+      "proxy_candidate": null,
+      "verdict": null,
+      "reasoning": [],
+      "custom_proxy_candidate": false,
+      "no_museum_edition": false
+    },
+    "acquisition": {
+      "target_owned": true,
+      "installed": true,
+      "source_recorded": false,
+      "acquired_at": null,
+      "source": null,
+      "price_paid": null,
+      "condition": null,
+      "language": "en"
+    },
+    "notes": []
+  },
+  {
+    "deck_card_id": "40c17aee-1e93-4db8-b491-cb2c10d0cc67",
+    "card_name": "Vesuva",
     "quantity": 1,
     "role": "Land",
     "current_printing": {
-      "scryfall_id": "fef40e37-f2fe-4162-a780-7ad109821bd3",
+      "scryfall_id": "40c17aee-1e93-4db8-b491-cb2c10d0cc67",
+      "finish": "normal"
+    },
+    "status": "active",
+    "decision": {
+      "status": "pending",
+      "finalized": false,
+      "finalized_at": null,
+      "selected_printing": null,
+      "museum_printing": null,
+      "proxy_candidate": null,
+      "verdict": null,
+      "reasoning": [],
+      "custom_proxy_candidate": false,
+      "no_museum_edition": false
+    },
+    "acquisition": {
+      "target_owned": true,
+      "installed": true,
+      "source_recorded": false,
+      "acquired_at": null,
+      "source": null,
+      "price_paid": null,
+      "condition": null,
+      "language": "en"
+    },
+    "notes": []
+  },
+  {
+    "deck_card_id": "83379f7f-3766-43f5-bd5e-e11ef9070ddb",
+    "card_name": "Victimize",
+    "quantity": 1,
+    "role": "Utility",
+    "current_printing": {
+      "scryfall_id": "83379f7f-3766-43f5-bd5e-e11ef9070ddb",
+      "finish": "normal"
+    },
+    "status": "active",
+    "decision": {
+      "status": "pending",
+      "finalized": false,
+      "finalized_at": null,
+      "selected_printing": null,
+      "museum_printing": null,
+      "proxy_candidate": null,
+      "verdict": null,
+      "reasoning": [],
+      "custom_proxy_candidate": false,
+      "no_museum_edition": false
+    },
+    "acquisition": {
+      "target_owned": true,
+      "installed": true,
+      "source_recorded": false,
+      "acquired_at": null,
+      "source": null,
+      "price_paid": null,
+      "condition": null,
+      "language": "en"
+    },
+    "notes": []
+  },
+  {
+    "deck_card_id": "6179f847-e334-4f7f-9a4e-0013942a394f",
+    "card_name": "Viscera Seer",
+    "quantity": 1,
+    "role": "Threat",
+    "current_printing": {
+      "scryfall_id": "6179f847-e334-4f7f-9a4e-0013942a394f",
+      "finish": "normal"
+    },
+    "status": "active",
+    "decision": {
+      "status": "pending",
+      "finalized": false,
+      "finalized_at": null,
+      "selected_printing": null,
+      "museum_printing": null,
+      "proxy_candidate": null,
+      "verdict": null,
+      "reasoning": [],
+      "custom_proxy_candidate": false,
+      "no_museum_edition": false
+    },
+    "acquisition": {
+      "target_owned": true,
+      "installed": true,
+      "source_recorded": false,
+      "acquired_at": null,
+      "source": null,
+      "price_paid": null,
+      "condition": null,
+      "language": "en"
+    },
+    "notes": []
+  },
+  {
+    "deck_card_id": "d8f69cea-823c-482b-a605-8138b3d950e6",
+    "card_name": "Welcoming Vampire",
+    "quantity": 1,
+    "role": "Threat",
+    "current_printing": {
+      "scryfall_id": "d8f69cea-823c-482b-a605-8138b3d950e6",
+      "finish": "foil"
+    },
+    "status": "active",
+    "decision": {
+      "status": "pending",
+      "finalized": false,
+      "finalized_at": null,
+      "selected_printing": null,
+      "museum_printing": null,
+      "proxy_candidate": null,
+      "verdict": null,
+      "reasoning": [],
+      "custom_proxy_candidate": false,
+      "no_museum_edition": false
+    },
+    "acquisition": {
+      "target_owned": true,
+      "installed": true,
+      "source_recorded": false,
+      "acquired_at": null,
+      "source": null,
+      "price_paid": null,
+      "condition": null,
+      "language": "en"
+    },
+    "notes": []
+  },
+  {
+    "deck_card_id": "e1004f64-5052-4b1e-8fd8-eda463fbd9b7",
+    "card_name": "Zahur, Glory's Past",
+    "quantity": 1,
+    "role": "Threat",
+    "current_printing": {
+      "scryfall_id": "e1004f64-5052-4b1e-8fd8-eda463fbd9b7",
+      "finish": "foil"
+    },
+    "status": "active",
+    "decision": {
+      "status": "pending",
+      "finalized": false,
+      "finalized_at": null,
+      "selected_printing": null,
+      "museum_printing": null,
+      "proxy_candidate": null,
+      "verdict": null,
+      "reasoning": [],
+      "custom_proxy_candidate": false,
+      "no_museum_edition": false
+    },
+    "acquisition": {
+      "target_owned": true,
+      "installed": true,
+      "source_recorded": false,
+      "acquired_at": null,
+      "source": null,
+      "price_paid": null,
+      "condition": null,
+      "language": "en"
+    },
+    "notes": []
+  },
+  {
+    "deck_card_id": "340efd40-6e1d-440e-b209-9b4993884e1d",
+    "card_name": "Zulaport Cutthroat",
+    "quantity": 1,
+    "role": "Threat",
+    "current_printing": {
+      "scryfall_id": "340efd40-6e1d-440e-b209-9b4993884e1d",
       "finish": "normal"
     },
     "status": "active",

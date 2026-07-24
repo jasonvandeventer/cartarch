@@ -1579,5 +1579,21 @@
       "selected_scryfall_id": "31e4b7a1-b377-49d2-a92e-4bcb0db35f16"
     },
     "reason": "decision revised"
+  },
+  {
+    "deck_card_id": "2d378437-4fc1-4004-a49a-98d7bac36ef5",
+    "card_name": "Cultivate",
+    "revision": 2,
+    "changed_at": "2026-07-24",
+    "change_type": "decision_revised",
+    "previous": {
+      "status": "keep",
+      "selected_scryfall_id": "2d378437-4fc1-4004-a49a-98d7bac36ef5"
+    },
+    "current": {
+      "status": "keep",
+      "selected_scryfall_id": "b8386ca9-0359-4a18-abea-0cb0e955a947"
+    },
+    "reason": "decision revised"
   }
 ]

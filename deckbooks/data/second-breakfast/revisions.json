@@ -158,5 +158,101 @@
       "selected_scryfall_id": "a223c85f-3952-40d0-88d4-d5c3e8cd864d"
     },
     "reason": "decision revised"
+  },
+  {
+    "deck_card_id": "328df403-7428-4b17-bdd1-9759fc0f32d8",
+    "card_name": "Frodo, Adventurous Hobbit",
+    "revision": 4,
+    "changed_at": "2026-07-24",
+    "change_type": "decision_revised",
+    "previous": {
+      "status": "pending",
+      "selected_scryfall_id": "a223c85f-3952-40d0-88d4-d5c3e8cd864d"
+    },
+    "current": {
+      "status": "pending",
+      "selected_scryfall_id": "a223c85f-3952-40d0-88d4-d5c3e8cd864d"
+    },
+    "reason": "decision revised"
+  },
+  {
+    "deck_card_id": "328df403-7428-4b17-bdd1-9759fc0f32d8",
+    "card_name": "Frodo, Adventurous Hobbit",
+    "revision": 5,
+    "changed_at": "2026-07-24",
+    "change_type": "decision_revised",
+    "previous": {
+      "status": "pending",
+      "selected_scryfall_id": "a223c85f-3952-40d0-88d4-d5c3e8cd864d"
+    },
+    "current": {
+      "status": "pending",
+      "selected_scryfall_id": "a223c85f-3952-40d0-88d4-d5c3e8cd864d"
+    },
+    "reason": "decision revised"
+  },
+  {
+    "deck_card_id": "328df403-7428-4b17-bdd1-9759fc0f32d8",
+    "card_name": "Frodo, Adventurous Hobbit",
+    "revision": 6,
+    "changed_at": "2026-07-24",
+    "change_type": "decision_revised",
+    "previous": {
+      "status": "pending",
+      "selected_scryfall_id": "a223c85f-3952-40d0-88d4-d5c3e8cd864d"
+    },
+    "current": {
+      "status": "pending",
+      "selected_scryfall_id": "a223c85f-3952-40d0-88d4-d5c3e8cd864d"
+    },
+    "reason": "decision revised"
+  },
+  {
+    "deck_card_id": "687a2b76-3f05-4732-bd9b-513d06d16300",
+    "card_name": "Sam, Loyal Attendant",
+    "revision": 3,
+    "changed_at": "2026-07-24",
+    "change_type": "decision_revised",
+    "previous": {
+      "status": "pending",
+      "selected_scryfall_id": "cfdfa303-2578-455b-929c-a217a0261bb3"
+    },
+    "current": {
+      "status": "pending",
+      "selected_scryfall_id": "cfdfa303-2578-455b-929c-a217a0261bb3"
+    },
+    "reason": "decision revised"
+  },
+  {
+    "deck_card_id": "687a2b76-3f05-4732-bd9b-513d06d16300",
+    "card_name": "Sam, Loyal Attendant",
+    "revision": 4,
+    "changed_at": "2026-07-24",
+    "change_type": "decision_revised",
+    "previous": {
+      "status": "pending",
+      "selected_scryfall_id": "cfdfa303-2578-455b-929c-a217a0261bb3"
+    },
+    "current": {
+      "status": "pending",
+      "selected_scryfall_id": "cfdfa303-2578-455b-929c-a217a0261bb3"
+    },
+    "reason": "decision revised"
+  },
+  {
+    "deck_card_id": "6620b4a3-fa33-4bd7-9180-314919d8ea2a",
+    "card_name": "Commander's Sphere",
+    "revision": 1,
+    "changed_at": "2026-07-24",
+    "change_type": "decision_finalized",
+    "previous": {
+      "status": "pending",
+      "selected_scryfall_id": "0ad783ed-69b9-48b5-9610-4fa4d8f9a6e6"
+    },
+    "current": {
+      "status": "pending",
+      "selected_scryfall_id": "0ad783ed-69b9-48b5-9610-4fa4d8f9a6e6"
+    },
+    "reason": "decision finalized"
   }
 ]

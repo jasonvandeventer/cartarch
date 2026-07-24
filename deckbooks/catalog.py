@@ -86,6 +86,56 @@ BOOKS: dict[str, dict] = {
             "selection_rule": "Rarity alone never determines the definitive printing.",
         },
     },
+    # --- CoruscantSunrise's other decks (seeded from prod 2026-07-24) -----------
+    # Placeholder identities — theme each as we go (mission/pillars/palette).
+    "containment-failure": {
+        "deck_name": "Containment Failure",
+        "name": "Containment Failure",
+        "commander_names": ["Blech, Loafing Pest"],
+        "subtitle": "A Golgari Commander deck.",
+        "identity": {
+            "mission": "",
+            "pillars": [],
+            "palette": [],
+            "selection_rule": "Rarity alone never determines the definitive printing.",
+        },
+    },
+    "dnr": {
+        "deck_name": "DNR",
+        "name": "DNR",
+        "commander_names": ["Anti-Venom, Horrifying Healer"],
+        "subtitle": "A mono-white Commander deck.",
+        "identity": {
+            "mission": "",
+            "pillars": [],
+            "palette": [],
+            "selection_rule": "Rarity alone never determines the definitive printing.",
+        },
+    },
+    "severance-package": {
+        "deck_name": "Severance Package",
+        "name": "Severance Package",
+        "commander_names": ["Teysa Karlov"],
+        "subtitle": "An Orzhov Commander deck.",
+        "identity": {
+            "mission": "",
+            "pillars": [],
+            "palette": [],
+            "selection_rule": "Rarity alone never determines the definitive printing.",
+        },
+    },
+    "stack-overflow": {
+        "deck_name": "Stack Overflow",
+        "name": "Stack Overflow",
+        "commander_names": ["Melek, Izzet Paragon"],
+        "subtitle": "An Izzet Commander deck.",
+        "identity": {
+            "mission": "",
+            "pillars": [],
+            "palette": [],
+            "selection_rule": "Rarity alone never determines the definitive printing.",
+        },
+    },
 }
 
 

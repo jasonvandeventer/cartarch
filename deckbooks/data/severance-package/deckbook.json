@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "id": "severance-package",
+  "name": "Severance Package",
+  "commander_names": [
+    "Teysa Karlov"
+  ],
+  "subtitle": "An Orzhov Commander deck.",
+  "edition": {
+    "name": "First Edition",
+    "revision": 1,
+    "created_at": "2026-07-24",
+    "updated_at": "2026-07-24"
+  },
+  "identity": {
+    "mission": "",
+    "pillars": [],
+    "palette": [],
+    "selection_rule": "Rarity alone never determines the definitive printing."
+  }
+}
