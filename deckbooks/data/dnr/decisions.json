@@ -3,7 +3,7 @@
     "deck_card_id": "0663dcc8-2f72-4439-bfa9-06c4ef06c54d",
     "card_name": "Akroma's Will",
     "quantity": 1,
-    "role": "Utility",
+    "role": "Protection",
     "current_printing": {
       "scryfall_id": "0663dcc8-2f72-4439-bfa9-06c4ef06c54d",
       "finish": "normal"
@@ -139,7 +139,7 @@
     "deck_card_id": "c6ff5063-c93f-4b21-8d08-ab0e8e046d39",
     "card_name": "Archaeomancer's Map",
     "quantity": 1,
-    "role": "Utility",
+    "role": "Ramp",
     "current_printing": {
       "scryfall_id": "c6ff5063-c93f-4b21-8d08-ab0e8e046d39",
       "finish": "normal"
@@ -173,7 +173,7 @@
     "deck_card_id": "f6589e02-8c84-4069-88d1-ebcc8520cae1",
     "card_name": "Archivist of Oghma",
     "quantity": 1,
-    "role": "Threat",
+    "role": "Draw",
     "current_printing": {
       "scryfall_id": "f6589e02-8c84-4069-88d1-ebcc8520cae1",
       "finish": "normal"
@@ -207,7 +207,7 @@
     "deck_card_id": "317f1133-7cf8-4b7a-919e-88c45f8c2c3a",
     "card_name": "Avacyn, Angel of Hope",
     "quantity": 1,
-    "role": "Threat",
+    "role": "Protection",
     "current_printing": {
       "scryfall_id": "317f1133-7cf8-4b7a-919e-88c45f8c2c3a",
       "finish": "normal"
@@ -275,7 +275,7 @@
     "deck_card_id": "5e96e656-7146-420d-aaae-3aedd773eea2",
     "card_name": "Brotherhood Outcast",
     "quantity": 1,
-    "role": "Threat",
+    "role": "Recursion",
     "current_printing": {
       "scryfall_id": "5e96e656-7146-420d-aaae-3aedd773eea2",
       "finish": "normal"
@@ -377,7 +377,7 @@
     "deck_card_id": "26f5d866-4ee9-4054-8d48-82da0a2d1170",
     "card_name": "Champion's Helm",
     "quantity": 1,
-    "role": "Utility",
+    "role": "Protection",
     "current_printing": {
       "scryfall_id": "26f5d866-4ee9-4054-8d48-82da0a2d1170",
       "finish": "normal"
@@ -411,7 +411,7 @@
     "deck_card_id": "3dc51393-de63-4ce3-ab02-c695e4448018",
     "card_name": "Cho-Manno, Revolutionary",
     "quantity": 1,
-    "role": "Threat",
+    "role": "Protection",
     "current_printing": {
       "scryfall_id": "3dc51393-de63-4ce3-ab02-c695e4448018",
       "finish": "normal"
@@ -445,7 +445,7 @@
     "deck_card_id": "654ade6b-0369-4b90-a744-2f57a45b04f4",
     "card_name": "Claim Jumper",
     "quantity": 1,
-    "role": "Threat",
+    "role": "Ramp",
     "current_printing": {
       "scryfall_id": "654ade6b-0369-4b90-a744-2f57a45b04f4",
       "finish": "normal"
@@ -513,7 +513,7 @@
     "deck_card_id": "27a233b3-aeb3-4bc4-8c81-fcca514c3eb5",
     "card_name": "Cut a Deal",
     "quantity": 1,
-    "role": "Utility",
+    "role": "Draw",
     "current_printing": {
       "scryfall_id": "27a233b3-aeb3-4bc4-8c81-fcca514c3eb5",
       "finish": "normal"
@@ -547,7 +547,7 @@
     "deck_card_id": "21b78c55-20cf-4a65-b50b-2f8093465646",
     "card_name": "Danitha Capashen, Paragon",
     "quantity": 1,
-    "role": "Threat",
+    "role": "Utility",
     "current_printing": {
       "scryfall_id": "21b78c55-20cf-4a65-b50b-2f8093465646",
       "finish": "normal"
@@ -581,7 +581,7 @@
     "deck_card_id": "49277723-84df-4842-a8e5-cdf1c1aa8161",
     "card_name": "Darksteel Plate",
     "quantity": 1,
-    "role": "Utility",
+    "role": "Protection",
     "current_printing": {
       "scryfall_id": "49277723-84df-4842-a8e5-cdf1c1aa8161",
       "finish": "normal"
@@ -649,7 +649,7 @@
     "deck_card_id": "ef722374-0305-4c30-ab45-cb772b252faf",
     "card_name": "Eight-and-a-Half-Tails",
     "quantity": 1,
-    "role": "Threat",
+    "role": "Protection",
     "current_printing": {
       "scryfall_id": "ef722374-0305-4c30-ab45-cb772b252faf",
       "finish": "normal"
@@ -751,7 +751,7 @@
     "deck_card_id": "ee0e17cb-a729-4be9-9fe3-e71ba45f0a6e",
     "card_name": "Generous Gift",
     "quantity": 1,
-    "role": "Utility",
+    "role": "Interaction",
     "current_printing": {
       "scryfall_id": "ee0e17cb-a729-4be9-9fe3-e71ba45f0a6e",
       "finish": "normal"
@@ -887,7 +887,7 @@
     "deck_card_id": "898c66d5-d8e6-4a58-ba41-4650ba0e7262",
     "card_name": "Helm of the Host",
     "quantity": 1,
-    "role": "Utility",
+    "role": "Enabler",
     "current_printing": {
       "scryfall_id": "898c66d5-d8e6-4a58-ba41-4650ba0e7262",
       "finish": "normal"
@@ -921,7 +921,7 @@
     "deck_card_id": "ec7bd155-1dd6-4fc3-870f-e0905f8c6d42",
     "card_name": "Heroic Sacrifice",
     "quantity": 1,
-    "role": "Utility",
+    "role": "Protection",
     "current_printing": {
       "scryfall_id": "ec7bd155-1dd6-4fc3-870f-e0905f8c6d42",
       "finish": "foil"
@@ -955,7 +955,7 @@
     "deck_card_id": "44927f22-0017-4c19-bd0a-41f09c0ce19f",
     "card_name": "Lae'zel, Vlaakith's Champion",
     "quantity": 1,
-    "role": "Threat",
+    "role": "Utility",
     "current_printing": {
       "scryfall_id": "44927f22-0017-4c19-bd0a-41f09c0ce19f",
       "finish": "normal"
@@ -989,7 +989,7 @@
     "deck_card_id": "647e6b32-c755-4700-b151-6a174dbb2bd0",
     "card_name": "Loran of the Third Path",
     "quantity": 1,
-    "role": "Threat",
+    "role": "Draw",
     "current_printing": {
       "scryfall_id": "647e6b32-c755-4700-b151-6a174dbb2bd0",
       "finish": "normal"
@@ -1023,7 +1023,7 @@
     "deck_card_id": "1d01ce54-3f64-465e-835a-27c55753926b",
     "card_name": "Loyal Warhound",
     "quantity": 1,
-    "role": "Threat",
+    "role": "Ramp",
     "current_printing": {
       "scryfall_id": "1d01ce54-3f64-465e-835a-27c55753926b",
       "finish": "normal"
@@ -1057,7 +1057,7 @@
     "deck_card_id": "26f0d639-9d7f-4a90-bbfd-f942bd59a89b",
     "card_name": "Mangara, the Diplomat",
     "quantity": 1,
-    "role": "Threat",
+    "role": "Draw",
     "current_printing": {
       "scryfall_id": "26f0d639-9d7f-4a90-bbfd-f942bd59a89b",
       "finish": "normal"
@@ -1091,7 +1091,7 @@
     "deck_card_id": "6ab5775a-7138-4526-83fe-350127695224",
     "card_name": "Martyrdom",
     "quantity": 1,
-    "role": "Utility",
+    "role": "Protection",
     "current_printing": {
       "scryfall_id": "6ab5775a-7138-4526-83fe-350127695224",
       "finish": "normal"
@@ -1193,7 +1193,7 @@
     "deck_card_id": "51c0ee3e-054e-4b01-b333-4ef3bc904750",
     "card_name": "Mesa Enchantress",
     "quantity": 1,
-    "role": "Threat",
+    "role": "Draw",
     "current_printing": {
       "scryfall_id": "51c0ee3e-054e-4b01-b333-4ef3bc904750",
       "finish": "normal"
@@ -1295,7 +1295,7 @@
     "deck_card_id": "b65ec6ad-80d8-4c76-8b69-fc401a8f1ce8",
     "card_name": "Mithril Coat",
     "quantity": 1,
-    "role": "Utility",
+    "role": "Protection",
     "current_printing": {
       "scryfall_id": "b65ec6ad-80d8-4c76-8b69-fc401a8f1ce8",
       "finish": "normal"
@@ -1397,7 +1397,7 @@
     "deck_card_id": "1995fed6-992f-4333-afa6-63d61cfdfa00",
     "card_name": "Pariah",
     "quantity": 1,
-    "role": "Utility",
+    "role": "Protection",
     "current_printing": {
       "scryfall_id": "1995fed6-992f-4333-afa6-63d61cfdfa00",
       "finish": "normal"
@@ -1431,7 +1431,7 @@
     "deck_card_id": "a8d4c344-273e-4d86-b414-b2982c3f475b",
     "card_name": "Pariah's Shield",
     "quantity": 1,
-    "role": "Utility",
+    "role": "Protection",
     "current_printing": {
       "scryfall_id": "a8d4c344-273e-4d86-b414-b2982c3f475b",
       "finish": "normal"
@@ -1465,7 +1465,7 @@
     "deck_card_id": "20298a61-2739-4254-b102-51a2a74b5ddc",
     "card_name": "Path to Exile",
     "quantity": 1,
-    "role": "Utility",
+    "role": "Interaction",
     "current_printing": {
       "scryfall_id": "20298a61-2739-4254-b102-51a2a74b5ddc",
       "finish": "foil"
@@ -1499,7 +1499,7 @@
     "deck_card_id": "5c1b0b81-6f78-4c4b-9d0d-28acf0a15940",
     "card_name": "Phyrexian Vindicator",
     "quantity": 1,
-    "role": "Threat",
+    "role": "Protection",
     "current_printing": {
       "scryfall_id": "5c1b0b81-6f78-4c4b-9d0d-28acf0a15940",
       "finish": "normal"
@@ -1567,7 +1567,7 @@
     "deck_card_id": "73e496f4-ec53-4e3c-a27d-5c1b5a54a642",
     "card_name": "Puresteel Paladin",
     "quantity": 1,
-    "role": "Threat",
+    "role": "Draw",
     "current_printing": {
       "scryfall_id": "73e496f4-ec53-4e3c-a27d-5c1b5a54a642",
       "finish": "normal"
@@ -1601,7 +1601,7 @@
     "deck_card_id": "1bd3fa8a-6c50-4f7f-9ae3-0810eec5e3db",
     "card_name": "Reprieve",
     "quantity": 1,
-    "role": "Utility",
+    "role": "Draw",
     "current_printing": {
       "scryfall_id": "1bd3fa8a-6c50-4f7f-9ae3-0810eec5e3db",
       "finish": "foil"
@@ -1669,7 +1669,7 @@
     "deck_card_id": "51647010-99f0-4b02-8c91-fdd826db130d",
     "card_name": "Sevinne's Reclamation",
     "quantity": 1,
-    "role": "Utility",
+    "role": "Recursion",
     "current_printing": {
       "scryfall_id": "51647010-99f0-4b02-8c91-fdd826db130d",
       "finish": "normal"
@@ -1703,7 +1703,7 @@
     "deck_card_id": "939c6e19-4b27-4023-bb9c-ae440f91e21c",
     "card_name": "Shadowspear",
     "quantity": 1,
-    "role": "Utility",
+    "role": "Protection",
     "current_printing": {
       "scryfall_id": "939c6e19-4b27-4023-bb9c-ae440f91e21c",
       "finish": "normal"
@@ -1737,7 +1737,7 @@
     "deck_card_id": "4ecbb947-2085-40ca-82a0-c2e1cbc94221",
     "card_name": "Shielded by Faith",
     "quantity": 1,
-    "role": "Utility",
+    "role": "Protection",
     "current_printing": {
       "scryfall_id": "4ecbb947-2085-40ca-82a0-c2e1cbc94221",
       "finish": "normal"
@@ -1771,7 +1771,7 @@
     "deck_card_id": "f21fba59-330b-4daf-bf77-6dd817327a64",
     "card_name": "Silver Shroud Costume",
     "quantity": 1,
-    "role": "Utility",
+    "role": "Protection",
     "current_printing": {
       "scryfall_id": "f21fba59-330b-4daf-bf77-6dd817327a64",
       "finish": "normal"
@@ -1805,7 +1805,7 @@
     "deck_card_id": "005dae9a-dddc-4a11-95bb-cce319edcce4",
     "card_name": "Skullclamp",
     "quantity": 1,
-    "role": "Utility",
+    "role": "Draw",
     "current_printing": {
       "scryfall_id": "005dae9a-dddc-4a11-95bb-cce319edcce4",
       "finish": "normal"
@@ -1873,7 +1873,7 @@
     "deck_card_id": "6e2389a6-61ba-4254-a59e-05a94b054ef0",
     "card_name": "Solemn Simulacrum",
     "quantity": 1,
-    "role": "Threat",
+    "role": "Ramp",
     "current_printing": {
       "scryfall_id": "6e2389a6-61ba-4254-a59e-05a94b054ef0",
       "finish": "normal"
@@ -1907,7 +1907,7 @@
     "deck_card_id": "ee9fa595-d7ee-47ab-a116-f4d75bb3b1bb",
     "card_name": "Spirit Mantle",
     "quantity": 1,
-    "role": "Utility",
+    "role": "Protection",
     "current_printing": {
       "scryfall_id": "ee9fa595-d7ee-47ab-a116-f4d75bb3b1bb",
       "finish": "foil"
@@ -1941,7 +1941,7 @@
     "deck_card_id": "cb7eb35d-2684-40f7-b678-0d9a180c955a",
     "card_name": "Sram, Senior Edificer",
     "quantity": 1,
-    "role": "Threat",
+    "role": "Draw",
     "current_printing": {
       "scryfall_id": "cb7eb35d-2684-40f7-b678-0d9a180c955a",
       "finish": "normal"
@@ -2009,7 +2009,7 @@
     "deck_card_id": "da9aa48f-c960-4148-b03a-026a027e436b",
     "card_name": "Stonehewer Giant",
     "quantity": 1,
-    "role": "Threat",
+    "role": "Utility",
     "current_printing": {
       "scryfall_id": "da9aa48f-c960-4148-b03a-026a027e436b",
       "finish": "normal"
@@ -2043,7 +2043,7 @@
     "deck_card_id": "ab135925-d924-456d-851a-6ccdaaf27271",
     "card_name": "Stroke of Midnight",
     "quantity": 1,
-    "role": "Utility",
+    "role": "Interaction",
     "current_printing": {
       "scryfall_id": "ab135925-d924-456d-851a-6ccdaaf27271",
       "finish": "normal"
@@ -2077,7 +2077,7 @@
     "deck_card_id": "978c2c7d-6898-4be2-aed7-e673210ce654",
     "card_name": "Stuffy Doll",
     "quantity": 1,
-    "role": "Threat",
+    "role": "Protection",
     "current_printing": {
       "scryfall_id": "978c2c7d-6898-4be2-aed7-e673210ce654",
       "finish": "normal"
@@ -2111,7 +2111,7 @@
     "deck_card_id": "aae09e17-b881-492c-ba47-8f381c09755d",
     "card_name": "Swiftfoot Boots",
     "quantity": 1,
-    "role": "Utility",
+    "role": "Protection",
     "current_printing": {
       "scryfall_id": "aae09e17-b881-492c-ba47-8f381c09755d",
       "finish": "foil"
@@ -2145,7 +2145,7 @@
     "deck_card_id": "ea68cf78-e200-4169-89f4-cdee3aa13592",
     "card_name": "Swords to Plowshares",
     "quantity": 1,
-    "role": "Utility",
+    "role": "Interaction",
     "current_printing": {
       "scryfall_id": "ea68cf78-e200-4169-89f4-cdee3aa13592",
       "finish": "normal"
@@ -2179,7 +2179,7 @@
     "deck_card_id": "d5806e68-1054-458e-866d-1f2470f682b2",
     "card_name": "The One Ring",
     "quantity": 1,
-    "role": "Utility",
+    "role": "Protection",
     "current_printing": {
       "scryfall_id": "d5806e68-1054-458e-866d-1f2470f682b2",
       "finish": "normal"
@@ -2247,7 +2247,7 @@
     "deck_card_id": "9076e13d-d16e-4528-aad0-8b8081b00e8d",
     "card_name": "Throne of Eldraine",
     "quantity": 1,
-    "role": "Utility",
+    "role": "Ramp",
     "current_printing": {
       "scryfall_id": "9076e13d-d16e-4528-aad0-8b8081b00e8d",
       "finish": "normal"
@@ -2281,7 +2281,7 @@
     "deck_card_id": "d61f8db1-0148-47bd-ae97-9aedccb83813",
     "card_name": "Timely Ward",
     "quantity": 1,
-    "role": "Utility",
+    "role": "Protection",
     "current_printing": {
       "scryfall_id": "d61f8db1-0148-47bd-ae97-9aedccb83813",
       "finish": "normal"
@@ -2315,7 +2315,7 @@
     "deck_card_id": "3f631a24-4d71-400c-a58d-ae91e193db2e",
     "card_name": "Trouble in Pairs",
     "quantity": 1,
-    "role": "Utility",
+    "role": "Draw",
     "current_printing": {
       "scryfall_id": "3f631a24-4d71-400c-a58d-ae91e193db2e",
       "finish": "foil"
@@ -2383,7 +2383,7 @@
     "deck_card_id": "ddf7fa6e-e38c-4f3d-8d8b-6ecbccdbb8f9",
     "card_name": "Winds of Abandon",
     "quantity": 1,
-    "role": "Utility",
+    "role": "Interaction",
     "current_printing": {
       "scryfall_id": "ddf7fa6e-e38c-4f3d-8d8b-6ecbccdbb8f9",
       "finish": "normal"
@@ -2417,7 +2417,7 @@
     "deck_card_id": "fb266506-5ea8-45c2-8740-4a71fb7e5133",
     "card_name": "With Great Power . . .",
     "quantity": 1,
-    "role": "Utility",
+    "role": "Protection",
     "current_printing": {
       "scryfall_id": "fb266506-5ea8-45c2-8740-4a71fb7e5133",
       "finish": "foil"
@@ -2451,7 +2451,7 @@
     "deck_card_id": "f21f9161-5945-40da-8da0-446f6a4a1c23",
     "card_name": "Zack Fair",
     "quantity": 1,
-    "role": "Threat",
+    "role": "Protection",
     "current_printing": {
       "scryfall_id": "f21f9161-5945-40da-8da0-446f6a4a1c23",
       "finish": "normal"

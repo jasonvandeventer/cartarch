@@ -37,7 +37,7 @@
     "deck_card_id": "b9ee82ee-4899-496e-80a6-e3403f6b364f",
     "card_name": "An Offer You Can't Refuse",
     "quantity": 1,
-    "role": "Utility",
+    "role": "Interaction",
     "current_printing": {
       "scryfall_id": "b9ee82ee-4899-496e-80a6-e3403f6b364f",
       "finish": "normal"
@@ -71,7 +71,7 @@
     "deck_card_id": "ef7e6e2d-d984-483e-b117-b1c5d640dc23",
     "card_name": "Arcane Bombardment",
     "quantity": 1,
-    "role": "Utility",
+    "role": "Payoff",
     "current_printing": {
       "scryfall_id": "ef7e6e2d-d984-483e-b117-b1c5d640dc23",
       "finish": "normal"
@@ -173,7 +173,7 @@
     "deck_card_id": "39b35408-3728-4e1b-9f58-b0775df914d6",
     "card_name": "Bolt Bend",
     "quantity": 1,
-    "role": "Utility",
+    "role": "Interaction",
     "current_printing": {
       "scryfall_id": "39b35408-3728-4e1b-9f58-b0775df914d6",
       "finish": "normal"
@@ -207,7 +207,7 @@
     "deck_card_id": "e21aa266-4264-4e02-9403-02930e641573",
     "card_name": "Bonus Round",
     "quantity": 1,
-    "role": "Utility",
+    "role": "Interaction",
     "current_printing": {
       "scryfall_id": "e21aa266-4264-4e02-9403-02930e641573",
       "finish": "normal"
@@ -343,7 +343,7 @@
     "deck_card_id": "84b7ef85-5751-4dd1-9cde-1cbb8097bbba",
     "card_name": "Chaos Warp",
     "quantity": 1,
-    "role": "Interaction",
+    "role": "Utility",
     "current_printing": {
       "scryfall_id": "84b7ef85-5751-4dd1-9cde-1cbb8097bbba",
       "finish": "normal"
@@ -479,7 +479,7 @@
     "deck_card_id": "e473db8a-ee0e-4753-aaab-76eda5808075",
     "card_name": "Commandeer",
     "quantity": 1,
-    "role": "Utility",
+    "role": "Interaction",
     "current_printing": {
       "scryfall_id": "e473db8a-ee0e-4753-aaab-76eda5808075",
       "finish": "normal"
@@ -513,7 +513,7 @@
     "deck_card_id": "22e816af-df55-4a3f-a6e7-0ff3bb1b45b5",
     "card_name": "Curious Homunculus // Voracious Reader",
     "quantity": 1,
-    "role": "Threat",
+    "role": "Ramp",
     "current_printing": {
       "scryfall_id": "22e816af-df55-4a3f-a6e7-0ff3bb1b45b5",
       "finish": "normal"
@@ -547,7 +547,7 @@
     "deck_card_id": "f11b8d24-375d-40dc-8497-c1ee779e156a",
     "card_name": "Emeritus of Conflict // Lightning Bolt",
     "quantity": 1,
-    "role": "Threat",
+    "role": "Utility",
     "current_printing": {
       "scryfall_id": "f11b8d24-375d-40dc-8497-c1ee779e156a",
       "finish": "normal"
@@ -683,7 +683,7 @@
     "deck_card_id": "84c3b38c-a6f7-49a2-8c47-d91b6be0a967",
     "card_name": "Faithless Looting",
     "quantity": 1,
-    "role": "Utility",
+    "role": "Draw",
     "current_printing": {
       "scryfall_id": "84c3b38c-a6f7-49a2-8c47-d91b6be0a967",
       "finish": "normal"
@@ -785,7 +785,7 @@
     "deck_card_id": "e882ef7d-ddff-40f5-a4f5-bff5c8169dc1",
     "card_name": "Flame of Anor",
     "quantity": 1,
-    "role": "Utility",
+    "role": "Interaction",
     "current_printing": {
       "scryfall_id": "e882ef7d-ddff-40f5-a4f5-bff5c8169dc1",
       "finish": "foil"
@@ -819,7 +819,7 @@
     "deck_card_id": "a4a2a4ce-a44b-480b-b1a2-94fb2514c082",
     "card_name": "Frantic Search",
     "quantity": 1,
-    "role": "Utility",
+    "role": "Draw",
     "current_printing": {
       "scryfall_id": "a4a2a4ce-a44b-480b-b1a2-94fb2514c082",
       "finish": "normal"
@@ -921,7 +921,7 @@
     "deck_card_id": "88d50518-5cfc-45de-a125-acabf97b8743",
     "card_name": "Hive Mind",
     "quantity": 1,
-    "role": "Utility",
+    "role": "Interaction",
     "current_printing": {
       "scryfall_id": "88d50518-5cfc-45de-a125-acabf97b8743",
       "finish": "normal"
@@ -989,7 +989,7 @@
     "deck_card_id": "6ef32c03-14f5-4ee2-af3a-4cbee45cd152",
     "card_name": "Increasing Vengeance",
     "quantity": 1,
-    "role": "Utility",
+    "role": "Interaction",
     "current_printing": {
       "scryfall_id": "6ef32c03-14f5-4ee2-af3a-4cbee45cd152",
       "finish": "foil"
@@ -1227,7 +1227,7 @@
     "deck_card_id": "1e3a5af6-5423-442b-a207-364e97a871d8",
     "card_name": "Izzet Charm",
     "quantity": 1,
-    "role": "Utility",
+    "role": "Interaction",
     "current_printing": {
       "scryfall_id": "1e3a5af6-5423-442b-a207-364e97a871d8",
       "finish": "normal"
@@ -1261,7 +1261,7 @@
     "deck_card_id": "a39b4b15-cd3e-4d30-8de2-8e584524d018",
     "card_name": "Izzet Signet",
     "quantity": 1,
-    "role": "Utility",
+    "role": "Ramp",
     "current_printing": {
       "scryfall_id": "a39b4b15-cd3e-4d30-8de2-8e584524d018",
       "finish": "normal"
@@ -1295,7 +1295,7 @@
     "deck_card_id": "6c3fe038-a982-4cbf-a158-c45fdc3d727e",
     "card_name": "Jace's Sanctum",
     "quantity": 1,
-    "role": "Utility",
+    "role": "Payoff",
     "current_printing": {
       "scryfall_id": "6c3fe038-a982-4cbf-a158-c45fdc3d727e",
       "finish": "normal"
@@ -1329,7 +1329,7 @@
     "deck_card_id": "c8ff751a-ec64-41d5-b22c-2a483ad9a9b2",
     "card_name": "Kitsa, Otterball Elite",
     "quantity": 1,
-    "role": "Threat",
+    "role": "Interaction",
     "current_printing": {
       "scryfall_id": "c8ff751a-ec64-41d5-b22c-2a483ad9a9b2",
       "finish": "normal"
@@ -1363,7 +1363,7 @@
     "deck_card_id": "c579956f-900a-4574-a68b-3c1d92ea67b6",
     "card_name": "Lithoform Engine",
     "quantity": 1,
-    "role": "Utility",
+    "role": "Interaction",
     "current_printing": {
       "scryfall_id": "c579956f-900a-4574-a68b-3c1d92ea67b6",
       "finish": "normal"
@@ -1397,7 +1397,7 @@
     "deck_card_id": "ac9a9cf1-f480-48e8-a9b8-75d7f1640d1a",
     "card_name": "Mathise, Surge Channeler",
     "quantity": 1,
-    "role": "Threat",
+    "role": "Interaction",
     "current_printing": {
       "scryfall_id": "ac9a9cf1-f480-48e8-a9b8-75d7f1640d1a",
       "finish": "foil"
@@ -1465,7 +1465,7 @@
     "deck_card_id": "0024708a-7f59-4707-97d9-4c5397f7333c",
     "card_name": "Midnight Clock",
     "quantity": 1,
-    "role": "Utility",
+    "role": "Ramp",
     "current_printing": {
       "scryfall_id": "0024708a-7f59-4707-97d9-4c5397f7333c",
       "finish": "normal"
@@ -1567,7 +1567,7 @@
     "deck_card_id": "82f949d0-41a0-4491-9057-bfb2bb20bdb3",
     "card_name": "Mizzix of the Izmagnus",
     "quantity": 1,
-    "role": "Threat",
+    "role": "Payoff",
     "current_printing": {
       "scryfall_id": "82f949d0-41a0-4491-9057-bfb2bb20bdb3",
       "finish": "normal"
@@ -1907,7 +1907,7 @@
     "deck_card_id": "3efbd60f-f1c0-4657-b2e4-902086b061b6",
     "card_name": "Narset's Reversal",
     "quantity": 1,
-    "role": "Utility",
+    "role": "Interaction",
     "current_printing": {
       "scryfall_id": "3efbd60f-f1c0-4657-b2e4-902086b061b6",
       "finish": "normal"
@@ -1975,7 +1975,7 @@
     "deck_card_id": "f9cff40b-9cae-47d0-8df4-c287a17a33e4",
     "card_name": "Perplexing Chimera",
     "quantity": 1,
-    "role": "Threat",
+    "role": "Interaction",
     "current_printing": {
       "scryfall_id": "f9cff40b-9cae-47d0-8df4-c287a17a33e4",
       "finish": "normal"
@@ -2009,7 +2009,7 @@
     "deck_card_id": "dc69f960-68ba-4315-8146-6a7a82047503",
     "card_name": "Ponder",
     "quantity": 1,
-    "role": "Utility",
+    "role": "Draw",
     "current_printing": {
       "scryfall_id": "dc69f960-68ba-4315-8146-6a7a82047503",
       "finish": "normal"
@@ -2043,7 +2043,7 @@
     "deck_card_id": "cb504714-b034-4938-93ad-7cb2ae320829",
     "card_name": "Pongify",
     "quantity": 1,
-    "role": "Utility",
+    "role": "Interaction",
     "current_printing": {
       "scryfall_id": "cb504714-b034-4938-93ad-7cb2ae320829",
       "finish": "normal"
@@ -2077,7 +2077,7 @@
     "deck_card_id": "6e681c39-aa00-4c6d-b077-affe3b90bed8",
     "card_name": "Preordain",
     "quantity": 1,
-    "role": "Utility",
+    "role": "Draw",
     "current_printing": {
       "scryfall_id": "6e681c39-aa00-4c6d-b077-affe3b90bed8",
       "finish": "normal"
@@ -2145,7 +2145,7 @@
     "deck_card_id": "8f6c2a5e-fe13-407c-aadd-c9caf2884ff1",
     "card_name": "Prismari Charm",
     "quantity": 1,
-    "role": "Utility",
+    "role": "Draw",
     "current_printing": {
       "scryfall_id": "8f6c2a5e-fe13-407c-aadd-c9caf2884ff1",
       "finish": "normal"
@@ -2213,7 +2213,7 @@
     "deck_card_id": "438d8a26-ddc9-4829-8aff-22d6af6575cf",
     "card_name": "Ral, Monsoon Mage // Ral, Leyline Prodigy",
     "quantity": 1,
-    "role": "Threat",
+    "role": "Draw",
     "current_printing": {
       "scryfall_id": "438d8a26-ddc9-4829-8aff-22d6af6575cf",
       "finish": "normal"
@@ -2247,7 +2247,7 @@
     "deck_card_id": "213bdaac-8044-4af3-b568-2859e3087082",
     "card_name": "Rapid Hybridization",
     "quantity": 1,
-    "role": "Utility",
+    "role": "Interaction",
     "current_printing": {
       "scryfall_id": "213bdaac-8044-4af3-b568-2859e3087082",
       "finish": "normal"
@@ -2281,7 +2281,7 @@
     "deck_card_id": "459f0dd1-3a52-4642-8c3e-11de9467507a",
     "card_name": "Reality Shift",
     "quantity": 1,
-    "role": "Utility",
+    "role": "Interaction",
     "current_printing": {
       "scryfall_id": "459f0dd1-3a52-4642-8c3e-11de9467507a",
       "finish": "normal"
@@ -2315,7 +2315,7 @@
     "deck_card_id": "0eef8431-f63c-44e0-940c-e1a38c338214",
     "card_name": "Redirect",
     "quantity": 1,
-    "role": "Utility",
+    "role": "Interaction",
     "current_printing": {
       "scryfall_id": "0eef8431-f63c-44e0-940c-e1a38c338214",
       "finish": "normal"
@@ -2349,7 +2349,7 @@
     "deck_card_id": "99302c41-434f-41ff-a61a-2c3681a0c135",
     "card_name": "Reiterate",
     "quantity": 1,
-    "role": "Utility",
+    "role": "Interaction",
     "current_printing": {
       "scryfall_id": "99302c41-434f-41ff-a61a-2c3681a0c135",
       "finish": "normal"
@@ -2417,7 +2417,7 @@
     "deck_card_id": "a9cc02d1-799d-42aa-9bc2-4c05452b63b4",
     "card_name": "Return the Favor",
     "quantity": 1,
-    "role": "Utility",
+    "role": "Interaction",
     "current_printing": {
       "scryfall_id": "a9cc02d1-799d-42aa-9bc2-4c05452b63b4",
       "finish": "normal"
@@ -2451,7 +2451,7 @@
     "deck_card_id": "997d4adb-d1bc-4d8f-9ed1-20fc8d7e4780",
     "card_name": "Reverberate",
     "quantity": 1,
-    "role": "Utility",
+    "role": "Interaction",
     "current_printing": {
       "scryfall_id": "997d4adb-d1bc-4d8f-9ed1-20fc8d7e4780",
       "finish": "normal"
@@ -2485,7 +2485,7 @@
     "deck_card_id": "a46cc78e-e032-40f8-9bc0-66a6e004f067",
     "card_name": "Ricochet Trap",
     "quantity": 1,
-    "role": "Utility",
+    "role": "Interaction",
     "current_printing": {
       "scryfall_id": "a46cc78e-e032-40f8-9bc0-66a6e004f067",
       "finish": "normal"
@@ -2655,7 +2655,7 @@
     "deck_card_id": "78a655b3-969f-40d7-9d69-61abf338df86",
     "card_name": "Storm King's Thunder",
     "quantity": 1,
-    "role": "Utility",
+    "role": "Interaction",
     "current_printing": {
       "scryfall_id": "78a655b3-969f-40d7-9d69-61abf338df86",
       "finish": "normal"
@@ -2689,7 +2689,7 @@
     "deck_card_id": "1a02fac3-8990-4bd1-8e34-beec6332088c",
     "card_name": "Storm of Saruman",
     "quantity": 1,
-    "role": "Utility",
+    "role": "Interaction",
     "current_printing": {
       "scryfall_id": "1a02fac3-8990-4bd1-8e34-beec6332088c",
       "finish": "foil"
@@ -2723,7 +2723,7 @@
     "deck_card_id": "52c896fe-c208-41ec-aad8-fe56c7858942",
     "card_name": "Storm-Kiln Artist",
     "quantity": 1,
-    "role": "Threat",
+    "role": "Ramp",
     "current_printing": {
       "scryfall_id": "52c896fe-c208-41ec-aad8-fe56c7858942",
       "finish": "foil"
@@ -2791,7 +2791,7 @@
     "deck_card_id": "99754055-6d67-4fde-aff3-41f6af6ea764",
     "card_name": "Stormcatch Mentor",
     "quantity": 1,
-    "role": "Threat",
+    "role": "Payoff",
     "current_printing": {
       "scryfall_id": "99754055-6d67-4fde-aff3-41f6af6ea764",
       "finish": "normal"
@@ -2859,7 +2859,7 @@
     "deck_card_id": "2c573d12-4c69-4a54-b1b9-236c003ba98a",
     "card_name": "Swarm Intelligence",
     "quantity": 1,
-    "role": "Utility",
+    "role": "Interaction",
     "current_printing": {
       "scryfall_id": "2c573d12-4c69-4a54-b1b9-236c003ba98a",
       "finish": "normal"
@@ -2893,7 +2893,7 @@
     "deck_card_id": "10affb59-7c57-4b72-892b-d813f385f4a9",
     "card_name": "Swerve",
     "quantity": 1,
-    "role": "Utility",
+    "role": "Interaction",
     "current_printing": {
       "scryfall_id": "10affb59-7c57-4b72-892b-d813f385f4a9",
       "finish": "normal"
@@ -2961,7 +2961,7 @@
     "deck_card_id": "9d8b61ab-9cc9-4eed-8241-67a834a1786d",
     "card_name": "Talisman of Creativity",
     "quantity": 1,
-    "role": "Utility",
+    "role": "Ramp",
     "current_printing": {
       "scryfall_id": "9d8b61ab-9cc9-4eed-8241-67a834a1786d",
       "finish": "normal"
@@ -3029,7 +3029,7 @@
     "deck_card_id": "085cb059-6cab-4725-95fb-de484167a5d4",
     "card_name": "Tempt with Mayhem",
     "quantity": 1,
-    "role": "Utility",
+    "role": "Interaction",
     "current_printing": {
       "scryfall_id": "085cb059-6cab-4725-95fb-de484167a5d4",
       "finish": "normal"
@@ -3063,7 +3063,7 @@
     "deck_card_id": "76c48a67-1410-40f1-9b93-0172d85e4688",
     "card_name": "Thousand-Year Storm",
     "quantity": 1,
-    "role": "Utility",
+    "role": "Interaction",
     "current_printing": {
       "scryfall_id": "76c48a67-1410-40f1-9b93-0172d85e4688",
       "finish": "normal"
@@ -3097,7 +3097,7 @@
     "deck_card_id": "f38eec33-a40e-4739-ad2c-2f57008cef4e",
     "card_name": "Twincast",
     "quantity": 1,
-    "role": "Utility",
+    "role": "Interaction",
     "current_printing": {
       "scryfall_id": "f38eec33-a40e-4739-ad2c-2f57008cef4e",
       "finish": "normal"
@@ -3131,7 +3131,7 @@
     "deck_card_id": "52173f36-19d2-48be-a8e8-8cbe946759c0",
     "card_name": "Urabrask // The Great Work",
     "quantity": 1,
-    "role": "Threat",
+    "role": "Ramp",
     "current_printing": {
       "scryfall_id": "52173f36-19d2-48be-a8e8-8cbe946759c0",
       "finish": "normal"
@@ -3165,7 +3165,7 @@
     "deck_card_id": "7cc2173a-b7fb-4bd6-9c8e-73de91c6903a",
     "card_name": "Virtue of Knowledge // Vantress Visions",
     "quantity": 1,
-    "role": "Utility",
+    "role": "Interaction",
     "current_printing": {
       "scryfall_id": "7cc2173a-b7fb-4bd6-9c8e-73de91c6903a",
       "finish": "normal"
@@ -3199,7 +3199,7 @@
     "deck_card_id": "962273bb-2186-4e33-99c5-65eedc4a93e9",
     "card_name": "Wild Ricochet",
     "quantity": 1,
-    "role": "Utility",
+    "role": "Interaction",
     "current_printing": {
       "scryfall_id": "962273bb-2186-4e33-99c5-65eedc4a93e9",
       "finish": "normal"

@@ -3,7 +3,7 @@
     "deck_card_id": "f2e0f538-5825-47e9-883c-3ec6fd5b25ea",
     "card_name": "Abyssal Harvester",
     "quantity": 1,
-    "role": "Threat",
+    "role": "Interaction",
     "current_printing": {
       "scryfall_id": "f2e0f538-5825-47e9-883c-3ec6fd5b25ea",
       "finish": "normal"
@@ -37,7 +37,7 @@
     "deck_card_id": "b2496c4a-df03-4583-bd76-f98ed5cb61ee",
     "card_name": "Arbiter of Woe",
     "quantity": 1,
-    "role": "Threat",
+    "role": "Draw",
     "current_printing": {
       "scryfall_id": "b2496c4a-df03-4583-bd76-f98ed5cb61ee",
       "finish": "normal"
@@ -71,7 +71,7 @@
     "deck_card_id": "87da5ad8-b35f-4f9c-b17a-bb2563cbc186",
     "card_name": "Ashnod's Altar",
     "quantity": 1,
-    "role": "Utility",
+    "role": "Ramp",
     "current_printing": {
       "scryfall_id": "87da5ad8-b35f-4f9c-b17a-bb2563cbc186",
       "finish": "normal"
@@ -105,7 +105,7 @@
     "deck_card_id": "690ccdc7-6c43-4902-9d11-2f07b7a36b11",
     "card_name": "Bartolomé del Presidio",
     "quantity": 1,
-    "role": "Threat",
+    "role": "Enabler",
     "current_printing": {
       "scryfall_id": "690ccdc7-6c43-4902-9d11-2f07b7a36b11",
       "finish": "normal"
@@ -139,7 +139,7 @@
     "deck_card_id": "3be363dc-70f0-4de3-b7de-5e4db2264883",
     "card_name": "Bastion of Remembrance",
     "quantity": 1,
-    "role": "Utility",
+    "role": "Enabler",
     "current_printing": {
       "scryfall_id": "3be363dc-70f0-4de3-b7de-5e4db2264883",
       "finish": "normal"
@@ -207,7 +207,7 @@
     "deck_card_id": "8b28572c-d2ba-4834-8630-3d82202ebb6f",
     "card_name": "Black Market Connections",
     "quantity": 1,
-    "role": "Utility",
+    "role": "Draw",
     "current_printing": {
       "scryfall_id": "8b28572c-d2ba-4834-8630-3d82202ebb6f",
       "finish": "normal"
@@ -275,7 +275,7 @@
     "deck_card_id": "b5275d76-2947-4219-be21-614c7421614a",
     "card_name": "Blood Artist",
     "quantity": 1,
-    "role": "Threat",
+    "role": "Payoff",
     "current_printing": {
       "scryfall_id": "b5275d76-2947-4219-be21-614c7421614a",
       "finish": "normal"
@@ -343,7 +343,7 @@
     "deck_card_id": "171a9a3f-6278-4921-9848-2b8459869d6c",
     "card_name": "Bontu's Monument",
     "quantity": 1,
-    "role": "Utility",
+    "role": "Payoff",
     "current_printing": {
       "scryfall_id": "171a9a3f-6278-4921-9848-2b8459869d6c",
       "finish": "normal"
@@ -377,7 +377,7 @@
     "deck_card_id": "22a77543-749a-49d8-96f4-3458ae5dcd38",
     "card_name": "Carrion Feeder",
     "quantity": 1,
-    "role": "Threat",
+    "role": "Enabler",
     "current_printing": {
       "scryfall_id": "22a77543-749a-49d8-96f4-3458ae5dcd38",
       "finish": "normal"
@@ -513,7 +513,7 @@
     "deck_card_id": "14fc0dfb-663a-4713-902e-96dbecc404b7",
     "card_name": "Corpse Augur",
     "quantity": 1,
-    "role": "Threat",
+    "role": "Draw",
     "current_printing": {
       "scryfall_id": "14fc0dfb-663a-4713-902e-96dbecc404b7",
       "finish": "normal"
@@ -547,7 +547,7 @@
     "deck_card_id": "cc7f2ce1-b442-4051-b1fe-90efde9bc181",
     "card_name": "Demon's Disciple",
     "quantity": 1,
-    "role": "Threat",
+    "role": "Utility",
     "current_printing": {
       "scryfall_id": "cc7f2ce1-b442-4051-b1fe-90efde9bc181",
       "finish": "normal"
@@ -581,7 +581,7 @@
     "deck_card_id": "652c3bbb-cac8-47ad-81de-41e954e17a29",
     "card_name": "Doomed Traveler",
     "quantity": 1,
-    "role": "Threat",
+    "role": "Enabler",
     "current_printing": {
       "scryfall_id": "652c3bbb-cac8-47ad-81de-41e954e17a29",
       "finish": "normal"
@@ -615,7 +615,7 @@
     "deck_card_id": "f8ecdf65-c6e6-4dac-899b-55cd80242629",
     "card_name": "Eldrazi Monument",
     "quantity": 1,
-    "role": "Utility",
+    "role": "Protection",
     "current_printing": {
       "scryfall_id": "f8ecdf65-c6e6-4dac-899b-55cd80242629",
       "finish": "normal"
@@ -649,7 +649,7 @@
     "deck_card_id": "6f816d97-10f0-4d92-aa21-254754530554",
     "card_name": "Elspeth, Sun's Champion",
     "quantity": 1,
-    "role": "Utility",
+    "role": "Interaction",
     "current_printing": {
       "scryfall_id": "6f816d97-10f0-4d92-aa21-254754530554",
       "finish": "foil"
@@ -683,7 +683,7 @@
     "deck_card_id": "5cf181ae-daa7-42f9-b667-5e679d80cf34",
     "card_name": "Embalmed Ascendant",
     "quantity": 1,
-    "role": "Threat",
+    "role": "Enabler",
     "current_printing": {
       "scryfall_id": "5cf181ae-daa7-42f9-b667-5e679d80cf34",
       "finish": "normal"
@@ -717,7 +717,7 @@
     "deck_card_id": "84701927-799f-4af4-85b8-389f903c5bc0",
     "card_name": "Erebos, Bleak-Hearted",
     "quantity": 1,
-    "role": "Threat",
+    "role": "Protection",
     "current_printing": {
       "scryfall_id": "84701927-799f-4af4-85b8-389f903c5bc0",
       "finish": "normal"
@@ -785,7 +785,7 @@
     "deck_card_id": "41775788-2432-495a-8abd-6c8beaad3d27",
     "card_name": "Fain, the Broker",
     "quantity": 1,
-    "role": "Threat",
+    "role": "Enabler",
     "current_printing": {
       "scryfall_id": "41775788-2432-495a-8abd-6c8beaad3d27",
       "finish": "normal"
@@ -853,7 +853,7 @@
     "deck_card_id": "0991db5d-2aba-467f-9044-c11e024d5d43",
     "card_name": "Final Act",
     "quantity": 1,
-    "role": "Utility",
+    "role": "Interaction",
     "current_printing": {
       "scryfall_id": "0991db5d-2aba-467f-9044-c11e024d5d43",
       "finish": "normal"
@@ -887,7 +887,7 @@
     "deck_card_id": "6b87b385-0ad9-4aa7-8a7e-c42b9c002a99",
     "card_name": "Idol of Oblivion",
     "quantity": 1,
-    "role": "Utility",
+    "role": "Draw",
     "current_printing": {
       "scryfall_id": "6b87b385-0ad9-4aa7-8a7e-c42b9c002a99",
       "finish": "normal"
@@ -955,7 +955,7 @@
     "deck_card_id": "49d5d62b-72ed-446a-b280-ad04c38bdd0c",
     "card_name": "Jadar, Ghoulcaller of Nephalia",
     "quantity": 1,
-    "role": "Threat",
+    "role": "Enabler",
     "current_printing": {
       "scryfall_id": "49d5d62b-72ed-446a-b280-ad04c38bdd0c",
       "finish": "normal"
@@ -1057,7 +1057,7 @@
     "deck_card_id": "c5a4b212-bc60-4a58-b5f6-4012a3158785",
     "card_name": "Luminous Broodmoth",
     "quantity": 1,
-    "role": "Threat",
+    "role": "Payoff",
     "current_printing": {
       "scryfall_id": "c5a4b212-bc60-4a58-b5f6-4012a3158785",
       "finish": "normal"
@@ -1091,7 +1091,7 @@
     "deck_card_id": "5f70dafc-c638-4ec0-ab5b-62998f752720",
     "card_name": "Marauding Blight-Priest",
     "quantity": 1,
-    "role": "Threat",
+    "role": "Payoff",
     "current_printing": {
       "scryfall_id": "5f70dafc-c638-4ec0-ab5b-62998f752720",
       "finish": "normal"
@@ -1125,7 +1125,7 @@
     "deck_card_id": "3db59d06-a226-42b2-8f01-6b63a6eea83f",
     "card_name": "Meathook Massacre II",
     "quantity": 1,
-    "role": "Utility",
+    "role": "Payoff",
     "current_printing": {
       "scryfall_id": "3db59d06-a226-42b2-8f01-6b63a6eea83f",
       "finish": "normal"
@@ -1159,7 +1159,7 @@
     "deck_card_id": "0c9e944b-98fa-4aea-825d-b8b8a9d7ed47",
     "card_name": "Minthara, Merciless Soul",
     "quantity": 1,
-    "role": "Threat",
+    "role": "Utility",
     "current_printing": {
       "scryfall_id": "0c9e944b-98fa-4aea-825d-b8b8a9d7ed47",
       "finish": "normal"
@@ -1193,7 +1193,7 @@
     "deck_card_id": "882747f9-b4fe-42be-8fe9-f871cd0779bd",
     "card_name": "Mirkwood Bats",
     "quantity": 1,
-    "role": "Threat",
+    "role": "Enabler",
     "current_printing": {
       "scryfall_id": "882747f9-b4fe-42be-8fe9-f871cd0779bd",
       "finish": "normal"
@@ -1227,7 +1227,7 @@
     "deck_card_id": "439aea5f-c64c-4460-b473-b4bc2c82c048",
     "card_name": "Mortify",
     "quantity": 1,
-    "role": "Utility",
+    "role": "Interaction",
     "current_printing": {
       "scryfall_id": "439aea5f-c64c-4460-b473-b4bc2c82c048",
       "finish": "normal"
@@ -1295,7 +1295,7 @@
     "deck_card_id": "b70293ae-d50d-44bf-aaa3-689727056ec5",
     "card_name": "Ogre Slumlord",
     "quantity": 1,
-    "role": "Threat",
+    "role": "Enabler",
     "current_printing": {
       "scryfall_id": "b70293ae-d50d-44bf-aaa3-689727056ec5",
       "finish": "normal"
@@ -1329,7 +1329,7 @@
     "deck_card_id": "20298a61-2739-4254-b102-51a2a74b5ddc",
     "card_name": "Path to Exile",
     "quantity": 1,
-    "role": "Utility",
+    "role": "Interaction",
     "current_printing": {
       "scryfall_id": "20298a61-2739-4254-b102-51a2a74b5ddc",
       "finish": "normal"
@@ -1363,7 +1363,7 @@
     "deck_card_id": "c1b0377c-efd6-4fab-89f0-b219ca2c4c22",
     "card_name": "Pawn of Ulamog",
     "quantity": 1,
-    "role": "Threat",
+    "role": "Ramp",
     "current_printing": {
       "scryfall_id": "c1b0377c-efd6-4fab-89f0-b219ca2c4c22",
       "finish": "normal"
@@ -1397,7 +1397,7 @@
     "deck_card_id": "1ac61e84-94d6-4ff7-a00f-29de93f09a38",
     "card_name": "Pitiless Plunderer",
     "quantity": 1,
-    "role": "Threat",
+    "role": "Ramp",
     "current_printing": {
       "scryfall_id": "1ac61e84-94d6-4ff7-a00f-29de93f09a38",
       "finish": "normal"
@@ -1431,7 +1431,7 @@
     "deck_card_id": "7092aa38-4f05-4b18-b894-d55ca9fe9b15",
     "card_name": "Plaguecrafter",
     "quantity": 1,
-    "role": "Threat",
+    "role": "Utility",
     "current_printing": {
       "scryfall_id": "7092aa38-4f05-4b18-b894-d55ca9fe9b15",
       "finish": "normal"
@@ -1499,7 +1499,7 @@
     "deck_card_id": "eaea189c-9973-435e-975d-dc47a331b28a",
     "card_name": "Plumb the Forbidden",
     "quantity": 1,
-    "role": "Utility",
+    "role": "Draw",
     "current_printing": {
       "scryfall_id": "eaea189c-9973-435e-975d-dc47a331b28a",
       "finish": "normal"
@@ -1533,7 +1533,7 @@
     "deck_card_id": "35e64605-8edb-4def-9522-765e90d1f0f3",
     "card_name": "Popular Egotist",
     "quantity": 1,
-    "role": "Threat",
+    "role": "Protection",
     "current_printing": {
       "scryfall_id": "35e64605-8edb-4def-9522-765e90d1f0f3",
       "finish": "normal"
@@ -1601,7 +1601,7 @@
     "deck_card_id": "00566375-e976-4e96-b751-cf0430452c9c",
     "card_name": "Reassembling Skeleton",
     "quantity": 1,
-    "role": "Threat",
+    "role": "Recursion",
     "current_printing": {
       "scryfall_id": "00566375-e976-4e96-b751-cf0430452c9c",
       "finish": "normal"
@@ -1703,7 +1703,7 @@
     "deck_card_id": "975a2d50-4230-4f13-b54e-5e0d27c7261a",
     "card_name": "Selfless Spirit",
     "quantity": 1,
-    "role": "Threat",
+    "role": "Protection",
     "current_printing": {
       "scryfall_id": "975a2d50-4230-4f13-b54e-5e0d27c7261a",
       "finish": "normal"
@@ -1737,7 +1737,7 @@
     "deck_card_id": "78509763-4bb8-4030-b205-76917de75c57",
     "card_name": "Serrated Scorpion",
     "quantity": 1,
-    "role": "Threat",
+    "role": "Utility",
     "current_printing": {
       "scryfall_id": "78509763-4bb8-4030-b205-76917de75c57",
       "finish": "normal"
@@ -1771,7 +1771,7 @@
     "deck_card_id": "13a0913d-776b-4ef8-adef-8861349df2b5",
     "card_name": "Shadowheart, Dark Justiciar",
     "quantity": 1,
-    "role": "Threat",
+    "role": "Draw",
     "current_printing": {
       "scryfall_id": "13a0913d-776b-4ef8-adef-8861349df2b5",
       "finish": "foil"
@@ -1805,7 +1805,7 @@
     "deck_card_id": "f824d5b6-259b-467b-93b5-e93db8b15359",
     "card_name": "Sifter of Skulls",
     "quantity": 1,
-    "role": "Threat",
+    "role": "Ramp",
     "current_printing": {
       "scryfall_id": "f824d5b6-259b-467b-93b5-e93db8b15359",
       "finish": "normal"
@@ -1873,7 +1873,7 @@
     "deck_card_id": "80812871-d9a7-40de-94a5-b854e55409db",
     "card_name": "Soldevi Adnate",
     "quantity": 1,
-    "role": "Threat",
+    "role": "Utility",
     "current_printing": {
       "scryfall_id": "80812871-d9a7-40de-94a5-b854e55409db",
       "finish": "normal"
@@ -1907,7 +1907,7 @@
     "deck_card_id": "0bd72802-8eab-4700-9bd2-d3997c17438f",
     "card_name": "Solemn Simulacrum",
     "quantity": 1,
-    "role": "Threat",
+    "role": "Ramp",
     "current_printing": {
       "scryfall_id": "0bd72802-8eab-4700-9bd2-d3997c17438f",
       "finish": "normal"
@@ -1941,7 +1941,7 @@
     "deck_card_id": "17be11f2-f2db-40c4-8fc1-2ed7173f9a1a",
     "card_name": "Staff of the Storyteller",
     "quantity": 1,
-    "role": "Utility",
+    "role": "Draw",
     "current_printing": {
       "scryfall_id": "17be11f2-f2db-40c4-8fc1-2ed7173f9a1a",
       "finish": "normal"
@@ -1975,7 +1975,7 @@
     "deck_card_id": "28d5eee5-bab8-4a26-83cd-16a3c07fb7b6",
     "card_name": "Sun Titan",
     "quantity": 1,
-    "role": "Threat",
+    "role": "Recursion",
     "current_printing": {
       "scryfall_id": "28d5eee5-bab8-4a26-83cd-16a3c07fb7b6",
       "finish": "normal"
@@ -2043,7 +2043,7 @@
     "deck_card_id": "948cdb9d-adae-4161-a233-7f7d28b3e1a7",
     "card_name": "Swords to Plowshares",
     "quantity": 1,
-    "role": "Utility",
+    "role": "Interaction",
     "current_printing": {
       "scryfall_id": "948cdb9d-adae-4161-a233-7f7d28b3e1a7",
       "finish": "normal"
@@ -2077,7 +2077,7 @@
     "deck_card_id": "b945f8c2-acfc-4622-8e96-993921d58995",
     "card_name": "Syr Konrad, the Grim",
     "quantity": 1,
-    "role": "Threat",
+    "role": "Payoff",
     "current_printing": {
       "scryfall_id": "b945f8c2-acfc-4622-8e96-993921d58995",
       "finish": "normal"
@@ -2213,7 +2213,7 @@
     "deck_card_id": "ae9009fa-4b52-422d-8ff3-f699089249d8",
     "card_name": "Tragedy Feaster",
     "quantity": 1,
-    "role": "Threat",
+    "role": "Enabler",
     "current_printing": {
       "scryfall_id": "ae9009fa-4b52-422d-8ff3-f699089249d8",
       "finish": "foil"
@@ -2281,7 +2281,7 @@
     "deck_card_id": "6854dc06-4845-4201-958b-2fdad3f7b64a",
     "card_name": "Vampiric Rites",
     "quantity": 1,
-    "role": "Utility",
+    "role": "Draw",
     "current_printing": {
       "scryfall_id": "6854dc06-4845-4201-958b-2fdad3f7b64a",
       "finish": "normal"
@@ -2315,7 +2315,7 @@
     "deck_card_id": "8bb2765f-4016-4e41-9db4-5ad463faceab",
     "card_name": "Vashta Nerada",
     "quantity": 1,
-    "role": "Threat",
+    "role": "Protection",
     "current_printing": {
       "scryfall_id": "8bb2765f-4016-4e41-9db4-5ad463faceab",
       "finish": "normal"
@@ -2383,7 +2383,7 @@
     "deck_card_id": "83379f7f-3766-43f5-bd5e-e11ef9070ddb",
     "card_name": "Victimize",
     "quantity": 1,
-    "role": "Utility",
+    "role": "Enabler",
     "current_printing": {
       "scryfall_id": "83379f7f-3766-43f5-bd5e-e11ef9070ddb",
       "finish": "normal"
@@ -2417,7 +2417,7 @@
     "deck_card_id": "6179f847-e334-4f7f-9a4e-0013942a394f",
     "card_name": "Viscera Seer",
     "quantity": 1,
-    "role": "Threat",
+    "role": "Enabler",
     "current_printing": {
       "scryfall_id": "6179f847-e334-4f7f-9a4e-0013942a394f",
       "finish": "normal"
@@ -2451,7 +2451,7 @@
     "deck_card_id": "d8f69cea-823c-482b-a605-8138b3d950e6",
     "card_name": "Welcoming Vampire",
     "quantity": 1,
-    "role": "Threat",
+    "role": "Draw",
     "current_printing": {
       "scryfall_id": "d8f69cea-823c-482b-a605-8138b3d950e6",
       "finish": "foil"
@@ -2485,7 +2485,7 @@
     "deck_card_id": "e1004f64-5052-4b1e-8fd8-eda463fbd9b7",
     "card_name": "Zahur, Glory's Past",
     "quantity": 1,
-    "role": "Threat",
+    "role": "Enabler",
     "current_printing": {
       "scryfall_id": "e1004f64-5052-4b1e-8fd8-eda463fbd9b7",
       "finish": "foil"
@@ -2519,7 +2519,7 @@
     "deck_card_id": "340efd40-6e1d-440e-b209-9b4993884e1d",
     "card_name": "Zulaport Cutthroat",
     "quantity": 1,
-    "role": "Threat",
+    "role": "Payoff",
     "current_printing": {
       "scryfall_id": "340efd40-6e1d-440e-b209-9b4993884e1d",
       "finish": "normal"

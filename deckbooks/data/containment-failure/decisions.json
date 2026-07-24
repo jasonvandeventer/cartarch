@@ -3,7 +3,7 @@
     "deck_card_id": "74379bab-1bf2-4dcd-b055-d2ac0bf2c390",
     "card_name": "Abrupt Decay",
     "quantity": 1,
-    "role": "Utility",
+    "role": "Interaction",
     "current_printing": {
       "scryfall_id": "74379bab-1bf2-4dcd-b055-d2ac0bf2c390",
       "finish": "normal"
@@ -37,7 +37,7 @@
     "deck_card_id": "6dda8d6b-fd31-4908-a953-20c180a33e56",
     "card_name": "Arasta of the Endless Web",
     "quantity": 1,
-    "role": "Threat",
+    "role": "Enabler",
     "current_printing": {
       "scryfall_id": "6dda8d6b-fd31-4908-a953-20c180a33e56",
       "finish": "normal"
@@ -105,7 +105,7 @@
     "deck_card_id": "aaf258fc-3ba4-4b83-bdbf-10a07e0b6c03",
     "card_name": "Assassin's Trophy",
     "quantity": 1,
-    "role": "Utility",
+    "role": "Interaction",
     "current_printing": {
       "scryfall_id": "aaf258fc-3ba4-4b83-bdbf-10a07e0b6c03",
       "finish": "normal"
@@ -207,7 +207,7 @@
     "deck_card_id": "dc060028-e01c-4bc7-8b52-7d0e2a350061",
     "card_name": "Blight Mound",
     "quantity": 1,
-    "role": "Utility",
+    "role": "Enabler",
     "current_printing": {
       "scryfall_id": "dc060028-e01c-4bc7-8b52-7d0e2a350061",
       "finish": "normal"
@@ -377,7 +377,7 @@
     "deck_card_id": "b35a8efe-2a3e-4060-9134-d4150e4bdf28",
     "card_name": "Corpsejack Menace",
     "quantity": 1,
-    "role": "Threat",
+    "role": "Utility",
     "current_printing": {
       "scryfall_id": "b35a8efe-2a3e-4060-9134-d4150e4bdf28",
       "finish": "normal"
@@ -445,7 +445,7 @@
     "deck_card_id": "59ed23a2-6153-47b2-ab73-062195cafb74",
     "card_name": "Defend the Rider",
     "quantity": 1,
-    "role": "Utility",
+    "role": "Protection",
     "current_printing": {
       "scryfall_id": "59ed23a2-6153-47b2-ab73-062195cafb74",
       "finish": "normal"
@@ -479,7 +479,7 @@
     "deck_card_id": "f2c4f80e-84a0-463b-82c3-5c6503809351",
     "card_name": "Doubling Season",
     "quantity": 1,
-    "role": "Utility",
+    "role": "Enabler",
     "current_printing": {
       "scryfall_id": "f2c4f80e-84a0-463b-82c3-5c6503809351",
       "finish": "normal"
@@ -547,7 +547,7 @@
     "deck_card_id": "508e1dd7-edbd-4b76-90bc-ff58c55b58a3",
     "card_name": "Eccentric Pestfinder // Turn Stones",
     "quantity": 1,
-    "role": "Threat",
+    "role": "Enabler",
     "current_printing": {
       "scryfall_id": "508e1dd7-edbd-4b76-90bc-ff58c55b58a3",
       "finish": "normal"
@@ -581,7 +581,7 @@
     "deck_card_id": "5d2d0033-1a73-4927-93a9-76d00ae7c6a8",
     "card_name": "Enduring Tenacity",
     "quantity": 1,
-    "role": "Threat",
+    "role": "Payoff",
     "current_printing": {
       "scryfall_id": "5d2d0033-1a73-4927-93a9-76d00ae7c6a8",
       "finish": "normal"
@@ -615,7 +615,7 @@
     "deck_card_id": "ff09be4d-bbcc-4c25-9df2-b3df07fca955",
     "card_name": "Essence Warden",
     "quantity": 1,
-    "role": "Threat",
+    "role": "Utility",
     "current_printing": {
       "scryfall_id": "ff09be4d-bbcc-4c25-9df2-b3df07fca955",
       "finish": "normal"
@@ -649,7 +649,7 @@
     "deck_card_id": "39704000-65d3-4d39-849e-a3b617376bbc",
     "card_name": "Eternal Witness",
     "quantity": 1,
-    "role": "Threat",
+    "role": "Recursion",
     "current_printing": {
       "scryfall_id": "39704000-65d3-4d39-849e-a3b617376bbc",
       "finish": "normal"
@@ -683,7 +683,7 @@
     "deck_card_id": "1d58d08d-cd62-416d-8d8e-7d9c56d5c4da",
     "card_name": "Evolution Sage",
     "quantity": 1,
-    "role": "Threat",
+    "role": "Utility",
     "current_printing": {
       "scryfall_id": "1d58d08d-cd62-416d-8d8e-7d9c56d5c4da",
       "finish": "normal"
@@ -717,7 +717,7 @@
     "deck_card_id": "1f9fb33a-3b39-4aff-93b8-aedafe0ea694",
     "card_name": "Fanatic of Rhonas",
     "quantity": 1,
-    "role": "Threat",
+    "role": "Ramp",
     "current_printing": {
       "scryfall_id": "1f9fb33a-3b39-4aff-93b8-aedafe0ea694",
       "finish": "foil"
@@ -751,7 +751,7 @@
     "deck_card_id": "6c41b3c9-bbed-447d-a952-250bb7091a9e",
     "card_name": "Farseek",
     "quantity": 1,
-    "role": "Utility",
+    "role": "Ramp",
     "current_printing": {
       "scryfall_id": "6c41b3c9-bbed-447d-a952-250bb7091a9e",
       "finish": "normal"
@@ -1091,7 +1091,7 @@
     "deck_card_id": "8d3facb6-314c-4dd2-a570-4515c596163c",
     "card_name": "Gilded Goose",
     "quantity": 1,
-    "role": "Threat",
+    "role": "Ramp",
     "current_printing": {
       "scryfall_id": "8d3facb6-314c-4dd2-a570-4515c596163c",
       "finish": "normal"
@@ -1159,7 +1159,7 @@
     "deck_card_id": "6a41e111-659e-4521-890f-19d814054dfc",
     "card_name": "Golgari Signet",
     "quantity": 1,
-    "role": "Utility",
+    "role": "Ramp",
     "current_printing": {
       "scryfall_id": "6a41e111-659e-4521-890f-19d814054dfc",
       "finish": "normal"
@@ -1193,7 +1193,7 @@
     "deck_card_id": "86f97dd8-8647-4938-aee0-690bb715f88b",
     "card_name": "Gorma, the Gullet",
     "quantity": 1,
-    "role": "Threat",
+    "role": "Payoff",
     "current_printing": {
       "scryfall_id": "86f97dd8-8647-4938-aee0-690bb715f88b",
       "finish": "foil"
@@ -1261,7 +1261,7 @@
     "deck_card_id": "de49db1e-3cb7-4f1a-9637-23e5820a0144",
     "card_name": "Haywire Mite",
     "quantity": 1,
-    "role": "Threat",
+    "role": "Utility",
     "current_printing": {
       "scryfall_id": "de49db1e-3cb7-4f1a-9637-23e5820a0144",
       "finish": "normal"
@@ -1295,7 +1295,7 @@
     "deck_card_id": "0bdaecd3-fc71-4c86-a65e-27681e1ba41f",
     "card_name": "Heroic Intervention",
     "quantity": 1,
-    "role": "Utility",
+    "role": "Protection",
     "current_printing": {
       "scryfall_id": "0bdaecd3-fc71-4c86-a65e-27681e1ba41f",
       "finish": "normal"
@@ -1363,7 +1363,7 @@
     "deck_card_id": "3e241642-5172-4437-b694-f6aa159d5cd9",
     "card_name": "Inspiring Call",
     "quantity": 1,
-    "role": "Utility",
+    "role": "Protection",
     "current_printing": {
       "scryfall_id": "3e241642-5172-4437-b694-f6aa159d5cd9",
       "finish": "normal"
@@ -1465,7 +1465,7 @@
     "deck_card_id": "ababe16b-9359-44cb-81fb-e0b3a42b46bd",
     "card_name": "Kodama's Reach",
     "quantity": 1,
-    "role": "Utility",
+    "role": "Ramp",
     "current_printing": {
       "scryfall_id": "ababe16b-9359-44cb-81fb-e0b3a42b46bd",
       "finish": "normal"
@@ -1533,7 +1533,7 @@
     "deck_card_id": "7439a855-4041-4d14-8edf-6741a734e55d",
     "card_name": "Lifecrafter's Bestiary",
     "quantity": 1,
-    "role": "Utility",
+    "role": "Draw",
     "current_printing": {
       "scryfall_id": "7439a855-4041-4d14-8edf-6741a734e55d",
       "finish": "normal"
@@ -1601,7 +1601,7 @@
     "deck_card_id": "9a8456d9-30dd-4acf-9255-e9540886df37",
     "card_name": "Maskwood Nexus",
     "quantity": 1,
-    "role": "Utility",
+    "role": "Enabler",
     "current_printing": {
       "scryfall_id": "9a8456d9-30dd-4acf-9255-e9540886df37",
       "finish": "normal"
@@ -1703,7 +1703,7 @@
     "deck_card_id": "55fb93e6-d057-4b70-ad12-e98291fd4a2c",
     "card_name": "Ohran Frostfang",
     "quantity": 1,
-    "role": "Threat",
+    "role": "Draw",
     "current_printing": {
       "scryfall_id": "55fb93e6-d057-4b70-ad12-e98291fd4a2c",
       "finish": "normal"
@@ -1771,7 +1771,7 @@
     "deck_card_id": "baf793b6-9612-43f3-9f1b-2e53e81cb89f",
     "card_name": "Ophiomancer",
     "quantity": 1,
-    "role": "Threat",
+    "role": "Enabler",
     "current_printing": {
       "scryfall_id": "baf793b6-9612-43f3-9f1b-2e53e81cb89f",
       "finish": "normal"
@@ -1839,7 +1839,7 @@
     "deck_card_id": "a8a982c8-bc08-44ba-b3ed-9e4b124615d6",
     "card_name": "Patchwork Banner",
     "quantity": 1,
-    "role": "Utility",
+    "role": "Ramp",
     "current_printing": {
       "scryfall_id": "a8a982c8-bc08-44ba-b3ed-9e4b124615d6",
       "finish": "normal"
@@ -1907,7 +1907,7 @@
     "deck_card_id": "b82c20ad-0f69-4822-ae76-770832cccdf7",
     "card_name": "Pawpatch Formation",
     "quantity": 1,
-    "role": "Utility",
+    "role": "Interaction",
     "current_printing": {
       "scryfall_id": "b82c20ad-0f69-4822-ae76-770832cccdf7",
       "finish": "normal"
@@ -1941,7 +1941,7 @@
     "deck_card_id": "c9b8626d-d3d8-4460-9adf-112f48f173f6",
     "card_name": "Pest Infestation",
     "quantity": 1,
-    "role": "Utility",
+    "role": "Enabler",
     "current_printing": {
       "scryfall_id": "c9b8626d-d3d8-4460-9adf-112f48f173f6",
       "finish": "normal"
@@ -1975,7 +1975,7 @@
     "deck_card_id": "d882beb9-6766-4818-afbb-f6fd7a2d5b70",
     "card_name": "Pest Mascot",
     "quantity": 1,
-    "role": "Threat",
+    "role": "Payoff",
     "current_printing": {
       "scryfall_id": "d882beb9-6766-4818-afbb-f6fd7a2d5b70",
       "finish": "normal"
@@ -2009,7 +2009,7 @@
     "deck_card_id": "1f2a066a-7bcd-4e9d-8e52-0769cd6c8124",
     "card_name": "Pest Rescuer",
     "quantity": 1,
-    "role": "Threat",
+    "role": "Enabler",
     "current_printing": {
       "scryfall_id": "1f2a066a-7bcd-4e9d-8e52-0769cd6c8124",
       "finish": "normal"
@@ -2043,7 +2043,7 @@
     "deck_card_id": "0784b6f0-9ebf-43d2-ba0f-a6bc93ba0c48",
     "card_name": "Phyrexian Arena",
     "quantity": 1,
-    "role": "Utility",
+    "role": "Draw",
     "current_printing": {
       "scryfall_id": "0784b6f0-9ebf-43d2-ba0f-a6bc93ba0c48",
       "finish": "normal"
@@ -2077,7 +2077,7 @@
     "deck_card_id": "eed76e15-6456-4ddc-addf-f0e6eff8bb6a",
     "card_name": "Prosperous Innkeeper",
     "quantity": 1,
-    "role": "Threat",
+    "role": "Ramp",
     "current_printing": {
       "scryfall_id": "eed76e15-6456-4ddc-addf-f0e6eff8bb6a",
       "finish": "normal"
@@ -2111,7 +2111,7 @@
     "deck_card_id": "52733829-27b7-40ec-a897-cabab35b3729",
     "card_name": "Realmwalker",
     "quantity": 1,
-    "role": "Threat",
+    "role": "Utility",
     "current_printing": {
       "scryfall_id": "52733829-27b7-40ec-a897-cabab35b3729",
       "finish": "normal"
@@ -2179,7 +2179,7 @@
     "deck_card_id": "6d3c06a5-a0b2-47a2-a583-d579c24a44c9",
     "card_name": "Roaming Throne",
     "quantity": 1,
-    "role": "Threat",
+    "role": "Utility",
     "current_printing": {
       "scryfall_id": "6d3c06a5-a0b2-47a2-a583-d579c24a44c9",
       "finish": "normal"
@@ -2247,7 +2247,7 @@
     "deck_card_id": "8c504c23-1e9a-411b-9cfe-4180d0c744f6",
     "card_name": "Scavenging Ooze",
     "quantity": 1,
-    "role": "Threat",
+    "role": "Utility",
     "current_printing": {
       "scryfall_id": "8c504c23-1e9a-411b-9cfe-4180d0c744f6",
       "finish": "normal"
@@ -2281,7 +2281,7 @@
     "deck_card_id": "b4e193e8-1127-475b-9af6-d0d0c44adf49",
     "card_name": "Shamanic Revelation",
     "quantity": 1,
-    "role": "Utility",
+    "role": "Draw",
     "current_printing": {
       "scryfall_id": "b4e193e8-1127-475b-9af6-d0d0c44adf49",
       "finish": "normal"
@@ -2315,7 +2315,7 @@
     "deck_card_id": "43d427a8-a237-4053-b90d-0f1dd249e9c1",
     "card_name": "Shelob, Child of Ungoliant",
     "quantity": 1,
-    "role": "Threat",
+    "role": "Enabler",
     "current_printing": {
       "scryfall_id": "43d427a8-a237-4053-b90d-0f1dd249e9c1",
       "finish": "normal"
@@ -2417,7 +2417,7 @@
     "deck_card_id": "e18927dd-c50c-4fb2-8d4c-d0f853b68294",
     "card_name": "Skyfisher Spider",
     "quantity": 1,
-    "role": "Threat",
+    "role": "Interaction",
     "current_printing": {
       "scryfall_id": "e18927dd-c50c-4fb2-8d4c-d0f853b68294",
       "finish": "normal"
@@ -2451,7 +2451,7 @@
     "deck_card_id": "6cc4c21d-9bdc-4490-9203-17f51db0ddd1",
     "card_name": "Snakeskin Veil",
     "quantity": 1,
-    "role": "Utility",
+    "role": "Protection",
     "current_printing": {
       "scryfall_id": "6cc4c21d-9bdc-4490-9203-17f51db0ddd1",
       "finish": "normal"
@@ -2519,7 +2519,7 @@
     "deck_card_id": "44265489-645a-43b0-bc1f-726905b06876",
     "card_name": "Springleaf Parade",
     "quantity": 1,
-    "role": "Utility",
+    "role": "Ramp",
     "current_printing": {
       "scryfall_id": "44265489-645a-43b0-bc1f-726905b06876",
       "finish": "normal"
@@ -2587,7 +2587,7 @@
     "deck_card_id": "50e95c7b-f0b2-4276-8c5e-4191b7ba35d1",
     "card_name": "Stocking the Pantry",
     "quantity": 1,
-    "role": "Utility",
+    "role": "Draw",
     "current_printing": {
       "scryfall_id": "50e95c7b-f0b2-4276-8c5e-4191b7ba35d1",
       "finish": "normal"
@@ -2723,7 +2723,7 @@
     "deck_card_id": "7a7e4f99-ece4-473e-b712-40e4c53558e8",
     "card_name": "Swarm Shambler",
     "quantity": 1,
-    "role": "Threat",
+    "role": "Enabler",
     "current_printing": {
       "scryfall_id": "7a7e4f99-ece4-473e-b712-40e4c53558e8",
       "finish": "normal"
@@ -2825,7 +2825,7 @@
     "deck_card_id": "49766e23-74f5-4d6a-a882-53127028face",
     "card_name": "Talisman of Resilience",
     "quantity": 1,
-    "role": "Utility",
+    "role": "Ramp",
     "current_printing": {
       "scryfall_id": "49766e23-74f5-4d6a-a882-53127028face",
       "finish": "normal"
@@ -2859,7 +2859,7 @@
     "deck_card_id": "eaa358ac-761d-4507-aa15-3d4684027207",
     "card_name": "Teacher's Pest",
     "quantity": 1,
-    "role": "Threat",
+    "role": "Recursion",
     "current_printing": {
       "scryfall_id": "eaa358ac-761d-4507-aa15-3d4684027207",
       "finish": "foil"
@@ -2927,7 +2927,7 @@
     "deck_card_id": "511f6a96-520d-4e6d-aba8-c553c5c9c0a0",
     "card_name": "The Ooze",
     "quantity": 1,
-    "role": "Utility",
+    "role": "Enabler",
     "current_printing": {
       "scryfall_id": "511f6a96-520d-4e6d-aba8-c553c5c9c0a0",
       "finish": "normal"
@@ -2995,7 +2995,7 @@
     "deck_card_id": "0875f4e3-d0be-41ce-870c-ee63f1af1904",
     "card_name": "Tireless Tracker",
     "quantity": 1,
-    "role": "Threat",
+    "role": "Draw",
     "current_printing": {
       "scryfall_id": "0875f4e3-d0be-41ce-870c-ee63f1af1904",
       "finish": "normal"
@@ -3029,7 +3029,7 @@
     "deck_card_id": "0b261989-b34e-4bba-90f8-2adfda58c89b",
     "card_name": "Toski, Bearer of Secrets",
     "quantity": 1,
-    "role": "Threat",
+    "role": "Protection",
     "current_printing": {
       "scryfall_id": "0b261989-b34e-4bba-90f8-2adfda58c89b",
       "finish": "normal"
@@ -3199,7 +3199,7 @@
     "deck_card_id": "107c8aa8-c8f8-4cbf-821b-bd2cb33354f0",
     "card_name": "Winding Constrictor",
     "quantity": 1,
-    "role": "Threat",
+    "role": "Utility",
     "current_printing": {
       "scryfall_id": "107c8aa8-c8f8-4cbf-821b-bd2cb33354f0",
       "finish": "normal"
@@ -3233,7 +3233,7 @@
     "deck_card_id": "0d68dee5-56ff-45bb-a37e-9e2dfc07c5a7",
     "card_name": "Witherbloom Command",
     "quantity": 1,
-    "role": "Utility",
+    "role": "Interaction",
     "current_printing": {
       "scryfall_id": "0d68dee5-56ff-45bb-a37e-9e2dfc07c5a7",
       "finish": "normal"
