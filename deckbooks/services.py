@@ -10,7 +10,7 @@ from __future__ import annotations
 from typing import Any
 
 from deckbooks import image_resolver, repository
-from deckbooks.config import DECKBOOK_ID
+from deckbooks.context import get_book
 from deckbooks.models import (
     CATEGORY_ORDER,
     CHAPTER_FLAVOR,
@@ -30,11 +30,11 @@ from deckbooks.models import (
 
 
 def get_deckbook() -> dict:
-    return repository.load_deckbook(DECKBOOK_ID)
+    return repository.load_deckbook(get_book())
 
 
 def _all_cards() -> list[dict]:
-    return repository.load_cards(DECKBOOK_ID)
+    return repository.load_cards(get_book())
 
 
 def active_cards() -> list[dict]:
@@ -277,7 +277,7 @@ def card_detail(deck_card_id: str) -> dict | None:
         )
     view["candidates"] = candidates
     view["revisions"] = [
-        r for r in repository.load_revisions(DECKBOOK_ID) if r.get("deck_card_id") == deck_card_id
+        r for r in repository.load_revisions(get_book()) if r.get("deck_card_id") == deck_card_id
     ]
     return view
 
@@ -330,7 +330,7 @@ def recently_finalized(limit: int = 6) -> list[dict]:
     so the overview shows momentum, not just a percentage."""
     revs = [
         r
-        for r in repository.load_revisions(DECKBOOK_ID)
+        for r in repository.load_revisions(get_book())
         if r.get("change_type") == "decision_finalized"
     ]
     # Newest first; dedup to the latest finalize per card.

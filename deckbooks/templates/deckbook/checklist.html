@@ -19,7 +19,7 @@
         <ul class="db-ledger-list">
           {% for c in s.cards %}
             <li>
-              <a class="db-ledger-name" href="/card/{{ c.deck_card_id }}">{{ c.card_name }}</a>
+              <a class="db-ledger-name" href="/{{ book }}/card/{{ c.deck_card_id }}">{{ c.card_name }}</a>
               <span class="db-ledger-set">
                 {% if c.ledger_view and c.ledger_view.meta %}{{ c.ledger_view.meta.set_code | upper }} #{{ c.ledger_view.meta.collector_number }}{% endif %}
               </span>

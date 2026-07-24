@@ -1,7 +1,7 @@
 # Cartarch Deckbooks — local prototype
 
-A premium digital collector's catalog for a single Commander deck: **OSHA
-Violation** (*Bello, Bard of the Brambles*). It records, for every card, which
+A premium digital collector's catalog for your Commander decks (a **library**
+of deckbooks; ships with **OSHA Violation** and **Sam & Frodo**). It records, for every card, which
 exact printing belongs in the definitive deck, why, whether it's owned/installed,
 and whether another printing is a museum piece or proxy candidate — presented as
 a book, not a CRUD dashboard.
@@ -13,17 +13,22 @@ production database or the running app.
 ## Run it
 
 ```bash
-# 1. Seed the deckbook from your local Cartarch data (reads dev-data/mana_archive.db
-#    read-only; no network, no writes to that DB).
-python -m deckbooks.init_deck
+# 1. Seed a deckbook from your local Cartarch data (read-only; no network).
+python -m deckbooks.init_deck                 # osha-violation (default)
+python -m deckbooks.init_deck sam-and-frodo   # a specific deckbook
+python -m deckbooks.init_deck --all           # every catalog deckbook
 
-# 2. Serve the book.
+# 2. Serve. A library index at / lists every deckbook; each lives at /{book}/…
 python -m deckbooks.app          # http://127.0.0.1:8800
 #   (or: uvicorn deckbooks.app:app --reload)
 
 # Tests
 python -m pytest deckbooks/tests
 ```
+
+Adding a deckbook is (mostly) one entry in `deckbooks/catalog.py` — the source
+deck's name in the local Cartarch DB plus its display identity — then
+`init_deck <id>`.
 
 `python -m deckbooks.init_deck --refresh` re-syncs deck membership (adds new
 cards, marks removed ones) **without overwriting any finalized decision**.
@@ -87,5 +92,4 @@ Seed state: Bello finalized (BLC #1 foil deck copy; BLC #101 raised-foil
 and Akroma's Memorial (on order) in the research queue; the other 83 `pending`.
 
 **Deferred (not blocking):** collection-aware ownership, a shareable URL, PDF
-export, multi-deckbook management. See `INTEGRATION.md` for the Cartarch
-boundary — none of these change the data model.
+export. See `INTEGRATION.md` for the Cartarch boundary — none change the data model.

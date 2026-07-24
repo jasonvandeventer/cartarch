@@ -1,0 +1,9 @@
+{% extends "deckbook/base.html" %}
+{% block chrome %}{% endblock %}
+{% block title %}No such deckbook{% endblock %}
+{% block body %}
+<div class="db-notice">
+  <h1 style="font-family: var(--display); color: var(--moss-deep);">No deckbook named “{{ book }}”</h1>
+  <p><a href="/">← Back to the library</a></p>
+</div>
+{% endblock %}

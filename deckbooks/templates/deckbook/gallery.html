@@ -5,7 +5,7 @@
 
 {% macro plate(card) -%}
   <a class="db-tile {% if card.role == 'Commander' %}is-commander{% endif %}{% if card.curation_complete %} is-sealed{% endif %}"
-     href="/card/{{ card.deck_card_id }}">
+     href="/{{ book }}/card/{{ card.deck_card_id }}">
     <div class="db-thumb-wrap">
       {{ card_image(card.display, "db-thumb", card.card_name) }}
       {% if card.curation_complete %}

@@ -26,7 +26,7 @@
       {% for card in cards %}
         {% set st = card.museum_state %}
         <a class="db-museum-piece state-{{ st }}{% if card.role == 'Commander' %} is-commander{% endif %}"
-           href="/card/{{ card.deck_card_id }}">
+           href="/{{ book }}/card/{{ card.deck_card_id }}">
           <span class="db-museum-frame">
             {{ card_image(card.museum_view or card.display, "db-museum-img", card.card_name) }}
           </span>

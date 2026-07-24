@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "id": "sam-and-frodo",
+  "name": "Sam & Frodo",
+  "commander_names": [
+    "Frodo, Adventurous Hobbit",
+    "Sam, Loyal Attendant"
+  ],
+  "subtitle": "Two hobbits, one Ring, and the long road to Mordor.",
+  "edition": {
+    "name": "First Edition",
+    "revision": 1,
+    "created_at": "2026-07-24",
+    "updated_at": "2026-07-24"
+  },
+  "identity": {
+    "mission": "Two hobbits carry a burden far greater than themselves. The deck should feel like the long walk to Mordor — quiet loyalty, mounting dread, and the small acts of courage that matter most when all seems lost.",
+    "pillars": [
+      {
+        "name": "The Fellowship",
+        "description": "Loyalty and support — the cards that protect and lift the ones beside them."
+      },
+      {
+        "name": "The Long Road",
+        "description": "The journey itself: lands, landscapes, and the miles between the Shire and the Mountain."
+      },
+      {
+        "name": "The Ring's Burden",
+        "description": "Temptation, sacrifice, and the cost of carrying what no one should have to."
+      }
+    ],
+    "palette": [
+      "Shire green",
+      "wayfarer brown",
+      "Ring gold",
+      "Mordor ash",
+      "old parchment"
+    ],
+    "selection_rule": "Rarity alone never determines the definitive printing."
+  }
+}

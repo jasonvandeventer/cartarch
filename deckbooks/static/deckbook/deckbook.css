@@ -61,7 +61,57 @@ a { color: var(--moss-deep); }
   text-transform: uppercase;
   font-size: 0.72rem;
   color: var(--gold);
+  text-decoration: none;
 }
+.db-nav .brand:hover { color: var(--gold-soft); }
+.db-nav-book {
+  font-family: var(--display);
+  font-style: italic;
+  color: var(--text-on-dark-dim);
+  font-size: 0.9rem;
+  padding-left: 0.8rem;
+  border-left: 1px solid rgba(184, 137, 75, 0.4);
+}
+
+/* ── Library index ───────────────────────────────────────────────────────── */
+.db-library {
+  min-height: 100vh;
+  background-color: var(--ink-band);
+  background-image:
+    radial-gradient(120% 80% at 50% -10%, rgba(60,46,28,0.55), transparent 60%),
+    repeating-linear-gradient(52deg, rgba(0,0,0,0.2) 0 3px, rgba(255,255,255,0.01) 3px 6px);
+  padding: 4rem 2rem;
+}
+.db-library-head { text-align: center; margin-bottom: 2.6rem; }
+.db-library-head .db-eyebrow { color: var(--bronze); }
+.db-library-head h1 { font-family: var(--display); color: var(--gold); font-size: 3rem; margin: 0.4rem 0 0.3rem; }
+.db-library-head p { color: var(--text-on-dark-dim); font-style: italic; }
+.db-library-shelf {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 1.6rem;
+  max-width: 960px;
+  margin: 0 auto;
+}
+.db-volume {
+  display: block;
+  text-decoration: none;
+  border: 2px solid var(--bronze);
+  border-radius: 8px;
+  background: linear-gradient(160deg, #2b2117, #1c150d);
+  box-shadow: var(--shadow);
+  transition: transform 0.14s ease, box-shadow 0.14s ease;
+  overflow: hidden;
+}
+.db-volume:hover { transform: translateY(-4px); box-shadow: 0 14px 34px rgba(0,0,0,0.6), 0 0 20px rgba(217,178,95,0.18); }
+.db-volume.is-unbound { opacity: 0.72; border-style: dashed; }
+.db-volume-spine { padding: 1.6rem 1.6rem 1.8rem; border-left: 5px solid var(--gold); display: flex; flex-direction: column; gap: 0.35rem; }
+.db-volume-name { font-family: var(--display); color: var(--gold); font-size: 1.7rem; line-height: 1.1; }
+.db-volume-cmd { color: var(--gold-soft); font-size: 0.95rem; }
+.db-volume-sub { color: var(--text-on-dark-dim); font-style: italic; font-size: 0.88rem; margin-top: 0.3rem; }
+.db-volume-stat { color: var(--bronze); font-size: 0.78rem; letter-spacing: 0.06em; text-transform: uppercase; margin-top: 0.6rem; }
+.db-volume-unbound { color: var(--text-on-dark-dim); font-size: 0.78rem; margin-top: 0.4rem; }
+.db-volume-unbound code { background: var(--ink-band); color: var(--gold-soft); padding: 0.1rem 0.4rem; border-radius: 4px; }
 .db-nav a {
   color: var(--text-on-dark-dim);
   text-decoration: none;

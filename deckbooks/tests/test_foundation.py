@@ -20,7 +20,7 @@ def test_init_seeds_bello_and_preserves_exact_printings(tmp_path, monkeypatch):
     # Point the repo + reader at throwaway locations so the real seed isn't touched.
     _isolate(tmp_path, monkeypatch)
 
-    summary = initialize(refresh=False)
+    summary = initialize("osha-violation", refresh=False)
     assert summary["action"] == "created"
     assert summary["finalized"] == 1
 
@@ -42,7 +42,7 @@ def test_init_seeds_bello_and_preserves_exact_printings(tmp_path, monkeypatch):
 
 def test_refresh_preserves_a_finalized_decision(tmp_path, monkeypatch):
     _isolate(tmp_path, monkeypatch)
-    initialize(refresh=False)
+    initialize("osha-violation", refresh=False)
 
     # Simulate a curator finalizing a second card, then a deck re-sync.
     cards = repository.load_cards("osha-violation")
@@ -51,7 +51,7 @@ def test_refresh_preserves_a_finalized_decision(tmp_path, monkeypatch):
     victim["decision"]["finalized"] = True
     repository.save_cards("osha-violation", cards)
 
-    initialize(refresh=True)
+    initialize("osha-violation", refresh=True)
     after = {c["card_name"]: c for c in repository.load_cards("osha-violation")}
     assert after["Sol Ring"]["decision"]["finalized"] is True  # survived the refresh
 

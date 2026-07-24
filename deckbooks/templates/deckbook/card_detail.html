@@ -83,7 +83,7 @@
 
       <details class="db-edit" {% if not card.curation_complete %}open{% endif %}>
         <summary>Edit this decision</summary>
-        <form method="post" action="/card/{{ card.deck_card_id }}/decision" class="db-form">
+        <form method="post" action="/{{ book }}/card/{{ card.deck_card_id }}/decision" class="db-form">
           <label>Status
             <select name="status">
               {% for s in statuses %}
@@ -129,8 +129,8 @@
   {% if card.candidates %}
     <div class="section-title">Printing comparison — every official printing
       <button type="button" class="db-briefing-btn"
-              data-briefing="/card/{{ card.deck_card_id }}/briefing">Copy briefing for ChatGPT</button>
-      <a class="db-briefing-link" href="/card/{{ card.deck_card_id }}/briefing" target="_blank" rel="noopener">view</a>
+              data-briefing="/{{ book }}/card/{{ card.deck_card_id }}/briefing">Copy briefing for ChatGPT</button>
+      <a class="db-briefing-link" href="/{{ book }}/card/{{ card.deck_card_id }}/briefing" target="_blank" rel="noopener">view</a>
     </div>
     <p class="db-briefing-hint muted-dim">Paste the copied text into ChatGPT (or any model) for a printing recommendation — it includes every printing's set, finish, price, treatment, and Scryfall link.</p>
     <div class="db-candidates">
@@ -144,17 +144,17 @@
           {% if cp %}<div class="db-candidate-price">${{ '%.2f' | format(cp) }}</div>{% endif %}
           {% if c.mark %}<div class="mark">{{ c.mark }}</div>{% endif %}
           <div class="db-candidate-actions">
-            <form method="post" action="/card/{{ card.deck_card_id }}/select-printing">
+            <form method="post" action="/{{ book }}/card/{{ card.deck_card_id }}/select-printing">
               <input type="hidden" name="scryfall_id" value="{{ c.meta.scryfall_id }}">
               <input type="hidden" name="role" value="current">
               <button type="submit" title="This is the copy I own / ordered">My copy</button>
             </form>
-            <form method="post" action="/card/{{ card.deck_card_id }}/select-printing">
+            <form method="post" action="/{{ book }}/card/{{ card.deck_card_id }}/select-printing">
               <input type="hidden" name="scryfall_id" value="{{ c.meta.scryfall_id }}">
               <input type="hidden" name="role" value="selected">
               <button type="submit" title="Make this the definitive deck copy">Definitive</button>
             </form>
-            <form method="post" action="/card/{{ card.deck_card_id }}/select-printing">
+            <form method="post" action="/{{ book }}/card/{{ card.deck_card_id }}/select-printing">
               <input type="hidden" name="scryfall_id" value="{{ c.meta.scryfall_id }}">
               <input type="hidden" name="role" value="museum">
               <button type="submit" title="Flag as museum / proxy candidate">Museum</button>
@@ -175,7 +175,7 @@
     </ul>
   {% endif %}
 
-  <p style="margin-top:2rem"><a href="/collection">← Back to the collection</a></p>
+  <p style="margin-top:2rem"><a href="/{{ book }}/collection">← Back to the collection</a></p>
 </div>
 <script>
   // Copy the LLM briefing to the clipboard (falls back to opening it if the

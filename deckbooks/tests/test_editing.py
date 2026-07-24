@@ -14,7 +14,7 @@ from deckbooks.tests.test_foundation import _isolate
 
 def test_finalize_persists_and_logs_one_revision(tmp_path, monkeypatch):
     _isolate(tmp_path, monkeypatch)
-    initialize(refresh=False)
+    initialize("osha-violation", refresh=False)
 
     sid = "28180667-cc1e-4f64-9a69-00425ef85ba0"  # Arcane Signet (research)
     editing.update_decision(
@@ -42,7 +42,7 @@ def test_finalize_persists_and_logs_one_revision(tmp_path, monkeypatch):
 
 def test_editing_a_finalized_card_appends_a_revision(tmp_path, monkeypatch):
     _isolate(tmp_path, monkeypatch)
-    initialize(refresh=False)
+    initialize("osha-violation", refresh=False)
     sid = "28180667-cc1e-4f64-9a69-00425ef85ba0"
     editing.update_decision(sid, {"status": "keep", "finalize": "1"})
     editing.update_decision(sid, {"status": "upgrade"})  # change after finalize
@@ -53,7 +53,7 @@ def test_editing_a_finalized_card_appends_a_revision(tmp_path, monkeypatch):
 
 def test_select_printing_sets_the_definitive_copy(tmp_path, monkeypatch):
     _isolate(tmp_path, monkeypatch)
-    initialize(refresh=False)
+    initialize("osha-violation", refresh=False)
     sid = "28180667-cc1e-4f64-9a69-00425ef85ba0"
     editing.update_decision(
         sid, {"selected_scryfall_id": "some-other-print", "selected_finish": "foil"}
@@ -67,7 +67,7 @@ def test_select_printing_sets_the_definitive_copy(tmp_path, monkeypatch):
 
 def test_unknown_card_and_bad_values_do_not_crash(tmp_path, monkeypatch):
     _isolate(tmp_path, monkeypatch)
-    initialize(refresh=False)
+    initialize("osha-violation", refresh=False)
     try:
         editing.update_decision("nope", {"status": "keep"})
         raise AssertionError("expected CardNotFound")
@@ -88,7 +88,7 @@ def test_card_briefing_lists_printings_and_criteria(tmp_path, monkeypatch):
     from deckbooks.tests.test_foundation import _isolate
 
     _isolate(tmp_path, monkeypatch)
-    initialize(refresh=False)
+    initialize("osha-violation", refresh=False)
     text = briefing.card_briefing("28180667-cc1e-4f64-9a69-00425ef85ba0")  # Arcane Signet
     assert text is not None
     assert "Aesthetic pillars" in text and "Selection rule" in text
@@ -109,7 +109,7 @@ def test_set_current_printing_preserves_finish(tmp_path, monkeypatch):
     from deckbooks.tests.test_foundation import _isolate
 
     _isolate(tmp_path, monkeypatch)
-    initialize(refresh=False)
+    initialize("osha-violation", refresh=False)
     sol = "e5ba8c01-b6f5-486d-b300-cbae2c2b5edf"  # Sol Ring, seeded as foil
     editing.update_decision(sol, {"current_scryfall_id": "some-other-print"})
     card = next(c for c in repository.load_cards("osha-violation") if c["deck_card_id"] == sol)
@@ -124,7 +124,7 @@ def test_museum_states_and_no_edition_clears_picks(tmp_path, monkeypatch):
     from deckbooks.tests.test_foundation import _isolate
 
     _isolate(tmp_path, monkeypatch)
-    initialize(refresh=False)
+    initialize("osha-violation", refresh=False)
     cards = {c["card_name"]: c for c in repository.load_cards("osha-violation")}
 
     arcane = cards["Arcane Signet"]["deck_card_id"]

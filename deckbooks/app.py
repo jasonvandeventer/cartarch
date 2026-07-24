@@ -1,13 +1,12 @@
-"""Local Deckbook web app — standalone FastAPI/Jinja2.
+"""Local Deckbook web app — standalone FastAPI/Jinja2, MULTI-deckbook.
 
 Run:  python -m deckbooks.app        (or: uvicorn deckbooks.app:app --reload)
 
-Read-only in this milestone: cover, overview dashboard, gallery, checklist, card
-detail (with the printing-comparison browser). Decoupled from the production app
-— it imports nothing from `app` and cannot touch prod data. Images come from
-Cartarch's existing mirror via the resolver; metadata from the local
-scryfall_cards cache. If the deckbook hasn't been initialized, every page shows a
-one-line "run init" prompt rather than crashing.
+A library index at `/` lists every deckbook; each book lives under `/{book}/…`
+(cover, overview, collection, ledger, museum, card detail). Decoupled from the
+production app — imports nothing from `app`, cannot touch prod. Images come from
+Cartarch's mirror; metadata from the local scryfall_cards cache. The current book
+is set per-request (deckbooks.context) so the read/write services stay simple.
 """
 
 from __future__ import annotations
@@ -18,8 +17,9 @@ from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from deckbooks import briefing, editing, services
-from deckbooks.config import BASE_DIR, DECKBOOK_ID
+from deckbooks import briefing, catalog, editing, services
+from deckbooks.config import BASE_DIR
+from deckbooks.context import use_book
 from deckbooks.models import DECISION_STATUSES, VALID_FINISHES
 from deckbooks.repository import exists
 
@@ -30,121 +30,157 @@ templates.env.globals["statuses"] = DECISION_STATUSES
 templates.env.globals["finishes"] = VALID_FINISHES
 
 
-def _ctx(request: Request, active: str = "", **extra) -> dict:
+def _known(book: str) -> bool:
+    """A book is servable if it's in the catalog or already has data on disk."""
+    return catalog.get_config(book) is not None or exists(book)
+
+
+def _ctx(request: Request, book: str, active: str = "", **extra) -> dict:
     return {
         "request": request,
+        "book": book,
         "deckbook": services.get_deckbook(),
         "active": active,
         **extra,
     }
 
 
-def _needs_init(request: Request) -> HTMLResponse | None:
-    if exists(DECKBOOK_ID):
-        return None
-    return templates.TemplateResponse(
-        "deckbook/needs_init.html", _ctx(request, deckbook={}), status_code=503
-    )
+def _enter(request: Request, book: str) -> HTMLResponse | None:
+    """Set the current book and guard it. Returns a response (404 / needs-init)
+    to return as-is, or None when the book is ready to render."""
+    if not _known(book):
+        return templates.TemplateResponse(
+            "deckbook/no_book.html", {"request": request, "book": book}, status_code=404
+        )
+    use_book(book)
+    if not exists(book):
+        return templates.TemplateResponse(
+            "deckbook/needs_init.html",
+            {"request": request, "book": book, "deckbook": {}},
+            status_code=503,
+        )
+    return None
 
 
 @app.get("/", response_class=HTMLResponse)
-def cover(request: Request):
-    return _needs_init(request) or templates.TemplateResponse(
-        "deckbook/cover.html", _ctx(request, active="cover", commander=_commander_view())
+def library(request: Request):
+    books = []
+    for bid in catalog.list_book_ids():
+        cfg = catalog.get_config(bid)
+        initialized = exists(bid)
+        progress = None
+        if initialized:
+            use_book(bid)
+            progress = services.progress()
+        books.append(
+            {
+                "id": bid,
+                "name": cfg["name"],
+                "commanders": cfg["commander_names"],
+                "subtitle": cfg["subtitle"],
+                "initialized": initialized,
+                "progress": progress,
+            }
+        )
+    return templates.TemplateResponse("deckbook/library.html", {"request": request, "books": books})
+
+
+@app.get("/{book}", response_class=HTMLResponse)
+def cover(request: Request, book: str):
+    return _enter(request, book) or templates.TemplateResponse(
+        "deckbook/cover.html", _ctx(request, book, active="cover", commander=_commander_view())
     )
 
 
-@app.get("/overview", response_class=HTMLResponse)
-def overview(request: Request):
-    return _needs_init(request) or templates.TemplateResponse(
-        "deckbook/overview.html", _ctx(request, active="overview", **services.overview())
+@app.get("/{book}/overview", response_class=HTMLResponse)
+def overview(request: Request, book: str):
+    return _enter(request, book) or templates.TemplateResponse(
+        "deckbook/overview.html", _ctx(request, book, active="overview", **services.overview())
     )
 
 
-# "Collection" (was /gallery) and "Ledger" (was /checklist) — the museum-register
-# naming the deck's identity calls for.
-@app.get("/collection", response_class=HTMLResponse)
-def collection(request: Request):
-    return _needs_init(request) or templates.TemplateResponse(
-        "deckbook/gallery.html", _ctx(request, active="collection", chapters=services.chapters())
+@app.get("/{book}/collection", response_class=HTMLResponse)
+def collection(request: Request, book: str):
+    return _enter(request, book) or templates.TemplateResponse(
+        "deckbook/gallery.html",
+        _ctx(request, book, active="collection", chapters=services.chapters()),
     )
 
 
-@app.get("/ledger", response_class=HTMLResponse)
-def ledger(request: Request):
-    return _needs_init(request) or templates.TemplateResponse(
-        "deckbook/checklist.html", _ctx(request, active="ledger", **services.ledger())
+@app.get("/{book}/ledger", response_class=HTMLResponse)
+def ledger(request: Request, book: str):
+    return _enter(request, book) or templates.TemplateResponse(
+        "deckbook/checklist.html", _ctx(request, book, active="ledger", **services.ledger())
     )
 
 
-@app.get("/museum", response_class=HTMLResponse)
-def museum(request: Request):
-    return _needs_init(request) or templates.TemplateResponse(
-        "deckbook/museum.html", _ctx(request, active="museum", **services.museum_wall())
+@app.get("/{book}/museum", response_class=HTMLResponse)
+def museum(request: Request, book: str):
+    return _enter(request, book) or templates.TemplateResponse(
+        "deckbook/museum.html", _ctx(request, book, active="museum", **services.museum_wall())
     )
 
 
-@app.get("/card/{deck_card_id}", response_class=HTMLResponse)
-def card_detail(request: Request, deck_card_id: str):
-    guard = _needs_init(request)
+@app.get("/{book}/card/{deck_card_id}", response_class=HTMLResponse)
+def card_detail(request: Request, book: str, deck_card_id: str):
+    guard = _enter(request, book)
     if guard:
         return guard
     view = services.card_detail(deck_card_id)
     if view is None:
         return templates.TemplateResponse(
-            "deckbook/not_found.html", _ctx(request, active="collection"), status_code=404
+            "deckbook/not_found.html", _ctx(request, book, active="collection"), status_code=404
         )
     return templates.TemplateResponse(
-        "deckbook/card_detail.html", _ctx(request, active="collection", card=view)
+        "deckbook/card_detail.html", _ctx(request, book, active="collection", card=view)
     )
 
 
-@app.get("/card/{deck_card_id}/briefing", response_class=PlainTextResponse)
-def card_briefing(deck_card_id: str):
-    """Markdown briefing to hand a model (ChatGPT) for a printing recommendation:
-    the card's decision + every printing's metadata + Scryfall links. text/plain
-    so it copies cleanly."""
+@app.get("/{book}/card/{deck_card_id}/briefing", response_class=PlainTextResponse)
+def card_briefing(book: str, deck_card_id: str):
+    if not _known(book):
+        return PlainTextResponse("No such deckbook.", status_code=404)
+    use_book(book)
     text = briefing.card_briefing(deck_card_id)
     if text is None:
         return PlainTextResponse("Card not found in this deckbook.", status_code=404)
     return PlainTextResponse(text)
 
 
-@app.post("/card/{deck_card_id}/decision")
-async def edit_decision(request: Request, deck_card_id: str):
-    """Apply a card-detail edit. Plain HTML form POST (no framework), so the
-    prototype works with JS off; redirects back to the card (PRG). Unknown
-    fields are ignored; a bad value normalizes rather than erroring."""
-    if not exists(DECKBOOK_ID):
+@app.post("/{book}/card/{deck_card_id}/decision")
+async def edit_decision(request: Request, book: str, deck_card_id: str):
+    """Apply a card-detail edit (plain form POST → PRG redirect)."""
+    if not _known(book) or not exists(book):
         return RedirectResponse("/", status_code=303)
+    use_book(book)
     form = dict(await request.form())
     try:
         editing.update_decision(deck_card_id, form)
     except editing.CardNotFound:
-        return RedirectResponse("/gallery", status_code=303)
-    return RedirectResponse(f"/card/{deck_card_id}?saved=1", status_code=303)
+        return RedirectResponse(f"/{book}/collection", status_code=303)
+    return RedirectResponse(f"/{book}/card/{deck_card_id}?saved=1", status_code=303)
 
 
-@app.post("/card/{deck_card_id}/select-printing")
+@app.post("/{book}/card/{deck_card_id}/select-printing")
 def select_printing(
+    book: str,
     deck_card_id: str,
     scryfall_id: str = Form(...),
     finish: str = Form("normal"),
     role: str = Form("selected"),
 ):
-    """One-click 'make this the definitive / museum / current printing' from the
-    candidate browser. role ∈ {selected, museum, current}."""
-    if not exists(DECKBOOK_ID):
+    """One-click 'make this the definitive / museum / current printing'."""
+    if not _known(book) or not exists(book):
         return RedirectResponse("/", status_code=303)
+    use_book(book)
     if role == "current":
-        # Preserve the existing finish (editing.py handles it) — don't force normal.
         editing.update_decision(deck_card_id, {"current_scryfall_id": scryfall_id})
     else:
         key = "museum" if role == "museum" else "selected"
         editing.update_decision(
             deck_card_id, {f"{key}_scryfall_id": scryfall_id, f"{key}_finish": finish}
         )
-    return RedirectResponse(f"/card/{deck_card_id}?saved=1", status_code=303)
+    return RedirectResponse(f"/{book}/card/{deck_card_id}?saved=1", status_code=303)
 
 
 def _commander_view() -> dict | None:

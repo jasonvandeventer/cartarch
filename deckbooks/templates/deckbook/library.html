@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>The Definitive Commander Collection — Library</title>
+  <link rel="stylesheet" href="/static/deckbook/deckbook.css">
+</head>
+<body>
+  <div class="db-library">
+    <header class="db-library-head">
+      <div class="db-eyebrow">The Definitive Commander Collection</div>
+      <h1>The Library</h1>
+      <p>Every deck, bound as its own volume.</p>
+    </header>
+    <div class="db-library-shelf">
+      {% for b in books %}
+        {% if b.initialized %}
+          <a class="db-volume" href="/{{ b.id }}">
+            <div class="db-volume-spine">
+              <span class="db-volume-name">{{ b.name }}</span>
+              <span class="db-volume-cmd">{{ b.commanders | join(" & ") }}</span>
+              <span class="db-volume-sub">{{ b.subtitle }}</span>
+              {% if b.progress %}
+                <span class="db-volume-stat">{{ b.progress.curated }} of {{ b.progress.total }} finalized</span>
+              {% endif %}
+            </div>
+          </a>
+        {% else %}
+          <div class="db-volume is-unbound">
+            <div class="db-volume-spine">
+              <span class="db-volume-name">{{ b.name }}</span>
+              <span class="db-volume-cmd">{{ b.commanders | join(" & ") }}</span>
+              <span class="db-volume-unbound">Not yet bound — <code>python -m deckbooks.init_deck {{ b.id }}</code></span>
+            </div>
+          </div>
+        {% endif %}
+      {% endfor %}
+    </div>
+  </div>
+</body>
+</html>

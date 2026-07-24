@@ -11,7 +11,7 @@ Scryfall link — everything a model needs to argue for a definitive printing.
 from __future__ import annotations
 
 from deckbooks import image_resolver, repository
-from deckbooks.config import DECKBOOK_ID
+from deckbooks.context import get_book
 
 
 def _price_summary(prices: dict) -> str:
@@ -34,11 +34,11 @@ def _printing_ref(p: dict | None) -> str:
 
 def card_briefing(deck_card_id: str) -> str | None:
     """Markdown briefing for one card, or None if the card isn't found."""
-    cards = repository.load_cards(DECKBOOK_ID)
+    cards = repository.load_cards(get_book())
     card = next((c for c in cards if c.get("deck_card_id") == deck_card_id), None)
     if card is None:
         return None
-    db = repository.load_deckbook(DECKBOOK_ID)
+    db = repository.load_deckbook(get_book())
     ident = db.get("identity", {})
     decision = card.get("decision", {})
 

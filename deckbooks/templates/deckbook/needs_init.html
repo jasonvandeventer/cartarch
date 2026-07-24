@@ -4,7 +4,8 @@
 {% block body %}
 <div class="db-notice">
   <h1 style="font-family: var(--display); color: var(--moss-deep);">The book hasn't been bound yet</h1>
-  <p>Seed the OSHA Violation deckbook from your local Cartarch data, then reload:</p>
-  <code>python -m deckbooks.init_deck</code>
+  <p>Seed this deckbook from your local Cartarch data, then reload:</p>
+  <code>python -m deckbooks.init_deck {{ book }}</code>
+  <p style="margin-top:1.2rem"><a href="/">← Back to the library</a></p>
 </div>
 {% endblock %}

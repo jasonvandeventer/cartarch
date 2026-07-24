@@ -17,7 +17,7 @@ import datetime as _dt
 from typing import Any
 
 from deckbooks import repository
-from deckbooks.config import DECKBOOK_ID
+from deckbooks.context import get_book
 from deckbooks.models import VALID_FINISHES, normalize_status
 
 
@@ -38,7 +38,7 @@ def _load_one(cards: list[dict], deck_card_id: str) -> dict:
 
 def _next_revision_no(deck_card_id: str) -> int:
     existing = [
-        r for r in repository.load_revisions(DECKBOOK_ID) if r.get("deck_card_id") == deck_card_id
+        r for r in repository.load_revisions(get_book()) if r.get("deck_card_id") == deck_card_id
     ]
     return len(existing) + 1
 
@@ -46,7 +46,7 @@ def _next_revision_no(deck_card_id: str) -> int:
 def _log_revision(card: dict, change_type: str, reason: str, previous: dict | None) -> None:
     decision = card["decision"]
     repository.append_revision(
-        DECKBOOK_ID,
+        get_book(),
         {
             "deck_card_id": card["deck_card_id"],
             "card_name": card["card_name"],
@@ -83,7 +83,7 @@ def update_decision(deck_card_id: str, form: dict[str, Any]) -> dict:
     museum_scryfall_id/finish, proxy_desired, proxy_printed, target_owned,
     installed, source_recorded, source, price_paid, condition, finalize.
     Returns the updated card."""
-    cards = repository.load_cards(DECKBOOK_ID)
+    cards = repository.load_cards(get_book())
     card = _load_one(cards, deck_card_id)
     decision = card["decision"]
     acquisition = card["acquisition"]
@@ -166,7 +166,7 @@ def update_decision(deck_card_id: str, form: dict[str, Any]) -> dict:
     elif was_finalized:
         change_type = "decision_revised"
 
-    repository.save_cards(DECKBOOK_ID, cards)
+    repository.save_cards(get_book(), cards)
     if change_type:
         _log_revision(card, change_type, form.get("reason", ""), prev_snapshot)
     return card
