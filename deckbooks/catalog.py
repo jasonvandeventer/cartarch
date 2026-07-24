@@ -47,11 +47,11 @@ BOOKS: dict[str, dict] = {
             "selection_rule": "Rarity alone never determines the definitive printing.",
         },
     },
-    "sam-and-frodo": {
+    "second-breakfast": {
         "deck_name": "Frodo, Adventurous Hobbit and Sam, Loyal Attendant",
-        "name": "Sam & Frodo",
+        "name": "Second Breakfast",
         "commander_names": ["Frodo, Adventurous Hobbit", "Sam, Loyal Attendant"],
-        "subtitle": "Two hobbits, one Ring, and the long road to Mordor.",
+        "subtitle": "Two hobbits, one Ring, and absolutely no skipping meals.",
         # A starting identity — edit to taste (say the word and I'll refine it).
         "identity": {
             "mission": (

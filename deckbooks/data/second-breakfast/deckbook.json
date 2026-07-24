@@ -1,12 +1,12 @@
 {
   "schema_version": 1,
-  "id": "sam-and-frodo",
-  "name": "Sam & Frodo",
+  "id": "second-breakfast",
+  "name": "Second Breakfast",
   "commander_names": [
     "Frodo, Adventurous Hobbit",
     "Sam, Loyal Attendant"
   ],
-  "subtitle": "Two hobbits, one Ring, and the long road to Mordor.",
+  "subtitle": "Two hobbits, one Ring, and absolutely no skipping meals.",
   "edition": {
     "name": "First Edition",
     "revision": 1,
