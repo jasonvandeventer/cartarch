@@ -5,7 +5,7 @@
   "commander_names": [
     "Melek, Izzet Paragon"
   ],
-  "subtitle": "An Izzet Commander deck.",
+  "subtitle": "Response to your response. Nobody's quite sure what resolves next — that's the point.",
   "edition": {
     "name": "First Edition",
     "revision": 1,
@@ -13,9 +13,28 @@
     "updated_at": "2026-07-24"
   },
   "identity": {
-    "mission": "",
-    "pillars": [],
-    "palette": [],
+    "mission": "An Izzet spellslinger built around the stack itself. Copies, redirections, and rebounds pile effects on top of one another until no one at the table — the pilot included — is quite sure what will resolve next. The deck should feel like controlled chaos: brilliant, overclocked, and one trigger away from a cascade of consequences.",
+    "pillars": [
+      {
+        "name": "The Stack Never Settles",
+        "description": "Spells copy, fork, and trigger more spells. The stack is always taller than it looks, and the top of it keeps changing."
+      },
+      {
+        "name": "Redirect & Misdirect",
+        "description": "Change targets, bounce spells back, and make removal hit the wrong thing. Control the question of who and what, not just how much."
+      },
+      {
+        "name": "Overclocked Genius",
+        "description": "The Izzet aesthetic — arcane circuitry, storm-lit laboratories, and mad-scientist confidence. Blue-red brilliance running hot."
+      }
+    ],
+    "palette": [
+      "izzet electric blue",
+      "molten red",
+      "arc-flash white",
+      "copper circuitry",
+      "stormglass violet"
+    ],
     "selection_rule": "Rarity alone never determines the definitive printing."
   }
 }
