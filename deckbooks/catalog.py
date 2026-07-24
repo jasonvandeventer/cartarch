@@ -129,6 +129,9 @@ BOOKS: dict[str, dict] = {
                 "Utility": "The small comforts that keep the table full.",
                 "Mana Base": "The Shire underfoot.",
             },
+            "destination_note": (
+                "Prioritize borderless printings to lean into the pastoral, storybook feel."
+            ),
             "selection_rule": "Rarity alone never determines the definitive printing.",
         },
     },

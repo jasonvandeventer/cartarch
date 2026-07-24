@@ -179,7 +179,7 @@ def list_printings_detailed(name: str) -> list[dict]:
         return []
     cols = (
         "set_code, set_name, collector_number, rarity, price_usd, price_usd_foil, "
-        "price_usd_etched, frame_effects, full_art"
+        "price_usd_etched, frame_effects, full_art, border_color"
     )
     with _connect() as conn:
         rows = conn.execute(
@@ -202,7 +202,11 @@ def list_printings_detailed(name: str) -> list[dict]:
             )
             if r[col]
         ]
-        treatments = frames + (["full art"] if r["full_art"] else [])
+        treatments = (
+            (["borderless"] if r["border_color"] == "borderless" else [])
+            + frames
+            + (["full art"] if r["full_art"] else [])
+        )
         out.append(
             {
                 "set_code": r["set_code"],
@@ -272,6 +276,21 @@ def price_for(prices: dict, finish: str) -> float | None:
             except (TypeError, ValueError):
                 continue
     return None
+
+
+def printing_id_by_set_collector(name: str, set_code: str, collector: str) -> str | None:
+    """Resolve a (card name, set code, collector number) to its Scryfall id — the
+    import key for ChatGPT's Destination picks. Name-scoped so a wrong set/collector
+    can't select a different card. Case-insensitive set; exact collector."""
+    if not (name and set_code and collector):
+        return None
+    with _connect() as conn:
+        row = conn.execute(
+            "SELECT scryfall_id FROM scryfall_cards "
+            "WHERE name = ? AND lower(set_code) = lower(?) AND collector_number = ? LIMIT 1",
+            (name, set_code.strip(), collector.strip()),
+        ).fetchone()
+    return row["scryfall_id"] if row else None
 
 
 def list_printings_for_name(name: str) -> list[PrintingMeta]:

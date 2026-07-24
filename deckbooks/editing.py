@@ -16,7 +16,7 @@ from __future__ import annotations
 import datetime as _dt
 from typing import Any
 
-from deckbooks import repository
+from deckbooks import image_resolver, repository
 from deckbooks.context import get_book
 from deckbooks.models import ROLES, VALID_FINISHES, normalize_status
 
@@ -172,6 +172,53 @@ def update_decision(deck_card_id: str, form: dict[str, Any]) -> dict:
     if change_type:
         _log_revision(card, change_type, form.get("reason", ""), prev_snapshot)
     return card
+
+
+def apply_destinations(text: str) -> dict:
+    """Bulk-apply ChatGPT's Destination picks. Each line:
+    `Card Name | SET #collector | finish | reason` (finish/reason optional). The
+    printing is resolved name-scoped by (set, collector) so a typo'd set can't
+    select a different card; unmatched lines are reported, never guessed."""
+    cards = repository.load_cards(get_book())
+    by_name: dict[str, dict] = {}
+    for c in cards:
+        if c.get("status") != "removed":
+            by_name.setdefault(c["card_name"].lower(), c)
+
+    applied = 0
+    unmatched: list[dict] = []
+    for raw in text.splitlines():
+        line = raw.strip()
+        if not line or line.startswith(("#", "```")) or set(line) <= set("| -"):
+            continue
+        parts = [p.strip() for p in line.split("|")]
+        if len(parts) < 2:
+            unmatched.append({"line": raw, "why": "need 'Name | SET #collector'"})
+            continue
+        name, setcn = parts[0], parts[1]
+        finish = parts[2].lower() if len(parts) > 2 and parts[2] else "normal"
+        reason = parts[3] if len(parts) > 3 else ""
+        card = by_name.get(name.lower())
+        if card is None:
+            unmatched.append({"line": raw, "why": f"no card named {name!r}"})
+            continue
+        toks = setcn.replace("#", " ").split()
+        if len(toks) < 2:
+            unmatched.append({"line": raw, "why": "expected 'SET #collector'"})
+            continue
+        sid = image_resolver.printing_id_by_set_collector(card["card_name"], toks[0], toks[1])
+        if not sid:
+            unmatched.append({"line": raw, "why": f"no {toks[0].upper()} #{toks[1]}"})
+            continue
+        if finish not in VALID_FINISHES:
+            finish = "normal"
+        card["decision"]["selected_printing"] = {"scryfall_id": sid, "finish": finish}
+        if reason:
+            card["decision"]["verdict"] = reason
+        applied += 1
+
+    repository.save_cards(get_book(), cards)
+    return {"applied": applied, "unmatched": unmatched}
 
 
 def _truthy(value: Any) -> bool:

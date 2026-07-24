@@ -89,6 +89,102 @@ def card_briefing(deck_card_id: str) -> str | None:
     return "\n".join(lines)
 
 
+def _price_range(prices: dict) -> str:
+    vals = [float(v) for v in prices.values() if v]
+    if not vals:
+        return "—"
+    lo, hi = min(vals), max(vals)
+    return f"${lo:.2f}" if lo == hi else f"${lo:.2f}–${hi:.2f}"
+
+
+def _notable_printings(printings: list[dict], cap: int = 16) -> list[dict]:
+    """Trim a card's printings to what an aesthetic choice actually turns on: every
+    special-treatment printing (borderless / showcase / extended / full-art / etc.)
+    plus the few cheapest standard ones — so the whole-deck briefing stays a
+    digestible size instead of dumping 130 printings of Sol Ring."""
+    special = [p for p in printings if p["treatments"]]
+    standard = [p for p in printings if not p["treatments"]]
+
+    def _cheap(p: dict) -> float:
+        vals = [float(v) for v in p["prices"].values() if v]
+        return min(vals) if vals else 9e9
+
+    standard.sort(key=_cheap)
+    return (special + standard[:4])[:cap]
+
+
+def deck_briefing() -> str:
+    """A whole-deck Markdown briefing for ChatGPT: the deck's theme plus, for every
+    card, its notable printings (treatment / finishes / price / Scryfall link). The
+    model returns one Destination pick per card in a paste-back format the import
+    route reads. This is the bulk sibling of card_briefing — same data, all cards."""
+    db = repository.load_deckbook(get_book())
+    ident = db.get("identity", {})
+    cards = [c for c in repository.load_cards(get_book()) if c.get("status") != "removed"]
+
+    lines: list[str] = []
+    lines.append(f"# Destination briefing — {db.get('name')}")
+    lines.append("")
+    lines.append(f"**Deck:** {db.get('name')} ({', '.join(db.get('commander_names', []))})")
+    if ident.get("mission"):
+        lines.append(f"**Mission:** {ident['mission']}")
+    if ident.get("pillars"):
+        lines.append(
+            "**Aesthetic pillars:** "
+            + "; ".join(f"{p['name']} — {p['description']}" for p in ident["pillars"])
+        )
+    if ident.get("palette"):
+        lines.append(f"**Palette:** {', '.join(ident['palette'])}")
+    lines.append("")
+
+    lines.append("## Your task")
+    lines.append("")
+    lines.append(
+        "For **every** card below, choose ONE **Destination** printing: the version that "
+        "makes the finished deck feel most thematic, beautiful, and deliberately curated. "
+        "Prefer special treatments (borderless, showcase, extended-art, full-art, retro) that "
+        "fit the palette and world above. Do NOT default to the rarest or most expensive."
+    )
+    if ident.get("destination_note"):
+        lines.append("")
+        lines.append(f"**Priority for this deck:** {ident['destination_note']}")
+    lines.append("")
+    lines.append(
+        "Treatment metadata is included, but trust your own knowledge of each printing's "
+        "art and open the Scryfall links when the look matters. Return **exactly one line "
+        "per card**, nothing else:"
+    )
+    lines.append("")
+    lines.append("```")
+    lines.append("Card Name | SET #collector | finish | one-line reason")
+    lines.append("```")
+    lines.append("`finish` is normal, foil, or etched. Use the Set code + collector below.")
+    lines.append("")
+
+    lines.append(f"## Cards ({len(cards)})")
+    lines.append("")
+    for c in sorted(cards, key=lambda x: (x.get("role") or "", x["card_name"])):
+        lines.append(f"### {c['card_name']} — {c.get('role', '')}")
+        lines.append(f"current: {_printing_ref(c.get('current_printing'))}")
+        printings = _notable_printings(image_resolver.list_printings_detailed(c["card_name"]))
+        if not printings:
+            lines.append("_(no paper printings found)_")
+            lines.append("")
+            continue
+        lines.append("")
+        lines.append("| Set | # | Rarity | Treatment | Finishes | Price | Scryfall |")
+        lines.append("| --- | --- | --- | --- | --- | --- | --- |")
+        for p in printings:
+            treatment = ", ".join(p["treatments"]) if p["treatments"] else "standard"
+            lines.append(
+                f"| {p['set_code'].upper()} | {p['collector_number']} | {p['rarity'] or '—'} "
+                f"| {treatment} | {', '.join(p['finishes'])} | {_price_range(p['prices'])} "
+                f"| {p['scryfall_url']} |"
+            )
+        lines.append("")
+    return "\n".join(lines)
+
+
 # Deckbook Printing Recommendation Policy v3 — evaluate the card in two stages:
 # document the CURRENT copy (a baseline, not a purchase rec) and choose the one
 # aspirational DESTINATION upgrade that belongs IN the deck (not protected in a

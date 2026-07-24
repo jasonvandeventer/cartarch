@@ -100,7 +100,8 @@ def _seed_fixture_db(db):
         CREATE TABLE scryfall_cards(scryfall_id TEXT PRIMARY KEY, name TEXT, set_code TEXT,
             set_name TEXT, collector_number TEXT, rarity TEXT, type_line TEXT,
             image_url TEXT, layout TEXT, price_usd TEXT, price_usd_foil TEXT,
-            price_usd_etched TEXT, frame_effects TEXT, full_art INTEGER, set_type TEXT);
+            price_usd_etched TEXT, frame_effects TEXT, full_art INTEGER, set_type TEXT,
+            border_color TEXT, promo_types TEXT);
         INSERT INTO decks VALUES (11, 'Bello, Bard of the Brambles', 24);
         """
     )

@@ -9,6 +9,45 @@
     <p>{{ deckbook.identity.mission }}</p>
   </div>
 
+  {% if request.query_params.get('imported') is not none %}
+    <div class="db-wax-confirm">
+      <span class="db-wax-confirm-seal">&#10022;</span>
+      Applied {{ request.query_params.get('imported') }} Destination pick(s){% if request.query_params.get('skipped')|int %} · {{ request.query_params.get('skipped') }} line(s) skipped (check set/collector){% endif %}.
+    </div>
+  {% endif %}
+
+  <section class="db-panel db-chatgpt">
+    <div class="db-panel-head"><span class="db-eyebrow-dark">Destination pass with ChatGPT</span></div>
+    <p class="muted-dim">Let a vision model pick the best Destination printing for every card.
+      <strong>1.</strong> Copy the whole-deck briefing (theme + every card's notable printings).
+      <strong>2.</strong> Paste it into ChatGPT and ask it to choose.
+      <strong>3.</strong> Paste its reply below to apply all picks at once.</p>
+    <p>
+      <button type="button" class="db-briefing-btn" data-briefing="/{{ book }}/deck-briefing">Copy full-deck briefing for ChatGPT</button>
+      <a class="db-briefing-link" href="/{{ book }}/deck-briefing" target="_blank" rel="noopener">view</a>
+    </p>
+    <form method="post" action="/{{ book }}/import-destinations">
+      <textarea name="picks" rows="6" class="db-picks"
+        placeholder="Paste ChatGPT's reply — one line per card:&#10;Sol Ring | 2X2 #444 | normal | matches the electric palette"></textarea>
+      <div><button type="submit">Apply Destination picks</button></div>
+    </form>
+  </section>
+
+  <script>
+    document.querySelectorAll('.db-briefing-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        fetch(btn.dataset.briefing).then(function (r) { return r.text(); }).then(function (text) {
+          if (navigator.clipboard) {
+            navigator.clipboard.writeText(text).then(function () {
+              var was = btn.textContent; btn.textContent = 'Copied ✓';
+              setTimeout(function () { btn.textContent = was; }, 1800);
+            }).catch(function () { window.open(btn.dataset.briefing, '_blank'); });
+          } else { window.open(btn.dataset.briefing, '_blank'); }
+        });
+      });
+    });
+  </script>
+
   <div class="db-overview-grid">
     <div class="db-dial">
       {% set pct = progress.curated_pct %}

@@ -264,6 +264,32 @@ a { color: var(--moss-deep); }
 }
 .db-cover .enter:hover { background: rgba(217, 178, 95, 0.12); }
 
+.db-chatgpt { margin: 1.4rem 0; }
+.db-chatgpt .db-picks {
+  width: 100%;
+  font-family: var(--serif);
+  font-size: 0.9rem;
+  padding: 0.6rem 0.7rem;
+  border: 1px solid var(--bronze);
+  border-radius: 8px;
+  background: var(--parchment-2);
+  color: var(--text);
+  margin: 0.7rem 0;
+  resize: vertical;
+}
+.db-chatgpt button {
+  font-family: inherit;
+  cursor: pointer;
+  border: 1px solid var(--bronze);
+  border-radius: 999px;
+  background: var(--moss-deep);
+  color: var(--gold-soft);
+  padding: 0.5rem 1.2rem;
+  letter-spacing: 0.05em;
+  font-size: 0.82rem;
+}
+.db-chatgpt button:hover { background: var(--moss); }
+
 /* ── Overview dashboard ──────────────────────────────────────────────────── */
 .db-overview-grid {
   display: grid;

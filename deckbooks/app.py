@@ -148,6 +148,28 @@ def card_briefing(book: str, deck_card_id: str):
     return PlainTextResponse(text)
 
 
+@app.get("/{book}/deck-briefing", response_class=PlainTextResponse)
+def deck_briefing(book: str):
+    """Whole-deck Destination briefing for ChatGPT (every card + notable printings)."""
+    if not _known(book):
+        return PlainTextResponse("No such deckbook.", status_code=404)
+    use_book(book)
+    return PlainTextResponse(briefing.deck_briefing())
+
+
+@app.post("/{book}/import-destinations")
+def import_destinations(book: str, picks: str = Form("")):
+    """Apply ChatGPT's Destination picks in bulk (one line per card)."""
+    if not _known(book) or not exists(book):
+        return RedirectResponse("/", status_code=303)
+    use_book(book)
+    result = editing.apply_destinations(picks)
+    return RedirectResponse(
+        f"/{book}/overview?imported={result['applied']}&skipped={len(result['unmatched'])}",
+        status_code=303,
+    )
+
+
 @app.post("/{book}/card/{deck_card_id}/decision")
 async def edit_decision(request: Request, book: str, deck_card_id: str):
     """Apply a card-detail edit (plain form POST → PRG redirect)."""
