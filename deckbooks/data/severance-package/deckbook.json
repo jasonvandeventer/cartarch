@@ -35,6 +35,15 @@
       "ledger grey",
       "signet-wax crimson"
     ],
+    "chapter_flavor": {
+      "Commander": "The executive who signs off on every departure — twice.",
+      "Ramp": "Funding the payroll.",
+      "Draw": "Reviewing the personnel files.",
+      "Interaction": "Terminations, effective immediately.",
+      "Threats": "When the layoffs bleed the whole table dry.",
+      "Utility": "The paperwork that makes attrition profitable.",
+      "Mana Base": "The corporate ground floor."
+    },
     "selection_rule": "Rarity alone never determines the definitive printing."
   },
   "cover": {
@@ -43,5 +52,17 @@
     "edge": "#b09553",
     "title": "#efe9db",
     "soft": "#c99a4a"
+  },
+  "interior": {
+    "paper": "#ece7db",
+    "paper2": "#ded7c5",
+    "panel": "#d6cdb7",
+    "gold": "#b0913f",
+    "goldSoft": "#d5ba7c",
+    "bronze": "#977c37",
+    "moss": "#6a5a49",
+    "mossDeep": "#453a30",
+    "ink": "#16130f",
+    "ink2": "#201b15"
   }
 }

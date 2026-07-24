@@ -6,7 +6,13 @@
   <title>{% block title %}OSHA Violation — Deckbook{% endblock %}</title>
   <link rel="stylesheet" href="/static/deckbook/deckbook.css">
 </head>
-<body>
+{% set t = deckbook.interior %}
+<body{% if t %} style="
+  --parchment: {{ t.paper }}; --parchment-2: {{ t.paper2 }}; --parchment-card: {{ t.panel }};
+  --gold: {{ t.gold }}; --gold-soft: {{ t.goldSoft }}; --bronze: {{ t.bronze }};
+  --moss: {{ t.moss }}; --moss-deep: {{ t.mossDeep }};
+  --ink-band: {{ t.ink }}; --ink-band-2: {{ t.ink2 }};
+  {% if t.text %}--text: {{ t.text }}; --text-dim: {{ t.textDim }};{% endif %}"{% endif %}>
   {% block chrome %}
   {% set nav = [('cover', '', 'I', 'Cover'), ('overview', '/overview', 'II', 'Overview'),
                 ('collection', '/collection', 'III', 'Collection'), ('ledger', '/ledger', 'IV', 'Ledger'),

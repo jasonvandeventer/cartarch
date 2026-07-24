@@ -36,6 +36,15 @@
       "fresh butter",
       "ale-brown parchment"
     ],
+    "chapter_flavor": {
+      "Commander": "The hobbits who never miss a meal.",
+      "Ramp": "Stocking the pantry before the feast.",
+      "Draw": "Second helpings — always more in hand.",
+      "Interaction": "A polite word for those who reach for your plate.",
+      "Threats": "When the quiet larder finally overflows.",
+      "Utility": "The small comforts that keep the table full.",
+      "Mana Base": "The Shire underfoot."
+    },
     "selection_rule": "Rarity alone never determines the definitive printing."
   },
   "cover": {
@@ -44,5 +53,17 @@
     "edge": "#b98a3c",
     "title": "#f0cf7a",
     "soft": "#cdb784"
+  },
+  "interior": {
+    "paper": "#ece0c4",
+    "paper2": "#e0d1ab",
+    "panel": "#dcc9a0",
+    "gold": "#cf9f45",
+    "goldSoft": "#e6c583",
+    "bronze": "#b0803a",
+    "moss": "#5f6d3c",
+    "mossDeep": "#46512a",
+    "ink": "#221a0e",
+    "ink2": "#2c2114"
   }
 }

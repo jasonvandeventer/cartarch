@@ -284,6 +284,7 @@ def build_deckbook(deckbook_id: str, cfg: dict) -> dict:
         },
         "identity": cfg["identity"],
         "cover": cfg.get("cover"),  # per-deck cover palette (None → default parchment theme)
+        "interior": cfg.get("interior"),  # per-deck interior tint (None → default parchment theme)
     }
 
 

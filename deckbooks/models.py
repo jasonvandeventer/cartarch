@@ -73,14 +73,17 @@ CATEGORY_ORDER = ("Commander", "Mana Base", "Ramp", "Draw", "Interaction", "Thre
 # order (distinct from CATEGORY_ORDER, which is the dashboard order); each
 # chapter opens with a divider carrying its flavor line — in the deck's voice.
 CHAPTER_SEQUENCE = ("Commander", "Ramp", "Draw", "Interaction", "Threats", "Utility", "Mana Base")
+# Deck-agnostic fallback flavor. A book supplies its own themed lines via
+# identity.chapter_flavor (catalog); these are the neutral defaults for any
+# chapter a book doesn't override.
 CHAPTER_FLAVOR = {
-    "Commander": "The bard who wakes the sleeping relics.",
-    "Ramp": "The artifacts that awaken the forest.",
-    "Draw": "Knowledge drawn from the wake of combat.",
-    "Interaction": "When the overgrown workshop must defend itself.",
-    "Threats": "The relics that rise to enormous, indestructible life.",
-    "Utility": "The odd curiosities that make it all hum.",
-    "Mana Base": "The ground from which everything grows.",
+    "Commander": "The heart of the deck.",
+    "Ramp": "The engine that fuels everything else.",
+    "Draw": "Where the deck refills its hand.",
+    "Interaction": "Answers held in reserve.",
+    "Threats": "How the game actually ends.",
+    "Utility": "The pieces that make it all hum.",
+    "Mana Base": "The ground it all stands on.",
 }
 ROMAN = ("I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X")
 

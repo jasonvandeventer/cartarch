@@ -35,6 +35,15 @@
       "copper circuitry",
       "stormglass violet"
     ],
+    "chapter_flavor": {
+      "Commander": "The mind that keeps the stack from ever settling.",
+      "Ramp": "Fuel for the next spell, and the next.",
+      "Draw": "More cards, more questions, more responses.",
+      "Interaction": "Counters, redirects, and the wrong target chosen.",
+      "Threats": "When the stack finally resolves your way.",
+      "Utility": "Copies, forks, and beautiful uncertainty.",
+      "Mana Base": "The circuitry it all runs on."
+    },
     "selection_rule": "Rarity alone never determines the definitive printing."
   },
   "cover": {
@@ -43,5 +52,19 @@
     "edge": "#3f8fd6",
     "title": "#7fd4ff",
     "soft": "#ff8a63"
+  },
+  "interior": {
+    "paper": "#dde3ec",
+    "paper2": "#ccd6e3",
+    "panel": "#c3cfdd",
+    "gold": "#2f6fb0",
+    "goldSoft": "#6ba6de",
+    "bronze": "#3f6f9c",
+    "moss": "#b0492e",
+    "mossDeep": "#24466f",
+    "ink": "#0c1424",
+    "ink2": "#131d30",
+    "text": "#1a2230",
+    "textDim": "#4d5a6b"
   }
 }

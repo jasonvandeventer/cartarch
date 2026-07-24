@@ -118,6 +118,10 @@ def chapters() -> list[dict]:
         buckets.setdefault(c["category"], []).append(c)
 
     ordered = list(CHAPTER_SEQUENCE) + [k for k in buckets if k not in CHAPTER_SEQUENCE]
+    # Per-deck chapter flavor overrides the neutral defaults (a book can theme any
+    # subset of chapters; the rest fall back).
+    identity = repository.load_deckbook(get_book()).get("identity") or {}
+    flavor = {**CHAPTER_FLAVOR, **(identity.get("chapter_flavor") or {})}
     out: list[dict] = []
     for cat in ordered:
         cards = buckets.get(cat)
@@ -127,7 +131,7 @@ def chapters() -> list[dict]:
             {
                 "name": cat,
                 "numeral": ROMAN[len(out)] if len(out) < len(ROMAN) else str(len(out) + 1),
-                "flavor": CHAPTER_FLAVOR.get(cat, ""),
+                "flavor": flavor.get(cat, ""),
                 "cards": cards,
                 "count": len(cards),
                 "done": sum(1 for x in cards if x["curation_complete"]),

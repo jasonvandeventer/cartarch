@@ -35,6 +35,15 @@
       "parchment",
       "rune-light gold"
     ],
+    "chapter_flavor": {
+      "Commander": "The bard who wakes the sleeping relics.",
+      "Ramp": "The artifacts that awaken the forest.",
+      "Draw": "Knowledge drawn from the wake of combat.",
+      "Interaction": "When the overgrown workshop must defend itself.",
+      "Threats": "The relics that rise to enormous, indestructible life.",
+      "Utility": "The odd curiosities that make it all hum.",
+      "Mana Base": "The ground from which everything grows."
+    },
     "selection_rule": "Rarity alone never determines the definitive printing."
   },
   "cover": {
@@ -43,5 +52,6 @@
     "edge": "#a9832f",
     "title": "#e2b750",
     "soft": "#d8c48a"
-  }
+  },
+  "interior": null
 }

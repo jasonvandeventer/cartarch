@@ -35,6 +35,15 @@
       "spore yellow-green",
       "specimen-jar glass"
     ],
+    "chapter_flavor": {
+      "Commander": "The pest that signals the swarm to grow.",
+      "Ramp": "Cultivating the culture before it spreads.",
+      "Draw": "Reading the specimens as they multiply.",
+      "Interaction": "Culling anything that threatens the colony.",
+      "Threats": "When the brood breaches containment.",
+      "Utility": "The mutations that let the swarm thrive.",
+      "Mana Base": "The soil the infestation roots in."
+    },
     "selection_rule": "Rarity alone never determines the definitive printing."
   },
   "cover": {
@@ -43,5 +52,19 @@
     "edge": "#6f8b3a",
     "title": "#a7d24a",
     "soft": "#c2cf7e"
+  },
+  "interior": {
+    "paper": "#dee2c6",
+    "paper2": "#d0d5ac",
+    "panel": "#c8cfa0",
+    "gold": "#88a23c",
+    "goldSoft": "#b4cf6a",
+    "bronze": "#6f7d3a",
+    "moss": "#4b5a24",
+    "mossDeep": "#354619",
+    "ink": "#12160b",
+    "ink2": "#1a1f10",
+    "text": "#232a15",
+    "textDim": "#56603c"
   }
 }

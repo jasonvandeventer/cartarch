@@ -35,6 +35,15 @@
       "flatline-monitor green",
       "consecrated gold"
     ],
+    "chapter_flavor": {
+      "Commander": "The host that cannot be killed.",
+      "Ramp": "Prepping the theatre before the procedure.",
+      "Draw": "Consulting the chart for what comes next.",
+      "Interaction": "Sterilizing every incoming threat.",
+      "Threats": "When the wall stops holding and starts winning.",
+      "Utility": "The instruments that keep the patient alive.",
+      "Mana Base": "The white ground the fortress stands on."
+    },
     "selection_rule": "Rarity alone never determines the definitive printing."
   },
   "cover": {
@@ -43,5 +52,19 @@
     "edge": "#7f8d99",
     "title": "#e9eff3",
     "soft": "#57e0a0"
+  },
+  "interior": {
+    "paper": "#eaedf1",
+    "paper2": "#dde2e8",
+    "panel": "#d5dbe2",
+    "gold": "#7c8b98",
+    "goldSoft": "#a9b4bd",
+    "bronze": "#6c7a86",
+    "moss": "#2b9068",
+    "mossDeep": "#1c6a4f",
+    "ink": "#10151b",
+    "ink2": "#171d25",
+    "text": "#1e2530",
+    "textDim": "#56626f"
   }
 }
