@@ -134,11 +134,43 @@ BOOKS: dict[str, dict] = {
         "deck_name": "DNR",
         "name": "DNR",
         "commander_names": ["Anti-Venom, Horrifying Healer"],
-        "subtitle": "A mono-white Commander deck.",
+        "subtitle": "Do Not Resuscitate — there won't be a need. Nothing that hits you lands where it's aimed.",
         "identity": {
-            "mission": "",
-            "pillars": [],
-            "palette": [],
+            "mission": (
+                "A mono-white invulnerability engine. Every point of damage aimed at you is "
+                "redirected — by Pariah, Pariah's Shield, and a stack of effects that emulate "
+                "them — onto Anti-Venom, who prevents that damage and grows a +1/+1 counter from "
+                "every point. Assemble the redundancy and you simply cannot be killed by damage; "
+                "from behind that wall the game is closed at your leisure. The deck should feel "
+                "like a fortress that turns every assault into fuel."
+            ),
+            "pillars": [
+                {
+                    "name": "The Redirect",
+                    "description": "Pariah, Pariah's Shield, and every emulation of them — all "
+                    "damage that would hit you is dealt to a creature instead. Stacked many "
+                    "times over so the engine never depends on one card.",
+                },
+                {
+                    "name": "The Unkillable Host",
+                    "description": "Anti-Venom prevents the redirected damage and converts it to "
+                    "+1/+1 counters. The wall doesn't just hold — it grows. Protection and "
+                    "recursion keep the host on the board.",
+                },
+                {
+                    "name": "Do Not Resuscitate",
+                    "description": "Once the redirection engine is online you cannot die to "
+                    "damage. Inevitability from behind the wall — close the game with the now-"
+                    "enormous host, at leisure.",
+                },
+            ],
+            "palette": [
+                "clinical white",
+                "surgical steel",
+                "gauze linen",
+                "flatline-monitor green",
+                "consecrated gold",
+            ],
             "selection_rule": "Rarity alone never determines the definitive printing.",
         },
     },
