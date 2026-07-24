@@ -18,7 +18,7 @@ from typing import Any
 
 from deckbooks import repository
 from deckbooks.context import get_book
-from deckbooks.models import VALID_FINISHES, normalize_status
+from deckbooks.models import ROLES, VALID_FINISHES, normalize_status
 
 
 class CardNotFound(ValueError):
@@ -94,6 +94,8 @@ def update_decision(deck_card_id: str, form: dict[str, Any]) -> dict:
         "selected_scryfall_id": (decision.get("selected_printing") or {}).get("scryfall_id"),
     }
 
+    if form.get("role") in ROLES:  # role lives on the card, not the decision
+        card["role"] = form["role"]
     if "status" in form:
         decision["status"] = normalize_status(form.get("status"))
     if "verdict" in form:

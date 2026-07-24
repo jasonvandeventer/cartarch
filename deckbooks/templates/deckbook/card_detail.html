@@ -91,6 +91,13 @@
               {% endfor %}
             </select>
           </label>
+          <label>Role
+            <select name="role">
+              {% for r in roles %}
+                <option value="{{ r }}" {% if r == card.role %}selected{% endif %}>{{ r }}</option>
+              {% endfor %}
+            </select>
+          </label>
           <label>Curatorial notes
             <textarea name="verdict" rows="3" placeholder="Why this printing?">{{ card.decision.verdict or '' }}</textarea>
           </label>

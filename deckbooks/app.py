@@ -20,7 +20,7 @@ from fastapi.templating import Jinja2Templates
 from deckbooks import briefing, catalog, editing, services
 from deckbooks.config import BASE_DIR
 from deckbooks.context import use_book
-from deckbooks.models import DECISION_STATUSES, VALID_FINISHES
+from deckbooks.models import DECISION_STATUSES, ROLES, VALID_FINISHES
 from deckbooks.repository import exists
 
 app = FastAPI(title="Cartarch Deckbooks (prototype)")
@@ -28,6 +28,7 @@ app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="stat
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 templates.env.globals["statuses"] = DECISION_STATUSES
 templates.env.globals["finishes"] = VALID_FINISHES
+templates.env.globals["roles"] = ROLES
 
 
 def _known(book: str) -> bool:
