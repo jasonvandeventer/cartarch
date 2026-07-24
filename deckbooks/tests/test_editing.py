@@ -93,11 +93,12 @@ def test_card_briefing_lists_printings_and_criteria(tmp_path, monkeypatch):
     assert text is not None
     assert "Aesthetic pillars" in text and "Selection rule" in text
     assert "Every official printing" in text and "scryfall.com/card/" in text
-    # Policy v2: two independent recommendations, the Collector's Pick label,
-    # and the steer away from rarity/price defaults.
-    assert "Definitive printing" in text and "Museum (Collector's Pick)" in text
-    assert "two independent recommendations" in text.lower() or "two** printings" in text
+    # Policy v3: two-stage Current + Destination framing, steer away from
+    # rarity/price defaults, and no leftover Definitive/Museum-pick labels.
+    assert "Current printing" in text and "Destination printing" in text
+    assert "current printing and destination upgrade" in text.lower()
     assert "rarest" in text.lower()
+    assert "Definitive" not in text and "Museum piece" not in text
     # Unknown card → None (route turns it into a 404).
     assert briefing.card_briefing("nope") is None
 

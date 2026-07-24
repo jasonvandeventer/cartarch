@@ -1,0 +1,114 @@
+[
+  {
+    "deck_card_id": "328df403-7428-4b17-bdd1-9759fc0f32d8",
+    "card_name": "Frodo, Adventurous Hobbit",
+    "revision": 1,
+    "changed_at": "2026-07-24",
+    "change_type": "decision_finalized",
+    "previous": {
+      "status": "pending",
+      "selected_scryfall_id": "95ed1ff5-a0a6-4fe0-94d2-e3675226db52"
+    },
+    "current": {
+      "status": "pending",
+      "selected_scryfall_id": "95ed1ff5-a0a6-4fe0-94d2-e3675226db52"
+    },
+    "reason": "decision finalized"
+  },
+  {
+    "deck_card_id": "687a2b76-3f05-4732-bd9b-513d06d16300",
+    "card_name": "Sam, Loyal Attendant",
+    "revision": 1,
+    "changed_at": "2026-07-24",
+    "change_type": "decision_finalized",
+    "previous": {
+      "status": "pending",
+      "selected_scryfall_id": "601402f4-8647-4c41-9a0f-63d10ce89d02"
+    },
+    "current": {
+      "status": "pending",
+      "selected_scryfall_id": "601402f4-8647-4c41-9a0f-63d10ce89d02"
+    },
+    "reason": "decision finalized"
+  },
+  {
+    "deck_card_id": "4e92354d-c203-41e1-822d-8263fadd9eb3",
+    "card_name": "Arcane Signet",
+    "revision": 1,
+    "changed_at": "2026-07-24",
+    "change_type": "decision_finalized",
+    "previous": {
+      "status": "pending",
+      "selected_scryfall_id": null
+    },
+    "current": {
+      "status": "pending",
+      "selected_scryfall_id": null
+    },
+    "reason": "decision finalized"
+  },
+  {
+    "deck_card_id": "9898dd33-63fb-49d3-bea4-5346d6d56f30",
+    "card_name": "Dryad of the Ilysian Grove",
+    "revision": 1,
+    "changed_at": "2026-07-24",
+    "change_type": "decision_finalized",
+    "previous": {
+      "status": "pending",
+      "selected_scryfall_id": null
+    },
+    "current": {
+      "status": "pending",
+      "selected_scryfall_id": null
+    },
+    "reason": "decision finalized"
+  },
+  {
+    "deck_card_id": "45835349-99c3-4071-95d1-7191110bfd9f",
+    "card_name": "Birds of Paradise",
+    "revision": 1,
+    "changed_at": "2026-07-24",
+    "change_type": "decision_finalized",
+    "previous": {
+      "status": "pending",
+      "selected_scryfall_id": null
+    },
+    "current": {
+      "status": "pending",
+      "selected_scryfall_id": null
+    },
+    "reason": "decision finalized"
+  },
+  {
+    "deck_card_id": "65ebbff0-fbe6-4310-a33f-e00bb2534979",
+    "card_name": "Burnished Hart",
+    "revision": 1,
+    "changed_at": "2026-07-24",
+    "change_type": "decision_finalized",
+    "previous": {
+      "status": "pending",
+      "selected_scryfall_id": null
+    },
+    "current": {
+      "status": "pending",
+      "selected_scryfall_id": null
+    },
+    "reason": "decision finalized"
+  },
+  {
+    "deck_card_id": "cf2fac9f-6749-4ca2-93c9-0dc068a220ec",
+    "card_name": "Chromatic Lantern",
+    "revision": 1,
+    "changed_at": "2026-07-24",
+    "change_type": "decision_finalized",
+    "previous": {
+      "status": "pending",
+      "selected_scryfall_id": null
+    },
+    "current": {
+      "status": "pending",
+      "selected_scryfall_id": null
+    },
+    "reason": "decision finalized"
+  }
+]

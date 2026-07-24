@@ -63,9 +63,8 @@ def card_briefing(deck_card_id: str) -> str | None:
         f"- Status: {decision.get('status')} "
         f"(finalized: {'yes' if decision.get('finalized') else 'no'})"
     )
-    lines.append(f"- Copy in the deck today: {_printing_ref(card.get('current_printing'))}")
-    lines.append(f"- Definitive (selected): {_printing_ref(decision.get('selected_printing'))}")
-    lines.append(f"- Museum piece: {_printing_ref(decision.get('museum_printing'))}")
+    lines.append(f"- Current printing: {_printing_ref(card.get('current_printing'))}")
+    lines.append(f"- Destination printing: {_printing_ref(decision.get('selected_printing'))}")
     if decision.get("verdict"):
         lines.append(f"- Existing verdict: {decision['verdict']}")
     lines.append("")
@@ -90,33 +89,56 @@ def card_briefing(deck_card_id: str) -> str | None:
     return "\n".join(lines)
 
 
-# Deckbook Printing Recommendation Policy v2 — the two recommendations optimize
-# for DIFFERENT goals and are deliberately NOT reconciled. Encoded here so every
-# briefing asks the model the same way. See deckbooks/PRINTING_POLICY.md.
+# Deckbook Printing Recommendation Policy v3 — evaluate the card in two stages:
+# document the CURRENT copy (a baseline, not a purchase rec) and choose the one
+# aspirational DESTINATION upgrade that belongs IN the deck (not protected in a
+# collection). Encoded here so every briefing asks the model the same way.
+# See deckbooks/PRINTING_POLICY.md.
 _RECOMMENDATION_POLICY = """\
-## Your task — two independent recommendations
+## Your task — current printing and destination upgrade
 
-Recommend **two** printings for this card. They optimise for **different goals**
-and must **not** be reconciled into one — sometimes they match, often they differ.
-Pick from the table above; name the exact set + collector number and the finish.
+Evaluate the card in two stages. Pick from the table above; name the exact set +
+collector number and the finish.
 
-### 1. Definitive printing
-*"What version should a player reasonably acquire for THIS deck?"*
-Optimise for: deck theme / narrative, artwork appropriateness, cohesion with the
-other cards, readability, availability, and cost / value — the best balance of
-aesthetics and practicality. A player should be able to assemble the **whole deck**
-from Definitive picks without unreasonable expense. Do **not** default to the
-rarest, newest, or most expensive printing.
-*Curator's note:* explain why this printing belongs in THIS deck.
+### 1. Current printing
+**"What version is in the deck today?"**
 
-### 2. Museum (Collector's Pick)
-*"If budget and practicality were irrelevant, what is the most beautiful or
-collectible expression of this card?"*
-Optimise for: visual impact, premium treatment, collectibility, artistic
-execution, and prestige. **Ignore deck theme.** It may be a Secret Lair, a
-Universes Beyond card, a serialised version, a Masterpiece, a raised foil, or an
-expensive promo — whatever is the most desirable presentation of the card. This is
-an aspirational target that may be **proxied** in the deck while the original stays
-protected in a collection.
-*Curator's note:* explain why it is the pinnacle of this card as an object of
-collection."""
+Retain the printing currently listed in the deck. Briefly explain how well it
+serves the deck's theme, artwork, palette, readability, and overall cohesion.
+
+This is not a recommendation to purchase a different practical printing. Its
+purpose is to document the deck's present state and provide a baseline for the
+eventual upgrade.
+
+### 2. Destination printing
+**"What version should eventually replace it in the finished deck?"**
+
+Choose the single official printing that would make the completed deck feel most
+thematic, beautiful, and deliberately curated.
+
+Optimise for:
+
+* Connection to the deck's mission and aesthetic pillars
+* Artwork that feels native to the deck's world
+* Cohesion with the deck's palette
+* Strong visual presence, including borderless, full-art, showcase, or especially
+  effective foil treatments
+* Artistic execution and how the physical treatment supports the illustration
+* Collectibility and prestige as secondary considerations
+
+Do not simply choose the rarest, most expensive, or most historically important
+printing. The goal is not to identify the best collectible version in isolation.
+The goal is to identify the best **in-deck destination upgrade** for this specific
+deck.
+
+The Destination printing should be the version worth acquiring when gradually
+blinging out the deck. It may be expensive or aspirational, but it should
+ultimately belong in the deck rather than remain protected in a collection.
+
+*Curator's note:* explain why this printing is the strongest final expression of
+the card within this deck.
+
+## Required output
+
+**Current:** exact set, collector number, and finish
+**Destination:** exact set, collector number, and finish"""

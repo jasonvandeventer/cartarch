@@ -36,7 +36,7 @@
       <figure class="db-plate selected">
         {{ card_image(card.selected_view or card.current_view, "db-plate-img", card.card_name) }}
         {{ plaque(card.selected_view or card.current_view,
-                  'Definitive Printing' if card.curation_complete else 'Current Printing') }}
+                  'Destination Printing' if card.curation_complete else 'Current Printing') }}
       </figure>
       <figure class="db-plate museum">
         {{ card_image(card.museum_view, "db-plate-img", card.card_name) }}
@@ -50,7 +50,7 @@
     {% if not card.museum_view %}
       <figure class="db-solo-plate">
         {{ card_image(card.display, "db-detail-art", card.card_name) }}
-        {{ plaque(card.display, 'Definitive Printing' if card.curation_complete else 'Current Printing') }}
+        {{ plaque(card.display, 'Destination Printing' if card.curation_complete else 'Current Printing') }}
       </figure>
     {% endif %}
     <div>
@@ -72,7 +72,7 @@
 
       <div class="section-title">Accession checklist</div>
       <ul class="db-accession">
-        <li>{{ box(card.decision.finalized) }} Definitive decision recorded</li>
+        <li>{{ box(card.decision.finalized) }} Destination printing chosen</li>
         <li>{{ box(card.acquisition.target_owned) }} Selected printing owned</li>
         <li>{{ box(card.acquisition.installed) }} Installed in the physical deck</li>
         <li>{{ box(card.acquisition.source_recorded) }} Acquisition source recorded</li>
@@ -122,7 +122,7 @@
             <input type="hidden" name="custom_proxy_candidate" value="0">
             <label class="cb"><input type="checkbox" name="custom_proxy_candidate" value="1" {% if card.is_custom_proxy %}checked{% endif %}> Custom proxy candidate (bespoke OSHA treatment)</label>
             <input type="hidden" name="no_museum_edition" value="0">
-            <label class="cb"><input type="checkbox" name="no_museum_edition" value="1" {% if card.is_no_edition %}checked{% endif %}> No separate Museum edition (Definitive is enough)</label>
+            <label class="cb"><input type="checkbox" name="no_museum_edition" value="1" {% if card.is_no_edition %}checked{% endif %}> No separate Museum edition (Destination is enough)</label>
           </fieldset>
           <div class="db-form-actions">
             <label class="cb finalize"><input type="checkbox" name="finalize" value="1" {% if card.curation_complete %}checked{% endif %}> Finalize this decision</label>
@@ -159,7 +159,7 @@
             <form method="post" action="/{{ book }}/card/{{ card.deck_card_id }}/select-printing">
               <input type="hidden" name="scryfall_id" value="{{ c.meta.scryfall_id }}">
               <input type="hidden" name="role" value="selected">
-              <button type="submit" title="Make this the definitive deck copy">Definitive</button>
+              <button type="submit" title="Make this the destination printing">Destination</button>
             </form>
             <form method="post" action="/{{ book }}/card/{{ card.deck_card_id }}/select-printing">
               <input type="hidden" name="scryfall_id" value="{{ c.meta.scryfall_id }}">

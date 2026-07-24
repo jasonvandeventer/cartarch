@@ -1,50 +1,52 @@
-# Deckbook Printing Recommendation Policy v2
+# Deckbook Printing Recommendation Policy v3
 
-Every card carries **two distinct printing recommendations**. They intentionally
-optimise for different goals and should **not converge** unless the same printing
-naturally satisfies both. Do not reconcile them into a single pick.
+Every card is evaluated in **two stages**: document the **Current** printing
+(the copy in the deck today — a baseline, *not* a purchase recommendation) and
+choose the one **Destination** printing (the eventual in-deck upgrade that
+completes the deck's visual identity).
 
 This policy is the source of truth for the ChatGPT briefing export
 (`deckbooks/briefing.py` embeds it verbatim) and the deckbook's own labels.
 
-## Definitive printing
+## 1. Current printing
 
-> "What version should a player reasonably acquire for this deck?"
+> "What version is in the deck today?"
 
-Optimise for: deck theme and narrative · artwork appropriateness · cohesion with
-the other cards · readability · availability · cost / value.
+Retain the printing currently listed in the deck. Briefly explain how well it
+serves the deck's theme, artwork, palette, readability, and overall cohesion.
 
-The Definitive recommendation is the best balance of aesthetics and practicality.
-A player should be able to assemble the **entire deck** from Definitive picks
-without unreasonable expense. **Do not** automatically recommend the rarest or
-most expensive version.
+This is not a recommendation to purchase a different practical printing. Its
+purpose is to document the deck's present state and provide a baseline for the
+eventual upgrade.
 
-*Curator's note must explain why the printing belongs in the deck.*
+## 2. Destination printing
 
-## Museum (Collector's Pick)
+> "What version should eventually replace it in the finished deck?"
 
-> "If budget and practicality were irrelevant, what is the most beautiful or
-> collectible expression of this card?"
+Choose the single official printing that would make the completed deck feel most
+thematic, beautiful, and deliberately curated.
 
-Optimise for: visual impact · premium treatment · collectibility · artistic
-execution · prestige. **Ignore deck theme.**
+Optimise for: connection to the deck's mission and aesthetic pillars · artwork
+native to the deck's world · cohesion with the palette · strong visual presence
+(borderless, full-art, showcase, or especially effective foil) · artistic
+execution and how the treatment supports the illustration · collectibility and
+prestige as *secondary* considerations.
 
-It may be a Secret Lair, a Universes Beyond card, a serialised version, a
-Masterpiece, a raised foil, or an expensive promo — whatever is the most desirable
-presentation. It is an **aspirational target** that may be **proxied** in the
-physical deck while the original stays protected in a collection.
+**Do not** simply choose the rarest, most expensive, or most historically
+important printing — the goal is the best **in-deck destination upgrade** for
+*this* deck, not the best collectible version in isolation. It may be expensive
+or aspirational, but it should ultimately **belong in the deck** rather than
+remain protected in a collection.
 
-*Curator's note must explain why it represents the pinnacle of the card as an
-object of collection.*
+*Curator's note must explain why this printing is the strongest final expression
+of the card within this deck.*
 
-## Relationship
+## Note on the Museum
 
-The two are **independent**. Sometimes they match:
-
-- Definitive: Future Sight Akroma's Memorial · Museum: Future Sight foil
-
-Often they differ:
-
-- Definitive: original Warstorm Surge · Museum: Marvel Showcase Warstorm Surge
-
-Both outcomes are expected. Never collapse them into one recommendation.
+The **Museum** page (and the per-card Museum / proxy flags) is a *separate* axis
+from the Destination decision above — a collector's-piece view of the deck. The
+briefing no longer asks for a Museum pick; Museum flags are set directly in the
+app. Superseded v2's "Definitive vs Museum (Collector's Pick)" two-recommendation
+scheme, which folded the aspirational pick into a protect-in-a-collection target.
+Destination replaces "Definitive": the aspirational upgrade now belongs in the
+deck, not the binder.

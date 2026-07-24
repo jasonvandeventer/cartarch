@@ -5,7 +5,7 @@
     "quantity": 1,
     "role": "Enabler",
     "current_printing": {
-      "scryfall_id": "2f5b4544-70d9-45ee-84a3-fa6253a53a82",
+      "scryfall_id": "c88eb33d-efba-4ad9-878f-f051079c9bce",
       "finish": "normal"
     },
     "status": "active",
@@ -14,8 +14,15 @@
       "finalized": false,
       "finalized_at": null,
       "selected_printing": null,
-      "museum_printing": null,
-      "proxy_candidate": null,
+      "museum_printing": {
+        "scryfall_id": "5f0d37b6-c092-439b-ba8e-e297ad35f155",
+        "finish": "normal"
+      },
+      "proxy_candidate": {
+        "scryfall_id": "5f0d37b6-c092-439b-ba8e-e297ad35f155",
+        "desired": false,
+        "printed": false
+      },
       "verdict": null,
       "reasoning": [],
       "custom_proxy_candidate": false,
@@ -113,11 +120,18 @@
     "status": "active",
     "decision": {
       "status": "pending",
-      "finalized": false,
-      "finalized_at": null,
+      "finalized": true,
+      "finalized_at": "2026-07-24",
       "selected_printing": null,
-      "museum_printing": null,
-      "proxy_candidate": null,
+      "museum_printing": {
+        "scryfall_id": "cf977357-e13d-4c67-ae53-397adf55131e",
+        "finish": "normal"
+      },
+      "proxy_candidate": {
+        "scryfall_id": "cf977357-e13d-4c67-ae53-397adf55131e",
+        "desired": false,
+        "printed": false
+      },
       "verdict": null,
       "reasoning": [],
       "custom_proxy_candidate": false,
@@ -181,11 +195,18 @@
     "status": "active",
     "decision": {
       "status": "pending",
-      "finalized": false,
-      "finalized_at": null,
+      "finalized": true,
+      "finalized_at": "2026-07-24",
       "selected_printing": null,
-      "museum_printing": null,
-      "proxy_candidate": null,
+      "museum_printing": {
+        "scryfall_id": "4c72e177-d95d-41df-91b3-4e489175b6aa",
+        "finish": "normal"
+      },
+      "proxy_candidate": {
+        "scryfall_id": "4c72e177-d95d-41df-91b3-4e489175b6aa",
+        "desired": false,
+        "printed": false
+      },
       "verdict": null,
       "reasoning": [],
       "custom_proxy_candidate": false,
@@ -249,11 +270,18 @@
     "status": "active",
     "decision": {
       "status": "pending",
-      "finalized": false,
-      "finalized_at": null,
+      "finalized": true,
+      "finalized_at": "2026-07-24",
       "selected_printing": null,
-      "museum_printing": null,
-      "proxy_candidate": null,
+      "museum_printing": {
+        "scryfall_id": "e72bfcae-b791-4a89-a41f-d5335a13f325",
+        "finish": "normal"
+      },
+      "proxy_candidate": {
+        "scryfall_id": "e72bfcae-b791-4a89-a41f-d5335a13f325",
+        "desired": false,
+        "printed": false
+      },
       "verdict": null,
       "reasoning": [],
       "custom_proxy_candidate": false,
@@ -385,11 +413,18 @@
     "status": "active",
     "decision": {
       "status": "pending",
-      "finalized": false,
-      "finalized_at": null,
+      "finalized": true,
+      "finalized_at": "2026-07-24",
       "selected_printing": null,
-      "museum_printing": null,
-      "proxy_candidate": null,
+      "museum_printing": {
+        "scryfall_id": "14d34e8d-6db5-429c-a956-f8f3bb8bb9cd",
+        "finish": "normal"
+      },
+      "proxy_candidate": {
+        "scryfall_id": "14d34e8d-6db5-429c-a956-f8f3bb8bb9cd",
+        "desired": false,
+        "printed": false
+      },
       "verdict": null,
       "reasoning": [],
       "custom_proxy_candidate": false,
@@ -455,9 +490,19 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
-      "museum_printing": null,
-      "proxy_candidate": null,
+      "selected_printing": {
+        "scryfall_id": "6620b4a3-fa33-4bd7-9180-314919d8ea2a",
+        "finish": "normal"
+      },
+      "museum_printing": {
+        "scryfall_id": "0ad783ed-69b9-48b5-9610-4fa4d8f9a6e6",
+        "finish": "normal"
+      },
+      "proxy_candidate": {
+        "scryfall_id": "0ad783ed-69b9-48b5-9610-4fa4d8f9a6e6",
+        "desired": false,
+        "printed": false
+      },
       "verdict": null,
       "reasoning": [],
       "custom_proxy_candidate": false,
@@ -555,11 +600,18 @@
     "status": "active",
     "decision": {
       "status": "pending",
-      "finalized": false,
-      "finalized_at": null,
+      "finalized": true,
+      "finalized_at": "2026-07-24",
       "selected_printing": null,
-      "museum_printing": null,
-      "proxy_candidate": null,
+      "museum_printing": {
+        "scryfall_id": "22e22287-21c5-4733-a527-b176fbf3725d",
+        "finish": "normal"
+      },
+      "proxy_candidate": {
+        "scryfall_id": "22e22287-21c5-4733-a527-b176fbf3725d",
+        "desired": false,
+        "printed": false
+      },
       "verdict": null,
       "reasoning": [],
       "custom_proxy_candidate": false,
@@ -1031,11 +1083,21 @@
     "status": "active",
     "decision": {
       "status": "pending",
-      "finalized": false,
-      "finalized_at": null,
-      "selected_printing": null,
-      "museum_printing": null,
-      "proxy_candidate": null,
+      "finalized": true,
+      "finalized_at": "2026-07-24",
+      "selected_printing": {
+        "scryfall_id": "95ed1ff5-a0a6-4fe0-94d2-e3675226db52",
+        "finish": "normal"
+      },
+      "museum_printing": {
+        "scryfall_id": "a223c85f-3952-40d0-88d4-d5c3e8cd864d",
+        "finish": "normal"
+      },
+      "proxy_candidate": {
+        "scryfall_id": "a223c85f-3952-40d0-88d4-d5c3e8cd864d",
+        "desired": false,
+        "printed": false
+      },
       "verdict": null,
       "reasoning": [],
       "custom_proxy_candidate": false,
@@ -2391,11 +2453,21 @@
     "status": "active",
     "decision": {
       "status": "pending",
-      "finalized": false,
-      "finalized_at": null,
-      "selected_printing": null,
-      "museum_printing": null,
-      "proxy_candidate": null,
+      "finalized": true,
+      "finalized_at": "2026-07-24",
+      "selected_printing": {
+        "scryfall_id": "601402f4-8647-4c41-9a0f-63d10ce89d02",
+        "finish": "normal"
+      },
+      "museum_printing": {
+        "scryfall_id": "cfdfa303-2578-455b-929c-a217a0261bb3",
+        "finish": "normal"
+      },
+      "proxy_candidate": {
+        "scryfall_id": "cfdfa303-2578-455b-929c-a217a0261bb3",
+        "desired": false,
+        "printed": false
+      },
       "verdict": null,
       "reasoning": [],
       "custom_proxy_candidate": false,
