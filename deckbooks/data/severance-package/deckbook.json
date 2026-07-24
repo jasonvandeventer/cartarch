@@ -5,7 +5,7 @@
   "commander_names": [
     "Teysa Karlov"
   ],
-  "subtitle": "An Orzhov Commander deck.",
+  "subtitle": "Every departure comes with benefits. We're letting them go — and cashing in.",
   "edition": {
     "name": "First Edition",
     "revision": 1,
@@ -13,9 +13,28 @@
     "updated_at": "2026-07-24"
   },
   "identity": {
-    "mission": "",
-    "pillars": [],
-    "palette": [],
+    "mission": "An Orzhov aristocrats machine. Staff up with expendable creatures and tokens, then process the layoffs — free sacrifice outlets feed a payroll of death triggers (drain, draw, tokens, counters), and Teysa Karlov signs off on each one twice. Every creature that leaves the company pays a dividend; do it enough and the table bleeds out while your books only grow. The deck should feel like ruthless, well-dressed corporate attrition — loss, monetized.",
+    "pillars": [
+      {
+        "name": "The Workforce",
+        "description": "A wide, expendable roster — cheap creatures and token makers that exist to be spent. Bodies are inventory, not investment."
+      },
+      {
+        "name": "Processing the Layoffs",
+        "description": "Free sacrifice outlets turn creatures into value on demand, and death-trigger payoffs (drain, draw, tokens, +1/+1 counters) collect on every departure."
+      },
+      {
+        "name": "Teysa Signs Off Twice",
+        "description": "Teysa Karlov doubles every death trigger — each severance pays out twice. Recursion brings the workforce back to be spent again."
+      }
+    ],
+    "palette": [
+      "orzhov ivory",
+      "funerary black",
+      "brushed-gold letterhead",
+      "ledger grey",
+      "signet-wax crimson"
+    ],
     "selection_rule": "Rarity alone never determines the definitive printing."
   }
 }
