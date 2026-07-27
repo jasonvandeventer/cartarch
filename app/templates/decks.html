@@ -118,6 +118,15 @@
             <div class="decks-featured-record-pct {% if featured.win_rate >= 0.5 %}up{% else %}dn{% endif %}">
               {{ (featured.win_rate * 100) | round | int }}% over {{ featured.games }}g
             </div>
+            {# #156 Option C — same note as the compact rows below. The Decks page
+               has TWO stat render paths (featured + others); a note added to only
+               one is invisible for whichever decks land in the other. #}
+            {% if featured.borrowed_games | default(0) %}
+              <div class="decks-featured-record-last"
+                   title="Piloted by someone other than you. These count toward the deck's record.">
+                {{ featured.borrowed_games }} lent out
+              </div>
+            {% endif %}
             {% if featured.last_played %}
               <div class="decks-featured-record-last">
                 Last played {{ featured.last_played | editorial_date }}
@@ -162,6 +171,15 @@
               <div class="decks-row-stat">
                 <div class="decks-row-stat-l">Games</div>
                 <div class="decks-row-stat-v">{{ deck.games }}</div>
+                {# #156 Option C — lent-out games count toward the deck, but say so.
+                   A win rate over games someone else piloted measures deck+pilot,
+                   not the deck; the reader discounts it themselves. #}
+                {% if deck.borrowed_games | default(0) %}
+                  <div class="decks-row-stat-note muted"
+                       title="Piloted by someone other than you. These count toward the deck's record.">
+                    {{ deck.borrowed_games }} lent out
+                  </div>
+                {% endif %}
               </div>
               <div class="decks-row-stat">
                 <div class="decks-row-stat-l">Health</div>

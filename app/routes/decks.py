@@ -144,6 +144,11 @@ def decks_page(
         deck.wins = stats.get("wins", 0)
         deck.losses = stats.get("losses", 0)
         deck.win_rate = stats.get("win_rate", 0.0)
+        # #156 Option C — must be copied explicitly: this loop enumerates the
+        # stats dict key by key, so a new service key does NOT reach the
+        # template on its own (the #152 failure mode, where every service test
+        # passed while the page rendered its empty state).
+        deck.borrowed_games = stats.get("borrowed_games", 0)
         deck.last_played = stats.get("last_played")
 
     # issue #27 — variant-group share management surfaced in the deck-edit

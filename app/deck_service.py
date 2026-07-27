@@ -2173,14 +2173,33 @@ def compute_deck_game_stats(session: Session, user_id: int, deck_ids: list[int])
     games and wins. ``placement == 1`` is a win. Mirrors the dashboard
     deck-performance contract for cross-page reconciliation.
 
-    Visibility (v4.0.1): a game counts if the viewer CREATED it
-    (``Game.user_id``) OR was a player at the table (``GameSeat.user_id``) —
-    matching the hybrid read-visibility added in v3.32.0. Previously only
-    games the viewer created were counted, so a participant who logged no game
-    saw 0 on a deck they actually played. No double-count: the query counts
-    distinct ``GameSeat`` rows grouped by deck, and a deck has exactly one seat
-    per game, so a viewer who is both creator and seat-holder still counts it
-    once.
+    Attribution (#156, owner decision 2026-07-27 — Option C): **every finalized
+    seat holding the deck counts, whoever piloted it**, and ``borrowed_games``
+    reports how many were piloted by someone other than the deck's owner. A
+    Commander deck gets lent out; discarding those results would hide real games,
+    and counting them silently would conflate deck strength with pilot skill.
+    Reporting both lets the reader discount it themselves.
+
+    This REPLACES the v4.0.1 viewer-visibility filter (``Game.user_id ==
+    viewer OR GameSeat.user_id == viewer``), which made this function and
+    ``dashboard_service`` answer the SAME question two different ways while the
+    docstring claimed they matched. They agreed in fact only because no
+    borrowed-deck seat existed yet (verified against prod 2026-07-27: 0 rows,
+    0 differing decks); the first one would have split them and surfaced as an
+    unexplained Dashboard-vs-Decks divergence. Both now use this rule.
+
+    **Not a visibility widening:** every caller passes the viewer's OWN
+    ``deck_ids`` (the Decks page passes ``list_decks(user_id=viewer)``), exactly
+    as ``dashboard_service`` filters ``Deck.user_id == viewer``. Dropping the
+    game-level filter reveals your own deck's full play record — never another
+    user's deck. **Known consequence:** another user who links your deck to a
+    seat in their game now moves your deck's count. Nothing in the app checks
+    deck ownership when a seat is created (the deliberate "cross-user permissive
+    stance" in ``routes/games.py``), so this is reachable; it is accepted as the
+    price of not discarding lent-deck games.
+
+    No double-count: the query counts ``GameSeat`` rows grouped by deck, and a
+    deck has exactly one seat per game.
     """
     if not deck_ids:
         return {}
@@ -2192,12 +2211,19 @@ def compute_deck_game_stats(session: Session, user_id: int, deck_ids: list[int])
             GameSeat.deck_id.label("deck_id"),
             func.count(GameSeat.id).label("games"),
             func.sum(case((GameSeat.placement == 1, 1), else_=0)).label("wins"),
+            # #156 Option C — how many of those seats were piloted by someone
+            # other than the deck's owner. ``is_distinct_from`` is null-safe:
+            # a guest seat (NULL user_id) playing your deck IS borrowed, and a
+            # plain ``!=`` would evaluate to NULL and silently drop it.
+            func.sum(case((GameSeat.user_id.is_distinct_from(Deck.user_id), 1), else_=0)).label(
+                "borrowed_games"
+            ),
             func.max(Game.played_at).label("last_played"),
         )
         .join(Game, GameSeat.game_id == Game.id)
+        .join(Deck, GameSeat.deck_id == Deck.id)
         .filter(
             GameSeat.deck_id.in_(deck_ids),
-            or_(Game.user_id == user_id, GameSeat.user_id == user_id),
             Game.status == "finalized",
             GameSeat.placement.is_not(None),
         )
@@ -2205,9 +2231,9 @@ def compute_deck_game_stats(session: Session, user_id: int, deck_ids: list[int])
         .all()
     )
 
-    # Silence the unused-import warning (desc is imported for symmetry with
-    # the dashboard pattern but not actually used in this query).
-    _ = desc
+    # Silence the unused-import warnings (imported for symmetry with the
+    # dashboard pattern; ``or_`` was the v4.0.1 visibility filter, now removed).
+    _ = (desc, or_)
 
     out: dict[int, dict] = {}
     for r in rows:
@@ -2220,6 +2246,7 @@ def compute_deck_game_stats(session: Session, user_id: int, deck_ids: list[int])
             "wins": wins,
             "losses": games - wins,
             "win_rate": (wins / games) if games > 0 else 0.0,
+            "borrowed_games": int(r.borrowed_games or 0),
             "last_played": r.last_played,
         }
     return out

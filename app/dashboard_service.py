@@ -345,12 +345,25 @@ def get_dashboard_data(session: Session, user_id: int, now: datetime | None = No
     # Per-deck: total games (count of seats with placement IS NOT NULL on a
     # finalized game) + wins (placement == 1). Filter to Deck.user_id ==
     # current user so we show the user's own decks. Top 6 by game count.
+    #
+    # #156 Option C — attribution is "every finalized seat holding the deck,
+    # whoever piloted it", with borrowed_games reporting the ones piloted by
+    # someone else. This query already counted every seat; the CHANGE is that
+    # deck_service.compute_deck_game_stats (the Decks page) now uses the same
+    # rule instead of its v4.0.1 viewer-visibility filter, so the two surfaces
+    # can no longer answer the same question two ways. Keep them in lockstep:
+    # the docstring on compute_deck_game_stats claimed a parity that was false.
     deck_perf_rows = (
         session.query(
             Deck.id.label("deck_id"),
             Deck.name.label("deck_name"),
             func.count(GameSeat.id).label("games"),
             func.sum(case((GameSeat.placement == 1, 1), else_=0)).label("wins"),
+            # Null-safe: a guest seat (NULL user_id) piloting your deck counts
+            # as borrowed; a plain != would evaluate to NULL and drop it.
+            func.sum(case((GameSeat.user_id.is_distinct_from(Deck.user_id), 1), else_=0)).label(
+                "borrowed_games"
+            ),
         )
         .join(GameSeat, GameSeat.deck_id == Deck.id)
         .join(Game, GameSeat.game_id == Game.id)
@@ -411,6 +424,7 @@ def get_dashboard_data(session: Session, user_id: int, now: datetime | None = No
                 "games": games,
                 "wins": wins,
                 "win_rate": (wins / games) if games > 0 else 0.0,
+                "borrowed_games": int(r.borrowed_games or 0),
             }
         )
 
