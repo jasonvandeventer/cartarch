@@ -161,6 +161,44 @@ const decksByUser = {{ decks_by_user_json | tojson }};
 const currentUserId = {{ current_user_id }};
 let playerCount = 4;
 
+// #156 — a seat records its PILOT (user_ids) and the DECK PLAYED (deck_ids) as
+// independent facts, and the server has always accepted a deck whose owner isn't
+// the seat-holder. Only this dropdown implied otherwise, by offering the seat
+// user's decks and nothing else — so borrowing a deck meant either misattributing
+// the seat or dropping the deck link entirely. Both halves are offered now:
+// the seat-holder's own decks first, everyone else's under "Borrowed from…".
+//
+// ONE builder, used by the initial render AND by onUserChange — those had
+// separate copies of the option-building loop, which is how they would drift.
+function buildDeckOptions(seatUserId, selectedDeckId) {
+  const own = seatUserId ? (decksByUser[seatUserId] || []) : [];
+  const borrowed = [];
+  Object.keys(decksByUser).forEach(uid => {
+    if (seatUserId && parseInt(uid) === seatUserId) return;
+    (decksByUser[uid] || []).forEach(d => borrowed.push(d));
+  });
+
+  const opt = d => {
+    const sel = selectedDeckId === d.id ? ' selected' : '';
+    return `<option value="${d.id}"${sel}>${escHtml(d.name)}</option>`;
+  };
+
+  let html = own.map(opt).join('');
+  if (borrowed.length) {
+    // Group by owner so "Borrowed from" reads as a person, not a flat list.
+    const byOwner = {};
+    borrowed.forEach(d => { (byOwner[d.owner] || (byOwner[d.owner] = [])).push(d); });
+    // "Borrowed" only means something once a pilot is chosen. With the seat
+    // empty every deck would read "Borrowed from …" — including the viewer's
+    // own, which is nonsense — so fall back to a plain owner-name group.
+    const groupLabel = o => (seatUserId ? `Borrowed from ${escHtml(o)}` : escHtml(o));
+    html += Object.keys(byOwner).sort().map(owner =>
+      `<optgroup label="${groupLabel(owner)}">${byOwner[owner].map(opt).join('')}</optgroup>`
+    ).join('');
+  }
+  return html;
+}
+
 // Default seat positions per player count (clockwise)
 const DEFAULT_POSITIONS = {
   2: ['p2', 'p6'],
@@ -227,10 +265,7 @@ function renderSeats() {
       `<option value="${u.id}"${seat.userId === u.id ? ' selected' : ''}>${u.name}</option>`
     ).join('');
 
-    const decks = (seat.userId ? (decksByUser[seat.userId] || []) : []);
-    const deckOptions = decks.map(d =>
-      `<option value="${d.id}"${seat.deckId === d.id ? ' selected' : ''}>${d.name}</option>`
-    ).join('');
+    const deckOptions = buildDeckOptions(seat.userId, seat.deckId);
     // Momir Basic uses no decks — hide the picker but keep an empty hidden field
     // so the deck_ids form array still aligns 1:1 with the seats.
     const deckField = isMomir
@@ -320,16 +355,13 @@ function assignSeat(pos) {
 function onUserChange(seatIndex, selectEl) {
   const userId = selectEl.value ? parseInt(selectEl.value) : null;
   seats[seatIndex].userId = userId;
-  const decks = userId ? (decksByUser[userId] || []) : [];
   const deckSel = document.getElementById(`deck-sel-${seatIndex}`);  // absent in Momir
   if (deckSel) {
-    deckSel.innerHTML = '<option value="">— no deck —</option>';
-    decks.forEach(d => {
-      const opt = document.createElement('option');
-      opt.value = d.id;
-      opt.textContent = d.name;
-      deckSel.appendChild(opt);
-    });
+    // #156 — same builder as the initial render, so the two can't drift. Changing
+    // the seat's user re-groups the list (their decks first, others borrowed) and
+    // clears the selection, since the previous pick belonged to the old context.
+    seats[seatIndex].deckId = null;
+    deckSel.innerHTML = '<option value="">— no deck —</option>' + buildDeckOptions(userId, null);
   }
   // Auto-fill name
   const nameInput = document.getElementById(`name-${seatIndex}`);

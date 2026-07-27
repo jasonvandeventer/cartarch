@@ -113,12 +113,30 @@ def game_new_page(
     from app import playgroup_service
 
     all_users = playgroup_service.get_pickable_users(session, current_user.id)
-    all_decks = session.query(Deck).order_by(Deck.name).all()
+
+    # #156 — decks are SCOPED to the people who can actually be seated. This used
+    # to be `session.query(Deck).all()`, i.e. every deck in the system serialised
+    # into the page for JS to filter client-side, so any user could read every
+    # other user's deck names out of the page source. The seat picker only ever
+    # offers `all_users`, so no other deck was reachable anyway — this narrows the
+    # payload to what the UI can use and closes the disclosure.
+    pickable_user_ids = {u.id for u in all_users} | {current_user.id}
+    all_decks = (
+        session.query(Deck).filter(Deck.user_id.in_(pickable_user_ids)).order_by(Deck.name).all()
+    )
     # JSON-safe: users list and deck lookup by user_id for JS filtering
     users_json = [{"id": u.id, "name": u.display_name or u.username} for u in all_users]
+    # #156 — a seat records a pilot and a deck independently, so a borrowed deck
+    # is representable and the server already accepts it. Carry the owner's name
+    # so the dropdown can offer other players' decks under a "Borrowed from…"
+    # group rather than the UI silently implying you may only play your own.
+    user_name_by_id = {u.id: (u.display_name or u.username) for u in all_users}
+    user_name_by_id.setdefault(current_user.id, current_user.display_name or current_user.username)
     decks_by_user_json = {}
     for d in all_decks:
-        decks_by_user_json.setdefault(str(d.user_id), []).append({"id": d.id, "name": d.name})
+        decks_by_user_json.setdefault(str(d.user_id), []).append(
+            {"id": d.id, "name": d.name, "owner": user_name_by_id.get(d.user_id, "")}
+        )
     # v3.32.0 — optional playgroup link picker. Linking a game to a playgroup
     # lets every member view it (read-only). Only the user's own playgroups
     # are offered. Empty list → the template hides the picker.
