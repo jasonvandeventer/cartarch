@@ -31,6 +31,9 @@ _UNKNOWN_SEAT_COLOR = "#8b949e"
 
 # Life chart SVG geometry (viewBox units; rendered responsive via width:100%).
 _W, _H, _PAD = 340, 140, 10
+# Width of the stub drawn for a seat eliminated before it ever took damage — a
+# one-point polyline renders nothing, and that seat must not vanish from the chart.
+_STUB_W = 3.0
 
 
 def _seat_label(seat) -> str:
@@ -145,50 +148,100 @@ def build_game_analytics(session: Session, game_id: int) -> dict | None:
     lives0 = {str(s.id): int(init_lives.get(str(s.id), s.starting_life)) for s in seats}
     max_turn = max((e.turn for e in events), default=1)
 
-    # ── 1. Life-over-time: replay life + cmd, snapshotting each seat per turn ──
+    # ── 1. Life-over-time: one sample per life-affecting EVENT (#151) ─────────
+    # The x-axis was one point per ROUND, which discarded every intra-round swing:
+    # `changed_at[sid][e.turn]` overwrote, so only a round's last value survived, and
+    # `game_events.turn` only increments when the rotation wraps past the first seat —
+    # so in a 4-seat pod one x-position spanned four seat turns. Now every `life`/`cmd`
+    # event emits a sample: the acting seat takes its new value, every other seat
+    # carries forward. `e.turn` survives only as round-boundary tick annotations.
     cur = dict(lives0)
-    changed_at: dict[str, dict[int, int]] = {sid: {} for sid in seat_ids}
+    samples: dict[str, list[int]] = {sid: [lives0[sid]] for sid in seat_ids}
+    # Sample index at which each seat was last eliminated (None = still in, or
+    # revived). Read from the EVENT STREAM, never from the finalized blob: the blob
+    # gives the fact, not the position, and cannot tell an elimination that stuck from
+    # one that was reverted (auto-eliminations auto-revive — see _auto_eliminate).
+    cut_at: dict[str, int | None] = dict.fromkeys(seat_ids)
+    round_ticks: list[dict] = []
+    current_round = 1
+    idx = 0
+
     for e in events:
+        if e.action_type == "eliminate":
+            p = json.loads(e.payload)
+            # Manual eliminates name the seat in the payload, auto ones only in the
+            # column — the column is set for both, so prefer it.
+            raw = e.seat_id if e.seat_id is not None else p.get("seat_id")
+            sid = str(raw) if raw is not None else None
+            if sid in cut_at:
+                cut_at[sid] = idx if p.get("eliminated") else None
+            continue
         hit = life_delta_for_event(e)
         if hit is None:
             continue
         sid, delta = hit
+        idx += 1
         if sid in cur:
             cur[sid] += delta
-            changed_at[sid][e.turn] = cur[sid]
+        for s in seat_ids:
+            samples[s].append(cur[s])
+        if e.turn > current_round:
+            current_round = e.turn
+            round_ticks.append({"index": idx, "round": e.turn})
 
-    # Carry each seat's life forward across turns with no change of its own.
+    n_samples = idx + 1
+
+    # Truncate at elimination, inclusive. A seat with no eliminate event — including
+    # one marked out only at finalize — keeps its full row and runs to the right edge;
+    # do NOT synthesize a cut from `eliminatedAtTurn`, which is round-grained and would
+    # land in the wrong place at event resolution.
     series_values: list[list[int]] = []
     for sid in seat_ids:
-        val = lives0[sid]
-        row = []
-        for t in range(1, max_turn + 1):
-            if t in changed_at[sid]:
-                val = changed_at[sid][t]
-            row.append(val)
-        series_values.append(row)
+        end = cut_at[sid]
+        series_values.append(samples[sid] if end is None else samples[sid][: end + 1])
 
     flat = [v for row in series_values for v in row] or [0]
     lo, hi = min(flat), max(flat)
     span = hi - lo or 1
-    x_span = (max_turn - 1) or 1
+    x_span = (n_samples - 1) or 1
 
-    def _x(turn_idx: int) -> float:
-        return _PAD + turn_idx / x_span * (_W - 2 * _PAD)
+    def _x(sample_idx: int) -> float:
+        return _PAD + sample_idx / x_span * (_W - 2 * _PAD)
 
     def _y(life: int) -> float:
         return _PAD + (hi - life) / span * (_H - 2 * _PAD)
 
+    def _step_points(row: list[int]) -> str:
+        """Step (not diagonal) rendering: hold the old value across to the new x, then
+        drop vertically. Life moves in discrete jumps, and a diagonal reads as a
+        gradual slide."""
+        y0 = _y(row[0])
+        if len(row) == 1:
+            # Eliminated before any life change. A one-point polyline draws nothing,
+            # so emit a short visible stub instead of losing the seat entirely.
+            return f"{_x(0):.1f},{y0:.1f} {_x(0) + _STUB_W:.1f},{y0:.1f}"
+        out = [f"{_x(0):.1f},{y0:.1f}"]
+        for i in range(1, len(row)):
+            x = _x(i)
+            out.append(f"{x:.1f},{_y(row[i - 1]):.1f}")  # across at the old value
+            out.append(f"{x:.1f},{_y(row[i]):.1f}")  # then down/up to the new one
+        return " ".join(out)
+
     life_series = []
     for sid, row in zip(seat_ids, series_values, strict=True):
-        points = " ".join(f"{_x(i):.1f},{_y(v):.1f}" for i, v in enumerate(row))
         life_series.append(
             {
                 "sid": sid,
                 "label": labels[sid],
                 "color": colors[sid],
-                "points": points,
+                "points": _step_points(row),
+                # After truncation this is life AT ELIMINATION, not the recorded
+                # `final_life` — the two differ by construction for every cmd/poison
+                # death (killed at 21 commander damage while still on positive life).
+                # The template labels it; the standings table above carries the
+                # authoritative number. See #154.
                 "final": row[-1],
+                "ended_at_elimination": cut_at[sid] is not None,
             }
         )
     life_chart = {
@@ -198,6 +251,9 @@ def build_game_analytics(session: Session, game_id: int) -> dict | None:
         "life_lo": lo,
         "life_hi": hi,
         "series": life_series,
+        # Faint verticals where the rotation wrapped — the only surviving use of
+        # `e.turn` on this axis.
+        "round_ticks": [{"x": round(_x(t["index"]), 1), "round": t["round"]} for t in round_ticks],
     }
 
     # ── 2. Elimination timeline (from the final blob) ─────────────────────────

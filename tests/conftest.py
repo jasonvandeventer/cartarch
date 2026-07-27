@@ -155,3 +155,24 @@ def fk_db(fk_db_engine):
         yield session
     finally:
         session.close()
+
+
+@pytest.fixture(autouse=True)
+def _reset_live_overlap_registry():
+    """Clear #155's in-process overlap registry between tests.
+
+    It keys on ``game_id`` in module-global state. Every test gets a FRESH database, so
+    ids restart at 1 and the previous test's version history reads as "someone already
+    wrote version N" — a false LOST UPDATE. pytest only surfaces captured logs for
+    FAILING tests, so this was silently polluting passing runs.
+
+    Test isolation only, NOT a production concern: prod has one long-lived database where
+    a given game id's version only ever climbs. Deliberately not "fixed" by weakening the
+    detector to an exact-equality check — ``>=`` is what catches a writer that clobbered
+    two earlier commits, and that case is real.
+    """
+    from app import live_game_service
+
+    live_game_service._last_written_version.clear()
+    live_game_service._live_in_flight.clear()
+    yield

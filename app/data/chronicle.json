@@ -1,5 +1,15 @@
 [
   {
+    "version": "4.12.8",
+    "date": "2026-07-26",
+    "added": [],
+    "refined": [],
+    "resolved": [
+      "The life chart on a finished game's summary now shows what actually happened. It plots every life change rather than one value per round, so a player who dropped low and climbed back within a single rotation no longer appears as a flat line. Changes render as steps rather than sloped lines, because life moves in jumps. And a player's line now stops at the moment they were eliminated instead of continuing to the right edge as though they had survived — one game had a line running to minus forty because damage kept being tapped onto a seat that was already out. Faint vertical marks show where each round began. This applies to every game already recorded, not just new ones."
+    ],
+    "archivist_note": "The old chart sampled one life total per round, which sounds reasonable until you notice a round in a four-player game covers four people's turns — so everything that happened in between was thrown away at drawing time. The information was never lost; it was all sitting in the game's event history, just not being read. A note on the numbers: a line now ends where the player was eliminated, and for someone killed by commander damage that is a positive life total, not zero. The Final standings table above the chart remains the authority on what a player finished on; the chart is a picture of the life track, and the two answer different questions."
+  },
+  {
     "version": "4.12.7",
     "date": "2026-07-26",
     "added": [],
