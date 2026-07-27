@@ -2755,6 +2755,13 @@ def _get_or_create_drawer_location(session: Session, user_id: int, drawer: str) 
             type="drawer",
             parent_id=None,
             sort_order=int(drawer) if drawer.isdigit() else 0,
+            # #159 — EXPLICIT, not the model default. A bootstrapped drawer must be
+            # sortable (that is the whole point of a drawer), and this was the ONLY
+            # StorageLocation site relying on the implicit ``mode`` default. The
+            # default flipped to "manual" so a user-created box is inert unless they
+            # opt in; without this line that flip would have silently disabled the
+            # drawer sorter for anyone whose drawers get auto-created.
+            mode="managed",
         )
         session.add(location)
         session.flush()

@@ -19,6 +19,11 @@ from app import card_filters, sort_spec
 from app.db import SessionLocal
 from app.deck_service import CARD_ROLE_TAGS
 from app.inventory_service import FINISH_OPTIONS
+from app.location_service import (
+    LOCATION_MODE_CHOICES,
+    location_mode_badge,
+    location_mode_label,
+)
 from app.models import InventoryRow, StorageLocation, User
 from app.pricing import effective_price
 from app.timeutil import utc_now
@@ -195,6 +200,12 @@ templates.env.globals["scryfall_image_fallback"] = scryfall_image_fallback
 templates.env.globals["color_filter_options"] = card_filters.COLOR_FILTER_OPTIONS
 templates.env.globals["type_filter_options"] = card_filters.TYPE_FILTER_OPTIONS
 templates.env.globals["card_filter_tokens"] = card_filters.card_filter_tokens
+# #159 — one definition of the mode picker, shared by the create form, the edit
+# popout and the badge. They had already drifted (create showed bare words, edit
+# showed sorter-role descriptions); a single list stops that recurring.
+templates.env.globals["location_mode_choices"] = LOCATION_MODE_CHOICES
+templates.env.globals["location_mode_label"] = location_mode_label
+templates.env.globals["location_mode_badge"] = location_mode_badge
 templates.env.globals["rarity_rank"] = sort_spec.rarity_rank
 templates.env.globals["effective_price"] = effective_price
 

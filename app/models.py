@@ -256,7 +256,12 @@ class StorageLocation(Base):
         ForeignKey("storage_locations.id"), nullable=True, index=True
     )
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
-    mode: Mapped[str] = mapped_column(String(16), default="managed", nullable=False, index=True)
+    # #159 — defaults to "manual" (do nothing) rather than "managed" (sorter may
+    # empty this). A user creating a box has just made a filing decision; the
+    # default must not undo it. Drawer auto-creation passes mode="managed"
+    # explicitly (inventory_service._get_or_create_drawer_location) — it was the
+    # only site relying on this default.
+    mode: Mapped[str] = mapped_column(String(16), default="manual", nullable=False, index=True)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
     capacity: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utc_now)

@@ -24,13 +24,15 @@
           </select>
         </div>
         <div class="locations-create-field">
-          <label>Sorter mode</label>
-          <select name="mode">
-            <option value="managed" selected>Managed</option>
-            <option value="manual">Manual</option>
-            <option value="sink">Sink</option>
-            <option value="ignored">Ignored</option>
+          {# #159 — one source: location_mode_choices. Safest option is first and
+             therefore the default, so not engaging with this choice does nothing. #}
+          <label>What should the sorter do with this?</label>
+          <select name="mode" id="loc-create-mode">
+            {% for value, label, desc, badge in location_mode_choices %}
+              <option value="{{ value }}" data-mode-desc="{{ desc }}"{% if loop.first %} selected{% endif %}>{{ label }}</option>
+            {% endfor %}
           </select>
+          <p class="locations-mode-desc muted" id="loc-create-mode-desc">{{ location_mode_choices[0][2] }}</p>
         </div>
         <div class="locations-create-field">
           <label>Parent</label>
@@ -106,7 +108,9 @@
                 </td>
                 <td data-label="Type">{{ loc_type_label(loc.type) }}</td>
                 <td class="col-priority-low" data-label="Mode">
-                  <span class="location-mode-badge location-mode-{{ loc.mode }}">{{ loc.mode }}</span>
+                  {# #159 — the badge said "managed", which names the sorter's role, not
+                     what happens to the cards. Same label as the picker. #}
+                  <span class="location-mode-badge location-mode-{{ loc.mode }}">{{ location_mode_badge(loc.mode) }}</span>
                 </td>
                 <td class="col-priority-low" data-label="Parent">{{ loc.parent.name if loc.parent else '—' }}</td>
                 <td data-label="Capacity">
@@ -161,15 +165,14 @@
                                  name="sort_order"
                                  value="{{ loc.sort_order }}"
                                  style="width: 80px">
-                          <label>Sorter mode</label>
-                          <select name="mode">
-                            <option value="managed" {% if loc.mode == "managed" %}selected{% endif %}>
-                              Managed — sorter places &amp; rebalances
-                            </option>
-                            <option value="manual" {% if loc.mode == "manual" %}selected{% endif %}>Manual — sorter never touches</option>
-                            <option value="sink" {% if loc.mode == "sink" %}selected{% endif %}>Sink — sorter pulls from only</option>
-                            <option value="ignored" {% if loc.mode == "ignored" %}selected{% endif %}>Ignored — invisible to sorter</option>
+                          {# #159 — same source as the create form, so the two can't drift. #}
+                          <label>What should the sorter do with this?</label>
+                          <select name="mode" class="loc-mode-select">
+                            {% for value, label, desc, badge in location_mode_choices %}
+                              <option value="{{ value }}" data-mode-desc="{{ desc }}"{% if loc.mode == value %} selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
                           </select>
+                          <p class="locations-mode-desc muted">{{ location_mode_label(loc.mode) }} — {% for value, label, desc, badge in location_mode_choices %}{% if value == loc.mode %}{{ desc }}{% endif %}{% endfor %}</p>
                           <label>Capacity <span class="locations-edit-hint">— optional</span></label>
                           <input type="number"
                                  name="capacity"
@@ -251,4 +254,30 @@
 
     {% include "_sorter_rule_controls.html" %}
   </section>
+
+  {# #159 — show the consequence of the SELECTED mode, not just the saved one.
+     Delegated so it covers the create form and every edit popout, and applied at
+     boot because browsers restore <select> values without firing `change`. #}
+  <script>
+  (function () {
+    function syncModeDesc(sel) {
+      var opt = sel.options[sel.selectedIndex];
+      if (!opt) return;
+      var form = sel.closest('form') || document;
+      var p = form.querySelector('.locations-mode-desc');
+      if (p) p.textContent = opt.dataset.modeDesc || '';
+    }
+    function syncAll() {
+      document.querySelectorAll('select[name="mode"]').forEach(syncModeDesc);
+    }
+    document.addEventListener('change', function (e) {
+      if (e.target.matches('select[name="mode"]')) syncModeDesc(e.target);
+    });
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', syncAll);
+    } else {
+      syncAll();
+    }
+  })();
+  </script>
 {% endblock %}

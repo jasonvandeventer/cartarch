@@ -21,6 +21,74 @@ SORTABLE_TARGET_MODES = frozenset({"managed"})
 # rebalanced; ``sink`` locations can be drained during rebalancing.
 SORTABLE_SOURCE_MODES = frozenset({"managed", "sink"})
 
+# #159 — user-facing mode labels. DISPLAY ONLY: the stored values above are
+# unchanged, and every comparison site still reads them. This exists because the
+# stored names describe the sorter's ROLE for a location ("managed", "sink") and
+# not the CONSEQUENCE to the user's cards, which is the thing they need to choose
+# on. Nothing in the picker told a user that "managed" means the sorter may empty
+# this box — and since ``mode`` defaulted to managed, four accounts ended up with
+# sortable storage they never chose (see #159, and the first-rule sweep warning
+# in sorter_rule_service.first_sweep_preview).
+#
+# Ordered SAFEST FIRST: the first entry is the create-form default, so the
+# do-nothing option is what a user gets when they don't engage with this choice.
+# Each label states what the sorter does TO THE CARDS, derived from the two
+# predicates above — keep them in sync if the predicates ever change:
+#
+#     mode      sorter files cards IN   sorter takes cards OUT
+#     manual            no                      no
+#     ignored           no                      no      (+ ranked last in trade suggestions)
+#     managed           yes                     yes
+#     sink              no                      yes
+# Each entry is (stored_value, picker_label, description, badge). The badge is the
+# at-a-glance table form — a status, not an instruction — because scanning which
+# boxes are at risk is the whole point; the picker label is the choice the user makes.
+LOCATION_MODE_CHOICES: list[tuple[str, str, str, str]] = [
+    (
+        "manual",
+        "Leave this alone",
+        "The sorter never adds or removes cards. Your filing stays exactly as you put it.",
+        "Left alone",
+    ),
+    (
+        "managed",
+        "Let the sorter organize this",
+        "The sorter may file cards here, and may take cards away when it rebalances.",
+        "Sorter organizes",
+    ),
+    (
+        "sink",
+        "Overflow — the sorter may empty this",
+        "The sorter never files cards here, but may pull cards out of it when rebalancing.",
+        "Sorter may empty",
+    ),
+    (
+        "ignored",
+        "Leave alone, and skip in trade suggestions",
+        "Same sorter behaviour as \u201cLeave this alone\u201d. Additionally ranked last when "
+        "suggesting cards you could trade.",
+        "Left alone \u00b7 no trades",
+    ),
+]
+
+DEFAULT_LOCATION_MODE = LOCATION_MODE_CHOICES[0][0]
+
+
+def location_mode_label(mode: str) -> str:
+    """Picker label for a stored mode value; unknown → the raw value."""
+    for value, label, _desc, _badge in LOCATION_MODE_CHOICES:
+        if value == mode:
+            return label
+    return mode
+
+
+def location_mode_badge(mode: str) -> str:
+    """Short at-a-glance table form; unknown → the raw value."""
+    for value, _label, _desc, badge in LOCATION_MODE_CHOICES:
+        if value == mode:
+            return badge
+    return mode
+
 
 def is_sortable_target(location: StorageLocation) -> bool:
     """Return True if the drawer sorter may PLACE cards INTO this location.
@@ -86,13 +154,13 @@ def create_location(
     type: str,
     parent_id: int | None = None,
     sort_order: int = 0,
-    mode: str = "managed",
+    mode: str = DEFAULT_LOCATION_MODE,  # #159 — safe default; see LOCATION_MODE_CHOICES
     note: str | None = None,
     capacity: int | None = None,
 ) -> StorageLocation:
     name = name.strip()
     type = type.strip().lower() or "other"
-    mode = (mode or "managed").strip().lower()
+    mode = (mode or DEFAULT_LOCATION_MODE).strip().lower()
 
     if not name:
         raise ValueError("Location name is required.")
