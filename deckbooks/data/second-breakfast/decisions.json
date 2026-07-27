@@ -14,7 +14,7 @@
       "finalized": false,
       "finalized_at": null,
       "selected_printing": {
-        "scryfall_id": "5f0d37b6-c092-439b-ba8e-e297ad35f155",
+        "scryfall_id": "c88eb33d-efba-4ad9-878f-f051079c9bce",
         "finish": "normal"
       },
       "museum_printing": {
@@ -26,7 +26,7 @@
         "desired": false,
         "printed": false
       },
-      "verdict": null,
+      "verdict": "The borderless assembly-line pantry humor perfectly visualizes Food, Clues, and Treasures accumulating together.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -57,10 +57,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "8101166d-03e1-4bc9-b50a-05743c02d653",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The Middle-earth passage looks like a practical Hobbit-sized route designed to slip past notice.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -91,10 +94,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "c03cc4a3-a526-4811-871e-290ae5bbe424",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The borderless storybook frame softens a severe removal spell into a dark illustrated fable.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -125,7 +131,10 @@
       "status": "pending",
       "finalized": true,
       "finalized_at": "2026-07-24",
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "1836b8a6-c616-4793-933b-b38296d70e72",
+        "finish": "normal"
+      },
       "museum_printing": {
         "scryfall_id": "cf977357-e13d-4c67-ae53-397adf55131e",
         "finish": "normal"
@@ -135,7 +144,7 @@
         "desired": false,
         "printed": false
       },
-      "verdict": null,
+      "verdict": "The borderless jeweled relic is ornate enough to feel special but still resembles a small, useful household treasure.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -166,10 +175,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "ad96343b-baac-428c-8270-fcffbbbe9fb8",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The standard portrait’s kitchen-table warmth fits the larder better than elevating her into a flashy crossover centerpiece.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -200,10 +212,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "7f927f72-fc9b-444f-9e0e-78a5e8e7bcaa",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The ordinary breakfast-table presentation captures the deck’s small-comfort philosophy better than unnecessary shine.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -234,7 +249,10 @@
       "status": "pending",
       "finalized": true,
       "finalized_at": "2026-07-24",
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "4c72e177-d95d-41df-91b3-4e489175b6aa",
+        "finish": "normal"
+      },
       "museum_printing": {
         "scryfall_id": "4c72e177-d95d-41df-91b3-4e489175b6aa",
         "finish": "normal"
@@ -244,7 +262,7 @@
         "desired": false,
         "printed": false
       },
-      "verdict": null,
+      "verdict": "The borderless woodland bird is lush, gentle, and naturally integrated with the deck’s Bloomburrow garden elements.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -275,10 +293,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "98178c9d-e113-4f0e-9a7b-3ebfaafe2503",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The borderless golden field and scrubland fit the deck’s harvest palette while expanding the pastoral landscape.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -309,10 +330,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "d00b4404-2ea0-4d15-922e-a8b7de3ac34e",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "Extended art opens the scene into a broad garden-green horizon without importing a conspicuous crossover aesthetic.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -343,10 +367,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "2bb8c103-37c3-4c5f-9b3f-48d8b2292783",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The borderless woodland portrait makes the token engine feel native to a flourishing garden rather than overtly militaristic.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -377,7 +404,10 @@
       "status": "pending",
       "finalized": true,
       "finalized_at": "2026-07-24",
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "14d34e8d-6db5-429c-a956-f8f3bb8bb9cd",
+        "finish": "normal"
+      },
       "museum_printing": {
         "scryfall_id": "14d34e8d-6db5-429c-a956-f8f3bb8bb9cd",
         "finish": "normal"
@@ -387,7 +417,7 @@
         "desired": false,
         "printed": false
       },
-      "verdict": null,
+      "verdict": "The borderless lantern provides warm hearthlike illumination and reads as useful travel gear rather than machinery.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -418,10 +448,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "48e98c57-c42f-4a3b-b07c-bc7d4882d719",
+        "finish": "foil"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The inexpensive borderless pastoral tower feels like a distant landmark beyond cultivated countryside.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -452,10 +485,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "31233339-c5ec-40fb-badd-94ef7f0ff7c0",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The borderless gardening scene directly expresses patient tending, gradual growth, and eventual abundance.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -486,10 +522,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "de36ecaa-62e0-4f1c-b07f-837a786dc897",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The borderless storybook treatment turns lifegain into a gentle golden dawn rather than a conspicuous power play.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -520,7 +559,10 @@
       "status": "pending",
       "finalized": true,
       "finalized_at": "2026-07-24",
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "36adefc7-44a8-40d0-8bdf-ad12d010b0bd",
+        "finish": "normal"
+      },
       "museum_printing": {
         "scryfall_id": "22e22287-21c5-4733-a527-b176fbf3725d",
         "finish": "normal"
@@ -530,7 +572,7 @@
         "desired": false,
         "printed": false
       },
-      "verdict": null,
+      "verdict": "Extended art lets the serene, fruit-bearing grove surround the dryad and reinforce the deck’s cultivated plenty.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -561,10 +603,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "00bbcc83-7307-46cc-b164-e1ff502d18a3",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The Bloomburrow printing makes the selective reset feel closest to the deck’s small-creature woodland world.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -595,10 +640,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "bf6069f2-7a32-4cb7-b2ab-ea6b51267cca",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The illustrated-map showcase treatment resembles a well-used travel page tucked into a Hobbit’s pack.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -629,10 +677,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "ed4c1e31-caa5-4cda-adc3-57d65c800a29",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "Extended art emphasizes quiet abundance and cultivated greenery appropriate to an ever-filling pantry.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -663,10 +714,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "49aaf5db-9418-4b97-97da-736c674905d4",
+        "finish": "foil"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The original art’s whimsical candy workshop is already the ideal expression of productive culinary excess.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -697,10 +751,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "77d54dca-d09b-49a6-a446-8144a7db6711",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "Extended art expands the autumnal fairy-tale woodland and gives the elder a warm, ancient pastoral presence.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -731,10 +788,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "008b953a-da2b-4c30-9424-6d6e3e938251",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The borderless showcase frame gives Faramir illustrated-manuscript dignity while remaining restrained beside the Hobbits.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -765,10 +825,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "b19fcc45-a77a-4296-a2a6-8320b5712cc5",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The showcase frame turns the abundant harvest into a pastoral storybook centerpiece without making Farmer Cotton grandiose.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -799,10 +862,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "f36f237f-6b44-4513-ba5d-fe6b4936f78e",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The borderless journey through green country fits a deck whose progress should look exploratory rather than explosive.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -833,10 +899,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "fbd897e0-0f6b-4a35-9f33-a16d85ddfad8",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The borderless fable treatment makes the toppling of something enormous feel clever and folkloric rather than bombastic.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -867,10 +936,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "0000419b-0bba-4488-8f7a-6194544ce91e",
+        "finish": "foil"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "A complementary Bloomburrow forest adds visual variety while preserving the same soft storybook ecosystem.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -935,10 +1007,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "28976e0f-578a-4825-89c4-28acda2b0eb2",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "Extended art gives the protected settlement a broad, peaceful agricultural setting suited to the Shire.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -970,8 +1045,8 @@
       "finalized": true,
       "finalized_at": "2026-07-24",
       "selected_printing": {
-        "scryfall_id": "a223c85f-3952-40d0-88d4-d5c3e8cd864d",
-        "finish": "foil"
+        "scryfall_id": "95ed1ff5-a0a6-4fe0-94d2-e3675226db52",
+        "finish": "normal"
       },
       "museum_printing": {
         "scryfall_id": "a223c85f-3952-40d0-88d4-d5c3e8cd864d",
@@ -982,7 +1057,7 @@
         "desired": false,
         "printed": false
       },
-      "verdict": null,
+      "verdict": "Extended art gives the commander a wider, warmer Shire setting while keeping him modest and approachable.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -1013,10 +1088,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "6d08e637-c2b3-4b38-9b07-5bba1f13efc3",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The borderless showcase version gives Frodo narrative importance while preserving the muted storybook style of the deck.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -1047,10 +1125,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "50a2bca4-8bac-4b8d-970e-1f438c9ee6bb",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The Middle-earth printing keeps the board wipe visually grounded within the deck’s broader illustrated world.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -1081,10 +1162,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "25e987d9-6a69-46af-bd9f-8e505fa721bb",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The Middle-earth printing keeps this disruptive land within the deck’s muted, old-world visual vocabulary.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -1115,10 +1199,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "c9ab64c3-130e-4afc-9589-6d5654daeac7",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The borderless woodland goose makes Food production charming, domestic, and visually native to the deck.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -1149,10 +1236,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "f608fcd6-b59d-457e-879e-bcc53e15bc15",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The borderless composition gives the removal visual distinction while its muted darkness avoids dominating the deck.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -1183,10 +1273,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "9f2cb054-7871-49f4-8201-3fd6f83f0251",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The showcase treatment casts Gollum as a troubling marginal figure within the same illustrated Middle-earth volume.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -1217,10 +1310,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "89670a1b-a6f1-491d-bbb4-92e3382da653",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The sole printing’s cozy woodland cookery captures skill growing slowly through repeated meals.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -1251,10 +1347,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "b29e9b2a-d9ca-48ff-9655-078ae5414e9a",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The original refuge is gentle, green, and weathered, reading as a humble stopping place rather than a landmark.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -1285,10 +1384,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "c48d1586-23e9-4b0e-91ff-01bd6f32427c",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "Extended art gives the chef and his overflowing kitchen enough space to become the deck’s grandest culinary character.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -1319,10 +1421,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "9e1f1110-0919-49cd-8b5b-979b2744fd3c",
+        "finish": "etched"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The Mystical Archive treatment resembles an illuminated recipe or song preserved on ale-brown parchment.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -1353,10 +1458,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "1269ca79-907e-4932-9e77-a9a5d2929060",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The borderless art surrounds Hazel with roots, stores, and domestic woodland magic while avoiding the needless premium foil.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -1387,10 +1495,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "95965b9a-9ab3-4dd4-b8de-65df9c62e797",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "Extended art enlarges the warm brewing scene and lets its food-and-potion details enrich the deck’s larder.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -1421,10 +1532,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "66081fd3-2457-4602-96c4-3075ddfec1c2",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The sole printing contributes exactly the sort of harmless, food-centered charm that keeps the deck beneath notice.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -1455,10 +1569,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "daed8456-011e-44e2-b180-6a8a75089257",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The original weathered idol feels like an unobtrusive household relic rather than an expensive centerpiece.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -1489,10 +1606,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "18e286b0-b4c4-4b42-ba11-2eec962fee8c",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The borderless chapel supplies melancholy pastoral solitude while remaining within the deck’s earth-toned palette.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -1523,10 +1643,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "e6209ca8-3a2a-4c0a-9f86-54283af9df75",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "Extended art allows its warm horizon and gentle radiance to suggest resilience accumulating quietly over time.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -1557,10 +1680,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "e1d583de-aa07-4708-8b9e-48aa9cd68e5b",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The showcase portrait makes Lobelia’s fierce domestic defense feel like a delightfully illustrated Shire anecdote.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -1591,10 +1717,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "d8f4d07b-2fc1-4d86-865b-b35526850c8e",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The Bloomburrow printing integrates broad removal into the same naturalistic woodland language as the deck’s engines.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -1625,10 +1754,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "ff7cea33-4d46-450a-a54e-b8d70910eee8",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The parchment showcase treatment gives Merry a familiar illustrated-tale quality consistent with Pippin.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -1659,10 +1791,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "42a317e2-e190-4442-aa1b-6f7eca8a3dc8",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The showcase portrait keeps Merry recognizably Hobbit-sized even as his role and resources expand.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -1693,10 +1828,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "882747f9-b4fe-42be-8fe9-f871cd0779bd",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The full-art swarm turns a dangerous payoff into atmospheric woodland life spreading unnoticed overhead.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -1727,10 +1865,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "a36a42b0-8216-4c99-a85f-22a520f31fd4",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The textless full-art painting is elegant, legible by familiarity, and subdued enough for the deck’s quiet menace.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -1761,10 +1902,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "6bebaafc-2114-4e00-a7f1-cd43a8d92d18",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The Middle-earth printing makes the strange forest feel like a whispered danger just beyond settled Hobbit country.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -1795,10 +1939,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "8e68589e-d71f-4a2b-9a97-b768e81aefa4",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "Extended art lets pale blooms and dark roots spread across the frame in a restrained green-black transition.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -1829,10 +1976,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "27f53bed-7075-4303-aa9e-fcca0a266e19",
+        "finish": "foil"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The original art turns accumulated confections into the deck’s ideal hidden endgame: the pantry finally fights back.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -1863,10 +2013,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "f415a76e-6b35-442e-a2e1-9e368f550566",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The full-art nocturnal scene supplies hushed storybook darkness without disrupting the deck’s pastoral palette.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -1897,10 +2050,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "d493c09c-7794-47ed-a002-3493187d1da6",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The showcase treatment makes the meal feel like an illustrated chapter from the deck’s defining feast.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -1931,10 +2087,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "9e068335-92f9-4ebd-bb00-f4ff741e3d7d",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The showcase treatment emphasizes careful handcraft and multiplying materials, echoing value assembled piece by piece.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -1965,10 +2124,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "7f3d574a-72b5-43be-b4b5-87865bbc7b5c",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The full-art forest road evokes generations of familiar footsteps and a journey beginning close to home.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -1999,10 +2161,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "20298a61-2739-4254-b102-51a2a74b5ddc",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The full-art pastoral road makes exile resemble a solitary journey away from the Shire rather than violent removal.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -2033,10 +2198,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "fbbdd288-83ec-4be9-b55f-17771fd5ecc4",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The parchment-like showcase portrait presents Pippin as a cheerful pantry conspirator rather than a battlefield legend.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -2067,10 +2235,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "4ef54258-6b01-4758-aed0-695fe5c10dfb",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The matching showcase treatment creates a deliberate pair with Merry and preserves the deck’s storybook continuity.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -2101,10 +2272,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "b03cf0bb-3207-4e8e-bb3f-e3e4367aa86e",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The sole printing adds comic culinary magic that reads as odd pantry business rather than a looming threat.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -2135,10 +2309,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "4f04188d-9a76-495d-b3a7-ee44810cf671",
+        "finish": "foil"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "A second Bloomburrow meadow broadens the pastoral setting while retaining the same gentle scale.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -2203,10 +2380,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "e3b3ad4a-7b7c-4d63-8843-e65a05c0c701",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The showcase treatment presents the prosperous pig like a whimsical illustration from a Hobbit farming almanac.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -2237,10 +2417,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "8dbdba5b-3014-47b9-b5c8-5f92a99df9f7",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The full-art innkeeper centers hospitality, modest profit, and a welcoming table—the deck’s social ideal.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -2271,10 +2454,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "0dcb97ff-9356-4be7-8991-091f950c0b63",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The full-art animated cottage is almost a thesis statement for a cozy home quietly becoming dangerous.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -2305,10 +2491,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "fc676894-59de-4e69-a110-5e4def877c58",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The showcase treatment presents restoration as an illustrated return to green fields, food, and ordinary life.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -2339,10 +2528,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "ada81bdf-340d-44f2-8c48-64af2f179bab",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The frameless hidden route conveys unobtrusive escape and infiltration without excessive spectacle.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -2373,10 +2565,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "5a56cbc2-6fc2-4443-90fe-59acd526f562",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The full-art portrait gives Rosie a warm, grounded domestic presence central to the deck’s Shire identity.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -2408,8 +2603,8 @@
       "finalized": true,
       "finalized_at": "2026-07-24",
       "selected_printing": {
-        "scryfall_id": "cfdfa303-2578-455b-929c-a217a0261bb3",
-        "finish": "foil"
+        "scryfall_id": "601402f4-8647-4c41-9a0f-63d10ce89d02",
+        "finish": "normal"
       },
       "museum_printing": {
         "scryfall_id": "cfdfa303-2578-455b-929c-a217a0261bb3",
@@ -2420,7 +2615,7 @@
         "desired": false,
         "printed": false
       },
-      "verdict": null,
+      "verdict": "The extended-art portrait makes Sam’s provisions and steadfast domestic warmth the deck’s visual anchor.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -2451,10 +2646,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "16891fb5-1388-465c-8d86-97de0ee94ef1",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The full-art portrait closes the deck’s story with Sam grounded in courage, earth, and the ordinary world worth preserving.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -2485,10 +2683,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "b5265db7-5165-469c-bdff-978a5cefc034",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The warm earthen stronghold provides a distant, weathered landmark that complements the parchment palette.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -2519,10 +2720,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "15c98441-2b31-4e48-a399-f36dffcfa41d",
+        "finish": "foil"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The original Eldraine woodland feast scene naturally joins food, forest, and fairy-tale resourcefulness.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -2553,10 +2757,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "7b1127d7-01c2-4bd0-ae27-72dcbf0920ca",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "Extended art emphasizes sunlit trees and open farmland, joining forest abundance with quiet cultivation.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -2587,10 +2794,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "54294215-3d63-4c44-8886-7e2f71c78379",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The subdued windswept landscape adds necessary bleakness without breaking the deck’s naturalistic treatment.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -2621,10 +2831,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "7ba00634-b62c-4a95-941d-775fc4c9e3a2",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "Extended art spreads the pale-gold and dusky vegetation into an atmospheric white-black boundary.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -2655,10 +2868,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "11b50fec-28e0-4eaf-9184-73cc7234577f",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The full-art treatment turns interaction into a charming local arrest handled by an unassuming village official.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -2689,10 +2905,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "7d698bdd-b485-409d-b03e-c7c7d3fe9a92",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The borderless ring appears as an old enchanted keepsake glowing warmly amid organic surroundings.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -2723,10 +2942,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "25eab51a-8dad-4a37-9551-c6bf0dc6ecf5",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The full-art figure has a gentle, wandering melancholy that suits a useful servant quietly doing several jobs.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -2757,10 +2979,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "f87adc0a-813e-4afe-9e4e-c2d2202c3256",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "Extended art gives the token-making construct breadth while its utilitarian design keeps it from becoming visually dominant.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -2791,10 +3016,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "e6fe0942-a5c9-4821-9992-19467e3a1176",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The full-art grove glows with fresh-butter sunlight and garden-green abundance—the deck palette in landscape form.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -2825,10 +3053,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "0223cf7f-4c6e-487f-babb-a740a15e1f0c",
+        "finish": "foil"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "A second Bloomburrow swamp adds shadowed garden depth while matching the other full-art basics.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -2893,10 +3124,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "cc9ece2f-7eda-4fc5-a562-3e16e71560e9",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The illuminated-archive frame makes the iconic farming metaphor feel like an old Shire proverb.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -2927,10 +3161,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "81325756-42c6-4e60-b981-cacff8854596",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The showcase version frames the deck’s rare open conflict as a chapter from an illustrated Hobbit history.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -2961,10 +3198,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "6f33a21e-5f05-4b5d-9c37-57d0fb719275",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "Extended art gives the elder Hobbit’s quiet authority and familiar Shire surroundings room to breathe.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -2995,10 +3235,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "248ed7a6-982a-4ff4-ba9b-3c1f47e7605c",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The full-art Shire is the deck’s inevitable visual heart: green hills, warm homes, and abundance beneath notice.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -3029,10 +3272,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "7a832060-ecc6-406a-ab06-b371aa952e13",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The full-art provisioner makes steady landfall value feel like continuous gathering for a long journey.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -3063,10 +3309,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "4ee7d9a4-c36e-4989-b448-fa56705a4aa6",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The full-art dreamscape is soft, contemplative, and suitably gradual for a card that converts patient lifegain into value.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -3097,10 +3346,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "5da88d23-8650-4b55-a3f9-e964427660ed",
+        "finish": "foil"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The rich forest elemental art feels ancient and natural, with foil reserved for its subtle supernatural glow.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -3131,10 +3383,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "a5b62c98-8ca3-4768-addf-e255ca98c63c",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The full-art woodland graveyard is somber but overgrown, keeping death folded naturally into the countryside.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false

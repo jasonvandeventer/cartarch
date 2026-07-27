@@ -1595,5 +1595,37 @@
       "selected_scryfall_id": "b8386ca9-0359-4a18-abea-0cb0e955a947"
     },
     "reason": "decision revised"
+  },
+  {
+    "deck_card_id": "601c59cf-f3df-4003-9ae9-613a1d4a620b",
+    "card_name": "Beast Within",
+    "revision": 2,
+    "changed_at": "2026-07-24",
+    "change_type": "decision_revised",
+    "previous": {
+      "status": "keep",
+      "selected_scryfall_id": "b6b6c66f-e3e0-4904-ae41-2ecc786f70c5"
+    },
+    "current": {
+      "status": "keep",
+      "selected_scryfall_id": "a23446e7-8573-4e8e-8698-e4ca62424416"
+    },
+    "reason": "decision revised"
+  },
+  {
+    "deck_card_id": "fb01696a-855c-45af-804c-d41acb6496e1",
+    "card_name": "Blasphemous Act",
+    "revision": 2,
+    "changed_at": "2026-07-24",
+    "change_type": "decision_revised",
+    "previous": {
+      "status": "upgrade",
+      "selected_scryfall_id": "9af44900-0afe-4409-8bad-0db4a915be92"
+    },
+    "current": {
+      "status": "upgrade",
+      "selected_scryfall_id": "4a184a4a-2c8c-4a10-9b26-a174859fa1e8"
+    },
+    "reason": "decision revised"
   }
 ]

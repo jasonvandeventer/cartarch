@@ -13,10 +13,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "84f71a16-915d-4b8e-8c39-cc46bcaa9de9",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The showcase treatment turns decomposition into a stylized biological process rather than generic removal.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -47,10 +50,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "255544be-db0f-4dcc-8787-f05652cd2684",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The borderless spider and spreading web make Arasta feel like a containment chamber overtaken by its subject.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -81,10 +87,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "e12857ca-54af-453a-a2ad-b5622e7c9b0c",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The borderless green-black relic resembles a bio-reactor component rather than a polished magical jewel.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -115,10 +124,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "0c4f4ff8-efd2-4d22-8491-54bd6e73006c",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The borderless overgrown trophy scene joins death, vegetation, and Golgari rot in one elegant image.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -149,10 +161,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "832d9185-fa03-4e10-b612-e7916da8bb55",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The borderless enchantment shows the entire animal mass crossing the threshold from nuisance to lethal force.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -183,10 +198,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "df4fa3ab-30e3-4e82-a8b8-4fbaeab7870b",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The borderless showcase makes Blech look like the deceptively harmless specimen at the center of the coming breach.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -217,10 +235,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "1261acee-a01f-4fd3-a737-fd97dcaa7656",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "Extended art gives the pest-producing heap the scale of a ruptured bio-waste enclosure.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -251,10 +272,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "eaac5673-fc6f-455c-a4e9-a19061f34d32",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "Extended art lets the swollen bog organism dominate the landscape as lifegain converts directly into mass.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -285,10 +309,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "6f730eba-fef1-4d2c-bcaf-9fe51f6bf270",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The borderless bog is dark, fungal, and atmospheric enough to serve as the contaminated disposal site.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -319,10 +346,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "02a16e1e-1ea8-49af-9cde-2166134f7bdc",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The full-art enclosure feels like an isolated research station surrounded by hostile wilderness.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -353,10 +383,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "a99e2ed7-8a6c-49cf-81ae-690a8636d5f6",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The borderless tower’s dark organic architecture reads as the facility from which containment has failed.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -387,10 +420,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "b35a8efe-2a3e-4060-9134-d4150e4bdf28",
+        "finish": "foil"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The original Golgari brute is wet, fungal, and anatomically excessive—the ideal counter-doubling mutation.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -421,10 +457,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "dca82673-3788-4b92-8605-bedda45e5b16",
+        "finish": "foil"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The borderless fungal landscape and foil sheen perfectly capture luminous spores spreading through swamp rot.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -455,10 +494,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "59ed23a2-6153-47b2-ab73-062195cafb74",
+        "finish": "foil"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The protective swarm imagery fits creatures instinctively shielding the organism carrying their growth signal.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -489,10 +531,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "c7d7db76-0a0c-444f-96f1-559838450549",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The borderless storybook multiplication feels lush, uncanny, and visibly impossible without resorting to a premium variant.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -523,10 +568,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "1af03fc3-5eb6-404e-96d9-e291a1e11ec3",
+        "finish": "foil"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The original carapaced crawler is small, damp, and exactly representative of the brood before the counters accumulate.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -557,10 +605,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "d9e6b777-e0f6-47e1-808e-81850039d891",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "Extended art emphasizes the obsessive researcher and the unsettling moment the specimens answer back.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -591,10 +642,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "59b698d6-4107-45d3-bc27-fb0746b7f91a",
+        "finish": "foil"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The full-art showcase makes the creature feel like a resilient experimental organism refusing every attempt at disposal.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -625,10 +679,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "da2a65d6-0887-4fe8-a6e6-909208fddd90",
+        "finish": "foil"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The colorshifted green frame and glowing life magic make each tiny gain feel like energy entering the culture.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -659,10 +716,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "362b72b5-4f63-43e2-bd09-4398b6aef5f3",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The borderless figure emerging through green decay feels like biomass being recovered and reconstituted.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -693,10 +753,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "bd4232b0-43e4-4352-948b-10cdc9660ac2",
+        "finish": "foil"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "Extended art and foil emphasize proliferating organic forms as the experiment accelerates beyond normal growth.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -727,10 +790,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "f82fce56-307a-44bf-8c46-0e1328550e17",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "Extended art gives the serpentine devotee a cultic, subterranean atmosphere compatible with the brood.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -761,10 +827,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "29951997-d769-457b-94ff-fadd5cbfbad5",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The borderless treatment depicts exploration as entry into increasingly strange and biologically altered terrain.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -795,10 +864,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "9a67d30b-7a4f-49b4-bf8b-e9cf8c248e4d",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The borderless eruption of enormous creatures is the exact moment every containment protocol becomes irrelevant.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -829,10 +901,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "2c2fc9f7-21af-4416-abf5-6fcb4f543680",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The sickly vegetation and yellow-green haze push the basic-land suite toward biohazard territory.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -1067,10 +1142,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "826ff8c2-8a1d-45f5-a7e2-d8bf826fcadc",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The original dark forge resembles a crude enhancement chamber where Blech’s brood is deliberately enlarged.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -1101,10 +1179,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "226b1cc4-44be-4d8d-963a-93c84b09c7f0",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The full-art anatomical treatment makes the familiar mana creature feel like a documented laboratory specimen.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -1135,10 +1216,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "f6729320-d557-4860-80e4-32afcf6aad34",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The borderless decay-farm is the deck’s ideal breeding ground: cultivated rot overflowing with organic waste.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -1169,10 +1253,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "c7cf673b-efa4-4a61-8f6f-d884fbe2d2cb",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The guild-kit printing most strongly resembles official containment equipment stamped with the responsible institution.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -1203,10 +1290,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "86f97dd8-8647-4938-aee0-690bb715f88b",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The borderless commander-style treatment gives the colossal feeder the scale of the outbreak’s final evolved form.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -1237,10 +1327,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "6b635f1c-1e65-4aec-af23-e75e49665014",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The borderless reptilian texture turns extra counters into visible armor thickening across the brood.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -1271,10 +1364,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "847a175e-ead1-4596-baf3-5f7f57859e0b",
+        "finish": "foil"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The tiny mechanical pest looks like a disposable containment-cleanup tool that has joined the infestation instead.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -1305,10 +1401,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "12edbdcc-085f-48c8-9605-3c7e3fe63bc7",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The borderless green surge looks like a sudden adaptive response protecting the entire colony at once.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -1339,10 +1438,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "71597acf-1ce6-46a8-b6c0-88755c8a377c",
+        "finish": "foil"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The grimy clandestine operation feels like the irresponsible trafficking that introduced the specimens.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -1373,10 +1475,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "199a94a3-41a5-4e4d-ad46-13eccca42a82",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The borderless composition turns the counter-bearing brood into a unified mass responding to one signal.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -1407,10 +1512,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "438bd3c1-98f2-4fcc-8521-995c6c5c1a79",
+        "finish": "foil"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The original foil Hydra provides the cleanest visual climax for exponential growth escaping all control.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -1441,10 +1549,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "69d247eb-0482-481e-824f-996ae1b20177",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The borderless structure resembles a sealed industrial laboratory whose defenses are now glowing ominously.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -1475,10 +1586,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "f9fa4a5a-4d9b-41c5-a86e-d0e7230d6e92",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The borderless organic hands and roots visualize the outbreak extending into every available environment.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -1509,10 +1623,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "9c10d359-543a-4d2e-9bbe-23f93a14aa2d",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The showcase map frame presents the lair like a marked quarantine zone containing something too large.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -1543,10 +1660,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "b7fbf696-0e8a-47bc-a284-752e8554a99b",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The dark organic instrument feels like a field catalogue repurposed for recording unstable specimens.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -1577,10 +1697,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "cb9bf59f-6879-4343-9158-207ddd170bfb",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The full-art serpent’s vivid toxic coloration looks like a genetically enhanced specimen under display lighting.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -1611,10 +1734,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "45887949-7cc6-4f83-a659-fb3284685c7d",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "Extended art makes the changeling apparatus resemble a specimen-classification device catastrophically overriding taxonomy.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -1645,10 +1771,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "c6b31722-9626-4fea-9971-54c9aa8238e8",
+        "finish": "foil"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The original mire’s oily darkness and dead vegetation make it an effective contaminated recovery site.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -1679,10 +1808,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "8e68589e-d71f-4a2b-9a97-b768e81aefa4",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "Extended art lets poisonous blossoms and black roots spread across the frame like a cultured pathogen.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -1713,10 +1845,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "05b5e975-bd75-4f7c-829d-e87f8b24bc2f",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The full-art serpent turns the card into a cold, predatory outbreak spreading beyond its frame.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -1747,10 +1882,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "cb789935-b0ba-427c-a0d5-93b006a28312",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "Extended art transforms the polished structure into an eerie central facility lit through specimen-glass colors.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -1781,10 +1919,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "a402cff8-be7f-4473-b880-a6a2eedfda86",
+        "finish": "foil"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The newer printing’s dark laboratory-adjacent mood and subtle foil movement suit a continuous supply of snakes.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -1815,10 +1956,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "d46d3ef7-b81f-42f4-9c1b-fa53f11eae65",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The newer printing’s enormous vegetation reinforces the brood’s counters as unchecked biological growth.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -1849,10 +1993,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "8c4e1fdc-9e6c-4377-8e5b-cb4c036267ce",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The full-art stitched standard resembles a taxonomy chart assembled from pieces of the five brood types.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -1883,10 +2030,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "35425069-0d8d-4a02-ba7c-50e7abfecb4c",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The full-art path feels like a trail repeatedly traversed by generations of increasingly altered specimens.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -1917,10 +2067,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "b82c20ad-0f69-4822-ae76-770832cccdf7",
+        "finish": "foil"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The small-animal formation looks harmless at first glance, exactly matching the brood’s deceptive early state.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -1951,10 +2104,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "99b7ac6b-b320-44b3-90b9-337a8be5a8e9",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "Extended art lets the multiplying pests spill laterally across the card like containment has already failed.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -1985,10 +2141,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "d882beb9-6766-4818-afbb-f6fd7a2d5b70",
+        "finish": "foil"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The harmless school mascot becomes the perfect visual warning that the earliest specimens never looked dangerous.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -2019,10 +2178,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "edc0937e-c39b-4fd5-afc2-7c7f6ce7c8c2",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "Extended art gives the handler and rescued specimens enough room to establish the deck’s misguided husbandry narrative.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -2053,10 +2215,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "fb0ecf3a-ac0e-45a6-98ae-8c043c636252",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "Extended art gives the biomechanical chamber a clinical, contaminated atmosphere suited to the deck’s laboratory horror.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -2087,10 +2252,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "eed76e15-6456-4ddc-addf-f0e6eff8bb6a",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The Bloomburrow host looks innocuous enough to conceal how much repeatable lifegain he feeds into the experiment.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -2121,10 +2289,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "3367b007-5985-448d-9203-67c22195d708",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "Extended art makes the shapeshifter resemble an adaptive carrier able to express every brood taxonomy.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -2155,10 +2326,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "c924fa52-a835-4259-8bfd-2cde60bdfcc5",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The full-art green roar captures the instant the enlarged specimens collectively recognize their strength.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -2189,10 +2363,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "0ff7858d-f18d-4e5a-9467-ebef3ef53ac1",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The full-art carapaced construct resembles a mobile brood amplifier built from layered chitin and stone.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -2223,10 +2400,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "0b064748-515a-4234-ad00-8a735d7aa385",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The full-art elder’s amphibious, textured body feels like a carefully observed natural specimen.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -2257,10 +2437,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "0a91920a-7de3-4e9b-9cce-ff43ce0157b8",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The full-art ooze visibly consumes and incorporates organic waste, fitting both cleanup and uncontrolled growth.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -2291,10 +2474,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "11347d20-2b14-41cb-a930-92e37fcd1b87",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The full-art showcase depicts the brood’s collective awakening as a sickly green moment of revelation.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -2325,10 +2511,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "43d427a8-a237-4053-b90d-0f1dd249e9c1",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "Extended art enlarges Shelob’s cavern and makes her an apex specimen looming over the lesser brood.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -2359,10 +2548,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "099352e2-38c8-4fb4-a25f-6d928aa20f9e",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The dark legendary storehouse reads naturally as a forbidden containment wing full of preserved failures.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -2393,10 +2585,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "97f7fbb9-228c-4a74-975b-38d3b6cecb32",
+        "finish": "foil"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The oversized vermin in an ordinary commercial setting perfectly depicts the infestation reaching civilian spaces.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -2427,10 +2622,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "87300ac8-8b6f-4c37-8058-beb59eaa66be",
+        "finish": "foil"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The original mechanical-industrial setting makes the spider resemble a specimen loose inside a facility.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -2461,10 +2659,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "d9849b22-1fba-4f6a-bd94-df1bc1764e6b",
+        "finish": "etched"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The ornate archive frame and etched finish make the protective mutation feel like an encoded alchemical procedure.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -2495,10 +2696,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "74109c41-d1e7-4108-bed1-3d9110d5e7d2",
+        "finish": "foil"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The dark full-art ring glows like a sealed power core behind contaminated glass.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -2529,10 +2733,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "4b0042a6-1391-4406-9058-3711f189508b",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "Extended art lets the tiny woodland procession multiply across the scene like an apparently benign migration.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -2563,10 +2770,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "33535dbf-203b-44c9-be20-67fafa0927ee",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The full-art vault feels secretive, metallic, and plausibly stocked with classified specimen records.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -2597,10 +2807,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "50e95c7b-f0b2-4276-8c5e-4191b7ba35d1",
+        "finish": "foil"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The mundane storage scene becomes darkly funny here: every shelf is quietly filling with infestation material.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -2631,10 +2844,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "5452c8e4-3463-4ae3-a9d1-5947bea4684e",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The full-art mire introduces stagnant water and harsher decay as the outbreak escapes controlled habitats.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -2733,10 +2949,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "63e0cde7-ec96-4428-b368-572154c97f1c",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "Extended art lets the amorphous colony read as many tiny organisms beginning to function as one body.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -2767,10 +2986,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "2b4ee0e7-7528-4fdc-a768-055d2c097f05",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The full-art breeding ground makes the deck’s five vermin types feel like one coordinated ecosystem.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -2801,10 +3023,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "a20a35cc-69e5-42b8-b28c-ae5147451150",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The original art’s diseased trees and poisoned atmosphere remain the clearest expression of contaminated woodland.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -2835,10 +3060,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "b37ba764-8dae-4be1-9939-969067d215af",
+        "finish": "foil"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The full-art green-black talisman resembles an energized culture vessel and matches the deck’s native visual language.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -2869,10 +3097,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "eaa358ac-761d-4507-aa15-3d4684027207",
+        "finish": "foil"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The foil classroom specimen embodies the disastrous normalization of keeping unstable pests close at hand.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -2903,10 +3134,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "e34fc9f2-05ed-462b-922e-75531bccacca",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "Extended art expands the toxic green temple into a monumental center for deliberate biological corruption.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -2937,10 +3171,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "511f6a96-520d-4e6d-aba8-c553c5c9c0a0",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "Extended art gives the green mass room to engulf its environment like an escaped culture.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -2971,10 +3208,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "248ed7a6-982a-4ff4-ba9b-3c1f47e7605c",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The full-art pastoral land creates unsettling contrast: even the safest countryside is now harboring the brood.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -3005,10 +3245,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "15e58f65-8f34-40b8-9bf9-529064f94d4b",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The full-art investigation scene resembles a researcher following evidence of something already loose.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -3039,10 +3282,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "63e08eb1-de6e-4f31-a523-86b1e013b1ca",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The full-art squirrel looks furtive and feral enough to function as an unlikely surviving test subject.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -3073,10 +3319,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "73731e45-51bb-4188-a54d-fdaa4bdfaf1f",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The full-art corrosive flood is the deck’s clearest image of a facility-wide biohazard emergency.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -3107,10 +3356,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "7ed22529-90a5-44e6-8e0e-76b92fb2618a",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The full-art infected mass delivers the definitive breach: countless altered bodies advancing as one lethal organism.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -3141,10 +3393,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "fa1f9d1d-f749-4a33-b6dc-52f97b416b3c",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "Extended art turns the fen into a disturbed wetland where the water itself appears biologically unstable.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -3175,10 +3430,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "142a605f-ec69-43eb-bdde-dd9e29f9fd22",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The Bloomburrow printing keeps the landscape close to the brood’s scale while emphasizing dim, saturated wetlands.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -3209,10 +3467,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "d1f94220-9565-429b-af8b-1d4348ae7a1a",
+        "finish": "etched"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The full-art anatomical serpent and etched finish make the deck’s counter amplifier resemble its prized engineered specimen.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -3243,10 +3504,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "0f04535d-a6b7-4d91-918d-fccc1adfcaf3",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "Extended art expands the green-black alchemical magic into a convincing biohazard event.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -3277,10 +3541,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "492fa77b-d103-446f-95d0-e4b11dfac05f",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The full-art foothills show vegetation swallowing ruined structures as containment spreads beyond the lowlands.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false

@@ -14,7 +14,7 @@
       "finalized": true,
       "finalized_at": "2026-07-23",
       "selected_printing": {
-        "scryfall_id": "d1ed5b20-94f6-455f-80a5-e4ed360167be",
+        "scryfall_id": "aa74ab7c-b9de-47ab-83ea-2b98738838c7",
         "finish": "normal"
       },
       "museum_printing": {
@@ -26,7 +26,7 @@
         "desired": false,
         "printed": false
       },
-      "verdict": null,
+      "verdict": "The borderless furnace-bright destruction feels like a relic being violently reforged.",
       "reasoning": []
     },
     "acquisition": {
@@ -55,10 +55,13 @@
       "status": "keep",
       "finalized": true,
       "finalized_at": "2026-07-23",
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "2fb8dace-c604-40fc-bbd4-5add5deb041a",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The sole printing already depicts the exact sort of whimsical workshop alchemy the deck is built around.",
       "reasoning": [],
       "custom_proxy_candidate": true,
       "no_museum_edition": false
@@ -90,7 +93,7 @@
       "finalized": true,
       "finalized_at": "2026-07-23",
       "selected_printing": {
-        "scryfall_id": "741218da-de09-4603-8409-b4b646909ffa",
+        "scryfall_id": "1836b8a6-c616-4793-933b-b38296d70e72",
         "finish": "normal"
       },
       "museum_printing": {
@@ -102,7 +105,7 @@
         "desired": false,
         "printed": false
       },
-      "verdict": null,
+      "verdict": "The borderless jeweled relic looks like a central tool from Bello’s enchanted workbench.",
       "reasoning": []
     },
     "acquisition": {
@@ -131,7 +134,10 @@
       "status": "pending",
       "finalized": true,
       "finalized_at": "2026-07-23",
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "5c43add9-f948-41fe-b40c-e1d357db5f05",
+        "finish": "normal"
+      },
       "museum_printing": {
         "scryfall_id": "11dcbb30-c464-4a13-a034-fa4770554f6e",
         "finish": "normal"
@@ -141,7 +147,7 @@
         "desired": false,
         "printed": false
       },
-      "verdict": null,
+      "verdict": "The stylized full-art plant colossus makes the wilderness itself feel exuberantly alive and slightly unruly.",
       "reasoning": []
     },
     "acquisition": {
@@ -170,7 +176,10 @@
       "status": "keep",
       "finalized": true,
       "finalized_at": "2026-07-23",
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "a23446e7-8573-4e8e-8698-e4ca62424416",
+        "finish": "foil"
+      },
       "museum_printing": {
         "scryfall_id": "a23446e7-8573-4e8e-8698-e4ca62424416",
         "finish": "normal"
@@ -180,7 +189,7 @@
         "desired": false,
         "printed": false
       },
-      "verdict": null,
+      "verdict": "The borderless beast transformation is lush, uncanny, and more playful than the card’s harsher alternatives.",
       "reasoning": []
     },
     "acquisition": {
@@ -222,7 +231,7 @@
         "desired": true,
         "printed": false
       },
-      "verdict": "The standard foil remains the definitive deck copy. It presents Bello clearly, suits the deck's Bloomburrow identity, and leaves the collecting budget for upgrades that materially improve the finished object. The raised-foil Imagine treatment is acknowledged as an extraordinary collector printing, but at roughly five hundred dollars it belongs in the book as a museum piece and optional proxy rather than a required purchase.",
+      "verdict": "The storybook borderless portrait establishes the deck’s mossy, animated-workshop world without paying for the premium duplicate.",
       "reasoning": [
         "The owned foil already presents Bello clearly across the table.",
         "It fits the deck's warm, storied Bloomburrow visual identity.",
@@ -258,10 +267,13 @@
       "status": "keep",
       "finalized": true,
       "finalized_at": "2026-07-23",
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "ee571a78-16b2-40ba-92b2-87c1bf4b39bc",
+        "finish": "foil"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The original painterly melee has warm motion and physical texture that suit the deck better than a plain reprint.",
       "reasoning": [],
       "custom_proxy_candidate": true,
       "no_museum_edition": false
@@ -293,8 +305,8 @@
       "finalized": true,
       "finalized_at": "2026-07-23",
       "selected_printing": {
-        "scryfall_id": "b8ddab6f-0d13-4ec7-908d-54edb09b5727",
-        "finish": "normal"
+        "scryfall_id": "4a184a4a-2c8c-4a10-9b26-a174859fa1e8",
+        "finish": "foil"
       },
       "museum_printing": {
         "scryfall_id": "4a184a4a-2c8c-4a10-9b26-a174859fa1e8",
@@ -305,7 +317,7 @@
         "desired": false,
         "printed": false
       },
-      "verdict": null,
+      "verdict": "The borderless fantasy catastrophe supplies enormous scale while retaining an illustrated, storybook texture.",
       "reasoning": []
     },
     "acquisition": {
@@ -347,7 +359,7 @@
         "desired": false,
         "printed": false
       },
-      "verdict": null,
+      "verdict": "The borderless cache turns treasure production into an overflowing hidden storeroom worthy of Bello’s workshop.",
       "reasoning": []
     },
     "acquisition": {
@@ -376,10 +388,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "b2dddd41-ae59-4e5e-bac5-3695ba09edfd",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "Extended art gives the brass animal construct room to read as a gentle, newly awakened workshop resident.",
       "reasoning": []
     },
     "acquisition": {
@@ -409,8 +424,8 @@
       "finalized": true,
       "finalized_at": "2026-07-23",
       "selected_printing": {
-        "scryfall_id": "94ba4278-c63e-49b4-bf60-16dfe5c70a0b",
-        "finish": "normal"
+        "scryfall_id": "6d0a3996-5a03-481b-9bda-15c6f6e5f9c4",
+        "finish": "etched"
       },
       "museum_printing": {
         "scryfall_id": "94ba4278-c63e-49b4-bf60-16dfe5c70a0b",
@@ -421,7 +436,7 @@
         "desired": false,
         "printed": false
       },
-      "verdict": null,
+      "verdict": "The Mystical Archive frame makes the spell itself feel like an unstable artifact pulled from Bello’s shelves.",
       "reasoning": []
     },
     "acquisition": {
@@ -450,10 +465,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "7ba7d71c-aaa6-49e9-9ba5-1fe7f8cbc9c4",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "Extended art lets the smoky red-green wilderness become a full transitional landscape.",
       "reasoning": []
     },
     "acquisition": {
@@ -482,10 +500,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "24179418-d92c-43eb-a8f6-b8ea83f8c80f",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The borderless fantasy tower is grand but naturalistic, serving as the workshop’s distant landmark.",
       "reasoning": []
     },
     "acquisition": {
@@ -514,10 +535,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "7d316dca-05e6-471e-99ad-dfd9eecedf39",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The panoramic borderless gorge blends glowing metal, red earth, and invasive growth into the deck palette.",
       "reasoning": []
     },
     "acquisition": {
@@ -547,8 +571,8 @@
       "finalized": true,
       "finalized_at": "2026-07-23",
       "selected_printing": {
-        "scryfall_id": "b8386ca9-0359-4a18-abea-0cb0e955a947",
-        "finish": "etched"
+        "scryfall_id": "31233339-c5ec-40fb-badd-94ef7f0ff7c0",
+        "finish": "normal"
       },
       "museum_printing": {
         "scryfall_id": "b8386ca9-0359-4a18-abea-0cb0e955a947",
@@ -559,7 +583,7 @@
         "desired": false,
         "printed": false
       },
-      "verdict": null,
+      "verdict": "The borderless horticultural scene is intimate, verdant, and more at home in Bello’s garden-workshop than ornate spellbook versions.",
       "reasoning": []
     },
     "acquisition": {
@@ -601,7 +625,7 @@
         "desired": false,
         "printed": false
       },
-      "verdict": null,
+      "verdict": "The borderless elemental ruin unifies stone, flame, and vegetation in one deliberately chaotic scene.",
       "reasoning": []
     },
     "acquisition": {
@@ -643,7 +667,7 @@
         "desired": false,
         "printed": false
       },
-      "verdict": null,
+      "verdict": "Extended art preserves Bloomburrow’s exuberant woodland charge and naturally belongs beside Bello.",
       "reasoning": []
     },
     "acquisition": {
@@ -672,10 +696,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "8dbb2112-85b9-49cf-9ed5-9273829c34f1",
+        "finish": "foil"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The original Nyx-infused floral spirit blends enchantment glow with restrained natural beauty.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -706,10 +733,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "f72efea9-0a23-4375-9bb1-b6a331316fbf",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The showcase woodland frame makes the gathering feel like an old illuminated tale sung beneath living trees.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -753,7 +783,7 @@
         "desired": false,
         "printed": false
       },
-      "verdict": null,
+      "verdict": "The showcase frame and carved Norse ornament make the vehicle feel like an ornate wooden relic brought to life.",
       "reasoning": []
     },
     "acquisition": {
@@ -795,7 +825,7 @@
         "desired": false,
         "printed": false
       },
-      "verdict": null,
+      "verdict": "The borderless dinosaur channels elemental thunder through a richly illustrated wilderness rather than a novelty treatment.",
       "reasoning": []
     },
     "acquisition": {
@@ -824,10 +854,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "bf6069f2-7a32-4cb7-b2ab-ea6b51267cca",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The showcase map treatment makes the land feel like an old field guide kept in the workshop.",
       "reasoning": []
     },
     "acquisition": {
@@ -856,10 +889,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "ed4c1e31-caa5-4cda-adc3-57d65c800a29",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "Extended art emphasizes the abundant, cultivated greenery rather than an unrelated crossover setting.",
       "reasoning": []
     },
     "acquisition": {
@@ -888,7 +924,10 @@
       "status": "keep",
       "finalized": true,
       "finalized_at": "2026-07-23",
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "3cf7fc86-08c6-43f1-9cdb-f609cea0b1a7",
+        "finish": "normal"
+      },
       "museum_printing": {
         "scryfall_id": "3cf7fc86-08c6-43f1-9cdb-f609cea0b1a7",
         "finish": "normal"
@@ -898,7 +937,7 @@
         "desired": false,
         "printed": false
       },
-      "verdict": null,
+      "verdict": "The borderless pastoral journey has warm storybook depth and a natural sense of woodland discovery.",
       "reasoning": []
     },
     "acquisition": {
@@ -940,7 +979,7 @@
         "desired": false,
         "printed": false
       },
-      "verdict": null,
+      "verdict": "The borderless glowing stone reads immediately as an old magical instrument among the workshop’s curios.",
       "reasoning": [],
       "custom_proxy_candidate": true
     },
@@ -970,10 +1009,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "0000419b-0bba-4488-8f7a-6194544ce91e",
+        "finish": "foil"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "A second distinct Bloomburrow panorama keeps the basics cohesive while making the living forest feel expansive.",
       "reasoning": []
     },
     "acquisition": {
@@ -1034,10 +1076,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "df66186f-b287-4d5c-9d8a-b1683f947846",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "Extended art turns the winding route into a broad, inviting journey through rustic wilderness.",
       "reasoning": []
     },
     "acquisition": {
@@ -1067,12 +1112,12 @@
       "finalized": true,
       "finalized_at": "2026-07-23",
       "selected_printing": {
-        "scryfall_id": "109dee37-5de5-40fa-9405-8645be6c5076",
-        "finish": "normal"
+        "scryfall_id": "5eaa6257-614b-4f39-b7fa-ea5f12f94b64",
+        "finish": "foil"
       },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "Aleksi Briclot’s warm woodland beast scene gives the deck a feral, painterly draw engine.",
       "reasoning": [],
       "no_museum_edition": false,
       "custom_proxy_candidate": true
@@ -1116,7 +1161,7 @@
         "desired": false,
         "printed": false
       },
-      "verdict": null,
+      "verdict": "The borderless storybook treatment turns the stampede into a tapestry-like eruption of joyful wilderness.",
       "reasoning": []
     },
     "acquisition": {
@@ -1158,7 +1203,7 @@
         "desired": false,
         "printed": false
       },
-      "verdict": null,
+      "verdict": "The borderless green eruption feels like the entire workshop and forest awakening at once.",
       "reasoning": []
     },
     "acquisition": {
@@ -1188,7 +1233,7 @@
       "finalized": true,
       "finalized_at": "2026-07-23",
       "selected_printing": {
-        "scryfall_id": "4561678b-db52-4b89-9f34-50fe600a55d7",
+        "scryfall_id": "f16c4abb-917a-4bd5-b0bc-b700611cd5b9",
         "finish": "normal"
       },
       "museum_printing": {
@@ -1200,7 +1245,7 @@
         "desired": false,
         "printed": false
       },
-      "verdict": null,
+      "verdict": "The borderless colossal beast has storybook monumentality and the deep greens expected of the deck’s apex threat.",
       "reasoning": []
     },
     "acquisition": {
@@ -1231,7 +1276,7 @@
       "finalized_at": "2026-07-23",
       "selected_printing": {
         "scryfall_id": "929ec761-fcc6-473d-b160-0feff6cdf7d0",
-        "finish": "normal"
+        "finish": "etched"
       },
       "museum_printing": {
         "scryfall_id": "e1ffa2cd-38d3-4ba5-98aa-8cd790a3aa2e",
@@ -1242,7 +1287,7 @@
         "desired": false,
         "printed": false
       },
-      "verdict": null,
+      "verdict": "The etched treatment makes the iconic mana relic feel weighty, metallic, and genuinely precious.",
       "reasoning": []
     },
     "acquisition": {
@@ -1272,7 +1317,7 @@
       "finalized": true,
       "finalized_at": "2026-07-23",
       "selected_printing": {
-        "scryfall_id": "a5f3fddf-a82e-4297-8ee5-458981700d9e",
+        "scryfall_id": "410bf6b3-885a-41cf-97f7-2e942922a4ec",
         "finish": "normal"
       },
       "museum_printing": {
@@ -1284,7 +1329,7 @@
         "desired": false,
         "printed": false
       },
-      "verdict": null,
+      "verdict": "The borderless bear is wild, painterly, and surrounded by enough forest texture to remain part of Bello’s world.",
       "reasoning": []
     },
     "acquisition": {
@@ -1313,10 +1358,13 @@
       "status": "keep",
       "finalized": true,
       "finalized_at": "2026-07-23",
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "4b0c5d14-4fab-4034-a2d3-0d851ef67cbd",
+        "finish": "foil"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The original old-frame painting has brutal physicality and aged-card character that makes it feel like a dangerous archived spell.",
       "reasoning": [],
       "custom_proxy_candidate": true,
       "no_museum_edition": false
@@ -1360,7 +1408,7 @@
         "desired": false,
         "printed": false
       },
-      "verdict": null,
+      "verdict": "The borderless composition feels strange, organic, and mythic enough to belong among awakened relics.",
       "reasoning": []
     },
     "acquisition": {
@@ -1389,10 +1437,13 @@
       "status": "keep",
       "finalized": true,
       "finalized_at": "2026-07-23",
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "ab8935b1-ec87-4330-9952-9ef8cd344531",
+        "finish": "foil"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The original grotesque wurm feels like an ancient organism unearthed beneath the workshop.",
       "reasoning": [],
       "custom_proxy_candidate": true,
       "no_museum_edition": false
@@ -1423,10 +1474,13 @@
       "status": "keep",
       "finalized": true,
       "finalized_at": "2026-07-23",
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "b9d50d26-3c44-4c8f-81bb-9093dacfb804",
+        "finish": "foil"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The original fairy-tale goblin is warm, whimsical, and exactly the right kind of generous woodland chaos.",
       "reasoning": [],
       "custom_proxy_candidate": true,
       "no_museum_edition": false
@@ -1457,10 +1511,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "8380f74f-aa76-42dc-9596-92d651e1c1f6",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The borderless ravine feels massive, earthen, and naturally charged with red-green power.",
       "reasoning": []
     },
     "acquisition": {
@@ -1490,8 +1547,8 @@
       "finalized": true,
       "finalized_at": "2026-07-23",
       "selected_printing": {
-        "scryfall_id": "a45ca366-2a43-4930-9c16-0ba72c1de3b8",
-        "finish": "normal"
+        "scryfall_id": "797bd0ea-5c4d-477e-9d92-199a99d6c2cf",
+        "finish": "foil"
       },
       "museum_printing": {
         "scryfall_id": "797bd0ea-5c4d-477e-9d92-199a99d6c2cf",
@@ -1502,7 +1559,7 @@
         "desired": false,
         "printed": false
       },
-      "verdict": null,
+      "verdict": "The borderless floating archive becomes a mysterious luminous artifact rather than a generic mana rock.",
       "reasoning": []
     },
     "acquisition": {
@@ -1531,10 +1588,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "2a83eca4-b6ad-4ec4-91f2-b2a62b32b056",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The borderless landscape’s ancient trees and volcanic glow embody living wilderness meeting elemental heat.",
       "reasoning": []
     },
     "acquisition": {
@@ -1563,7 +1623,10 @@
       "status": "keep",
       "finalized": true,
       "finalized_at": "2026-07-23",
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "896f357e-38e6-4259-91bc-1c2e7119d1d5",
+        "finish": "etched"
+      },
       "museum_printing": {
         "scryfall_id": "896f357e-38e6-4259-91bc-1c2e7119d1d5",
         "finish": "normal"
@@ -1573,7 +1636,7 @@
         "desired": false,
         "printed": false
       },
-      "verdict": null,
+      "verdict": "The etched legendary treatment gives the ancient tree spirit the solemn presence of a living relic.",
       "reasoning": []
     },
     "acquisition": {
@@ -1615,7 +1678,7 @@
         "desired": false,
         "printed": false
       },
-      "verdict": null,
+      "verdict": "Extended art centers an earthy druid whose magic visibly rises from soil and old growth.",
       "reasoning": []
     },
     "acquisition": {
@@ -1644,7 +1707,10 @@
       "status": "pending",
       "finalized": true,
       "finalized_at": "2026-07-23",
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "151bdf3a-4445-43b1-8cea-2737c13d9dee",
+        "finish": "normal"
+      },
       "museum_printing": {
         "scryfall_id": "cb9bf59f-6879-4343-9158-207ddd170bfb",
         "finish": "normal"
@@ -1654,7 +1720,7 @@
         "desired": false,
         "printed": false
       },
-      "verdict": null,
+      "verdict": "The showcase frame integrates the cobra into a stylized living landscape without overpowering the deck’s palette.",
       "reasoning": []
     },
     "acquisition": {
@@ -1683,7 +1749,10 @@
       "status": "keep",
       "finalized": true,
       "finalized_at": "2026-07-23",
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "1fcf02eb-2aaa-4c22-a3b3-f57019664118",
+        "finish": "foil"
+      },
       "museum_printing": {
         "scryfall_id": "d863ff4a-c79f-4018-ac20-f40ad1fcfb36",
         "finish": "normal"
@@ -1693,7 +1762,7 @@
         "desired": false,
         "printed": false
       },
-      "verdict": null,
+      "verdict": "The original reflective woodland magic is luminous, organic, and visually quieter than the deck’s explosive payoffs.",
       "reasoning": []
     },
     "acquisition": {
@@ -1723,8 +1792,8 @@
       "finalized": true,
       "finalized_at": "2026-07-23",
       "selected_printing": {
-        "scryfall_id": "174e631f-f024-41fd-8660-7cc8708ee3a2",
-        "finish": "normal"
+        "scryfall_id": "cb3d470d-e0f0-44c2-97f7-f31c02cdfbd3",
+        "finish": "foil"
       },
       "museum_printing": {
         "scryfall_id": "679d884f-4511-4267-89b9-9d350255ef32",
@@ -1735,7 +1804,7 @@
         "desired": false,
         "printed": false
       },
-      "verdict": null,
+      "verdict": "The classic glowing stone and restrained old-frame presentation make it feel like a practical workshop implement.",
       "reasoning": []
     },
     "acquisition": {
@@ -1764,10 +1833,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "090cecfe-bf79-4547-965b-3567783e7d11",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "Extended art foregrounds the exact moss-and-ember contrast at the heart of the deck palette.",
       "reasoning": []
     },
     "acquisition": {
@@ -1796,10 +1868,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "851a7251-7af5-4137-8422-159314f7351a",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The full-art bridge disappearing into dense greenery feels like a forgotten structure reclaimed by magic.",
       "reasoning": []
     },
     "acquisition": {
@@ -1828,10 +1903,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "0b384d24-8771-4860-8fc1-1b74217f1c4c",
+        "finish": "foil"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "A second complementary Bloomburrow vista gives the red basics variety without breaking the deck’s world.",
       "reasoning": []
     },
     "acquisition": {
@@ -1893,8 +1971,8 @@
       "finalized": true,
       "finalized_at": "2026-07-23",
       "selected_printing": {
-        "scryfall_id": "bbbfadff-43a1-4c46-9426-d3417715baae",
-        "finish": "normal"
+        "scryfall_id": "924a24e7-91b8-4ceb-a136-7a765d98c994",
+        "finish": "foil"
       },
       "museum_printing": {
         "scryfall_id": "7bf210d8-1a57-40a2-9426-5f7be0cad719",
@@ -1905,7 +1983,7 @@
         "desired": false,
         "printed": false
       },
-      "verdict": null,
+      "verdict": "The original glowing forge combines ancient stone, runes, and craftsmanship more convincingly than crossover treatments.",
       "reasoning": [],
       "custom_proxy_candidate": true
     },
@@ -1935,10 +2013,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "ce7785c2-0b3f-4952-8b2d-71fe73cf64e0",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The borderless storybook treatment renders the forest’s intent as elegant, decorative living magic.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -1969,10 +2050,13 @@
       "status": "keep",
       "finalized": true,
       "finalized_at": "2026-07-23",
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "880f6602-f335-4ad8-9e2f-f32b6d715f72",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The original warm, firelit fortress reads like a remote workshop outpost rather than generic battlefield spectacle.",
       "reasoning": [],
       "custom_proxy_candidate": true,
       "no_museum_edition": false
@@ -2003,10 +2087,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "7f3d574a-72b5-43be-b4b5-87865bbc7b5c",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The full-art forest path feels like a route through Bello’s ancestral woodland rather than a generic tribal land.",
       "reasoning": []
     },
     "acquisition": {
@@ -2035,10 +2122,13 @@
       "status": "pending",
       "finalized": true,
       "finalized_at": "2026-07-23",
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "4141559d-6f6d-4d1d-8052-90ccc4eee4ae",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "Extended art gives the verdant journey room to breathe and reinforces the deck’s overgrown-world identity.",
       "reasoning": [],
       "custom_proxy_candidate": true,
       "no_museum_edition": false
@@ -2069,10 +2159,13 @@
       "status": "keep",
       "finalized": true,
       "finalized_at": "2026-07-23",
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "332c9742-dc3b-48e5-8736-7724fae1b4c4",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The enchantment-frame reprint emphasizes abundance and natural magic with a clean, cohesive presentation.",
       "reasoning": [],
       "custom_proxy_candidate": true,
       "no_museum_edition": false
@@ -2116,7 +2209,7 @@
         "desired": false,
         "printed": false
       },
-      "verdict": null,
+      "verdict": "The full-art wurm is enormous yet organic, with its quills echoing carved wooden and thorny workshop forms.",
       "reasoning": []
     },
     "acquisition": {
@@ -2145,10 +2238,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "ed878350-ebc3-419b-9dd9-384e44906569",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The full-art animated ravine makes the land itself look newly awakened and ready to attack.",
       "reasoning": []
     },
     "acquisition": {
@@ -2190,7 +2286,7 @@
         "desired": false,
         "printed": false
       },
-      "verdict": null,
+      "verdict": "The extended golden cascade looks like a workshop accident turning treasure into magical momentum.",
       "reasoning": []
     },
     "acquisition": {
@@ -2219,10 +2315,13 @@
       "status": "keep",
       "finalized": true,
       "finalized_at": "2026-07-23",
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "23bc2161-50f0-4c42-9a38-824f8c0c0015",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The full-art stampede turns the card into a wall of living wilderness and joyful excess.",
       "reasoning": [],
       "custom_proxy_candidate": true,
       "no_museum_edition": false
@@ -2254,7 +2353,7 @@
       "finalized": true,
       "finalized_at": "2026-07-23",
       "selected_printing": {
-        "scryfall_id": "fd4c1ff9-fbbc-4e72-b695-58876a43ec99",
+        "scryfall_id": "b4bbf009-0798-4d8b-b375-6d6fde975c34",
         "finish": "normal"
       },
       "museum_printing": {
@@ -2266,7 +2365,7 @@
         "desired": false,
         "printed": false
       },
-      "verdict": null,
+      "verdict": "The full-art surge of roots and foliage is the purest expression of wilderness suddenly coming alive.",
       "reasoning": []
     },
     "acquisition": {
@@ -2295,10 +2394,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "ab474dc9-945d-48cc-8c74-7e5bd59ef8b5",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The full-art tower reads as a secluded archive of dangerous curiosities surrounded by atmospheric wilderness.",
       "reasoning": []
     },
     "acquisition": {
@@ -2327,10 +2429,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "be0481ee-a028-436d-a4f8-a43720d1e542",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The full-art treatment gives roots and stone equal weight, perfectly expressing the deck’s organic architecture.",
       "reasoning": []
     },
     "acquisition": {
@@ -2359,10 +2464,13 @@
       "status": "keep",
       "finalized": true,
       "finalized_at": "2026-07-23",
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "ffb5786b-6825-4ebf-a1e1-80011340adbb",
+        "finish": "foil"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The original fairy-tale scout belongs naturally in the brambled woodland and adds a needed intimate character beat.",
       "reasoning": [],
       "custom_proxy_candidate": true,
       "no_museum_edition": false
@@ -2394,7 +2502,7 @@
       "finalized": true,
       "finalized_at": "2026-07-23",
       "selected_printing": {
-        "scryfall_id": "bf0b01ab-c846-459b-8d6f-7e5cb75a5d26",
+        "scryfall_id": "0b064748-515a-4234-ad00-8a735d7aa385",
         "finish": "normal"
       },
       "museum_printing": {
@@ -2406,7 +2514,7 @@
         "desired": false,
         "printed": false
       },
-      "verdict": null,
+      "verdict": "The full-art storybook elder brings gentle woodland character and hand-painted warmth to the ramp package.",
       "reasoning": []
     },
     "acquisition": {
@@ -2448,7 +2556,7 @@
         "desired": false,
         "printed": false
       },
-      "verdict": null,
+      "verdict": "Extended art enlarges the luminous enchanted grove and makes the weaver feel embedded in living magic.",
       "reasoning": [],
       "no_museum_edition": true,
       "custom_proxy_candidate": false
@@ -2479,7 +2587,10 @@
       "status": "keep",
       "finalized": true,
       "finalized_at": "2026-07-23",
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "3088aed3-4568-4978-ac4c-6c435b65c083",
+        "finish": "normal"
+      },
       "museum_printing": {
         "scryfall_id": "819f30d8-6277-4811-b2c9-f78bc8f86fe7",
         "finish": "normal"
@@ -2489,7 +2600,7 @@
         "desired": false,
         "printed": false
       },
-      "verdict": null,
+      "verdict": "The borderless portrait surrounds Selvala with rich woodland life while preserving a dignified natural palette.",
       "reasoning": [],
       "no_museum_edition": true,
       "custom_proxy_candidate": false
@@ -2520,10 +2631,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "bec84099-b8b4-4a3b-88f9-37fd02e848de",
+        "finish": "foil"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The unusual frameless landscape makes the thicket feel secluded, tactile, and deliberately curated.",
       "reasoning": []
     },
     "acquisition": {
@@ -2552,7 +2666,10 @@
       "status": "keep",
       "finalized": true,
       "finalized_at": "2026-07-23",
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "7d698bdd-b485-409d-b03e-c7c7d3fe9a92",
+        "finish": "normal"
+      },
       "museum_printing": {
         "scryfall_id": "880711b0-da06-4c4f-aa4e-1be58fc0bc67",
         "finish": "normal"
@@ -2562,7 +2679,7 @@
         "desired": false,
         "printed": false
       },
-      "verdict": null,
+      "verdict": "The borderless ring appears as an ancient, glowing woodland relic rather than a sterile piece of machinery.",
       "reasoning": [],
       "custom_proxy_candidate": true
     },
@@ -2592,10 +2709,13 @@
       "status": "pending",
       "finalized": true,
       "finalized_at": "2026-07-23",
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "59313b00-ac75-484a-ad74-db9d8960c0f8",
+        "finish": "foil"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The original Mirran relic is ominous, ancient, and materially convincing—the ideal dangerous workshop exhibit.",
       "reasoning": [],
       "custom_proxy_candidate": true,
       "no_museum_edition": false
@@ -2626,10 +2746,13 @@
       "status": "pending",
       "finalized": true,
       "finalized_at": "2026-07-23",
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "18e20113-6ba1-474b-bfed-1fa462fc63e2",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The fiery sky over a grounded fantasy landscape best matches the deck’s rune-lit, apocalyptic workshop magic.",
       "reasoning": [],
       "custom_proxy_candidate": true,
       "no_museum_edition": false
@@ -2660,10 +2783,13 @@
       "status": "pending",
       "finalized": true,
       "finalized_at": "2026-07-23",
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "1ee52480-8faf-4418-af70-fd999096e3bb",
+        "finish": "foil"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The original radiant sunbird is iconic, symmetrical, and perfectly aligned with the deck’s rune-gold palette.",
       "reasoning": [],
       "custom_proxy_candidate": true,
       "no_museum_edition": false
@@ -2694,10 +2820,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "2a4471a4-efcf-46a9-87df-62af9d616bd1",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "Extended art presents a weathered ruin swallowed by nature, exactly the deck’s abandoned-relic premise.",
       "reasoning": []
     },
     "acquisition": {
@@ -2726,10 +2855,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "6b92b751-6162-4293-953b-ec7190309a6a",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "Extended art grants the elemental landscape the breadth expected of a world reshaping itself.",
       "reasoning": []
     },
     "acquisition": {
@@ -2758,10 +2890,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "47360bb6-9724-4418-b1f3-59d0b28e7798",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The showcase treatment makes the rings read as a deliberately displayed set of dangerous, ornate relics.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -2792,10 +2927,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "086b6003-6d90-426b-809e-ea837d868290",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The full-art living barrier reads as ancient architecture reclaimed and animated by greenery.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -2826,10 +2964,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "f7596fb2-2f2b-4fde-8b8b-e041e16de4e9",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The showcase saga looks like a richly illustrated tale preserved among the workshop’s oldest books.",
       "reasoning": [],
       "custom_proxy_candidate": false,
       "no_museum_edition": false
@@ -2873,7 +3014,7 @@
         "desired": false,
         "printed": false
       },
-      "verdict": null,
+      "verdict": "Extended art expands the playful woodland contest and keeps this native Bello card visually prominent.",
       "reasoning": []
     },
     "acquisition": {
@@ -2902,10 +3043,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "a817f77d-19ea-4342-b90f-d92f62543303",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The full-art thorn-choked boundary is eerie, vertical, and strongly tied to living, hostile vegetation.",
       "reasoning": []
     },
     "acquisition": {
@@ -2935,7 +3079,7 @@
       "finalized": true,
       "finalized_at": "2026-07-23",
       "selected_printing": {
-        "scryfall_id": "cdaa22df-e071-4b2a-aa42-0334ff7bd662",
+        "scryfall_id": "226c386a-3382-451b-abe8-682f49f637ec",
         "finish": "normal"
       },
       "museum_printing": {
@@ -2947,7 +3091,7 @@
         "desired": false,
         "printed": false
       },
-      "verdict": null,
+      "verdict": "The full-art vessel feels like a strange carved container of memory recovered from an overgrown ruin.",
       "reasoning": []
     },
     "acquisition": {
@@ -2989,7 +3133,7 @@
         "desired": false,
         "printed": false
       },
-      "verdict": null,
+      "verdict": "The borderless engine has the scale and luminous metalwork of Bello’s most important awakened machine.",
       "reasoning": []
     },
     "acquisition": {
@@ -3018,10 +3162,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "d23aa765-4fc6-402f-9b49-5e55a90eec11",
+        "finish": "normal"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The full-art woodland is quiet, lush, and visually restorative amid the deck’s louder machinery.",
       "reasoning": []
     },
     "acquisition": {
@@ -3050,7 +3197,10 @@
       "status": "keep",
       "finalized": true,
       "finalized_at": "2026-07-23",
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "aab62a48-93b5-4eb3-aa6b-92dd4cc617f6",
+        "finish": "normal"
+      },
       "museum_printing": {
         "scryfall_id": "fd09badf-b28d-48b9-8cb4-2336e5b1e4b9",
         "finish": "normal"
@@ -3060,7 +3210,7 @@
         "desired": false,
         "printed": false
       },
-      "verdict": null,
+      "verdict": "The full-art two-headed dragon supplies symmetrical ember-lit spectacle without leaving the deck’s fantasy palette.",
       "reasoning": [],
       "custom_proxy_candidate": true
     },
@@ -3103,7 +3253,7 @@
         "desired": false,
         "printed": false
       },
-      "verdict": null,
+      "verdict": "The borderless storybook version makes impossible scale feel whimsical and enchanted rather than horrific.",
       "reasoning": []
     },
     "acquisition": {
@@ -3132,7 +3282,10 @@
       "status": "keep",
       "finalized": true,
       "finalized_at": "2026-07-23",
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "80afdcf9-728e-4514-baa7-a373360094af",
+        "finish": "foil"
+      },
       "museum_printing": {
         "scryfall_id": "80afdcf9-728e-4514-baa7-a373360094af",
         "finish": "normal"
@@ -3142,7 +3295,7 @@
         "desired": false,
         "printed": false
       },
-      "verdict": null,
+      "verdict": "The full-art enchantment erupts in rune-bright energy and gives the finished deck a suitably spectacular climax.",
       "reasoning": []
     },
     "acquisition": {
@@ -3184,7 +3337,7 @@
         "desired": false,
         "printed": false
       },
-      "verdict": null,
+      "verdict": "Extended art preserves the elemental weasel’s native Bloomburrow setting and gives its fire-and-foliage contrast room.",
       "reasoning": []
     },
     "acquisition": {
@@ -3213,10 +3366,13 @@
       "status": "pending",
       "finalized": false,
       "finalized_at": null,
-      "selected_printing": null,
+      "selected_printing": {
+        "scryfall_id": "e8e31184-dca4-48b1-be9d-581247c41d99",
+        "finish": "foil"
+      },
       "museum_printing": null,
       "proxy_candidate": null,
-      "verdict": null,
+      "verdict": "The original stained-glass-like Dominaria landscape joins timber, mountain, and warm sunset in one coherent vista.",
       "reasoning": []
     },
     "acquisition": {
@@ -3527,7 +3683,7 @@
       "finalized": true,
       "finalized_at": "2026-07-23",
       "selected_printing": {
-        "scryfall_id": "950ee61d-0bc1-4d7b-ba68-157061aa98eb",
+        "scryfall_id": "7c23360d-ff57-412c-9899-6050cb481da6",
         "finish": "normal"
       },
       "museum_printing": {
@@ -3539,7 +3695,7 @@
         "desired": false,
         "printed": false
       },
-      "verdict": null,
+      "verdict": "The showcase memorial resembles a monumental enchanted artifact framed with mythic, decorative gravity.",
       "reasoning": []
     },
     "acquisition": {
