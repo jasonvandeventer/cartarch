@@ -164,11 +164,48 @@ def is_commander_legal(card: Card) -> bool:
     return legality not in _ILLEGAL
 
 
+def _front_face(type_line: str | None) -> str:
+    """The front face of a stored ``type_line``, lowercased.
+
+    ``cards.type_line`` holds Scryfall's ROOT type line, which for every
+    multi-face layout is ``"Front // Back"``. Splitting on the literal separator
+    is deliberate and does NOT consult ``cards.layout``: layout is NULL on 15
+    rows, and front-face-first ordering was verified to hold for every multi-face
+    layout present in the data (transform, modal_dfc, flip, adventure, split,
+    prepare, reversible_card, art_series, double_faced_token). A single-faced
+    type line has no separator and passes through unchanged.
+    """
+    return (type_line or "").split(" // ")[0].lower()
+
+
 def can_be_commander(card: Card) -> bool:
-    """v1 commander eligibility from local metadata only."""
-    tl = (card.type_line or "").lower()
+    """Commander eligibility from local metadata. Multi-face cards are judged on
+    their FRONT face only: outside the game a card has the characteristics of its
+    front face (CR 712.4a), so a back-face legendary creature does not make the
+    card a legal commander (CR 903.3a).
+
+    The old predicate substring-matched the COMBINED type line, so anything with a
+    legendary creature on the back qualified — Invasion of Fiora (a Battle), The
+    Legend of Kyoshi (a Saga), Westvale Abbey (a Land), Nezumi Graverobber (a flip
+    card). Eight owned cards across six accounts were affected.
+
+    KNOWN GAP, deliberately not closed here: the ``can be your commander`` branch
+    is NOT face-scoped. ``_normalize_card_payload`` joins multi-face oracle text
+    with ``\\n\\n``, not ``//``, so per-face text is unrecoverable from the stored
+    column. No card currently has that phrase together with a multi-face type
+    line, so the branch is harmless today; closing it properly needs a per-face
+    column.
+    """
+    front = _front_face(card.type_line)
     oracle = (card.oracle_text or "").lower()
-    return ("legendary" in tl and "creature" in tl) or "can be your commander" in oracle
+    if "legendary" in front and "creature" in front:
+        return True
+    if "can be your commander" in oracle:
+        return True
+    # Grist-class: a legendary card that is a CREATURE CARD everywhere except the
+    # battlefield, which makes it a legal commander despite a non-creature front
+    # type line. Grist, the Hunger Tide is the only card in the corpus matching.
+    return "legendary" in front and "isn't on the battlefield" in oracle and "creature" in oracle
 
 
 def card_in_color_identity(card: Card, commander_colors: set[str]) -> bool:

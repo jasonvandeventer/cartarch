@@ -1,5 +1,16 @@
 [
   {
+    "version": "4.12.16",
+    "date": "2026-07-27",
+    "added": [],
+    "refined": [],
+    "resolved": [
+      "The deck generator offered cards as commanders that cannot legally be one. A double-faced card like Invasion of Fiora or The Legend of Kyoshi has a legendary creature on its back, and the check was reading both faces at once — so a Battle, a Saga and even a Land were all being suggested. Outside of a game a card counts as its front face only, so the check now reads just that. Eight cards across six collections were affected.",
+      "The same check was also refusing Grist, the Hunger Tide, which genuinely can be a commander: it counts as a creature card anywhere except the battlefield. It is now accepted."
+    ],
+    "archivist_note": "Reported from the playgroup Discord. The card data stores a two-faced card's type as one string with both halves joined by a slash, and the check was searching that whole string for the words it needed — which any card with a legendary creature on the back will contain. It had been that way since the feature shipped, and nothing tested it. The fix is a single split; the more useful outcome is that the check now has a test for every card shape it has to judge, each one using a real card's data rather than an invented example, since invented examples were exactly what would have missed this."
+  },
+  {
     "version": "4.12.15",
     "date": "2026-07-27",
     "added": [
