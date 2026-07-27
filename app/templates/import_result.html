@@ -73,7 +73,7 @@
     </div>
     {% if _nothing_new %}
       <p class="muted" style="margin-top: 0.75rem;">Nothing new to import — every card was already in your collection.</p>
-    {% elif placement_breakdown %}
+    {% elif placement_breakdown|default(false) %}
       {# #131 — multi-location import: per-destination card counts. #}
       <p class="muted" style="margin-top: 0.75rem;">Cards placed across
         <strong>{{ placement_breakdown|length }}</strong> locations:</p>

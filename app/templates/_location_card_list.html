@@ -4,7 +4,7 @@
    page render `oob_stats` is falsy and the hero renders its own stats; in the
    HTMX add response `oob_stats` is true so this out-of-band block updates the
    hero stat cards in the same swap. #}
-{% if oob_stats %}
+{% if oob_stats|default(false) %}
   <div id="location-stats" hx-swap-oob="true" class="stat-grid collection-stats-grid">
     <div class="stat-card compact">
       <div class="stat-label">Total value</div>

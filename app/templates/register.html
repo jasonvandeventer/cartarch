@@ -7,7 +7,7 @@
 {% block subheading %}Already have one? <a href="/login">Sign in instead</a>{% endblock %}
 
 {% block form_pane %}
-  {% if error %}<p class="auth-error">{{ error }}</p>{% endif %}
+  {% if error|default(false) %}<p class="auth-error">{{ error }}</p>{% endif %}
   <form action="/register" method="post" class="stack-form">
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
     <label>Display name</label>

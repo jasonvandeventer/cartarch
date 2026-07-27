@@ -3,7 +3,7 @@
    _audit_scan_response.html after each scan (set `oob = True`). #}
 {% from "_macros.html" import img_fallback %}
 {% set pct = ((progress.total_seen / progress.total_expected * 100) | round(0, 'floor')) if progress.total_expected else 0 %}
-<div id="audit-progress"{% if oob %} hx-swap-oob="true"{% endif %}>
+<div id="audit-progress"{% if oob|default(false) %} hx-swap-oob="true"{% endif %}>
   <div id="progress-counters" class="audit-progress-summary">
     <p class="audit-progress-line">
       <strong>{{ progress.total_seen }}</strong> of

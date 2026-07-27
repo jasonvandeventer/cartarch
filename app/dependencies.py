@@ -32,6 +32,25 @@ LAST_ACTIVE_THROTTLE = timedelta(minutes=5)
 
 templates = Jinja2Templates(directory="app/templates")
 
+# #157 — Jinja's DEFAULT `Undefined` renders a missing variable as empty and treats it as
+# FALSY in a conditional, so a context key a route forgot to pass produces a plausible
+# page (an empty state, a placeholder) rather than an error. That has shipped three bugs:
+# two sanitized card projections missing `scryfall_id` (blank card frames, v4.11.36 and
+# v4.12.0) and `record` never reaching playgroup_detail (v4.12.10, empty state while every
+# service test passed).
+#
+# `StrictUndefined` turns each of those into a loud failure — but ONLY under pytest. In
+# production a missing variable stays cosmetic; making it a 500 would trade a visible gap
+# for an outage on any template path the tests don't reach. So CI becomes the gate that
+# blocks NEW instances, and prod keeps today's forgiving behaviour.
+#
+# Keyed on PYTEST_CURRENT_TEST, which the runner sets per test and nothing else sets.
+# Deliberately NOT an env var a deploy could set by accident.
+if os.getenv("PYTEST_CURRENT_TEST") or os.getenv("PYTEST_VERSION"):
+    from jinja2 import StrictUndefined
+
+    templates.env.undefined = StrictUndefined
+
 # v3.27.17 — host allowlist for Referer-based redirect validation.
 # Same-host (request.url.netloc) is always implicitly allowed; this set
 # names the additional hosts cartarch.com lives behind so a user on the

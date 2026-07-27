@@ -27,7 +27,7 @@
             <span class="audit-card-name">{{ a.type }}</span>
             <span class="muted">
               {% if a.inventory_row_id %}row {{ a.inventory_row_id }}{% endif %}
-              {% if a.card_id %}· card {{ a.card_id }}{% endif %}
+              {% if a.card_id|default(false) %}· card {{ a.card_id }}{% endif %}
               {% if a.quantity %}· x{{ a.quantity }}{% endif %}
             </span>
           </li>

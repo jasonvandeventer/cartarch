@@ -872,7 +872,13 @@ initGrid();
 window.addEventListener('resize', () => { applyLayout(); if (IS_MOMIR) sizeMomirBoard(); });
 portraitMQ.addEventListener('change', () => { applyLayout(); if (IS_MOMIR) sizeMomirBoard(); });
 
-{% if not is_ended %}
+{# #157 — the condition is re-derived, NOT `is_ended`: that `{% set %}` lives at the top
+   of `{% block content %}` and this is `{% block extra_scripts %}`, a different block, so
+   `is_ended` is out of scope here. Jinja's permissive Undefined made `not is_ended`
+   silently TRUE, which happened to be the right answer only because v3.33.2 routes
+   finalized games to game_summary.html instead — this template never sees one. Left as a
+   real guard rather than deleted, so it stays correct if that routing ever changes. #}
+{% if game.status != 'finalized' %}
 // ── State ─────────────────────────────────────────────────────
 // v3.28.13 — multi-counter shape. state.extraCounters[seatId] is an array of
 // { type, value, customLabel? }. A seat may hold multiple simultaneous typed

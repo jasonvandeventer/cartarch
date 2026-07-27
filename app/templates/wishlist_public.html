@@ -15,10 +15,10 @@
       {% if owner_name %}{{ owner_name }}'s wishlist{% else %}Shared wishlist{% endif %}
     </h1>
     <p class="wishlist-public-meta">{{ view.count }} card{{ '' if view.count == 1 else 's' }} wanted</p>
-    {% if view.viewer_owns %}
+    {% if view.viewer_owns|default(false) %}
       <p class="wishlist-public-owned-summary">You own {{ view.owned_count }} of these {{ view.count }}.</p>
     {% endif %}
-    {% if view.can_propose and view.owned_count %}
+    {% if view.can_propose|default(false) and view.owned_count|default(0) %}
       <p><a class="btn-like" href="/trades/new?from_wishlist_user={{ view.owner_user_id }}">Propose a trade</a></p>
     {% endif %}
   </header>
@@ -34,14 +34,14 @@
     <p id="wl-public-no-match" class="muted" hidden>No cards match that filter.</p>
     <ul class="wishlist-public-list">
       {% for it in view.cards %}
-        <li class="wishlist-public-row{% if it.owned %} wl-owned{% endif %}"
+        <li class="wishlist-public-row{% if it.owned|default(false) %} wl-owned{% endif %}"
             data-filter-text="{{ it.name }}"
             data-colors="{{ it.filter_colors }}" data-types="{{ it.filter_types }}">
           <span class="wl-name">{{ it.name }}</span>
           {% if it.specific_printing %}<span class="wl-printing">specific printing</span>{% endif %}
-          {% if it.owned %}
+          {% if it.owned|default(false) %}
             <span class="wl-owned-badge">you own {{ it.owned }}</span>
-            {% if it.locations %}
+            {% if it.locations|default(false) %}
               <span class="wl-owned-where">{% for l in it.locations %}{{ l.quantity }}× {{ l.label }}{% if not loop.last %} · {% endif %}{% endfor %}</span>
             {% endif %}
           {% endif %}

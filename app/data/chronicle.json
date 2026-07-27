@@ -1,5 +1,15 @@
 [
   {
+    "version": "4.12.11",
+    "date": "2026-07-26",
+    "added": [],
+    "refined": [],
+    "resolved": [
+      "A class of silent display bug is now caught before it can ship. When a page failed to hand a piece of data to its template, the template treated it as simply absent — so the page rendered something plausible, like an empty section or a blank card frame, with no error anywhere. Three such bugs reached you this way. The test suite now treats a missing value as a failure, so the next one stops at the build instead."
+    ],
+    "archivist_note": "Nothing here changes what any page does; it changes what happens when a page is wrong. The templating engine's default is to be forgiving about data that never arrives, which is pleasant right up until the forgiveness hides a real mistake — and it hid three: two sets of card art that rendered as empty frames, and a section that showed its no-data message while the data existed. Tests are now strict about it and the running site stays forgiving, on the view that a visibly incomplete page beats an error page for anything the tests do not reach. Twelve places that are genuinely optional had to be marked as such first, which was its own small audit."
+  },
+  {
     "version": "4.12.10",
     "date": "2026-07-26",
     "added": [
