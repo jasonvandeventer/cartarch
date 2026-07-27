@@ -500,7 +500,12 @@
       elimBtn.disabled = false;
       elimBtn.textContent = iAmElim ? "I'm back" : 'Eliminate me';
     }
-    document.getElementById('cmp-endturn').classList.toggle('cmp-endturn-mine', myTurn);
+    // Only the active player may end the turn (server enforces it too); the
+    // table/tablet keeps the override on game_detail.html.
+    const endBtn = document.getElementById('cmp-endturn');
+    endBtn.classList.toggle('cmp-endturn-mine', myTurn);
+    endBtn.disabled = !myTurn;
+    endBtn.textContent = myTurn ? 'End turn' : `${seatName(st.currentTurnId)}'s turn`;
   }
 
   function escapeHtml(s) { return String(s).replace(/[&<>"']/g, c => (

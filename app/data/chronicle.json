@@ -1,5 +1,15 @@
 [
   {
+    "version": "4.12.3",
+    "date": "2026-07-26",
+    "added": [],
+    "refined": [
+      "In companion mode, only the player whose turn it is can end the turn from their phone. The End turn button now stays disabled and shows whose turn it actually is until your turn comes around. The shared tablet running the table view keeps full control and can still advance the turn for anyone, in any order — including for a guest seat that isn't linked to an account."
+    ],
+    "resolved": [],
+    "archivist_note": "Any seated player could advance the turn from their own phone, which made an accidental tap someone else's problem. The turn now belongs to the person taking it. We kept one deliberate escape hatch: the table view can always move the turn, so if the tracker ever falls out of step with the physical table, the tablet fixes it rather than the game getting stuck."
+  },
+  {
     "version": "4.12.2",
     "date": "2026-07-23",
     "added": [],

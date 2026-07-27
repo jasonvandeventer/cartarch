@@ -15525,6 +15525,7 @@ body.cmp-body { margin: 0; height: 100dvh; overflow: hidden; touch-action: manip
   background: var(--brand-gold-soft); color: var(--text); cursor: pointer;
 }
 .cmp-endturn.cmp-endturn-mine { background: var(--brand-green); color: #0e140b; }
+.cmp-endturn:disabled { background: transparent; border: 1px dashed var(--accent-2); opacity: 0.5; cursor: not-allowed; }
 .cmp-spectator { text-align: center; padding: 2rem 1rem; }
 .cmp-ended {
   position: fixed; inset: 0; z-index: 1002; display: flex; flex-direction: column;

@@ -9,13 +9,16 @@ uses (so Session 2 can reuse the client render logic).
 Authorization is deliberately split from the rest of the app's owner-only model:
 
 * THE TABLE — a request presenting the game's ``client_token`` (the "table
-  token") may control ALL seats. This is the shared tablet running the tracker.
-  It is NOT tied to the logged-in user: the creator's phone does not get table
-  powers just because the same account is signed in on the tablet.
+  token") may control ALL seats, and may advance the turn for anyone (including
+  out of order). This is the shared tablet running the tracker. NOTE: the token
+  is handed out by ``routes/games.py`` to the game OWNER on whatever device
+  loads ``/games/{id}`` — it is owner-scoped, not device-scoped, so the creator
+  can obtain table powers from their phone via the game detail page. Accepted:
+  the creator is the person running the tablet in practice.
 * PLAYER PHONES — seat-scoped. A user attributed to a seat
   (``GameSeat.user_id``) controls that seat only (cmd is scoped to the RECEIVING
-  seat; turn advance is any seated player). The creator without the table token
-  is seat-scoped like everyone else.
+  seat; turn advance is the ACTIVE seat only — see ``_authorize_seat_scoped``).
+  The creator without the table token is seat-scoped like everyone else.
 
 Read access (:func:`get_live_state`, the SSE stream) is viewer-scoped and NOT
 token-gated: seat players and playgroup members may watch.
@@ -526,13 +529,26 @@ def _require_seat(seat_id, seats_by_id: dict[int, GameSeat], field: str) -> int:
 
 
 def _authorize_seat_scoped(
-    atype: str, action: dict, game: Game, user_id: int, seats_by_id: dict[int, GameSeat]
+    atype: str,
+    action: dict,
+    game: Game,
+    user_id: int,
+    seats_by_id: dict[int, GameSeat],
+    state: dict,
 ) -> None:
     """Seat-scoped authorization (no table token). Raises ``PermissionError``
     (→ 403). Seat existence is validated separately (→ 400)."""
     if atype == "turn":
-        if not any(s.user_id == user_id for s in game.seats):
-            raise PermissionError("Only a seated player may advance the turn")
+        # Only the ACTIVE player ends the turn from their phone. An unattributed
+        # active seat (guest, no user_id) has no phone owner, so that turn is
+        # table-token-only — friction, not a wedge: the table surface exists in
+        # every live game (live_start is owner-only and lands on the detail page,
+        # which carries the token). Deliberately a hard reject, unlike the
+        # sorcery-speed soft rule in _apply_momir_activate: the tablet is the
+        # documented escape hatch if currentTurnId drifts from the real table.
+        active = seats_by_id.get(_coerce_int(state.get("currentTurnId")))
+        if active is None or active.user_id != user_id:
+            raise PermissionError("Only the active player may advance the turn")
         return
 
     # #115 — enabling Planechase is a table-only game config; rolling the planar
@@ -1369,11 +1385,11 @@ def apply_live_action(
     seats_by_id = {s.id: s for s in game.seats}
     _validate_action_seats(atype, action, seats_by_id)  # 400 on bad seat, table path included
 
+    state = json.loads(live.state)
     has_table = bool(table_token) and table_token == game.client_token
     if not has_table:
-        _authorize_seat_scoped(atype, action, game, user_id, seats_by_id)
+        _authorize_seat_scoped(atype, action, game, user_id, seats_by_id, state)
 
-    state = json.loads(live.state)
     extras = _apply_mutation(session, atype, action, state, game, has_table)
 
     # Event append shares this transaction — no event without its mutation. The

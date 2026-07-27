@@ -250,11 +250,39 @@ def test_cmd_scoped_to_receiving_seat(matrix):
         )
 
 
-def test_any_seated_player_advances_turn(matrix):
+def test_active_player_advances_own_turn(matrix):
     m = matrix
-    # player_b is seated → may advance turn even though it's not "their" seat action.
-    live = _act(m["db"], m["game"].id, m["b"].id, {"type": "turn"})
+    # first_seat_number=1 → seat1 (player_a) is active.
+    live = _act(m["db"], m["game"].id, m["a"].id, {"type": "turn"})
     assert _state(live)["currentTurnId"] == m["seats"][1].id  # 1 → 2
+
+
+def test_non_active_seated_player_cannot_advance_turn(matrix):
+    m = matrix
+    # player_b is seated but it is seat1's turn → 403 (was allowed pre-fix).
+    with pytest.raises(PermissionError):
+        _act(m["db"], m["game"].id, m["b"].id, {"type": "turn"})
+    assert _state(m["game"].live_state)["currentTurnId"] == m["seats"][0].id
+
+
+def test_table_token_advances_any_turn(matrix):
+    m = matrix
+    # The tablet keeps full override — player_b's token request ends seat1's turn.
+    live = _act(m["db"], m["game"].id, m["b"].id, {"type": "turn"}, TABLE)
+    assert _state(live)["currentTurnId"] == m["seats"][1].id
+
+
+def test_unattributed_active_seat_is_table_only(matrix):
+    m = matrix
+    s3 = m["seats"][2]  # no user_id
+    _act(m["db"], m["game"].id, m["a"].id, {"type": "turn"})  # 1 → 2
+    _act(m["db"], m["game"].id, m["b"].id, {"type": "turn"})  # 2 → 3 (unattributed)
+    assert _state(m["game"].live_state)["currentTurnId"] == s3.id
+    for actor in (m["a"], m["b"], m["owner"]):  # no phone satisfies an unattributed seat
+        with pytest.raises(PermissionError):
+            _act(m["db"], m["game"].id, actor.id, {"type": "turn"})
+    live = _act(m["db"], m["game"].id, m["owner"].id, {"type": "turn"}, TABLE)
+    assert _state(live)["currentTurnId"] == m["seats"][0].id  # table unwedges it
 
 
 def test_playgroup_viewer_cannot_mutate_but_can_read(matrix):
