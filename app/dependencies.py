@@ -514,7 +514,7 @@ def _pending_count_for(user_id: int | None) -> int:
 
 def _has_drawers_for(user_id: int | None) -> bool:
     """Whether the user has any drawer location — gates the drawer-specific nav
-    (#104, replaces the DRAWER_SORTER_USERNAMES username gate). Short-lived session,
+    (#104, replaced the old username-frozenset gate). Short-lived session,
     the _pending_count_for precedent."""
     if not user_id:
         return False

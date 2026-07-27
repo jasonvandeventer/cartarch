@@ -92,6 +92,7 @@ from app.sorter_rule_service import (
     create_sorter_rule,
     delete_sorter_rule,
     edit_sorter_rule,
+    first_sweep_preview,
     has_sortable_setup,
     list_sorter_rules,
     move_sorter_rule,
@@ -1751,6 +1752,15 @@ def locations_page(
     sorter_rules = list_sorter_rules(session, current_user.id)
     rule_target_locations = [loc for loc in locations if loc.type != "deck"]
 
+    # Warn before the FIRST rule switches the sorter on: everything sitting in a
+    # managed/sink location becomes sorter input. Only computed while the sorter
+    # is still off — once it is on, the sweep has already been consented to.
+    first_sweep = (
+        []
+        if has_sortable_setup(session, current_user.id)
+        else first_sweep_preview(session, current_user.id)
+    )
+
     return render(
         request,
         "locations.html",
@@ -1763,6 +1773,8 @@ def locations_page(
             "current_user": current_user,
             "sorter_rules": sorter_rules,
             "rule_target_locations": rule_target_locations,
+            "first_sweep": first_sweep,
+            "sweep_unack": request.query_params.get("sweep_unack") == "1",
         },
     )
 
@@ -1774,10 +1786,22 @@ def locations_page(
 def sorter_rule_create(
     query: str = Form(""),
     target_location_id: int = Form(...),
+    acknowledge_sweep: str = Form(""),
     session: Session = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
     _: None = CsrfRequired,
 ):
+    # The FIRST rule switches the sorter on for this user (has_sortable_setup),
+    # which makes every managed/sink location a sortable SOURCE — see
+    # first_sweep_preview. Gate it server-side: the template's checkbox is the
+    # affordance, this is the actual guard. Later rules change nothing about
+    # what is sweepable, so they are not gated.
+    if not has_sortable_setup(session, current_user.id) and first_sweep_preview(
+        session, current_user.id
+    ):
+        if acknowledge_sweep != "1":
+            return RedirectResponse("/locations?sweep_unack=1#sorter-rules", status_code=303)
+
     try:
         create_sorter_rule(session, current_user.id, query, target_location_id)
     except ValueError:
@@ -2121,12 +2145,16 @@ def _build_location_items(
     user_id: int,
     *,
     search: str = "",
-    sort: str = "slot",
+    sort: str = "",
     direction: str = "asc",
-) -> tuple[list[dict], float, int]:
-    """Build the (items, total_value, total_quantity) for a location's card
-    grid. Shared by ``location_detail_page`` and the quick-add route so the
-    full page and the HTMX partial stay byte-identical."""
+) -> tuple[list[dict], float, int, str]:
+    """Build the (items, total_value, total_quantity, resolved_sort) for a
+    location's card grid. Shared by ``location_detail_page`` and the quick-add
+    route so the full page and the HTMX partial stay byte-identical.
+
+    ``sort=""`` means "no explicit choice" and resolves per location: "slot"
+    where rows are actually slotted, "name" where none are. An explicit choice
+    is always honoured, including an explicit "slot" on an unslotted box."""
     loc_query = (
         session.query(InventoryRow)
         .options(joinedload(InventoryRow.card), joinedload(InventoryRow.storage_location))
@@ -2141,10 +2169,16 @@ def _build_location_items(
 
     # v3.36.11 — shared SORT control. The location grid fetches all rows (no
     # pagination), so it sorts in Python via the shared spec (sort_inventory_rows)
-    # — uniform with Decks and reaching the computed Price/Color too. Default
-    # "slot" preserves the prior order; unknown keys fall back to name (the
-    # sorter's tiebreaker default).
-    rows = sort_spec.sort_inventory_rows(loc_query.all(), sort or "slot", direction)
+    # — uniform with Decks and reaching the computed Price/Color too. Unknown
+    # keys fall back to name (the sorter's tiebreaker default).
+    #
+    # Slot is only meaningful where the drawer sorter assigned one. A Bulk box
+    # has no slotted rows, so defaulting to "slot" there sorted a few hundred
+    # rows by a uniformly-NULL key and left them in tiebreaker order. Rows are
+    # already materialised, so probing them costs no extra query.
+    rows = loc_query.all()
+    resolved_sort = sort or ("slot" if any(r.slot is not None for r in rows) else "name")
+    rows = sort_spec.sort_inventory_rows(rows, resolved_sort, direction)
 
     items = []
     total_value = 0.0
@@ -2169,7 +2203,7 @@ def _build_location_items(
                 "storage_location_id": row.storage_location_id,
             }
         )
-    return items, total_value, total_quantity
+    return items, total_value, total_quantity, resolved_sort
 
 
 @router.get("/locations/{location_id}")
@@ -2177,7 +2211,7 @@ def location_detail_page(
     request: Request,
     location_id: int,
     search: str = "",
-    sort: str = "slot",
+    sort: str = "",
     direction: str = "asc",
     session: Session = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
@@ -2191,7 +2225,7 @@ def location_detail_page(
         if deck:
             return RedirectResponse(f"/decks/{deck.id}", status_code=302)
 
-    items, total_value, total_quantity = _build_location_items(
+    items, total_value, total_quantity, sort = _build_location_items(
         session,
         location_id,
         current_user.id,
@@ -2289,7 +2323,7 @@ def location_add_card(
 
     # The grid the modal lives on is for ``location_id``; render that list.
     if request.headers.get("HX-Request"):
-        items, total_value, total_quantity = _build_location_items(
+        items, total_value, total_quantity, _ = _build_location_items(
             session, location_id, current_user.id
         )
         location = get_location(session, location_id=location_id, user_id=current_user.id)

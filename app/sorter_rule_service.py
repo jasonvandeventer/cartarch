@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 # The search parser lives in inventory_service; import the pieces we reuse.
@@ -33,13 +34,52 @@ def _chunks(items: list, size: int = _PARAM_CHUNK) -> Iterator[list]:
 
 def has_sortable_setup(session: Session, user_id: int) -> bool:
     """True if the user participates in the auto-sorter — i.e. has ≥1 sorter rule
-    or ≥1 drawer location. Replaces the DRAWER_SORTER_USERNAMES username gate (#104):
+    or ≥1 drawer location. Replaces the old username-frozenset gate (#104):
     the sorter is now open to anyone who sets one up."""
     from app.location_service import user_has_drawers
 
     if session.query(SorterRule.id).filter(SorterRule.user_id == user_id).first() is not None:
         return True
     return user_has_drawers(session, user_id)
+
+
+def first_sweep_preview(session: Session, user_id: int) -> list[dict]:
+    """Locations whose contents the sorter would sweep on its FIRST run.
+
+    ``StorageLocation.mode`` defaults to ``managed``, and ``resort_collection``
+    treats any non-deck ``managed``/``sink`` location as a sortable SOURCE over
+    the user's WHOLE collection (``row_ids=None``). So a user who has quietly
+    built boxes and binders through the normal UI turns all of them into sorter
+    input the moment they create their first rule — a bulk relocation of every
+    card they had deliberately filed by hand.
+
+    Returns ``[{location, rows, cards}, ...]`` for the non-empty ones, biggest
+    first. Empty list = nothing to warn about. Mirrors ``resort_collection``'s
+    source predicate; a location holding no rows is not a warning.
+    """
+    from app.location_service import SORTABLE_SOURCE_MODES
+
+    rows = (
+        session.query(
+            StorageLocation,
+            func.count(InventoryRow.id),
+            func.coalesce(func.sum(InventoryRow.quantity), 0),
+        )
+        .join(InventoryRow, InventoryRow.storage_location_id == StorageLocation.id)
+        .filter(
+            StorageLocation.user_id == user_id,
+            StorageLocation.type != "deck",
+            StorageLocation.mode.in_(SORTABLE_SOURCE_MODES),
+            InventoryRow.user_id == user_id,
+        )
+        .group_by(StorageLocation.id)
+        .all()
+    )
+    return sorted(
+        ({"location": loc, "rows": n, "cards": int(qty)} for loc, n, qty in rows),
+        key=lambda d: d["cards"],
+        reverse=True,
+    )
 
 
 def validate_query(query: str) -> str | None:

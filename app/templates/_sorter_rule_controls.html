@@ -68,6 +68,33 @@
   {% endif %}
 
   {% if rule_target_locations %}
+    {# Your first rule switches the sorter on, and everything in a managed
+       location becomes sorter input. Say so before it happens, with the real
+       numbers — the server enforces the checkbox (see sorter_rule_create). #}
+    {% if first_sweep | default([]) %}
+      {% if sweep_unack | default(false) %}
+        <p class="error-banner" style="color: var(--danger, #c00); margin: 0 0 0.5rem">
+          Rule not saved — please confirm you understand what the sorter will move.
+        </p>
+      {% endif %}
+      <div class="sweep-warning" style="border: 1px solid var(--danger, #c00); border-radius: 6px; padding: 0.75rem; margin: 0 0 0.75rem">
+        <strong>This will be your first sorter rule.</strong>
+        <p style="margin: 0.4rem 0">
+          Turning the sorter on makes these locations <em>sortable sources</em> — the
+          sorter may move their contents out and re-file them. Cards you placed by
+          hand will not stay put.
+        </p>
+        <ul style="margin: 0.4rem 0 0.6rem 1.1rem">
+          {% for s in first_sweep %}
+            <li>{{ s.location.name }} — <strong>{{ s.cards }}</strong> card{{ '' if s.cards == 1 else 's' }} ({{ s.rows }} row{{ '' if s.rows == 1 else 's' }})</li>
+          {% endfor %}
+        </ul>
+        <p class="muted" style="margin: 0 0 0.5rem; font-size: 0.85rem">
+          To keep a location as-is, set its mode to <em>Manual</em> before adding the
+          rule. Manual locations are never used as sorter sources.
+        </p>
+      </div>
+    {% endif %}
     <form action="/sorter-rules" method="post" class="stack-form">
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
       <input type="text" name="query" maxlength="512" placeholder="Search query (e.g. t:vampire) — empty = catch-all">
@@ -77,6 +104,12 @@
           <option value="{{ loc.id }}">{{ loc.name }}</option>
         {% endfor %}
       </select>
+      {% if first_sweep | default([]) %}
+        <label style="display: block; margin: 0.25rem 0">
+          <input type="checkbox" name="acknowledge_sweep" value="1" required>
+          I understand the sorter may move the cards listed above.
+        </label>
+      {% endif %}
       <button type="submit">Add rule</button>
     </form>
   {% else %}
