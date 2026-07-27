@@ -1,5 +1,21 @@
 [
   {
+    "version": "4.12.15",
+    "date": "2026-07-27",
+    "added": [
+      "When you set up a game you can now pick a deck belonging to another player at the table. Their decks appear under a “Borrowed from…” heading, below your own. Borrowing a deck for a night is normal, and until now the only ways to record it were to credit the wrong person or to leave the deck blank.",
+      "A deck's record now shows how many of its games somebody else piloted — “3 lent out” beside the game count. The games still count toward the deck; the note lets you read the win rate knowing what is in it."
+    ],
+    "refined": [
+      "Storage locations are now described by what the sorter will do to your cards rather than by what the sorter calls them. “Managed” is now “Let the sorter organize this”, and its opposite is plainly “Leave this alone”. A newly created box or binder now defaults to being left alone, so the sorter only touches storage you have deliberately handed to it."
+    ],
+    "resolved": [
+      "The Decks page and the Dashboard could have reported different game counts for the same deck. They were counting different things — one included every game a deck was played in, the other only games you created or sat at — while a note in the code claimed the two matched. They now use one rule. No number changes today; the difference would only have appeared the first time a deck was lent out, and it would have looked like a bug with no cause.",
+      "The new-game page was sending every deck name in the system to your browser and hiding all but the relevant ones. It now sends only the decks of people who can actually be seated at your table."
+    ],
+    "archivist_note": "Two of these came from pulling on the same thread. Deciding whether a borrowed deck should count toward the deck or its pilot meant reading how deck records are actually calculated, and that turned up two places in the app already answering the question in opposite ways — with a comment asserting they agreed. They did agree, but only because nobody had ever lent a deck; the first loan would have split them and looked like a mystery. The decision was to count the game and say who played it, which is the only version that neither throws away a real game nor quietly passes off someone else's piloting as the deck's own. The privacy fix on the last line was not planned; it was simply sitting on the line we had to edit anyway."
+  },
+  {
     "version": "4.12.14",
     "date": "2026-07-27",
     "added": [
