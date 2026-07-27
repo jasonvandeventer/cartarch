@@ -251,6 +251,12 @@ def build_game_analytics(session: Session, game_id: int) -> dict | None:
         "life_lo": lo,
         "life_hi": hi,
         "series": life_series,
+        # #154 — drives the explanatory note. Only shown when at least one line is
+        # actually truncated, so a game with no eliminations carries no caveat about
+        # a case it doesn't have. Computed here rather than in Jinja: `selectattr`
+        # over a list of dicts relies on Jinja's attribute/item fallback, and an
+        # explicit boolean is one line and cannot surprise anyone.
+        "any_truncated": any(s["ended_at_elimination"] for s in life_series),
         # Faint verticals where the rotation wrapped — the only surviving use of
         # `e.turn` on this axis.
         "round_ticks": [{"x": round(_x(t["index"]), 1), "round": t["round"]} for t in round_ticks],

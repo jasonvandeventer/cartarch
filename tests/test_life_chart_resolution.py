@@ -243,3 +243,50 @@ def test_a_game_with_no_life_events_does_not_divide_by_zero(db):
     for s in lc["series"]:
         assert s["final"] == 40
         assert len(s["points"].split()) == 2  # the stub, drawn rather than lost
+
+
+# ── #154 — the chart/standings caveat ────────────────────────────────────────
+
+
+def test_the_caveat_appears_only_when_a_line_is_actually_truncated(db):
+    """#154, option 1 (label, don't reconcile). The note explains a real divergence; a
+    game with no eliminations has nothing to caveat and must not carry one."""
+    owner = _user(db)
+    g, (s1, s2, _s3) = _game(db, owner.id)
+    for _ in range(3):
+        _act(db, g, owner, {"type": "life", "seat_id": s2.id, "delta": -2})
+    assert build_game_analytics(db, g.id)["life_chart"]["any_truncated"] is False
+
+    _act(db, g, owner, {"type": "eliminate", "seat_id": s1.id, "eliminated": True})
+    assert build_game_analytics(db, g.id)["life_chart"]["any_truncated"] is True
+
+    # ...and it goes away again on revive, along with the truncation it describes.
+    _act(db, g, owner, {"type": "eliminate", "seat_id": s1.id, "eliminated": False})
+    assert build_game_analytics(db, g.id)["life_chart"]["any_truncated"] is False
+
+
+def test_a_commander_damage_death_is_the_case_the_caveat_covers(db):
+    """21 commander damage kills on POSITIVE life, so chart terminal (19) and recorded
+    final_life (0) differ by construction — not a bug in either. #154."""
+    owner = _user(db)
+    g, (victim, killer, _s3) = _game(db, owner.id)
+    _act(
+        db,
+        g,
+        owner,
+        {"type": "cmd", "receiver_seat_id": victim.id, "attacker_seat_id": killer.id, "delta": 21},
+    )
+    end_game(
+        db,
+        g.id,
+        owner.id,
+        placements={killer.id: 1, victim.id: 2},
+        final_lives={victim.id: 0, killer.id: 40},
+        turn_count=1,
+        notes="",
+    )
+    lc = build_game_analytics(db, g.id)["life_chart"]
+    row = next(s for s in lc["series"] if s["sid"] == str(victim.id))
+    assert row["final"] == 19 and row["ended_at_elimination"] is True
+    assert db.get(GameSeat, victim.id).final_life == 0  # standings disagrees, correctly
+    assert lc["any_truncated"] is True  # so the caveat is shown

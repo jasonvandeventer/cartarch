@@ -95,6 +95,18 @@
       {% set lc = a.life_chart %}
       <div class="ga-block">
         <h4 class="ga-heading">Life over time</h4>
+        {# #154 — the chart and the standings table measure different things and will
+           not agree for every seat. Say so once, here, rather than leaving the reader
+           to spot a contradiction: a commander-damage or poison death happens while
+           the player still has positive life, so the line ends above the 0 that
+           Final standings records. Only shown when a line is actually truncated. #}
+        {% if lc.any_truncated %}
+          <p class="muted ga-subnote">
+            Lines end where a player was eliminated. A commander-damage or poison death
+            happens on positive life, so that last value can differ from the total in
+            Final standings above — which is the record.
+          </p>
+        {% endif %}
         <div class="ga-life-chart">
           <svg viewBox="0 0 {{ lc.width }} {{ lc.height }}" preserveAspectRatio="none"
                role="img" aria-label="Life totals over the course of the game"

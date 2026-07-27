@@ -1,5 +1,15 @@
 [
   {
+    "version": "4.12.9",
+    "date": "2026-07-26",
+    "added": [],
+    "refined": [
+      "The life chart on a finished game now explains itself where it can disagree with the Final standings table above it. A player killed by commander damage or poison dies while still on positive life, so their line ends above the zero the standings record — a short note now says so, and appears only on games where a line actually stops early."
+    ],
+    "resolved": [],
+    "archivist_note": "Two numbers on one page that do not match will always read as a mistake, even when both are right. The chart draws the life track and ends a line where the player was eliminated; the standings record what they finished on. For a commander-damage kill those genuinely differ, and the honest fix is to say which is which rather than bend one to match the other — quietly redrawing the line down to zero would have made the picture agree with the table by making it untrue."
+  },
+  {
     "version": "4.12.8",
     "date": "2026-07-26",
     "added": [],
