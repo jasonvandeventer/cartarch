@@ -1,0 +1,125 @@
+{% from "_macros.html" import editorial_eyebrow %}
+{% extends "base.html" %}
+{% block content %}
+  <section class="panel page-hero compact-hero">
+    <div>
+      {{ editorial_eyebrow("Play · Games · Analytics") }}
+      <h2 class="panel-title">Game Analytics</h2>
+    </div>
+    <a href="/games"><button type="button">Back to games</button></a>
+  </section>
+
+  {% if not analytics %}
+    <section class="panel">
+      <p class="muted">
+        No recorded live games yet. These figures come from games played in live mode —
+        games logged by hand have no event stream to read, so they are not counted here.
+      </p>
+    </section>
+  {% else %}
+    {% set a = analytics %}
+    <section class="panel">
+      <h3 class="panel-title">Across {{ a.games }} recorded live game{{ '' if a.games == 1 else 's' }}</h3>
+      {# Sample sizes are shown beside every figure on purpose. With single-digit game
+         counts a bare average implies far more than the data supports. #}
+      <p class="muted ga-subnote">
+        Only games played in live mode are counted — a hand-logged game has no event
+        stream. Every average shows the number of observations behind it.
+      </p>
+
+      <h4 class="ga-heading">Elimination order</h4>
+      <div class="table-wrap">
+        <table class="stacking-table">
+          <thead>
+            <tr>
+              <th>Player</th>
+              <th>Games</th>
+              <th>First out</th>
+              <th>Survived</th>
+              {% for p in range(1, a.max_place + 1) %}<th>{{ p }}<sup>{{ 'st' if p == 1 else 'nd' if p == 2 else 'rd' if p == 3 else 'th' }}</sup> out</th>{% endfor %}
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in a.players %}
+              <tr>
+                <td data-label="Player">{{ r.label }}</td>
+                <td data-label="Games">{{ r.games }}</td>
+                {# Share of THIS player's games — they did not sit in every one. #}
+                <td data-label="First out">{{ r.first_out }} <span class="muted">({{ r.first_out_pct }}%)</span></td>
+                <td data-label="Survived">{{ r.survived }}</td>
+                {% for n in r.positions %}<td data-label="out">{{ n or '—' }}</td>{% endfor %}
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <h4 class="ga-heading" style="margin-top:1.25rem">Pace</h4>
+      <p class="muted ga-subnote">
+        Turn times are wall clock between taps — they include table talk, rules lookups and
+        breaks, so they measure elapsed time at the table, not how fast anyone decides.
+      </p>
+      <div class="table-wrap">
+        <table class="stacking-table">
+          <thead>
+            <tr><th>Pod size</th><th>Games</th><th>Average length</th></tr>
+          </thead>
+          <tbody>
+            {% for p in a.pace_by_pod %}
+              <tr>
+                <td data-label="Pod size">{{ p.pod_size }} players</td>
+                <td data-label="Games">{{ p.games }}</td>
+                <td data-label="Average length">{{ p.avg_label }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <div class="table-wrap" style="margin-top:0.75rem">
+        <table class="stacking-table">
+          <thead>
+            <tr><th>Player</th><th>Turns</th><th>Average turn</th></tr>
+          </thead>
+          <tbody>
+            {% for r in a.players %}
+              <tr>
+                <td data-label="Player">{{ r.label }}</td>
+                <td data-label="Turns">{{ r.turns }}</td>
+                <td data-label="Average turn">{{ r.avg_turn_label }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h3 class="panel-title">Per game</h3>
+      <div class="table-wrap">
+        <table class="stacking-table">
+          <thead>
+            <tr><th>Game</th><th>Pod</th><th>Length</th><th>Elimination order</th></tr>
+          </thead>
+          <tbody>
+            {% for g in a.per_game %}
+              <tr>
+                <td data-label="Game"><a href="/games/{{ g.game_id }}">{{ g.played_at | editorial_date }}</a></td>
+                <td data-label="Pod">{{ g.pod_size }}</td>
+                <td data-label="Length">{{ g.total_label }}</td>
+                <td data-label="Elimination order">
+                  {% if g.order %}
+                    {% for name in g.order %}{{ loop.index }}. {{ name }}{% if not loop.last %} · {% endif %}{% endfor %}
+                    {% if g.survivors %}<span class="muted"> · survived: {{ g.survivors | join(', ') }}</span>{% endif %}
+                  {% else %}
+                    <span class="muted">no eliminations recorded</span>
+                  {% endif %}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  {% endif %}
+{% endblock %}

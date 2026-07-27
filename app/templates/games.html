@@ -23,6 +23,14 @@
     <a href="/games/manual-log">
       <button type="button" style="margin-left:0.5rem">Log a Game</button>
     </a>
+    {# #158 — cross-game pod dynamics + pace. Only meaningful once at least one game
+       has been played in live mode, so it is hidden until then rather than linking
+       to an empty state. #}
+    {% if games | selectattr('status', 'equalto', 'finalized') | list %}
+      <a href="/games/analytics">
+        <button type="button" style="margin-left:0.5rem">Analytics</button>
+      </a>
+    {% endif %}
   </section>
   {% if games %}
     <section class="panel">

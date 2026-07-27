@@ -1,5 +1,15 @@
 [
   {
+    "version": "4.12.12",
+    "date": "2026-07-27",
+    "added": [
+      "A Game Analytics page, reached from the Games list, covering every game you have played in live mode. It shows who goes out first and how often, the full elimination order of each game, how long games run at each pod size, and each player's average turn length. Every average is printed next to the number of games or turns behind it, so a figure drawn from one game is never mistaken for a settled one."
+    ],
+    "refined": [],
+    "resolved": [],
+    "archivist_note": "This is the half of cross-game analytics that the data can actually support today. The deck-level half — win rate per deck, bracket calibration — needs the same deck played repeatedly, and the pod builds new decks faster than it replays old ones, so those queries have about two games each to work from. Player-level questions have no such problem: it is the same four or five people every session, so everybody already has enough games to say something. Two honesty notes are carried onto the page itself. Turn times are wall clock between taps, so they include table talk and rules arguments and are not a measure of how fast anyone thinks. And who eliminated whom is absent on purpose: only a commander-damage kill records who dealt it, which across every recorded game is two."
+  },
+  {
     "version": "4.12.11",
     "date": "2026-07-26",
     "added": [],

@@ -349,6 +349,33 @@ def _format_game_elapsed(game) -> str | None:
     return f"{hours}h {minutes}m" if hours else f"{minutes}m"
 
 
+# #158 — MUST stay registered BEFORE `/games/{game_id}`. FastAPI matches in
+# registration order, and `game_id: int` would reject the literal "analytics" with a
+# 422 rather than falling through. Same precedent as `/games/new` and
+# `/games/manual-log` above.
+@router.get("/games/analytics")
+def games_analytics_page(
+    request: Request,
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+):
+    """Cross-game pod dynamics + pace over the games this user was part of (#158).
+
+    `build_cross_game_analytics` returns None when no qualifying game has an event
+    stream; the template renders an empty state rather than a page of zeros."""
+    from app.game_analytics_service import build_cross_game_analytics
+
+    return render(
+        request,
+        "games_analytics.html",
+        {
+            "title": "Game Analytics",
+            "current_user": current_user,
+            "analytics": build_cross_game_analytics(session, current_user.id),
+        },
+    )
+
+
 @router.get("/games/{game_id}")
 def game_detail_page(
     request: Request,

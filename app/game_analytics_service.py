@@ -22,6 +22,7 @@ import json
 from sqlalchemy.orm import Session
 
 from app.models import Game, GameEvent
+from app.playgroup_service import GUESTS_LABEL  # #158 reuses #152's guest-row convention
 
 # Distinct, theme-agnostic seat colors (max 6 seats in a Commander pod).
 _PALETTE = ["#3fb950", "#58a6ff", "#f85149", "#d29922", "#bc8cff", "#39c5cf"]
@@ -431,3 +432,204 @@ def scan_life_consistency(session: Session) -> list[dict]:
         for (gid,) in session.query(GameEvent.game_id).distinct().order_by(GameEvent.game_id.desc())
     ]
     return [r for r in (check_life_consistency(session, gid) for gid in game_ids) if r is not None]
+
+
+# ── #158 — cross-game pod dynamics + pace ─────────────────────────────────────
+# Aggregates ACROSS recorded live games. Split out of #96 because its gate is
+# different: #96's per-deck surfaces need repeat samples of the same deck (1.8
+# games each today), while these are player-level and the roster is stable, so
+# each player already has 4-8 observations.
+#
+# Scope is the viewer's PARTICIPANT set (`_participant_games_predicate` — owned +
+# played-in, the same definition the Recent Games list uses), narrowed to games
+# that actually have an event stream. A game with no `live_started` is EXCLUDED,
+# never counted as a zero — it has no data, which is not the same as no time.
+
+
+def _final_elimination_events(events: list[GameEvent]) -> list[tuple[str, GameEvent]]:
+    """``[(seat_id_str, the eliminate event that finally removed it)]``, in event order.
+
+    A seat can be eliminated and revived — manually, or automatically when its own
+    loss condition un-triggers (`_auto_eliminate`) — so the ordering key is the LAST
+    elimination that STUCK, not the first that fired. Same rule #151 uses to decide
+    where to truncate a chart line.
+
+    Deliberately NOT read from the finalized blob's `eliminated` / `eliminatedAtTurn`
+    maps: those are round-grained, so two seats out in the same round tie and get
+    broken by seat id. Real example — game 67, where Alex (event 1602) died before
+    Phil (1618) but the blob ordering reports Phil first. First-out frequency has to
+    be right about exactly that case.
+    """
+    last: dict[str, GameEvent] = {}
+    for e in events:
+        if e.action_type != "eliminate":
+            continue
+        p = json.loads(e.payload)
+        # Manual eliminates name the seat in the payload, auto ones only in the
+        # column — the column is set for both, so prefer it.
+        raw = e.seat_id if e.seat_id is not None else p.get("seat_id")
+        if raw is None:
+            continue
+        sid = str(raw)
+        if p.get("eliminated"):
+            last[sid] = e
+        else:
+            last.pop(sid, None)  # revived — no longer out
+    return sorted(last.items(), key=lambda kv: (kv[1].created_at, kv[1].id))
+
+
+def _player_key(seat) -> tuple:
+    """Aggregation key for a player across games.
+
+    Grouped by ``user_id``, NEVER ``player_name`` — the same rule #152 established,
+    for the same reason: `player_name` is a per-seat free-text snapshot and one
+    account really has played under several spellings. Unattributed seats collapse
+    into a single Guests row rather than one row per placeholder name.
+    """
+    return ("u", seat.user_id) if seat.user_id is not None else ("guest",)
+
+
+def build_cross_game_analytics(session: Session, user_id: int) -> dict | None:
+    """Pod dynamics + pace across every recorded live game the viewer was part of.
+
+    Returns ``None`` when no qualifying game has an event stream — the caller hides
+    the section rather than rendering zeros.
+
+    Every figure carries its own sample size. With 8 recorded games and pod sizes of
+    only 4 and 5 (four games each), a bare average would imply far more than the data
+    supports; the template is expected to show ``n`` beside each number.
+    """
+    from app.game_service import _participant_games_predicate
+
+    games = (
+        session.query(Game)
+        .filter(_participant_games_predicate(user_id))
+        .order_by(Game.played_at.desc(), Game.id.desc())
+        .all()
+    )
+    if not games:
+        return None
+
+    rows = (
+        session.query(GameEvent)
+        .filter(GameEvent.game_id.in_([g.id for g in games]))
+        .order_by(GameEvent.created_at.asc(), GameEvent.id.asc())
+        .all()
+    )
+    by_game: dict[int, list[GameEvent]] = {}
+    for e in rows:
+        by_game.setdefault(e.game_id, []).append(e)
+
+    labels: dict[tuple, str] = {}
+    first_out: dict[tuple, int] = {}
+    positions: dict[tuple, dict[int, int]] = {}
+    survived: dict[tuple, int] = {}
+    appearances: dict[tuple, int] = {}
+    seg_time: dict[tuple, float] = {}
+    seg_count: dict[tuple, int] = {}
+    pod: dict[int, list[float]] = {}
+    per_game: list[dict] = []
+
+    for g in games:
+        events = by_game.get(g.id, [])
+        started = next((e for e in events if e.action_type == "live_started"), None)
+        if started is None:
+            continue  # no event stream — excluded, NOT counted as a zero
+        seats = {str(s.id): s for s in g.seats}
+        if not seats:
+            continue
+        for s in g.seats:
+            key = _player_key(s)
+            # Games are ordered newest-first, so setdefault keeps the MOST RECENT
+            # spelling for an account that has played under several — the same
+            # reason #152 groups on user_id in the first place.
+            labels.setdefault(key, GUESTS_LABEL if key == ("guest",) else _seat_label(s))
+            appearances[key] = appearances.get(key, 0) + 1
+
+        # ── elimination order, from the event stream (see _final_elimination_events)
+        order = [sid for sid, _e in _final_elimination_events(events) if sid in seats]
+        for place, sid in enumerate(order, start=1):
+            key = _player_key(seats[sid])
+            positions.setdefault(key, {})[place] = positions.setdefault(key, {}).get(place, 0) + 1
+            if place == 1:
+                first_out[key] = first_out.get(key, 0) + 1
+        for sid, seat in seats.items():
+            if sid not in order:
+                key = _player_key(seat)
+                survived[key] = survived.get(key, 0) + 1
+
+        # ── pace: total wall clock, and per-segment time attributed via _segment_owners
+        finalized = next((e for e in events if e.action_type == "finalized"), None)
+        last = finalized or events[-1]
+        total = (last.created_at - started.created_at).total_seconds()
+        pod.setdefault(len(seats), []).append(total)
+
+        owners = _segment_owners(g, events, json.loads(started.payload))
+        marks = [started] + [e for e in events if e.action_type == "turn"]
+        for i in range(len(marks) - 1):
+            sid = owners[i] if i < len(owners) else None
+            seat = seats.get(sid)
+            if seat is None:
+                continue
+            key = _player_key(seat)
+            secs = (marks[i + 1].created_at - marks[i].created_at).total_seconds()
+            seg_time[key] = seg_time.get(key, 0.0) + secs
+            seg_count[key] = seg_count.get(key, 0) + 1
+
+        per_game.append(
+            {
+                "game_id": g.id,
+                "played_at": g.played_at,
+                "pod_size": len(seats),
+                "order": [_seat_label(seats[sid]) for sid in order],
+                "survivors": [_seat_label(s) for sid, s in seats.items() if sid not in order],
+                "total_label": _fmt_duration(total),
+            }
+        )
+
+    if not per_game:
+        return None
+
+    total_games = len(per_game)
+    max_place = max((p for d in positions.values() for p in d), default=0)
+
+    players = []
+    for key, label in labels.items():
+        fo = first_out.get(key, 0)
+        seen = appearances.get(key, 0)
+        players.append(
+            {
+                "label": label,
+                "games": seen,
+                "first_out": fo,
+                # Share of THIS player's games, not of all games — they did not sit
+                # in every one.
+                "first_out_pct": round(100.0 * fo / seen) if seen else 0,
+                "survived": survived.get(key, 0),
+                "positions": [positions.get(key, {}).get(p, 0) for p in range(1, max_place + 1)],
+                "turns": seg_count.get(key, 0),
+                "avg_turn_label": (
+                    _fmt_duration(seg_time[key] / seg_count[key]) if seg_count.get(key) else "—"
+                ),
+                "avg_turn_seconds": (
+                    round(seg_time[key] / seg_count[key], 1) if seg_count.get(key) else None
+                ),
+            }
+        )
+    players.sort(key=lambda r: (-r["first_out"], -r["games"], r["label"].lower()))
+
+    return {
+        "games": total_games,
+        "max_place": max_place,
+        "players": players,
+        "per_game": per_game,
+        "pace_by_pod": [
+            {
+                "pod_size": size,
+                "games": len(vals),  # sample size — must be rendered beside the average
+                "avg_label": _fmt_duration(sum(vals) / len(vals)),
+                "avg_seconds": round(sum(vals) / len(vals), 1),
+            }
+            for size, vals in sorted(pod.items())
+        ],
+    }
