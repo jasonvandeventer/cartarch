@@ -27,7 +27,12 @@ token-gated: seat players and playgroup members may watch.
 from __future__ import annotations
 
 import json
+import logging
 import secrets
+import threading
+import time
+from collections import OrderedDict
+from contextlib import contextmanager
 
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
@@ -36,6 +41,117 @@ from app import live_game_events
 from app.game_service import get_game, get_viewable_game
 from app.models import Game, GameEvent, GameLiveState, GameSeat, OracleCatalog
 from app.timeutil import utc_now
+
+logger = logging.getLogger(__name__)
+
+# ── #155 — live-action request-overlap instrumentation ────────────────────────
+# DIAGNOSTIC ONLY. Nothing in this block locks a game, retries, or changes what is
+# written; it observes. Remove it — or consciously keep it — once #153's
+# lost-update hypothesis is settled either way.
+#
+# The race #153 hypothesises: two requests read version N, both write N+1, and the
+# second silently discards the first's mutation (apply_live_action json.loads the
+# WHOLE blob, mutates it, re-serialises, commits — no optimistic locking). The
+# route runs the service via `run_in_threadpool`, so those really are concurrent
+# threads, not interleaved coroutines.
+#
+# Detected with NO extra query: remember the highest version actually written per
+# game. If a commit writes a version that was already written, this request just
+# clobbered whoever wrote it. `_live_in_flight` separately counts concurrent
+# requests per game so BENIGN overlap is visible too — overlap and data loss are
+# different questions and the logs should answer both.
+#
+# LIMITATION: in-process. It sees races between threadpool workers in one pod,
+# which is the realistic case on a single-replica deploy. A cross-pod race would
+# escape the detector — but every line carries v_read / v_written, so the raw logs
+# still support offline detection.
+_LIVE_OVERLAP_MAX_GAMES = 512  # bounded like the login throttle; diagnostic must not leak
+_last_written_version: OrderedDict[int, int] = OrderedDict()
+_live_in_flight: dict[int, int] = {}
+_overlap_lock = threading.Lock()
+
+
+@contextmanager
+def _track_in_flight(game_id: int):
+    """Count this request as in-flight for ``game_id`` for its whole duration and
+    yield how many OTHER requests were already running when it started.
+
+    Entry, not commit, is the right moment to sample: any two overlapping requests
+    have at least one that started while the other was in flight, so an entry
+    reading catches every overlap. Sampling at commit would miss a pair whose
+    earlier request had already finished.
+
+    Decrements even when the action raises, so a rejected action cannot leak a
+    phantom concurrent request into the next one's reading."""
+    with _overlap_lock:
+        running = _live_in_flight.get(game_id, 0) + 1
+        _live_in_flight[game_id] = running
+    try:
+        yield running - 1  # excluding this request
+    finally:
+        with _overlap_lock:
+            remaining = _live_in_flight.get(game_id, 1) - 1
+            if remaining > 0:
+                _live_in_flight[game_id] = remaining
+            else:
+                _live_in_flight.pop(game_id, None)
+
+
+def _record_live_action(
+    game_id: int,
+    user_id: int,
+    atype: str,
+    v_read: int,
+    v_written: int,
+    started_iso: str,
+    t0: float,
+    overlap: int = 0,
+) -> None:
+    """Emit the #155 record for one applied action, flagging a detected lost update.
+
+    Called AFTER commit, so ``v_written`` is what actually landed. Never raises —
+    instrumentation must not be able to fail a live game action."""
+    duration_ms = (time.perf_counter() - t0) * 1000.0
+    try:
+        with _overlap_lock:
+            previous = _last_written_version.get(game_id)
+            # Already written at or beyond this version → a concurrent writer got
+            # there first and this commit overwrote their blob.
+            clobbered = previous is not None and previous >= v_written
+            _last_written_version[game_id] = max(previous or 0, v_written)
+            _last_written_version.move_to_end(game_id)
+            while len(_last_written_version) > _LIVE_OVERLAP_MAX_GAMES:
+                _last_written_version.popitem(last=False)
+        logger.info(
+            "live_action game=%s actor=%s type=%s v_read=%s v_written=%s "
+            "start=%s dur_ms=%.3f concurrent=%s lost_update=%s",
+            game_id,
+            user_id,
+            atype,
+            v_read,
+            v_written,
+            started_iso,
+            duration_ms,
+            overlap,
+            clobbered,
+        )
+        if clobbered:
+            logger.warning(
+                "LOST UPDATE game=%s actor=%s type=%s v_read=%s v_written=%s "
+                "already_written=%s dur_ms=%.3f concurrent=%s — this commit discarded a "
+                "concurrent mutation (#153/#155)",
+                game_id,
+                user_id,
+                atype,
+                v_read,
+                v_written,
+                previous,
+                duration_ms,
+                overlap,
+            )
+    except Exception:  # pragma: no cover — never let telemetry break a game
+        logger.debug("live_action instrumentation failed", exc_info=True)
+
 
 # Momir Basic (format="momir") layers two extra actions on top of the shared
 # companion infra: momir_activate (summon a random creature at a CMC) and
@@ -1396,12 +1512,37 @@ def apply_live_action(
     locking. Acceptable at a single physical table's write rate; the ``version``
     bump is for SSE ordering + client staleness display, not conflict rejection.
     """
+    # #155 instrumentation — the clock starts here because the read that can go
+    # stale (get_viewable_game → game.live_state) happens below, so this is the
+    # true start of the race window, not the route's request boundary.
+    t0 = time.perf_counter()
+    started_iso = utc_now().isoformat()
+    with _track_in_flight(game_id) as overlap:
+        return _apply_live_action_inner(
+            session, game_id, user_id, action, table_token, t0, started_iso, overlap
+        )
+
+
+def _apply_live_action_inner(
+    session: Session,
+    game_id: int,
+    user_id: int,
+    action: dict,
+    table_token: str | None,
+    t0: float,
+    started_iso: str,
+    overlap: int,
+) -> GameLiveState:
+    """The body of :func:`apply_live_action`, unchanged except for the #155 record
+    emitted after commit. Split out only so the in-flight counter wraps every exit
+    path (including the raises) without indenting the whole function."""
     game = get_viewable_game(session, game_id, user_id)
     if game is None:
         raise LookupError("Game not found or not viewable")
     live = game.live_state
     if live is None:
         raise LookupError("No live state for this game")
+    version_read = live.version
 
     atype = (action or {}).get("type")
     if atype not in _MUTATING_TYPES:
@@ -1433,5 +1574,8 @@ def apply_live_action(
     live.version += 1
     live.updated_at = utc_now()
     session.commit()
+    _record_live_action(
+        game_id, user_id, atype, version_read, live.version, started_iso, t0, overlap
+    )
     _publish(live)
     return live

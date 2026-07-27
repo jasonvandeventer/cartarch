@@ -1,5 +1,13 @@
 [
   {
+    "version": "4.12.7",
+    "date": "2026-07-26",
+    "added": [],
+    "refined": [],
+    "resolved": [],
+    "archivist_note": "Diagnostic plumbing, invisible in the app. When several people tap their phones at the same moment during a live game, it is possible in principle for one tap's effect to be quietly overwritten by another — we have circumstantial evidence that this has happened and no way to prove it. This release makes each live-game action write a line to the server log recording when it ran, how long it took, how many other actions were running alongside it, and the version of the game state it read versus the one it wrote. That last pair is the tell: if two actions read the same version, the second one overwrote the first. Nothing about the game changes; the app does not lock, retry, or behave differently in any way. It just writes down enough to answer the question the next time a live game is played."
+  },
+  {
     "version": "4.12.6",
     "date": "2026-07-26",
     "added": [],
