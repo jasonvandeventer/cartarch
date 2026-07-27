@@ -175,10 +175,13 @@
           <strong>{{ p.total }}</strong> total · {{ p.turn_count }} turns · {{ p.avg_turn }} avg/turn
         </p>
         {% if p.turns %}
+          {# Deliberately DECORATIVE (aria-hidden): one bar per player-turn runs to
+             ~40 on a long game, and announcing each would bury the page. The same
+             information is in the Pace summary line above and the life chart. #}
           <div class="ga-pace-strip" aria-hidden="true">
             {% for t in p.turns %}
-              <span class="ga-pace-bar" style="height:{{ [t.pct, 6] | max }}%"
-                    title="Turn {{ t.turn }}: {{ t.label }}"></span>
+              <span class="ga-pace-bar" style="height:{{ [t.pct, 6] | max }}%;background:{{ t.color }}"
+                    title="Round {{ t.round }} · {{ t.player }} — {{ t.label }}"></span>
             {% endfor %}
           </div>
         {% endif %}

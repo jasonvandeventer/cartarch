@@ -25,6 +25,9 @@ from app.models import Game, GameEvent
 
 # Distinct, theme-agnostic seat colors (max 6 seats in a Commander pod).
 _PALETTE = ["#3fb950", "#58a6ff", "#f85149", "#d29922", "#bc8cff", "#39c5cf"]
+# Pace bar for a segment whose owner couldn't be derived (seatless game, or a
+# stamped seat that has since been deleted) — neutral, never a wrong player's color.
+_UNKNOWN_SEAT_COLOR = "#8b949e"
 
 # Life chart SVG geometry (viewBox units; rendered responsive via width:100%).
 _W, _H, _PAD = 340, 140, 10
@@ -32,6 +35,52 @@ _W, _H, _PAD = 340, 140, 10
 
 def _seat_label(seat) -> str:
     return seat.player_name or f"Seat {seat.seat_number}"
+
+
+def _segment_owners(game: Game, events: list[GameEvent], init: dict) -> list[str]:
+    """Seat-id STRING owning each pace segment, in order — ``[starting seat,
+    owner after turn event 0, owner after turn event 1, ...]``.
+
+    A ``turn`` event carries ``seat_id IS NULL`` by design (``_event_seat_id``),
+    and ``actor_user_id`` is neither present on pre-#112 games nor a reliable
+    owner signal (whoever tapped, not whose turn it was). So the owner is
+    DERIVED: read the ``active_seat_id`` the live service now stamps into the
+    turn payload, and fall back to replaying the same rotation for games that
+    predate the stamp.
+
+    Two things the replay must get right or it desyncs permanently:
+      * rotation follows ``turn_rotation`` (CLOCKWISE grid_position order), NOT
+        seat_number order — they differ in real pods. Colors stay on seat_number
+        order, so the life chart is unaffected.
+      * elimination state is replayed from the event stream (manual + ``auto``
+        eliminate events, including revives), because an eliminated seat is
+        skipped and a wrong set shifts every later segment.
+    """
+    # Imported here, not at module scope: live_game_service imports game_service,
+    # and analytics is a leaf that only needs the two rotation helpers.
+    from app.live_game_service import next_seat_in_rotation, turn_rotation
+
+    rot = turn_rotation(game)
+    eliminated = {str(k): bool(v) for k, v in (init.get("eliminated") or {}).items()}
+    current = rot[0] if rot else None
+    owners = [str(current)]
+    for e in events:
+        if e.action_type == "eliminate":
+            p = json.loads(e.payload)
+            # Manual eliminates name the seat in the payload, auto ones only in
+            # the column — the column is set for both, so prefer it.
+            sid = e.seat_id if e.seat_id is not None else p.get("seat_id")
+            if sid is not None:
+                eliminated[str(sid)] = bool(p.get("eliminated"))
+        elif e.action_type == "turn":
+            stamped = json.loads(e.payload).get("active_seat_id")
+            if stamped is not None:
+                current = int(stamped)
+            else:
+                nxt, _ = next_seat_in_rotation(rot, current, eliminated)
+                current = nxt if nxt is not None else current
+            owners.append(str(current))
+    return owners
 
 
 def _fmt_duration(seconds: float) -> str:
@@ -172,10 +221,22 @@ def build_game_analytics(session: Session, game_id: int) -> dict | None:
     # ── 4. Pace: turn durations from turn-advance timestamps + total wall clock ─
     turn_events = [e for e in events if e.action_type == "turn"]
     turn_marks = [started] + turn_events  # started opens turn 1
+    seg_owners = _segment_owners(game, events, init)
     turns = []
     for i in range(len(turn_marks) - 1):
         secs = (turn_marks[i + 1].created_at - turn_marks[i].created_at).total_seconds()
-        turns.append({"turn": i + 1, "seconds": secs, "label": _fmt_duration(secs)})
+        sid = seg_owners[i] if i < len(seg_owners) else None
+        turns.append(
+            {
+                "turn": i + 1,  # segment index (NOT the round — see "round" below)
+                "round": turn_marks[i].turn,  # the round this segment was played in
+                "seconds": secs,
+                "label": _fmt_duration(secs),
+                "sid": sid,
+                "player": labels.get(sid, "—"),
+                "color": colors.get(sid, _UNKNOWN_SEAT_COLOR),
+            }
+        )
     last = finalized or (events[-1] if events else started)
     total_seconds = (last.created_at - started.created_at).total_seconds()
     longest = max((t["seconds"] for t in turns), default=0) or 1

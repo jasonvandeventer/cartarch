@@ -1,5 +1,15 @@
 [
   {
+    "version": "4.12.4",
+    "date": "2026-07-26",
+    "added": [],
+    "refined": [
+      "On a finished game's summary, each bar in the Pace strip is now filled with that player's color from the life chart, and hovering a bar names the player and the round it was played in — so you can see at a glance whose turns were the long ones. This works for games you play from now on and for every game already recorded."
+    ],
+    "resolved": [],
+    "archivist_note": "The Pace strip knew how long each turn took but not whose turn it was — turn events were never recorded against a seat. Rather than leave older games grey, the summary now reconstructs the seating rotation from the game's own event history, skipping players as they were eliminated and bringing them back if they were revived. A caution worth stating plainly: the strip reflects what the app was told during the game. If a turn was tapped twice by mistake, that mistake is in the picture too."
+  },
+  {
     "version": "4.12.3",
     "date": "2026-07-26",
     "added": [],

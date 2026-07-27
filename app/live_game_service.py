@@ -386,6 +386,36 @@ def _clockwise_seats(game: Game) -> list[GameSeat]:
     return sorted(by_number, key=lambda s: _clockwise_index(s.grid_position))
 
 
+def turn_rotation(game: Game) -> list[int]:
+    """Seat ids in turn order, BEGINNING at the game's starting seat. Shared with
+    ``game_analytics_service``, which replays the same rotation to attribute each
+    pace segment to a player — the two must never derive rotation separately."""
+    seats = _clockwise_seats(game)
+    order = [s.id for s in seats]
+    first_id = _first_seat_id(game, seats)
+    start = order.index(first_id) if first_id in order else 0
+    return order[start:] + order[:start]
+
+
+def next_seat_in_rotation(
+    rot: list[int], current: int | None, eliminated: dict
+) -> tuple[int | None, bool]:
+    """Next non-eliminated seat after ``current`` in ``rot`` (a
+    :func:`turn_rotation` list), plus whether the rotation wrapped past the first
+    seat (→ a new round). ``(None, False)`` when every seat is eliminated —
+    callers leave the current seat in place. ``eliminated`` is the state blob's
+    seat-id-STRING-keyed map."""
+    if not rot:
+        return None, False
+    i = rot.index(current) if current in rot else 0
+    for step in range(1, len(rot) + 1):
+        j = (i + step) % len(rot)
+        cand = rot[j]
+        if not eliminated.get(str(cand), False):
+            return cand, j <= i
+    return None, False
+
+
 def state_payload(live: GameLiveState) -> dict:
     """The wire shape for both the action response and every SSE event:
     ``{"version": N, "state": {...}}``. Full state (not a delta) so a
@@ -697,7 +727,13 @@ def _apply_mutation(
             causes.pop(sid, None)
 
     elif atype == "turn":
-        _advance_turn(session, state, game, has_table)
+        # Stamp the seat STARTING the next turn into the event payload, so the
+        # pace strip can attribute each segment to a player. The `seat_id` COLUMN
+        # stays NULL for turn events (documented invariant, consumed elsewhere) —
+        # this rides in the payload, which needs no migration. Reading it back:
+        # segment 1 belongs to _first_seat_id, and segment i+1 to the
+        # active_seat_id carried on turn event i.
+        return {"active_seat_id": _advance_turn(session, state, game, has_table)}
 
     return {}
 
@@ -1129,11 +1165,12 @@ def _run_combat(
     }
 
 
-def _advance_turn(session: Session, state: dict, game: Game, has_table: bool) -> None:
+def _advance_turn(session: Session, state: dict, game: Game, has_table: bool) -> int | None:
     """Advance ``currentTurnId`` to the next non-eliminated seat in physical
     clockwise order; increment ``turn`` when the rotation wraps past the first
     seat. In Momir, the seat the turn passes TO then begins its turn (untap +
-    draw), which can deck it out."""
+    draw), which can deck it out. Returns the seat STARTING the next turn (the
+    new ``currentTurnId``), which the caller stamps into the event payload."""
     # Combat ends with the turn: drop any attackers still awaiting a block
     # decision (Momir-only key — absent in Commander state, left untouched). Also
     # clear damage marked this turn (#111 tokens carry `damage`; setdefault-safe).
@@ -1143,28 +1180,20 @@ def _advance_turn(session: Session, state: dict, game: Game, has_table: bool) ->
         for tok in toks:
             if "damage" in tok:
                 tok["damage"] = 0
-    seats = _clockwise_seats(game)
-    if not seats:
-        return
-    order = [s.id for s in seats]
-    first_id = _first_seat_id(game, seats)
-    start = order.index(first_id) if first_id in order else 0
-    rot = order[start:] + order[:start]  # rotation beginning at the first seat
-
-    current = state.get("currentTurnId")
-    i = rot.index(current) if current in rot else 0
-    elim = state.get("eliminated", {})
-    for step in range(1, len(rot) + 1):
-        j = (i + step) % len(rot)
-        cand = rot[j]
-        if not elim.get(str(cand), False):
-            state["currentTurnId"] = cand
-            if j <= i:  # wrapped back to/through the first seat → new round
-                state["turn"] = int(state.get("turn", 1)) + 1
-            if _is_momir(game):
-                _begin_momir_turn(session, game.id, cand, state, has_table)
-            return
-    # everyone eliminated → leave currentTurnId as-is.
+    rot = turn_rotation(game)  # begins at the first seat
+    if not rot:
+        return None
+    cand, wrapped = next_seat_in_rotation(
+        rot, state.get("currentTurnId"), state.get("eliminated", {})
+    )
+    if cand is None:
+        return state.get("currentTurnId")  # everyone eliminated → leave as-is
+    state["currentTurnId"] = cand
+    if wrapped:  # wrapped back to/through the first seat → new round
+        state["turn"] = int(state.get("turn", 1)) + 1
+    if _is_momir(game):
+        _begin_momir_turn(session, game.id, cand, state, has_table)
+    return cand
 
 
 def _begin_momir_turn(
