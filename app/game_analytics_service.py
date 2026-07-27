@@ -263,12 +263,25 @@ def build_game_analytics(session: Session, game_id: int) -> dict | None:
         "round_ticks": [{"x": round(_x(t["index"]), 1), "round": t["round"]} for t in round_ticks],
     }
 
-    # ── 2. Elimination timeline (from the final blob) ─────────────────────────
+    # ── 2. Elimination timeline — ORDER from the event stream ─────────────────
+    # Membership still comes from the final blob, but the ORDER does not.
+    # `eliminatedAtTurn` is round-grained, so two seats out in the same round tie and
+    # were broken by seat id — game 67 reported Phil before Alex although Alex died
+    # first (events 1602 vs 1618). `_final_elimination_events` orders by the event
+    # that actually removed each seat, and handles revives (the LAST elimination that
+    # stuck), matching #151's truncation rule and #158's first-out statistic.
+    #
+    # Membership is equivalent by construction: every write to the blob's `eliminated`
+    # map is accompanied by an eliminate event (`_apply_mutation`, `_auto_eliminate`,
+    # `_deck_out` all append one), verified 0 blob-only eliminations across prod. The
+    # second clause is belt-and-braces so an unforeseen write path cannot make a seat
+    # silently vanish from the timeline — it appends by round rather than dropping.
     elim = final.get("eliminated", {})
     at_turn = final.get("eliminatedAtTurn", {})
     causes = final.get("eliminationCause", {})
-    out_ids = sorted(
-        (sid for sid in seat_ids if elim.get(sid)),
+    out_ids = [sid for sid, _e in _final_elimination_events(events) if sid in labels]
+    out_ids += sorted(
+        (sid for sid in seat_ids if elim.get(sid) and sid not in out_ids),
         key=lambda s: (int(at_turn.get(s, 0)), int(s)),
     )
     timeline = []

@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import itertools
 import json
+import re
 from datetime import timedelta
 
 from app import playgroup_service
@@ -59,6 +60,7 @@ class _Builder:
             db.flush()
             self.seats[label] = s
         self.minutes = minutes
+        self.eliminated: dict[str, bool] = {}
         self._ev(
             "live_started",
             None,
@@ -94,19 +96,31 @@ class _Builder:
     def out(self, label, secs=1):
         s = self.seats[label]
         self._ev("eliminate", s, json.dumps({"seat_id": s.id, "eliminated": True}), secs=secs)
+        self.eliminated[str(s.id)] = True
         return self
 
     def revive(self, label, secs=1):
         s = self.seats[label]
         self._ev("eliminate", s, json.dumps({"seat_id": s.id, "eliminated": False}), secs=secs)
+        self.eliminated.pop(str(s.id), None)
         return self
 
     def finish(self, total_minutes=None):
         self.n = (total_minutes or self.minutes) * 60
+        # The finalized blob mirrors what the service writes: an `eliminated` map and a
+        # round-grained `eliminatedAtTurn`. Every event here is turn 1, so all seats TIE
+        # on that key — which is exactly the case where blob ordering falls back to seat
+        # id and gets the order wrong.
         self._ev(
             "finalized",
             None,
-            json.dumps({"lives": {str(s.id): 0 for s in self.seats.values()}}),
+            json.dumps(
+                {
+                    "lives": {str(s.id): 0 for s in self.seats.values()},
+                    "eliminated": dict(self.eliminated),
+                    "eliminatedAtTurn": dict.fromkeys(self.eliminated, 1),
+                }
+            ),
             secs=0,
         )
         self.db.flush()
@@ -286,3 +300,57 @@ def test_the_empty_state_renders_rather_than_zeros(db, client, user):
     r = client.get("/games/analytics")
     assert r.status_code == 200
     assert "No recorded live games yet" in r.text
+
+
+# ── the per-game timeline now shares the same ordering authority ─────────────
+
+
+def test_same_round_eliminations_are_ordered_by_EVENT_not_seat_id(db):
+    """`game_summary.html`'s ELIMINATION ORDER block used to read the finalized blob,
+    whose `eliminatedAtTurn` is round-grained — so two seats out in one round tied and
+    broke by seat id. Live case: game 67 reported Phil before Alex although Alex died
+    first. Seats here are created in id order Ann < Bo, and Bo dies FIRST, so a seat-id
+    tiebreak would report Ann first."""
+    from app.game_analytics_service import build_game_analytics
+
+    owner, b = _user(db, "Ann"), _user(db, "Bo")
+    g = _Builder(db, owner, [("Ann", owner), ("Bo", b)])
+    g.out("Bo").out("Ann").finish()
+
+    tl = build_game_analytics(db, g.game.id)["timeline"]
+    assert [t["label"] for t in tl] == ["Bo", "Ann"]
+    assert [t["remaining"] for t in tl] == [1, 0]
+
+
+def test_the_timeline_still_excludes_a_revived_seat(db):
+    from app.game_analytics_service import build_game_analytics
+
+    owner, b = _user(db, "Ann"), _user(db, "Bo")
+    g = _Builder(db, owner, [("Ann", owner), ("Bo", b)])
+    g.out("Bo").revive("Bo").out("Ann").finish()
+
+    tl = build_game_analytics(db, g.game.id)["timeline"]
+    assert [t["label"] for t in tl] == ["Ann"]  # Bo came back; not in the order
+
+
+def test_the_analytics_link_is_in_the_sidebar_and_marks_itself_active(db, client, user):
+    """Both nav rows must never highlight at once: `/games` uses a startswith match, so
+    it has to exclude the analytics path explicitly."""
+    _Builder(db, user, [("Me", user)]).finish()
+    db.commit()
+
+    def nav_classes(html):
+        """{href: class} for the two sidebar rows under Play."""
+        out = {}
+        for href, cls in re.findall(
+            r'<a href="(/games(?:/analytics)?)"\s+class="(nav-item[^"]*)"', html
+        ):
+            out[href] = cls
+        return out
+
+    on_list = nav_classes(client.get("/games").text)
+    assert "active" in on_list["/games"] and "active" not in on_list["/games/analytics"]
+
+    on_analytics = nav_classes(client.get("/games/analytics").text)
+    assert "active" in on_analytics["/games/analytics"]
+    assert "active" not in on_analytics["/games"]

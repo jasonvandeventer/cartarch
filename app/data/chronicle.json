@@ -1,5 +1,17 @@
 [
   {
+    "version": "4.12.13",
+    "date": "2026-07-27",
+    "added": [
+      "Analytics is now a sidebar entry under Games, rather than only a button on the Games page."
+    ],
+    "refined": [],
+    "resolved": [
+      "On a finished game's summary, the Elimination order list could show two players who went out in the same round in the wrong order. It was sorting by round number and then, for ties, by an internal seat number rather than by when each player actually went out. It now follows the recorded order of events, so a same-round pair reads correctly."
+    ],
+    "archivist_note": "Found while building the cross-game analytics page, which needed a first-out statistic and so needed the elimination order to be exactly right. The per-game list had the same flaw and had been showing it in at least one real game — the two players who died in the final round were listed the wrong way round. Both surfaces now share one definition of when a player went out, which also handles the case where somebody is eliminated, brought back, and then eliminated again: the order follows the elimination that stuck."
+  },
+  {
     "version": "4.12.12",
     "date": "2026-07-27",
     "added": [

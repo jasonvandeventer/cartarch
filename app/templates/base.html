@@ -250,9 +250,17 @@
                 {% endif %}
               </a>
               <a href="/games"
-                 class="nav-item{% if path.startswith('/games') %} active{% endif %}">
+                 class="nav-item{% if path.startswith('/games') and path != '/games/analytics' %} active{% endif %}">
                 <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="14.5 17.5 3 6 3 3 6 3 17.5 14.5"/><line x1="13" x2="19" y1="19" y2="13"/><line x1="16" x2="20" y1="16" y2="20"/><line x1="19" x2="21" y1="21" y2="19"/><polyline points="14.5 6.5 18 3 21 3 21 6 17.5 9.5"/><line x1="5" x2="9" y1="14" y2="18"/><line x1="7" x2="4" y1="17" y2="20"/><line x1="3" x2="5" y1="19" y2="21"/></svg>
                 <span>Games</span>
+              </a>
+              {# #158 — cross-game pod dynamics + pace. Sits under Games because it
+                 reads the same records; its own active state so both rows are never
+                 highlighted at once. #}
+              <a href="/games/analytics"
+                 class="nav-item{% if path == '/games/analytics' %} active{% endif %}">
+                <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" x2="18" y1="20" y2="10"/><line x1="12" x2="12" y1="20" y2="4"/><line x1="6" x2="6" y1="20" y2="14"/></svg>
+                <span>Analytics</span>
               </a>
               <a href="/companion"
                  class="nav-item{% if path == '/companion' %} active{% endif %}">
@@ -625,6 +633,7 @@
                position on mobile as on desktop sidebar. #}
             <a href="/trades">Trades{% if trade_pending_count and trade_pending_count > 0 %} ({{ trade_pending_count }}){% endif %}</a>
             <a href="/games">Games</a>
+            <a href="/games/analytics">Analytics</a>
             <a href="/companion">Live Games</a>
             <a href="/audit">Audit</a>
             {% if current_user.is_admin %}<a href="/admin">Admin</a>{% endif %}
