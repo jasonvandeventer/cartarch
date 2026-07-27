@@ -1,5 +1,13 @@
 [
   {
+    "version": "4.12.6",
+    "date": "2026-07-26",
+    "added": [],
+    "refined": [],
+    "resolved": [],
+    "archivist_note": "Groundwork, with nothing to see on the site. A player noticed that the life totals in a finished game's standings did not match the ones in its analytics chart, and the honest answer turned out to be that the app keeps three different records of what a player finished on and they do not always agree. This release adds an internal check that reconciles all three, game by game and seat by seat, so the question can be asked repeatedly instead of re-derived by hand. It changes nothing you can see and corrects no existing game — deciding which of the three numbers is the true one is a separate conversation, now written down as its own piece of work."
+  },
+  {
     "version": "4.12.5",
     "date": "2026-07-26",
     "added": [],

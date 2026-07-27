@@ -37,6 +37,30 @@ def _seat_label(seat) -> str:
     return seat.player_name or f"Seat {seat.seat_number}"
 
 
+def life_delta_for_event(event: GameEvent) -> tuple[str, int] | None:
+    """``(seat_id_string, signed life change)`` for a life-affecting event, else
+    ``None``.
+
+    THE one definition of how a `game_events` row moves a life total. The chart
+    replay and the #153 consistency check both go through it, so a checker can
+    never report a false divergence by re-deriving the rule slightly differently.
+
+    Only ``life`` and ``cmd`` qualify in a Commander game — see the
+    ``state["lives"]`` writer table in #153; the two Momir writers
+    (``momir_damage`` seat targets, ``_run_combat``) mutate life WITHOUT a
+    reconstructable per-event delta in the payload, which is why
+    :func:`check_life_consistency` refuses to judge a Momir game."""
+    if event.action_type == "life":
+        p = json.loads(event.payload)
+        return str(p.get("seat_id")), int(p.get("delta", 0))
+    if event.action_type == "cmd":
+        # The coupled, post-floor life change the service already computed.
+        # NEVER re-derive the floor rule here.
+        p = json.loads(event.payload)
+        return str(p.get("receiver_seat_id")), -int(p.get("actual_delta", 0))
+    return None
+
+
 def _segment_owners(game: Game, events: list[GameEvent], init: dict) -> list[str]:
     """Seat-id STRING owning each pace segment, in order — ``[starting seat,
     owner after turn event 0, owner after turn event 1, ...]``.
@@ -125,18 +149,13 @@ def build_game_analytics(session: Session, game_id: int) -> dict | None:
     cur = dict(lives0)
     changed_at: dict[str, dict[int, int]] = {sid: {} for sid in seat_ids}
     for e in events:
-        if e.action_type == "life":
-            p = json.loads(e.payload)
-            sid = str(p.get("seat_id"))
-            if sid in cur:
-                cur[sid] += int(p.get("delta", 0))
-                changed_at[sid][e.turn] = cur[sid]
-        elif e.action_type == "cmd":
-            p = json.loads(e.payload)
-            sid = str(p.get("receiver_seat_id"))
-            if sid in cur:
-                cur[sid] -= int(p.get("actual_delta", 0))
-                changed_at[sid][e.turn] = cur[sid]
+        hit = life_delta_for_event(e)
+        if hit is None:
+            continue
+        sid, delta = hit
+        if sid in cur:
+            cur[sid] += delta
+            changed_at[sid][e.turn] = cur[sid]
 
     # Carry each seat's life forward across turns with no change of its own.
     series_values: list[list[int]] = []
@@ -256,3 +275,97 @@ def build_game_analytics(session: Session, game_id: int) -> dict | None:
         "cmd_matrix": cmd_matrix,
         "pace": pace,
     }
+
+
+# ── #153 — life-total consistency check ───────────────────────────────────────
+# Diagnostic only. Reads nothing but `game_events` + `game_seats`, writes nothing,
+# and is NOT wired into any page. Exists so the divergence in #153 is measurable
+# repeatedly rather than re-derived by hand each time someone looks.
+#
+# THREE artifacts claim to know a seat's final life, with three different
+# provenances (#153):
+#   blob       — the `finalized` bookend payload. SERVER state at end_game time.
+#   replay     — `live_started` baseline + every life/cmd event delta. SERVER,
+#                reconstructed. Should equal `blob`; in 10 known seats it does not.
+#   final_life — `game_seats.final_life`. CLIENT-submitted: the End-game modal
+#                posts `final_life_{seat_id}`, prefilled at modal-open from the
+#                browser's in-memory state and hand-editable before submit. A gap
+#                here needs NO server bug to explain, so it is reported separately
+#                and must not be conflated with replay-vs-blob.
+
+
+def check_life_consistency(session: Session, game_id: int) -> dict | None:
+    """Per-seat reconciliation of the three life artifacts for one game.
+
+    Returns ``None`` when the game has no ``live_started`` event (a pre-v4.3 /
+    localStorage game — nothing to replay), or when it is a Momir game, whose
+    ``momir_damage`` / combat life changes carry no reconstructable per-event
+    delta (see :func:`life_delta_for_event`) and would produce false divergences.
+    """
+    game = session.get(Game, game_id)
+    if game is None:
+        return None
+    if (game.format or "").casefold() == "momir":
+        return None
+    events = (
+        session.query(GameEvent)
+        .filter(GameEvent.game_id == game_id)
+        .order_by(GameEvent.created_at.asc(), GameEvent.id.asc())
+        .all()
+    )
+    started = next((e for e in events if e.action_type == "live_started"), None)
+    if started is None:
+        return None
+    finalized = next((e for e in events if e.action_type == "finalized"), None)
+
+    baseline = json.loads(started.payload).get("lives", {})
+    blob = json.loads(finalized.payload).get("lives", {}) if finalized else None
+
+    replay = {str(k): int(v) for k, v in baseline.items()}
+    for e in events:
+        hit = life_delta_for_event(e)
+        if hit is None:
+            continue
+        sid, delta = hit
+        if sid in replay:
+            replay[sid] += delta
+
+    seats = []
+    for seat in sorted(game.seats, key=lambda s: s.seat_number):
+        sid = str(seat.id)
+        b = int(blob[sid]) if blob is not None and sid in blob else None
+        r = replay.get(sid)
+        f = seat.final_life
+        seats.append(
+            {
+                "seat_id": seat.id,
+                "label": _seat_label(seat),
+                "baseline": baseline.get(sid),
+                "replay": r,
+                "blob": b,
+                "final_life": f,
+                # replay - blob: SERVER-side divergence. Non-zero is the #153 defect.
+                "replay_vs_blob": None if (b is None or r is None) else r - b,
+                # final_life - blob: the CLIENT-form gap. Non-zero needs no server bug.
+                "final_vs_blob": None if (b is None or f is None) else f - b,
+            }
+        )
+    return {
+        "game_id": game.id,
+        "format": game.format,
+        "status": game.status,
+        "has_finalized": finalized is not None,
+        "seats": seats,
+        "replay_diverged": [s for s in seats if s["replay_vs_blob"] not in (None, 0)],
+        "final_diverged": [s for s in seats if s["final_vs_blob"] not in (None, 0)],
+    }
+
+
+def scan_life_consistency(session: Session) -> list[dict]:
+    """:func:`check_life_consistency` over every game that has events, newest first.
+    Games it cannot judge (no ``live_started``, or Momir) are skipped."""
+    game_ids = [
+        gid
+        for (gid,) in session.query(GameEvent.game_id).distinct().order_by(GameEvent.game_id.desc())
+    ]
+    return [r for r in (check_life_consistency(session, gid) for gid in game_ids) if r is not None]
