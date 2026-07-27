@@ -1,5 +1,17 @@
 [
   {
+    "version": "4.12.14",
+    "date": "2026-07-27",
+    "added": [
+      "Before your first sorter rule takes effect, the app now shows exactly which of your boxes and binders the sorter is allowed to take cards out of — named, with card counts — and asks you to confirm. A location set to Manual is never used as a source, so setting one to Manual before adding the rule keeps it exactly as you filed it."
+    ],
+    "refined": [],
+    "resolved": [
+      "A storage location opened in an order that meant nothing. The card list was sorted by slot number, but only drawers have slots — in a box or binder every card's slot is empty, so a few hundred cards came out in effectively arbitrary order. Boxes and binders now open alphabetically by name; drawers still open by slot, and choosing a sort yourself always wins."
+    ],
+    "archivist_note": "This began as a question about whether the automatic sorter was still restricted to a single account. It is not — that restriction was lifted some time ago, and the sorter has been open to anyone who sets one up ever since. What we had not noticed is that nobody ever has: not one sorter rule exists across the whole user base. That turned out to matter, because a new location is created as sorter-managed by default, and switching the sorter on hands it every managed location at once. The first person to try the feature would have watched a bulk box of several thousand cards emptied and re-filed, having been told nothing beforehand. Nobody has hit this, and the warning now stands in front of it. The deeper fix is the wording: \"managed\" tells you what the sorter calls a box, not what it will do to your cards, and that is the next thing to change."
+  },
+  {
     "version": "4.12.13",
     "date": "2026-07-27",
     "added": [
