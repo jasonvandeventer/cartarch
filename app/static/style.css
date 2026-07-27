@@ -529,6 +529,14 @@ body::after {
   display: flex;
   flex-direction: column;
   gap: 1.1rem;
+  /* LOAD-BEARING. The bare `nav { display:flex; flex-wrap: wrap }` rule
+     further down (a v3.x horizontal site-header leftover) matches this
+     element; .sidebar-nav overrides display/direction/gap but NOT wrap.
+     A *wrapping* column flex container with a constrained height puts the
+     overflow in a SECOND COLUMN to the right — so .nav-donate rendered
+     beside the nav groups, past the 236px sidebar edge, and was clipped
+     away entirely by .app-sidebar { overflow: hidden }. */
+  flex-wrap: nowrap;
 }
 .nav-group {
   display: flex;
@@ -671,11 +679,18 @@ body::after {
     overflow: hidden;
   }
   .sidebar-nav {
-    /* Fills the sidebar so its flex children (the scroll wrapper + the
-       Donate footer) can lay out against a known height. The base
-       `display: flex; flex-direction: column; gap: 1.1rem` rule above
-       still applies; this only adds the height. */
-    height: 100%;
+    /* Takes the space REMAINING in the sidebar, so its flex children (the
+       scroll wrapper + the Donate footer) lay out against a known height.
+       Was `height: 100%`, which resolved against .app-sidebar's FULL
+       content box and so ignored the sibling .sidebar-toggle (~34px + its
+       0.5rem margin) and the parent's 1.25rem gap sharing that box — the
+       nav declared ~52px more than existed and the surplus was clipped.
+       `min-height: 0` is LOAD-BEARING for the same reason it is on
+       .sidebar-nav-scroll below: without it the automatic minimum size
+       stops a flex child shrinking under its content, so the overflow
+       comes back. */
+    flex: 1 1 auto;
+    min-height: 0;
   }
   .sidebar-nav-scroll {
     /* The flex-growing middle region. `min-height: 0` is LOAD-BEARING —

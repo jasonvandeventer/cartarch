@@ -1,5 +1,15 @@
 [
   {
+    "version": "4.12.5",
+    "date": "2026-07-26",
+    "added": [],
+    "refined": [],
+    "resolved": [
+      "The Donate link at the bottom of the desktop sidebar could disappear, taking the last nav row with it, when the browser window was short. It now stays pinned and fully visible at the bottom of the sidebar at any window height, with the nav groups above it scrolling on their own."
+    ],
+    "archivist_note": "Reported as the Donate button going wonky on a short window, and it turned out to be two faults stacked. The sidebar's nav was told to be as tall as the whole sidebar, forgetting that the Collapse button and a gap already sit in that same space — so it always ran about fifty pixels long. And an old style rule left over from a navigation bar we retired years ago was quietly telling that column it was allowed to wrap, which sent the overflow sideways out past the edge of the sidebar rather than down. Both are fixed, and the layout was measured in a real browser at five window heights across all three sidebar states rather than eyeballed."
+  },
+  {
     "version": "4.12.4",
     "date": "2026-07-26",
     "added": [],
