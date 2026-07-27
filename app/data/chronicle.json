@@ -1,5 +1,17 @@
 [
   {
+    "version": "4.12.10",
+    "date": "2026-07-26",
+    "added": [
+      "Playgroups now keep a record. Each playgroup's page shows games played, wins, losses and win rate for every member, counted over the games linked to that playgroup. Players are grouped by account rather than by the name typed on the seat, so someone who has played under two different names is one row, not two. Everyone who played without an account is folded into a single Guests row, and a tie for first counts as a win for everyone who tied."
+    ],
+    "refined": [
+      "When you start a new game or log one by hand and you belong to exactly one playgroup, that playgroup is now pre-selected instead of the blank option. You can still choose not to share, and nothing is guessed if you belong to several."
+    ],
+    "resolved": [],
+    "archivist_note": "Two halves, and the second one is why the first will stay honest. The record can only count games that were linked to the playgroup, and linking was an optional dropdown that defaulted to blank — so the way to end up missing from your own leaderboard was simply to forget. Pre-selecting the only playgroup you belong to removes that failure mode without ever guessing on your behalf. The page says plainly that unlinked games are not counted, because a leaderboard that quietly omits things is worse than one that admits what it cannot see."
+  },
+  {
     "version": "4.12.9",
     "date": "2026-07-26",
     "added": [],

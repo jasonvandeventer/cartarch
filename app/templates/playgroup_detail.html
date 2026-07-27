@@ -124,6 +124,51 @@
     </div>
   </section>
 
+  {# ── Record (#152) — win-loss over games LINKED to this playgroup ────────── #}
+  <section class="panel">
+    <h3 class="panel-title">Record</h3>
+    {% if record %}
+      <p class="muted playgroup-record-note">
+        Games linked to this playgroup. Each member links their own games, so a game
+        nobody linked is not counted here.
+      </p>
+      <div class="table-wrap">
+        <table class="stacking-table playgroup-record-table">
+          <thead>
+            <tr>
+              <th>Player</th>
+              <th>Games</th>
+              <th>W</th>
+              <th>L</th>
+              <th>Win rate</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in record %}
+              <tr>
+                <td data-label="Player">
+                  {{ r.label }}
+                  {% if r.user_id == current_user.id %}<span class="muted">(you)</span>{% endif %}
+                </td>
+                {# Games played is not optional: a win rate alone hides that 10 wins
+                   from 19 games and 2 from 22 are different records. #}
+                <td data-label="Games">{{ r.played }}</td>
+                <td data-label="W">{{ r.wins }}</td>
+                <td data-label="L">{{ r.losses }}</td>
+                <td data-label="Win rate">{{ "%.0f%%" | format(r.win_rate * 100) }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p class="muted">
+        No games are linked to this playgroup yet. Link one from the game's page, or pick
+        this playgroup when you start a new game.
+      </p>
+    {% endif %}
+  </section>
+
   {# ── Shares (v3.29.1) — Showcases members have shared with this playgroup ── #}
   <section class="panel">
     <h3 class="panel-title">Shared collections</h3>

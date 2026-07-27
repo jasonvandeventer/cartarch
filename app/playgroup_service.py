@@ -24,11 +24,23 @@ from __future__ import annotations
 
 import secrets
 
-from sqlalchemy import func, select
+from sqlalchemy import case, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.models import Game, Playgroup, PlaygroupMember, Share, Trade, User, WishlistShare
+from app.models import (
+    Game,
+    GameSeat,
+    Playgroup,
+    PlaygroupMember,
+    Share,
+    Trade,
+    User,
+    WishlistShare,
+)
+
+# Label for the single row that aggregates every unattributed seat (#152).
+GUESTS_LABEL = "Guests"
 
 # Service-layer canonical role enum (the v3.27.2 / v3.27.3 pattern, no
 # DB CHECK constraint). v3.29.0 ships two roles; the enum can widen
@@ -271,7 +283,72 @@ def get_playgroup_detail(session: Session, playgroup_id: int, viewer_user_id: in
         "playgroup": playgroup,
         "viewer_role": viewer_membership.role,
         "members": [{"member": pm, "user": u} for pm, u in members],
+        "record": playgroup_record(session, playgroup_id),
     }
+
+
+def playgroup_record(session: Session, playgroup_id: int) -> list[dict]:
+    """Win-loss record per PLAYER over the games linked to this playgroup (#152).
+
+    Returns ``[{"user_id", "label", "played", "wins", "losses", "win_rate"}, ...]``
+    sorted by wins descending, then win rate — highest first.
+
+    Three rules, decided in #152 and not to be re-litigated:
+
+    * **Group by ``GameSeat.user_id``, never ``player_name``.** ``player_name`` is a
+      per-seat free-text snapshot and the live data really does split one person across
+      several spellings (``Alex`` / ``SaintWacko`` is one account). Name grouping
+      produces a wrong leaderboard on first render.
+    * **Every null-``user_id`` seat collapses into ONE ``Guests`` row**, not one row per
+      placeholder name. (If distinct named guests ever appear it stops being a
+      per-player row — noted in #152, not pre-solved here.)
+    * **``placement == 1`` is a win for EVERY seat holding it.** #114 permits duplicate
+      placements for simultaneous eliminations, so a tie for first wins for all tied
+      seats; any other placement is a loss, including a tie below first.
+
+    Scope is games carrying this ``playgroup_id`` — deliberately NOT every game among
+    the members, or an unlinked private game would surface on a shared page.
+
+    Only seats with a **recorded placement** count. A linked game still in progress has
+    no result yet, and counting it would break the reconciliation this record promises
+    (``wins + losses == played``) by adding a game that is neither.
+    """
+    rows = (
+        session.query(
+            GameSeat.user_id,
+            User.display_name,
+            User.username,
+            func.count().label("played"),
+            func.sum(case((GameSeat.placement == 1, 1), else_=0)).label("wins"),
+        )
+        .join(Game, Game.id == GameSeat.game_id)
+        .outerjoin(User, User.id == GameSeat.user_id)
+        .filter(Game.playgroup_id == playgroup_id, GameSeat.placement.isnot(None))
+        .group_by(GameSeat.user_id, User.display_name, User.username)
+        .all()
+    )
+
+    record = []
+    for user_id, display_name, username, played, wins in rows:
+        played, wins = int(played), int(wins or 0)
+        record.append(
+            {
+                "user_id": user_id,
+                # Same name convention as the Members table on this page. A guest has
+                # no account, so it can only ever be the label.
+                "label": (display_name or username) if user_id is not None else GUESTS_LABEL,
+                "played": played,
+                "wins": wins,
+                "losses": played - wins,
+                # `played` is >= 1 for any row GROUP BY produced, so this cannot divide
+                # by zero; the guard is for callers that build a row by hand.
+                "win_rate": (wins / played) if played else 0.0,
+            }
+        )
+    # Wins first, then rate. `played` and label break remaining ties so the order is
+    # stable across requests rather than dependent on row order.
+    record.sort(key=lambda r: (-r["wins"], -r["win_rate"], -r["played"], r["label"].lower()))
+    return record
 
 
 # ── Mutations ───────────────────────────────────────────────────

@@ -39,10 +39,15 @@
 
         {% if user_playgroups %}
           <label>Share with Playgroup <span class="muted">(optional)</span></label>
+          {# #152 — preselect when there is exactly one playgroup to pick. A game that
+             is never linked is invisible to the playgroup record, and the old blank
+             default made that the outcome of simply forgetting. Blank stays selectable,
+             and with zero or several playgroups the behaviour is unchanged: no guess. #}
+          {% set only_playgroup = user_playgroups | length == 1 %}
           <select name="playgroup_id">
-            <option value="" selected>— Not shared —</option>
+            <option value=""{% if not only_playgroup %} selected{% endif %}>— Not shared —</option>
             {% for pg in user_playgroups %}
-              <option value="{{ pg.playgroup.id }}">{{ pg.playgroup.name }}</option>
+              <option value="{{ pg.playgroup.id }}"{% if only_playgroup %} selected{% endif %}>{{ pg.playgroup.name }}</option>
             {% endfor %}
           </select>
         {% endif %}

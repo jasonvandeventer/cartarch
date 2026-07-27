@@ -154,6 +154,7 @@ def playgroups_detail(
             "playgroup": detail["playgroup"],
             "viewer_role": detail["viewer_role"],
             "members": detail["members"],
+            "record": detail["record"],  # #152 — win-loss over games linked to this playgroup
             "shares": shares,
             "member_wishlists": member_wishlists,
             "error": error,

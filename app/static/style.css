@@ -15621,6 +15621,9 @@ body.cmp-lobby-body { height: auto; min-height: 100dvh; overflow-y: auto; }
   margin: 0 0 0.5rem;
 }
 .ga-subnote { margin: -0.3rem 0 0.5rem; font-size: 0.82rem; }
+/* #152 — playgroup win-loss record. Reuses .stacking-table; only the intro note
+   needs sizing, matching .ga-subnote's role above a table. */
+.playgroup-record-note { margin: -0.3rem 0 0.6rem; font-size: 0.82rem; }
 .ga-life-chart {
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
