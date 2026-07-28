@@ -18,9 +18,17 @@
              data-list-filter
              data-list-filter-target="#commander-list li"
              style="max-width: 360px; margin-bottom: 0.75rem">
-      <ul id="commander-list" style="list-style:none;padding:0;margin:0;display:grid;gap:0.35rem">
+      {# #169 — `data-card-hover` + target wires the shared preview component. The
+         image URLs are emitted HERE, from the Jinja globals, so card-hover.js never
+         builds one — the same split list-filter.js uses for filter semantics. #}
+      <ul id="commander-list"
+          data-card-hover
+          data-card-hover-target="li"
+          style="list-style:none;padding:0;margin:0;display:grid;gap:0.35rem">
         {% for card in candidates %}
-          <li data-filter-text="{{ card.name }} {{ card.type_line }}">
+          <li data-filter-text="{{ card.name }} {{ card.type_line }}"
+              data-card-image="{{ mirror_image_url(card.scryfall_id, 'normal') }}"
+              data-card-image-alt="{{ scryfall_image_fallback(card.scryfall_id, 'normal') }}">
             <a href="/recommendations/commander/{{ card.id }}/preview">
               {{ card.name }}
             </a>
@@ -35,6 +43,7 @@
          and a wall. Loaded per-page with `static_v()` exactly as every other
          consumer does; `base.html` deliberately does not carry it. #}
       <script src="/static/list-filter.js?v={{ static_v('list-filter.js') }}"></script>
+      <script src="/static/card-hover.js?v={{ static_v('card-hover.js') }}"></script>
     {% else %}
       <p>You don't own any Commander-legal legendary creatures yet. Import some
          cards, then come back to brew.</p>

@@ -15987,3 +15987,26 @@ body.cmp-lobby-body { height: auto; min-height: 100dvh; overflow-y: auto; }
 .wl-filter-bar input[type="search"] {
   min-width: 12rem;
 }
+
+/* #169 — card hover preview (card-hover.js). ONE node for the whole list.
+   `pointer-events: none` is load-bearing: without it the preview sits under the
+   cursor, steals mouseenter from the row beneath, and flickers. */
+.card-hover-preview {
+  position: fixed;
+  z-index: 9999;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 90ms ease-out;
+}
+.card-hover-preview.is-visible {
+  opacity: 1;
+  visibility: visible;
+}
+.card-hover-preview img {
+  display: block;
+  width: 240px;
+  max-width: 40vw;
+  border-radius: 4.75% / 3.5%; /* MTG card corner ratio */
+  box-shadow: 0 8px 24px rgb(0 0 0 / 55%);
+}
