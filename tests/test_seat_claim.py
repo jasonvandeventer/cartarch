@@ -420,3 +420,98 @@ def test_two_games_cannot_share_an_ENABLED_code(db, user):
     with _pytest.raises(IntegrityError):
         _game(db, user, code="SAME")
     db.rollback()
+
+
+# ── Joining is set up where you decide who is playing ───────────────────────
+
+
+def test_the_new_game_form_offers_joining_up_front(client, db, user):
+    """It used to be discoverable one page too late — create the game, then hunt
+    for a button. The moment you decide who is playing is the moment you want it."""
+    body = client.get("/games/new").text
+
+    assert 'name="enable_join"' in body
+    assert "join from their phones" in body
+
+
+def test_the_button_says_CREATE_not_START(client, db, user):
+    """It creates the game in `created` status; it does NOT start it. The old label
+    implied pressing it closed the door on joining, when it is what opens it."""
+    body = client.get("/games/new").text
+
+    assert "Create Game" in body
+    assert "Start Game" not in body
+
+
+def test_creating_with_the_box_ticked_mints_a_code(client, db, user):
+    r = client.post(
+        "/games",
+        data={
+            "player_count": "2",
+            "format": "Commander",
+            "player_names": ["", ""],
+            "deck_ids": ["", ""],
+            "commander_names": ["", ""],
+            "user_ids": ["", ""],
+            "grid_positions": ["", ""],
+            "starting_life": "40",
+            "enable_join": "true",
+        },
+        follow_redirects=False,
+    )
+
+    assert r.status_code == 303
+    game = db.query(Game).order_by(Game.id.desc()).first()
+    assert game.join_code, "the host would have to go find a button"
+    assert game.status == "created", "creating must not start the game"
+
+
+def test_creating_WITHOUT_the_box_mints_nothing(client, db, user):
+    """An unticked box must mean off — a checkbox that is always on is not a choice."""
+    client.post(
+        "/games",
+        data={
+            "player_count": "2",
+            "format": "Commander",
+            "player_names": ["", ""],
+            "deck_ids": ["", ""],
+            "commander_names": ["", ""],
+            "user_ids": ["", ""],
+            "grid_positions": ["", ""],
+            "starting_life": "40",
+        },
+        follow_redirects=False,
+    )
+
+    game = db.query(Game).order_by(Game.id.desc()).first()
+    assert game.join_code is None
+
+
+def test_a_code_minted_at_creation_actually_works(client, db, user):
+    """End to end: the whole point is that the next page is ready to join."""
+    client.post(
+        "/games",
+        data={
+            "player_count": "2",
+            "format": "Commander",
+            "player_names": ["", ""],
+            "deck_ids": ["", ""],
+            "commander_names": ["", ""],
+            "user_ids": ["", ""],
+            "grid_positions": ["", ""],
+            "starting_life": "40",
+            "enable_join": "true",
+        },
+        follow_redirects=False,
+    )
+    game = db.query(Game).order_by(Game.id.desc()).first()
+
+    page = client.get(f"/games/{game.id}").text
+    assert game.join_code in page
+    assert "<svg" in page  # the QR rendered
+
+    joiner = _user(db, display="Mason")
+    claimed, _ = claim_seat(
+        db, code=game.join_code, user_id=joiner.id, seat_id=claimable_seats(game)[0].id
+    )
+    assert claimed.user_id == joiner.id

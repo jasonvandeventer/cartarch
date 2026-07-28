@@ -180,6 +180,11 @@ def game_create(
     first_seat_number: int | None = Form(None),
     playgroup_id: str = Form(""),
     momir_physical: bool = Form(False),
+    # #165 — mint the seat-claim code at creation, so the host lands on the game
+    # page with the code and QR already up instead of hunting for a button. Default
+    # ON: the code is inert until someone uses it, and a game nobody joins is
+    # unaffected. The owner can still revoke it from the game page.
+    enable_join: bool = Form(False),
     session: Session = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
     _: None = CsrfRequired,
@@ -280,6 +285,10 @@ def game_create(
     # owner is a member of the target playgroup; a bad / non-member / empty
     # value simply leaves the game private (non-blocking, mirroring the
     # first_seat_number / format philosophy).
+    if enable_join:
+        game.join_code = game_service.generate_join_code(session)
+        session.commit()
+
     pg_raw = playgroup_id.strip()
     if pg_raw:
         try:

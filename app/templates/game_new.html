@@ -62,6 +62,15 @@
             {% endfor %}
           </select>
         {% endif %}
+        {# #165 — mint the claim code AT CREATION. Joining was discoverable one page
+           too late: the code only appeared on the game page afterwards, so the host
+           had to create the game and then go find a button. The moment you decide
+           who is playing is the moment you want this on. Owner can still toggle it
+           from the game page either way. #}
+        <label style="display:flex; gap:0.4rem; align-items:baseline">
+          <input type="checkbox" name="enable_join" value="true" checked style="width:auto">
+          <span>Let players join from their phones — shows a code and QR on the next page</span>
+        </label>
         <label>Number of Players</label>
         <div class="player-count-row">
           {% for n in [2, 3, 4, 5, 6, 7, 8] %}
@@ -126,12 +135,16 @@
       </div>
       <div id="seat-rows" style="margin-top:1.5rem"></div>
       <div style="margin-top:1.5rem">
-        <button type="button" id="start-game-btn" onclick="openFirstPlayerModal()">Start Game</button>
+        {# Named "Create" deliberately: this creates the game in `created` status, it
+           does NOT start it. "Go Live" on the game page is what starts it. The old
+           "Start Game" label implied pressing it closed the door on joining, when it
+           is in fact the step that OPENS it (#165). #}
+        <button type="button" id="start-game-btn" onclick="openFirstPlayerModal()">Create Game</button>
         <a href="/games">
           <button type="button" style="margin-left:0.5rem">Cancel</button>
         </a>
       </div>
-      {# First-player picker modal — opened by Start Game; Step 2 wires the JS #}
+      {# First-player picker modal — opened by Create Game; Step 2 wires the JS #}
       <div id="first-player-modal" class="fp-modal" data-dismiss style="display:none">
         <div class="fp-modal-inner">
           <h3 class="fp-modal-title">Who goes first?</h3>
@@ -147,7 +160,7 @@
                     id="fp-start-btn"
                     class="fp-start-btn"
                     onclick="confirmFirstPlayerAndStart()"
-                    disabled>Start ▶</button>
+                    disabled>Create ▶</button>
           </div>
         </div>
       </div>
@@ -387,7 +400,7 @@ function escHtml(s) {
 }
 
 // ── First-player picker modal (v3.25.2) ──────────────────────────
-// Replaces the old inline <select>. Opened by Start Game; the form
+// Replaces the old inline <select>. Opened by Create Game; the form
 // submits ONLY from confirmFirstPlayerAndStart(), with the chosen
 // seat_number written into hidden #first_seat_number. No backend change
 // — reuses the v3.25.1 first_seat_number plumbing. Decision 1: Start is
