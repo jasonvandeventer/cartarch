@@ -538,14 +538,33 @@ def game_companion_page(
 @router.post("/games/{game_id}/companion/deck")
 def companion_set_deck(
     game_id: int,
-    deck_id: int = Form(0),  # 0 / absent → clear the seat's deck
+    # #171 — ABSENT is not 0. This was `Form(0)`, so any POST that said nothing
+    # about the deck was read as "clear my deck" and answered 200 — including a
+    # malformed body, a truncated one, or one carrying a field this endpoint does
+    # not understand. Clearing is legitimate and stays, but it must be ASKED for.
+    #
+    # Not reachable from the shipped UI (`pickDeck()` always sends the field, and
+    # clearing is an explicit `pickDeck(0)`), but #165's phone-side join flow will
+    # post new fields to this endpoint, and a request that forgot to echo `deck_id`
+    # would silently wipe the player's selection while reporting success.
+    deck_id: int | None = Form(None),
     session: Session = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
     _: None = CsrfRequired,
 ):
     """A seated player picks their OWN deck (only while the game is `created`).
     No table token — personal, phones-only. Returns the re-derived seat identity
-    for in-place UI update."""
+    for in-place UI update.
+
+    ``deck_id=0`` clears the seat's deck. Omitting ``deck_id`` is a **400**: the
+    service layer treats None/0 as "clear" and that is correct there, but a route
+    must not turn a caller's SILENCE into that instruction.
+    """
+    if deck_id is None:
+        raise HTTPException(
+            status_code=400,
+            detail="deck_id is required; send 0 to clear the seat's deck",
+        )
     try:
         seat = set_own_seat_deck(session, game_id, current_user.id, deck_id or None)
     except LookupError as e:

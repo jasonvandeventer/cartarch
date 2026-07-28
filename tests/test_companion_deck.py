@@ -243,3 +243,78 @@ def test_list_user_decks_for_companion_sorted(db, user):
     out = game_service.list_user_decks_for_companion(db, user.id)
     assert [d["name"] for d in out] == ["Aaa Deck", "Zzz Deck"]  # sorted by name
     assert out[0]["commander_name"] == "Aaa Cmdr"
+
+
+# ── #171: a silent body must not clear the seat ──────────────────────────────
+
+
+def test_route_omitting_deck_id_is_a_400_and_changes_nothing(db, client, user):
+    """THE bug. `Form(0)` made an absent field mean "clear my deck", answered 200.
+
+    Not reachable from the shipped UI — `pickDeck()` always sends the field — but
+    #165's phone-side join flow will POST new fields here, and one that forgot to
+    echo `deck_id` would have wiped the player's selection while reporting success.
+
+    The `db.commit()` matters: the route uses its own session, so without it the
+    game is invisible and this passes on a 404 instead of exercising the guard.
+    """
+    deck = _deck(db, user.id)
+    game, _seats = _game(db, user.id, seats=[{"user_id": user.id, "deck_id": deck.id}, {}])
+    db.commit()
+
+    r = client.post(f"/games/{game.id}/companion/deck", data={})
+
+    assert r.status_code == 400
+    seat = next(s for s in game.seats if s.user_id == user.id)
+    db.refresh(seat)
+    assert seat.deck_id == deck.id, "an empty body cleared the seat"
+
+
+def test_route_an_unrecognised_field_alone_is_a_400(db, client, user):
+    """The realistic #165 shape: a commander name posted without `deck_id`."""
+    deck = _deck(db, user.id)
+    game, _seats = _game(db, user.id, seats=[{"user_id": user.id, "deck_id": deck.id}, {}])
+    db.commit()
+
+    r = client.post(
+        f"/games/{game.id}/companion/deck",
+        data={"commander_name": "Atraxa, Praetors' Voice"},
+    )
+
+    assert r.status_code == 400
+    seat = next(s for s in game.seats if s.user_id == user.id)
+    db.refresh(seat)
+    assert seat.deck_id == deck.id
+
+
+def test_route_an_EXPLICIT_zero_still_clears(db, client, user):
+    """Clearing is legitimate and must survive — it just has to be asked for."""
+    deck = _deck(db, user.id)
+    game, _seats = _game(db, user.id, seats=[{"user_id": user.id, "deck_id": deck.id}, {}])
+    db.commit()
+
+    r = client.post(f"/games/{game.id}/companion/deck", data={"deck_id": 0})
+
+    assert r.status_code == 200
+    seat = next(s for s in game.seats if s.user_id == user.id)
+    db.refresh(seat)
+    assert seat.deck_id is None
+    assert seat.deck_name_at_game is None and seat.commander_name_at_game is None
+
+
+def test_the_shipped_phone_picker_payload_still_works(db, client, user):
+    """`game_companion.html`'s pickDeck() posts deck_id + csrf_token and nothing else.
+
+    Pinned so the 400 above can never be tightened into breaking the real UI.
+    """
+    deck = _deck(db, user.id, name="Atraxa")
+    game, _seats = _game(db, user.id, seats=[{"user_id": user.id}, {}])
+    db.commit()
+
+    r = client.post(
+        f"/games/{game.id}/companion/deck",
+        data={"deck_id": str(deck.id), "csrf_token": "x"},
+    )
+
+    assert r.status_code == 200
+    assert r.json()["seat"]["deck_name"] == "Atraxa"
