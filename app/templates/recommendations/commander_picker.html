@@ -28,6 +28,13 @@
           </li>
         {% endfor %}
       </ul>
+      {# #168 — the filter input above emits `data-list-filter` but this template was
+         the ONLY one of the eight emitting it that never loaded the engine, so the
+         box was inert. The list is unpaginated and unbounded — 539 rows on the
+         largest account — so the filter is the difference between a usable picker
+         and a wall. Loaded per-page with `static_v()` exactly as every other
+         consumer does; `base.html` deliberately does not carry it. #}
+      <script src="/static/list-filter.js?v={{ static_v('list-filter.js') }}"></script>
     {% else %}
       <p>You don't own any Commander-legal legendary creatures yet. Import some
          cards, then come back to brew.</p>
