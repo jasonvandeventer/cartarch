@@ -20,7 +20,7 @@ from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse, RedirectResponse
 from sqlalchemy.orm import Session, joinedload
 
-from app import sort_spec
+from app import deck_service, sort_spec
 from app.bracket_v2_service import (
     estimate_bracket_v2,
     gc_list_version,
@@ -129,6 +129,15 @@ def decks_page(
     current_user: User = Depends(get_current_user),
 ):
     decks = list_decks(session, user_id=current_user.id)
+    # #164 placeholders anchor game history but hold no cards and cannot be
+    # played. They are split OUT of `decks` here rather than filtered in the
+    # template, so everything downstream — the header totals, the featured-deck
+    # pick, the compact rows, the variant-share loops — excludes them for free
+    # and none of it can drift. Owner decision 2026-07-28: keep them REACHABLE
+    # (hiding them entirely would make them undeletable, and filling one in is
+    # now how a placeholder graduates), just not mixed in with real decks.
+    record_only = [d for d in decks if deck_service.is_record_only_deck(d)]
+    decks = [d for d in decks if not deck_service.is_record_only_deck(d)]
     show_onboarding = len(decks) == 0
 
     # v3.28.7 — editorial-row Decks page. Attach per-deck game stats
@@ -190,6 +199,8 @@ def decks_page(
         {
             "title": "Decks",
             "decks": decks,
+            # #152 lesson: a new context key needs THIS line, not just the service.
+            "record_only_decks": record_only,
             "featured": featured,
             "current_user": current_user,
             "show_onboarding": show_onboarding,

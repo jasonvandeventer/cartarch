@@ -319,4 +319,37 @@
       <p class="muted">No decks yet. Create one above to start organizing your cards.</p>
     </section>
   {% endif %}
+
+  {# #164 placeholders. Collapsed and below everything, because they are not decks
+     you own — they exist so a past game has something to point at. They stay
+     REACHABLE rather than hidden: hiding them entirely would make them impossible
+     to delete, and importing a decklist into one is how a placeholder becomes a
+     real deck (v4.12.30). Deliberately minimal — name, commander, the games it
+     anchors, delete. No stats, no edit popout, nothing implying it is playable. #}
+  {% if record_only_decks | default([]) %}
+    <details class="panel" style="margin-top:1.25rem">
+      <summary style="cursor:pointer; font-weight:600">
+        Record-only decks ({{ record_only_decks | length }})
+      </summary>
+      <p class="muted" style="margin:0.6rem 0 0.9rem; font-size:0.92rem">
+        Created for games where a commander was recorded but no deck was picked, so
+        the result still counts toward that commander. They hold no cards and are not
+        offered when you pick a deck for a game. Import a decklist into one to turn it
+        into a real deck, or delete it — the games keep their record either way.
+      </p>
+      {% for deck in record_only_decks %}
+        <div style="display:flex; align-items:baseline; gap:0.75rem; padding:0.4rem 0; border-top:1px solid var(--border)">
+          <a href="/decks/{{ deck.id }}" style="font-weight:600">{{ deck.name }}</a>
+          <span class="muted" style="font-size:0.88rem">{{ deck.format or 'Commander' }}</span>
+          <form action="/decks/{{ deck.id }}/delete" method="post" style="margin-left:auto">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <button type="submit" class="btn-danger-small"
+                    onclick="return confirm('Delete {{ deck.name }}? Games played with it keep their record.');">
+              Delete
+            </button>
+          </form>
+        </div>
+      {% endfor %}
+    </details>
+  {% endif %}
 {% endblock %}

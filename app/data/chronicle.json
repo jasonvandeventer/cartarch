@@ -1,5 +1,15 @@
 [
   {
+    "version": "4.12.31",
+    "date": "2026-07-28",
+    "added": [
+      "A “Record-only decks” section at the foot of the Decks page, folded away, holding the decks that exist purely to anchor a past game's result. They are out of the main list and out of the counts at the top, so the page reports the decks you actually have — but they are still there to open, fill in or delete, which is why they are not simply hidden."
+    ],
+    "refined": [],
+    "resolved": [],
+    "archivist_note": "Hiding them outright was the tempting version and the wrong one: it would have left them counted nowhere, visible nowhere, and impossible to remove. Something you are not meant to think about still has to be somewhere you can reach."
+  },
+  {
     "version": "4.12.30",
     "date": "2026-07-28",
     "added": [],

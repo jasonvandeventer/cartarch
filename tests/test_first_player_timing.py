@@ -262,3 +262,58 @@ def test_a_placeholder_still_matches_its_commander_so_the_lineage_holds(db, user
     found, missing = resolve_commander_to_deck(db, user.id, "Gorma, the Gullet")
     assert found is not None and found.id == d.id
     assert not missing
+
+
+# ── The Decks page keeps them, in their own section (v4.12.31) ──────────────
+
+
+def _placeholder(db, user, name):
+    from app.models import Deck, StorageLocation
+
+    loc = StorageLocation(user_id=user.id, name=name, type="deck", mode="manual")
+    db.add(loc)
+    db.commit()
+    d = Deck(user_id=user.id, name=name, storage_location_id=loc.id, contents_tracked=False)
+    db.add(d)
+    db.commit()
+    return d
+
+
+def test_placeholders_render_in_their_own_section_not_the_main_list(client, db, user):
+    """Owner decision 2026-07-28: keep them reachable, out of the way.
+
+    Route-level, because a service test cannot see this — `record_only_decks` has
+    to actually reach the template (the #152 failure mode).
+    """
+    _placeholder(db, user, "Anchor Only")
+    body = client.get("/decks").text
+    assert "Record-only decks (1)" in body
+    assert "Anchor Only" in body
+    # Not in the main rows: the compact-row markup is what "a real deck" looks like.
+    head = body.split("Record-only decks")[0]
+    assert "Anchor Only" not in head, "a placeholder leaked into the main deck list"
+
+
+def test_placeholders_do_not_inflate_the_page_totals(client, db, user):
+    """A count that includes decks you cannot play misstates what you own.
+
+    Splitting in the ROUTE rather than the template is what makes this hold for
+    the header totals, the featured pick and the rows at once.
+    """
+    from app.models import Deck, StorageLocation
+
+    loc = StorageLocation(user_id=user.id, name="Real One", type="deck", mode="manual")
+    db.add(loc)
+    db.commit()
+    db.add(Deck(user_id=user.id, name="Real One", storage_location_id=loc.id))
+    db.commit()
+    _placeholder(db, user, "Anchor Only")
+
+    head = client.get("/decks").text.split("Record-only decks")[0]
+    assert ">1<" in head, "the deck total should count the one real deck, not two"
+
+
+def test_a_placeholder_is_still_deletable_from_the_page(client, db, user):
+    """The reason they are not simply hidden. Hiding them would strand them."""
+    d = _placeholder(db, user, "Anchor Only")
+    assert f'action="/decks/{d.id}/delete"' in client.get("/decks").text

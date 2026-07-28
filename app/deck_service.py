@@ -2049,6 +2049,18 @@ def list_decks_basic(session: Session, user_id: int) -> list[Deck]:
     )
 
 
+def is_record_only_deck(deck) -> bool:
+    """Per-deck predicate: a #164 placeholder that has never been filled in.
+
+    The Python half of :func:`list_pickable_decks`'s SQL condition, and the two
+    MUST stay in step — same pairing as ``is_brew_placeholder_row`` /
+    ``brew_placeholder_exclusion``. Requires ``card_count`` (``list_decks`` sets
+    it); an unpopulated deck reads as 0 and would be misjudged, so do not call
+    this on a bare ORM row.
+    """
+    return not deck.contents_tracked and not (getattr(deck, "card_count", 0) or 0)
+
+
 def list_pickable_decks(session: Session, user_ids) -> list[Deck]:
     """Decks that can be SEATED in a game, for every game deck picker (v4.12.29).
 
