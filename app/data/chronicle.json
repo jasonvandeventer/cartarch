@@ -1,5 +1,18 @@
 [
   {
+    "version": "4.12.23",
+    "date": "2026-07-28",
+    "added": [
+      "Players can now take their own seat in a game from their phone, before the host starts it. The host switches joining on and the game page shows a code and a QR; players either scan it or type the code at cartarch.com/join, pick a free seat, and enter their commander. The seat records who they are, not just a name — and the commander finds their existing deck for it, or creates one, so a deck you never wrote down stops being a blank.",
+      "The host's game page now updates on its own as seats are taken, so you can see who has joined without reloading."
+    ],
+    "refined": [
+      "The QR is a shortcut, never the only way in. The code is always shown as text beside it, because a tablet across the table, an angled screen or a camera in bad light shouldn't be the thing that stops someone joining."
+    ],
+    "resolved": [],
+    "archivist_note": "Joining is only open while the game is still being set up; once it starts, seats are locked. That isn't a new rule — it is the same one that already governed changing your deck from your phone, reused rather than reinvented. Two things had to be got right and neither was obvious. A seat claimed from a phone records the account, not merely the typed name, because the win-loss record counts people by account and a name alone would quietly drop someone out of their own history. And the code that lets you claim a seat is deliberately a different thing from the code that gives the tablet control of the table — they look alike and do very different jobs, so the app will not accept one in place of the other. Guests without an account still can't join; that needs its own design and has its own issue."
+  },
+  {
     "version": "4.12.22",
     "date": "2026-07-28",
     "added": [],
