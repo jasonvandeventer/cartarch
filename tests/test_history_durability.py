@@ -268,46 +268,56 @@ def test_variant_tokens_are_service_layer_constrained(db, user):
 # ── contents_tracked is a column only ───────────────────────────────────────
 
 
-def test_contents_tracked_defaults_true_and_still_has_no_READER(db, user):
-    """#163 scoped this to a column; #164 writes it but nothing reads it.
+def test_contents_tracked_marks_a_placeholder_and_gates_only_the_game_pickers(db, user):
+    """#164 wrote this column and nothing read it; v4.12.29 is the FIRST reader.
 
-    The distinction is the finding, not a technicality. #164 planned to teach every
-    content-dependent surface to skip untracked decks — and measurement showed they
-    already degrade correctly, because they gate on *"does this deck have rows"*
-    (`routes/decks.py`: `if all_deck_rows:`). That is the real condition and it
-    cannot drift from reality the way a flag can.
+    **The no-reader AST guard that used to live here was deleted deliberately, and
+    this is the "say why".** Its reasoning was sound and is worth preserving: #164
+    planned to teach every content-dependent surface to skip untracked decks, and
+    measurement showed they already degrade correctly because they gate on *"does
+    this deck have rows"* (`routes/decks.py`: `if all_deck_rows:`) — the real
+    condition, which cannot drift from reality the way a flag can. That argument
+    still holds for every one of those surfaces, and none of them reads the flag.
 
-    So a WRITE is expected (a placeholder marks itself), and a READ is a regression:
-    it would introduce a second, weaker source of truth beside a working one. If a
-    reader is genuinely wanted, delete this test deliberately and say why.
+    It does NOT hold for a game deck PICKER, which is why the reader is here and
+    nowhere else. A picker is not asking "can I render this deck" — it is asking
+    "can this deck be brought to a table", and `if rows:` answers that WRONG in
+    both directions: a deck created five minutes ago and not yet filled is empty
+    and must stay pickable, while a placeholder is unplayable no matter what rows
+    it might one day acquire. `contents_tracked` is exactly "nobody is tracking
+    what is in this", which is the distinction a picker needs.
 
-    Checked by AST, not by grepping text — prose in a docstring mentioning the
-    column is not a reader, and a text scan cannot tell the difference.
+    The scope of the reader is therefore load-bearing: `list_pickable_decks` and
+    nothing else. A placeholder stays live everywhere it matters — its seats point
+    at it, `resolve_commander_to_deck` still matches it so a replay of that
+    commander joins the existing lineage instead of minting a second placeholder,
+    and it is still listed and manageable on the Decks page.
     """
-    import ast
-    import pathlib
+    from app.deck_service import list_pickable_decks
 
-    deck = _deck(db, user)
-    assert deck.contents_tracked is True
+    tracked = _deck(db, user)
+    assert tracked.contents_tracked is True
 
-    readers: list[str] = []
-    for path in pathlib.Path("app").rglob("*.py"):
-        if path.name == "models.py":
-            continue  # the column declaration itself
-        tree = ast.parse(path.read_text())
-        written: set[int] = set()
-        for node in ast.walk(tree):
-            # Collect assignment TARGETS first: `deck.contents_tracked = False`.
-            if isinstance(node, ast.Assign):
-                for tgt in node.targets:
-                    if isinstance(tgt, ast.Attribute) and tgt.attr == "contents_tracked":
-                        written.add(id(tgt))
-        for node in ast.walk(tree):
-            if isinstance(node, ast.Attribute) and node.attr == "contents_tracked":
-                if id(node) not in written:
-                    readers.append(f"{path}:{node.lineno}")
+    placeholder = _deck(db, user, name="Placeholder Commander")
+    placeholder.contents_tracked = False
+    db.commit()
 
-    assert not readers, f"contents_tracked gained a READER: {readers}"
+    offered = {d.id for d in list_pickable_decks(db, [user.id])}
+    assert tracked.id in offered
+    assert placeholder.id not in offered, "an untracked placeholder is not playable"
+
+
+def test_an_empty_but_tracked_deck_is_still_pickable(db, user):
+    """The reason the flag is the discriminator and `if rows:` is not.
+
+    A deck you made and have not filled yet is empty and MUST stay offered — the
+    whole point of logging a game is often that you just built the thing.
+    """
+    from app.deck_service import list_pickable_decks
+
+    fresh = _deck(db, user, name="Built This Morning")
+    assert fresh.contents_tracked is True
+    assert fresh.id in {d.id for d in list_pickable_decks(db, [user.id])}
 
 
 def test_retired_at_is_not_set_on_a_live_deck(db, user):

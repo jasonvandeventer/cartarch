@@ -129,12 +129,7 @@ def game_new_page(
     # offers `all_users`, so no other deck was reachable anyway — this narrows the
     # payload to what the UI can use and closes the disclosure.
     pickable_user_ids = {u.id for u in all_users} | {current_user.id}
-    all_decks = (
-        session.query(Deck)
-        .filter(Deck.user_id.in_(pickable_user_ids), Deck.retired_at.is_(None))
-        .order_by(Deck.name)
-        .all()
-    )
+    all_decks = deck_service.list_pickable_decks(session, pickable_user_ids)
     # JSON-safe: users list and deck lookup by user_id for JS filtering
     users_json = [{"id": u.id, "name": u.display_name or u.username} for u in all_users]
     # #156 — a seat records a pilot and a deck independently, so a borrowed deck
@@ -321,12 +316,7 @@ def manual_log_page(
 ):
     from app import playgroup_service
 
-    decks = (
-        session.query(Deck)
-        .filter(Deck.user_id == current_user.id, Deck.retired_at.is_(None))
-        .order_by(Deck.name)
-        .all()
-    )
+    decks = deck_service.list_pickable_decks(session, [current_user.id])
     user_playgroups = playgroup_service.list_playgroups_for_user(session, current_user.id)
     return render(
         request,
@@ -473,12 +463,7 @@ def game_detail_page(
     if is_owner:
         from app import playgroup_service
 
-        decks = (
-            session.query(Deck)
-            .filter(Deck.user_id == current_user.id, Deck.retired_at.is_(None))
-            .order_by(Deck.name)
-            .all()
-        )
+        decks = deck_service.list_pickable_decks(session, [current_user.id])
         # People picker for retroactive seat→user attribution + playgroup
         # picker to open the game up to a group.
         pickable_users = playgroup_service.get_pickable_users(session, current_user.id)

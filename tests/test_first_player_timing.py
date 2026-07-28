@@ -204,3 +204,61 @@ def test_a_retired_deck_is_not_offered_in_any_game_deck_picker(client, db, user)
 
     g = _game(db, user)
     assert "Ghost Deck" not in client.get(f"/games/{g.id}").text
+
+
+def test_a_placeholder_deck_is_not_offered_in_any_game_deck_picker(client, db, user):
+    """#164's placeholders are real decks anchoring real game history — but they
+    are not decks you can bring to a table, and they were showing up in every
+    picker (three of them on the owner's own account, from the backfill).
+
+    Owner decision 2026-07-28: keep them tracked, stop offering them. NOT by
+    deleting, which would also drop them out of deck analytics and stop
+    `resolve_commander_to_deck` matching them, so a replay of that commander
+    would mint a SECOND placeholder and split the lineage.
+    """
+    from app.game_service import list_user_decks_for_companion
+    from app.models import Deck, StorageLocation
+
+    loc = StorageLocation(user_id=user.id, name="Ghost Cmdr", type="deck", mode="manual")
+    db.add(loc)
+    db.commit()
+    d = Deck(user_id=user.id, name="Ghost Cmdr", storage_location_id=loc.id, contents_tracked=False)
+    db.add(d)
+    db.commit()
+
+    assert "Ghost Cmdr" not in client.get("/games/new").text
+    assert "Ghost Cmdr" not in client.get("/games/manual-log").text
+    assert all(x["name"] != "Ghost Cmdr" for x in list_user_decks_for_companion(db, user.id))
+
+    g = _game(db, user)
+    assert "Ghost Cmdr" not in client.get(f"/games/{g.id}").text
+
+
+def test_a_placeholder_still_matches_its_commander_so_the_lineage_holds(db, user):
+    """The other half of the decision: invisible in pickers, still the anchor.
+
+    If it stopped matching, the next game logged with that commander would create
+    a second placeholder beside the first and the history would fork.
+    """
+    from app.deck_service import resolve_commander_to_deck
+    from app.models import Card, Deck, DeckCommander, StorageLocation
+
+    card = Card(
+        scryfall_id="ph-1",
+        name="Gorma, the Gullet",
+        set_code="tst",
+        collector_number="1",
+        type_line="Legendary Creature — Horror",
+    )
+    loc = StorageLocation(user_id=user.id, name="Gorma", type="deck", mode="manual")
+    db.add_all([card, loc])
+    db.commit()
+    d = Deck(user_id=user.id, name="Gorma", storage_location_id=loc.id, contents_tracked=False)
+    db.add(d)
+    db.commit()
+    db.add(DeckCommander(deck_id=d.id, card_id=card.id))
+    db.commit()
+
+    found, missing = resolve_commander_to_deck(db, user.id, "Gorma, the Gullet")
+    assert found is not None and found.id == d.id
+    assert not missing

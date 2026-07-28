@@ -2049,6 +2049,48 @@ def list_decks_basic(session: Session, user_id: int) -> list[Deck]:
     )
 
 
+def list_pickable_decks(session: Session, user_ids) -> list[Deck]:
+    """Decks that can be SEATED in a game, for every game deck picker (v4.12.29).
+
+    ONE definition, four callers — the new-game picker (cross-user, hence the
+    ``user_ids`` sequence), the manual log, the game-detail seat picker, and the
+    companion picker. They each hand-rolled `session.query(Deck)`, which is how
+    they missed #163's retirement filter for eleven days; a fifth surface written
+    against this cannot miss the next rule either.
+
+    Two exclusions, and they are NOT the same idea:
+
+    - **Retired** (#163) — you deleted it. Deletion became a soft retire so game
+      history survives, and a retired deck must stay as invisible as a deleted one.
+    - **Untracked** (#164) — a PLACEHOLDER, minted by the backfill for a seat that
+      recorded a commander but no deck. It exists to anchor history, and it is not
+      a deck you own or can bring to a table, so offering it in a picker is
+      offering something unplayable.
+
+    **`contents_tracked` is deliberately the discriminator here, not "has no
+    rows".** They are not equivalent: a deck you created five minutes ago and have
+    not filled yet is also empty, and it MUST stay pickable. The flag says
+    "nobody is tracking what is in this" — exactly the distinction wanted, and the
+    reason #164 reserved the column. This is the first reader; see the note in
+    ``tests/test_history_durability.py`` for why the no-reader guard was retired.
+
+    A placeholder stays fully live everywhere else: ``resolve_commander_to_deck``
+    still MATCHES it (so replaying that commander joins the existing lineage
+    instead of minting a second placeholder), its seats keep pointing at it, and
+    it still appears on the Decks page where it can be managed.
+    """
+    return (
+        session.query(Deck)
+        .filter(
+            Deck.user_id.in_(list(user_ids)),
+            Deck.retired_at.is_(None),
+            Deck.contents_tracked.is_(True),
+        )
+        .order_by(Deck.name.asc())
+        .all()
+    )
+
+
 def list_decks(session: Session, user_id: int) -> list[Deck]:
     decks = (
         session.query(Deck)

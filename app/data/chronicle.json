@@ -1,5 +1,15 @@
 [
   {
+    "version": "4.12.29",
+    "date": "2026-07-28",
+    "added": [],
+    "refined": [
+      "Decks that exist only to hold a past game's record are no longer offered when you pick a deck for a game. These were created for seats that named a commander but no deck, so that the game history had something to point at — they hold no cards and cannot be brought to a table. They stay exactly where they were in the data: their games still count, and playing that commander again attaches to the same deck rather than starting a second copy of it."
+    ],
+    "resolved": [],
+    "archivist_note": "The distinction being drawn is between a deck that is empty and a deck whose contents nobody is tracking. They look identical in a list, and one of them is a deck you built this morning and have not typed in yet. Deciding this on emptiness would have quietly hidden the deck someone was most eager to play."
+  },
+  {
     "version": "4.12.28",
     "date": "2026-07-28",
     "added": [],
