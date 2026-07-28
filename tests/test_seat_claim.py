@@ -395,3 +395,28 @@ def test_no_QR_or_code_is_shown_once_the_game_is_live(client, db, user):
 
     assert "Turn joining off" not in body
     assert "Let players join from their phones" not in body
+
+
+def test_two_games_may_both_have_claiming_DISABLED(db, user):
+    """The other half of the PARTIAL unique index.
+
+    `uq_games_join_code` is unique only `WHERE join_code IS NOT NULL`. Without the
+    predicate, the second game with claiming off would collide — so every game but
+    one could never disable it. (The enabled-collision half is enforced by the DB
+    and was verified on PG18; this half is the one a plain unique index breaks.)
+    """
+    _game(db, user, code=None)
+    _game(db, user, code=None)
+
+    assert db.query(Game).filter(Game.join_code.is_(None)).count() == 2
+
+
+def test_two_games_cannot_share_an_ENABLED_code(db, user):
+    """Otherwise a claim would be ambiguous about which game it joins."""
+    import pytest as _pytest
+    from sqlalchemy.exc import IntegrityError
+
+    _game(db, user, code="SAME")
+    with _pytest.raises(IntegrityError):
+        _game(db, user, code="SAME")
+    db.rollback()
