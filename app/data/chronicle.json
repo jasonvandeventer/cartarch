@@ -1,5 +1,17 @@
 [
   {
+    "version": "4.12.19",
+    "date": "2026-07-28",
+    "added": [
+      "On the Brew page, hovering a commander now shows the card image beside your cursor, so you can see what you are picking without opening it first. Desktop only — on a phone or tablet, tapping a commander still just opens it, which is the behaviour you want there."
+    ],
+    "refined": [],
+    "resolved": [
+      "The “Filter commanders…” box on the Brew page did nothing at all. The list is not paginated, and the largest collection here fills it with 539 commanders, so a filter that quietly ignored what you typed made the page close to unusable. It now filters as you type, on both the name and the card type."
+    ],
+    "archivist_note": "Two reports about the same page, and the second one only became worth building once the first was fixed — a hover preview across 539 unfilterable rows would have been decoration. The filter turned out to be one missing line: the page asked for the shared filtering behaviour but never loaded the code that provides it, and it was the only page of eight doing so. The test written for it does not check that one page any more; it checks every page, and fails if a ninth is ever added the same way. That is usually the better bargain when a bug is really an omission."
+  },
+  {
     "version": "4.12.18",
     "date": "2026-07-28",
     "added": [],
