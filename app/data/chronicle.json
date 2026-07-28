@@ -1,5 +1,18 @@
 [
   {
+    "version": "4.12.17",
+    "date": "2026-07-28",
+    "added": [
+      "Decks now record their commander as part of the deck itself, rather than it only being inferable from the cards inside — so a deck keeps its identity even when it is renamed, and a deck with two commanders records both without caring which order you list them in. Games now record which variant was played, such as Planechase, and more than one can apply to a single game. Neither is shown anywhere yet; this is the groundwork the per-deck statistics need."
+    ],
+    "refined": [],
+    "resolved": [
+      "Deleting a deck quietly erased its game history. Every game that deck had ever been played in lost its record of which deck was at the table — no warning, and no way to tell afterwards that anything had gone. Deleting a deck now keeps that history intact. What you see is unchanged: your real cards still return to your collection, and the deck still disappears from your list, including freeing up its name if you want to reuse it.",
+      "Deleting an account did the same thing to a player, unpicking them from every game they had ever sat in. Account deletion now stops rather than doing that, and points at deactivating the account instead — which takes someone out of the pickers without erasing them from the games they played."
+    ],
+    "archivist_note": "This one is almost entirely invisible, and the interesting part is a fix that would have looked like a fix. The obvious repair was to tell the database to refuse a deletion that would break game records. That change on its own would have done nothing at all, because the app was already clearing those records itself a moment before asking the database to delete anything — so by the time the new rule could object, there was nothing left to object to. It would have read as protection in the code and in the release notes while the history kept disappearing. Both halves had to go together, and the tests were written to fail if either one comes back."
+  },
+  {
     "version": "4.12.16",
     "date": "2026-07-27",
     "added": [],
