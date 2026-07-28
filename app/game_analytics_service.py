@@ -149,13 +149,47 @@ def build_game_analytics(session: Session, game_id: int) -> dict | None:
     lives0 = {str(s.id): int(init_lives.get(str(s.id), s.starting_life)) for s in seats}
     max_turn = max((e.turn for e in events), default=1)
 
-    # ── 1. Life-over-time: one sample per life-affecting EVENT (#151) ─────────
-    # The x-axis was one point per ROUND, which discarded every intra-round swing:
-    # `changed_at[sid][e.turn]` overwrote, so only a round's last value survived, and
-    # `game_events.turn` only increments when the rotation wraps past the first seat —
-    # so in a 4-seat pod one x-position spanned four seat turns. Now every `life`/`cmd`
-    # event emits a sample: the acting seat takes its new value, every other seat
-    # carries forward. `e.turn` survives only as round-boundary tick annotations.
+    # ── 1. Life-over-time: one sample per life-affecting RUN (#151, #161) ────
+    # #151: the x-axis was one point per ROUND, which discarded every intra-round
+    # swing — `changed_at[sid][e.turn]` overwrote, so only a round's last value
+    # survived, and `game_events.turn` only increments when the rotation wraps past
+    # the first seat, so in a 4-seat pod one x-position spanned four seat turns.
+    # Per-event sampling fixed that and is NOT being reverted.
+    #
+    # #161: but players enter damage by tapping ±1 repeatedly, so one hit for 12 drew
+    # as twelve one-life steps — a staircase where the game had a cliff. 824 of the
+    # 1075 life-affecting events on record are `life` taps and almost all are ±1.
+    # Consecutive samples are therefore COLLAPSED into a single x-position while all
+    # three of these hold, and a new column starts when any one changes:
+    #
+    #   1. same affected seat   (payload.seat_id / receiver_seat_id, per
+    #                            life_delta_for_event — never re-derived here)
+    #   2. same round           (e.turn)
+    #   3. same direction       (sign of the delta)
+    #
+    # Measured on the recorded corpus: **678 of 1075 x-positions absorbed (63.1%)**.
+    # #161 predicted 689 (64.1%) from a three-guard rule; the elimination break below
+    # is a fourth guard the issue did not model, and it costs exactly 11 columns —
+    # runs where an `eliminate` event sits between two otherwise-continuous samples.
+    # Worth the 11: without it a revived seat's post-revive value folds into a column
+    # that sits BEFORE its own `cut_at`, i.e. on the far side of its truncation.
+    #
+    # **The direction guard is not optional.** Without it this reintroduces exactly
+    # the bug #151 fixed: a seat going 40 → 10 → 35 with nobody acting in between is
+    # two consecutive same-seat samples, and merging them renders 40 → 35 and erases
+    # the trough. `test_a_drop_and_recovery_inside_one_rotation_both_render` is that
+    # case and must keep passing with its assertions unchanged.
+    #
+    # **The round guard** stops a run straddling a boundary, which would otherwise put
+    # the round tick at the same x as the collapsed point. It costs 11 of 700 absorbed
+    # points — the faithful behaviour is nearly free.
+    #
+    # Collapsing happens AT APPEND TIME, not as a post-process, because every consumer
+    # below is index-based: `cut_at` (set from the live `idx`), `round_ticks`,
+    # `n_samples`, `x_span`, and `_step_points` walking each row positionally. Doing it
+    # here keeps all of them consistent for free; post-processing would need every one
+    # remapped, and a missed remap puts round ticks and elimination cutoffs at the
+    # wrong x with no test failure to catch it.
     cur = dict(lives0)
     samples: dict[str, list[int]] = {sid: [lives0[sid]] for sid in seat_ids}
     # Sample index at which each seat was last eliminated (None = still in, or
@@ -166,6 +200,12 @@ def build_game_analytics(session: Session, game_id: int) -> dict | None:
     round_ticks: list[dict] = []
     current_round = 1
     idx = 0
+    # #161 — the open run: which seat, which round, which direction. `run_sign` of 0
+    # never continues a run, so a no-op (delta == 0) event always starts its own
+    # column rather than silently joining its neighbour.
+    run_sid: str | None = None
+    run_round: int | None = None
+    run_sign = 0
 
     for e in events:
         if e.action_type == "eliminate":
@@ -176,16 +216,32 @@ def build_game_analytics(session: Session, game_id: int) -> dict | None:
             sid = str(raw) if raw is not None else None
             if sid in cut_at:
                 cut_at[sid] = idx if p.get("eliminated") else None
+            # #161 — an elimination always breaks the open run. Otherwise a seat
+            # eliminated mid-run and revived could have its post-revive value folded
+            # back into a column that sits BEFORE its own `cut_at`, putting the value
+            # on the far side of the truncation.
+            run_sid = run_round = None
+            run_sign = 0
             continue
         hit = life_delta_for_event(e)
         if hit is None:
             continue
         sid, delta = hit
-        idx += 1
+        sign = (delta > 0) - (delta < 0)
+        continues_run = sid == run_sid and e.turn == run_round and sign != 0 and sign == run_sign
         if sid in cur:
             cur[sid] += delta
-        for s in seat_ids:
-            samples[s].append(cur[s])
+        if continues_run:
+            # Same seat, same round, same direction — fold into the current column so
+            # a run of twelve ±1 taps reads as one drop. Every seat is rewritten, not
+            # just the actor, so the carried-forward rows stay the same length.
+            for s in seat_ids:
+                samples[s][-1] = cur[s]
+        else:
+            idx += 1
+            for s in seat_ids:
+                samples[s].append(cur[s])
+            run_sid, run_round, run_sign = sid, e.turn, sign
         if e.turn > current_round:
             current_round = e.turn
             round_ticks.append({"index": idx, "round": e.turn})

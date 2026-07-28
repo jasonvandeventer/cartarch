@@ -3,10 +3,16 @@
 One test per acceptance criterion. All of them drive the REAL live-game service so the
 chart consumes exactly what the service persists.
 
-Geometry note: the x-axis is one sample per life-affecting event (`life` / `cmd`), with
-sample 0 the `live_started` baseline. Step rendering means a transition emits TWO points
-(across at the old value, then down to the new), so a row of N samples renders as
-`1 + 2*(N-1)` points.
+Geometry note: the x-axis is one sample per life-affecting RUN, with sample 0 the
+`live_started` baseline. Step rendering means a transition emits TWO points (across at
+the old value, then down to the new), so a row of N samples renders as `1 + 2*(N-1)`
+points.
+
+**#161 amended what "a sample" means.** Consecutive events collapse into one sample
+while the seat, the round AND the direction all hold — so a run of twelve ±1 taps is one
+drop, not twelve steps. Tests that want N distinct transitions must therefore vary one of
+those three; several below alternate direction deliberately for exactly that reason. The
+collapse rule itself is pinned in `test_life_chart_run_coalescing.py`.
 """
 
 from __future__ import annotations
@@ -78,10 +84,14 @@ def test_a_drop_and_recovery_inside_one_rotation_both_render(db):
 
 
 def test_life_changes_render_as_steps_not_diagonals(db):
+    # #161 — deltas ALTERNATE direction so the three events stay three distinct
+    # samples. Same-direction taps now collapse into one column (that is the whole
+    # point of #161), which would leave this testing stepping across a single
+    # transition. The assertion below is unchanged; the input is what moved.
     owner = _user(db)
     g, (s1, _s2, _s3) = _game(db, owner.id)
-    for _ in range(3):
-        _act(db, g, owner, {"type": "life", "seat_id": s1.id, "delta": -4})
+    for delta in (-4, +4, -4):
+        _act(db, g, owner, {"type": "life", "seat_id": s1.id, "delta": delta})
 
     pts = _series(db, g, s1)["points"].split()
     xs, ys = _xs(_series(db, g, s1)["points"]), _ys(_series(db, g, s1)["points"])
