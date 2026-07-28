@@ -1,5 +1,15 @@
 [
   {
+    "version": "4.12.21",
+    "date": "2026-07-28",
+    "added": [],
+    "refined": [],
+    "resolved": [
+      "Fixed a fault in the tool that backfills decks for games where a deck was named but never registered: its preview mode, which is supposed to show what it would do and change nothing, was in fact creating decks. Five were created and have been removed; no game or card data was affected. Preview now genuinely previews."
+    ],
+    "archivist_note": "Caught by checking the database immediately after running the preview, rather than by trusting the word 'preview' printed on the screen. The cause was one layer down: the deck-creation routine saves to the database on its own, so the tool's instruction not to save was quietly overruled by the code it called. That is the sort of thing that reads as correct at every level you look at, until you count the rows. The routine now takes the instruction, and the tests for it work by attempting a save, undoing it, and checking nothing survived — which is the only version of that test worth having."
+  },
+  {
     "version": "4.12.20",
     "date": "2026-07-28",
     "added": [
