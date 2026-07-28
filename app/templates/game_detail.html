@@ -261,6 +261,50 @@
           <button type="button" class="game-launch-btn" onclick="dismissLaunch(true)">⛶ Go fullscreen</button>
           <button type="button" class="game-launch-skip" onclick="dismissLaunch(false)">Continue without fullscreen</button>
           {% if is_owner and game.status == 'created' %}
+            {# ── Who goes first (v4.12.26) ────────────────────────────────
+               MOVED HERE from /games/new, where the question could not be
+               answered: with #165 claiming, seats 2..N are placeholders at
+               creation and the host was picking between "Player 2" and
+               "Player 3". This is the right moment — everyone who is going to
+               join has joined, and the game has not started.
+
+               Chips are plain submit buttons, so choosing works with JS off;
+               the roll is the only JS, and it only animates before submitting
+               the seat it landed on. Nothing here gates Go Live: leaving it
+               unset falls back to the clockwise first seat exactly as before
+               (`_first_seat_id`), which is why this is an offer and not a
+               modal. #}
+            <form method="post"
+                  action="/games/{{ game.id }}/first-seat"
+                  id="first-seat-form"
+                  style="margin-top:0.9rem">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+              <p class="game-launch-hint muted" style="margin-bottom:0.4rem">
+                {% if game.first_seat_number %}
+                  {% set fs = game.seats | selectattr('seat_number', 'equalto', game.first_seat_number) | first %}
+                  <strong>{{ fs.player_name if fs else 'Seat ' ~ game.first_seat_number }}</strong> goes first.
+                {% else %}
+                  Who goes first? <span class="muted">(optional — defaults to seat 1)</span>
+                {% endif %}
+              </p>
+              <div class="fp-seat-chips" id="fp-seat-chips">
+                {% for s in game.seats | sort(attribute='seat_number') %}
+                  <button type="submit"
+                          name="seat_number"
+                          value="{{ s.seat_number }}"
+                          data-seat="{{ s.seat_number }}"
+                          class="fp-chip{% if s.seat_number == game.first_seat_number %} selected{% endif %}">
+                    <span class="fp-chip-seat">Seat {{ s.seat_number }}</span>
+                    <span class="fp-chip-name">{{ s.player_name }}</span>
+                  </button>
+                {% endfor %}
+              </div>
+              <button type="button"
+                      id="fp-roll-btn"
+                      class="fp-roll-btn"
+                      onclick="rollFirstPlayer()">🎲 Roll for first player</button>
+            </form>
+
             {# Opt-in to multi-device live mode. POSTs /live/start, which flips
                the game to in_progress and redirects back — the page then boots
                in live mode. Games never taken live keep the localStorage tracker. #}
@@ -763,6 +807,28 @@ const clockwiseSeats = seatDefs.slice().sort((a, b) => a.turnOrder - b.turnOrder
 
 // v3.25.1 — explicit first player (preserved).
 const firstSeatNumber = {{ game.first_seat_number | tojson }};
+
+// v4.12.26 — the dice roll, moved here with the picker. Animates across the
+// server-rendered chips and then submits the one it landed on, so the result is
+// PERSISTED like a tap rather than living in page memory: the host may roll,
+// then wait for a late joiner, then go live, and the choice has to survive that.
+function rollFirstPlayer() {
+  const chips = [...document.querySelectorAll('#fp-seat-chips .fp-chip')];
+  if (chips.length < 1) return;
+  const btn = document.getElementById('fp-roll-btn');
+  if (btn.disabled) return;
+  btn.disabled = true;
+  const landing = Math.floor(Math.random() * chips.length);
+  let ticks = 0;
+  const timer = setInterval(() => {
+    chips.forEach((c, i) => c.classList.toggle('rolling', i === ticks % chips.length));
+    if (++ticks >= 15) {                       // ~15 × 80ms ≈ 1.2s shuffle
+      clearInterval(timer);
+      chips.forEach(c => c.classList.remove('rolling'));
+      chips[landing].click();                  // submits value=seat_number
+    }
+  }, 80);
+}
 const firstSeatId =
   (firstSeatNumber != null
     ? seatDefs.find(s => s.seatNumber === firstSeatNumber)?.id

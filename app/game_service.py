@@ -603,6 +603,48 @@ def set_game_playgroup(
     return True
 
 
+def set_first_seat(
+    session: Session,
+    game_id: int,
+    owner_user_id: int,
+    seat_number: int | None,
+) -> bool:
+    """Owner-only: record who goes first, or clear the choice (v4.12.26).
+
+    **This is a BEFORE-START decision, not a creation-time one, and that is the
+    whole point of the function existing.** ``first_seat_number`` used to be
+    collected by a modal on ``/games/new``, which asked the question at the one
+    moment it cannot be answered: with #165 seat claiming, the players who will
+    hold seats 2..N have not joined yet, so the host was choosing between
+    placeholders named ``Player 2`` and ``Player 3``.
+
+    Nothing in the model had to move — :func:`live_game_service._first_seat_id`
+    and the local tracker both read ``game.first_seat_number`` **at start time**
+    and fall back to the first seat when it is NULL. Only the moment of asking
+    was wrong.
+
+    ``created`` only: once a game is live or finalized the turn order is already
+    in the live blob, and rewriting the column would desync the rotation from
+    what the table is looking at. ``None`` clears the choice (back to the
+    clockwise default). A ``seat_number`` that is not one of this game's seats is
+    REFUSED rather than normalized away — unlike format or attribution, a wrong
+    starting player is silently wrong for the whole game.
+
+    Returns ``True`` on success; ``False`` if the game isn't owned by
+    ``owner_user_id``, isn't ``created``, or the seat doesn't belong to it.
+    """
+    game = session.query(Game).filter(Game.id == game_id, Game.user_id == owner_user_id).first()
+    if not game or game.status != "created":
+        return False
+    if seat_number is not None:
+        belongs = any(s.seat_number == seat_number for s in game.seats)
+        if not belongs:
+            return False
+    game.first_seat_number = seat_number
+    session.commit()
+    return True
+
+
 def end_game(
     session: Session,
     game_id: int,

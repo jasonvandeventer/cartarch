@@ -840,6 +840,35 @@ def game_set_playgroup(
     return RedirectResponse(url=f"/games/{game_id}", status_code=303)
 
 
+@router.post("/games/{game_id}/first-seat")
+def game_set_first_seat(
+    game_id: int,
+    seat_number: str = Form(""),
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+    _: None = CsrfRequired,
+):
+    """Owner-only: choose who goes first, from the game page (v4.12.26).
+
+    Moved off ``/games/new``, where the question was unanswerable — see
+    :func:`game_service.set_first_seat`. Empty value clears the choice.
+
+    A refusal is a **400, not a silent normalize.** The non-blocking posture the
+    rest of game creation takes (a bad format falls back, a bad attribution is
+    dropped) is wrong here: the caller asked for a specific starting player, and
+    quietly starting someone else instead is the failure the whole change is
+    about.
+    """
+    raw = seat_number.strip()
+    try:
+        target = int(raw) if raw else None
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid seat") from None
+    if not game_service.set_first_seat(session, game_id, current_user.id, target):
+        raise HTTPException(status_code=400, detail="Cannot set the first player for this game")
+    return RedirectResponse(url=f"/games/{game_id}", status_code=303)
+
+
 @router.post("/games/{game_id}/notes")
 def game_update_notes(
     request: Request,

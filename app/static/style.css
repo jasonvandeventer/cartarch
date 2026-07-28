@@ -3672,8 +3672,17 @@ body.game-mode {
   z-index: 700;
   background: radial-gradient(ellipse at 50% 50%, #131a0c 0%, #0b0f06 100%);
   display: flex;
-  align-items: center;
-  justify-content: center;
+  /* This is `position: fixed; inset: 0`, so anything taller than the viewport is
+     simply GONE — and centring is what makes it unrecoverable: the overflow goes
+     off BOTH ends and a scrollbar cannot reach the top. The overlay has been
+     growing (join code + QR in v4.12.23, the first-player picker in v4.12.26) and
+     a phone in landscape is the short viewport that finds it.
+
+     `margin: auto` on the child does the centring instead of `align-items` /
+     `justify-content`: auto margins absorb spare space when there is any, and
+     collapse to zero when there is not, so the scroll actually reaches the top.
+     The centred-flex + overflow combination does not. */
+  overflow-y: auto;
 }
 .game-launch-inner {
   display: flex;
@@ -3682,6 +3691,7 @@ body.game-mode {
   gap: 1.4rem;
   text-align: center;
   padding: 2rem;
+  margin: auto;
 }
 .game-launch-format {
   font-size: 1.1rem;

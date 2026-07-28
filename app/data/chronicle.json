@@ -1,5 +1,17 @@
 [
   {
+    "version": "4.12.26",
+    "date": "2026-07-28",
+    "added": [],
+    "refined": [
+      "Choosing who goes first now happens on the game page, before you start, instead of on the setup form. Setting a game up no longer asks the question at all — at that point the other seats are still empty placeholders, so it was asking you to choose between “Player 2” and “Player 3” before those people had joined. Pick a player once everyone is in, or roll for one; skip it entirely and play still starts from seat one as it always has."
+    ],
+    "resolved": [
+      "The panel holding the join code and QR could sit off the top of the screen with no way to scroll to it, on a phone or small tablet held sideways. The starting overlay was pinned to the window and centred, so anything too tall to fit was cut off at both ends rather than pushed into a scroll. Measured at 139 pixels lost on a landscape phone — which hid the join code from precisely the device most likely to be propped up as the table."
+    ],
+    "archivist_note": "The first-player question was always going to have to move; it was written when every seat was filled in by whoever set the game up, and seat claiming quietly made it a question asked too early. Worth noting that the overlay clipping was found only because the picker was being fitted into that same space — it had already been losing the join code for several days, on a device nobody had tried."
+  },
+  {
     "version": "4.12.25",
     "date": "2026-07-28",
     "added": [],

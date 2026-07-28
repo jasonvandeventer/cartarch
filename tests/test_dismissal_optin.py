@@ -22,11 +22,13 @@ POPOVER_OPTINS = [
     ("_review_tags_panel.html", "js-dismiss", 1),
 ]
 
+# game_new.html carried one — the first-player modal — until v4.12.26 moved that
+# decision to the game page (it asked at creation, when seats 2..N are still #165
+# placeholders). It has no modal now, so it is off this inventory rather than at 0.
 MODAL_OPTINS = [
     ("game_detail.html", "data-dismiss", 2),  # end-game + damage-matrix
     ("game_summary.html", "data-dismiss", 1),
     ("games.html", "data-dismiss", 1),
-    ("game_new.html", "data-dismiss", 1),
     ("_players_modal.html", "data-dismiss", 1),
     ("_quick_add_modal.html", "data-dismiss", 1),
     ("deck_detail.html", "data-dismiss", 2),  # bulk-move + bulk-delete
