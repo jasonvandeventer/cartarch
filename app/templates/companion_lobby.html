@@ -20,6 +20,26 @@
       <a href="/" class="cmp-back" title="Back to Cartarch">✕</a>
     </header>
 
+    {# Playgroup games you can still take a seat in. Above your own games because
+       it is the time-sensitive one — the table is waiting. Links to the ordinary
+       /join/{code} page: membership earns the LINK, the claim and its guards are
+       unchanged, and the code + QR still work for anyone outside the group. #}
+    {% if joinable | default([]) %}
+      <div class="cmp-lobby-list" style="margin-bottom:1rem">
+        {% for j in joinable %}
+          <a class="cmp-lobby-row" href="/join/{{ j.join_code }}">
+            <div class="cmp-lobby-row-main">
+              <span class="cmp-badge cmp-badge-waiting">Join</span>
+              <span class="cmp-lobby-deck">Take a seat</span>
+            </div>
+            <div class="cmp-lobby-row-meta muted">
+              {{ j.playgroup_name or j.format }} · {{ j.open_seats }} of {{ j.seat_count }} seats open
+            </div>
+          </a>
+        {% endfor %}
+      </div>
+    {% endif %}
+
     {% if entries %}
       <div class="cmp-lobby-list">
         {% for e in entries %}
@@ -41,7 +61,9 @@
         {% endfor %}
       </div>
     {% else %}
-      <div class="cmp-lobby-empty muted">No games yet — your live games will appear here.</div>
+      {% if not joinable | default([]) %}
+        <div class="cmp-lobby-empty muted">No games yet — your live games will appear here.</div>
+      {% endif %}
     {% endif %}
   </div>
 </body>

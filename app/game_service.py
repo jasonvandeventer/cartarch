@@ -1025,6 +1025,64 @@ def claimable_seats(game: Game) -> list[GameSeat]:
     return sorted((s for s in game.seats if s.user_id is None), key=lambda s: s.seat_number)
 
 
+def joinable_games_for_user(session: Session, user_id: int) -> list[dict]:
+    """Games a playgroup co-member can take a seat in WITHOUT being handed a code.
+
+    The app already knows who is in your playgroup, so making a member scan a QR
+    to join their own group's game is asking them to prove something it can look
+    up. Their phone lists it instead (owner decision 2026-07-28).
+
+    Four conditions, and each one is doing work:
+
+    * ``status == 'created'`` — claiming is refused once live, the same boundary
+      :func:`claim_seat` enforces. Listing a game you cannot join is worse than
+      not listing it.
+    * ``join_code IS NOT NULL`` — **the code stays THE toggle.** A host who turned
+      joining off has turned it off for members too; this is a second DOOR, never
+      a second switch. Deliberate: two independent ways to enable joining is a
+      state nobody can reason about from the game page.
+    * The user is a MEMBER of the game's playgroup. An unlinked game is invisible
+      here, exactly as an unlinked game is invisible to the playgroup record.
+    * The user does not already hold a seat, and one is free. ``claim_seat``
+      refuses both, so offering either would be offering a dead link.
+
+    **This is a discovery surface, NOT a new permission.** The claim it links to is
+    the same ``/join/{code}`` primitive with the same guards; membership only earns
+    you the link. Claiming itself stays open to anyone holding the code (owner
+    decision, same date) — so a guest at the table is unaffected.
+    """
+    my_playgroups = select(PlaygroupMember.playgroup_id).where(PlaygroupMember.user_id == user_id)
+    games = (
+        session.query(Game)
+        .filter(
+            Game.status == "created",
+            Game.join_code.isnot(None),
+            Game.playgroup_id.in_(my_playgroups),
+        )
+        .order_by(Game.played_at.desc())
+        .all()
+    )
+    out: list[dict] = []
+    for game in games:
+        if any(s.user_id == user_id for s in game.seats):
+            continue
+        open_seats = claimable_seats(game)
+        if not open_seats:
+            continue
+        out.append(
+            {
+                "game_id": game.id,
+                "join_code": game.join_code,
+                "format": game.format or "Commander",
+                "playgroup_name": game.playgroup.name if game.playgroup else "",
+                "seat_count": len(game.seats),
+                "open_seats": len(open_seats),
+                "played_at": game.played_at,
+            }
+        )
+    return out
+
+
 def claim_seat(
     session: Session,
     *,

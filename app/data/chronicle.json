@@ -1,5 +1,15 @@
 [
   {
+    "version": "4.12.32",
+    "date": "2026-07-28",
+    "added": [
+      "Playgroup members no longer need the code. A game linked to one of your playgroups, with a seat still free, now appears at the top of your phone's game list with a Take a seat button. The app already knows who is in the group, so asking a member to scan a QR to join their own group's game was asking them to prove something it could look up. The code and QR are unchanged and still work — they are what a guest, or anyone outside the group, uses."
+    ],
+    "refined": [],
+    "resolved": [],
+    "archivist_note": "The join code was built for the person who walks in unknown, and then applied to everyone, including the four people the app has watched play together for months. Being recognised by something you already belong to is a small courtesy, and it is the one the group notices."
+  },
+  {
     "version": "4.12.31",
     "date": "2026-07-28",
     "added": [

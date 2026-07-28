@@ -515,3 +515,113 @@ def test_a_code_minted_at_creation_actually_works(client, db, user):
         db, code=game.join_code, user_id=joiner.id, seat_id=claimable_seats(game)[0].id
     )
     assert claimed.user_id == joiner.id
+
+
+# ── Playgroup co-members find the game without a code (v4.12.32) ────────────
+
+
+def _playgroup_with(db, *users, name=None):
+    from app.models import Playgroup, PlaygroupMember
+
+    pg = Playgroup(name=name or f"PG{next(_seq)}", created_by=users[0].id)
+    db.add(pg)
+    db.commit()
+    for u in users:
+        db.add(PlaygroupMember(playgroup_id=pg.id, user_id=u.id))
+    db.commit()
+    return pg
+
+
+def test_a_co_member_is_offered_the_game_without_being_handed_a_code(client, db, user):
+    """The app already knows who is in the playgroup — making a member scan a QR
+    to join their own group's game asks them to prove something it can look up."""
+    from app.game_service import joinable_games_for_user
+
+    member = _user(db, display="Mason")
+    pg = _playgroup_with(db, user, member)
+    g = _game(db, user, code="PGCODE01")
+    g.playgroup_id = pg.id
+    db.commit()
+
+    offered = joinable_games_for_user(db, member.id)
+    assert [x["game_id"] for x in offered] == [g.id]
+    assert offered[0]["open_seats"] == 4
+
+
+def test_a_non_member_is_not_offered_it(db, user):
+    from app.game_service import joinable_games_for_user
+
+    outsider = _user(db)
+    pg = _playgroup_with(db, user)
+    g = _game(db, user, code="PGCODE02")
+    g.playgroup_id = pg.id
+    db.commit()
+    assert joinable_games_for_user(db, outsider.id) == []
+
+
+def test_the_code_is_still_THE_toggle_for_members_too(db, user):
+    """A second independent way to enable joining is a state nobody could reason
+    about from the game page. Joining off means off, membership or not."""
+    from app.game_service import joinable_games_for_user
+
+    member = _user(db)
+    pg = _playgroup_with(db, user, member)
+    g = _game(db, user, code=None)
+    g.playgroup_id = pg.id
+    db.commit()
+    assert joinable_games_for_user(db, member.id) == []
+
+
+def test_an_unlinked_game_is_invisible_here(db, user):
+    """Same scope rule the playgroup record uses — an unlinked private game must
+    not surface on a shared surface."""
+    from app.game_service import joinable_games_for_user
+
+    member = _user(db)
+    _playgroup_with(db, user, member)
+    _game(db, user, code="PGCODE03")  # no playgroup_id
+    assert joinable_games_for_user(db, member.id) == []
+
+
+def test_a_started_or_full_game_is_not_offered(db, user):
+    """claim_seat refuses both, so offering either is offering a dead link."""
+    from app.game_service import joinable_games_for_user
+
+    member = _user(db)
+    pg = _playgroup_with(db, user, member)
+
+    live = _game(db, user, status="in_progress", code="PGCODE04")
+    live.playgroup_id = pg.id
+    full = _game(db, user, code="PGCODE05")
+    full.playgroup_id = pg.id
+    for s in full.seats:
+        s.user_id = user.id if s.seat_number == 1 else _user(db).id
+    db.commit()
+
+    assert joinable_games_for_user(db, member.id) == []
+
+
+def test_someone_already_seated_is_not_offered_their_own_game(db, user):
+    from app.game_service import joinable_games_for_user
+
+    member = _user(db)
+    pg = _playgroup_with(db, user, member)
+    g = _game(db, user, code="PGCODE06")
+    g.playgroup_id = pg.id
+    g.seats[1].user_id = member.id
+    db.commit()
+    assert joinable_games_for_user(db, member.id) == []
+
+
+def test_the_offer_actually_renders_on_the_companion_lobby(client, db, user):
+    """Route-level: `joinable` has to reach the template (#152's failure mode)."""
+    pg = _playgroup_with(db, user, name="Smackdown")
+    other = _user(db)
+    g = _game(db, other, code="PGCODE07")
+    g.playgroup_id = pg.id
+    db.commit()
+
+    body = client.get("/companion").text
+    assert "/join/PGCODE07" in body
+    assert "Take a seat" in body
+    assert "Smackdown" in body

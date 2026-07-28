@@ -654,7 +654,15 @@ def companion_lobby(
     return render(
         request,
         "companion_lobby.html",
-        {"title": "Live Games", "entries": entries[:20], "current_user": current_user},
+        {
+            "title": "Live Games",
+            "entries": entries[:20],
+            # Discovery, not permission: a co-member gets the link to the SAME
+            # /join/{code} claim rather than a second way of being allowed in.
+            # #152 lesson — a new service function needs THIS line too.
+            "joinable": game_service.joinable_games_for_user(session, current_user.id),
+            "current_user": current_user,
+        },
     )
 
 
