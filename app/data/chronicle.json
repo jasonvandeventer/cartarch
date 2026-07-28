@@ -1,5 +1,17 @@
 [
   {
+    "version": "4.12.20",
+    "date": "2026-07-28",
+    "added": [
+      "When you set up a game, each seat now has a box where you can simply type a commander instead of picking from your deck list. If you already have that commander's deck, the seat links to it however you have since renamed it. If you don't, Cartarch creates the deck for you on the spot — a deck that knows its commander and nothing else, which you can fill in later or never. Until now, playing a deck you had never registered meant the game recorded nothing about it."
+    ],
+    "refined": [
+      "Typing a commander Cartarch doesn't recognise no longer fails quietly. The game is still created — a game is never lost over a deck-naming problem — and the page tells you which name didn't match. Worth knowing: some alternate-art printings display a different name from the card's real one, and only the real name is searchable."
+    ],
+    "resolved": [],
+    "archivist_note": "The plan for this one said the hard part would be teaching every analysis page to cope with a deck that has no cards in it. It turned out they already do — a deck with no cards has been possible all along, and every page that reports on a deck's contents already checks whether there are any before saying anything. So the flag added last release for that purpose is still doing nothing, which is the right outcome: the app was already asking the better question, namely whether cards are actually there, rather than trusting a label that could fall out of step with reality. What was left was the part that mattered anyway — making a deck you never wrote down into something a game can point at."
+  },
+  {
     "version": "4.12.19",
     "date": "2026-07-28",
     "added": [
