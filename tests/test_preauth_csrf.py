@@ -331,7 +331,16 @@ def test_all_four_forms_reach_past_guard_cookieless():
             follow_redirects=False,
         )
         assert r.status_code == 200, f"reset cookie-less -> {r.status_code}"
-        assert "403" not in r.text
+        # Assert the SUCCESS state, not the absence of the string "403".
+        #
+        # The old check was `assert "403" not in r.text`, which was both redundant
+        # (the status assertion above is what actually catches a 403 — a rejected
+        # pre-auth POST raises HTTPException, it does not render 403 text into a
+        # 200) and FLAKY: every page footer renders the app version as
+        # `dev-<short-sha>`, so any commit whose short SHA contains "403" failed
+        # this line. Commit 3403cbf did exactly that. Roughly 1 in 30 commits would
+        # have tripped it, on a test with nothing to do with the change.
+        assert "password has been reset" in r.text
     finally:
         main.app.dependency_overrides.pop(get_db_session, None)
 
