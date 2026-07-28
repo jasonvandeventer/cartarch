@@ -1,5 +1,16 @@
 [
   {
+    "version": "4.12.24",
+    "date": "2026-07-28",
+    "added": [],
+    "refined": [
+      "Setting up a game now offers phone joining on the setup page itself, rather than after the fact. Tick the box and the game page opens with the code and QR already showing, instead of you having to create the game and then go find the button. Leaving it unticked keeps joining off.",
+      "The button that finishes game setup now reads “Create Game” rather than “Start Game”, because that is what it does — the game is set up but not started, and “Go Live” is what starts it. The old wording suggested pressing it was the point of no return for players joining, when it is actually the step that lets them."
+    ],
+    "resolved": [],
+    "archivist_note": "Both faults were visible the moment somebody used the page rather than read the code, which is the only reason they were found. Neither is a defect in the sense of anything behaving wrongly — the joining feature worked exactly as built, one page further along than anyone would look for it, behind a button whose name suggested the opposite of what it did."
+  },
+  {
     "version": "4.12.23",
     "date": "2026-07-28",
     "added": [
