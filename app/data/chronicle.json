@@ -1,5 +1,17 @@
 [
   {
+    "version": "4.12.27",
+    "date": "2026-07-28",
+    "added": [
+      "A QR code for the companion link, on the game screen once play has started. Handing a phone the companion address used to mean reading a URL off a tablet and typing it in. The link and the copy button are both still there — scanning is the shortcut, never the only way in."
+    ],
+    "refined": [],
+    "resolved": [
+      "Both QR codes were drawing at about 75 pixels across — small enough that a phone camera reaching over a table in poor light might not resolve them. They now render at their intended size, on a white field so the camera can find the edges."
+    ],
+    "archivist_note": "The size fault is a quiet one: the code was correct, scannable on a desk, and would have failed only at the moment it mattered, held at arm's length across a lit table. It was measured rather than eyeballed, which is the only reason it was caught before somebody stood up to reach."
+  },
+  {
     "version": "4.12.26",
     "date": "2026-07-28",
     "added": [],

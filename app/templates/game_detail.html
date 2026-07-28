@@ -330,7 +330,7 @@
                    and it works with JS off. Renders "" on failure, degrading to the
                    code rather than to a broken page. #}
                 {% if join_qr %}
-                  <div class="join-qr" style="margin:0.5rem 0; max-width:190px">{{ join_qr | safe }}</div>
+                  <div class="join-qr" style="margin:0.5rem auto">{{ join_qr | safe }}</div>
                 {% endif %}
                 <form method="post" action="/games/{{ game.id }}/join-code" style="display:inline">
                   <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
@@ -351,6 +351,15 @@
               <div class="companion-share-label">Players: join on your phone</div>
               <input type="text" id="companion-url" class="companion-share-url" readonly>
               <button type="button" class="game-launch-skip" onclick="copyCompanionUrl()">Copy link</button>
+              {# Scanning beats retyping a URL off a tablet. Same posture as the #165
+                 join QR: a SHORTCUT, never the mechanism — the link and the copy
+                 button stay, because an angled screen or a bad camera must not be
+                 what stops a player connecting. `join_qr_svg` returns "" on failure,
+                 so a QR that will not draw degrades to the link rather than to a
+                 broken page. #}
+              {% if companion_qr %}
+                <div class="join-qr" style="margin:0.6rem auto 0">{{ companion_qr | safe }}</div>
+              {% endif %}
               <div class="companion-share-label">or open <strong>cartarch.com/companion</strong> on your phone</div>
             </div>
           {% endif %}

@@ -482,6 +482,16 @@ def game_detail_page(
             if game.status == "created" and game.join_code
             else ""
         ),
+        # The same shortcut for the OTHER phone hand-off. Once the game is live the
+        # overlay stops offering a join code and offers the companion link instead —
+        # which was a URL to retype off a tablet. Built from `_public_base_url()`,
+        # not the JS `location.origin` the input box uses, for the reason the reset
+        # link is: behind cloudflared the request scheme is the internal http.
+        "companion_qr": (
+            game_service.join_qr_svg(f"{_public_base_url()}/games/{game.id}/companion")
+            if game.status == "in_progress"
+            else ""
+        ),
         "title": f"Game {game_id}",
         "game": game,
         "decks": decks,

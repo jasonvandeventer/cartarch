@@ -143,3 +143,27 @@ def test_a_started_game_refuses_the_change(db, user):
 def test_the_picker_is_gone_once_the_game_is_no_longer_created(client, db, user):
     g = _game(db, user, status="in_progress")
     assert "/first-seat" not in client.get(f"/games/{g.id}").text
+
+
+# ── The companion QR (v4.12.27) ─────────────────────────────────────────────
+
+
+def test_a_live_game_offers_the_companion_link_as_a_qr(client, db, user):
+    """Once live, the overlay stops offering a join code and offers the companion
+    URL — which was a link to retype off a tablet."""
+    g = _game(db, user, status="in_progress")
+    body = client.get(f"/games/{g.id}").text
+    # Slice from the block, not split() on it — "companion-share" appears four
+    # times (wrapper, two labels, the url input), so split()[1] is a ten-character
+    # fragment between the first two and would pass or fail for the wrong reason.
+    block = body[body.index('class="companion-share"') :][:4000]
+    assert "<svg" in block, "the companion QR is not inside the share block"
+    assert "/companion" in body
+
+
+def test_the_companion_qr_is_absent_before_the_game_starts(client, db, user):
+    """`created` offers the JOIN code instead — two different hand-offs, and
+    showing both at once would ask a player to scan the wrong one."""
+    g = _game(db, user, status="created")
+    r = client.get(f"/games/{g.id}")
+    assert "companion-share" not in r.text

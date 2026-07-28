@@ -3693,6 +3693,30 @@ body.game-mode {
   padding: 2rem;
   margin: auto;
 }
+/* The QR (#165 join code, v4.12.27 companion link) is server-rendered SVG whose
+   intrinsic size is in MILLIMETRES — `width="19.8mm"`, about 75px. A `max-width`
+   on the wrapper cannot grow that, so both QRs were drawing at 75px: a 21-module
+   code at ~3.5px per module, right at the edge of what a phone camera resolves
+   across a table in bad light. The wrapper's max-width is the intended size, so
+   make the SVG actually fill it. Scanning is the whole point of the affordance. */
+.join-qr {
+  /* The wrapper sits in a `align-items: center` column, so it shrink-to-fits its
+     content — which means the SVG's `width: 100%` below resolves against the
+     SVG's own 75px and nothing grows. The intended size has to be stated here. */
+  width: 190px;
+  max-width: 100%;
+  margin-inline: auto;
+}
+.join-qr svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  /* Quiet zone. A QR needs light margin to be found at all, and these sit on a
+     near-black overlay. */
+  background: #fff;
+  padding: 6px;
+  border-radius: 6px;
+}
 .game-launch-format {
   font-size: 1.1rem;
   color: var(--muted);
