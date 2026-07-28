@@ -452,3 +452,53 @@ def test_the_borrowed_rule_does_NOT_fire_when_nobody_owns_the_commander(db, user
     db.commit()
 
     assert _deck_owner_for(db, seat) == (user.id, "")
+
+
+# ── commit=False must actually mean no write ────────────────────────────────
+
+
+def test_commit_false_writes_NOTHING_after_a_rollback(db, user):
+    """THE bug this file exists to prevent recurring.
+
+    `create_deck` committed unconditionally while `resolve_commander_to_deck`
+    advertised `commit=False`, so the #164 backfill's DRY RUN wrote five decks to
+    production. A caller cannot honour a no-write contract that its callee silently
+    breaks — so the contract is now tested end to end, through a rollback, rather
+    than trusted.
+    """
+    _card(db, "Atraxa, Praetors' Voice", "sc-atraxa")
+    before = db.query(Deck).count()
+
+    deck, missing = deck_service.resolve_commander_to_deck(
+        db, user.id, "Atraxa, Praetors' Voice", commit=False
+    )
+    assert missing == [] and deck is not None
+    assert deck.id is not None, "commit=False must still flush, or dependent rows have no FK"
+
+    db.rollback()
+
+    assert db.query(Deck).count() == before, "a dry run wrote a deck"
+    assert db.query(DeckCommander).count() == 0
+    assert db.query(StorageLocation).filter(StorageLocation.type == "deck").count() == 0, (
+        "a dry run left an orphan storage location"
+    )
+
+
+def test_create_deck_commit_false_leaves_nothing_behind(db, user):
+    """The same contract at the layer that actually broke it."""
+    before = db.query(Deck).count()
+
+    d = deck_service.create_deck(db, user.id, "Scratch", commit=False)
+    assert d.id is not None
+
+    db.rollback()
+
+    assert db.query(Deck).count() == before
+    assert db.query(StorageLocation).filter(StorageLocation.name == "Scratch").count() == 0
+
+
+def test_create_deck_still_commits_by_default(db, user):
+    """The default must be unchanged — every existing caller relies on it."""
+    d = deck_service.create_deck(db, user.id, "Committed")
+    db.rollback()
+    assert db.get(Deck, d.id) is not None

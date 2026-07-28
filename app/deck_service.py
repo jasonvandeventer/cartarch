@@ -1920,7 +1920,20 @@ def create_deck(
     format_name: str = "",
     notes: str = "",
     is_brew: bool = False,
+    *,
+    commit: bool = True,
 ) -> Deck:
+    """Create a deck and its paired StorageLocation.
+
+    ``commit=False`` leaves the transaction open for a caller composing several
+    writes — it FLUSHES so ``deck.id`` is usable for dependent rows, but does not
+    commit. Mirrors ``delete_deck``'s existing ``commit`` parameter.
+
+    This is not decoration. ``resolve_commander_to_deck`` passed ``commit=False``
+    while this function committed unconditionally, so a "dry run" of the #164
+    backfill wrote five decks to production. A caller cannot honour a no-write
+    contract that its callee silently breaks.
+    """
     deck_name = name.strip()
 
     location = StorageLocation(
@@ -1946,8 +1959,11 @@ def create_deck(
         is_brew=bool(is_brew),
     )
     session.add(deck)
-    session.commit()
-    session.refresh(deck)
+    if commit:
+        session.commit()
+        session.refresh(deck)
+    else:
+        session.flush()  # populate deck.id for dependent rows, without committing
     return deck
 
 
@@ -5341,7 +5357,7 @@ def resolve_commander_to_deck(
     ):
         deck_name = f"{deck_name} (commander)"
 
-    deck = create_deck(session, user_id, deck_name, format_name="Commander")
+    deck = create_deck(session, user_id, deck_name, format_name="Commander", commit=commit)
     deck.contents_tracked = False
     for card in cards:
         session.add(DeckCommander(deck_id=deck.id, card_id=card.id))
