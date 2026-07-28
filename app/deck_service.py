@@ -2067,11 +2067,17 @@ def list_pickable_decks(session: Session, user_ids) -> list[Deck]:
       a deck you own or can bring to a table, so offering it in a picker is
       offering something unplayable.
 
-    **`contents_tracked` is deliberately the discriminator here, not "has no
-    rows".** They are not equivalent: a deck you created five minutes ago and have
-    not filled yet is also empty, and it MUST stay pickable. The flag says
-    "nobody is tracking what is in this" — exactly the distinction wanted, and the
-    reason #164 reserved the column. This is the first reader; see the note in
+    **The untracked test is `flag AND no rows`, and the second half is not
+    optional.** `contents_tracked` alone is the wrong predicate in one direction:
+    nothing ever flips it back to true, so importing a decklist INTO a placeholder
+    would produce a real 100-card deck that stayed invisible in every picker
+    forever. `if rows:` alone is wrong in the other direction: a deck created five
+    minutes ago and not yet filled is also empty and MUST stay pickable. Together
+    they say the only thing that actually disqualifies a deck — *nobody is
+    tracking its contents and it has none* — and the rows half self-heals, so a
+    placeholder needs no write to graduate.
+
+    This is `contents_tracked`'s first reader; see the note in
     ``tests/test_history_durability.py`` for why the no-reader guard was retired.
 
     A placeholder stays fully live everywhere else: ``resolve_commander_to_deck``
@@ -2079,12 +2085,17 @@ def list_pickable_decks(session: Session, user_ids) -> list[Deck]:
     instead of minting a second placeholder), its seats keep pointing at it, and
     it still appears on the Decks page where it can be managed.
     """
+    has_rows = (
+        select(InventoryRow.id)
+        .where(InventoryRow.storage_location_id == Deck.storage_location_id)
+        .exists()
+    )
     return (
         session.query(Deck)
         .filter(
             Deck.user_id.in_(list(user_ids)),
             Deck.retired_at.is_(None),
-            Deck.contents_tracked.is_(True),
+            or_(Deck.contents_tracked.is_(True), has_rows),
         )
         .order_by(Deck.name.asc())
         .all()

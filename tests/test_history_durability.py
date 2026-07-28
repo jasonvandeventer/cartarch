@@ -322,3 +322,37 @@ def test_an_empty_but_tracked_deck_is_still_pickable(db, user):
 
 def test_retired_at_is_not_set_on_a_live_deck(db, user):
     assert _deck(db, user).retired_at is None
+
+
+def test_a_placeholder_that_gains_cards_becomes_pickable_again(db, user):
+    """Nothing ever flips `contents_tracked` back to true.
+
+    So the flag ALONE would be a trap: import a decklist into a placeholder and
+    you have a real 100-card deck that is invisible in every game picker forever,
+    with no way to fix it from the UI. The `or has rows` half self-heals — a
+    placeholder graduates by being used, not by a write nobody would think to make.
+    """
+    from app.deck_service import list_pickable_decks
+    from app.models import Card, InventoryRow
+
+    placeholder = _deck(db, user, name="Grew Into A Deck")
+    placeholder.contents_tracked = False
+    db.commit()
+    assert placeholder.id not in {d.id for d in list_pickable_decks(db, [user.id])}
+
+    card = Card(scryfall_id="grew-1", name="Sol Ring", set_code="tst", collector_number="1")
+    db.add(card)
+    db.commit()
+    db.add(
+        InventoryRow(
+            user_id=user.id,
+            card_id=card.id,
+            quantity=1,
+            finish="normal",
+            storage_location_id=placeholder.storage_location_id,
+            is_pending=False,
+        )
+    )
+    db.commit()
+
+    assert placeholder.id in {d.id for d in list_pickable_decks(db, [user.id])}

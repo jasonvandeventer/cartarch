@@ -1,5 +1,15 @@
 [
   {
+    "version": "4.12.30",
+    "date": "2026-07-28",
+    "added": [],
+    "refined": [],
+    "resolved": [
+      "A record-only deck that you later filled with cards would have stayed hidden from the game pickers permanently, with nothing in the app able to undo it. Nothing marks such a deck as tracked once it is created, so the flag alone was never going to be enough — a deck now counts as playable if it is marked tracked or simply has cards in it, and filling one in is all it takes."
+    ],
+    "archivist_note": "Shipped an hour after the change that caused it, and found by asking what happens next rather than by anything going wrong. A deck put beyond reach by a rule that never fires again is the kind of fault that waits months for the one person who tries it."
+  },
+  {
     "version": "4.12.29",
     "date": "2026-07-28",
     "added": [],
