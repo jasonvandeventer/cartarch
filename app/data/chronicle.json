@@ -1,5 +1,15 @@
 [
   {
+    "version": "4.12.28",
+    "date": "2026-07-28",
+    "added": [],
+    "refined": [],
+    "resolved": [
+      "A deck you deleted still appeared everywhere a deck can be picked for a game. Deleting a deck stopped destroying it earlier this month — the cards come back to your collection exactly as before, but the record itself is kept so past games do not lose track of what was played. Four of the game screens were still listing decks directly instead of asking for your current ones, so they never learned the difference, and a deleted deck kept turning up in the dropdown."
+    ],
+    "archivist_note": "The keeping-the-record change was careful about the thing it was built to protect and incurious about everything downstream of it. A deck was hidden from the deck list, which is where anyone would look to check, and left visible in four dropdowns nobody thought to open."
+  },
+  {
     "version": "4.12.27",
     "date": "2026-07-28",
     "added": [

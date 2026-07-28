@@ -167,3 +167,40 @@ def test_the_companion_qr_is_absent_before_the_game_starts(client, db, user):
     g = _game(db, user, status="created")
     r = client.get(f"/games/{g.id}")
     assert "companion-share" not in r.text
+
+
+# ── Retired decks stay out of the pickers (v4.12.28) ────────────────────────
+
+
+def test_a_retired_deck_is_not_offered_in_any_game_deck_picker(client, db, user):
+    """#163 made deck deletion a RETIREMENT so game history survives. Four game
+    surfaces hand-rolled `session.query(Deck)` instead of going through
+    `list_decks`, so they never learned about it — a deck you "deleted" kept
+    appearing everywhere you pick one, which is the whole user-visible point of
+    deletion undone.
+
+    Covers the new-game picker (cross-user), the manual log, the game-detail
+    seat picker and the companion picker in one pass.
+    """
+    from app.deck_service import delete_deck
+    from app.game_service import list_user_decks_for_companion
+    from app.models import Deck, StorageLocation
+
+    loc = StorageLocation(user_id=user.id, name="Ghost Deck", type="deck", mode="manual")
+    db.add(loc)
+    db.commit()
+    d = Deck(user_id=user.id, name="Ghost Deck", storage_location_id=loc.id)
+    db.add(d)
+    db.commit()
+    deck_id = d.id
+
+    assert "Ghost Deck" in client.get("/games/new").text
+    delete_deck(db, deck_id, user.id)
+    db.expire_all()
+
+    assert "Ghost Deck" not in client.get("/games/new").text
+    assert "Ghost Deck" not in client.get("/games/manual-log").text
+    assert all(x["name"] != "Ghost Deck" for x in list_user_decks_for_companion(db, user.id))
+
+    g = _game(db, user)
+    assert "Ghost Deck" not in client.get(f"/games/{g.id}").text

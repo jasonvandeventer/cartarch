@@ -935,7 +935,12 @@ def list_user_decks_for_companion(session: Session, user_id: int) -> list[dict]:
     """The user's own decks for the companion pre-live deck picker: id, name,
     commander name + art scryfall_id, sorted by name. Matches the game-creation
     picker's filter — no brew exclusion (``game_new`` lists all decks)."""
-    decks = session.query(Deck).filter(Deck.user_id == user_id).order_by(Deck.name).all()
+    decks = (
+        session.query(Deck)
+        .filter(Deck.user_id == user_id, Deck.retired_at.is_(None))
+        .order_by(Deck.name)
+        .all()
+    )
     return [
         {
             "id": d.id,
