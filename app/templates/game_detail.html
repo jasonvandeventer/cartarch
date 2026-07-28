@@ -269,7 +269,38 @@
               <button type="submit" class="game-launch-btn go-live-btn">📱 Go Live (multi-device)</button>
             </form>
             <p class="game-launch-hint muted">Players join from their phones to control their own seats.</p>
-            <p class="game-launch-hint muted">Players can pick their deck from their phone (cartarch.com/companion) before you go live.</p>
+
+            {# #165 — seat claiming. The code IS the toggle (NULL = off), same posture
+               as Deck.share_token and Playgroup.join_code. Owner-only, and shown only
+               while `created` because claiming is refused once the game is live. #}
+            <div class="join-claim-panel" style="margin-top:0.9rem">
+              {% if game.join_code %}
+                <p class="game-launch-hint muted" style="margin-bottom:0.3rem">
+                  Players join at <strong>{{ public_base_url() }}/join</strong> with code
+                  <strong style="letter-spacing:0.06em">{{ game.join_code }}</strong> — or scan:
+                </p>
+                {# QR is a SHORTCUT to the same claim, never the only way in: a tablet
+                   across the table or a camera in bad light must not stop someone
+                   joining, so the code above is always shown as text. Rendered
+                   SERVER-SIDE as inline SVG — no CDN, nothing for the CSP to block,
+                   and it works with JS off. Renders "" on failure, degrading to the
+                   code rather than to a broken page. #}
+                {% if join_qr %}
+                  <div class="join-qr" style="margin:0.5rem 0; max-width:190px">{{ join_qr | safe }}</div>
+                {% endif %}
+                <form method="post" action="/games/{{ game.id }}/join-code" style="display:inline">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                  <input type="hidden" name="enable" value="false">
+                  <button type="submit" class="btn-like">Turn joining off</button>
+                </form>
+              {% else %}
+                <form method="post" action="/games/{{ game.id }}/join-code">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                  <input type="hidden" name="enable" value="true">
+                  <button type="submit" class="btn-like">Let players join from their phones</button>
+                </form>
+              {% endif %}
+            </div>
           {% endif %}
           {% if game.status == 'in_progress' %}
             <div class="companion-share">
@@ -2327,4 +2358,33 @@ seatDefs.forEach((s, i) => {
 });
 {% endif %}
   </script>
+
+  {% if is_owner and game.status == 'created' %}
+    {# #165 finding 2 — there is NO SSE stream before `live_start`: get_live_state
+       raises LookupError while game.live_state is None, so a claim would land in the
+       database while this page showed a static seat list. Polling is the smaller
+       honest fix; a pre-live stream is the upgrade if this ever feels slow.
+       ponytail: 4s poll, stops the moment the game leaves `created`. #}
+    <script>
+    (function () {
+      var GID = {{ game.id }};
+      var timer = setInterval(function () {
+        fetch('/games/' + GID + '/lobby.json', { credentials: 'same-origin' })
+          .then(function (r) { return r.ok ? r.json() : null; })
+          .then(function (d) {
+            if (!d) return;
+            if (d.status !== 'created') { clearInterval(timer); location.reload(); return; }
+            var claimed = d.seats.filter(function (s) { return s.claimed; }).length;
+            var el = document.getElementById('lobby-claimed-count');
+            if (el && el.dataset.count !== String(claimed)) {
+              el.dataset.count = String(claimed);
+              location.reload();  // a seat changed hands; re-render from the server
+            }
+          })
+          .catch(function () { /* transient; the next tick retries */ });
+      }, 4000);
+    })();
+    </script>
+    <span id="lobby-claimed-count" data-count="{{ game.seats | selectattr('user_id') | list | length }}" hidden></span>
+  {% endif %}
 {% endblock %}

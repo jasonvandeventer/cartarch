@@ -249,6 +249,18 @@ def static_v(path: str) -> str:
     return digest
 
 
+# #165 — the canonical site origin, for links a phone must be able to reach (the
+# seat-claim QR). Lazily imported INSIDE the closure: `main.py` imports this module,
+# so a top-level import here would cycle. Reads configured site identity, never the
+# per-request scheme — behind cloudflared `request.url.scheme` is the internal http,
+# which is exactly the bug that shipped a non-TLS auth link.
+def _public_base_url() -> str:
+    from app.main import public_base_url
+
+    return public_base_url()
+
+
+templates.env.globals["public_base_url"] = _public_base_url
 templates.env.globals["static_v"] = static_v
 
 

@@ -657,6 +657,20 @@ class TransactionLog(Base):
 class Game(Base):
     __tablename__ = "games"
 
+    # #165 — same PARTIAL unique posture as ``uq_playgroups_join_code``: a claim
+    # code must be unambiguous among ENABLED codes, while NULL (claiming off) may
+    # repeat across every game that has it disabled. Both dialects, so the
+    # predicate emits on SQLite and Postgres alike.
+    __table_args__ = (
+        Index(
+            "uq_games_join_code",
+            "join_code",
+            unique=True,
+            sqlite_where=text("join_code IS NOT NULL"),
+            postgresql_where=text("join_code IS NOT NULL"),
+        ),
+    )
+
     id: Mapped[int] = mapped_column(primary_key=True)
     # v3.39.x (gate #5) — was NO ACTION + NOT NULL. The gate-#5 parent-delete
     # harness proved a NO-ACTION ``user_id`` BLOCKS ``DELETE FROM users`` under FK
@@ -710,6 +724,15 @@ class Game(Base):
     # first_seat_number above). NULL = legacy game predating this fix; client
     # falls back to the bare ``mana-game-${gameId}`` key.
     client_token: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    # #165 — the SEAT-CLAIM code. Distinct from ``client_token`` in kind, not just
+    # value: the table token grants control of EVERY seat and must never reach a
+    # phone, while this only lets a logged-in member attach THEMSELVES to one
+    # unclaimed seat, and only while the game is ``created``. Never confuse them.
+    #
+    # NULL = claiming disabled. Follows the v3.29.0 ``Playgroup.join_code`` model
+    # exactly, including the PARTIAL unique index below — codes are unique among
+    # ENABLED ones; NULL repeats freely.
+    join_code: Mapped[str | None] = mapped_column(String(32), nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utc_now)
     # v3.33.2 — wall-clock end timestamp, stamped once by end_game when the

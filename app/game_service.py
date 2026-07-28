@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import logging
+import secrets
 from typing import Any
 
 from sqlalchemy import and_, or_, select
@@ -20,6 +22,8 @@ from app.models import (
     User,
 )
 from app.timeutil import utc_now
+
+logger = logging.getLogger(__name__)
 
 # Optional operator-picked win condition captured at finalize (game-event
 # history, Phase 2). Service-layer enum, same non-blocking normalize pattern as
@@ -181,6 +185,29 @@ def _capture_deck_identity(session: Session, deck_id: int | None) -> tuple[str |
         .all()
     )
     names = [r.card.name for r in commander_rows if r.card and r.card.name]
+    if not names:
+        # #165 — fall back to #163's commander ANCHOR (`deck_commanders`). A
+        # PLACEHOLDER deck (#164) knows its commander but holds no cards, so the
+        # inventory-row lookup above finds nothing and the snapshot would record
+        # `(deck.name, None)` — losing the one fact such a deck exists to carry.
+        #
+        # Fixed at this shared function rather than at the caller so EVERY snapshot
+        # site benefits: game creation, `set_own_seat_deck`, the seat claim, and the
+        # #164 backfill all route through here.
+        #
+        # Same 2-card cap and `" + "` join as above; ordered by `card_id` for a
+        # stable, order-independent rendering of a partner pair.
+        from app.models import DeckCommander
+
+        names = [
+            n
+            for (n,) in session.query(Card.name)
+            .join(DeckCommander, DeckCommander.card_id == Card.id)
+            .filter(DeckCommander.deck_id == deck.id)
+            .order_by(Card.id)
+            .limit(2)
+            if n
+        ]
     commander_name = " + ".join(names) if names else None
     return deck.name, commander_name
 
@@ -918,3 +945,143 @@ def set_own_seat_deck(
     seat.commander_name_at_game = commander_name
     session.commit()
     return seat
+
+
+# --- #165: seat claiming from a phone ----------------------------------------
+
+
+def generate_join_code(session: Session) -> str:
+    """A unique opaque seat-claim code.
+
+    Same primitive and retry shape as ``playgroup_service._generate_join_code``
+    and ``Game.client_token``. NOT interchangeable with ``client_token``: that
+    grants control of every seat and must never reach a phone; this only lets a
+    logged-in member attach themselves to one unclaimed seat.
+    """
+    for _ in range(8):
+        code = secrets.token_urlsafe(8)
+        if session.query(Game.id).filter(Game.join_code == code).first() is None:
+            return code
+    return secrets.token_urlsafe(16)  # astronomically unlikely; widen entropy
+
+
+def get_game_by_join_code(session: Session, code: str) -> Game | None:
+    """Strictly by ENABLED join code. Empty/None never matches — ``join_code ==
+    None`` would be NULL-rejecting anyway, but the explicit guard means a blank
+    form field cannot fall through to a game whose claiming is disabled."""
+    trimmed = (code or "").strip()
+    if not trimmed:
+        return None
+    return session.query(Game).filter(Game.join_code == trimmed).first()
+
+
+def claimable_seats(game: Game) -> list[GameSeat]:
+    """Seats nobody has claimed — no ``user_id``. Ordered by seat number so the
+    phone's list matches the table's."""
+    return sorted((s for s in game.seats if s.user_id is None), key=lambda s: s.seat_number)
+
+
+def claim_seat(
+    session: Session,
+    *,
+    code: str,
+    user_id: int,
+    seat_id: int,
+    display_name: str = "",
+    commander_entry: str = "",
+) -> tuple[GameSeat, list[str]]:
+    """A logged-in member claims ONE unclaimed seat. Returns ``(seat, unresolved)``.
+
+    ``unresolved`` names a commander the catalog does not contain; the seat is
+    still claimed (never fail a claim over a deck-naming problem — the same
+    non-blocking posture game creation takes for format / first_seat / attribution)
+    and the caller shows the name back.
+
+    Guards, each deliberate:
+
+    * ``created`` ONLY — once live, raises :class:`GameLockedError` → 409. This is
+      the SAME boundary ``set_own_seat_deck`` already enforces, not a second timing
+      model.
+    * The seat must be **unclaimed**. Taking someone else's seat is a
+      ``PermissionError`` → 403, not a silent overwrite.
+    * One seat per person: a member already seated in this game cannot claim a
+      second. Otherwise one phone could occupy the table.
+    * **The claim ALWAYS attaches ``user_id``.** #152's playgroup record groups by
+      ``GameSeat.user_id`` and never ``player_name``, so a claim that set only a
+      name would regress attribution for the best-covered population.
+    * The placeholder ``player_name`` ("Player 3") is OVERWRITTEN. Positional
+      labels are worse than nothing — next month's "Player 3" is a different human
+      (see #167 on ``Opp 1/2/3``).
+    """
+    from app.deck_service import resolve_commander_to_deck
+
+    game = get_game_by_join_code(session, code)
+    if game is None:
+        raise LookupError("Game not found")
+    if game.status != "created":
+        raise GameLockedError("This game has already started")
+
+    if any(s.user_id == user_id for s in game.seats):
+        raise PermissionError("You already have a seat in this game")
+
+    seat = next((s for s in game.seats if s.id == seat_id), None)
+    if seat is None:
+        raise LookupError("Seat not found")
+    if seat.user_id is not None:
+        raise PermissionError("That seat is already taken")
+
+    user = session.get(User, user_id)
+    seat.user_id = user_id
+    resolved_name = (display_name or "").strip()
+    if not resolved_name and user is not None:
+        resolved_name = (user.display_name or user.username or "").strip()
+    if resolved_name:
+        seat.player_name = resolved_name[:128]
+    seat.user_name_at_game = seat.player_name
+
+    unresolved: list[str] = []
+    if (commander_entry or "").strip():
+        deck, missing = resolve_commander_to_deck(session, user_id, commander_entry, commit=False)
+        unresolved = missing
+        if deck is not None:
+            seat.deck_id = deck.id
+            deck_name, commander_name = _capture_deck_identity(session, deck.id)
+            seat.deck_name_at_game = deck_name
+            seat.commander_name_at_game = commander_name
+
+    session.commit()
+    return seat, unresolved
+
+
+def join_qr_svg(url: str) -> str:
+    """Inline SVG QR for a claim URL (#165).
+
+    Server-side, so there is no CDN request, no vendored JS, nothing for the CSP to
+    block, and it works with JS disabled. `SvgPathImage` is pure Python — Pillow is
+    not involved.
+
+    The QR is a SHORTCUT to the claim, never the mechanism: the code is always
+    displayed as text beside it, so a tablet across the table, an angled screen, or
+    a camera in bad light can never be what stops someone joining. Returns "" on any
+    failure for the same reason — a QR that will not draw must degrade to the code,
+    not to a broken page.
+    """
+    if not url:
+        return ""
+    try:
+        import io
+
+        import qrcode
+        from qrcode.image.svg import SvgPathImage
+
+        qr = qrcode.QRCode(box_size=6, border=2, error_correction=qrcode.constants.ERROR_CORRECT_M)
+        qr.add_data(url)
+        qr.make(fit=True)
+        buf = io.BytesIO()
+        qr.make_image(image_factory=SvgPathImage).save(buf)
+        svg = buf.getvalue().decode("utf-8")
+        # Drop the XML prolog so the fragment can be embedded directly in the page.
+        return svg[svg.index("<svg") :] if "<svg" in svg else ""
+    except Exception:  # noqa: BLE001 — a QR failure must never break the page
+        logger.warning("join QR render failed", exc_info=True)
+        return ""

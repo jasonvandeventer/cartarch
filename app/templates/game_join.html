@@ -1,0 +1,92 @@
+{% from "_macros.html" import editorial_eyebrow %}
+{% extends "base.html" %}
+{% block content %}
+  {# #165 — the phone's claim page. ONE claim primitive with TWO front doors: a QR
+     link lands here with the code in the path, and the manual form below posts the
+     same code. The QR is a shortcut, never the only way in — a tablet across the
+     table or a camera in bad light must not stop someone joining. #}
+  <section class="panel page-hero compact-hero">
+    <div>
+      {{ editorial_eyebrow("Play · Join") }}
+      <h2 class="panel-title">Join a game</h2>
+    </div>
+  </section>
+
+  {% if request.query_params.get('commander_unresolved') %}
+    <section class="panel" style="border:1px solid var(--danger,#c00)">
+      <strong>Couldn't find:</strong> {{ request.query_params.get('commander_unresolved') }}
+      <p class="muted" style="margin:0.35rem 0 0; font-size:0.9rem">
+        You're in the game — only the deck didn't attach. Check the spelling; note that
+        alternate-art printings showing a different name aren't searchable, so use the
+        card's real name.
+      </p>
+    </section>
+  {% endif %}
+
+  <section class="panel">
+    {# The manual door. Always present, even when a code is already resolved, so a
+       mistyped or stale code can be corrected without going back. #}
+    <form method="get" action="/join" class="filter-row">
+      <input type="text"
+             name="code"
+             value="{{ code }}"
+             placeholder="Enter the game code"
+             autocomplete="off"
+             autocapitalize="off"
+             autocorrect="off"
+             spellcheck="false"
+             style="min-width:200px">
+      <button type="submit">Find game</button>
+    </form>
+
+    {% if code and not game %}
+      <p class="muted" style="margin-top:0.75rem">
+        No game found for that code. Codes are case-sensitive, and the host can turn
+        joining off.
+      </p>
+    {% elif already_started %}
+      <p class="muted" style="margin-top:0.75rem">
+        That game has already started, so seats are locked. Ask the host to add you
+        from the tablet.
+      </p>
+    {% elif game and not seats %}
+      <p class="muted" style="margin-top:0.75rem">Every seat in that game is already taken.</p>
+    {% endif %}
+  </section>
+
+  {% if game and seats and not already_started %}
+    <section class="panel">
+      <h3 class="panel-title">Pick your seat</h3>
+      <form method="post" action="/join/{{ code }}/claim" class="stack-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+        <label>Seat</label>
+        <select name="seat_id" required>
+          {% for seat in seats %}
+            <option value="{{ seat.id }}">Seat {{ seat.seat_number }} — {{ seat.player_name }}</option>
+          {% endfor %}
+        </select>
+
+        {# Blank falls back to the account's display name in claim_seat — the seat is
+           ALWAYS attributed to the user_id either way. A name without a user link
+           would regress attribution, since #152 groups by user_id and never by name. #}
+        <label>Your name <span class="muted">(optional)</span></label>
+        <input type="text"
+               name="display_name"
+               placeholder="{{ current_user.display_name or current_user.username }}"
+               maxlength="128">
+
+        {# Routes through #164's resolve_commander_to_deck: finds your deck for that
+           commander however you have since renamed it, or creates a placeholder.
+           An unmatched name claims the seat anyway and reports back. #}
+        <label>Commander <span class="muted">(optional)</span></label>
+        <input type="text"
+               name="commander_name"
+               placeholder="e.g. Atraxa, Praetors' Voice"
+               autocapitalize="words">
+
+        <button type="submit">Take this seat</button>
+      </form>
+    </section>
+  {% endif %}
+{% endblock %}

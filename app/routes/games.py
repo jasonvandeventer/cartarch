@@ -20,7 +20,7 @@ from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import JSONResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
-from app import deck_service
+from app import deck_service, game_service
 from app.dependencies import (
     CsrfRequired,
     get_current_user,
@@ -65,6 +65,13 @@ def _momir_valid_mvs(session, game) -> list[int]:
 
 
 router = APIRouter()
+
+
+def _public_base_url() -> str:
+    """#165 — lazy import: main.py imports this module, so a top-level import cycles."""
+    from app.main import public_base_url
+
+    return public_base_url()
 
 
 @router.get("/games")
@@ -458,6 +465,14 @@ def game_detail_page(
         user_playgroups = playgroup_service.list_playgroups_for_user(session, current_user.id)
 
     ctx = {
+        # #165 — the seat-claim QR, rendered SERVER-SIDE as inline SVG. Only while
+        # `created` and only when the owner has enabled joining; "" otherwise, and
+        # the template falls back to the printed code (which is always shown).
+        "join_qr": (
+            game_service.join_qr_svg(f"{_public_base_url()}/join/{game.join_code}")
+            if game.status == "created" and game.join_code
+            else ""
+        ),
         "title": f"Game {game_id}",
         "game": game,
         "decks": decks,
@@ -854,3 +869,137 @@ def game_delete(
 ):
     delete_game(session, game_id, current_user.id)
     return RedirectResponse("/games", status_code=303)
+
+
+# --- #165: seat claiming from a phone ----------------------------------------
+# ONE claim primitive, TWO front doors: a QR link carries the code in the path,
+# and the manual form posts the same code. A tablet across the table, angled away,
+# or a camera in bad light must never be the thing that stops someone joining.
+
+
+@router.get("/join")
+def join_manual_page(
+    request: Request,
+    code: str = "",
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+):
+    """Manual front door — type or paste a code. Also the QR link's landing page
+    when the code is passed as a query param."""
+    trimmed = (code or "").strip()
+    game = game_service.get_game_by_join_code(session, trimmed) if trimmed else None
+    return render(
+        request,
+        "game_join.html",
+        {
+            "title": "Join a game",
+            "current_user": current_user,
+            "code": trimmed,
+            "game": game,
+            # A game that has already started is found but not joinable — say so
+            # rather than pretending the code is wrong.
+            "already_started": bool(game and game.status != "created"),
+            "seats": game_service.claimable_seats(game) if game else [],
+        },
+    )
+
+
+@router.get("/join/{code}")
+def join_by_code(
+    request: Request,
+    code: str,
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+):
+    """QR front door. Same page as the manual route — the QR is a shortcut to the
+    claim, not a separate mechanism."""
+    return join_manual_page(request, code=code, session=session, current_user=current_user)
+
+
+@router.post("/join/{code}/claim")
+def join_claim(
+    code: str,
+    seat_id: int = Form(...),
+    display_name: str = Form(""),
+    commander_name: str = Form(""),
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+    _: None = CsrfRequired,
+):
+    try:
+        seat, unresolved = game_service.claim_seat(
+            session,
+            code=code,
+            user_id=current_user.id,
+            seat_id=seat_id,
+            display_name=display_name,
+            commander_entry=commander_name,
+        )
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    except GameLockedError as e:
+        raise HTTPException(status_code=409, detail=str(e)) from e
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e)) from e
+
+    # Land on the phone companion view — the seat is theirs now, so they can pick
+    # or change their deck from the same place they will play from.
+    target = f"/games/{seat.game_id}/companion"
+    if unresolved:
+        from urllib.parse import quote_plus
+
+        target += f"?commander_unresolved={quote_plus(', '.join(dict.fromkeys(unresolved)))}"
+    return RedirectResponse(target, status_code=303)
+
+
+@router.post("/games/{game_id}/join-code")
+def game_toggle_join_code(
+    game_id: int,
+    enable: bool = Form(True),
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+    _: None = CsrfRequired,
+):
+    """Owner-only: mint or revoke this game's claim code. The code IS the toggle —
+    NULL means claiming is off, same posture as `Deck.share_token` (#143) and
+    `Playgroup.join_code`."""
+    game = get_game(session, game_id, current_user.id)
+    if game is None:
+        raise HTTPException(status_code=404, detail="Game not found")
+    game.join_code = game_service.generate_join_code(session) if enable else None
+    session.commit()
+    return RedirectResponse(f"/games/{game_id}", status_code=303)
+
+
+@router.get("/games/{game_id}/lobby.json")
+def game_lobby_state(
+    game_id: int,
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+):
+    """Seat occupancy while the game is `created`, for the tablet to poll.
+
+    #165 finding: there is NO SSE stream before `live_start` — `get_live_state`
+    raises `LookupError` while `game.live_state is None` — so a claim would land in
+    the database while the tablet showed a static page. Polling is the smaller
+    honest fix; a pre-live stream is the upgrade if this ever feels slow.
+    """
+    game = get_viewable_game(session, game_id, current_user.id)
+    if game is None:
+        raise HTTPException(status_code=404, detail="Game not found")
+    return JSONResponse(
+        {
+            "status": game.status,
+            "seats": [
+                {
+                    "seat_id": s.id,
+                    "seat_number": s.seat_number,
+                    "player_name": s.player_name,
+                    "claimed": s.user_id is not None,
+                    "deck_name": s.deck_name_at_game,
+                    "commander_name": s.commander_name_at_game,
+                }
+                for s in sorted(game.seats, key=lambda x: x.seat_number)
+            ],
+        }
+    )
