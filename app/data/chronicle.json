@@ -1,5 +1,15 @@
 [
   {
+    "version": "4.12.22",
+    "date": "2026-07-28",
+    "added": [],
+    "refined": [],
+    "resolved": [
+      "Hardened the part of companion mode where a player picks their own deck from their phone. A request that didn't mention a deck at all was being taken to mean “remove my deck”, and answered as though that had been asked for. Choosing to remove your deck still works exactly as before; a request that simply doesn't say now fails instead of guessing. Nothing was wrong from the app itself — the phone's picker has always sent the field — so no one's game was affected."
+    ],
+    "archivist_note": "Found while testing whether players can join a game and pick a commander from their phone, which is a feature we haven't built yet. Testing what does exist turned this up on the way past. It mattered enough to fix now rather than later because the phone-joining work will send new information to exactly this place, and a request that forgot one field would have quietly erased somebody's deck while reporting success — the kind of fault that leaves no error to find afterwards. Cheap today, unpleasant to diagnose in a month."
+  },
+  {
     "version": "4.12.21",
     "date": "2026-07-28",
     "added": [],
