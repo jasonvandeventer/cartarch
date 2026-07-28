@@ -2024,7 +2024,10 @@ def list_decks_basic(session: Session, user_id: int) -> list[Deck]:
     return (
         session.query(Deck)
         .options(joinedload(Deck.storage_location))
-        .filter(Deck.user_id == user_id)
+        # #163 — retired decks are invisible, exactly as deleted ones were. Deck
+        # deletion is now a soft retire so game history survives; if these showed
+        # up the change would stop being invisible.
+        .filter(Deck.user_id == user_id, Deck.retired_at.is_(None))
         .order_by(Deck.name.asc())
         .all()
     )
@@ -2034,7 +2037,10 @@ def list_decks(session: Session, user_id: int) -> list[Deck]:
     decks = (
         session.query(Deck)
         .options(joinedload(Deck.storage_location))
-        .filter(Deck.user_id == user_id)
+        # #163 — retired decks are invisible, exactly as deleted ones were. Deck
+        # deletion is now a soft retire so game history survives; if these showed
+        # up the change would stop being invisible.
+        .filter(Deck.user_id == user_id, Deck.retired_at.is_(None))
         .order_by(Deck.name.asc())
         .all()
     )
@@ -2253,12 +2259,16 @@ def compute_deck_game_stats(session: Session, user_id: int, deck_ids: list[int])
 
 
 def get_deck(session: Session, deck_id: int, user_id: int) -> Deck | None:
+    """Owner-scoped deck lookup. #163: a RETIRED deck resolves to None, so every
+    caller (deck detail, mutations, and ``delete_deck`` itself) behaves exactly as
+    it did when the row was hard-deleted. Retiring is therefore idempotent."""
     return (
         session.query(Deck)
         .options(joinedload(Deck.storage_location))
         .filter(
             Deck.id == deck_id,
             Deck.user_id == user_id,
+            Deck.retired_at.is_(None),
         )
         .first()
     )
@@ -4791,7 +4801,18 @@ def remove_from_considering(session: Session, user_id: int, row_id: int) -> bool
     return True
 
 
-def delete_deck(session: Session, deck_id: int, user_id: int, *, commit: bool = True) -> bool:
+def delete_deck(
+    session: Session, deck_id: int, user_id: int, *, commit: bool = True, hard: bool = False
+) -> bool:
+    """Disband a deck. #163: RETIRES by default rather than deleting the row.
+
+    ``hard=True`` really removes the row and is for the admin account-deletion path
+    ONLY, where the whole user is going away and leaving retired decks behind would
+    violate ``decks.user_id NOT NULL``. That caller must first verify no game seat
+    references the deck — ``game_seats.deck_id`` is RESTRICT and a hard delete would
+    otherwise be refused by the database (which is the constraint working, but a
+    500 rather than a clean message).
+    """
     deck = get_deck(session, deck_id=deck_id, user_id=user_id)
     if not deck:
         return False
@@ -4806,8 +4827,10 @@ def delete_deck(session: Session, deck_id: int, user_id: int, *, commit: bool = 
     #     estimates; both keyed by deck_id.
     #   - deck_token_requirements.deck_id is CASCADE intent (ORM, but no Deck
     #     relationship) — delete the rows.
-    #   - game_seats.deck_id is SET NULL intent; deck_name_at_game (snapshotted at
-    #     game creation) preserves the historical deck identity, so just null the FK.
+    #   - game_seats.deck_id is #163 RESTRICT now. The seats are NOT touched here:
+    #     nulling them was the mechanism that erased a deck's game history, and it
+    #     also made the FK decorative by clearing every referencing row before the
+    #     DELETE could refuse. The deck row itself is RETIRED rather than deleted.
     from app.models import DeckTokenRequirement
 
     # issue #27 — drop every deck_card_share where this deck is the source OR
@@ -4852,10 +4875,6 @@ def delete_deck(session: Session, deck_id: int, user_id: int, *, commit: bool = 
     session.query(DeckTokenRequirement).filter(DeckTokenRequirement.deck_id == deck.id).delete(
         synchronize_session=False
     )
-    session.query(GameSeat).filter(GameSeat.deck_id == deck.id).update(
-        {GameSeat.deck_id: None}, synchronize_session=False
-    )
-
     if deck.storage_location_id:
         deck_rows = (
             session.query(InventoryRow)
@@ -4946,8 +4965,23 @@ def delete_deck(session: Session, deck_id: int, user_id: int, *, commit: bool = 
         if considering_loc is not None and considering_loc.user_id == user_id:
             session.delete(considering_loc)
 
-    # Delete the deck
-    session.delete(deck)
+    # #163 — RETIRE, do not delete. The disband above is unchanged, so the
+    # user-visible outcome is identical: the deck leaves their list and its real
+    # cards come back to the collection. What changes is that the row survives, so
+    # every ``game_seats.deck_id`` pointing at it keeps pointing at it and that
+    # deck's game history is not silently erased.
+    #
+    # ``list_decks`` filters retired decks out, and ``uq_decks_user_name`` is a
+    # PARTIAL unique index (``WHERE retired_at IS NULL``) so the freed name can be
+    # reused immediately — without that, retiring would squat on the name and turn
+    # an invisible change into a visible regression.
+    #
+    # The deck keeps its identity columns (name, commander set) precisely because
+    # those are what the surviving seats are anchored to.
+    if hard:
+        session.delete(deck)
+    else:
+        deck.retired_at = utc_now()
     if commit:
         session.commit()
     return True

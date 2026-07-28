@@ -369,6 +369,8 @@ def get_dashboard_data(session: Session, user_id: int, now: datetime | None = No
         .join(Game, GameSeat.game_id == Game.id)
         .filter(
             Deck.user_id == user_id,
+            # #163 — a retired deck is invisible everywhere a deleted one was.
+            Deck.retired_at.is_(None),
             Game.status == "finalized",
             GameSeat.placement.is_not(None),
         )

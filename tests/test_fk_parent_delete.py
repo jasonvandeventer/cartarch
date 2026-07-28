@@ -392,7 +392,9 @@ def seed_delete_deck(s) -> Seeded:
             "CASCADE",
             dtr.id,
         ),
-        ChildFK("game_seats.deck_id->decks", "game_seats", "deck_id", "SET NULL", seat.id),
+        # #163 — delete_deck now RETIRES the deck, so the seat keeps pointing at it.
+        # Nulling this was the mechanism that erased a deck's game history.
+        ChildFK("game_seats.deck_id->decks", "game_seats", "deck_id", "RESTRICT", seat.id),
         ChildFK(
             "showcase_items.inventory_row_id->inventory_rows",
             "showcase_items",
@@ -506,7 +508,13 @@ def seed_delete_user(s) -> Seeded:
     game = Game(user_id=owner.id)
     s.add(game)
     s.flush()
-    seat = GameSeat(game_id=game.id, seat_number=1, player_name="P1", user_id=owner.id)
+    # #163 — this seat is deliberately NOT attributed to the user being deleted.
+    # ``delete_user`` refuses outright for a user holding seats, so attributing it
+    # would abort the delete and make every other child FK in this case
+    # unevaluable — silently gutting the coverage. The refusal path has its own
+    # test below; this case exercises everything that happens when the delete is
+    # actually allowed to proceed.
+    seat = GameSeat(game_id=game.id, seat_number=1, player_name="P1", user_id=None)
     s.add(seat)
     s.flush()
 
@@ -565,7 +573,11 @@ def seed_delete_user(s) -> Seeded:
             "gate-#5 amendment: was NO ACTION (crash); now SET NULL + name snapshot",
             post_check=_game_snapshot_check(game.id),
         ),
-        ChildFK("game_seats.user_id->users", "game_seats", "user_id", "SET NULL", seat.id),
+        # #163 — the seat FK is NOT asserted here any more. delete_user now REFUSES
+        # outright for a user holding seats, so keeping it in this seed would make
+        # every other child below unevaluable (nothing gets deleted at all) and
+        # would silently lose the coverage this case exists for. The refusal itself
+        # is pinned by test_delete_user_is_refused_when_the_user_has_game_history.
         ChildFK("token_inventory.user_id->users", "token_inventory", "user_id", "CASCADE", tok.id),
         ChildFK("watchlist.user_id->users", "watchlist", "user_id", "CASCADE", wl.id),
         ChildFK(
@@ -889,11 +901,11 @@ _EXPECTED_ONDELETE = {
     "deck_bracket_estimates.deck_id->decks": "CASCADE",
     "deck_bracket_findings.deck_id->decks": "CASCADE",
     "deck_token_requirements.deck_id->decks": "CASCADE",
-    "game_seats.deck_id->decks": "SET NULL",
+    "game_seats.deck_id->decks": "RESTRICT",  # #163 — was SET NULL
     "showcase_items.inventory_row_id->inventory_rows": "CASCADE",
     "trade_items.inventory_row_id->inventory_rows": "SET NULL",
     "games.user_id->users": "SET NULL",  # gate-#5 amendment (was NO ACTION)
-    "game_seats.user_id->users": "SET NULL",
+    "game_seats.user_id->users": "RESTRICT",  # #163 — was SET NULL
     "token_inventory.user_id->users": "CASCADE",
     "watchlist.user_id->users": "CASCADE",
     "password_reset_tokens.user_id->users": "CASCADE",
@@ -941,6 +953,13 @@ def test_parent_delete(ep: Entrypoint, posture: str, request):
         elif child.ondelete == "CASCADE":
             ok = state == "absent"
             reason = "" if ok else f"CASCADE child not deleted (state={state})"
+        elif child.ondelete == "RESTRICT":
+            # #163 — the parent is NOT deletable while this row references it, so
+            # the reference must survive UNCHANGED. "set" is the pass condition:
+            # a nulled ref is the exact history-erasure this constraint prevents,
+            # and an absent one means the child was destroyed instead.
+            ok = state == "set"
+            reason = "" if ok else f"RESTRICT ref did not survive intact (state={state})"
         elif child.ondelete == "SET NULL":
             if child.expect_survives:
                 ok = state == "null"

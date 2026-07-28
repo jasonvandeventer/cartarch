@@ -181,6 +181,40 @@ def delete_user(
     if not target:
         return RedirectResponse(url="/admin", status_code=303)
 
+    # #163 — REFUSE rather than erase. ``game_seats.user_id`` used to be
+    # ON DELETE SET NULL, and this route nulled the seats itself before the DELETE
+    # ran, so deleting an account silently detached that person from every game they
+    # had ever played. The FK is now RESTRICT and the null-out below is gone, which
+    # means the DELETE would raise an IntegrityError here instead — so check first
+    # and fail cleanly with something actionable.
+    #
+    # DECISION NOT COVERED BY #163: the issue supplies ``decks.retired_at`` as the
+    # soft-delete path for decks but specifies nothing for users. ``User.is_active``
+    # already exists and already removes a user from the people-picker
+    # (``get_pickable_users`` filters on it), so deactivation is the existing
+    # equivalent and is what this points at. Every current member holds seats, so
+    # without this guard admin user deletion would 500 for all of them.
+    # Seats attributed to this user...
+    seat_count = session.query(GameSeat).filter(GameSeat.user_id == user_id).count()
+    # ...and seats (anyone's) that reference one of THIS user's decks. Both are
+    # game history anchored to the account, and both are RESTRICT now. The second
+    # is the borrowed-deck case: another player's seat can point at this user's
+    # deck, so deleting the account would take that game's deck reference with it.
+    deck_seat_count = (
+        session.query(GameSeat)
+        .join(Deck, GameSeat.deck_id == Deck.id)
+        .filter(Deck.user_id == user_id)
+        .count()
+    )
+    if seat_count or deck_seat_count:
+        return RedirectResponse(
+            url=(
+                "/admin?error=user_has_game_history"
+                f"&seats={seat_count}&deck_seats={deck_seat_count}"
+            ),
+            status_code=303,
+        )
+
     # v3.29.0 — playgroup pre-cleanup. For each playgroup the deleted
     # user owns: transfer ownership to the longest-tenured remaining
     # member (D3 auto-transfer), or hard-delete the playgroup if the
@@ -279,7 +313,11 @@ def delete_user(
     # deck_token_requirements + nulls game_seats.deck_id (gate-#5 fix) and disbands
     # the deck's inventory to pending (deleted in step 4).
     for (deck_id_,) in session.query(Deck.id).filter(Deck.user_id == user_id).all():
-        deck_service.delete_deck(session, deck_id_, user_id, commit=False)
+        # #163 — hard, not retire: the account is going away, and a retired deck
+        # would keep a NOT NULL ``decks.user_id`` pointing at a deleted user. Safe
+        # because the guard at the top of this route already refused if any seat
+        # references this user or their decks.
+        deck_service.delete_deck(session, deck_id_, user_id, commit=False, hard=True)
 
     # (3) Token inventory → delete_token each (nulls deck_token_requirements.
     # token_inventory_id; the decks' own requirements are already gone). BEFORE the
@@ -339,19 +377,11 @@ def delete_user(
             synchronize_session=False
         )
         remaining -= leaves
-    # v3.27.5 — null seat→user FK on this user's historical seats. The
-    # ``ondelete="SET NULL"`` clause on ``GameSeat.user_id`` is declared on
-    # the model for documentation + v4 Postgres forward-compat but SQLite
-    # doesn't enforce it (the project runs with ``PRAGMA foreign_keys`` OFF
-    # — see app/db.py). This explicit UPDATE guarantees the outcome
-    # regardless of engine: deleting a user nulls the FK on their seats,
-    # leaving ``user_name_at_game`` untouched (the v3.27.5 snapshot column
-    # SURVIVES deletion — that's its entire purpose). Seats in games owned
-    # by OTHER users now correctly show the deleted user's historical name
-    # via the snapshot.
-    session.query(GameSeat).filter(GameSeat.user_id == user_id).update(
-        {GameSeat.user_id: None}, synchronize_session=False
-    )
+    # #163 — the v3.27.5 seat→user null-out is GONE. It was the mechanism that
+    # detached a player from their game history on account deletion, and it also
+    # made the FK decorative by clearing every referencing row before the DELETE
+    # could refuse. A user holding seats is now refused at the top of this route.
+    # ``user_name_at_game`` still survives independently; it was never the problem.
     # v3.29.2 — same SET-NULL discipline for terminal trades involving
     # this user. The pending trades involving this user were ORM-
     # deleted above (cascade); what remains are TERMINAL trades

@@ -343,7 +343,21 @@ class Deck(Base):
     # #133 removed the v3.30.18/v3.30.20 ``cross_user_deck_conflict`` workarounds
     # that guarded the old global-unique index; ``ix_decks_name`` remains only as
     # a plain lookup index.
-    __table_args__ = (UniqueConstraint("user_id", "name", name="uq_decks_user_name"),)
+    # #163 — the name-uniqueness scope EXCLUDES retired decks. Deck deletion became
+    # a soft retire, and without the partial predicate a retired deck would squat on
+    # its name forever, so a user could no longer reuse a name they had "deleted".
+    # That would be a user-visible regression from a change meant to be invisible.
+    # Partial unique indexes are supported on both Postgres and SQLite.
+    __table_args__ = (
+        Index(
+            "uq_decks_user_name",
+            "user_id",
+            "name",
+            unique=True,
+            postgresql_where=text("retired_at IS NULL"),
+            sqlite_where=text("retired_at IS NULL"),
+        ),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
@@ -365,6 +379,17 @@ class Deck(Base):
     declared_bracket: Mapped[int | None] = mapped_column(Integer, nullable=True)
     blurb: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utc_now)
+    # #163 — soft delete. A deck with game history can no longer be hard-deleted
+    # (game_seats.deck_id is RESTRICT), so ``delete_deck`` stamps this instead. The
+    # deck still DISBANDS exactly as before (real cards return to the collection,
+    # proxies are destroyed) so the user-visible outcome is unchanged; the row and
+    # its game history survive. ``list_decks`` filters these out.
+    retired_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
+    # #163 — COLUMN ONLY in this issue, deliberately read by nothing. #164's
+    # placeholder decks (a commander and no cards) will set it False, and the
+    # content-dependent surfaces that must then skip them are #164's work, not
+    # this issue's. Defaults True so every existing deck is unaffected.
+    contents_tracked: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     # v3.33.0 — optional link into a "variant group": a family of builds of the
     # same deck (e.g. Atraxa v1 / v2) that SHARE one physical copy of many cards.
     # Accounting-only overlay — one physical card still lives in exactly ONE
@@ -739,11 +764,15 @@ class GameSeat(Base):
     game_id: Mapped[int] = mapped_column(ForeignKey("games.id"), nullable=False, index=True)
     seat_number: Mapped[int] = mapped_column(Integer, nullable=False)
     player_name: Mapped[str] = mapped_column(String(128), nullable=False)
-    # ``ondelete="SET NULL"`` documents v4 Postgres intent: a seat (game history)
-    # outlives a later-deleted deck — the deck ref nulls, the seat persists. SQLite
-    # doesn't enforce it (PRAGMA foreign_keys OFF). Gate #4 orphan audit (id 40).
+    # #163 — RESTRICT, not SET NULL. The old rule nulled this on EVERY seat the
+    # deck ever occupied when the deck was deleted, silently erasing that deck's
+    # entire game history with no warning and no trace. Deck deletion is now a
+    # soft retire (``Deck.retired_at``); this constraint is the backstop for any
+    # path that still attempts a hard delete. The app-level null-out that used to
+    # run in ``delete_deck`` is REMOVED — without that removal this constraint is
+    # decorative, because the seats were already nulled before the DELETE ran.
     deck_id: Mapped[int | None] = mapped_column(
-        ForeignKey("decks.id", ondelete="SET NULL"), nullable=True
+        ForeignKey("decks.id", ondelete="RESTRICT"), nullable=True
     )
     placement: Mapped[int | None] = mapped_column(Integer, nullable=True)
     starting_life: Mapped[int] = mapped_column(Integer, default=40, nullable=False)
@@ -763,8 +792,13 @@ class GameSeat(Base):
     # see ``delete_user`` in ``app/routes/admin.py``. ``user_name_at_game``
     # is captured at game creation and SURVIVES account deletion (the
     # whole point of the snapshot).
+    # #163 — RESTRICT, not SET NULL (same reasoning as ``deck_id`` above): the old
+    # rule silently detached a player from every game they ever played when their
+    # account was deleted. ``delete_user`` now REFUSES for a user holding seats and
+    # points at deactivation (``User.is_active``) instead; its app-level null-out
+    # is removed for the same reason as the deck one.
     user_id: Mapped[int | None] = mapped_column(
-        ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+        ForeignKey("users.id", ondelete="RESTRICT"), nullable=True, index=True
     )
     user_name_at_game: Mapped[str | None] = mapped_column(Text, nullable=True)
     # v3.27.0b-1 — deck identity captured at game creation. Analytics read
@@ -1668,3 +1702,71 @@ class AuditLog(Base):
     # and the "last FULL audit" staleness signal on the hub.
     scope: Mapped[str | None] = mapped_column(Text, nullable=True)
     completed_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utc_now, nullable=False)
+
+
+class DeckCommander(Base):
+    """#163 — a deck's commander identity, as an order-independent SET of cards.
+
+    **Why a join table and not ``decks.commander_card_id`` plus a partner column.**
+    Multi-commander is the general case here, not an edge case: 5 of the 39 decks
+    carrying any commander have more than one (Partners, Backgrounds, Doctor's
+    companion). Arity is not fixed by the rules, so a fixed number of columns is
+    wrong on its face.
+
+    More importantly, a column-plus-partner-slot design carries forward the exact
+    hazard it is meant to remove. ``game_seats.commander_name_at_game`` already
+    records deck 4 both ways —
+
+        "Frodo, Adventurous Hobbit + Sam, Loyal Attendant"
+        "Sam, Loyal Attendant + Frodo, Adventurous Hobbit"
+
+    — and a two-column layout just relocates that instability into "which card goes
+    in which column". **Lineage comparison is SET EQUALITY over ``card_id``**, never
+    string or column comparison.
+
+    NO uniqueness constraint spans decks: whether two of one user's decks sharing a
+    commander set are one lineage or two is an OPEN owner decision (#163 amendment
+    2), and a constraint here would pre-decide it. Zero users have such a pair today.
+
+    A deck with no rows here has an EMPTY set, which is legal — 4 decks are in that
+    state now, and #164's placeholder decks begin there.
+    """
+
+    __tablename__ = "deck_commanders"
+    __table_args__ = (UniqueConstraint("deck_id", "card_id", name="uq_deck_commanders_deck_card"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    deck_id: Mapped[int] = mapped_column(
+        ForeignKey("decks.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    card_id: Mapped[int] = mapped_column(
+        ForeignKey("cards.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utc_now)
+
+
+class GameVariant(Base):
+    """#163 — a format variant in play for a game. Variants COMPOSE.
+
+    Planechase + Momir + random-deck is a legitimate combination, so a single enum
+    column on ``games`` is the wrong shape. One row per (game, variant).
+
+    Variant was previously discoverable only by scanning ``game_events``, and only
+    8 of 23 finalized games have an event stream at all — so a manually-logged
+    Planechase game was undetectable. ``games.momir_physical`` was the one-off
+    predecessor: null on 18 of 23 rows and ``true`` on ZERO, i.e. never once set
+    affirmatively.
+
+    Values are service-layer constrained (``VALID_GAME_VARIANTS``), matching the
+    project's existing no-DB-CHECK pattern for constrained columns.
+    """
+
+    __tablename__ = "game_variants"
+    __table_args__ = (UniqueConstraint("game_id", "variant", name="uq_game_variants_game_variant"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    game_id: Mapped[int] = mapped_column(
+        ForeignKey("games.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    variant: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utc_now)

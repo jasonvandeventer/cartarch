@@ -35,6 +35,24 @@ def normalize_win_condition(raw: str | None) -> str | None:
     return value if value in VALID_WIN_CONDITIONS else None
 
 
+# #163 — game VARIANTS, which compose. Planechase + Momir + random-deck is a
+# legitimate combination, so this is a set per game (``game_variants`` join table),
+# never a single enum column. Service-layer constrained, matching the
+# VALID_LOCATION_MODES / CANONICAL_GAME_FORMATS pattern below — no DB CHECK.
+#
+# ``momir`` supersedes the ``games.momir_physical`` boolean, which was null on 18
+# of 23 rows and true on ZERO — never once set affirmatively.
+VALID_GAME_VARIANTS = frozenset({"planechase", "archenemy", "momir", "random_deck"})
+
+
+def normalize_game_variant(value: str | None) -> str | None:
+    """Canonical variant token, or None if unrecognised. Mirrors
+    ``normalize_game_format``: a bad value normalises away rather than blocking a
+    write, per the project's constrained-value rule."""
+    token = (value or "").strip().lower().replace("-", "_").replace(" ", "_")
+    return token if token in VALID_GAME_VARIANTS else None
+
+
 # v3.27.2 — Game.format canonical taxonomy. Service-layer enforcement
 # (matches the existing VALID_LOCATION_TYPES / VALID_LOCATION_MODES pattern
 # in app/location_service.py — no DB-level CHECK constraint, since adding
