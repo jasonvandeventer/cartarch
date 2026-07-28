@@ -1,6 +1,22 @@
 {% from "_macros.html" import editorial_eyebrow %}
 {% extends "base.html" %}
 {% block content %}
+  {# #164 — a commander name that matched no card in the local catalog. The game was
+     still created and the seat kept its blank deck; this says which name failed so it
+     is not silently dropped. A FLAVOR name lands here ("Buttercup, Provincial
+     Princess" is Sisay) because Cartarch stores no flavor names. #}
+  {% if request.query_params.get('commander_unresolved') %}
+    <div class="panel" style="border:1px solid var(--danger,#c00); margin-bottom:0.75rem">
+      <strong>Couldn't find:</strong>
+      {{ request.query_params.get('commander_unresolved') }}
+      <p class="muted" style="margin:0.35rem 0 0; font-size:0.9rem">
+        Those seats kept no deck. Check the spelling, and note that alternate-art
+        printings with a different displayed name (a “flavor name”) aren't searchable —
+        use the card's real name.
+      </p>
+    </div>
+  {% endif %}
+
   {# v3.28.13 — Folio redesign (cluster re-opener). Masthead-+-bottom-bar
      layout replaces the v3.26-era floating .game-topbar + .card-slot-center
      overlay + .game-histbar. Per-seat composition is a panel-local CSS grid;

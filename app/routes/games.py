@@ -20,6 +20,7 @@ from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import JSONResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
+from app import deck_service
 from app.dependencies import (
     CsrfRequired,
     get_current_user,
@@ -162,6 +163,10 @@ def game_create(
     format: str = Form(""),
     player_names: list[str] = Form(...),
     deck_ids: list[str] = Form(...),
+    # #164 — per-seat commander entry. Used ONLY when that seat picked no deck:
+    # typing a commander resolves to an existing deck of that commander, or
+    # creates a placeholder. Parallel-indexed with the other seat arrays.
+    commander_names: list[str] = Form(default=[]),
     user_ids: list[str] = Form(default=[]),
     grid_positions: list[str] = Form(default=[]),
     starting_life: int = Form(40),
@@ -181,6 +186,12 @@ def game_create(
         starting_life = 24
 
     seats = []
+    # #164 — names that matched no card in the local catalog. Reported back rather
+    # than silently dropped, because a FLAVOR name lands here ("Buttercup,
+    # Provincial Princess" is Sisay) and Cartarch stores no flavor names. Creating
+    # a placeholder from an unmatched name would mint a deck under a wrong or empty
+    # commander, which is worse than the blank we started with.
+    unresolved_commanders: list[str] = []
     for i in range(player_count):
         name = player_names[i].strip() if i < len(player_names) else f"Player {i + 1}"
         did_raw = deck_ids[i] if i < len(deck_ids) else ""
@@ -205,6 +216,18 @@ def game_create(
             user_id = int(uid_raw) if uid_raw else None
         except ValueError:
             user_id = None
+        # #164 — a typed commander is a FALLBACK for a seat with no deck picked,
+        # never an override: an explicit deck selection always wins. The deck is
+        # created under the SEAT's user when known (that is whose deck it is), and
+        # only under the creator as a last resort for an unattributed seat.
+        cmd_raw = (commander_names[i] if i < len(commander_names) else "").strip()
+        if deck_id is None and cmd_raw:
+            resolved, missing = deck_service.resolve_commander_to_deck(
+                session, user_id or current_user.id, cmd_raw, commit=False
+            )
+            if resolved is not None:
+                deck_id = resolved.id
+            unresolved_commanders.extend(missing)
         pos_raw = grid_positions[i].strip() if i < len(grid_positions) else ""
         seats.append(
             {
@@ -256,6 +279,16 @@ def game_create(
             set_game_playgroup(session, game.id, current_user.id, int(pg_raw))
         except ValueError:
             pass
+    # #164 — surface any commander name that matched nothing. The game is still
+    # created (never fail a game over an attribution problem — the same
+    # non-blocking philosophy as format / first_seat_number / user attribution);
+    # the seat simply keeps its blank deck, which is honest, and the banner says
+    # which name did not resolve so the user can retype or fix it later.
+    if unresolved_commanders:
+        from urllib.parse import quote_plus
+
+        missing = quote_plus(", ".join(dict.fromkeys(unresolved_commanders)))
+        return RedirectResponse(f"/games/{game.id}?commander_unresolved={missing}", status_code=303)
     return RedirectResponse(f"/games/{game.id}", status_code=303)
 
 

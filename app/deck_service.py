@@ -5207,3 +5207,146 @@ def resolve_add_printing(
         "price": row["p"],
         "finish_differs": False,
     }
+
+
+# --- #164: commander name -> deck resolution (find-or-create) ----------------
+
+# The separator `commander_name_at_game` already uses for multi-commander decks.
+# Accepted on input too, so a name pasted straight out of a seat snapshot resolves.
+_COMMANDER_NAME_SEP = re.compile(r"\s*(?:\+|//|,\s*and\s+|\s+and\s+)\s*", re.IGNORECASE)
+
+
+def _split_commander_names(raw: str) -> list[str]:
+    """Split a typed commander entry into individual card names.
+
+    Partners / Backgrounds / Doctor's companion are entered as one string. The
+    separator set matches what `commander_name_at_game` has actually contained in
+    prod (`+` and `and` both occur), so a name copied from a seat resolves.
+    """
+    return [part.strip() for part in _COMMANDER_NAME_SEP.split(raw or "") if part.strip()]
+
+
+def _deck_commander_names(session: Session, deck_ids: list[int]) -> dict[int, frozenset[str]]:
+    """`deck_id -> frozenset of lowercased commander card names`, one query.
+
+    **Compared on NAME, not on `card_id`.** #163 anchors `deck_commanders` on
+    `card_id`, which is a PRINTING — two printings of Atraxa are different rows, so
+    card-id set equality would fail to recognise the same commander across
+    printings. The catalog has no `oracle_id` (see the brew-mode oracle-matching
+    note), so the card NAME is the oracle proxy here, exactly as it is there.
+    """
+    from app.models import DeckCommander
+
+    if not deck_ids:
+        return {}
+    out: dict[int, set[str]] = {}
+    rows = (
+        session.query(DeckCommander.deck_id, Card.name)
+        .join(Card, Card.id == DeckCommander.card_id)
+        .filter(DeckCommander.deck_id.in_(deck_ids))
+        .all()
+    )
+    for deck_id, name in rows:
+        out.setdefault(deck_id, set()).add((name or "").strip().lower())
+    return {k: frozenset(v) for k, v in out.items()}
+
+
+def _pick_representative_printing(session: Session, user_id: int, name: str) -> Card | None:
+    """The printing a commander name resolves to.
+
+    Prefers one the user OWNS (any non-proxy inventory row), mirroring
+    `resolve_add_printing`'s rule 2 — if they physically have a copy, that is the
+    one they mean. Falls back to any catalog printing so a commander they own only
+    on paper still resolves. Returns None if the name is not in the catalog at all,
+    which is the visible-failure path: a **flavor name** ("Buttercup, Provincial
+    Princess" for Sisay) lands here, because Cartarch stores no flavor names
+    (owner decision 2026-07-27, option 1 — fail visibly, create nothing).
+    """
+    lowered = (name or "").strip().lower()
+    if not lowered:
+        return None
+    owned = (
+        session.query(Card)
+        .join(InventoryRow, InventoryRow.card_id == Card.id)
+        .filter(
+            func.lower(Card.name) == lowered,
+            InventoryRow.user_id == user_id,
+            InventoryRow.is_proxy.is_(False),
+        )
+        .order_by(Card.id)
+        .first()
+    )
+    if owned is not None:
+        return owned
+    return session.query(Card).filter(func.lower(Card.name) == lowered).order_by(Card.id).first()
+
+
+def resolve_commander_to_deck(
+    session: Session, user_id: int, commander_entry: str, *, commit: bool = True
+) -> tuple[Deck | None, list[str]]:
+    """Find-or-create the user's deck for a commander NAME (#164).
+
+    Returns ``(deck, unresolved_names)``. A non-empty ``unresolved_names`` means
+    NOTHING was created — the caller shows the names back to the user. This is the
+    accepted flavor-name behaviour: fail visibly rather than mint a placeholder
+    under a wrong or empty commander.
+
+    **Find before create.** `uq_decks_user_name` is UNIQUE per user, so a blind
+    create would raise on the second attempt at the same commander. Matching is on
+    the commander name SET, so it recognises the deck however it was named — the
+    whole point of #163's anchor, and why six renamed decks did not lose identity.
+
+    A created deck is a PLACEHOLDER: `contents_tracked = False`, no cards. That is
+    not a special case, it is the minimal form of the normal one.
+    """
+    names = _split_commander_names(commander_entry)
+    if not names:
+        return None, []
+
+    cards: list[Card] = []
+    unresolved: list[str] = []
+    for name in names:
+        card = _pick_representative_printing(session, user_id, name)
+        if card is None:
+            unresolved.append(name)
+        else:
+            cards.append(card)
+    if unresolved:
+        return None, unresolved
+
+    wanted = frozenset((c.name or "").strip().lower() for c in cards)
+
+    # --- find ---------------------------------------------------------------
+    candidate_ids = [
+        did
+        for (did,) in session.query(Deck.id).filter(
+            Deck.user_id == user_id, Deck.retired_at.is_(None)
+        )
+    ]
+    for deck_id, commander_names in _deck_commander_names(session, candidate_ids).items():
+        if commander_names == wanted:
+            return session.get(Deck, deck_id), []
+
+    # --- create -------------------------------------------------------------
+    from app.models import DeckCommander
+
+    deck_name = " + ".join(c.name for c in cards)
+    # A deck may already own the NAME without being anchored to this commander
+    # (renamed by hand, or created before commanders were recorded). Fall back
+    # rather than violate uq_decks_user_name.
+    if (
+        session.query(Deck.id)
+        .filter(Deck.user_id == user_id, Deck.name == deck_name, Deck.retired_at.is_(None))
+        .first()
+    ):
+        deck_name = f"{deck_name} (commander)"
+
+    deck = create_deck(session, user_id, deck_name, format_name="Commander")
+    deck.contents_tracked = False
+    for card in cards:
+        session.add(DeckCommander(deck_id=deck.id, card_id=card.id))
+    if commit:
+        session.commit()
+    else:
+        session.flush()
+    return deck, []

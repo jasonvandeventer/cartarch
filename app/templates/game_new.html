@@ -268,12 +268,24 @@ function renderSeats() {
     const deckOptions = buildDeckOptions(seat.userId, seat.deckId);
     // Momir Basic uses no decks — hide the picker but keep an empty hidden field
     // so the deck_ids form array still aligns 1:1 with the seats.
+    // #164 — a commander box beside the deck picker. It is a FALLBACK, not an
+    // override: the server only reads it when this seat picked no deck, so an
+    // explicit selection always wins. Typing a commander resolves to an existing
+    // deck of that commander or creates a placeholder, which is how a deck that
+    // was never registered stops being an unrecordable blank.
+    // Momir has no decks, so it gets neither field (both still submit empty
+    // strings so the parallel form arrays stay 1:1 with the seats).
     const deckField = isMomir
-      ? `<input type="hidden" name="deck_ids" value="">`
+      ? `<input type="hidden" name="deck_ids" value="">
+         <input type="hidden" name="commander_names" value="">`
       : `<select name="deck_ids" id="deck-sel-${i}" style="min-width:180px">
           <option value="">— no deck —</option>
           ${deckOptions}
-        </select>`;
+        </select>
+        <input type="text" name="commander_names" id="cmd-${i}"
+               placeholder="…or type a commander"
+               title="Used only if no deck is selected. Resolves to that commander's deck, creating one if you don't have it yet."
+               style="width:190px">`;
 
     const posLabel = seat.position ? `Seat ${POS_LABEL[seat.position]}` : '— choose seat —';
     const posClass = seat.position ? 'seat-pos-pill assigned' : 'seat-pos-pill unassigned';

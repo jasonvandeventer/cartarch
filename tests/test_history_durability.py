@@ -268,21 +268,46 @@ def test_variant_tokens_are_service_layer_constrained(db, user):
 # ── contents_tracked is a column only ───────────────────────────────────────
 
 
-def test_contents_tracked_defaults_true_and_is_read_by_nothing(db, user):
-    """#163 scopes this to a column; the consumers are #164."""
-    import subprocess
+def test_contents_tracked_defaults_true_and_still_has_no_READER(db, user):
+    """#163 scoped this to a column; #164 writes it but nothing reads it.
+
+    The distinction is the finding, not a technicality. #164 planned to teach every
+    content-dependent surface to skip untracked decks — and measurement showed they
+    already degrade correctly, because they gate on *"does this deck have rows"*
+    (`routes/decks.py`: `if all_deck_rows:`). That is the real condition and it
+    cannot drift from reality the way a flag can.
+
+    So a WRITE is expected (a placeholder marks itself), and a READ is a regression:
+    it would introduce a second, weaker source of truth beside a working one. If a
+    reader is genuinely wanted, delete this test deliberately and say why.
+
+    Checked by AST, not by grepping text — prose in a docstring mentioning the
+    column is not a reader, and a text scan cannot tell the difference.
+    """
+    import ast
+    import pathlib
 
     deck = _deck(db, user)
     assert deck.contents_tracked is True
 
-    hits = subprocess.run(
-        ["grep", "-rn", "contents_tracked", "app/"],
-        capture_output=True,
-        text=True,
-    ).stdout.splitlines()
-    # models.py declares it; nothing else may read it yet.
-    non_model = [h for h in hits if not h.startswith("app/models.py")]
-    assert not non_model, f"contents_tracked gained a consumer: {non_model}"
+    readers: list[str] = []
+    for path in pathlib.Path("app").rglob("*.py"):
+        if path.name == "models.py":
+            continue  # the column declaration itself
+        tree = ast.parse(path.read_text())
+        written: set[int] = set()
+        for node in ast.walk(tree):
+            # Collect assignment TARGETS first: `deck.contents_tracked = False`.
+            if isinstance(node, ast.Assign):
+                for tgt in node.targets:
+                    if isinstance(tgt, ast.Attribute) and tgt.attr == "contents_tracked":
+                        written.add(id(tgt))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Attribute) and node.attr == "contents_tracked":
+                if id(node) not in written:
+                    readers.append(f"{path}:{node.lineno}")
+
+    assert not readers, f"contents_tracked gained a READER: {readers}"
 
 
 def test_retired_at_is_not_set_on_a_live_deck(db, user):
