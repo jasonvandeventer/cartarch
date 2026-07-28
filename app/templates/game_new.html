@@ -429,7 +429,12 @@ function openFirstPlayerModal() {
   if (fpRollTimer) { clearInterval(fpRollTimer); fpRollTimer = null; }
   fpSelectedSeat = null;
   document.getElementById('first_seat_number').value = '';
-  document.getElementById('fp-result').textContent = '';
+  // Create is disabled until a seat is chosen (decision 1), so SAY SO. An
+  // unexplained dead primary button reads as a broken page, and did: a host
+  // opened this modal on prod, found nothing clickable that mattered, and left
+  // without creating the game. #fp-result already reserves the line and
+  // fpApplySelection overwrites it with the answer.
+  document.getElementById('fp-result').textContent = 'Tap a player above, or roll for one.';
   document.getElementById('fp-start-btn').disabled = true;   // decision 1
   document.getElementById('fp-roll-btn').disabled = false;
   renderFirstPlayerChips();

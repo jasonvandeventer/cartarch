@@ -1,5 +1,15 @@
 [
   {
+    "version": "4.12.25",
+    "date": "2026-07-28",
+    "added": [],
+    "refined": [
+      "The “Who goes first?” step now tells you what it wants. Its Create button stays switched off until a player is chosen — that part is on purpose, since the app should never quietly decide who starts — but nothing said so, and a switched-off button with no explanation looks like a broken page rather than a question waiting for an answer."
+    ],
+    "resolved": [],
+    "archivist_note": "A host opened that box, found nothing that appeared to do anything, and closed it without making the game. The room never got its record. Nothing had failed; the page had simply asked a question in a way that did not look like one."
+  },
+  {
     "version": "4.12.24",
     "date": "2026-07-28",
     "added": [],

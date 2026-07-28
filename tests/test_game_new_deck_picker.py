@@ -135,3 +135,18 @@ def test_borrowed_framing_is_conditional_on_a_pilot_being_chosen(client, db, use
     assert "seatUserId ? `Borrowed from" in body, (
         "the borrowed framing must depend on a pilot being selected"
     )
+
+
+def test_the_disabled_create_button_explains_itself(client):
+    """The first-player modal opens with Create disabled — the page must say why.
+
+    Found in prod: a host opened this modal, saw a greyed-out primary button and
+    no instruction, and left without creating the game (`GET /games/new` with no
+    following `POST /games` in the access log). The gate itself is deliberate —
+    no implicit first player — so the fix is the explanation, not the gate.
+    """
+    body = client.get("/games/new").text
+    assert "Tap a player above, or roll for one." in body
+    # The hint occupies the same line the answer replaces, so it must be set on
+    # open, not left as the empty string it used to be.
+    assert "document.getElementById('fp-result').textContent = '';" not in body
