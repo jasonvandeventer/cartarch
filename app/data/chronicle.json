@@ -1,5 +1,15 @@
 [
   {
+    "version": "4.12.18",
+    "date": "2026-07-28",
+    "added": [],
+    "refined": [
+      "The life chart in a game's analytics now shows a single hit as a single drop. Because damage gets entered by tapping one life at a time, a hit for twelve used to draw as twelve tiny steps — a staircase where the game actually had a cliff. Consecutive taps on the same player, in the same round, in the same direction are now drawn as one movement, which removed about two thirds of the points on a typical chart without losing anything that happened."
+    ],
+    "resolved": [],
+    "archivist_note": "The care here went into what must NOT be merged. If a player drops to 10 and climbs back to 35 with nobody else acting in between, those are two consecutive taps on the same player — and merging them would draw a line straight from 40 to 35, erasing the near-death entirely. That is the same class of mistake an earlier release fixed, so the rule only merges taps moving in the same direction, and the test that guards it was required to keep passing untouched rather than be adjusted to fit. A fourth condition turned up during the work that the plan had not anticipated: a player being knocked out has to break a run too, or a revival can fold back into a moment before they died. It costs about eleven points across every game on record, which is a fair price for a line that cannot lie about when someone left the table."
+  },
+  {
     "version": "4.12.17",
     "date": "2026-07-28",
     "added": [
