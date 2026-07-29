@@ -2300,6 +2300,11 @@ td {
 .btn-like {
   cursor: pointer;
   list-style: none;
+  /* The class means "looks like a button", and it is now used on <a> as well as
+     <summary> (#173 replaced a <button> nested inside an <a>, which is invalid
+     HTML). An anchor keeps its underline inside the button box without this;
+     <summary> is unaffected. */
+  text-decoration: none;
   user-select: none;
   display: inline-block;
   padding: 0.35rem 0.75rem;

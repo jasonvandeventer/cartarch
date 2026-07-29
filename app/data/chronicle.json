@@ -1,5 +1,15 @@
 [
   {
+    "version": "4.12.34",
+    "date": "2026-07-28",
+    "added": [],
+    "refined": [],
+    "resolved": [
+      "Four faults on the Log a Game page. The Opponents subtitle sat on top of the heading above it. The Notes box rendered narrow and in a typewriter face while every other field on the page was full width in the site's own. None of the field labels were connected to the fields they name, so clicking one did nothing and a screen reader announced nothing. And the Cancel control was built in a way browsers are not required to agree on."
+    ],
+    "archivist_note": "All four had been there since the page was written, on a form used a handful of times a month, and none of them stopped anybody logging a game. They are the sort of thing that is only ever found by looking at a page rather than at what it does."
+  },
+  {
     "version": "4.12.33",
     "date": "2026-07-28",
     "added": [],

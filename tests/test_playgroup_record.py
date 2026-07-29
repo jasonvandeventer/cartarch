@@ -208,8 +208,13 @@ _PICKER_PAGES = ("/games/new", "/games/manual-log")
 
 
 def _picker(html: str) -> str:
-    """The playgroup <select> only."""
-    m = re.search(r'<select name="playgroup_id".*?</select>', html, re.S)
+    """The playgroup <select> only.
+
+    Attribute-order-agnostic on purpose: this used to require `name=` to be the
+    FIRST attribute, so #173 adding an `id=` for its label broke three tests that
+    have nothing to do with labels.
+    """
+    m = re.search(r'<select[^>]*\bname="playgroup_id"[^>]*>.*?</select>', html, re.S)
     return m.group(0) if m else ""
 
 

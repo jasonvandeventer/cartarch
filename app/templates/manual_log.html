@@ -12,25 +12,25 @@
     <form method="post" action="/games/manual-log">
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
       <div class="stack-form">
-        <label>Date played</label>
-        <input type="date" name="played_date" value="{{ today }}" required>
+        <label for="ml-date">Date played</label>
+        <input type="date" id="ml-date" name="played_date" value="{{ today }}" required>
 
-        <label>Format</label>
-        <select name="format">
+        <label for="ml-format">Format</label>
+        <select id="ml-format" name="format">
           {% for f in formats %}
             <option value="{{ f }}"{% if f == 'Commander' %} selected{% endif %}>{{ f }}</option>
           {% endfor %}
         </select>
 
-        <label>Your deck <span class="muted">(optional)</span></label>
-        <select name="my_deck_id">
+        <label for="ml-deck">Your deck <span class="muted">(optional)</span></label>
+        <select id="ml-deck" name="my_deck_id">
           <option value="">— no deck —</option>
           {% for d in decks %}
             <option value="{{ d.id }}">{{ d.name }}</option>
           {% endfor %}
         </select>
 
-        <label>Result</label>
+        <label for="result-sel">Result</label>
         <select name="result" id="result-sel">
           <option value="won">Won</option>
           <option value="lost">Lost</option>
@@ -38,13 +38,13 @@
         </select>
 
         {% if user_playgroups %}
-          <label>Share with Playgroup <span class="muted">(optional)</span></label>
+          <label for="ml-playgroup">Share with Playgroup <span class="muted">(optional)</span></label>
           {# #152 — preselect when there is exactly one playgroup to pick. A game that
              is never linked is invisible to the playgroup record, and the old blank
              default made that the outcome of simply forgetting. Blank stays selectable,
              and with zero or several playgroups the behaviour is unchanged: no guess. #}
           {% set only_playgroup = user_playgroups | length == 1 %}
-          <select name="playgroup_id">
+          <select id="ml-playgroup" name="playgroup_id">
             <option value=""{% if not only_playgroup %} selected{% endif %}>— Not shared —</option>
             {% for pg in user_playgroups %}
               <option value="{{ pg.playgroup.id }}"{% if only_playgroup %} selected{% endif %}>{{ pg.playgroup.name }}</option>
@@ -54,29 +54,57 @@
       </div>
 
       <h3 class="panel-title" style="margin-top:1.5rem">Opponents</h3>
-      <p class="muted" style="margin-top:-0.5rem">At least one opponent (name required); leave extra rows blank.</p>
+      {# The -0.5rem that used to be here assumed the heading had a bottom margin to
+         absorb; `.panel-title` sets `margin: 0`, so adjacent-sibling collapsing gave a
+         net -8px and pulled this line into the heading's descenders. #}
+      <p class="muted" style="margin:0.4rem 0 0.75rem">At least one opponent (name required); leave extra rows blank.</p>
       <div class="stack-form" id="opponent-rows">
         {% for i in range(5) %}
           <div class="opp-row" style="display:flex;gap:0.5rem;flex-wrap:wrap">
+            {# Repeated rows, so five duplicated visible label pairs would be noise;
+               aria-label gives a screen reader the same name without the placeholder
+               being the only one the control has. #}
             <input type="text" name="opp_names" placeholder="Opponent {{ i + 1 }} name"
+                   aria-label="Opponent {{ i + 1 }} name"
                    maxlength="100" style="flex:1;min-width:140px" data-opp-name>
             <input type="text" name="opp_decks" placeholder="Their deck (optional)"
+                   aria-label="Opponent {{ i + 1 }} deck (optional)"
                    maxlength="100" style="flex:1;min-width:140px">
           </div>
         {% endfor %}
       </div>
 
-      <div id="winner-block" style="margin-top:1rem;display:none">
-        <label>Who won? <span class="muted">(you selected Lost)</span></label>
+      {# fieldset/legend, not <label>: this names a GROUP of radios, and a label may
+         reference exactly one control. The radios themselves are wrapped by their own
+         labels in rebuildWinner(), which is a correct implicit association. #}
+      <fieldset id="winner-block" style="margin-top:1rem;display:none;border:0;padding:0;min-width:0">
+        <legend class="muted" style="padding:0">Who won? <span class="muted">(you selected Lost)</span></legend>
         <div id="winner-options" class="stack-form"></div>
-      </div>
+      </fieldset>
 
-      <label style="margin-top:1rem;display:block">Notes <span class="muted">(optional)</span></label>
-      <textarea name="notes" maxlength="500" rows="3" placeholder="Anything worth remembering…"></textarea>
+      {# Was a direct child of the <form>, outside any .stack-form — so it got UA
+         defaults: default `cols` width and monospace. Every other control here is full
+         width only because .stack-form is a column flex container whose items stretch.
+         The base `input, select, textarea` rule sets padding/border/colour but never
+         width or font-family. #}
+      <div class="stack-form" style="margin-top:1rem">
+        <label for="ml-notes">Notes <span class="muted">(optional)</span></label>
+        {# `font-family`, not the `font` shorthand: the shorthand would also reset
+           font-size, and the mobile media query's 16px floor on inputs is the
+           documented fix for iOS auto-zoom. Scoped to this field rather than the
+           base `textarea` rule (#173 non-goal) — that rule covers 21 textareas and
+           `.decklist-textarea` legitimately WANTS monospace for pasted decklists. #}
+        <textarea id="ml-notes" name="notes" maxlength="500" rows="3"
+                  style="font-family: inherit"
+                  placeholder="Anything worth remembering…"></textarea>
+      </div>
 
       <div style="margin-top:1.5rem">
         <button type="submit">Log Game</button>
-        <a href="/games"><button type="button" style="margin-left:0.5rem">Cancel</button></a>
+        {# A <button> nested in an <a> inside a <form> is invalid HTML — interactive
+           content cannot contain interactive content, and browsers recover from it
+           inconsistently. A styled anchor is the same affordance, correctly. #}
+        <a href="/games" class="btn-like" style="margin-left:0.5rem">Cancel</a>
       </div>
     </form>
   </section>
