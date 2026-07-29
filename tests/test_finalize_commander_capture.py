@@ -247,3 +247,47 @@ def test_an_unresolved_name_still_records_the_result(client, db, user):
     db.refresh(seat)
     assert seat.placement == 1
     assert seat.deck_id is None
+
+
+# ── The suggestion list reaches the form that needs it most ─────────────────
+# Reported 2026-07-29: the Wolverine failure happened HERE, on the summary form,
+# and the box offered nothing to pick.
+
+
+def _bulk_commander(db, name):
+    from app.legacy_tables import scryfall_cards
+
+    db.execute(
+        scryfall_cards.insert().values(
+            scryfall_id=f"bulk-{name[:8]}",
+            name=name,
+            set_code="mar",
+            set_name="Marvel",
+            collector_number="97",
+            type_line="Legendary Creature — Mutant Berserker Hero",
+        )
+    )
+    db.commit()
+
+
+def test_the_played_box_suggests_commanders(client, db, user):
+    game = _game(db, user, status="finalized")
+    _bulk_commander(db, "Wolverine, Best There Is")
+
+    body = client.get(f"/games/{game.id}").text
+
+    assert 'list="commander-options"' in body
+    assert "Wolverine, Best There Is" in body
+
+
+def test_a_game_with_nothing_to_attribute_ships_no_option_list(client, db, user):
+    """~196 KB of options nobody can use is not a free default."""
+    game = _game(db, user, status="finalized")
+    _bulk_commander(db, "Wolverine, Best There Is")
+    for seat in game.seats:
+        seat.commander_name_at_game = "Atraxa, Praetors' Voice"
+    db.commit()
+
+    body = client.get(f"/games/{game.id}").text
+
+    assert "Wolverine, Best There Is" not in body

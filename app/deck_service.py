@@ -5337,11 +5337,24 @@ def _pick_representative_printing(session: Session, user_id: int, name: str) -> 
 
     Prefers one the user OWNS (any non-proxy inventory row), mirroring
     `resolve_add_printing`'s rule 2 — if they physically have a copy, that is the
-    one they mean. Falls back to any catalog printing so a commander they own only
-    on paper still resolves. Returns None if the name is not in the catalog at all,
-    which is the visible-failure path: a **flavor name** ("Buttercup, Provincial
-    Princess" for Sisay) lands here, because Cartarch stores no flavor names
-    (owner decision 2026-07-27, option 1 — fail visibly, create nothing).
+    one they mean. Falls back to any `cards` printing so a commander they own only
+    on paper still resolves.
+
+    **Third: the bulk cache, materialising a `Card` row.** `cards` only holds
+    cards somebody TOUCHED, so a commander NOBODY here owns was simply not in it
+    — "Wolverine, Best There Is" failed to resolve while `scryfall_cards` held
+    two printings. That is not a spelling problem and the flavor-name banner was
+    the wrong explanation for it. The daily bulk cache is the catalog; `cards` is
+    the subset we happen to own. Request-path-safe: a local read, NO network.
+
+    The new `Card` is FLUSHED, never committed — `resolve_commander_to_deck`
+    carries a `commit` flag and a materialised card must roll back with the rest
+    of a dry run (the #164 lesson).
+
+    Returns None only when neither table knows the name: a **flavor name**
+    ("Buttercup, Provincial Princess" for Sisay) lands here, because Cartarch
+    stores no flavor names (owner decision 2026-07-27, option 1 — fail visibly,
+    create nothing), as does a card printed since the last bulk sync.
     """
     lowered = (name or "").strip().lower()
     if not lowered:
@@ -5359,7 +5372,19 @@ def _pick_representative_printing(session: Session, user_id: int, name: str) -> 
     )
     if owned is not None:
         return owned
-    return session.query(Card).filter(func.lower(Card.name) == lowered).order_by(Card.id).first()
+    known = session.query(Card).filter(func.lower(Card.name) == lowered).order_by(Card.id).first()
+    if known is not None:
+        return known
+
+    from app.scryfall import cache_payload_by_name, card_constructor_kwargs
+
+    payload = cache_payload_by_name(session, name)
+    if payload is None:
+        return None
+    card = Card(**card_constructor_kwargs(payload), updated_at=utc_now())
+    session.add(card)
+    session.flush()
+    return card
 
 
 def resolve_commander_to_deck(

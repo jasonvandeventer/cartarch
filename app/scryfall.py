@@ -15,7 +15,7 @@ from typing import Any
 import ijson
 import requests
 from requests.adapters import HTTPAdapter
-from sqlalchemy import bindparam, text
+from sqlalchemy import bindparam, func, text
 from sqlalchemy.orm import Session
 from urllib3.util.retry import Retry
 
@@ -543,6 +543,44 @@ def _cached_row_to_payload(m) -> dict[str, Any]:
         # #100 — 28th field, stored JSON array text, verbatim like keywords.
         "produced_mana": m["produced_mana"],
     }
+
+
+def cache_payload_by_name(session: Session, name: str) -> dict[str, Any] | None:
+    """One printing of an exact card NAME from the bulk cache, as a payload.
+
+    The `cards` table only holds cards somebody TOUCHED, so a name nobody in the
+    system owns is absent from it — which is why commander resolution could not
+    find "Wolverine, Best There Is" while `scryfall_cards` held two printings of
+    it. Same shape of gap the wishlist price fallback closed, and the same fix:
+    the daily bulk cache is the catalog, `cards` is what we happen to own.
+
+    **Takes the request `Session`, unlike the `_cache_get_*` helpers above** —
+    they run from fetch paths that have no session, this one is called mid-
+    transaction and its result becomes a `Card` the caller must be able to flush
+    and roll back with everything else. Mirrors
+    `pricing.bulk_cache_min_price_by_name`.
+
+    Exact match first so `ix_scryfall_cards_name` applies (the cache stores the
+    Scryfall-canonical case, which is what a picked suggestion carries); a typed
+    name falls back to a case-insensitive scan, matching what
+    `_pick_representative_printing` already does against `cards`. Deterministic
+    printing: lowest (set, collector, id), so the same name always resolves the
+    same way. Request-path-safe — NO network.
+    """
+    from app.legacy_tables import scryfall_cards as sc
+
+    wanted = (name or "").strip()
+    if not wanted:
+        return None
+    order = (sc.c.set_code, sc.c.collector_number, sc.c.scryfall_id)
+    for predicate in (
+        sc.c.name == wanted,
+        func.lower(sc.c.name) == wanted.lower(),
+    ):
+        m = session.execute(sc.select().where(predicate).order_by(*order)).mappings().first()
+        if m is not None:
+            return _cached_row_to_payload(m)
+    return None
 
 
 def _cache_get_by_ids(ids: list[str]) -> dict[str, dict[str, Any]]:

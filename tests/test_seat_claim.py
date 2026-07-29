@@ -661,6 +661,51 @@ def test_the_offer_actually_renders_on_the_companion_lobby(client, db, user):
 # a native <datalist>, so it costs no route and no keystroke fetch.
 
 
+def test_a_commander_nobody_owns_is_offered(client, db, user):
+    """The reported failure, 2026-07-29: this pod plays a set nobody has entered,
+    so a list drawn from `cards` had none of their commanders in it and the box
+    read as broken. The catalog is the bulk cache."""
+    from app.legacy_tables import scryfall_cards
+
+    _game(db, user)
+    db.execute(
+        scryfall_cards.insert().values(
+            scryfall_id="bulk-wolv",
+            name="Wolverine, Best There Is",
+            set_code="mar",
+            set_name="Marvel",
+            collector_number="97",
+            type_line="Legendary Creature — Mutant Berserker Hero",
+        )
+    )
+    db.commit()
+    assert db.query(Card).count() == 0
+
+    body = client.get("/join/CODE123").text
+
+    assert "Wolverine, Best There Is" in body
+
+
+def test_a_non_commander_in_the_cache_is_not_offered(db):
+    """`can_be_commander` still decides — the wider source is not a wider rule."""
+    from app.legacy_tables import scryfall_cards
+    from app.recommendation_service import commander_name_options
+
+    db.execute(
+        scryfall_cards.insert().values(
+            scryfall_id="bulk-cradle",
+            name="Gaea's Cradle",
+            set_code="usg",
+            set_name="Urza's Saga",
+            collector_number="321",
+            type_line="Legendary Land",
+        )
+    )
+    db.commit()
+
+    assert commander_name_options(db) == []
+
+
 def test_the_commander_box_offers_the_local_catalogs_commanders(client, db, user):
     _game(db, user)
     _card(db, "Atraxa, Praetors' Voice", "sug-1")

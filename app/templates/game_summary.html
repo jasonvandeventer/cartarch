@@ -1,6 +1,7 @@
 {% from "_macros.html" import editorial_eyebrow %}
 {% extends "base.html" %}
 {% block content %}
+  {% include "_commander_datalist.html" %}
   {# v3.33.2 — read-only summary for a FINALIZED game. Replaces the frozen
      full-screen life tracker (which read as a "non-functional tracker") with a
      normal page showing the recorded results: final standings, turn count,
@@ -13,10 +14,10 @@
       <strong>Couldn't find:</strong>
       {{ request.query_params.get('commander_unresolved') }}
       <p class="muted" style="margin:0.35rem 0 0; font-size:0.9rem">
-        The result is recorded — only the deck didn't attach. Check the spelling, and
-        note that alternate-art printings with a different displayed name (a “flavor
-        name”) aren't searchable; use the card's real name. You can retry from
-        <em>Edit result</em>.
+        The result is recorded — only the deck didn't attach. Check the spelling and use
+        the card's real name — an alternate-art
+        printing showing a different name (a “flavor name”) isn't searchable, and a
+        card printed in the last day or so may not be in the catalog yet. You can retry from <em>Edit result</em>.
       </p>
     </div>
   {% endif %}
@@ -265,6 +266,7 @@
                       {% else %}
                         <input type="text"
                                name="commander_{{ seat.id }}"
+                               list="commander-options"
                                placeholder="Commander"
                                aria-label="Commander played by {{ seat.player_name }}"
                                autocapitalize="words"

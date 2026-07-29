@@ -103,6 +103,17 @@ def user(db):
     return u
 
 
+@pytest.fixture(autouse=True)
+def _clear_commander_options_cache():
+    """The commander suggestion list is cached per-process per DAY (it reads 1.3 MB),
+    which would otherwise leak one test's seeded cards into the next."""
+    from app.recommendation_service import _COMMANDER_OPTIONS_CACHE
+
+    _COMMANDER_OPTIONS_CACHE.clear()
+    yield
+    _COMMANDER_OPTIONS_CACHE.clear()
+
+
 @pytest.fixture
 def client(db_engine, user):
     """FastAPI ``TestClient`` with the DB dependency pointed at the temp engine,

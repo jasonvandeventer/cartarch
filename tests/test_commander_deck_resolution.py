@@ -502,3 +502,95 @@ def test_create_deck_still_commits_by_default(db, user):
     d = deck_service.create_deck(db, user.id, "Committed")
     db.rollback()
     assert db.get(Deck, d.id) is not None
+
+
+# ── The catalog is the BULK CACHE, not the cards we happen to own ────────────
+# Reported 2026-07-29: attributing Phil's seat to "Wolverine, Best There Is"
+# failed with the flavor-name banner. It is not a flavor name — `cards` only
+# holds cards somebody TOUCHED, and nobody here owns it, while `scryfall_cards`
+# held two printings the whole time.
+
+
+def _bulk(db, name, sid="bulk-1", set_code="mar", collector="97"):
+    from app.legacy_tables import scryfall_cards
+
+    db.execute(
+        scryfall_cards.insert().values(
+            scryfall_id=sid,
+            name=name,
+            set_code=set_code,
+            set_name="Test Set",
+            collector_number=collector,
+            type_line="Legendary Creature — Mutant Berserker Hero",
+            color_identity="G",
+        )
+    )
+    db.commit()
+    return sid
+
+
+def test_a_commander_nobody_owns_still_resolves(db, user):
+    """The reported case, end to end."""
+    _bulk(db, "Wolverine, Best There Is")
+    assert db.query(Card).filter(Card.name == "Wolverine, Best There Is").count() == 0
+
+    deck, unresolved = deck_service.resolve_commander_to_deck(
+        db, user.id, "Wolverine, Best There Is"
+    )
+
+    assert unresolved == []
+    assert deck is not None and deck.name == "Wolverine, Best There Is"
+    card = db.query(Card).filter(Card.name == "Wolverine, Best There Is").one()
+    assert card.set_code == "mar"
+    assert db.query(DeckCommander).filter(DeckCommander.deck_id == deck.id).count() == 1
+
+
+def test_a_typed_name_matches_the_cache_case_insensitively(db, user):
+    """`cards` has always matched on `lower(name)`; the cache must not be stricter,
+    or an owned commander resolves from a typo-cased entry and an unowned one does
+    not."""
+    _bulk(db, "Wolverine, Best There Is")
+
+    deck, unresolved = deck_service.resolve_commander_to_deck(
+        db, user.id, "wolverine, BEST there is"
+    )
+
+    assert unresolved == []
+    assert deck is not None
+
+
+def test_an_owned_printing_still_wins_over_the_cache(db, user):
+    """Rule 2 is unchanged — the cache is a FALLBACK, not a new first choice."""
+    owned = _card(db, "Wolverine, Best There Is", "owned-wolv", set_code="sld")
+    _own(db, user, owned)
+    _bulk(db, "Wolverine, Best There Is", sid="bulk-wolv")
+
+    deck, _ = deck_service.resolve_commander_to_deck(db, user.id, "Wolverine, Best There Is")
+
+    anchor = db.query(DeckCommander).filter(DeckCommander.deck_id == deck.id).one()
+    assert anchor.card_id == owned.id
+
+
+def test_a_materialised_card_rolls_back_with_a_dry_run(db, user):
+    """#164's lesson: a no-write contract is only as honest as the deepest call it
+    makes. The Card is FLUSHED, so `commit=False` must discard it too."""
+    _bulk(db, "Wolverine, Best There Is")
+
+    deck_service.resolve_commander_to_deck(db, user.id, "Wolverine, Best There Is", commit=False)
+    db.rollback()
+
+    assert db.query(Card).filter(Card.name == "Wolverine, Best There Is").count() == 0
+    assert db.query(Deck).count() == 0
+
+
+def test_a_name_in_neither_table_still_fails_visibly(db, user):
+    """The flavor-name path is unchanged — it just no longer swallows real cards."""
+    _bulk(db, "Sisay, Weatherlight Captain")
+
+    deck, unresolved = deck_service.resolve_commander_to_deck(
+        db, user.id, "Buttercup, Provincial Princess"
+    )
+
+    assert deck is None
+    assert unresolved == ["Buttercup, Provincial Princess"]
+    assert db.query(Card).count() == 0

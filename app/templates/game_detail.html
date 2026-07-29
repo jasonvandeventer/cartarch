@@ -1,6 +1,7 @@
 {% from "_macros.html" import editorial_eyebrow %}
 {% extends "base.html" %}
 {% block content %}
+  {% include "_commander_datalist.html" %}
   {# #164 — a commander name that matched no card in the local catalog. The game was
      still created and the seat kept its blank deck; this says which name failed so it
      is not silently dropped. A FLAVOR name lands here ("Buttercup, Provincial
@@ -10,9 +11,9 @@
       <strong>Couldn't find:</strong>
       {{ request.query_params.get('commander_unresolved') }}
       <p class="muted" style="margin:0.35rem 0 0; font-size:0.9rem">
-        Those seats kept no deck. Check the spelling, and note that alternate-art
-        printings with a different displayed name (a “flavor name”) aren't searchable —
-        use the card's real name.
+        Those seats kept no deck. Check the spelling and use the card's real name — an alternate-art
+        printing showing a different name (a “flavor name”) isn't searchable, and a
+        card printed in the last day or so may not be in the catalog yet.
       </p>
     </div>
   {% endif %}
@@ -661,6 +662,7 @@
                 {% if not seat.deck_id and not seat.commander_name_at_game %}
                   <input type="text"
                          name="commander_{{ seat.id }}"
+                         list="commander-options"
                          placeholder="What did {{ seat.player_name }} play? (commander)"
                          aria-label="Commander played by {{ seat.player_name }}"
                          autocapitalize="words"

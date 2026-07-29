@@ -1,0 +1,8 @@
+{# ONE definition of the commander suggestion list, shared by the join page and
+   both #175 finalize forms. Sourced from the local catalog (bulk cache ∪ cards),
+   which is exactly what `_pick_representative_printing` can resolve — so a picked
+   suggestion can never land on the "couldn't find" banner. Empty is inert, so a
+   page that has nothing to suggest simply renders a plain text box. #}
+<datalist id="commander-options">
+  {% for name in commander_options %}<option value="{{ name }}"></option>{% endfor %}
+</datalist>

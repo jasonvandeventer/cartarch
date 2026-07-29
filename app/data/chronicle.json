@@ -1,5 +1,18 @@
 [
   {
+    "version": "4.12.38",
+    "date": "2026-07-29",
+    "added": [
+      "The Commander box on the end-of-game and edit-result forms suggests names as you type, the same as the join page. That is the form where a game already finished gets its blank seats filled in, and it is where the missing suggestions were noticed."
+    ],
+    "refined": [],
+    "resolved": [
+      "Typing a commander nobody here owns now finds it. Attributing a seat to Wolverine, Best There Is failed with a message about spelling and flavor names, and it was neither — the app was only looking through cards someone had already put in a collection, and nobody had put that one anywhere. It now looks through the full daily card catalog, which is every printing in Magic, so a commander you have never owned attaches to a deck the same as one sitting in a drawer. The message for a name that really is unknown says so more honestly too.",
+      "The commander suggestions had the same blind spot and looked broken because of it: a pod playing a set nobody had entered into Cartarch got a list with none of their commanders in it. Suggestions now come from the same full catalog — about 3,900 commanders rather than 1,300 — and everything offered is still guaranteed to attach."
+    ],
+    "archivist_note": "The failure said \"check the spelling\" about a name that was spelled correctly, which is the particular unkindness of an error message that names the wrong cause. Underneath it was a quiet assumption we had stopped noticing: that the card table is the catalog. It is not — it is the cards this group happens to have touched, and the real catalog has been sitting alongside it, refreshed daily, the whole time. One assumption, two symptoms, reported twenty minutes apart."
+  },
+  {
     "version": "4.12.37",
     "date": "2026-07-29",
     "added": [

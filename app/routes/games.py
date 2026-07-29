@@ -507,6 +507,16 @@ def game_detail_page(
         # `created` game, and live-mode state is server-authoritative.)
         "table_token": game.client_token if is_owner else None,
         "momir_valid_mvs": _momir_valid_mvs(session, game),
+        # #175's "Played" box is where a blank seat gets attributed, and it is where
+        # the missing-suggestions report came from — so it carries the same list the
+        # join page does. Computed ONLY when a seat actually renders the field
+        # (neither deck nor commander recorded); otherwise the page would ship
+        # ~196 KB of options nobody can use.
+        "commander_options": (
+            commander_name_options(session)
+            if any(not s.deck_id and not s.commander_name_at_game for s in game.seats)
+            else []
+        ),
     }
 
     # v3.33.2 — finalized games render a read-only summary (final standings,

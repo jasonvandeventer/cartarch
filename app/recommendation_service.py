@@ -208,17 +208,28 @@ def can_be_commander(card: Card) -> bool:
     return "legendary" in front and "isn't on the battlefield" in oracle and "creature" in oracle
 
 
+# The suggestion list is the same for everybody and only changes when the daily
+# bulk sync lands, but computing it reads 1.3 MB (4,620 distinct name/type/oracle
+# triples measured on prod 2026-07-29) — fine once a day, absurd once a request.
+# Day-bucketed so a new set appears within a day without anyone restarting a pod;
+# the dict is cleared on every miss, so it holds one list, never a growing history.
+_COMMANDER_OPTIONS_CACHE: dict[str, list[str]] = {}
+
+
 def commander_name_options(session: Session) -> list[str]:
     """Every catalog name a typed commander can resolve to — the suggestion list
-    behind the join page's Commander box.
+    behind the Commander boxes on the join page and the finalize forms.
 
-    **Scoped to the local `cards` table on purpose.** That is exactly
-    `deck_service._pick_representative_printing`'s success condition, so every
-    suggestion is guaranteed to attach a deck. A Scryfall-backed typeahead (the
-    `/decks/api/card-autocomplete` pattern) would offer the tens of thousands of
-    names Cartarch has never seen, each of which fails resolution and drops the
-    player on the "couldn't find" banner — a suggestion list that suggests
-    failures is worse than a plain text box.
+    **The catalog is `scryfall_cards`, NOT `cards` (v4.12.38).** It was `cards`,
+    which holds only what somebody here has TOUCHED — so a pod playing a set
+    nobody has entered got a list with none of their commanders in it, and the
+    box looked broken. `cards` is unioned in anyway: it is a subset in practice,
+    but a name that resolves must never stop being offered.
+
+    The invariant that made a local source right is UNCHANGED and is the point:
+    every option comes from a table `_pick_representative_printing` can resolve
+    against, so **a picked suggestion can never land on the "couldn't find"
+    banner**. A live Scryfall typeahead cannot promise that.
 
     The SQL prefilter is deliberately WIDER than eligibility; `can_be_commander`
     applies the real predicate in Python so front-face judging (#160) keeps ONE
@@ -226,16 +237,40 @@ def commander_name_options(session: Session) -> list[str]:
     prints supertypes first, so a back-face legend ("Land // Legendary Creature")
     never matches it in the first place.
 
-    ponytail: the whole list ships inline, measured on prod 2026-07-29 at 1,298
-    names / 64 KB uncompressed (~9 KB over the wire, Cloudflare compresses HTML
-    at the edge). That is the ceiling: if the catalog grows enough to feel slow
-    on a phone, the upgrade is a `?q=` endpoint and a fetch-per-keystroke
-    dropdown — three of which already exist to copy — not a bigger datalist.
+    ponytail: the whole list ships inline — 3,939 names / 196 KB uncompressed
+    (~26 KB over the wire; Cloudflare compresses HTML at the edge), up from
+    1,298 / 64 KB. That is the ceiling, and it is now close: the next widening
+    wants a `?q=` endpoint and a fetch-per-keystroke dropdown — three of which
+    already exist to copy — not a bigger datalist.
     """
-    rows = session.query(Card.name, Card.type_line, Card.oracle_text).filter(
-        Card.type_line.ilike("Legendary%") | Card.oracle_text.ilike("%can be your commander%")
+    from app.legacy_tables import scryfall_cards as sc
+
+    key = utc_now().strftime("%Y-%m-%d")
+    cached = _COMMANDER_OPTIONS_CACHE.get(key)
+    if cached is not None:
+        return cached
+
+    predicate_cols = (sc.c.name, sc.c.type_line, sc.c.oracle_text)
+    rows = list(
+        session.execute(
+            sc.select()
+            .with_only_columns(*predicate_cols)
+            .distinct()
+            .where(
+                sc.c.type_line.ilike("Legendary%")
+                | sc.c.oracle_text.ilike("%can be your commander%")
+            )
+        ).all()
     )
-    return sorted({r.name for r in rows if r.name and can_be_commander(r)})
+    rows += list(
+        session.query(Card.name, Card.type_line, Card.oracle_text).filter(
+            Card.type_line.ilike("Legendary%") | Card.oracle_text.ilike("%can be your commander%")
+        )
+    )
+    options = sorted({r.name for r in rows if r.name and can_be_commander(r)})
+    _COMMANDER_OPTIONS_CACHE.clear()
+    _COMMANDER_OPTIONS_CACHE[key] = options
+    return options
 
 
 def card_in_color_identity(card: Card, commander_colors: set[str]) -> bool:
