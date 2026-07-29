@@ -1,5 +1,15 @@
 [
   {
+    "version": "4.12.33",
+    "date": "2026-07-28",
+    "added": [],
+    "refined": [
+      "The commander picker for the deck brewer now lists each commander once, however many printings of it you own, and says so — “· 3 printings” — rather than quietly dropping them. It used to show one line per printing, and since the list shows only the name and the type, those lines were identical: three rows reading “Merry, Esquire of Rohan” with nothing to tell them apart. Alternate art within a single set is the common cause. Which printing the brewer uses does not affect the deck it suggests, so a copy you can pick up is preferred over one already sitting in a deck."
+    ],
+    "resolved": [],
+    "archivist_note": "Six or seven percent of one list, and less elsewhere — small enough that it stayed a curiosity for a while. What made it worth doing is that the duplicates were not merely surplus, they were indistinguishable, and a list that repeats itself for no visible reason invites you to wonder what else it is getting wrong."
+  },
+  {
     "version": "4.12.32",
     "date": "2026-07-28",
     "added": [

@@ -32,7 +32,7 @@ from typing import Any
 from sqlalchemy.orm import Session, joinedload
 
 from app import deck_service
-from app.models import Card, DeckStrategyProfile, InventoryRow
+from app.models import Card, DeckStrategyProfile, InventoryRow, StorageLocation
 from app.timeutil import utc_now
 
 # --- Skeleton + scoring constants ---------------------------------------------
@@ -1541,18 +1541,80 @@ def suggest_upgrades(session: Session, deck, user_id: int, analysis: DeckAnalysi
 
 
 def list_commander_candidates(session: Session, user_id: int) -> list[Card]:
-    """Owned, Commander-legal legendary creatures the user could pick."""
+    """Owned, Commander-legal legendary creatures the user could pick — **one row
+    per unique NAME**, not per printing (#170).
+
+    Deduping on ``card.id`` rendered a legend once per printing, and the picker
+    shows only name and type line, so the extra rows were textually IDENTICAL —
+    three lines reading *"Merry, Esquire of Rohan — Legendary Creature — Halfling
+    Soldier"*, each linking to a different preview. Alt-art and showcase
+    treatments inside ONE set produce distinct ``cards`` rows with identical text,
+    which is what makes them indistinguishable rather than merely redundant.
+    Measured on prod 2026-07-28: 539 rows for 502 commanders on the largest
+    account (6.9% waste), three others between 1.8% and 3.8%.
+
+    **Safe because the brew is printing-invariant.** ``generate_recommendation``
+    reads the commander only for oracle-level properties — colour identity, theme
+    extraction, legality — so two printings of Atraxa produce byte-identical
+    output. The chosen ``card_id`` decides just two things: the #169 hover preview
+    image, and which physical copy ``create_brew_from_recommendation`` references.
+
+    **Representative printing follows #119's `resolve_add_printing` rule 2 —
+    prefer an owned LOOSE, non-proxy copy** (not deck-resident), resolved to that
+    copy's exact printing. Its other two rules do not apply and are deliberately
+    not adapted: rule 1 keys on a deck's variant group and no deck exists yet, and
+    rule 3 picks the cheapest printing in all of Magic, whereas every candidate
+    here is owned by construction. A commander that is ONLY deck-resident still
+    qualifies as a candidate — you may well want to brew around it again — so it
+    falls back to that copy rather than dropping off the list.
+
+    Ties break on lowest ``InventoryRow.id`` (the order ``_owned_loose_row`` uses),
+    so the same account renders the same printing every time. ``card.printing_count``
+    is attached for the template, which says "· N printings" rather than hiding
+    the collapse silently.
+    """
     rows = (
         session.query(InventoryRow)
         .options(joinedload(InventoryRow.card))
         .filter(InventoryRow.user_id == user_id, InventoryRow.is_proxy.is_(False))
+        .order_by(InventoryRow.id)
         .all()
     )
-    seen: dict[int, Card] = {}
+    # Which locations are decks — one query, so "is this copy loose" costs nothing
+    # per row. `_owned_loose_row` asks the same question with an outer join.
+    deck_location_ids = {
+        loc_id
+        for (loc_id,) in session.query(StorageLocation.id).filter(
+            StorageLocation.user_id == user_id, StorageLocation.type == "deck"
+        )
+    }
+
+    eligible: dict[int, bool] = {}
+    best: dict[str, tuple[bool, int, Card]] = {}
+    printings: dict[str, set[int]] = {}
     for row in rows:
         card = row.card
-        if not card or card.id in seen:
+        if not card:
             continue
-        if can_be_commander(card) and is_commander_legal(card):
-            seen[card.id] = card
-    return sorted(seen.values(), key=lambda c: c.name or "")
+        ok = eligible.get(card.id)
+        if ok is None:
+            ok = can_be_commander(card) and is_commander_legal(card)
+            eligible[card.id] = ok
+        if not ok:
+            continue
+
+        name = card.name or ""
+        printings.setdefault(name, set()).add(card.id)
+        is_loose = row.storage_location_id not in deck_location_ids
+        # Rank: a loose copy beats a deck-resident one; within a rank the first
+        # row wins, and rows arrive in id order.
+        candidate = (is_loose, row.id, card)
+        current = best.get(name)
+        if current is None or (is_loose and not current[0]):
+            best[name] = candidate
+
+    out = []
+    for name, (_loose, _row_id, card) in best.items():
+        card.printing_count = len(printings[name])
+        out.append(card)
+    return sorted(out, key=lambda c: c.name or "")

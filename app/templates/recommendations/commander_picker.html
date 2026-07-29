@@ -33,6 +33,11 @@
               {{ card.name }}
             </a>
             <span style="opacity:0.6">— {{ card.type_line }}</span>
+            {# #170 — say that the row collapsed. Silently hiding printings a user
+               knows they own reads as a bug in the other direction. #}
+            {% if (card.printing_count | default(1)) > 1 %}
+              <span class="muted" style="font-size:0.85em">· {{ card.printing_count }} printings</span>
+            {% endif %}
           </li>
         {% endfor %}
       </ul>
