@@ -48,6 +48,7 @@ from app.dependencies import (
     render,
     render_auth_page,
     require_preauth_csrf,
+    safe_next_path,
     safe_redirect_url,
 )
 from app.inventory_service import (
@@ -953,6 +954,14 @@ def chronicle_entry_page(
     return _render_chronicle(request, current_user, entry)
 
 
+def _login_url(next_url: str) -> str:
+    """`/login`, carrying a validated `next` when there is one. Both register
+    outcomes (new account and the neutral duplicate response) go through it, so
+    the enumeration-oracle parity of v3.27.17 is preserved — the two paths stay
+    byte-identical."""
+    return f"/login?next={quote(next_url, safe='')}" if next_url else "/login"
+
+
 @app.post("/register")
 def register(
     request: Request,
@@ -963,8 +972,15 @@ def register(
     # Stateless pre-auth CSRF (#63) — see require_preauth_csrf. Origin/Referer +
     # signed token, no session-cookie dependency.
     csrf_token: str = Form(""),
+    # Where the visitor was heading before the auth wall (a game's /join/{code},
+    # typically). Registration does not auto-login, so it hands `next` on to
+    # /login rather than consuming it.
+    next: str = Form(""),
 ):
-    reissue = require_preauth_csrf(request, csrf_token, "register.html", {"title": "Register"})
+    next_url = safe_next_path(next, "")
+    reissue = require_preauth_csrf(
+        request, csrf_token, "register.html", {"title": "Register", "next_url": next_url}
+    )
     if reissue is not None:
         return reissue
 
@@ -975,7 +991,11 @@ def register(
         return render(
             request,
             "register.html",
-            {"title": "Register", "error": "Please enter a valid email address."},
+            {
+                "title": "Register",
+                "error": "Please enter a valid email address.",
+                "next_url": next_url,
+            },
         )
 
     # v3.27.14 — shared password-strength check; same rules now apply
@@ -985,7 +1005,7 @@ def register(
         return render(
             request,
             "register.html",
-            {"title": "Register", "error": password_error},
+            {"title": "Register", "error": password_error, "next_url": next_url},
         )
 
     if not display_name:
@@ -1017,7 +1037,7 @@ def register(
         # account-creation path below.
         _throwaway = hash_password(password)
         del _throwaway
-        return RedirectResponse("/login", status_code=303)
+        return RedirectResponse(_login_url(next_url), status_code=303)
 
     user = User(
         username=username,
@@ -1028,13 +1048,15 @@ def register(
     session.add(user)
     session.commit()
 
-    return RedirectResponse("/login", status_code=303)
+    return RedirectResponse(_login_url(next_url), status_code=303)
 
 
 @app.get("/register")
-def register_page(request: Request):
+def register_page(request: Request, next: str = ""):
     # render_auth_page: bfcache-hostile headers (no-store + Pragma) — issue #31.
-    return render_auth_page(request, "register.html", {"title": "Register"})
+    return render_auth_page(
+        request, "register.html", {"title": "Register", "next_url": safe_next_path(next, "")}
+    )
 
 
 # v3.27.12 — Watchlist. A per-user list of cards the user wants to track.

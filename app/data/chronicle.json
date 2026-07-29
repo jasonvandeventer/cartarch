@@ -1,5 +1,18 @@
 [
   {
+    "version": "4.12.37",
+    "date": "2026-07-29",
+    "added": [
+      "You can join a game without a Cartarch account. Scan the code or type it in, put in your name, take a seat — that is the whole thing. The seat is recorded as yours rather than as a nameless guest, so the playgroup table and every other record counts you the same as anyone else, and the phone stays you for this game and the next one. Anybody who already has an account is still offered the chance to sign in first, which is worth doing: a guest lives in that browser only.",
+      "The commander box on the join page suggests names as you type. Everything it offers is a card the app already knows, so a name you pick from the list always finds your deck for it — which is not something a suggestion list drawn from all of Magic could promise. Typing it out by hand still works, and you still need to for a partner pair."
+    ],
+    "refined": [],
+    "resolved": [
+      "Following a link before signing in no longer loses the link. Scanning a game's join code while signed out dropped you on the sign-in page with the code gone, and creating an account on the way lost it twice over — which is most of what \"people without an account cannot join\" actually meant. Any address you were heading for now survives the sign-in, and survives signing up too."
+    ],
+    "archivist_note": "Two of these three are the same story told at different depths. The complaint was that a player without an account could not join a game; the first thing we found was that a player WITH an account could not either, if their phone happened to be signed out — the door was open and the hallway to it was missing. That is the unglamorous half, and it was the larger half. The other half is real work: a guest is now given an account rather than left as a blank, because a seat with nobody behind it is a seat the record cannot ever read back, and we would rather ask for a name than lose a game."
+  },
+  {
     "version": "4.12.36",
     "date": "2026-07-29",
     "added": [

@@ -8,7 +8,7 @@ import secrets
 import subprocess
 from collections.abc import Generator
 from datetime import UTC, date, datetime, timedelta
-from urllib.parse import urlparse
+from urllib.parse import quote, urlparse
 from zoneinfo import ZoneInfo
 
 from fastapi import Depends, Form, HTTPException, Request, status
@@ -85,6 +85,23 @@ def safe_redirect_url(request: Request, default: str = "/collection") -> str:
     ):
         return default
     return referer
+
+
+def safe_next_path(value: str | None, default: str = "/") -> str:
+    """Validate an untrusted ``?next=`` before redirecting to it after sign-in.
+
+    **Local absolute paths only.** ``startswith("/")`` alone is NOT enough: a
+    browser follows ``//evil.com`` and ``/\\evil.com`` as protocol-relative URLs
+    to another host, which is the classic open-redirect on a login form —
+    exactly the class ``safe_redirect_url`` guards on the Referer side. Control
+    characters are rejected too, so nothing can smuggle a second header.
+    """
+    v = (value or "").strip()
+    if not v.startswith("/") or v.startswith(("//", "/\\")):
+        return default
+    if any(c < " " or c == "\x7f" for c in v):
+        return default
+    return v
 
 
 def client_ip_for(request: Request) -> str | None:
@@ -749,10 +766,20 @@ def get_current_user(
     user_id = request.session.get("user_id")
 
     if not user_id:
+        # Carry the destination through the login wall. Fixed HERE rather than on
+        # the join route because every deep link has the same defect: a phone that
+        # scans a game's join QR while signed out landed on /login with the code
+        # discarded, and the player standing at the table had no way back to it.
+        # Sign-up funnels through /login too, so this is also the whole path for
+        # somebody whose account does not exist yet.
+        target = request.url.path
+        if request.url.query:
+            target = f"{target}?{request.url.query}"
+        location = f"/login?next={quote(target, safe='')}"
         raise HTTPException(
             status_code=status.HTTP_303_SEE_OTHER,
             detail="Redirect to login",
-            headers={"Location": "/login"},
+            headers={"Location": location},
         )
 
     user = session.query(User).filter(User.id == user_id).first()

@@ -200,7 +200,12 @@ def get_pickable_users(session: Session, current_user_id: int) -> list[User]:
     if len(scoped) <= 1:
         return list(
             session.query(User)
-            .filter(User.is_active.is_(True))
+            # #172 — the fallback is "everyone", which now includes accounts minted
+            # by guests claiming a seat. A host with no playgroup would otherwise
+            # watch this picker fill with strangers from other people's tables. A
+            # guest who is deliberately added to a playgroup still shows, because
+            # `scoped` (co_members_of) is not filtered — only the blunt fallback is.
+            .filter(User.is_active.is_(True), ~User.is_guest)
             .order_by(User.display_name, User.username)
             .all()
         )

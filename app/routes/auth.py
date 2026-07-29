@@ -12,6 +12,7 @@ from app.dependencies import (
     render,
     render_auth_page,
     require_preauth_csrf,
+    safe_next_path,
 )
 from app.login_throttle import (
     is_login_throttled,
@@ -26,9 +27,13 @@ router = APIRouter()
 
 
 @router.get("/login")
-def login_page(request: Request):
+def login_page(request: Request, next: str = ""):
     # render_auth_page: bfcache-hostile headers (no-store + Pragma) — issue #31.
-    return render_auth_page(request, "login.html", {"error": None})
+    # `next` is the deep link that hit the auth wall (get_current_user sets it);
+    # it rides the form so a sign-in lands where the user was actually going.
+    return render_auth_page(
+        request, "login.html", {"error": None, "next_url": safe_next_path(next, "")}
+    )
 
 
 @router.post("/login")
@@ -41,8 +46,12 @@ def login(
     # token, NOT the session cookie — privacy iOS browsers (FxiOS/OPT) drop our
     # cookie on the POST. Expired token re-renders the form; tamper/cross-site 403.
     csrf_token: str = Form(""),
+    next: str = Form(""),
 ):
-    reissue = require_preauth_csrf(request, csrf_token, "login.html")
+    # Re-validated on the way out, never trusted as submitted — the form field is
+    # as attacker-controlled as the query param was.
+    next_url = safe_next_path(next, "")
+    reissue = require_preauth_csrf(request, csrf_token, "login.html", {"next_url": next_url})
     if reissue is not None:
         return reissue
 
@@ -57,7 +66,10 @@ def login(
         return render(
             request,
             "login.html",
-            {"error": "Too many failed login attempts. Please wait a few minutes and try again."},
+            {
+                "error": "Too many failed login attempts. Please wait a few minutes and try again.",
+                "next_url": next_url,
+            },
             status_code=429,
         )
 
@@ -65,7 +77,11 @@ def login(
 
     if not user:
         record_failed_login(username, client_ip)
-        return render(request, "login.html", {"error": "Invalid username or password."})
+        return render(
+            request,
+            "login.html",
+            {"error": "Invalid username or password.", "next_url": next_url},
+        )
 
     # Successful login clears this username's failure counter so earlier
     # typos don't lock out a legitimate user.
@@ -81,7 +97,7 @@ def login(
 
     request.session["user_id"] = user.id
 
-    return RedirectResponse(url="/", status_code=303)
+    return RedirectResponse(url=next_url or "/", status_code=303)
 
 
 @router.post("/logout")

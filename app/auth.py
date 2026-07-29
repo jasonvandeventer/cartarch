@@ -1,9 +1,11 @@
+import secrets
+
 from fastapi import Request
 from pwdlib import PasswordHash
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from app.models import User
+from app.models import GUEST_USERNAME_DOMAIN, User
 
 password_hash = PasswordHash.recommended()
 
@@ -27,6 +29,48 @@ def hash_password(password: str) -> str:
 # WRITE paths.
 PASSWORD_MIN_LENGTH = 8
 PASSWORD_MAX_LENGTH = 256
+
+
+def create_guest_user(db: Session, display_name: str, *, commit: bool = True) -> User:
+    """#172 — mint the account behind a guest seat claim.
+
+    A guest is a REAL user row, not a second identity system (see the note on
+    ``GUEST_USERNAME_DOMAIN``): their seat then attributes exactly like anyone
+    else's, their commander resolves to a deck they own, and companion mode,
+    turn authorization and the playgroup record all work with no change.
+
+    **The password is unusable by construction** — a random secret nobody holds,
+    hashed so the column format stays valid and ``verify_password`` simply
+    returns False. Nobody signs in as a guest; the browser session IS the
+    identity, and losing the cookie loses the identity. Reusing the same phone
+    for the next game reuses the same guest, which is the useful half of that.
+
+    The generated username is not user-supplied, so this opens no enumeration
+    surface. Caller is responsible for the rate limit that matters: a claim
+    needs a valid join code AND a free seat in a game that has not started.
+
+    ``commit=False`` FLUSHES instead — the id is usable for dependent rows but
+    nothing is written until the caller commits, so a claim that gets refused
+    (game already started, seat taken) leaves no stray account. Same shape as
+    ``create_deck(commit=False)``, and for the same reason #164 learned the hard
+    way: a function that commits unconditionally makes its caller's guarantees a
+    lie.
+    """
+    name = (display_name or "").strip()
+    if not name:
+        raise ValueError("A guest needs a name")
+    user = User(
+        username=f"guest-{secrets.token_hex(8)}@{GUEST_USERNAME_DOMAIN}",
+        password_hash=hash_password(secrets.token_urlsafe(32)),
+        display_name=name[:64],
+        is_active=True,
+    )
+    db.add(user)
+    if commit:
+        db.commit()
+    else:
+        db.flush()
+    return user
 
 
 def validate_password_strength(password: str) -> str | None:

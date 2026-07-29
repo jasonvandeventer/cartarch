@@ -4,12 +4,17 @@
 
 {% block crumb %}§ Register{% endblock %}
 {% block heading %}Open the <b>catalogue</b>.{% endblock %}
-{% block subheading %}Already have one? <a href="/login">Sign in instead</a>{% endblock %}
+{# `next` survives the sign-up round trip: register does NOT auto-login (the
+   enumeration-oracle defence), so it hands the destination on to /login. #}
+{% block subheading %}Already have one?
+  <a href="/login{% if next_url|default('') %}?next={{ next_url|urlencode }}{% endif %}">Sign in instead</a>
+{% endblock %}
 
 {% block form_pane %}
   {% if error|default(false) %}<p class="auth-error">{{ error }}</p>{% endif %}
   <form action="/register" method="post" class="stack-form">
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <input type="hidden" name="next" value="{{ next_url|default('') }}">
     <label>Display name</label>
     <input type="text"
            name="display_name"
@@ -32,6 +37,7 @@
     <button type="submit">Create account</button>
   </form>
   <div class="auth-foot-links">
-    <span>Already have an account? <a href="/login">Sign in</a></span>
+    <span>Already have an account?
+      <a href="/login{% if next_url|default('') %}?next={{ next_url|urlencode }}{% endif %}">Sign in</a></span>
   </div>
 {% endblock %}

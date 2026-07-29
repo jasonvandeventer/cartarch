@@ -12,6 +12,15 @@
     </div>
   </section>
 
+  {% if error|default('') == 'name_required' %}
+    <section class="panel" style="border:1px solid var(--danger,#c00)">
+      <strong>Please enter your name</strong>
+      <p class="muted" style="margin:0.35rem 0 0; font-size:0.9rem">
+        A guest seat has nothing else to go on — "Player 3" is what we're replacing.
+      </p>
+    </section>
+  {% endif %}
+
   {% if request.query_params.get('commander_unresolved') %}
     <section class="panel" style="border:1px solid var(--danger,#c00)">
       <strong>Couldn't find:</strong> {{ request.query_params.get('commander_unresolved') }}
@@ -57,6 +66,18 @@
   {% if game and seats and not already_started %}
     <section class="panel">
       <h3 class="panel-title">Pick your seat</h3>
+      {# #172 — no account needed. Claiming mints one behind the scenes so the seat
+         is attributable (a NULL-user seat records nothing anyone can read back);
+         signing in first is offered because a guest identity lives in this browser
+         only, and an existing account keeps your decks and your record. #}
+      {% if not current_user %}
+        <p class="muted" style="margin:-0.25rem 0 0.75rem">
+          No account needed — take a seat as a guest, and this phone stays you for
+          the game. Already have a Cartarch account?
+          <a href="/login?next=%2Fjoin%2F{{ code|urlencode }}">Sign in first</a>
+          to keep this game with your decks and record.
+        </p>
+      {% endif %}
       <form method="post" action="/join/{{ code }}/claim" class="stack-form">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 
@@ -67,23 +88,46 @@
           {% endfor %}
         </select>
 
-        {# Blank falls back to the account's display name in claim_seat — the seat is
-           ALWAYS attributed to the user_id either way. A name without a user link
-           would regress attribution, since #152 groups by user_id and never by name. #}
-        <label>Your name <span class="muted">(optional)</span></label>
-        <input type="text"
-               name="display_name"
-               placeholder="{{ current_user.display_name or current_user.username }}"
-               maxlength="128">
+        {# Signed in: blank falls back to the account's display name in claim_seat —
+           the seat is ALWAYS attributed to the user_id either way, and #152 groups by
+           user_id, never by name. As a GUEST (#172) the name is the only thing anyone
+           will ever see for this seat, so it is required and there is nothing to fall
+           back to. #}
+        {% if current_user %}
+          <label>Your name <span class="muted">(optional)</span></label>
+          <input type="text"
+                 name="display_name"
+                 placeholder="{{ current_user.display_name or current_user.username }}"
+                 maxlength="128">
+        {% else %}
+          <label>Your name</label>
+          <input type="text"
+                 name="display_name"
+                 placeholder="e.g. Mason"
+                 required
+                 maxlength="128"
+                 autocapitalize="words">
+        {% endif %}
 
         {# Routes through #164's resolve_commander_to_deck: finds your deck for that
            commander however you have since renamed it, or creates a placeholder.
            An unmatched name claims the seat anyway and reports back. #}
         <label>Commander <span class="muted">(optional)</span></label>
+        {# A native <datalist> rather than a fetch-per-keystroke dropdown: the phone
+           renders it with the OS picker above the keyboard, it works with JS off,
+           and it needs no route. Every option comes from the local catalog, which
+           is exactly what _pick_representative_printing can resolve — so a picked
+           suggestion can never land on the "couldn't find" banner. Free text still
+           submits (a partner pair "A + B" is typed, not picked). #}
         <input type="text"
                name="commander_name"
+               list="commander-options"
                placeholder="e.g. Atraxa, Praetors' Voice"
-               autocapitalize="words">
+               autocapitalize="words"
+               autocomplete="off">
+        <datalist id="commander-options">
+          {% for name in commander_options %}<option value="{{ name }}"></option>{% endfor %}
+        </datalist>
 
         <button type="submit">Take this seat</button>
       </form>

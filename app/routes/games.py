@@ -21,10 +21,12 @@ from fastapi.responses import JSONResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
 from app import deck_service, game_service
+from app.auth import create_guest_user
 from app.dependencies import (
     CsrfRequired,
     get_current_user,
     get_db_session,
+    get_optional_current_user,
     render,
     safe_redirect_url,
 )
@@ -53,6 +55,7 @@ from app.game_service import (
 )
 from app.live_game_service import valid_momir_mvs
 from app.models import Deck, Game, GameEvent, GameSeat, User
+from app.recommendation_service import commander_name_options
 from app.timeutil import utc_now
 
 
@@ -960,13 +963,21 @@ def game_delete(
 def join_manual_page(
     request: Request,
     code: str = "",
+    error: str = "",
     session: Session = Depends(get_db_session),
-    current_user: User = Depends(get_current_user),
+    current_user: User | None = Depends(get_optional_current_user),
 ):
     """Manual front door — type or paste a code. Also the QR link's landing page
-    when the code is passed as a query param."""
+    when the code is passed as a query param.
+
+    **Open to a signed-out visitor** (#172): this page is where somebody without
+    an account joins, so an auth wall here would be the wall. It exposes nothing
+    a code-holder is not entitled to see — the seats at the table they scanned.
+    """
     trimmed = (code or "").strip()
     game = game_service.get_game_by_join_code(session, trimmed) if trimmed else None
+    seats = game_service.claimable_seats(game) if game else []
+    claimable = bool(game and seats and game.status == "created")
     return render(
         request,
         "game_join.html",
@@ -978,7 +989,11 @@ def join_manual_page(
             # A game that has already started is found but not joinable — say so
             # rather than pretending the code is wrong.
             "already_started": bool(game and game.status != "created"),
-            "seats": game_service.claimable_seats(game) if game else [],
+            "seats": seats,
+            "error": error,
+            # Only queried when the claim form will actually render, so the bare
+            # /join page (and a bad code) costs nothing.
+            "commander_options": commander_name_options(session) if claimable else [],
         },
     )
 
@@ -987,24 +1002,46 @@ def join_manual_page(
 def join_by_code(
     request: Request,
     code: str,
+    error: str = "",
     session: Session = Depends(get_db_session),
-    current_user: User = Depends(get_current_user),
+    current_user: User | None = Depends(get_optional_current_user),
 ):
     """QR front door. Same page as the manual route — the QR is a shortcut to the
     claim, not a separate mechanism."""
-    return join_manual_page(request, code=code, session=session, current_user=current_user)
+    return join_manual_page(
+        request, code=code, error=error, session=session, current_user=current_user
+    )
 
 
 @router.post("/join/{code}/claim")
 def join_claim(
+    request: Request,
     code: str,
     seat_id: int = Form(...),
     display_name: str = Form(""),
     commander_name: str = Form(""),
     session: Session = Depends(get_db_session),
-    current_user: User = Depends(get_current_user),
+    current_user: User | None = Depends(get_optional_current_user),
     _: None = CsrfRequired,
 ):
+    # #172 — a visitor with no account joins by being GIVEN one. Every guard that
+    # matters is unchanged and still in claim_seat: a valid join code, a game that
+    # has not started, a free seat, one seat per person. What changes is only WHO
+    # can be the claimant, and the account makes that person attributable — a
+    # NULL-user seat records nothing anyone can ever read back.
+    guest = None
+    if current_user is None:
+        name = (display_name or "").strip()
+        if not name:
+            # A nameless guest seat is "Player 3" again, which is the thing #165
+            # set out to stop. Back to the form rather than a bare 400 — this
+            # happens at a table, mid-game-setup.
+            return RedirectResponse(f"/join/{code}?error=name_required", status_code=303)
+        # commit=False: a claim that gets refused below (game already started,
+        # seat taken) must not leave the account it speculatively minted, and the
+        # request's session is closed without a commit on the exception path.
+        guest = current_user = create_guest_user(session, name, commit=False)
+
     try:
         seat, unresolved = game_service.claim_seat(
             session,
@@ -1020,6 +1057,15 @@ def join_claim(
         raise HTTPException(status_code=409, detail=str(e)) from e
     except PermissionError as e:
         raise HTTPException(status_code=403, detail=str(e)) from e
+
+    if guest is not None:
+        # Only now — the row is committed and the seat is really theirs. Signing
+        # the browser in earlier would point the cookie at a user_id that a
+        # refused claim rolled back, and every later request would 401.
+        # The browser IS that user from here: nothing downstream needs to know it
+        # was a guest, because companion mode, seat-scoped turn authorization and
+        # the playgroup record all read user_id and find one.
+        request.session["user_id"] = guest.id
 
     # Land on the phone companion view — the seat is theirs now, so they can pick
     # or change their deck from the same place they will play from.

@@ -35,6 +35,34 @@ from app.models import (
 _seq = itertools.count(1)
 
 
+@pytest.fixture
+def guest_client(client):
+    """A client with NO auth override at all — a real signed-out browser over the
+    test DB, carrying its cookies. The only way to prove the claim actually signs
+    the guest in, since the shared fixture would answer with the pinned user."""
+    from app import main
+    from app.dependencies import get_current_user
+
+    main.app.dependency_overrides.pop(get_current_user, None)
+    yield client
+
+
+@pytest.fixture
+def authed_client(client, user):
+    """The shared ``client`` fixture pins ``get_current_user`` but not
+    ``get_optional_current_user`` — which is what the join routes read since #172,
+    so through ``client`` they see an anonymous visitor. This pins both, i.e. a
+    signed-in claimant; use plain ``client`` to exercise the guest path."""
+    from app import main
+    from app.dependencies import get_optional_current_user
+
+    main.app.dependency_overrides[get_optional_current_user] = lambda: user
+    try:
+        yield client
+    finally:
+        main.app.dependency_overrides.pop(get_optional_current_user, None)
+
+
 def _user(db, display=None):
     u = User(username=f"claim{next(_seq)}@ex.com", password_hash="x", display_name=display)
     db.add(u)
@@ -273,21 +301,21 @@ def test_a_started_game_says_so_rather_than_pretending_the_code_is_wrong(client,
     assert "Pick your seat" not in body
 
 
-def test_claiming_through_the_route_redirects_to_the_companion_view(client, db, user):
+def test_claiming_through_the_route_redirects_to_the_companion_view(authed_client, db, user):
     g = _game(db, user)
     seat = claimable_seats(g)[0]
 
-    r = client.post("/join/CODE123/claim", data={"seat_id": seat.id}, follow_redirects=False)
+    r = authed_client.post("/join/CODE123/claim", data={"seat_id": seat.id}, follow_redirects=False)
 
     assert r.status_code == 303
     assert r.headers["location"].startswith(f"/games/{g.id}/companion")
 
 
-def test_the_route_reports_an_unresolved_commander(client, db, user):
+def test_the_route_reports_an_unresolved_commander(authed_client, db, user):
     g = _game(db, user)
     seat = claimable_seats(g)[0]
 
-    r = client.post(
+    r = authed_client.post(
         "/join/CODE123/claim",
         data={"seat_id": seat.id, "commander_name": "Buttercup, Provincial Princess"},
         follow_redirects=False,
@@ -296,13 +324,13 @@ def test_the_route_reports_an_unresolved_commander(client, db, user):
     assert "commander_unresolved" in r.headers["location"]
 
 
-def test_claiming_a_taken_seat_through_the_route_is_403(client, db, user):
+def test_claiming_a_taken_seat_through_the_route_is_403(authed_client, db, user):
     g = _game(db, user)
     other = _user(db)
     seat = claimable_seats(g)[0]
     claim_seat(db, code="CODE123", user_id=other.id, seat_id=seat.id)
 
-    r = client.post("/join/CODE123/claim", data={"seat_id": seat.id}, follow_redirects=False)
+    r = authed_client.post("/join/CODE123/claim", data={"seat_id": seat.id}, follow_redirects=False)
 
     assert r.status_code == 403
 
@@ -625,3 +653,227 @@ def test_the_offer_actually_renders_on_the_companion_lobby(client, db, user):
     assert "/join/PGCODE07" in body
     assert "Take a seat" in body
     assert "Smackdown" in body
+
+
+# ── The commander suggestion list ───────────────────────────────────────────
+# Typing "Atraxa, Praetors' Voice" exactly, on a phone, is the friction — and a
+# typo is silent non-attribution, the very gap #175 exists to close. The list is
+# a native <datalist>, so it costs no route and no keystroke fetch.
+
+
+def test_the_commander_box_offers_the_local_catalogs_commanders(client, db, user):
+    _game(db, user)
+    _card(db, "Atraxa, Praetors' Voice", "sug-1")
+
+    body = client.get("/join/CODE123").text
+
+    assert 'list="commander-options"' in body
+    assert '<datalist id="commander-options">' in body
+    assert "Atraxa, Praetors&#39; Voice" in body
+
+
+def test_every_suggestion_resolves(client, db, user):
+    """The invariant that makes a local list the right source: a picked suggestion
+    can never land on the "couldn't find" banner. A Scryfall typeahead would offer
+    thousands of names `_pick_representative_printing` cannot resolve."""
+    from app.deck_service import resolve_commander_to_deck
+    from app.recommendation_service import commander_name_options
+
+    _card(db, "Atraxa, Praetors' Voice", "sug-2")
+    _card(db, "Grist, the Hunger Tide", "sug-3")
+    db.query(Card).filter(Card.scryfall_id == "sug-3").update(
+        {
+            "type_line": "Legendary Creature — Insect",
+            "oracle_text": "Grist isn't on the battlefield, it's a creature card.",
+        }
+    )
+    db.commit()
+
+    names = commander_name_options(db)
+    assert names
+
+    for name in names:
+        deck, unresolved = resolve_commander_to_deck(db, user.id, name)
+        assert unresolved == [], f"{name} was suggested but does not resolve"
+        assert deck is not None
+
+
+def test_a_non_commander_is_not_suggested(db):
+    """Front-face judging is #160's, not a second definition — a back-face legend
+    (Westvale Abbey) is not a commander and must not be offered."""
+    from app.recommendation_service import commander_name_options
+
+    db.add(
+        Card(
+            scryfall_id="sug-4",
+            name="Westvale Abbey",
+            set_code="tst",
+            collector_number="2",
+            type_line="Land // Legendary Creature — Demon",
+        )
+    )
+    # Passes the SQL prefilter and is excluded only by can_be_commander itself.
+    db.add(
+        Card(
+            scryfall_id="sug-5",
+            name="Gaea's Cradle",
+            set_code="tst",
+            collector_number="3",
+            type_line="Legendary Land",
+        )
+    )
+    db.commit()
+
+    assert commander_name_options(db) == []
+
+
+# ── #172: joining WITHOUT a Cartarch account ────────────────────────────────
+# A guest is a real `users` row with an unusable password, not a second identity
+# system. That is the cheap way, not the thorough one: every attribution surface
+# keys on user_id, and `decks.user_id` is NOT NULL, so a NULL-user seat records
+# nothing anyone can read back.
+
+
+def test_a_signed_out_visitor_can_reach_the_claim_form(client, db, user):
+    """An auth wall on the join page IS the wall — this is where somebody with no
+    account joins."""
+    _game(db, user)
+
+    body = client.get("/join/CODE123").text
+
+    assert "Pick your seat" in body
+    assert "No account needed" in body
+
+
+def test_claiming_as_a_guest_mints_an_account_and_attributes_the_seat(client, db, user):
+    from app.models import User as UserModel
+
+    g = _game(db, user)
+    seat = claimable_seats(g)[1]
+
+    r = client.post(
+        "/join/CODE123/claim",
+        data={"seat_id": seat.id, "display_name": "Mason"},
+        follow_redirects=False,
+    )
+
+    assert r.status_code == 303
+    assert r.headers["location"].startswith(f"/games/{g.id}/companion")
+    db.refresh(seat)
+    assert seat.player_name == "Mason"
+    assert seat.user_id is not None, "a guest seat that records no user records nothing"
+    guest = db.get(UserModel, seat.user_id)
+    assert guest.is_guest
+    assert guest.display_name == "Mason"
+
+
+def test_the_guest_password_is_unusable(db):
+    """A random secret nobody holds, on an RFC 2606 `.invalid` domain that can
+    never receive a reset mail either — so the account cannot be taken over."""
+    from app.auth import authenticate_user, create_guest_user
+
+    guest = create_guest_user(db, "Mason")
+
+    assert guest.username.endswith("@guests.cartarch.invalid")
+    assert authenticate_user(db, guest.username, "") is None
+    assert authenticate_user(db, guest.username, "password") is None
+
+
+def test_a_nameless_guest_is_sent_back_to_the_form(client, db, user):
+    """ "Player 3" is exactly what claiming exists to replace, so an unnamed guest
+    seat is worse than no claim."""
+    g = _game(db, user)
+    seat = claimable_seats(g)[0]
+
+    r = client.post(
+        "/join/CODE123/claim",
+        data={"seat_id": seat.id, "display_name": "   "},
+        follow_redirects=False,
+    )
+
+    assert r.headers["location"] == "/join/CODE123?error=name_required"
+    db.refresh(seat)
+    assert seat.user_id is None
+
+
+def test_a_guest_commander_resolves_to_a_deck_they_own(client, db, user):
+    """The whole point of the account: `decks.user_id` is NOT NULL, so a NULL-user
+    seat could never carry #164's placeholder."""
+    from app.models import Deck as DeckModel
+
+    g = _game(db, user)
+    _card(db, "Atraxa, Praetors' Voice", "guest-atx")
+    seat = claimable_seats(g)[0]
+
+    client.post(
+        "/join/CODE123/claim",
+        data={
+            "seat_id": seat.id,
+            "display_name": "Mason",
+            "commander_name": "Atraxa, Praetors' Voice",
+        },
+        follow_redirects=False,
+    )
+
+    db.refresh(seat)
+    assert seat.deck_id is not None
+    assert db.get(DeckModel, seat.deck_id).user_id == seat.user_id
+
+
+def test_every_claim_guard_still_applies_to_a_guest(client, db, user):
+    """#172 changes WHO may claim, never WHAT a claim is allowed to do — and a
+    refused claim must not leave the account it speculatively minted."""
+    from app.models import User as UserModel
+
+    g = _game(db, user, status="in_progress")
+    seat = g.seats[0]
+
+    r = client.post(
+        "/join/CODE123/claim",
+        data={"seat_id": seat.id, "display_name": "Mason"},
+        follow_redirects=False,
+    )
+
+    assert r.status_code == 409
+    db.refresh(seat)
+    assert seat.user_id is None
+    assert db.query(UserModel).filter(UserModel.is_guest).count() == 0, (
+        "a refused claim left a stray guest account behind"
+    )
+
+
+def test_a_guest_does_not_clutter_the_people_picker(db, user):
+    """The picker's no-playgroup fallback is "everyone" — without this it fills
+    with strangers from other people's tables."""
+    from app.auth import create_guest_user
+    from app.playgroup_service import get_pickable_users
+
+    guest = create_guest_user(db, "Mason")
+
+    assert guest.id not in {u.id for u in get_pickable_users(db, user.id)}
+
+
+def test_a_guest_can_use_the_companion_view_it_lands_on(guest_client, db, user, monkeypatch):
+    """The payoff of minting an account rather than a NULL-user seat: the phone is
+    signed in, so the ordinary seat-scoped surfaces work with no change at all.
+
+    `render()` reads the nav badge counts through the global `SessionLocal`, not
+    the overridden dependency — invisible to every other test because none of
+    them carries a REAL session cookie, and this one does.
+    """
+    from sqlalchemy.orm import sessionmaker
+
+    monkeypatch.setattr("app.dependencies.SessionLocal", sessionmaker(bind=db.get_bind()))
+    g = _game(db, user)
+    seat = claimable_seats(g)[0]
+
+    r = guest_client.post(
+        "/join/CODE123/claim",
+        data={"seat_id": seat.id, "display_name": "Mason"},
+        follow_redirects=False,
+    )
+    assert r.status_code == 303
+
+    page = guest_client.get(f"/games/{g.id}/companion")
+    assert page.status_code == 200
+    assert "Mason" in page.text

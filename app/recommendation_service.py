@@ -208,6 +208,36 @@ def can_be_commander(card: Card) -> bool:
     return "legendary" in front and "isn't on the battlefield" in oracle and "creature" in oracle
 
 
+def commander_name_options(session: Session) -> list[str]:
+    """Every catalog name a typed commander can resolve to — the suggestion list
+    behind the join page's Commander box.
+
+    **Scoped to the local `cards` table on purpose.** That is exactly
+    `deck_service._pick_representative_printing`'s success condition, so every
+    suggestion is guaranteed to attach a deck. A Scryfall-backed typeahead (the
+    `/decks/api/card-autocomplete` pattern) would offer the tens of thousands of
+    names Cartarch has never seen, each of which fails resolution and drops the
+    player on the "couldn't find" banner — a suggestion list that suggests
+    failures is worse than a plain text box.
+
+    The SQL prefilter is deliberately WIDER than eligibility; `can_be_commander`
+    applies the real predicate in Python so front-face judging (#160) keeps ONE
+    definition. `Legendary%` is a PREFIX and still front-face-correct — Scryfall
+    prints supertypes first, so a back-face legend ("Land // Legendary Creature")
+    never matches it in the first place.
+
+    ponytail: the whole list ships inline, measured on prod 2026-07-29 at 1,298
+    names / 64 KB uncompressed (~9 KB over the wire, Cloudflare compresses HTML
+    at the edge). That is the ceiling: if the catalog grows enough to feel slow
+    on a phone, the upgrade is a `?q=` endpoint and a fetch-per-keystroke
+    dropdown — three of which already exist to copy — not a bigger datalist.
+    """
+    rows = session.query(Card.name, Card.type_line, Card.oracle_text).filter(
+        Card.type_line.ilike("Legendary%") | Card.oracle_text.ilike("%can be your commander%")
+    )
+    return sorted({r.name for r in rows if r.name and can_be_commander(r)})
+
+
 def card_in_color_identity(card: Card, commander_colors: set[str]) -> bool:
     """Subset semantics (Commander 'castable within' rule). Colorless ('')
     matches any commander; NULL identity (unfetched) can't be verified → False

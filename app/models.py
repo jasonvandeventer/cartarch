@@ -23,10 +23,27 @@ from sqlalchemy import (
     text,
     true,
 )
+from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base, UTCDateTime
 from app.timeutil import utc_now
+
+# #172 — a GUEST is a real ``users`` row with an unusable password, not a second
+# kind of identity. Every attribution surface in the app keys on ``user_id`` —
+# the playgroup record (#152), deck game stats, #164's commander→deck resolution,
+# #175's finalize capture — and ``decks.user_id`` is NOT NULL, so a seat with
+# ``user_id IS NULL`` is a seat that records NOTHING. Minting an account is far
+# less machinery than teaching every one of those surfaces a second identity,
+# and it makes a guest's game history real rather than collapsing it into the
+# single GUESTS_LABEL row.
+#
+# ``.invalid`` is RFC 2606 reserved: the address can never be registered or
+# receive mail, so a guest account can never be taken over through
+# forgot-password. NO new column — the domain IS the marker, which is why there
+# is no migration here.
+GUEST_USERNAME_DOMAIN = "guests.cartarch.invalid"
+_GUEST_USERNAME_SUFFIX = "@" + GUEST_USERNAME_DOMAIN
 
 
 class User(Base):
@@ -98,6 +115,22 @@ class User(Base):
     # dropped, so this is now a one-to-many collection (was uselist=False
     # under the v3.29.1 decision A5 one-per-user cap).
     showcases: Mapped[list[Showcase]] = relationship(back_populates="user")
+
+    @hybrid_property
+    def is_guest(self) -> bool:
+        """#172 — an account minted by claiming a seat without signing up.
+
+        A ``hybrid_property`` so Python and SQL share ONE definition: the people
+        picker filters on it (``~User.is_guest``) while templates read it per
+        row. Guests cannot sign in (their password is a secret nobody holds),
+        so this is also the answer to "can this account come back".
+        """
+        return (self.username or "").endswith(_GUEST_USERNAME_SUFFIX)
+
+    @is_guest.inplace.expression
+    @classmethod
+    def _is_guest_expression(cls):
+        return cls.username.like("%" + _GUEST_USERNAME_SUFFIX)
 
 
 class Card(Base):
