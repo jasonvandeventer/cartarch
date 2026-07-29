@@ -10,7 +10,7 @@ Self-hosted web application for managing a physical Magic: The Gathering collect
 
 This is a production system, not a tutorial. It runs on a personal Kubernetes cluster serving real users, with the operational discipline that implies.
 
-- **900+ automated tests** with a CI release-record guard that blocks deployments from unverified commits
+- **1,390+ automated tests** with a CI release-record guard that blocks deployments from unverified commits
 - **Full CI/CD release pipeline**: git tag → GitHub Actions build → GHCR publish → ArgoCD Image Updater promotion → PreSync Alembic migration hook → additive migrate-before-deploy discipline → post-deploy verify/soak job
 - **CloudNativePG PostgreSQL** with WAL archiving to R2 object storage; backup chain verified through completed full-restore drills
 - **Blue/green cluster migration** from k3s to Talos with simultaneous SQLite-to-PostgreSQL data migration, zero data loss, and minimal planned downtime (write-freeze + tunnel repoint)
@@ -114,8 +114,10 @@ See [docs/screenshots/](docs/screenshots/) for capture guidelines and additional
 - **Token panel**: auto-discovers tokens produceable by the deck via Scryfall `all_parts`; click a token image to view its detail page
 - **Role tag system** with 10 tags (Ramp, Draw, Tutor, Removal, Wipe, Protection, Engine, Synergy, Threat, Hate); auto-detected from oracle text and commander themes with per-tag source + confidence tracking (auto/medium vs user/high vs auto/certain); **Retag** button re-runs detection over already-tagged rows additively; **Review tags** panel on deck detail surfaces auto/medium suggestions for one-click confirm or remove
 - Click any health metric count to filter the deck grid to just those cards
-
-> _Brackets and combo display were removed from deck surfaces in v3.27.9 pending the Deck Analytics Rebuild. The underlying `bracket_v2_service` module (the sole bracket estimator), Commander Spellbook integration, and the `compute_deck_combos` function are preserved as dormant code for the rebuild to reuse. (The superseded V1 `compute_deck_bracket` estimator was deleted in the 2026-06-09 pre-v4 cleanup.) See `roadmap.md` Deferred / latent items "Deck Analytics Rebuild" for the path back._
+- **Bracket estimate** per deck at `/decks/{id}/bracket`, backed by `bracket_v2_service` with Commander Spellbook combo detection. Decks carry a bracket chip on the Decks page; declaring a bracket below the computed floor is flagged rather than silently accepted, and a deck that changed since its last evaluation re-estimates automatically
+- **Brew mode** — a deck built from cards you may not own. Unowned cards become proxy rows inside the deck, so the list is complete while your collection totals stay honest; a buy-list splits what you have, what you're missing, and what you already own in another deck
+- **Collection-aware brew generator** at `/recommendations/commander` — pick an owned commander and it assembles a legal 100-card deck from cards you own, with a stated reason per card. Deterministic and entirely offline: every signal is a column already stored, so no external call happens on the request path
+- **Variant groups** link builds of the same deck that share one physical copy of many cards. Both builds render the full shared decklist with shared cards badged, without duplicating a single inventory row
 
 ### Watchlist
 
@@ -127,7 +129,7 @@ See [docs/screenshots/](docs/screenshots/) for capture guidelines and additional
 
 ### Organization
 
-- Drawer/slot system for physical organization (gated per-user)
+- Drawer/slot system for physical organization — activates for any user who creates a sorter rule or a drawer location
 - Custom storage locations: create, edit (name/type/parent/sort order), and delete
 - Move cards between locations from the location detail page or deck detail page
 - **Bulk move**: select multiple cards from a location or deck and move them in one action; destination picker includes both storage locations and other decks; drawer-sorter users get a "Return to Sorter" option that bulk-returns rows to pending and triggers auto-placement
@@ -137,8 +139,8 @@ See [docs/screenshots/](docs/screenshots/) for capture guidelines and additional
 
 ### Pricing & Card Data
 
-- Live Scryfall pricing (USD regular, foil, etched) per card and deck totals
-- Background price refresh loop keeps data fresh
+- **Daily MTGJSON price ingest** (USD regular, foil, etched) per card and deck totals — one row per printing+finish, with per-provider retail prices resolved in a fixed order and a manual per-card override. Scryfall is still the source for card *metadata*; it no longer writes prices, so a metadata refresh can't clobber them
+- A transient provider miss keeps the last known number rather than blanking it, so staleness shows as an old price instead of a missing one
 - Card attributes: colors, color identity, mana cost, CMC, oracle text, type line
 
 ### Multi-user
@@ -149,7 +151,16 @@ See [docs/screenshots/](docs/screenshots/) for capture guidelines and additional
 - **Shared password strength validator** — 8-char minimum, 256-char maximum, no composition requirements (NIST SP 800-63B aligned); applied at `/register`, `/account/change-password`, AND `/reset-password` so the three password-set paths can't drift
 - Admin panel: create/delete users, toggle admin/active, reset passwords
 - Display names shown throughout the UI; email used as login identifier
-- Per-user data isolation; drawer sorter is opt-in per username
+- Per-user data isolation; the drawer sorter is opt-in **by setup, not by account** — it activates once a user has at least one sorter rule or one drawer location, so nobody is on a hard-coded list
+
+### Playgroups, sharing & trading
+
+- **Playgroups** are the social unit: join by code, and membership is what scopes the people picker, shared games, shared showcases and shared wishlists. A user belongs to many
+- **Showcases** — curate a subset of your inventory (a whole location, or the whole collection) and expose it read-only to one playgroup. A showcase item *references* an inventory row rather than copying it, so quantities and prices stay live. The read-only view is a sanitised projection: no notes, no storage locations, no ownership internals
+- **Wishlist sharing**, two ways and both names-only: an unguessable public link for anyone, or shared to a playgroup so co-members see it alongside theirs. Prices, targets and ownership counts are deliberately hidden — it reads as a gift registry. A logged-in viewer additionally sees which of the cards *they* already own
+- **Trades** are recorded, not brokered: propose from a co-member's showcase or from their wishlist, pick cards from both sides, and the running balance totals each side live. Proposing from a wishlist seeds the *offered* side, so there is no such thing as a one-sided gift trade. Cards already offered to someone show a `[pending]` badge on their wishlist — aggregate only, never who proposed it
+- **Public deck links** — publish any deck read-only to an unguessable URL. The token *is* the toggle: revoke by clearing it. The public page is a whitelisted projection carrying name, format, commanders and the card list, with no price, ownership, proxy or tag data
+- **Decklist check** at `/decklist` — paste a list and see, per card, whether you own it and where it is, sorted so loose copies surface ahead of ones you'd have to break a deck to get
 
 ### Game Tracker
 
@@ -162,6 +173,21 @@ See [docs/screenshots/](docs/screenshots/) for capture guidelines and additional
 - **Elimination toggle**: mark players as eliminated; auto-detects winner when 1 player remains
 - State persisted to `localStorage` — survives page refresh mid-game
 - End Game records placements, final life totals, and turn count; W/L record shown on each deck's detail page
+
+**Companion mode — the table runs on a tablet, everyone else uses their phone**
+
+- **Go Live** promotes a game to a server-authoritative live state streamed over SSE, so the tablet and every phone see the same board. Games never taken live keep the offline `localStorage` tracker unchanged
+- **Players claim their own seat before the game starts**, by scanning a QR on the tablet or typing the short code — and playgroup members skip the code entirely, since a linked game with a free seat is listed on their phone. Claiming attaches the seat to their account, so results are attributed correctly however they spelled their name that night
+- **Typing a commander is enough**: the name resolves to that player's existing deck for that commander, or creates a placeholder that anchors the game's record. An unrecognised name still claims the seat and reports back rather than failing the join
+- A seated player controls **their own** seat from their phone — life, counters, their deck — while the tablet keeps override authority over every seat. Ending your turn is restricted to the player whose turn it is
+- **Who goes first is decided on the game page, after everyone has joined** — tap a player or roll for one. Skipping it starts from seat one
+- Supplemental format trackers for **Planechase**, **Archenemy**, and multiplayer **Momir Basic**
+
+**Analytics**
+
+- **Per-game**: a stepped life chart sampled per life-changing event (not per round, which used to discard every intra-round swing), truncated where a seat was eliminated, plus a turn-pace strip
+- **Cross-game** at `/games/analytics`: pod dynamics, turn pace, and elimination timing. Every average ships its sample size, and a game with no recorded event stream is excluded rather than counted as a zero
+- **Playgroup record**: per-player wins, losses, and games played across the games linked to that playgroup, grouped by account rather than by the name typed on the night
 
 ### Tokens
 
