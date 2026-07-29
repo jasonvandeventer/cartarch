@@ -147,67 +147,82 @@ def normalize_game_status(raw: str | None, unknown_to: str = DEFAULT_GAME_STATUS
     return _STATUS_LOOKUP.get(cleaned.casefold(), unknown_to)
 
 
+def deck_commander_cards(session: Session, deck: Deck | None, limit: int = 2) -> list[Card]:
+    """A deck's commander CARDS in display order — the ONE answer to "who is this
+    deck's commander", shared by the name snapshot and BOTH art surfaces.
+
+    Resolution: ``InventoryRow.role == 'commander'`` rows in the deck's location
+    (by row id, i.e. creation order), falling back to #163's ``deck_commanders``
+    ANCHOR ordered by ``Card.id``.
+
+    **The fallback existing in only one of three copies is the bug this function
+    exists to end (v4.12.40).** #165 added it to :func:`_capture_deck_identity`
+    alone, so a deck whose commander was never TAGGED as a row still recorded its
+    commander NAME correctly while both art surfaces silently rendered nothing —
+    every #164 placeholder, plus any deck where nobody pressed the commander
+    toggle. Measured on prod 2026-07-29: **11 of the 68 seats holding a deck had
+    no art, and 10 of those had an anchor sitting right there.** 57 working and 11
+    not, with nothing a player could see distinguishing them, is exactly what
+    "the art is intermittent" looks like from the table.
+
+    Filters by ``deck.user_id``, NOT the game owner — a seat can hold a borrowed
+    deck (#156). Capped at ``limit`` (2 = the Partner / Background / Friends
+    Forever ceiling the art rendering enforces).
+    """
+    if deck is None:
+        return []
+    cards: list[Card] = []
+    if deck.storage_location_id:
+        rows = (
+            session.query(InventoryRow)
+            .join(Card)
+            .filter(
+                InventoryRow.user_id == deck.user_id,
+                InventoryRow.storage_location_id == deck.storage_location_id,
+                InventoryRow.role == "commander",
+            )
+            .order_by(InventoryRow.id)
+            .limit(limit)
+            .all()
+        )
+        cards = [r.card for r in rows if r.card]
+    if cards:
+        return cards
+    from app.models import DeckCommander
+
+    return (
+        session.query(Card)
+        .join(DeckCommander, DeckCommander.card_id == Card.id)
+        .filter(DeckCommander.deck_id == deck.id)
+        .order_by(Card.id)
+        .limit(limit)
+        .all()
+    )
+
+
 def _capture_deck_identity(session: Session, deck_id: int | None) -> tuple[str | None, str | None]:
     """Snapshot deck name + commander names for a seat (v3.27.0b-1).
 
     Returns ``(deck_name, commander_name)`` for the given ``deck_id``.
 
-    Commander identification mirrors :func:`get_seat_commander_image_urls`
-    exactly: ``InventoryRow.role == 'commander'`` filtered by
-    ``deck.user_id`` (NOT the game owner — game seats can reference other
-    users' decks), ordered by ``InventoryRow.id`` (creation order in the
-    deck), capped at 2 (Partner / Choose-a-Background / Friends Forever
-    ceiling — the same cap the v3.26.1 art rendering enforces).
+    Commander identification is :func:`deck_commander_cards` — the shared
+    resolver both art surfaces now use too, so a name and its art can no longer
+    disagree about who the commander is (v4.12.40; they did, for 11 of 68 seats).
 
     Multi-commander pairs join with ``" + "`` — casual MTG parlance for
     two separate Partner cards. ``" // "`` is reserved for split-card
     faces (Scryfall convention) and would be semantically wrong here.
 
     NULL ``deck_id``, dangling FK, or a deck with no ``storage_location_id``
-    all yield ``(None, None)``. A deck with no commander rows tagged
-    yields ``(deck.name, None)``.
+    all yield ``(None, None)``. A deck with no commander recorded at all — no
+    tagged row and no anchor — yields ``(deck.name, None)``.
     """
     if not deck_id:
         return None, None
     deck = session.query(Deck).filter(Deck.id == deck_id).first()
     if not deck or not deck.storage_location_id:
         return None, None
-    commander_rows = (
-        session.query(InventoryRow)
-        .join(Card)
-        .filter(
-            InventoryRow.user_id == deck.user_id,
-            InventoryRow.storage_location_id == deck.storage_location_id,
-            InventoryRow.role == "commander",
-        )
-        .order_by(InventoryRow.id)
-        .limit(2)
-        .all()
-    )
-    names = [r.card.name for r in commander_rows if r.card and r.card.name]
-    if not names:
-        # #165 — fall back to #163's commander ANCHOR (`deck_commanders`). A
-        # PLACEHOLDER deck (#164) knows its commander but holds no cards, so the
-        # inventory-row lookup above finds nothing and the snapshot would record
-        # `(deck.name, None)` — losing the one fact such a deck exists to carry.
-        #
-        # Fixed at this shared function rather than at the caller so EVERY snapshot
-        # site benefits: game creation, `set_own_seat_deck`, the seat claim, and the
-        # #164 backfill all route through here.
-        #
-        # Same 2-card cap and `" + "` join as above; ordered by `card_id` for a
-        # stable, order-independent rendering of a partner pair.
-        from app.models import DeckCommander
-
-        names = [
-            n
-            for (n,) in session.query(Card.name)
-            .join(DeckCommander, DeckCommander.card_id == Card.id)
-            .filter(DeckCommander.deck_id == deck.id)
-            .order_by(Card.id)
-            .limit(2)
-            if n
-        ]
+    names = [c.name for c in deck_commander_cards(session, deck) if c.name]
     commander_name = " + ".join(names) if names else None
     return deck.name, commander_name
 
@@ -846,73 +861,36 @@ def get_deck_record(session: Session, deck_id: int) -> dict[str, int]:
 
 
 def get_seat_commander_image_urls(session: Session, game: Game) -> dict[int, list[str]]:
-    """Return ``{seat_id: [commander_image_url, ...]}`` for the seats in ``game``.
+    """``{seat_id: [commander_image_url, ...]}`` for the seats in ``game``.
 
-    For each seat with a deck, looks up the commander rows via
-    ``InventoryRow.role == 'commander'`` in the deck's storage location and
-    returns the associated :attr:`Card.image_url` values, ordered by
-    ``InventoryRow.id`` (creation order in the deck) and capped at two — the
-    Partner / Choose-a-Background / Friends Forever ceiling that MTG rules
-    permit. Seats with no deck, no commander tagged, or commanders with no
-    cached image URL get an empty list.
+    The tablet's panel-background art (v3.26.1): one URL yields the full-card
+    cover treatment, two yield a vertical-halves split (top = primary).
 
-    Filters by the deck's owner (``deck.user_id``) — not the game's owner —
-    because game seats can reference decks owned by other users (see
-    ``game_create`` in ``main.py``, which builds the deck dropdown from all
-    decks, not just the requesting user's).
+    Commanders come from :func:`deck_commander_cards`, so a deck that records its
+    commander ONLY on #163's anchor — every #164 placeholder, and any deck where
+    nobody pressed the commander toggle — now gets art like any other. That
+    fallback used to live only in the name snapshot, which is why the art was
+    intermittent with no visible pattern (v4.12.40).
 
-    Used by ``game_detail_page`` to thread commander art into the game-tracker
-    ``seatDefs`` for the v3.26.1 panel-background visual treatment. One URL
-    yields the full-card cover treatment; two URLs yield a vertical-halves
-    split (top = primary, bottom = secondary).
+    A seat with no deck, no commander, or a commander whose card has no cached
+    image URL gets an empty list.
     """
     result: dict[int, list[str]] = {}
     for seat in game.seats:
-        if not seat.deck_id or not seat.deck or not seat.deck.storage_location_id:
-            result[seat.id] = []
-            continue
-        commander_rows = (
-            session.query(InventoryRow)
-            .join(Card)
-            .filter(
-                InventoryRow.user_id == seat.deck.user_id,
-                InventoryRow.storage_location_id == seat.deck.storage_location_id,
-                InventoryRow.role == "commander",
-            )
-            .order_by(InventoryRow.id)
-            .all()
-        )
-        urls: list[str] = []
-        for row in commander_rows:
-            if row.card and row.card.image_url:
-                urls.append(row.card.image_url)
-            if len(urls) >= 2:
-                break
-        result[seat.id] = urls
+        cards = deck_commander_cards(session, seat.deck) if seat.deck_id else []
+        result[seat.id] = [c.image_url for c in cards if c.image_url][:2]
     return result
 
 
 def deck_commander_scryfall_id(session: Session, deck: Deck | None) -> str | None:
-    """The scryfall_id of a deck's PRIMARY commander (for companion art), or
-    ``None``. Same resolution as :func:`get_seat_commander_image_urls` —
-    ``role='commander'`` inventory rows in the deck's location, first by id.
-    Degrades to ``None`` at every gap: no deck, no location, no tagged commander,
-    or a commander card with no ``scryfall_id``."""
-    if not deck or not deck.storage_location_id:
-        return None
-    row = (
-        session.query(InventoryRow)
-        .join(Card)
-        .filter(
-            InventoryRow.user_id == deck.user_id,
-            InventoryRow.storage_location_id == deck.storage_location_id,
-            InventoryRow.role == "commander",
-        )
-        .order_by(InventoryRow.id)
-        .first()
-    )
-    if row and row.card and row.card.scryfall_id:
-        return row.card.scryfall_id
+    """The scryfall_id of a deck's PRIMARY commander (the phone's background art),
+    or ``None``. Same resolver as the tablet and the name snapshot —
+    :func:`deck_commander_cards` — so the two art surfaces cannot disagree.
+    Degrades to ``None`` at every gap: no deck, no commander recorded anywhere, or
+    a commander card with no ``scryfall_id``."""
+    for card in deck_commander_cards(session, deck, limit=1):
+        if card.scryfall_id:
+            return card.scryfall_id
     return None
 
 

@@ -2463,17 +2463,28 @@ seatDefs.forEach((s, i) => {
           .then(function (d) {
             if (!d) return;
             if (d.status !== 'created') { clearInterval(timer); location.reload(); return; }
-            var claimed = d.seats.filter(function (s) { return s.claimed; }).length;
+            // A seat's SIGNATURE, not just the claimed count: a seated player
+            // picking their deck from their phone changes no count, so the tablet
+            // used to sit there with no commander art until someone reloaded it —
+            // which reads as "the art is intermittent" (v4.12.40). Seeded
+            // server-side in data-sig below, so a change between render and the
+            // first poll is caught rather than swallowed.
+            var sig = d.seats.map(function (s) {
+              return s.seat_id + ':' + (s.claimed ? 1 : 0) + ':' +
+                     (s.commander_name || s.deck_name || '') + '|';
+            }).join('');
             var el = document.getElementById('lobby-claimed-count');
-            if (el && el.dataset.count !== String(claimed)) {
-              el.dataset.count = String(claimed);
-              location.reload();  // a seat changed hands; re-render from the server
+            if (el && el.dataset.sig !== sig) {
+              el.dataset.sig = sig;
+              location.reload();  // a seat changed hands or changed deck
             }
           })
           .catch(function () { /* transient; the next tick retries */ });
       }, 4000);
     })();
     </script>
-    <span id="lobby-claimed-count" data-count="{{ game.seats | selectattr('user_id') | list | length }}" hidden></span>
+    {# Same string the poll builds, rendered from the state this page is showing. #}
+  <span id="lobby-claimed-count" hidden
+        data-sig="{% for s in game.seats | sort(attribute='seat_number') %}{{ s.id }}:{{ 1 if s.user_id else 0 }}:{{ s.commander_name_at_game or s.deck_name_at_game or '' }}|{% endfor %}"></span>
   {% endif %}
 {% endblock %}

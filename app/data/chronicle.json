@@ -1,5 +1,16 @@
 [
   {
+    "version": "4.12.40",
+    "date": "2026-07-29",
+    "added": [],
+    "refined": [],
+    "resolved": [
+      "Commander art fills the seat background reliably now, on the table screen and on each player's phone. It was appearing for some players and not others with nothing to explain the difference: the art was only ever found by looking for a card inside the deck marked as its commander, so a deck that records its commander any other way — including every deck created by typing a commander in — came up blank while the player's name and commander showed correctly right beside it. Eleven of the sixty-eight seats with a deck were in that state. All three places that ask who a deck's commander is now share one answer.",
+      "The table screen also picks up art when someone chooses their deck from their phone. It was watching only for seats being taken, so a player who claimed a seat and then picked a deck left the table showing an empty background until somebody reloaded the page."
+    ],
+    "archivist_note": "\"Intermittent\" is almost always a distinction you cannot see from where you are standing. This one had a clean rule behind it — art appeared if and only if a card inside the deck had been tagged as the commander — and no player had any reason to know that rule existed, so from the table it looked like weather. The fix is smaller than the explanation: one function, asked once, answered the same way everywhere."
+  },
+  {
     "version": "4.12.39",
     "date": "2026-07-29",
     "added": [
