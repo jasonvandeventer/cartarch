@@ -1,5 +1,17 @@
 [
   {
+    "version": "4.12.39",
+    "date": "2026-07-29",
+    "added": [
+      "The Games list shows each game's number, so a game someone refers to can be found by scanning the column instead of typing its address."
+    ],
+    "refined": [
+      "A deck we can name is now offered when you pick a deck for a game, even if no card list has been entered for it. These decks get created whenever a commander is recorded for a seat that had no deck — they were being held back as unplayable, which had it backwards: the deck is sitting on the table, we simply hold no list for it. Offering it is also what makes anyone fill it in. They still sit apart on the Decks page, under a heading that now says plainly that you can pick them, because everything above it there — totals, stats, value — is about cards, and these have none yet."
+    ],
+    "resolved": [],
+    "archivist_note": "Yesterday we decided a deck with no card list could not be brought to a table. Today the obvious objection arrived: of course it can, it is a physical deck in somebody's bag, and the app not knowing its contents is our gap rather than theirs. The rule now asks whether we can NAME the deck, which is a fairer question, and a nameless one — no cards, no commander, nothing to print in a dropdown — is still the only thing held back."
+  },
+  {
     "version": "4.12.38",
     "date": "2026-07-29",
     "added": [

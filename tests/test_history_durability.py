@@ -17,6 +17,7 @@ from __future__ import annotations
 
 from app import deck_service
 from app.models import Card, Deck, Game, GameSeat, StorageLocation, User
+from app.timeutil import utc_now
 
 
 def _deck(db, owner, name="Test Deck", *, with_location=True):
@@ -356,3 +357,60 @@ def test_a_placeholder_that_gains_cards_becomes_pickable_again(db, user):
     db.commit()
 
     assert placeholder.id in {d.id for d in list_pickable_decks(db, [user.id])}
+
+
+# ── v4.12.39: a deck we can NAME is a deck someone can play ──────────────────
+# Owner decision 2026-07-29, reversing v4.12.29's judgement (not a bug in it).
+# v4.12.29 read "we have no card list" as "cannot be brought to a table" — but
+# the physical deck is on the table; Cartarch's ignorance of its contents is not
+# the player's. Offering it is also what makes anyone fill it in.
+
+
+def test_a_commander_anchored_placeholder_is_pickable(db, user):
+    from app.deck_service import list_pickable_decks
+    from app.models import Card, DeckCommander
+
+    placeholder = _deck(db, user, name="Wolverine, Best There Is")
+    placeholder.contents_tracked = False
+    card = Card(
+        scryfall_id="pick-wolv",
+        name="Wolverine, Best There Is",
+        set_code="mar",
+        collector_number="97",
+        type_line="Legendary Creature — Mutant",
+    )
+    db.add(card)
+    db.commit()
+    db.add(DeckCommander(deck_id=placeholder.id, card_id=card.id))
+    db.commit()
+
+    assert placeholder.id in {d.id for d in list_pickable_decks(db, [user.id])}
+
+
+def test_a_nameless_placeholder_is_still_not_pickable(db, user):
+    """The clause that survives: no contents, no commander, nothing to show in a
+    dropdown. Offering that is offering a blank row."""
+    from app.deck_service import list_pickable_decks
+
+    nameless = _deck(db, user, name="Nothing Known")
+    nameless.contents_tracked = False
+    db.commit()
+
+    assert nameless.id not in {d.id for d in list_pickable_decks(db, [user.id])}
+
+
+def test_a_retired_deck_is_not_rescued_by_its_commander(db, user):
+    """The two exclusions are different ideas — you DELETED a retired deck, and a
+    commander anchor must not undo that."""
+    from app.deck_service import list_pickable_decks
+    from app.models import Card, DeckCommander
+
+    gone = _deck(db, user, name="Deleted Deck")
+    card = Card(scryfall_id="pick-atx", name="Atraxa", set_code="tst", collector_number="1")
+    db.add(card)
+    db.commit()
+    db.add(DeckCommander(deck_id=gone.id, card_id=card.id))
+    gone.retired_at = utc_now()
+    db.commit()
+
+    assert gone.id not in {d.id for d in list_pickable_decks(db, [user.id])}

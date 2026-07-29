@@ -320,22 +320,24 @@
     </section>
   {% endif %}
 
-  {# #164 placeholders. Collapsed and below everything, because they are not decks
-     you own — they exist so a past game has something to point at. They stay
-     REACHABLE rather than hidden: hiding them entirely would make them impossible
-     to delete, and importing a decklist into one is how a placeholder becomes a
-     real deck (v4.12.30). Deliberately minimal — name, commander, the games it
-     anchors, delete. No stats, no edit popout, nothing implying it is playable. #}
+  {# #164 placeholders — decks with a commander and no card list. Kept apart from
+     decks with contents because everything up the page (totals, the featured pick,
+     stats, value) is about contents, not because they are unplayable: since
+     v4.12.39 they ARE offered in game pickers, and the copy below says so. They
+     stay REACHABLE rather than hidden — hiding them would make them impossible to
+     delete, and importing a decklist into one is how a placeholder graduates
+     (v4.12.30). Minimal by design: name, format, delete. #}
   {% if record_only_decks | default([]) %}
     <details class="panel" style="margin-top:1.25rem">
       <summary style="cursor:pointer; font-weight:600">
-        Record-only decks ({{ record_only_decks | length }})
+        Decks without a card list ({{ record_only_decks | length }})
       </summary>
       <p class="muted" style="margin:0.6rem 0 0.9rem; font-size:0.92rem">
-        Created for games where a commander was recorded but no deck was picked, so
-        the result still counts toward that commander. They hold no cards and are not
-        offered when you pick a deck for a game. Import a decklist into one to turn it
-        into a real deck, or delete it — the games keep their record either way.
+        Created from games where a commander was recorded but no deck was picked, so
+        the result still counts toward that commander. <strong>You can pick these when
+        you log a game</strong> — they just hold no cards yet, which is why they sit
+        apart from decks with contents and stats. Import a decklist into one and it
+        becomes a full deck; delete it and the games keep their record either way.
       </p>
       {% for deck in record_only_decks %}
         <div style="display:flex; align-items:baseline; gap:0.75rem; padding:0.4rem 0; border-top:1px solid var(--border)">

@@ -284,13 +284,18 @@ def test_placeholders_render_in_their_own_section_not_the_main_list(client, db, 
 
     Route-level, because a service test cannot see this — `record_only_decks` has
     to actually reach the template (the #152 failure mode).
+
+    The SECTION survived v4.12.39 even though the picker rule did not: everything
+    above it on that page is about contents (totals, featured, stats, value), and
+    a deck with no card list has none of that. Only the heading and the copy
+    changed, because "not offered when you pick a deck" stopped being true.
     """
     _placeholder(db, user, "Anchor Only")
     body = client.get("/decks").text
-    assert "Record-only decks (1)" in body
+    assert "Decks without a card list (1)" in body
     assert "Anchor Only" in body
     # Not in the main rows: the compact-row markup is what "a real deck" looks like.
-    head = body.split("Record-only decks")[0]
+    head = body.split("Decks without a card list")[0]
     assert "Anchor Only" not in head, "a placeholder leaked into the main deck list"
 
 

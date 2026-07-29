@@ -12,6 +12,7 @@ from app.models import (
     Card,
     Deck,
     DeckCardShare,
+    DeckCommander,
     DeckGoal,
     Game,
     GameGoalResult,
@@ -2052,11 +2053,18 @@ def list_decks_basic(session: Session, user_id: int) -> list[Deck]:
 def is_record_only_deck(deck) -> bool:
     """Per-deck predicate: a #164 placeholder that has never been filled in.
 
-    The Python half of :func:`list_pickable_decks`'s SQL condition, and the two
-    MUST stay in step — same pairing as ``is_brew_placeholder_row`` /
-    ``brew_placeholder_exclusion``. Requires ``card_count`` (``list_decks`` sets
-    it); an unpopulated deck reads as 0 and would be misjudged, so do not call
-    this on a bare ORM row.
+    **It was the Python half of :func:`list_pickable_decks`'s SQL condition; since
+    v4.12.39 the two ask DIFFERENT questions and are deliberately no longer
+    twins.** The picker asks *"can this be brought to a table"* and now answers
+    yes for a commander-anchored placeholder — the physical deck exists, Cartarch
+    just holds no list for it. This one asks *"do we have a card list"*, which is
+    what decides whether a deck belongs among decks with contents, stats and a
+    value. So a placeholder is now pickable AND still sectioned off here; the
+    section's copy says so rather than repeating the old "not offered in pickers"
+    claim, which this change made false.
+
+    Requires ``card_count`` (``list_decks`` sets it); an unpopulated deck reads as
+    0 and would be misjudged, so do not call this on a bare ORM row.
     """
     return not deck.contents_tracked and not (getattr(deck, "card_count", 0) or 0)
 
@@ -2074,20 +2082,28 @@ def list_pickable_decks(session: Session, user_ids) -> list[Deck]:
 
     - **Retired** (#163) — you deleted it. Deletion became a soft retire so game
       history survives, and a retired deck must stay as invisible as a deleted one.
-    - **Untracked** (#164) — a PLACEHOLDER, minted by the backfill for a seat that
-      recorded a commander but no deck. It exists to anchor history, and it is not
-      a deck you own or can bring to a table, so offering it in a picker is
-      offering something unplayable.
+    - **Unidentifiable** (#164, amended v4.12.39) — untracked, empty, AND with no
+      commander recorded. Such a deck is a bare row nobody can name.
 
-    **The untracked test is `flag AND no rows`, and the second half is not
-    optional.** `contents_tracked` alone is the wrong predicate in one direction:
-    nothing ever flips it back to true, so importing a decklist INTO a placeholder
-    would produce a real 100-card deck that stayed invisible in every picker
-    forever. `if rows:` alone is wrong in the other direction: a deck created five
-    minutes ago and not yet filled is also empty and MUST stay pickable. Together
-    they say the only thing that actually disqualifies a deck — *nobody is
-    tracking its contents and it has none* — and the rows half self-heals, so a
-    placeholder needs no write to graduate.
+    **The test is `flag AND no rows AND no commander`, and every clause earns its
+    place.** `contents_tracked` alone is wrong in one direction: nothing ever
+    flips it back to true, so importing a decklist INTO a placeholder would leave
+    a real 100-card deck invisible in every picker forever. `if rows:` alone is
+    wrong in the other: a deck created five minutes ago is also empty and MUST
+    stay pickable.
+
+    **The commander clause is the v4.12.39 amendment, and it reverses a judgement,
+    not a bug.** v4.12.29 read "we have no card list" as "cannot be brought to a
+    table" — but the physical deck is sitting on the table; Cartarch's ignorance
+    of its contents is not the player's. Owner decision 2026-07-29: a deck we can
+    NAME is a deck someone can play, and offering it is what makes anyone fill it
+    in. Measured that day: all 7 placeholders in prod carry a commander and none
+    carries a row, so this makes exactly those 7 pickable. A truly nameless
+    placeholder — no contents, no commander, nothing to show in a dropdown —
+    stays out, which is what the tests below pin.
+
+    **The rows clause still self-heals**, so a placeholder that gains a decklist
+    graduates without a write nobody would think to make.
 
     This is `contents_tracked`'s first reader; see the note in
     ``tests/test_history_durability.py`` for why the no-reader guard was retired.
@@ -2102,12 +2118,13 @@ def list_pickable_decks(session: Session, user_ids) -> list[Deck]:
         .where(InventoryRow.storage_location_id == Deck.storage_location_id)
         .exists()
     )
+    has_commander = select(DeckCommander.card_id).where(DeckCommander.deck_id == Deck.id).exists()
     return (
         session.query(Deck)
         .filter(
             Deck.user_id.in_(list(user_ids)),
             Deck.retired_at.is_(None),
-            or_(Deck.contents_tracked.is_(True), has_rows),
+            or_(Deck.contents_tracked.is_(True), has_rows, has_commander),
         )
         .order_by(Deck.name.asc())
         .all()

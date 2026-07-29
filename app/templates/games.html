@@ -33,6 +33,7 @@
         <table class="stacking-table">
           <thead>
             <tr>
+              <th>#</th>
               <th>Date</th>
               <th class="col-priority-low">Format</th>
               <th>Players</th>
@@ -46,6 +47,9 @@
             {% for game in games %}
               {% set winner = game.seats | selectattr('placement', 'eq', 1) | first | default(none) %}
               <tr>
+                {# The game number, so a game referenced in conversation can be found
+                   by scanning this column instead of typing /games/<id>. #}
+                <td data-label="Game"><a href="/games/{{ game.id }}">{{ game.id }}</a></td>
                 <td>
                   <a href="/games/{{ game.id }}">{{ game.played_at.strftime("%Y-%m-%d") }}</a>
                   {% if not game.is_owned_by_viewer %}
