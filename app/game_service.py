@@ -1025,6 +1025,78 @@ def claimable_seats(game: Game) -> list[GameSeat]:
     return sorted((s for s in game.seats if s.user_id is None), key=lambda s: s.seat_number)
 
 
+def attach_seat_commanders(
+    session: Session,
+    game_id: int,
+    owner_user_id: int,
+    entries: dict[int, str],
+) -> list[str]:
+    """Record what a seat played, at FINALIZE. Returns names that matched nothing.
+
+    #175 — the last chance to capture attribution. Game creation offers a deck
+    picker and a commander field (#164), and #165 lets a player set their own from
+    a phone; all three are skippable, and measured over 23 games that produced **30
+    of 94 finalized Commander seats with no deck, 29 of them with no commander name
+    or deck name either.** Nothing recorded means nothing a backfill can resolve —
+    #164's already harvested every seat that recorded something. Finalize is the
+    one moment everyone is definitely paying attention, so it is the backstop for
+    every earlier path that was skipped.
+
+    Guards, each deliberate:
+
+    * **An existing ``deck_id`` is NEVER overwritten.** The form only renders this
+      field for seats that have neither a deck nor a commander, but a stray or
+      forged field must not be able to rewrite a seat that already knows what it
+      played. Silently changing a recorded result is worse than dropping input.
+    * **A seat with no ``user_id`` is skipped and reported.** ``decks.user_id`` is
+      NOT NULL, so a guest seat has nobody to own the deck. That is #167/#172 and
+      is deliberately not pre-decided here.
+    * **Resolution goes through #164's** :func:`resolve_commander_to_deck` — one
+      implementation, which finds an existing deck for that commander before
+      creating a placeholder. That FIND-before-CREATE is also what makes this
+      idempotent, which matters because ``/end`` is deliberately re-runnable
+      (#114 post-finalize editing).
+    * **Never fails the finalize.** An unmatched name is returned to the caller to
+      show, and the result still records — the same non-blocking posture game
+      creation and seat claiming already take.
+    """
+    from app.deck_service import resolve_commander_to_deck
+
+    game = session.query(Game).filter(Game.id == game_id, Game.user_id == owner_user_id).first()
+    if not game:
+        return []
+
+    seats_by_id = {s.id: s for s in game.seats}
+    unresolved: list[str] = []
+    touched = False
+    for seat_id, raw in entries.items():
+        text = (raw or "").strip()
+        if not text:
+            continue
+        seat = seats_by_id.get(seat_id)
+        if seat is None or seat.deck_id is not None:
+            continue
+        if seat.user_id is None:
+            unresolved.append(text)
+            continue
+        deck, missing = resolve_commander_to_deck(session, seat.user_id, text, commit=False)
+        if deck is None:
+            unresolved.extend(missing or [text])
+            continue
+        seat.deck_id = deck.id
+        # Re-derive every deck-denormalised field through the SAME helper creation
+        # and claiming use, so a seat attributed here is indistinguishable from one
+        # attributed at the table.
+        seat.deck_name_at_game, seat.commander_name_at_game = _capture_deck_identity(
+            session, deck.id
+        )
+        touched = True
+
+    if touched or unresolved:
+        session.commit()
+    return unresolved
+
+
 def joinable_games_for_user(session: Session, user_id: int) -> list[dict]:
     """Games a playgroup co-member can take a seat in WITHOUT being handed a code.
 

@@ -5,6 +5,21 @@
      full-screen life tracker (which read as a "non-functional tracker") with a
      normal page showing the recorded results: final standings, turn count,
      elapsed playtime, full notes. Live games still render game_detail.html. #}
+  {# #175 — a finalize that could not resolve a typed commander lands HERE, not on
+     game_detail.html, because the game is now finalized. The banner has to exist on
+     both or the message fires exactly where nobody sees it. #}
+  {% if request.query_params.get('commander_unresolved') %}
+    <div class="panel" style="border:1px solid var(--danger,#c00); margin-bottom:0.75rem">
+      <strong>Couldn't find:</strong>
+      {{ request.query_params.get('commander_unresolved') }}
+      <p class="muted" style="margin:0.35rem 0 0; font-size:0.9rem">
+        The result is recorded — only the deck didn't attach. Check the spelling, and
+        note that alternate-art printings with a different displayed name (a “flavor
+        name”) aren't searchable; use the card's real name. You can retry from
+        <em>Edit result</em>.
+      </p>
+    </div>
+  {% endif %}
   {% set winner = game.seats | selectattr('placement', 'eq', 1) | first | default(none) %}
   <section class="panel hero-panel compact-hero">
     <div class="hero-row">
@@ -226,18 +241,36 @@
     <div id="edit-result-modal" data-dismiss
          style="display:none;position:fixed;inset:0;z-index:900;background:rgba(0,0,0,0.6);
                 align-items:flex-start;justify-content:center;overflow-y:auto;padding:2rem 1rem">
-      <div class="panel" style="max-width:640px;width:100%;margin-top:2rem">
+      <div class="panel" style="max-width:960px;width:100%;margin-top:2rem">
         <h3 class="panel-title">Edit result</h3>
         <form method="post" action="/games/{{ game.id }}/end">
           <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
           <p class="muted" style="font-size:0.85rem">Duplicate placements are allowed — tie simultaneous eliminations.</p>
           <div class="table-wrap">
             <table class="stacking-table">
-              <thead><tr><th>Player</th><th>Place</th><th>Final life</th><th>Out by</th></tr></thead>
+              <thead><tr><th>Player</th><th>Played</th><th>Place</th><th>Final life</th><th>Out by</th></tr></thead>
               <tbody>
                 {% for seat in game.seats %}
                   <tr>
                     <td data-label="Player">{{ seat.player_name }}</td>
+                    {# #175 — this form is the ONLY way to attribute a seat after the
+                       fact, so it matters more than the tracker copy: 29 seats in the
+                       database recorded nothing at all and can only be fixed by
+                       somebody who remembers. Editable only while the seat holds
+                       neither a deck nor a commander; otherwise it just states what
+                       was recorded. #}
+                    <td data-label="Played">
+                      {% if seat.deck_id or seat.commander_name_at_game %}
+                        <span class="muted">{{ seat.commander_name_at_game or seat.deck_name_at_game }}</span>
+                      {% else %}
+                        <input type="text"
+                               name="commander_{{ seat.id }}"
+                               placeholder="Commander"
+                               aria-label="Commander played by {{ seat.player_name }}"
+                               autocapitalize="words"
+                               style="width:150px">
+                      {% endif %}
+                    </td>
                     <td data-label="Place">
                       <select name="placement_{{ seat.id }}">
                         <option value="">—</option>

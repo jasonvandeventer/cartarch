@@ -654,6 +654,18 @@
                     <option value="manual">Manual (other)</option>
                   </select>
                 </div>
+                {# #175 — last-chance attribution. Shown ONLY for a seat holding neither
+                   a deck nor a commander name; on a seat that already recorded one it
+                   would be noise, and a form everyone dismisses captures nothing.
+                   Routes through #164's resolve_commander_to_deck. #}
+                {% if not seat.deck_id and not seat.commander_name_at_game %}
+                  <input type="text"
+                         name="commander_{{ seat.id }}"
+                         placeholder="What did {{ seat.player_name }} play? (commander)"
+                         aria-label="Commander played by {{ seat.player_name }}"
+                         autocapitalize="words"
+                         style="width:100%;max-width:520px;margin:-0.25rem 0 0.5rem">
+                {% endif %}
                 {# issue #47 — goal completion checkboxes, only for seats whose
                    deck the recorder owns (multiplayer: the deck owner's goals
                    apply to that seat). Active goals only. #}

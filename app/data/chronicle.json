@@ -1,5 +1,15 @@
 [
   {
+    "version": "4.12.36",
+    "date": "2026-07-29",
+    "added": [
+      "Recording a game now asks what anyone played whose seat has nothing recorded — a single box beside their name, on both the end-of-game form and the edit form for games already finished. Type a commander and it attaches to that player's deck for it, or creates one to hold the record. A name it cannot find still saves the result and tells you which one missed. Seats that already say what they played are left alone, so this is never a field you have to dismiss."
+    ],
+    "refined": [],
+    "resolved": [],
+    "archivist_note": "Thirty of the ninety-four recorded seats say nothing about what was played, and twenty-nine of those say nothing at all — no deck, no commander, not even a name typed in free text. There is nothing there to recover; they can only be filled in by somebody who remembers. Setting a game up has offered a deck and a commander for some time, and a phone can now set its own, but all of it is optional, and the record above is what optional looked like over twenty-three games. Asking at the end is the last honest chance."
+  },
+  {
     "version": "4.12.35",
     "date": "2026-07-29",
     "added": [],

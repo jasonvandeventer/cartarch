@@ -761,6 +761,33 @@ async def game_end(
             continue
     record_goal_results(session, game_id, current_user.id, checked)
 
+    # #175 — last-chance attribution. The form renders `commander_{seat_id}` only
+    # for seats holding neither a deck nor a commander name; the service re-checks
+    # and refuses to overwrite a seat that already has one, so a stray field cannot
+    # rewrite a recorded result. Runs AFTER end_game so a failure to resolve a name
+    # can never cost the result itself.
+    commander_entries: dict[int, str] = {}
+    for key in form_data:
+        if not key.startswith("commander_"):
+            continue
+        try:
+            commander_entries[int(key.split("_", 1)[1])] = str(form_data.get(key, ""))
+        except ValueError:
+            continue
+    unresolved = (
+        game_service.attach_seat_commanders(session, game_id, current_user.id, commander_entries)
+        if commander_entries
+        else []
+    )
+
+    if unresolved:
+        # Same banner the creation and claim paths use — one shape for "the game
+        # is recorded, only the deck did not attach". `dict.fromkeys` dedupes while
+        # keeping order, matching game_create above.
+        from urllib.parse import quote_plus
+
+        missing = quote_plus(", ".join(dict.fromkeys(unresolved)))
+        return RedirectResponse(f"/games/{game_id}?commander_unresolved={missing}", status_code=303)
     return RedirectResponse(f"/games/{game_id}", status_code=303)
 
 
