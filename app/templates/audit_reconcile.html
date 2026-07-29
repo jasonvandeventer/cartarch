@@ -34,9 +34,7 @@
         {% for c in changes %}<li>{{ c }}</li>{% endfor %}
       </ul>
       <div style="display:flex;gap:0.5rem;margin-top:1rem">
-        <a href="/audit/start?location_id={{ audit.storage_location_id }}">
-          <button type="button" class="btn-like">Restart audit</button>
-        </a>
+        <a href="/audit/start?location_id={{ audit.storage_location_id }}" class="btn-like">Restart audit</a>
         <form method="post" action="/audit/{{ audit.id }}/abandon"
               onsubmit="return confirm('Abandon this audit? All scans will be discarded.');">
           <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
@@ -169,9 +167,7 @@
       <section class="panel">
         <div style="display:flex;gap:0.5rem;flex-wrap:wrap">
           <button type="submit" class="btn-like">Apply changes</button>
-          <a href="/audit/start?location_id={{ audit.storage_location_id }}">
-            <button type="button">Back to scanning</button>
-          </a>
+          <a href="/audit/start?location_id={{ audit.storage_location_id }}" class="btn">Back to scanning</a>
         </div>
       </section>
     </form>

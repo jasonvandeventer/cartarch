@@ -1,5 +1,15 @@
 [
   {
+    "version": "4.12.35",
+    "date": "2026-07-29",
+    "added": [],
+    "refined": [
+      "Forty-three navigation controls across nineteen pages were built as a button placed inside a link, which is not valid and which browsers are free to interpret differently. Each is now a single link styled to look exactly as it did. A few of them, and the buttons sitting beside them in the same toolbar, now use the site's own typeface rather than the browser's default — those two had never matched, which only became visible once they stood next to each other."
+    ],
+    "resolved": [],
+    "archivist_note": "The count in the original report was twelve; it was closer to forty-three, because the search that produced it only looked one line at a time and most of these span two. The interesting part was not the sweep but what it uncovered: every button in the application has been rendering in Arial this whole time. Left alone for now, deliberately — that is four hundred controls and its own afternoon."
+  },
+  {
     "version": "4.12.34",
     "date": "2026-07-28",
     "added": [],

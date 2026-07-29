@@ -135,15 +135,9 @@
       {% else %}
         {% set primary_label = "View pending" %}
       {% endif %}
-      <a href="{{ destination_url }}">
-        <button type="button">{{ primary_label }}</button>
-      </a>
-      <a href="/import">
-        <button type="button" class="ghost-button">Import more cards</button>
-      </a>
-      <a href="/imports/history">
-        <button type="button" class="ghost-button">View import history</button>
-      </a>
+      <a href="{{ destination_url }}" class="btn">{{ primary_label }}</a>
+      <a href="/import" class="btn ghost-button">Import more cards</a>
+      <a href="/imports/history" class="btn ghost-button">View import history</a>
     </div>
   </section>
   {% if failed_rows %}

@@ -130,9 +130,7 @@
                   {% if summary.last_touched_at %}{{ summary.last_touched_at | editorial_date }}{% else %}<span class="locations-last-touched-empty">—</span>{% endif %}
                 </td>
                 <td style="text-align: right; white-space: nowrap;">
-                  <a href="/locations/{{ loc.id }}">
-                    <button type="button">Open</button>
-                  </a>
+                  <a href="/locations/{{ loc.id }}" class="btn">Open</a>
                   {% if loc.type not in ('root', 'deck') %}
                     <details class="inline-details js-dismiss"
                              style="display: inline-block;

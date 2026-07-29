@@ -7,9 +7,7 @@
       audit of <strong>{{ audit_banner.location_name }}</strong>.
     </span>
     <span class="audit-resume-actions">
-      <a href="/audit/start?location_id={{ audit_banner.location_id }}">
-        <button type="button" class="btn-like">Resume</button>
-      </a>
+      <a href="/audit/start?location_id={{ audit_banner.location_id }}" class="btn-like">Resume</a>
       <form method="post" action="/audit/{{ audit_banner.audit_id }}/abandon"
             onsubmit="return confirm('Abandon this audit? All scans will be discarded.');">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">

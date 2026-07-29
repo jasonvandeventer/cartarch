@@ -690,9 +690,7 @@
                placeholder="Search your collection to add cards"
                value="{{ collection_search }}">
         <button type="submit">Search Collection</button>
-        <a href="/decks/{{ deck.id }}?search={{ search }}">
-          <button type="button">Clear</button>
-        </a>
+        <a href="/decks/{{ deck.id }}?search={{ search }}" class="btn">Clear</a>
       </form>
       {% if collection_search and collection_results %}
         <div class="inventory-grid" style="margin-top: 1rem;">
@@ -787,9 +785,7 @@
           <option value="subtype" {% if group_by == 'subtype' %}selected{% endif %}>Group: Subtype</option>
         </select>
         <button type="submit">Apply</button>
-        <a href="/decks/{{ deck.id }}?collection_search={{ collection_search }}">
-          <button type="button">Clear</button>
-        </a>
+        <a href="/decks/{{ deck.id }}?collection_search={{ collection_search }}" class="btn">Clear</a>
       </form>
       </div>
     </section>
@@ -812,9 +808,7 @@
           <section class="panel">
             <p>No cards in this deck yet.</p>
             <p class="muted">Use Search Collection above to find owned cards and add them to this deck.</p>
-            <a href="/collection">
-              <button type="button">Go to Collection</button>
-            </a>
+            <a href="/collection" class="btn">Go to Collection</a>
           </section>
         {% endif %}
       </div>

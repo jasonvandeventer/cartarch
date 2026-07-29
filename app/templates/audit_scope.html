@@ -20,9 +20,7 @@
   <section class="panel">
     <h3 class="panel-title">Audit everything</h3>
     <p class="muted">Verify the whole location — every card, in physical order.</p>
-    <a href="/audit/start?location_id={{ location.id }}&full=1">
-      <button type="button" class="btn-like">Audit everything ({{ total_cards }} card{{ 's' if total_cards != 1 else '' }})</button>
-    </a>
+    <a href="/audit/start?location_id={{ location.id }}&full=1" class="btn-like">Audit everything ({{ total_cards }} card{{ 's' if total_cards != 1 else '' }})</a>
   </section>
 
   {% if location_sets %}
@@ -48,7 +46,7 @@
           <button type="submit" id="audit-scope-submit" class="btn-like" disabled>
             Audit selected sets (<span id="audit-scope-total">0</span> cards)
           </button>
-          <a href="/audit"><button type="button">Cancel</button></a>
+          <a href="/audit" class="btn">Cancel</a>
         </div>
       </form>
     </section>

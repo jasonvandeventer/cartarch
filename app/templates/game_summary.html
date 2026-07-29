@@ -26,7 +26,7 @@
           <button type="button" class="btn-like" onclick="togglePlayersModal()">Players</button>
           <button type="button" class="btn-like" onclick="toggleEditResult()">Edit result</button>
         {% endif %}
-        <a href="/games"><button type="button">Back to games</button></a>
+        <a href="/games" class="btn">Back to games</a>
         {% if is_owner %}
           <form method="post" action="/games/{{ game.id }}/delete" style="display:inline"
                 onsubmit="return confirm('Delete this game record?')">

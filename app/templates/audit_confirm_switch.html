@@ -16,10 +16,8 @@
         <input type="hidden" name="next" value="/audit/start?location_id={{ target_location.id }}">
         <button type="submit" class="btn-danger">Abandon &amp; audit {{ target_location.name }}</button>
       </form>
-      <a href="/audit/start?location_id={{ active_audit.storage_location_id }}">
-        <button type="button" class="btn-like">Resume current audit</button>
-      </a>
-      <a href="/locations/{{ target_location.id }}"><button type="button">Cancel</button></a>
+      <a href="/audit/start?location_id={{ active_audit.storage_location_id }}" class="btn-like">Resume current audit</a>
+      <a href="/locations/{{ target_location.id }}" class="btn">Cancel</a>
     </div>
   </section>
 {% endblock %}

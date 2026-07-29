@@ -23,9 +23,7 @@
         </span>
       </div>
       <div class="audit-resume-actions">
-        <a href="/audit/start?location_id={{ active_audit.storage_location_id }}">
-          <button type="button" class="btn-like">Resume</button>
-        </a>
+        <a href="/audit/start?location_id={{ active_audit.storage_location_id }}" class="btn-like">Resume</a>
         <form method="post" action="/audit/{{ active_audit.id }}/abandon"
               onsubmit="return confirm('Abandon this audit? All scans will be discarded.');">
           <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
@@ -74,9 +72,7 @@
                   {% else %}—{% endif %}
                 </td>
                 <td style="text-align:right">
-                  <a href="/audit/start?location_id={{ loc.location_id }}">
-                    <button type="button" class="btn-like">Start Audit</button>
-                  </a>
+                  <a href="/audit/start?location_id={{ loc.location_id }}" class="btn-like">Start Audit</a>
                 </td>
               </tr>
             {% endfor %}

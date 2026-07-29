@@ -17,19 +17,13 @@
         <div class="stat-label">Wins</div>
       </div>
     </div>
-    <a href="/games/new">
-      <button type="button">+ New Game</button>
-    </a>
-    <a href="/games/manual-log">
-      <button type="button" style="margin-left:0.5rem">Log a Game</button>
-    </a>
+    <a href="/games/new" class="btn">+ New Game</a>
+    <a href="/games/manual-log" class="btn" style="margin-left:0.5rem">Log a Game</a>
     {# #158 — cross-game pod dynamics + pace. Only meaningful once at least one game
        has been played in live mode, so it is hidden until then rather than linking
        to an empty state. #}
     {% if games | selectattr('status', 'equalto', 'finalized') | list %}
-      <a href="/games/analytics">
-        <button type="button" style="margin-left:0.5rem">Analytics</button>
-      </a>
+      <a href="/games/analytics" class="btn" style="margin-left:0.5rem">Analytics</a>
     {% endif %}
   </section>
   {% if games %}

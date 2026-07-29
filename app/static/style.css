@@ -1909,12 +1909,6 @@ textarea {
   background: var(--danger);
   color: #fff;
 }
-.ghost-button {
-  background: transparent;
-  border: 1px solid #4b5563;
-  color: #e5e7eb;
-}
-
 table {
   width: 100%;
   border-collapse: collapse;
@@ -2297,9 +2291,69 @@ td {
   opacity: 0.6;
 }
 
+/* #174 — an <a> that must LOOK like a plain <button>.
+ *
+ * 43 navigation controls were written as `<button>` nested inside `<a>`, which is
+ * invalid HTML (interactive content cannot contain interactive content) and which
+ * browsers recover from inconsistently. The obvious fix — swap in `.btn-like` —
+ * would have restyled all 43, because `.btn-like` is a small outlined chip while a
+ * bare `<button>` is the accent-filled primary. So this mirrors the `button`
+ * element rule instead, and the sweep becomes visually inert.
+ *
+ * KEEP IN STEP with the `button {}` rule (~line 1569). If that changes and this
+ * does not, half the app's buttons quietly diverge from the other half.
+ *
+ * `.ghost-button` only overrides background/border/colour and inherits the box
+ * from `button {}` — so on an anchor it needs `.btn ghost-button`, not
+ * `ghost-button` alone, or it renders with no padding at all. */
+.btn {
+  display: inline-block;
+  padding: 0.58rem 0.9rem;
+  border: none;
+  background: var(--accent);
+  color: white;
+  border-radius: 10px;
+  cursor: pointer;
+  font-weight: 600;
+  text-decoration: none;
+  text-align: center;
+  font-family: inherit;
+  font-size: inherit;
+  line-height: normal;
+}
+/* Nothing in this stylesheet sets a font on <button>, so EVERY button in the app
+ * renders in the UA default — Arial 13.33px — while everything around it is
+ * Montserrat 16px. Nobody noticed until #174 replaced 43 nested buttons with
+ * anchors, which inherit, putting the two faces side by side in one toolbar
+ * ("Clear all" beside "Apply").
+ *
+ * Scoped to `.filter-row` DELIBERATELY (owner decision 2026-07-29). That is the
+ * only container measured to hold both a swept anchor and a plain button as
+ * siblings. Normalising `button {}` outright is the real fix and is tempting, but
+ * 457 of the 462 buttons on /collection are unpinned — most of them row actions
+ * in the dense card grid — so it is an app-wide restyle needing its own visual
+ * pass, not a footnote to a validity sweep. */
+:where(.filter-row) button {
+  font-family: inherit;
+  font-size: inherit;
+}
+/* Overrides the box set by `button {}` / `.btn`, so it MUST come after both.
+ * It lived ~400 lines earlier until #174, where `.btn ghost-button` on an anchor
+ * silently lost its transparent background to `.btn`. */
+.ghost-button {
+  background: transparent;
+  border: 1px solid #4b5563;
+  color: #e5e7eb;
+}
 .btn-like {
   cursor: pointer;
   list-style: none;
+  /* Was inherited from the `button {}` rule, so the SAME class rendered at 600 on
+   * its 53 <button> uses and 400 on its 18 <summary> uses — two looks, one name.
+   * #174 made that visible by moving 28 of the buttons to <a>, which dropped them
+   * to 400. Declaring it here restores those and settles the class on one weight;
+   * the cost is that the summaries and 6 older anchors get bolder. */
+  font-weight: 600;
   /* The class means "looks like a button", and it is now used on <a> as well as
      <summary> (#173 replaced a <button> nested inside an <a>, which is invalid
      HTML). An anchor keeps its underline inside the button box without this;
@@ -6486,9 +6540,6 @@ table.dmtx .dmtx-rowhead {
   .filter-row a {
     width: 100%;
   }
-  .filter-row a button {
-    width: 100%;
-  }
 
   /* Popouts: cap at 90vw + scroll inside if tall */
   .edit-popout,
@@ -6706,6 +6757,7 @@ table.dmtx .dmtx-rowhead {
     ):not(.tc-art-toggle-btn):not(.fs-btn) {
     min-height: 44px;
   }
+  body:not(.game-mode) .btn,
   body:not(.game-mode) .btn-like,
   body:not(.game-mode) .return-summary,
   body:not(.game-mode) .bracket-badge,

@@ -24,25 +24,15 @@
       {% if not use_drawer_sorter and not locations %}
         <p class="muted">Start by creating a storage location (binder, box, shelf, etc.), then import your cards into it.</p>
         <div style="display:flex; gap:1rem; flex-wrap:wrap;">
-          <a href="/locations">
-            <button type="button">Create a Location</button>
-          </a>
-          <a href="/decks">
-            <button type="button">Go to Decks</button>
-          </a>
+          <a href="/locations" class="btn">Create a Location</a>
+          <a href="/decks" class="btn">Go to Decks</a>
         </div>
       {% else %}
         <p class="muted">Start by importing your collection, then build decks.</p>
         <div style="display:flex; gap:1rem; flex-wrap:wrap;">
-          <a href="/import">
-            <button type="button">Import Collection</button>
-          </a>
-          <a href="/import">
-            <button type="button">Add Cards Manually</button>
-          </a>
-          <a href="/decks">
-            <button type="button">Go to Decks</button>
-          </a>
+          <a href="/import" class="btn">Import Collection</a>
+          <a href="/import" class="btn">Add Cards Manually</a>
+          <a href="/decks" class="btn">Go to Decks</a>
         </div>
       {% endif %}
     </section>
@@ -183,14 +173,10 @@
       <input type="hidden" name="price_max" value="{{ facet_price_max_raw }}">
       <input type="hidden" name="view" value="{{ view_mode }}">
       <button type="submit">Apply</button>
-      <a href="/collection"><button type="button">Clear all</button></a>
+      <a href="/collection" class="btn">Clear all</a>
       {% set export_qs %}search={{ search|urlencode }}&finish={{ finish_filter }}&location_id={{ location_id }}&loc={{ location_ids }}&sort={{ sort }}&direction={{ direction }}&colors={{ facet_colors_set | sort | join('') }}&types={{ facet_types_set | sort | join(',') | urlencode }}&status={{ facet_status_set | sort | join(',') }}&finishes={{ facet_finishes_set | sort | join(',') }}&price_min={{ facet_price_min_raw }}&price_max={{ facet_price_max_raw }}{% endset %}
-      <a href="/collection/export?{{ export_qs }}">
-        <button type="button">Export CSV</button>
-      </a>
-      <a href="/collection/export?{{ export_qs }}&format=json">
-        <button type="button">Export JSON</button>
-      </a>
+      <a href="/collection/export?{{ export_qs }}" class="btn">Export CSV</a>
+      <a href="/collection/export?{{ export_qs }}&format=json" class="btn">Export JSON</a>
       {# v3.28.8 — Grid/Rows view toggle. Submits the form with view=rows
          (or back to grid). The toggle's hidden input is overridden by the
          button's click via a tiny inline JS handler that sets the value
@@ -513,13 +499,16 @@
             <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center">
               {% set qs = '&search=' ~ search|urlencode ~ '&finish=' ~ finish_filter ~ '&location_id=' ~ location_id ~ '&sort=' ~ sort ~ '&direction=' ~ direction ~ '&view=' ~ view_mode ~ '&colors=' ~ (facet_colors_set | sort | join('')) ~ '&types=' ~ (facet_types_set | sort | join(',') | urlencode) ~ '&status=' ~ (facet_status_set | sort | join(',')) ~ '&finishes=' ~ (facet_finishes_set | sort | join(',')) ~ '&price_min=' ~ facet_price_min_raw ~ '&price_max=' ~ facet_price_max_raw %}
               {% if page > 1 %}
-                <a href="/collection?page={{ page - 1 }}{{ qs }}"><button type="button">Previous</button></a>
+                <a href="/collection?page={{ page - 1 }}{{ qs }}" class="btn">Previous</a>
               {% endif %}
               {% for p in range(1, total_pages + 1) %}
                 {% if p == 1 or p == total_pages or (p >= page - 2 and p <= page + 2) %}
-                  <a href="/collection?page={{ p }}{{ qs }}">
-                    <button type="button" {% if p == page %}style="font-weight: bold; opacity: 0.8;"{% endif %}>{{ p }}</button>
-                  </a>
+                  {# The emphasis is the CURRENT-page indicator and must stay
+                     conditional — applied to every number it stops marking
+                     anything. #}
+                  <a href="/collection?page={{ p }}{{ qs }}"
+                     class="btn"
+                     {% if p == page %}style="font-weight: bold; opacity: 0.8;"{% endif %}>{{ p }}</a>
                 {% elif p == 2 and page > 4 %}
                   <span class="muted">…</span>
                 {% elif p == total_pages - 1 and page < total_pages - 3 %}
@@ -527,7 +516,7 @@
                 {% endif %}
               {% endfor %}
               {% if page < total_pages %}
-                <a href="/collection?page={{ page + 1 }}{{ qs }}"><button type="button">Next</button></a>
+                <a href="/collection?page={{ page + 1 }}{{ qs }}" class="btn">Next</a>
               {% endif %}
             </div>
           </div>
