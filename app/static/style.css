@@ -15951,8 +15951,26 @@ body.cmp-lobby-body { height: auto; min-height: 100dvh; overflow-y: auto; }
   border-color: #ef4444 !important;
   color: #fca5a5 !important;
 }
-.bracket-violation-panel {
+.bracket-violation-panel,
+.legality-panel {
   border: 1px solid rgba(239, 68, 68, 0.5);
+}
+.legality-list {
+  margin: 0 0 0.75rem 1.1rem;
+  font-size: 0.9rem;
+}
+.legality-detail {
+  opacity: 0.7;
+}
+.legality-proxy {
+  font: 700 0.6rem "Montserrat", system-ui, sans-serif;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 0.05rem 0.35rem;
+  margin-left: 0.35rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  opacity: 0.75;
 }
 .bracket-confidence-badge {
   font: 700 0.65rem "Montserrat", system-ui, sans-serif;

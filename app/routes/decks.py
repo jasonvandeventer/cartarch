@@ -38,6 +38,7 @@ from app.deck_service import (
     assign_deck_variant_group,
     build_public_deck_view,
     bump_deck_row_quantity,
+    check_deck_legality,
     compute_consistency,
     compute_dead_cards,
     compute_deck_analytics,
@@ -756,6 +757,7 @@ def deck_detail_page(
     analytics = None
     health = None
     consistency = None
+    deck_legality = None
     if deck and deck.storage_location_id:
         # issue #57 — analytics run over the FULL decklist (own rows UNION rows
         # shared in from sibling decks), so Card Types / Color Pips / mana curve
@@ -765,6 +767,10 @@ def deck_detail_page(
             analytics = compute_deck_analytics(all_deck_rows)
             health = compute_deck_health(all_deck_rows)
             consistency = compute_consistency(all_deck_rows)
+            # #176 — legality findings from persisted columns only. Gated on
+            # `if all_deck_rows:` like every other content-dependent surface,
+            # which is the real condition (an empty deck has nothing to judge).
+            deck_legality = check_deck_legality(session, deck, all_deck_rows)
 
     # #103 Phase B — hero bracket badge from the PERSISTED estimate only (the
     # request path never estimates; v3.27.9 invariant). Staleness = the deck's
@@ -915,6 +921,7 @@ def deck_detail_page(
             "analytics": analytics,
             "health": health,
             "consistency": consistency,
+            "deck_legality": deck_legality,
             "deck_record": deck_record,
             "goal_stats": deck_goal_stats(session, current_user.id, deck.id) if deck else [],
             "health_filter": health_filter if health_filter in _VALID_HEALTH_FILTERS else "",

@@ -504,6 +504,58 @@
       </div>
     </section>
   {% endif %}
+  {# #176 — legality findings. Hidden entirely when the deck is clean: a panel
+     that renders "all good" on every deck is one people stop reading, and this
+     one only matters on the rare page where it fires. #}
+  {% if deck_legality and deck_legality.has_findings %}
+    <section class="panel legality-panel">
+      <h3 class="panel-title"><span class="deck-detail-section-mark">§</span> Legality</h3>
+      {% if deck_legality.size %}
+        <p class="warning-text">
+          {{ deck_legality.size.total }} cards — {{ deck.format }} expects
+          {{ deck_legality.size.expected }}.
+        </p>
+      {% endif %}
+      {% if deck_legality.banned %}
+        <p class="warning-text">Banned in {{ deck.format }}:</p>
+        <ul class="legality-list">
+          {% for item in deck_legality.banned %}
+            <li>
+              {{ item.card.name }}
+              {% if item.is_proxy %}<span class="legality-proxy">proxy</span>{% endif %}
+            </li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+      {% if deck_legality.off_color %}
+        <p class="warning-text">
+          Outside the commander's colour identity
+          ({{ deck_legality.commander_identity or "colourless" }}):
+        </p>
+        <ul class="legality-list">
+          {% for item in deck_legality.off_color %}
+            <li>
+              {{ item.card.name }}
+              <span class="legality-detail">{{ item.card.color_identity }}</span>
+              {% if item.is_proxy %}<span class="legality-proxy">proxy</span>{% endif %}
+            </li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+      {% if deck_legality.duplicates %}
+        <p class="warning-text">More than one copy:</p>
+        <ul class="legality-list">
+          {% for item in deck_legality.duplicates %}
+            <li>
+              {{ item.card.name }}
+              <span class="legality-detail">×{{ item.copies }}</span>
+              {% if item.is_proxy %}<span class="legality-proxy">proxy</span>{% endif %}
+            </li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+    </section>
+  {% endif %}
   {% if health %}
     <section class="panel health-panel">
       <h3 class="panel-title"><span class="deck-detail-section-mark">§</span> Deck Health</h3>

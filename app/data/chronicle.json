@@ -1,5 +1,15 @@
 [
   {
+    "version": "4.12.41",
+    "date": "2026-07-31",
+    "added": [
+      "Your deck page now tells you when a deck is not legal. It checks four things — cards banned in the format, cards outside your commander's colours, more than one copy of a card, and whether the deck is the right size — and lists what it found, marking anything that is only a proxy so a half-built deck does not look broken. Nothing appears at all when a deck is clean, so the panel only shows up on the page where there is actually something to say. Every check reads card information Cartarch already holds, so looking costs nothing and needs no connection to anywhere."
+    ],
+    "refined": [],
+    "resolved": [],
+    "archivist_note": "We went looking for something else entirely — a way to rate decks against the official bracket system — and found the interesting answer was the boring one. A bracket is a conversation; whether a card is banned is not. Checked across forty decks, the new panel finds two real problems, both of which had been sitting in plain sight for months and neither of which anyone would have noticed by playing. The hardest bugs, though, were in the checking rather than the decks. Colours are stored with spaces between them, and a snow-covered basic is not spelled quite the same as an ordinary one; get either wrong and the page confidently tells somebody their perfectly legal deck is illegal. That is a worse failure than silence, so both now have a test written with a real card in it rather than a made-up one."
+  },
+  {
     "version": "4.12.40",
     "date": "2026-07-29",
     "added": [],

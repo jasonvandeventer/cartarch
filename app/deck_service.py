@@ -532,6 +532,118 @@ def get_card_legality(card, format_name: str) -> str | None:
     return data.get(format_name.lower())
 
 
+# Cards that opt out of the singleton rule in their own oracle text ("A deck can
+# have any number of cards named ..."). Read from the text rather than a name
+# list, so a new one needs no code change: Rat Colony, Persistent Petitioners,
+# Dragon's Approach, Shadowborn Apostle, Slime Against Humanity, Nazgûl.
+_ANY_NUMBER_RE = re.compile(r"any number of cards named", re.IGNORECASE)
+
+COMMANDER_DECK_SIZE = 100
+
+
+def check_deck_legality(session: Session, deck, rows: list) -> dict:
+    """Format-legality findings for a deck, from persisted columns only (#176).
+
+    Reports, never judges: banned cards, colour identity against the commander,
+    singleton violations, and deck size. Request-path safe — no Scryfall call and
+    no per-row query; ``rows`` is the decklist the caller already loaded.
+
+    Reuses the existing definitions rather than restating them:
+    :func:`get_card_legality` parses the legalities JSON,
+    ``_is_basic_land_any_kind`` already knows a snow basic's type line reads
+    "Basic Snow Land — Plains", and ``deck_commander_cards`` is the ONE answer to
+    who a deck's commander is (role rows, else the ``deck_commanders`` anchor).
+
+    **TWO stored-format traps this function exists to get right.** Both produced
+    confident, plausible false positives while #176 was being measured, and
+    neither was visible in the code that caused them:
+
+    * ``Card.color_identity`` is SPACE-SEPARATED and sorted — ``"B G"``, not
+      ``"BG"`` — so it is ``.split()``, never iterated per character. Iterating
+      per character makes the space itself a colour, and then every multicolour
+      card in a deck with mono-coloured commanders is flagged. That was 12 fake
+      violations in one deck.
+    * A snow basic does NOT contain the substring ``"Basic Land"``. Matching that
+      substring flags 25 copies of a perfectly legal basic.
+
+    **A deck with no resolvable commander produces NO colour findings.** An
+    unknown identity is not an empty one. Flagging every coloured card in every
+    #164 placeholder would be far worse than staying quiet — a panel that cries
+    wolf is one people learn to dismiss, and then it catches nothing.
+
+    Commander-specific checks are gated on the format, which is free-text and
+    demonstrably wrong on live data (a 75-card Pauper list is filed as
+    "Commander" in prod today).
+    """
+    # Local imports: deck_service ↔ inventory_service is a known cycle, and
+    # game_service lazy-imports deck_service in the other direction.
+    from app.game_service import deck_commander_cards
+    from app.inventory_service import _is_basic_land_any_kind
+
+    fmt = (deck.format or "").strip()
+    is_commander = fmt.lower() == "commander"
+
+    # Aggregate by card NAME: singleton is a name-level rule, so two finish rows
+    # of one card at quantity 1 each is still a violation. is_proxy stays True
+    # only when EVERY copy is a proxy — a staged placeholder is a different thing
+    # from a card in the physical deck, and the panel says which.
+    by_name: dict[str, dict] = {}
+    for row in rows:
+        card = getattr(row, "card", None)
+        if card is None:
+            continue
+        entry = by_name.setdefault(card.name, {"card": card, "copies": 0, "is_proxy": True})
+        entry["copies"] += row.quantity or 0
+        if not row.is_proxy:
+            entry["is_proxy"] = False
+
+    # limit is deliberately generous: 2 is the Partner/Background ceiling the ART
+    # surfaces enforce, but a TRUNCATED identity here manufactures violations, so
+    # legality reads the whole anchor set.
+    commander_cards = deck_commander_cards(session, deck, limit=8) if is_commander else []
+    identity: set[str] = set()
+    for card in commander_cards:
+        identity.update((card.color_identity or "").split())
+
+    banned: list[dict] = []
+    off_color: list[dict] = []
+    duplicates: list[dict] = []
+
+    for entry in by_name.values():
+        card = entry["card"]
+        if get_card_legality(card, fmt) == "banned":
+            banned.append(entry)
+        # Gated on resolving commander CARDS, not on a non-empty identity — a
+        # genuinely colourless commander (Kozilek) has an empty identity and its
+        # deck's coloured cards ARE violations.
+        if commander_cards and set((card.color_identity or "").split()) - identity:
+            off_color.append(entry)
+        if (
+            is_commander
+            and entry["copies"] > 1
+            and not _is_basic_land_any_kind(card)
+            and not _ANY_NUMBER_RE.search(card.oracle_text or "")
+        ):
+            duplicates.append(entry)
+
+    total = sum(e["copies"] for e in by_name.values())
+    size = None
+    if is_commander and total != COMMANDER_DECK_SIZE:
+        size = {"total": total, "expected": COMMANDER_DECK_SIZE}
+
+    for bucket in (banned, off_color, duplicates):
+        bucket.sort(key=lambda e: e["card"].name.lower())
+
+    return {
+        "banned": banned,
+        "off_color": off_color,
+        "duplicates": duplicates,
+        "size": size,
+        "commander_identity": " ".join(p for p in ["W", "U", "B", "R", "G"] if p in identity),
+        "has_findings": bool(banned or off_color or duplicates or size),
+    }
+
+
 def suggest_card_roles(card, themes: dict | None = None) -> list[str]:
     """Return auto-detected role tags for a card based on oracle text patterns.
 
