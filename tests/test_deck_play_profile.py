@@ -108,6 +108,57 @@ def test_payload_validation():
         deck_service.save_play_profile(s, deck, huge)
 
 
+def test_seed_play_profiles(tmp_path):
+    """Seed inserts auto rows, never touches custom rows, tolerates missing decks."""
+    s = _fresh_session()
+    user = _user(s)
+    seeded_deck = _deck(s, user)
+    custom_deck = _deck(s, user)
+    deck_service.save_play_profile(s, custom_deck, {"pilot": True}, is_custom=True)
+
+    seed = {
+        str(seeded_deck.id): {"primary_plan": ["seeded"]},
+        str(custom_deck.id): {"primary_plan": ["should not land"]},
+        "999999": {"primary_plan": ["no such deck"]},
+    }
+    path = tmp_path / "seed.json"
+    path.write_text(json.dumps(seed), encoding="utf-8")
+
+    stats = deck_service.seed_play_profiles(s, seed_path=str(path))
+    assert stats == {"seeded": 1, "skipped_custom": 1, "missing_decks": 1}
+    row = deck_service.get_play_profile(s, seeded_deck.id)
+    assert row.is_custom is False
+    assert json.loads(row.profile_data) == {"primary_plan": ["seeded"]}
+    assert json.loads(deck_service.get_play_profile(s, custom_deck.id).profile_data) == {
+        "pilot": True
+    }
+
+    # Re-run is a no-op upsert, not an error or a duplicate.
+    stats = deck_service.seed_play_profiles(s, seed_path=str(path))
+    assert stats["seeded"] == 1
+    assert s.query(DeckPlayProfile).count() == 2
+
+    # Missing file (fresh checkout without the data file) is a clean no-op.
+    assert deck_service.seed_play_profiles(s, seed_path=str(tmp_path / "absent.json")) == {
+        "seeded": 0,
+        "skipped_custom": 0,
+        "missing_decks": 0,
+    }
+
+
+def test_shipped_seed_file_is_valid():
+    """CI-validates the real seed data: parseable, and every profile passes the
+    same validation save_play_profile applies (dict, under the size cap)."""
+    with open(deck_service.PLAY_PROFILE_SEED, encoding="utf-8") as fh:
+        data = json.load(fh)
+    assert data, "shipped seed file is empty"
+    for deck_id, profile in data.items():
+        int(deck_id)
+        assert isinstance(profile, dict), f"deck {deck_id}: profile is not an object"
+        size = len(json.dumps(profile, ensure_ascii=False).encode("utf-8"))
+        assert size <= deck_service.PLAY_PROFILE_MAX_BYTES, f"deck {deck_id}: {size} bytes"
+
+
 def test_delete_deck_removes_profile():
     """SQLite enforces no FKs, so delete_deck must clean the row explicitly —
     same pattern as goals and the strategy profile."""

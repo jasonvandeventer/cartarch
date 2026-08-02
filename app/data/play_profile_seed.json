@@ -1,0 +1,827 @@
+{
+ "17": {
+  "role": "value_tempo",
+  "primary_plan": [
+   "Use Pako as the primary engine: attack early to exile cards from every library, then use Haldan to cast the useful cards. Protect Pako and keep pressure distributed; win through accumulated stolen value and combat, not commander-damage tunnel vision.",
+   "Use Pako as the primary engine: attack early to exile cards from every library, then use Haldan to cast the useful cards.",
+   "Convert the established engine into a decisive combat, drain, poison, or combo finish as described above."
+  ],
+  "secondary_plan": [
+   "When the primary engine is answered twice, shift toward independent threats",
+   "When a clean lethal line exists, stop optimizing value"
+  ],
+  "hard_rules": [
+   "Protect: Repeatable card advantage Core commander engine The primary finisher until lethal",
+   "Expend freely: Tokens and replaceable utility pieces",
+   "Tutor priority: Missing engine category first. Protection if the engine is already assembled. A finisher only when the board can exploit it now or next turn.",
+   "Interaction priority: Stop an opponent who can win before the deck’s next meaningful turn. Remove effects that shut off the deck’s primary resource axis or exile irreplaceable engines. Otherwise preserve interaction for board wipes, combo attempts, or a profitable tempo swing."
+  ],
+  "confidence": "medium",
+  "source": "pilot-bible 2026-08-01 + hand-authored corrections"
+ },
+ "16": {
+  "role": "voltron_politics",
+  "primary_plan": [
+   "Resolve Alexios, increase his power, and exploit forced attacks so opponents damage one another. Avoid unnecessary removal of players who are carrying Alexios unless they can redirect or sacrifice him; finish the last opponent with commander-sized combat pressure.",
+   "Resolve Alexios, increase his power, and exploit forced attacks so opponents damage one another.",
+   "Convert the established engine into a decisive combat, drain, poison, or combo finish as described above."
+  ],
+  "secondary_plan": [
+   "When the primary engine is answered twice, shift toward independent threats",
+   "When a clean lethal line exists, stop optimizing value"
+  ],
+  "hard_rules": [
+   "Protect: Repeatable card advantage Core commander engine The primary finisher until lethal",
+   "Expend freely: Tokens and replaceable utility pieces",
+   "Tutor priority: Missing engine category first. Protection if the engine is already assembled. A finisher only when the board can exploit it now or next turn.",
+   "Interaction priority: Stop an opponent who can win before the deck’s next meaningful turn. Remove effects that shut off the deck’s primary resource axis or exile irreplaceable engines. Otherwise preserve interaction for board wipes, combo attempts, or a profitable tempo swing."
+  ],
+  "confidence": "medium",
+  "source": "pilot-bible 2026-08-01 + hand-authored corrections"
+ },
+ "34": {
+  "role": "counters_stompy",
+  "primary_plan": [
+   "Ramp into Vorinclex and oversized threats, multiply counters, and convert one protected board into lethal combat. Do not spend the early game trading small resources; the deck wins by making every later permanent disproportionately large.",
+   "Ramp into Vorinclex and oversized threats, multiply counters, and convert one protected board into lethal combat.",
+   "Convert the established engine into a decisive combat, drain, poison, or combo finish as described above."
+  ],
+  "secondary_plan": [
+   "When the primary engine is answered twice, shift toward independent threats",
+   "When a clean lethal line exists, stop optimizing value"
+  ],
+  "hard_rules": [
+   "Protect: Repeatable card advantage Core commander engine The primary finisher until lethal",
+   "Expend freely: Tokens and replaceable utility pieces",
+   "Tutor priority: Missing engine category first. Protection if the engine is already assembled. A finisher only when the board can exploit it now or next turn.",
+   "Interaction priority: Stop an opponent who can win before the deck’s next meaningful turn. Remove effects that shut off the deck’s primary resource axis or exile irreplaceable engines. Otherwise preserve interaction for board wipes, combo attempts, or a profitable tempo swing."
+  ],
+  "confidence": "medium",
+  "source": "pilot-bible 2026-08-01 + hand-authored corrections"
+ },
+ "54": {
+  "role": "lifegain_midrange",
+  "primary_plan": [
+   "Use lifegain to stabilize and support damage payoffs, then resolve Gisela when she creates an immediate combat or burn swing. Win by doubling outgoing damage while halving retaliation, not by passively accumulating life.",
+   "Use lifegain to stabilize and support damage payoffs, then resolve Gisela when she creates an immediate combat or burn swing.",
+   "Convert the established engine into a decisive combat, drain, poison, or combo finish as described above."
+  ],
+  "secondary_plan": [
+   "When the primary engine is answered twice, shift toward independent threats",
+   "When a clean lethal line exists, stop optimizing value"
+  ],
+  "hard_rules": [
+   "Protect: Repeatable card advantage Core commander engine The primary finisher until lethal",
+   "Expend freely: Tokens and replaceable utility pieces",
+   "Tutor priority: Missing engine category first. Protection if the engine is already assembled. A finisher only when the board can exploit it now or next turn.",
+   "Interaction priority: Stop an opponent who can win before the deck’s next meaningful turn. Remove effects that shut off the deck’s primary resource axis or exile irreplaceable engines. Otherwise preserve interaction for board wipes, combo attempts, or a profitable tempo swing."
+  ],
+  "confidence": "medium",
+  "source": "pilot-bible 2026-08-01 + hand-authored corrections"
+ },
+ "58": {
+  "role": "aura_voltron",
+  "primary_plan": [
+   "Stock the graveyard and battlefield with high-impact Auras, resolve Bruna, and attack to attach them for free. Protect Bruna from exile and sacrifice effects; the main close is one- or two-hit commander damage.",
+   "Stock the graveyard and battlefield with high-impact Auras, resolve Bruna, and attack to attach them for free.",
+   "Convert the established engine into a decisive combat, drain, poison, or combo finish as described above."
+  ],
+  "secondary_plan": [
+   "If commander tax becomes prohibitive, pivot to alternate creature carrier or recursion",
+   "Against sacrifice-heavy tables, keep expendable creatures"
+  ],
+  "hard_rules": [
+   "Protect: Commander Protection/evasion Auras Recursion for Auras",
+   "Expend freely: Low-impact Auras when upgrading the threat",
+   "Tutor priority: Missing engine category first. Protection if the engine is already assembled. A finisher only when the board can exploit it now or next turn.",
+   "Interaction priority: Stop an opponent who can win before the deck’s next meaningful turn. Remove effects that shut off the deck’s primary resource axis or exile irreplaceable engines. Otherwise preserve interaction for board wipes, combo attempts, or a profitable tempo swing."
+  ],
+  "confidence": "medium",
+  "source": "pilot-bible 2026-08-01 + hand-authored corrections"
+ },
+ "30": {
+  "role": "tokens_politics",
+  "primary_plan": [
+   "Develop a wide token board, use group or political effects to keep pressure off you, and turn the accumulated creatures into a decisive combat step. Avoid becoming the obvious threat before the payoff turn.",
+   "Develop a wide token board, use group or political effects to keep pressure off you, and turn the accumulated creatures into a decisive combat step.",
+   "Convert the established engine into a decisive combat, drain, poison, or combo finish as described above."
+  ],
+  "secondary_plan": [
+   "When the primary engine is answered twice, shift toward independent threats",
+   "When a clean lethal line exists, stop optimizing value"
+  ],
+  "hard_rules": [
+   "Protect: Repeatable card advantage Core commander engine The primary finisher until lethal",
+   "Expend freely: Tokens and replaceable utility pieces",
+   "Tutor priority: Missing engine category first. Protection if the engine is already assembled. A finisher only when the board can exploit it now or next turn.",
+   "Interaction priority: Stop an opponent who can win before the deck’s next meaningful turn. Remove effects that shut off the deck’s primary resource axis or exile irreplaceable engines. Otherwise preserve interaction for board wipes, combo attempts, or a profitable tempo swing."
+  ],
+  "confidence": "medium",
+  "source": "pilot-bible 2026-08-01 + hand-authored corrections"
+ },
+ "36": {
+  "role": "poison_proliferate",
+  "primary_plan": [
+   "Give each opponent at least one poison counter quickly, then proliferate repeatedly and use corrupted payoffs to maintain cards and tempo. The deck should race toward ten poison; stolen-card value is secondary.",
+   "Give each opponent at least one poison counter quickly, then proliferate repeatedly and use corrupted payoffs to maintain cards and tempo.",
+   "Convert the established engine into a decisive combat, drain, poison, or combo finish as described above."
+  ],
+  "secondary_plan": [
+   "After all players have poison, stop risking creatures merely to connect",
+   "Focus the player closest to ten only when it reduces the table’s ability to answer you"
+  ],
+  "hard_rules": [
+   "Protect: Repeatable proliferate engines Card draw after corrupted is active",
+   "Expend freely: Small infect/toxic creatures once counters are established",
+   "Tutor priority: Missing engine category first. Protection if the engine is already assembled. A finisher only when the board can exploit it now or next turn.",
+   "Interaction priority: Stop an opponent who can win before the deck’s next meaningful turn. Remove effects that shut off the deck’s primary resource axis or exile irreplaceable engines. Otherwise preserve interaction for board wipes, combo attempts, or a profitable tempo swing."
+  ],
+  "confidence": "medium",
+  "source": "pilot-bible 2026-08-01 + hand-authored corrections"
+ },
+ "50": {
+  "role": "lifegain_counters_combat",
+  "primary_plan": [
+   "Create Pests and other creatures, trigger repeated lifegain, convert that lifegain into counters, and finish through a wide or oversized combat step. Do not pilot this as aristocrats: sacrifice is incidental and the board is meant to survive and attack.",
+   "Create Pests and other creatures, trigger repeated lifegain, convert that lifegain into counters, and finish through a wide or oversized combat step.",
+   "Convert the established engine into a decisive combat, drain, poison, or combo finish as described above."
+  ],
+  "secondary_plan": [
+   "After a wipe, rebuild engines before finishers",
+   "If the board stalls, assemble evasion/trample or mass pump"
+  ],
+  "hard_rules": [
+   "Protect: Repeatable lifegain Counter multipliers Protection/overrun",
+   "Expend freely: Pest tokens only when trades protect engines",
+   "Tutor priority: Missing engine category first. Protection if the engine is already assembled. A finisher only when the board can exploit it now or next turn.",
+   "Interaction priority: Stop an opponent who can win before the deck’s next meaningful turn. Remove effects that shut off the deck’s primary resource axis or exile irreplaceable engines. Otherwise preserve interaction for board wipes, combo attempts, or a profitable tempo swing."
+  ],
+  "confidence": "high",
+  "source": "pilot-bible 2026-08-01 + hand-authored corrections"
+ },
+ "62": {
+  "role": "dice_artifacts",
+  "primary_plan": [
+   "Roll dice often enough to make Mr. House a token and value engine, then leverage the resulting Robots, Treasures, and artifact synergies into combat or an artifact payoff. Do not hold dice cards for perfect outcomes when repeated attempts generate the deck's advantage.",
+   "Roll dice often enough to make Mr.",
+   "Convert the established engine into a decisive combat, drain, poison, or combo finish as described above."
+  ],
+  "secondary_plan": [
+   "When the primary engine is answered twice, shift toward independent threats",
+   "When a clean lethal line exists, stop optimizing value"
+  ],
+  "hard_rules": [
+   "Protect: Repeatable card advantage Core commander engine The primary finisher until lethal",
+   "Expend freely: Tokens and replaceable utility pieces",
+   "Tutor priority: Missing engine category first. Protection if the engine is already assembled. A finisher only when the board can exploit it now or next turn.",
+   "Interaction priority: Stop an opponent who can win before the deck’s next meaningful turn. Remove effects that shut off the deck’s primary resource axis or exile irreplaceable engines. Otherwise preserve interaction for board wipes, combo attempts, or a profitable tempo swing."
+  ],
+  "confidence": "medium",
+  "source": "pilot-bible 2026-08-01 + hand-authored corrections"
+ },
+ "53": {
+  "role": "taxing_attrition",
+  "primary_plan": [
+   "Deploy Liesa and tax effects so every spell and attack costs opponents life or resources. Preserve your life total through lifegain and selective removal, then let the table's normal actions create inevitability.",
+   "Deploy Liesa and tax effects so every spell and attack costs opponents life or resources.",
+   "Convert the established engine into a decisive combat, drain, poison, or combo finish as described above."
+  ],
+  "secondary_plan": [
+   "When the primary engine is answered twice, shift toward independent threats",
+   "When a clean lethal line exists, stop optimizing value"
+  ],
+  "hard_rules": [
+   "Protect: Repeatable card advantage Core commander engine The primary finisher until lethal",
+   "Expend freely: Tokens and replaceable utility pieces",
+   "Tutor priority: Missing engine category first. Protection if the engine is already assembled. A finisher only when the board can exploit it now or next turn.",
+   "Interaction priority: Stop an opponent who can win before the deck’s next meaningful turn. Remove effects that shut off the deck’s primary resource axis or exile irreplaceable engines. Otherwise preserve interaction for board wipes, combo attempts, or a profitable tempo swing."
+  ],
+  "confidence": "medium",
+  "source": "pilot-bible 2026-08-01 + hand-authored corrections"
+ },
+ "42": {
+  "role": "angel_tribal",
+  "primary_plan": [
+   "Curve Giada into Angels, use her mana and counters to make each subsequent Angel larger, and dominate through evasive combat. Protect Giada when she is the mana bridge; rebuild rather than overextend into an obvious wipe.",
+   "Curve Giada into Angels, use her mana and counters to make each subsequent Angel larger, and dominate through evasive combat.",
+   "Convert the established engine into a decisive combat, drain, poison, or combo finish as described above."
+  ],
+  "secondary_plan": [
+   "When the primary engine is answered twice, shift toward independent threats",
+   "When a clean lethal line exists, stop optimizing value"
+  ],
+  "hard_rules": [
+   "Protect: Repeatable card advantage Core commander engine The primary finisher until lethal",
+   "Expend freely: Tokens and replaceable utility pieces",
+   "Tutor priority: Missing engine category first. Protection if the engine is already assembled. A finisher only when the board can exploit it now or next turn.",
+   "Interaction priority: Stop an opponent who can win before the deck’s next meaningful turn. Remove effects that shut off the deck’s primary resource axis or exile irreplaceable engines. Otherwise preserve interaction for board wipes, combo attempts, or a profitable tempo swing."
+  ],
+  "confidence": "medium",
+  "source": "pilot-bible 2026-08-01 + hand-authored corrections"
+ },
+ "55": {
+  "role": "damage_redirection_lock",
+  "goals": [
+   "Assemble Pariah and Anti-Venom and protect them"
+  ],
+  "primary_plan": [
+   "assemble a pair: any creature that cannot die, carrying any damage-redirection effect",
+   "damage-proof hosts are redundant — Anti-Venom, Horrifying Healer; Cho-Manno, Revolutionary; Phyrexian Vindicator. Any of them works.",
+   "redirection effects are redundant too — Pariah; Pariah's Shield; With Great Power . . . Any of them works.",
+   "once the pair is live you take no damage and are effectively immortal; protect the pair",
+   "win from behind it — commander damage, or redirect damage into an opponent via Stuffy Doll",
+   "Assemble any damage-proof creature with any damage-redirection effect, then use damage-based removal and combat to make the pairing control the board. Anti-Venom is one host, not the only required host; protect the two-card engine from exile, bounce, and sacrifice effects.",
+   "Assemble any damage-proof creature with any damage-redirection effect, then use damage-based removal and combat to make the pairing control the board.",
+   "Convert the established engine into a decisive combat, drain, poison, or combo finish as described above."
+  ],
+  "secondary_plan": [
+   "When the primary engine is answered twice, shift toward independent threats",
+   "When a clean lethal line exists, stop optimizing value"
+  ],
+  "hard_rules": [
+   "The plan is a PAIR, not two specific cards. Any damage-proof creature plus any Pariah effect is good enough — do not hold a redirection effect waiting for one particular host, and do not treat losing one host as losing the plan. Both halves are redundant by design.",
+   "CORRECTION to the auto-generated combo_lines above: Stuffy Doll + Pariah is NOT a draw. It instantly kills one opponent, then the loop ends because that opponent is dead. Treat it as a kill line, not a game-ending loop to avoid.",
+   "If a damage-proof host is already on the battlefield and a redirection effect is castable or equippable, completing the pair is urgent — that is the turn the deck stops losing.",
+   "Removal aimed at the assembled pair is the highest threat on the board. Removal aimed at a spare host or spare redirection effect is not — those are replaceable.",
+   "Pilot's rule: a Pariah effect goes on an opponent's creature only when severely on the back foot and the own pair cannot be assembled. With a damage-proof host available, always assemble the pair instead.",
+   "Protect: Repeatable card advantage Core commander engine The primary finisher until lethal",
+   "Expend freely: Tokens and replaceable utility pieces",
+   "Tutor priority: Missing engine category first. Protection if the engine is already assembled. A finisher only when the board can exploit it now or next turn.",
+   "Interaction priority: Stop an opponent who can win before the deck’s next meaningful turn. Remove effects that shut off the deck’s primary resource axis or exile irreplaceable engines. Otherwise preserve interaction for board wipes, combo attempts, or a profitable tempo swing."
+  ],
+  "threat_preferences": {
+   "removal_targeting_the_assembled_pair": 100,
+   "compact_combo": 85,
+   "imminent_lethal_combat": 60,
+   "removal_targeting_a_spare_host": 40,
+   "generic_value_engine": 25
+  },
+  "confidence": "high",
+  "source": "pilot-bible 2026-08-01 + hand-authored corrections"
+ },
+ "38": {
+  "role": "spellslinger_triggers",
+  "primary_plan": [
+   "Establish Veyran and cast sequences of cheap instants and sorceries so magecraft and copy triggers multiply. Hold enough spells to produce one explosive turn; avoid firing cantrips with no engine unless digging is necessary.",
+   "Establish Veyran and cast sequences of cheap instants and sorceries so magecraft and copy triggers multiply.",
+   "Convert the established engine into a decisive combat, drain, poison, or combo finish as described above."
+  ],
+  "secondary_plan": [
+   "When the primary engine is answered twice, shift toward independent threats",
+   "When a clean lethal line exists, stop optimizing value"
+  ],
+  "hard_rules": [
+   "Protect: Repeatable card advantage Core commander engine The primary finisher until lethal",
+   "Expend freely: Tokens and replaceable utility pieces",
+   "Tutor priority: Missing engine category first. Protection if the engine is already assembled. A finisher only when the board can exploit it now or next turn.",
+   "Interaction priority: Stop an opponent who can win before the deck’s next meaningful turn. Remove effects that shut off the deck’s primary resource axis or exile irreplaceable engines. Otherwise preserve interaction for board wipes, combo attempts, or a profitable tempo swing."
+  ],
+  "confidence": "medium",
+  "source": "pilot-bible 2026-08-01 + hand-authored corrections"
+ },
+ "21": {
+  "role": "elemental_stompy",
+  "primary_plan": [
+   "Ramp, deploy Elemental synergy pieces, and use Ashling plus large Elementals to dominate combat. Preserve the commander when its scaling ability materially improves the next attack; otherwise continue developing threats.",
+   "Ramp, deploy Elemental synergy pieces, and use Ashling plus large Elementals to dominate combat.",
+   "Convert the established engine into a decisive combat, drain, poison, or combo finish as described above."
+  ],
+  "secondary_plan": [
+   "When the primary engine is answered twice, shift toward independent threats",
+   "When a clean lethal line exists, stop optimizing value"
+  ],
+  "hard_rules": [
+   "Protect: Repeatable card advantage Core commander engine The primary finisher until lethal",
+   "Expend freely: Tokens and replaceable utility pieces",
+   "Tutor priority: Missing engine category first. Protection if the engine is already assembled. A finisher only when the board can exploit it now or next turn.",
+   "Interaction priority: Stop an opponent who can win before the deck’s next meaningful turn. Remove effects that shut off the deck’s primary resource axis or exile irreplaceable engines. Otherwise preserve interaction for board wipes, combo attempts, or a profitable tempo swing."
+  ],
+  "confidence": "medium",
+  "source": "pilot-bible 2026-08-01 + hand-authored corrections"
+ },
+ "23": {
+  "role": "energy_engine",
+  "primary_plan": [
+   "Generate Energy with efficient permanents, preserve it until a payoff creates cards, mana, recursion, or a decisive board swing, and let Dr. Madison Li connect the artifact engine. Avoid spending Energy merely because an activation is available.",
+   "Generate Energy with efficient permanents, preserve it until a payoff creates cards, mana, recursion, or a decisive board swing, and let Dr.",
+   "Convert the established engine into a decisive combat, drain, poison, or combo finish as described above."
+  ],
+  "secondary_plan": [
+   "When the primary engine is answered twice, shift toward independent threats",
+   "When a clean lethal line exists, stop optimizing value"
+  ],
+  "hard_rules": [
+   "Protect: Repeatable card advantage Core commander engine The primary finisher until lethal",
+   "Expend freely: Tokens and replaceable utility pieces",
+   "Tutor priority: Missing engine category first. Protection if the engine is already assembled. A finisher only when the board can exploit it now or next turn.",
+   "Interaction priority: Stop an opponent who can win before the deck’s next meaningful turn. Remove effects that shut off the deck’s primary resource axis or exile irreplaceable engines. Otherwise preserve interaction for board wipes, combo attempts, or a profitable tempo swing."
+  ],
+  "confidence": "medium",
+  "source": "pilot-bible 2026-08-01 + hand-authored corrections"
+ },
+ "14": {
+  "role": "midrange",
+  "primary_plan": [
+   "Build a creature board, target Agrus Kos or another key creature with beneficial single-target effects, and pay to copy those effects across the team. Sandbag the best trick until it becomes a board-wide payoff or protects against interaction.",
+   "Build a creature board, target Agrus Kos or another key creature with beneficial single-target effects, and pay to copy those effects across the team.",
+   "Convert the established engine into a decisive combat, drain, poison, or combo finish as described above."
+  ],
+  "secondary_plan": [
+   "When the primary engine is answered twice, shift toward independent threats",
+   "When a clean lethal line exists, stop optimizing value"
+  ],
+  "hard_rules": [
+   "Protect: Repeatable card advantage Core commander engine The primary finisher until lethal",
+   "Expend freely: Tokens and replaceable utility pieces",
+   "Tutor priority: Missing engine category first. Protection if the engine is already assembled. A finisher only when the board can exploit it now or next turn.",
+   "Interaction priority: Stop an opponent who can win before the deck’s next meaningful turn. Remove effects that shut off the deck’s primary resource axis or exile irreplaceable engines. Otherwise preserve interaction for board wipes, combo attempts, or a profitable tempo swing."
+  ],
+  "confidence": "medium",
+  "source": "pilot-bible 2026-08-01 + hand-authored corrections"
+ },
+ "24": {
+  "role": "midrange",
+  "primary_plan": [
+   "Feed high-power creatures or expendable bodies to Ghoulcaller Gisa, create a large Zombie army, and use recursion or death value to recover from removal. Activate Gisa when the sacrificed power materially increases board presence.",
+   "Feed high-power creatures or expendable bodies to Ghoulcaller Gisa, create a large Zombie army, and use recursion or death value to recover from removal.",
+   "Convert the established engine into a decisive combat, drain, poison, or combo finish as described above."
+  ],
+  "secondary_plan": [
+   "When the primary engine is answered twice, shift toward independent threats",
+   "When a clean lethal line exists, stop optimizing value"
+  ],
+  "hard_rules": [
+   "Protect: Repeatable card advantage Core commander engine The primary finisher until lethal",
+   "Expend freely: Tokens and replaceable utility pieces",
+   "Tutor priority: Missing engine category first. Protection if the engine is already assembled. A finisher only when the board can exploit it now or next turn.",
+   "Interaction priority: Stop an opponent who can win before the deck’s next meaningful turn. Remove effects that shut off the deck’s primary resource axis or exile irreplaceable engines. Otherwise preserve interaction for board wipes, combo attempts, or a profitable tempo swing."
+  ],
+  "confidence": "medium",
+  "source": "pilot-bible 2026-08-01 + hand-authored corrections"
+ },
+ "29": {
+  "role": "vampire_cheat",
+  "primary_plan": [
+   "Create Blood tokens and trigger Strefan, then attack to sacrifice Blood and cheat expensive Vampires into play tapped and attacking. Preserve at least one Blood for a meaningful payload rather than cycling every token away.",
+   "Create Blood tokens and trigger Strefan, then attack to sacrifice Blood and cheat expensive Vampires into play tapped and attacking.",
+   "Convert the established engine into a decisive combat, drain, poison, or combo finish as described above."
+  ],
+  "secondary_plan": [
+   "When the primary engine is answered twice, shift toward independent threats",
+   "When a clean lethal line exists, stop optimizing value"
+  ],
+  "hard_rules": [
+   "Protect: Repeatable card advantage Core commander engine The primary finisher until lethal",
+   "Expend freely: Tokens and replaceable utility pieces",
+   "Tutor priority: Missing engine category first. Protection if the engine is already assembled. A finisher only when the board can exploit it now or next turn.",
+   "Interaction priority: Stop an opponent who can win before the deck’s next meaningful turn. Remove effects that shut off the deck’s primary resource axis or exile irreplaceable engines. Otherwise preserve interaction for board wipes, combo attempts, or a profitable tempo swing."
+  ],
+  "confidence": "medium",
+  "source": "pilot-bible 2026-08-01 + hand-authored corrections"
+ },
+ "57": {
+  "role": "convoke_spells",
+  "primary_plan": [
+   "Develop tokens and low-cost creatures, tap them to convoke impactful spells, and use Kasla to scry and draw through the deck. Treat untapped creatures as mana when the convoke spell advances the board more than combat would.",
+   "Develop tokens and low-cost creatures, tap them to convoke impactful spells, and use Kasla to scry and draw through the deck.",
+   "Convert the established engine into a decisive combat, drain, poison, or combo finish as described above."
+  ],
+  "secondary_plan": [
+   "When the primary engine is answered twice, shift toward independent threats",
+   "When a clean lethal line exists, stop optimizing value"
+  ],
+  "hard_rules": [
+   "Protect: Repeatable card advantage Core commander engine The primary finisher until lethal",
+   "Expend freely: Tokens and replaceable utility pieces",
+   "Tutor priority: Missing engine category first. Protection if the engine is already assembled. A finisher only when the board can exploit it now or next turn.",
+   "Interaction priority: Stop an opponent who can win before the deck’s next meaningful turn. Remove effects that shut off the deck’s primary resource axis or exile irreplaceable engines. Otherwise preserve interaction for board wipes, combo attempts, or a profitable tempo swing."
+  ],
+  "confidence": "medium",
+  "source": "pilot-bible 2026-08-01 + hand-authored corrections"
+ },
+ "11": {
+  "role": "midrange",
+  "primary_plan": [
+   "Ramp and make extra land drops, use Obuun to animate and enlarge lands, and attack with landfall-fueled threats. Protect key utility lands and avoid exposing too many animated lands to creature removal without a lethal reason.",
+   "Ramp and make extra land drops, use Obuun to animate and enlarge lands, and attack with landfall-fueled threats.",
+   "Convert the established engine into a decisive combat, drain, poison, or combo finish as described above."
+  ],
+  "secondary_plan": [
+   "When the primary engine is answered twice, shift toward independent threats",
+   "When a clean lethal line exists, stop optimizing value"
+  ],
+  "hard_rules": [
+   "Protect: Repeatable card advantage Core commander engine The primary finisher until lethal",
+   "Expend freely: Tokens and replaceable utility pieces",
+   "Tutor priority: Missing engine category first. Protection if the engine is already assembled. A finisher only when the board can exploit it now or next turn.",
+   "Interaction priority: Stop an opponent who can win before the deck’s next meaningful turn. Remove effects that shut off the deck’s primary resource axis or exile irreplaceable engines. Otherwise preserve interaction for board wipes, combo attempts, or a profitable tempo swing."
+  ],
+  "confidence": "medium",
+  "source": "pilot-bible 2026-08-01 + hand-authored corrections"
+ },
+ "31": {
+  "role": "etb_value",
+  "goals": [
+   "6x ETB: Have the same ETB effect on the stack six times simultaneously"
+  ],
+  "primary_plan": [
+   "Ramp into Yarok and repeat high-value enter-the-battlefield effects until cards, removal, landfall, and tokens overwhelm the table. The six-copy ETB objective is a showcase line, not the only plan; take ordinary doubled value when it is strong.",
+   "Ramp into Yarok and repeat high-value enter-the-battlefield effects until cards, removal, landfall, and tokens overwhelm the table.",
+   "Convert the established engine into a decisive combat, drain, poison, or combo finish as described above."
+  ],
+  "secondary_plan": [
+   "When the primary engine is answered twice, shift toward independent threats",
+   "When a clean lethal line exists, stop optimizing value"
+  ],
+  "hard_rules": [
+   "Protect: Repeatable card advantage Core commander engine The primary finisher until lethal",
+   "Expend freely: Tokens and replaceable utility pieces",
+   "Tutor priority: Missing engine category first. Protection if the engine is already assembled. A finisher only when the board can exploit it now or next turn.",
+   "Interaction priority: Stop an opponent who can win before the deck’s next meaningful turn. Remove effects that shut off the deck’s primary resource axis or exile irreplaceable engines. Otherwise preserve interaction for board wipes, combo attempts, or a profitable tempo swing."
+  ],
+  "confidence": "medium",
+  "source": "pilot-bible 2026-08-01 + hand-authored corrections"
+ },
+ "64": {
+  "role": "elfball",
+  "primary_plan": [
+   "Elfball: ramp with mana elves, go wide with elf tokens, pump the board with elf lords",
+   "Lathril's combat damage to a player creates that many Elf tokens — attack early and often to snowball the board",
+   "win by overwhelming combat, or by Lathril's tap ability: tap ten untapped Elves to drain each opponent for 10 and gain 10 — with a wide board this kills the table in a few activations",
+   "Deploy mana Elves, create Elf tokens, amplify them with lords, and attack early with Lathril to snowball token production. Threaten both a wide combat kill and Lathril's ten-Elf drain activation.",
+   "Deploy mana Elves, create Elf tokens, amplify them with lords, and attack early with Lathril to snowball token production.",
+   "Convert the established engine into a decisive combat, drain, poison, or combo finish as described above."
+  ],
+  "secondary_plan": [
+   "After a wipe, rebuild with draw engines rather than immediately replaying every creature",
+   "If combat stalls, hold ten untapped Elves for Lathril"
+  ],
+  "hard_rules": [
+   "Lathril is the engine. Cast her, keep her alive, and get her connecting in combat — tokens compound.",
+   "The ten-Elf tap drain is a primary win condition, not an afterthought: at 20+ Elves, draining is usually better than an all-out attack into blockers.",
+   "A board wipe is the single worst thing that can happen to this deck. Respect open mana from white/black opponents before overcommitting, and rebuild via Lathril rather than dumping every elf after a wipe.",
+   "Protect: Mana Elves when land-light Card-draw engines Lathril when combat can connect",
+   "Expend freely: Late mana dorks after development Elf tokens when trading preserves engines",
+   "Tutor priority: Missing engine category first. Protection if the engine is already assembled. A finisher only when the board can exploit it now or next turn.",
+   "Interaction priority: Stop an opponent who can win before the deck’s next meaningful turn. Remove effects that shut off the deck’s primary resource axis or exile irreplaceable engines. Otherwise preserve interaction for board wipes, combo attempts, or a profitable tempo swing."
+  ],
+  "threat_preferences": {
+   "board_wipe_threat": 100,
+   "removal_targeting_lathril": 90,
+   "imminent_lethal_combat": 70,
+   "compact_combo": 60,
+   "generic_value_engine": 25
+  },
+  "confidence": "high",
+  "source": "pilot-bible 2026-08-01 + hand-authored corrections"
+ },
+ "12": {
+  "role": "proactive_combo",
+  "primary_plan": [
+   "establish Malcolm or another pirate damage engine",
+   "generate treasures",
+   "assemble a deterministic combo",
+   "protect the combo attempt",
+   "Establish Malcolm or another Pirate damage engine, generate Treasures from distributed damage, and assemble one of the deck's compact combo lines. Protect the enabler and conserve interaction for stopping disruption or a faster win.",
+   "Establish Malcolm or another Pirate damage engine, generate Treasures from distributed damage, and assemble one of the deck's compact combo lines.",
+   "Convert the established engine into a decisive combat, drain, poison, or combo finish as described above."
+  ],
+  "secondary_plan": [
+   "use Kediss to spread commander damage",
+   "convert treasure velocity into card advantage",
+   "If combo is disrupted, rebuild Treasure and cards rather than forcing a weak line",
+   "If another player presents a faster win, become temporary control"
+  ],
+  "hard_rules": [
+   "do not discard a unique combo piece for low-impact value",
+   "preserve counterspells when an opponent represents a win",
+   "prioritize removal of Rule of Law effects",
+   "attempt a deterministic win when the line is available and protected",
+   "Protect: Combo enablers Treasure engine Protection for the winning turn",
+   "Expend freely: Incidental attackers and redundant pieces after a better line is assembled",
+   "Tutor priority: Missing engine category first. Protection if the engine is already assembled. A finisher only when the board can exploit it now or next turn.",
+   "Interaction priority: Stop an opponent who can win before the deck’s next meaningful turn. Remove effects that shut off the deck’s primary resource axis or exile irreplaceable engines. Otherwise preserve interaction for board wipes, combo attempts, or a profitable tempo swing."
+  ],
+  "threat_preferences": {
+   "compact_combo": 100,
+   "imminent_lethal_combat": 90,
+   "stax_blocking_primary_plan": 85,
+   "generic_value_engine": 35
+  },
+  "confidence": "high",
+  "source": "pilot-bible 2026-08-01 + hand-authored corrections"
+ },
+ "1": {
+  "role": "midrange",
+  "primary_plan": [
+   "Ramp into mana-value-four-or-greater artifacts and enchantments, let Bello animate them on your turn, and attack while those permanents continue serving as engines. Preserve the noncreature infrastructure and avoid trading animated engines casually.",
+   "Ramp into mana-value-four-or-greater artifacts and enchantments, let Bello animate them on your turn, and attack while those permanents continue serving as engines.",
+   "Convert the established engine into a decisive combat, drain, poison, or combo finish as described above."
+  ],
+  "secondary_plan": [
+   "If Bello is repeatedly removed, play as enchantment/artifact value midrange",
+   "After a creature wipe, exploit that engines usually remain"
+  ],
+  "hard_rules": [
+   "Protect: Noncreature engines Bello when an attack is profitable Protection from sweepers",
+   "Expend freely: Temporary tokens; animated permanents only in lethal or favorable trades",
+   "Tutor priority: Missing engine category first. Protection if the engine is already assembled. A finisher only when the board can exploit it now or next turn.",
+   "Interaction priority: Stop an opponent who can win before the deck’s next meaningful turn. Remove effects that shut off the deck’s primary resource axis or exile irreplaceable engines. Otherwise preserve interaction for board wipes, combo attempts, or a profitable tempo swing."
+  ],
+  "confidence": "high",
+  "source": "pilot-bible 2026-08-01 + hand-authored corrections"
+ },
+ "26": {
+  "role": "flash_faerie_tempo",
+  "primary_plan": [
+   "Pass with mana open, interact on opponents' turns, and let Alela convert that interaction into Faeries. Accumulate evasive damage while forcing opponents to play into countermagic and flash threats.",
+   "Pass with mana open, interact on opponents' turns, and let Alela convert that interaction into Faeries.",
+   "Convert the established engine into a decisive combat, drain, poison, or combo finish as described above."
+  ],
+  "secondary_plan": [
+   "When the primary engine is answered twice, shift toward independent threats",
+   "When a clean lethal line exists, stop optimizing value"
+  ],
+  "hard_rules": [
+   "Protect: Repeatable card advantage Core commander engine The primary finisher until lethal",
+   "Expend freely: Tokens and replaceable utility pieces",
+   "Tutor priority: Missing engine category first. Protection if the engine is already assembled. A finisher only when the board can exploit it now or next turn.",
+   "Interaction priority: Stop an opponent who can win before the deck’s next meaningful turn. Remove effects that shut off the deck’s primary resource axis or exile irreplaceable engines. Otherwise preserve interaction for board wipes, combo attempts, or a profitable tempo swing."
+  ],
+  "confidence": "medium",
+  "source": "pilot-bible 2026-08-01 + hand-authored corrections"
+ },
+ "59": {
+  "role": "poison_theft_control",
+  "primary_plan": [
+   "Give opponents enough poison to enable Ixhel, then prioritize playing their exiled cards and controlling the table. Poison is the access key, not necessarily the primary clock; win through stolen resources unless proliferation presents a clean kill.",
+   "Give opponents enough poison to enable Ixhel, then prioritize playing their exiled cards and controlling the table.",
+   "Convert the established engine into a decisive combat, drain, poison, or combo finish as described above."
+  ],
+  "secondary_plan": [
+   "If stolen cards form a stronger plan, follow that plan",
+   "If proliferation creates a two-turn poison clock, pivot to poison"
+  ],
+  "hard_rules": [
+   "Protect: Ixhel when exile value will trigger Permission/removal for stolen engines",
+   "Expend freely: Small poison creatures after access is unlocked",
+   "Tutor priority: Missing engine category first. Protection if the engine is already assembled. A finisher only when the board can exploit it now or next turn.",
+   "Interaction priority: Stop an opponent who can win before the deck’s next meaningful turn. Remove effects that shut off the deck’s primary resource axis or exile irreplaceable engines. Otherwise preserve interaction for board wipes, combo attempts, or a profitable tempo swing."
+  ],
+  "confidence": "medium",
+  "source": "pilot-bible 2026-08-01 + hand-authored corrections"
+ },
+ "8": {
+  "role": "aggro_tempo",
+  "primary_plan": [
+   "resolve Raph & Mikey and attack: the commander cheats big creatures from hand into play, so huge bodies (Ghalta, Impervious Greatwurm, Kogla and Yidaro) are payloads to deploy through it, not spells to hard-cast",
+   "extra combats multiply everything: Anzrag and Aggravated Assault give additional combat steps, each one re-triggering the commander and re-attacking with the whole board",
+   "Old Gnawbone + Aggravated Assault is the closer: treasures from combat damage pay for the next combat, repeating until the table is dead",
+   "Resolve Raph & Mikey, attack, and cheat large creatures from hand into play rather than planning to hard-cast them. Extra combats retrigger the commander and the whole attacking board, so prioritize them as the central multiplier.",
+   "Resolve Raph & Mikey, attack, and cheat large creatures from hand into play rather than planning to hard-cast them.",
+   "Convert the established engine into a decisive combat, drain, poison, or combo finish as described above."
+  ],
+  "secondary_plan": [
+   "When the primary engine is answered twice, shift toward independent threats",
+   "When a clean lethal line exists, stop optimizing value"
+  ],
+  "hard_rules": [
+   "The commander is the enabler, not just a beater — keep casting it, and prefer attacking with it to unlock the cheat trigger over holding it back.",
+   "Hold a huge creature in hand for the commander's trigger instead of tapping out to hard-cast it, unless the board is empty and you need a blocker now.",
+   "When Old Gnawbone and Aggravated Assault are both available, that is the win: connect once, then chain combats. Protect that turn's attackers.",
+   "Protect: Repeatable card advantage Core commander engine The primary finisher until lethal",
+   "Expend freely: Tokens and replaceable utility pieces",
+   "Tutor priority: Missing engine category first. Protection if the engine is already assembled. A finisher only when the board can exploit it now or next turn.",
+   "Interaction priority: Stop an opponent who can win before the deck’s next meaningful turn. Remove effects that shut off the deck’s primary resource axis or exile irreplaceable engines. Otherwise preserve interaction for board wipes, combo attempts, or a profitable tempo swing."
+  ],
+  "threat_preferences": {
+   "removal_targeting_commander": 90,
+   "board_wipe_threat": 85,
+   "imminent_lethal_combat": 70,
+   "compact_combo": 65,
+   "generic_value_engine": 25
+  },
+  "confidence": "high",
+  "source": "pilot-bible 2026-08-01 + hand-authored corrections"
+ },
+ "4": {
+  "role": "food_value_midrange",
+  "primary_plan": [
+   "Quietly accumulate Food and token engines, convert Food into cards, mana, life, and creatures, and avoid becoming archenemy before inevitability is established. Close through a wide token attack, drain payoff, or Frodo line when the table cannot interrupt it.",
+   "Quietly accumulate Food and token engines, convert Food into cards, mana, life, and creatures, and avoid becoming archenemy before inevitability is established.",
+   "Convert the established engine into a decisive combat, drain, poison, or combo finish as described above."
+  ],
+  "secondary_plan": [
+   "Stay defensive until engine density creates inevitability",
+   "Pivot to Frodo or drain kill only when protection/timing is favorable"
+  ],
+  "hard_rules": [
+   "Protect: Academy Manufactor-style multipliers Repeatable Food engines Drain/finish payoffs",
+   "Expend freely: Individual Food tokens when conversion is efficient",
+   "Tutor priority: Missing engine category first. Protection if the engine is already assembled. A finisher only when the board can exploit it now or next turn.",
+   "Interaction priority: Stop an opponent who can win before the deck’s next meaningful turn. Remove effects that shut off the deck’s primary resource axis or exile irreplaceable engines. Otherwise preserve interaction for board wipes, combo attempts, or a profitable tempo swing."
+  ],
+  "confidence": "high",
+  "source": "pilot-bible 2026-08-01 + hand-authored corrections"
+ },
+ "6": {
+  "role": "aristocrats",
+  "primary_plan": [
+   "Create disposable creatures, sacrifice them for cards or mana, and double death triggers with Teysa. Sequence outlets, fodder, and payoffs so every death creates value; finish through repeated drain rather than fair combat.",
+   "Create disposable creatures, sacrifice them for cards or mana, and double death triggers with Teysa.",
+   "Convert the established engine into a decisive combat, drain, poison, or combo finish as described above."
+  ],
+  "secondary_plan": [
+   "Pivot from board development to drain once outlet + payoff + fodder are assembled",
+   "Against graveyard hate, prioritize token-based loops"
+  ],
+  "hard_rules": [
+   "Protect: Free sacrifice outlets Repeatable fodder Teysa when multiple death triggers are ready",
+   "Expend freely: Tokens and creatures whose value is already realized",
+   "Tutor priority: Missing engine category first. Protection if the engine is already assembled. A finisher only when the board can exploit it now or next turn.",
+   "Interaction priority: Stop an opponent who can win before the deck’s next meaningful turn. Remove effects that shut off the deck’s primary resource axis or exile irreplaceable engines. Otherwise preserve interaction for board wipes, combo attempts, or a profitable tempo swing."
+  ],
+  "confidence": "high",
+  "source": "pilot-bible 2026-08-01 + hand-authored corrections"
+ },
+ "40": {
+  "role": "aura_voltron",
+  "primary_plan": [
+   "Use Killian's discount to cast targeted Auras and protection efficiently, build an evasive threat, and pressure commander damage. Keep protection available once Killian represents a short clock.",
+   "Use Killian's discount to cast targeted Auras and protection efficiently, build an evasive threat, and pressure commander damage.",
+   "Convert the established engine into a decisive combat, drain, poison, or combo finish as described above."
+  ],
+  "secondary_plan": [
+   "If commander tax becomes prohibitive, pivot to alternate creature carrier or recursion",
+   "Against sacrifice-heavy tables, keep expendable creatures"
+  ],
+  "hard_rules": [
+   "Protect: Commander Protection/evasion Auras Recursion for Auras",
+   "Expend freely: Low-impact Auras when upgrading the threat",
+   "Tutor priority: Missing engine category first. Protection if the engine is already assembled. A finisher only when the board can exploit it now or next turn.",
+   "Interaction priority: Stop an opponent who can win before the deck’s next meaningful turn. Remove effects that shut off the deck’s primary resource axis or exile irreplaceable engines. Otherwise preserve interaction for board wipes, combo attempts, or a profitable tempo swing."
+  ],
+  "confidence": "medium",
+  "source": "pilot-bible 2026-08-01 + hand-authored corrections"
+ },
+ "61": {
+  "role": "counters_burn",
+  "primary_plan": [
+   "Place +1/+1 counters repeatedly and let Shalai and Hallar convert each counter event into direct damage. Prefer effects that add counters to multiple creatures or repeat over time; combat is a backup to the triggered-damage engine.",
+   "Place +1/+1 counters repeatedly and let Shalai and Hallar convert each counter event into direct damage.",
+   "Convert the established engine into a decisive combat, drain, poison, or combo finish as described above."
+  ],
+  "secondary_plan": [
+   "When the primary engine is answered twice, shift toward independent threats",
+   "When a clean lethal line exists, stop optimizing value"
+  ],
+  "hard_rules": [
+   "Protect: Repeatable card advantage Core commander engine The primary finisher until lethal",
+   "Expend freely: Tokens and replaceable utility pieces",
+   "Tutor priority: Missing engine category first. Protection if the engine is already assembled. A finisher only when the board can exploit it now or next turn.",
+   "Interaction priority: Stop an opponent who can win before the deck’s next meaningful turn. Remove effects that shut off the deck’s primary resource axis or exile irreplaceable engines. Otherwise preserve interaction for board wipes, combo attempts, or a profitable tempo swing."
+  ],
+  "confidence": "medium",
+  "source": "pilot-bible 2026-08-01 + hand-authored corrections"
+ },
+ "18": {
+  "role": "exile_graveyard_tokens",
+  "primary_plan": [
+   "Stock the graveyard and create repeated opportunities to cast or play cards from exile, then use Quintorius to turn those actions into Spirits and value. Sequence recursion so each card leaving the graveyard advances both board and hand.",
+   "Stock the graveyard and create repeated opportunities to cast or play cards from exile, then use Quintorius to turn those actions into Spirits and value.",
+   "Convert the established engine into a decisive combat, drain, poison, or combo finish as described above."
+  ],
+  "secondary_plan": [
+   "When the primary engine is answered twice, shift toward independent threats",
+   "When a clean lethal line exists, stop optimizing value"
+  ],
+  "hard_rules": [
+   "Protect: Repeatable card advantage Core commander engine The primary finisher until lethal",
+   "Expend freely: Tokens and replaceable utility pieces",
+   "Tutor priority: Missing engine category first. Protection if the engine is already assembled. A finisher only when the board can exploit it now or next turn.",
+   "Interaction priority: Stop an opponent who can win before the deck’s next meaningful turn. Remove effects that shut off the deck’s primary resource axis or exile irreplaceable engines. Otherwise preserve interaction for board wipes, combo attempts, or a profitable tempo swing."
+  ],
+  "confidence": "medium",
+  "source": "pilot-bible 2026-08-01 + hand-authored corrections"
+ },
+ "56": {
+  "role": "copy_stack_combo",
+  "primary_plan": [
+   "Sculpt the hand and top of library, establish Melek or another copy engine, then chain copied instants and sorceries into a lethal or insurmountable turn. Redirection and chaos effects support the stack plan; do not cast them randomly when they can protect or multiply the decisive sequence.",
+   "Sculpt the hand and top of library, establish Melek or another copy engine, then chain copied instants and sorceries into a lethal or insurmountable turn.",
+   "Convert the established engine into a decisive combat, drain, poison, or combo finish as described above."
+  ],
+  "secondary_plan": [
+   "If Melek is too expensive, use hand-based copy engines",
+   "If the table taps low, convert setup into the decisive turn"
+  ],
+  "hard_rules": [
+   "Protect: Copy engines Hand size/card selection Protection for the stack turn",
+   "Expend freely: Low-impact cantrips when they improve setup",
+   "Tutor priority: Missing engine category first. Protection if the engine is already assembled. A finisher only when the board can exploit it now or next turn.",
+   "Interaction priority: Stop an opponent who can win before the deck’s next meaningful turn. Remove effects that shut off the deck’s primary resource axis or exile irreplaceable engines. Otherwise preserve interaction for board wipes, combo attempts, or a profitable tempo swing."
+  ],
+  "confidence": "high",
+  "source": "pilot-bible 2026-08-01 + hand-authored corrections"
+ },
+ "60": {
+  "role": "planeswalker_control",
+  "primary_plan": [
+   "Ramp and deploy planeswalkers behind blockers and removal, then use Atraxa to proliferate loyalty toward repeated ultimates. Defend the walkers that generate cards or control first; do not spread protection evenly when one walker is the engine.",
+   "Ramp and deploy planeswalkers behind blockers and removal, then use Atraxa to proliferate loyalty toward repeated ultimates.",
+   "Convert the established engine into a decisive combat, drain, poison, or combo finish as described above."
+  ],
+  "secondary_plan": [
+   "When the primary engine is answered twice, shift toward independent threats",
+   "When a clean lethal line exists, stop optimizing value"
+  ],
+  "hard_rules": [
+   "Protect: Repeatable card advantage Core commander engine The primary finisher until lethal",
+   "Expend freely: Tokens and replaceable utility pieces",
+   "Tutor priority: Missing engine category first. Protection if the engine is already assembled. A finisher only when the board can exploit it now or next turn.",
+   "Interaction priority: Stop an opponent who can win before the deck’s next meaningful turn. Remove effects that shut off the deck’s primary resource axis or exile irreplaceable engines. Otherwise preserve interaction for board wipes, combo attempts, or a profitable tempo swing."
+  ],
+  "confidence": "medium",
+  "source": "pilot-bible 2026-08-01 + hand-authored corrections"
+ },
+ "22": {
+  "role": "team_combat",
+  "primary_plan": [
+   "Develop Leonardo and Michelangelo, use their complementary buffs and combat abilities to improve the entire team, and win through coordinated attacks. Build enough board presence before committing both commanders into removal.",
+   "Develop Leonardo and Michelangelo, use their complementary buffs and combat abilities to improve the entire team, and win through coordinated attacks.",
+   "Convert the established engine into a decisive combat, drain, poison, or combo finish as described above."
+  ],
+  "secondary_plan": [
+   "When the primary engine is answered twice, shift toward independent threats",
+   "When a clean lethal line exists, stop optimizing value"
+  ],
+  "hard_rules": [
+   "Protect: Repeatable card advantage Core commander engine The primary finisher until lethal",
+   "Expend freely: Tokens and replaceable utility pieces",
+   "Tutor priority: Missing engine category first. Protection if the engine is already assembled. A finisher only when the board can exploit it now or next turn.",
+   "Interaction priority: Stop an opponent who can win before the deck’s next meaningful turn. Remove effects that shut off the deck’s primary resource axis or exile irreplaceable engines. Otherwise preserve interaction for board wipes, combo attempts, or a profitable tempo swing."
+  ],
+  "confidence": "medium",
+  "source": "pilot-bible 2026-08-01 + hand-authored corrections"
+ },
+ "9": {
+  "role": "lands_engine",
+  "primary_plan": [
+   "Develop the land engine, use Toph to turn land interactions into material advantage, and convert repeated landfall or animated lands into combat pressure. Preserve land recursion and extra-land-drop pieces over small tempo gains.",
+   "Develop the land engine, use Toph to turn land interactions into material advantage, and convert repeated landfall or animated lands into combat pressure.",
+   "Convert the established engine into a decisive combat, drain, poison, or combo finish as described above."
+  ],
+  "secondary_plan": [
+   "When the primary engine is answered twice, shift toward independent threats",
+   "When a clean lethal line exists, stop optimizing value"
+  ],
+  "hard_rules": [
+   "Protect: Repeatable card advantage Core commander engine The primary finisher until lethal",
+   "Expend freely: Tokens and replaceable utility pieces",
+   "Tutor priority: Missing engine category first. Protection if the engine is already assembled. A finisher only when the board can exploit it now or next turn.",
+   "Interaction priority: Stop an opponent who can win before the deck’s next meaningful turn. Remove effects that shut off the deck’s primary resource axis or exile irreplaceable engines. Otherwise preserve interaction for board wipes, combo attempts, or a profitable tempo swing."
+  ],
+  "confidence": "medium",
+  "source": "pilot-bible 2026-08-01 + hand-authored corrections"
+ },
+ "25": {
+  "role": "life_change_counters",
+  "primary_plan": [
+   "Create large life gains or losses, then use Willowdusk after the biggest swing to place a lethal quantity of counters on a creature. Treat life as a manipulable resource and keep a safe counter recipient available.",
+   "Create large life gains or losses, then use Willowdusk after the biggest swing to place a lethal quantity of counters on a creature.",
+   "Convert the established engine into a decisive combat, drain, poison, or combo finish as described above."
+  ],
+  "secondary_plan": [
+   "When the primary engine is answered twice, shift toward independent threats",
+   "When a clean lethal line exists, stop optimizing value"
+  ],
+  "hard_rules": [
+   "Protect: Repeatable card advantage Core commander engine The primary finisher until lethal",
+   "Expend freely: Tokens and replaceable utility pieces",
+   "Tutor priority: Missing engine category first. Protection if the engine is already assembled. A finisher only when the board can exploit it now or next turn.",
+   "Interaction priority: Stop an opponent who can win before the deck’s next meaningful turn. Remove effects that shut off the deck’s primary resource axis or exile irreplaceable engines. Otherwise preserve interaction for board wipes, combo attempts, or a profitable tempo swing."
+  ],
+  "confidence": "medium",
+  "source": "pilot-bible 2026-08-01 + hand-authored corrections"
+ },
+ "37": {
+  "role": "cheat_reanimator",
+  "primary_plan": [
+   "Ramp into Yuna, stock or exploit the graveyard, and cheat expensive permanents into play for explosive board swings. Prioritize high-impact payloads and protection over casting medium threats fairly.",
+   "Ramp into Yuna, stock or exploit the graveyard, and cheat expensive permanents into play for explosive board swings.",
+   "Convert the established engine into a decisive combat, drain, poison, or combo finish as described above."
+  ],
+  "secondary_plan": [
+   "When the primary engine is answered twice, shift toward independent threats",
+   "When a clean lethal line exists, stop optimizing value"
+  ],
+  "hard_rules": [
+   "Protect: Repeatable card advantage Core commander engine The primary finisher until lethal",
+   "Expend freely: Tokens and replaceable utility pieces",
+   "Tutor priority: Missing engine category first. Protection if the engine is already assembled. A finisher only when the board can exploit it now or next turn.",
+   "Interaction priority: Stop an opponent who can win before the deck’s next meaningful turn. Remove effects that shut off the deck’s primary resource axis or exile irreplaceable engines. Otherwise preserve interaction for board wipes, combo attempts, or a profitable tempo swing."
+  ],
+  "confidence": "medium",
+  "source": "pilot-bible 2026-08-01 + hand-authored corrections"
+ }
+}

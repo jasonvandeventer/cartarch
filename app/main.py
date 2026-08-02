@@ -30,7 +30,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from starlette.middleware.sessions import SessionMiddleware
 
-from app import sort_spec
+from app import deck_service, sort_spec
 from app.auth import hash_password, validate_password_strength
 from app.dashboard_service import get_dashboard_data
 from app.db import SessionLocal, checkpoint_and_dispose, init_db, shutdown_event
@@ -218,6 +218,15 @@ async def lifespan(app: FastAPI):
     # (imported only by alembic/env.py), so the hook is now their sole creator too.
     # ``init_db`` still validates that at least one user exists.
     init_db()
+    # v4.12.44 — deck play profiles ship with the image and reseed at every boot,
+    # so profile updates deploy like code. Pilot-edited rows are never overwritten
+    # (save_play_profile's is_custom contract); failure here should not block boot.
+    try:
+        with SessionLocal() as _seed_session:
+            _seed_stats = deck_service.seed_play_profiles(_seed_session)
+        print(f"play-profile seed: {_seed_stats}")
+    except Exception as exc:  # noqa: BLE001 — seed is best-effort, boot must survive it
+        print(f"play-profile seed FAILED (continuing boot): {exc}")
     for _target, _name in (
         (_price_refresh_loop, "price-refresh"),
         (_trait_backfill_loop, "trait-backfill"),

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 import secrets
 
@@ -2578,6 +2579,38 @@ def save_play_profile(session: Session, deck: Deck, profile: dict, *, is_custom:
         session.add(row)
         session.flush()
     return row
+
+
+PLAY_PROFILE_SEED = os.path.join(os.path.dirname(__file__), "data", "play_profile_seed.json")
+
+
+def seed_play_profiles(session: Session, seed_path: str = PLAY_PROFILE_SEED) -> dict:
+    """Deploy-time seed: upsert the shipped play profiles as auto-seeded rows.
+
+    Runs at every startup (called from the lifespan hook) so profile updates ride
+    the normal push→deploy path instead of pod surgery. Idempotent: pilot-edited
+    rows (is_custom=True) are never touched — that's the save_play_profile
+    contract — and decks missing from this database are skipped, not errors
+    (the seed ships playgroup decks; a fresh dev DB has none of them).
+    """
+    if not os.path.exists(seed_path):
+        return {"seeded": 0, "skipped_custom": 0, "missing_decks": 0}
+    with open(seed_path, encoding="utf-8") as fh:
+        data = json.load(fh)
+    seeded = skipped = missing = 0
+    for deck_id, profile in data.items():
+        deck = session.get(Deck, int(deck_id))
+        if deck is None:
+            missing += 1
+            continue
+        row = get_play_profile(session, deck.id)
+        if row is not None and row.is_custom:
+            skipped += 1
+            continue
+        save_play_profile(session, deck, profile, is_custom=False)
+        seeded += 1
+    session.commit()
+    return {"seeded": seeded, "skipped_custom": skipped, "missing_decks": missing}
 
 
 def get_deck_by_share_token(session: Session, token: str) -> Deck | None:

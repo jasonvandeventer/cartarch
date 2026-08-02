@@ -1,5 +1,12 @@
 [
   {
+    "version": "4.12.44",
+    "date": "2026-08-02",
+    "added": [
+      "The playgroup's piloting knowledge now ships with Cartarch itself. All 38 gauntlet decks' play profiles — each deck's actual plan, what it protects, and what it tutors for first — are seeded into the database automatically at every deploy, so updating a profile is a normal push instead of a manual import. Anything a pilot has edited by hand is left untouched: the seed only ever writes rows marked as auto-generated."
+    ]
+  },
+  {
     "version": "4.12.43",
     "date": "2026-08-02",
     "added": [
