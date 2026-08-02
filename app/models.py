@@ -573,6 +573,50 @@ class DeckStrategyProfile(Base):
     deck: Mapped[Deck] = relationship()
 
 
+class DeckPlayProfile(Base):
+    """Per-deck *piloting* profile — how to play the deck, not how to build it.
+
+    DISTINCT from ``DeckStrategyProfile`` above, which holds deckbuilding targets
+    (lands 36-38, ramp 10-14) for the analyzer. This one holds the pilot's intent:
+    primary/secondary plan, hard rules, threat priorities. Consumed by the Forge
+    AI-player simulation, which currently keeps this as YAML outside Cartarch —
+    so the pilot's own knowledge is invisible to the deck builder today.
+
+    It also exists to CORRECT auto-derived data. ``deck_combos`` descriptions are
+    generated and can be wrong (a terminating kill loop misread as an infinite
+    draw), and a confidently wrong combo description is worse than none: a policy
+    reading it will avoid its own win condition. The pilot needs somewhere
+    authoritative to say otherwise — once, at the source — so the deck builder,
+    the bracket estimator and the simulation all see the same correction.
+
+    One row per deck (``deck_id`` unique). ``profile_data`` is a JSON blob so the
+    shape can evolve without a migration per field. ``is_custom=False`` =
+    auto-seeded (safe to regenerate); ``True`` = pilot-edited, so re-seeding must
+    never silently overwrite it — same contract as ``DeckStrategyProfile``.
+
+    ``deck_id`` is ON DELETE CASCADE NOT NULL. SQLite enforces no FKs (PRAGMA
+    foreign_keys OFF), so ``delete_deck`` deletes the profile explicitly; the DB
+    CASCADE is Postgres defense-in-depth. ``is_custom`` uses
+    ``server_default=false()`` (never an integer literal — a bare ``0`` breaks
+    CREATE TABLE on Postgres).
+    """
+
+    __tablename__ = "deck_play_profiles"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    deck_id: Mapped[int] = mapped_column(
+        ForeignKey("decks.id", ondelete="CASCADE"), nullable=False, unique=True, index=True
+    )
+    profile_data: Mapped[str] = mapped_column(Text, nullable=False)
+    is_custom: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=false()
+    )
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utc_now)
+
+    deck: Mapped[Deck] = relationship()
+
+
 class VariantGroup(Base):
     __tablename__ = "variant_groups"
     __table_args__ = (UniqueConstraint("user_id", "name", name="uq_variant_groups_user_name"),)

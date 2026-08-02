@@ -2536,6 +2536,50 @@ def revoke_deck_share_token(session: Session, deck_id: int, user_id: int) -> boo
     return True
 
 
+# --- Play profile (piloting intent — deck_play_profiles) ---------------------- #
+# DISTINCT from DeckStrategyProfile (deckbuilding targets for the analyzer): this
+# is how to PILOT the deck — plans, hard rules, threat priorities — consumed by
+# the Forge AI-player simulation and, later, a profile editor. Same is_custom
+# contract as the strategy profile: False = auto-seeded (regenerable), True =
+# pilot-edited (never silently overwritten).
+
+PLAY_PROFILE_MAX_BYTES = 65536  # a play profile is prose + lists; 64KB is generous
+
+
+def get_play_profile(session: Session, deck_id: int):
+    from app.models import DeckPlayProfile
+
+    return session.query(DeckPlayProfile).filter(DeckPlayProfile.deck_id == deck_id).first()
+
+
+def save_play_profile(session: Session, deck: Deck, profile: dict, *, is_custom: bool = True):
+    """Upsert the deck's play profile. Raises ValueError on a payload that isn't
+    a JSON object or exceeds PLAY_PROFILE_MAX_BYTES — the route surfaces that as
+    a 400 rather than persisting junk the simulation would then trust."""
+    from app.models import DeckPlayProfile
+
+    if not isinstance(profile, dict):
+        raise ValueError("play profile must be a JSON object")
+    payload = json.dumps(profile, ensure_ascii=False)
+    if len(payload.encode("utf-8")) > PLAY_PROFILE_MAX_BYTES:
+        raise ValueError(f"play profile exceeds {PLAY_PROFILE_MAX_BYTES} bytes")
+
+    row = get_play_profile(session, deck.id)
+    if row:
+        # An auto-seeded row may be overwritten by anything; a pilot-edited row
+        # is only ever replaced by another pilot edit (is_custom=True).
+        if row.is_custom and not is_custom:
+            return row
+        row.profile_data = payload
+        row.is_custom = is_custom
+        row.updated_at = utc_now()
+    else:
+        row = DeckPlayProfile(deck_id=deck.id, profile_data=payload, is_custom=is_custom)
+        session.add(row)
+        session.flush()
+    return row
+
+
 def get_deck_by_share_token(session: Session, token: str) -> Deck | None:
     """The ONLY public lookup — strictly by token. Empty/None token never matches."""
     if not token:
@@ -5065,6 +5109,15 @@ def delete_deck(
     from app.models import DeckStrategyProfile
 
     session.query(DeckStrategyProfile).filter(DeckStrategyProfile.deck_id == deck.id).delete(
+        synchronize_session=False
+    )
+
+    # The deck's PLAY profile (piloting intent) is a separate table from the
+    # strategy profile above and needs the same treatment: CASCADE intent
+    # (PG-only defense-in-depth), so delete explicitly for SQLite.
+    from app.models import DeckPlayProfile
+
+    session.query(DeckPlayProfile).filter(DeckPlayProfile.deck_id == deck.id).delete(
         synchronize_session=False
     )
     # Drop the in-memory Deck.goals collection if a caller loaded it (the deck

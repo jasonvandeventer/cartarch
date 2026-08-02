@@ -1293,6 +1293,58 @@ async def decks_materialize(
     )
 
 
+# --- Play profile (piloting intent) — issue: deck_play_profiles --------------- #
+# JSON in, JSON out: the consumers are programmatic (the Forge AI-player
+# simulation's profile generator, and later an editor UI), not a template.
+# Owner-scoped like every other deck route; the POST carries the session-bound
+# CSRF token as a form field alongside the JSON payload, same double-submit
+# contract as all authenticated writes.
+
+
+@router.get("/decks/{deck_id}/play-profile")
+def deck_play_profile_get(
+    deck_id: int,
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+):
+    deck = get_deck(session, deck_id=deck_id, user_id=current_user.id)
+    if not deck:
+        raise HTTPException(status_code=404, detail="Deck not found")
+    row = deck_service.get_play_profile(session, deck.id)
+    if not row:
+        return JSONResponse({"deck_id": deck.id, "profile": None, "is_custom": False})
+    return JSONResponse(
+        {
+            "deck_id": deck.id,
+            "profile": json.loads(row.profile_data),
+            "is_custom": row.is_custom,
+            "updated_at": row.updated_at.isoformat() if row.updated_at else None,
+        }
+    )
+
+
+@router.post("/decks/{deck_id}/play-profile")
+def deck_play_profile_save(
+    deck_id: int,
+    profile_data: str = Form(...),
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+    _: None = CsrfRequired,
+):
+    deck = get_deck(session, deck_id=deck_id, user_id=current_user.id)
+    if not deck:
+        raise HTTPException(status_code=404, detail="Deck not found")
+    try:
+        profile = json.loads(profile_data)
+        row = deck_service.save_play_profile(session, deck, profile, is_custom=True)
+    except (ValueError, json.JSONDecodeError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    session.commit()
+    return JSONResponse(
+        {"deck_id": deck.id, "profile": json.loads(row.profile_data), "is_custom": row.is_custom}
+    )
+
+
 @router.get("/decks/{deck_id}/export")
 def decks_export(
     deck_id: int,
