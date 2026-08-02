@@ -1,5 +1,12 @@
 [
   {
+    "version": "4.12.43",
+    "date": "2026-08-02",
+    "added": [
+      "A deck can now carry a piloting profile: how it wants to be played, not just what goes in it. It stores the deck's actual plan, what to protect, what to spend freely, and what to fetch first when a tutor resolves. The AI game-simulation pilot reads this profile to play your deck the way you would, and anything you write by hand is never overwritten by an automatic regeneration. This release also carries the v4.12.42 code, which shipped without its release record."
+    ]
+  },
+  {
     "version": "4.12.41",
     "date": "2026-07-31",
     "added": [
