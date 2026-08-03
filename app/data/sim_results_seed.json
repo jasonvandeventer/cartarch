@@ -1,0 +1,1010 @@
+[
+ {
+  "deck_id": 17,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "banded",
+  "wins": 7,
+  "games": 13
+ },
+ {
+  "deck_id": 17,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "core",
+  "wins": 4,
+  "games": 15
+ },
+ {
+  "deck_id": 17,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "random",
+  "wins": 5,
+  "games": 15
+ },
+ {
+  "deck_id": 17,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "spotlight",
+  "wins": 6,
+  "games": 23
+ },
+ {
+  "deck_id": 16,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "banded",
+  "wins": 5,
+  "games": 12
+ },
+ {
+  "deck_id": 16,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "core",
+  "wins": 9,
+  "games": 15
+ },
+ {
+  "deck_id": 16,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "random",
+  "wins": 10,
+  "games": 12
+ },
+ {
+  "deck_id": 16,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "spotlight",
+  "wins": 20,
+  "games": 26
+ },
+ {
+  "deck_id": 34,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "banded",
+  "wins": 7,
+  "games": 12
+ },
+ {
+  "deck_id": 34,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "core",
+  "wins": 4,
+  "games": 15
+ },
+ {
+  "deck_id": 34,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "random",
+  "wins": 3,
+  "games": 15
+ },
+ {
+  "deck_id": 34,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "spotlight",
+  "wins": 3,
+  "games": 20
+ },
+ {
+  "deck_id": 54,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "banded",
+  "wins": 3,
+  "games": 9
+ },
+ {
+  "deck_id": 54,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "random",
+  "wins": 4,
+  "games": 12
+ },
+ {
+  "deck_id": 54,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "spotlight",
+  "wins": 4,
+  "games": 15
+ },
+ {
+  "deck_id": 58,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "banded",
+  "wins": 8,
+  "games": 19
+ },
+ {
+  "deck_id": 58,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "random",
+  "wins": 4,
+  "games": 11
+ },
+ {
+  "deck_id": 58,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "spotlight",
+  "wins": 13,
+  "games": 32
+ },
+ {
+  "deck_id": 30,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "banded",
+  "wins": 3,
+  "games": 14
+ },
+ {
+  "deck_id": 30,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "core",
+  "wins": 6,
+  "games": 13
+ },
+ {
+  "deck_id": 30,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "random",
+  "wins": 3,
+  "games": 16
+ },
+ {
+  "deck_id": 30,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "spotlight",
+  "wins": 0,
+  "games": 7
+ },
+ {
+  "deck_id": 36,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "banded",
+  "wins": 5,
+  "games": 14
+ },
+ {
+  "deck_id": 36,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "core",
+  "wins": 3,
+  "games": 15
+ },
+ {
+  "deck_id": 36,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "random",
+  "wins": 1,
+  "games": 13
+ },
+ {
+  "deck_id": 36,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "spotlight",
+  "wins": 2,
+  "games": 9
+ },
+ {
+  "deck_id": 50,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "banded",
+  "wins": 0,
+  "games": 12
+ },
+ {
+  "deck_id": 50,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "core",
+  "wins": 4,
+  "games": 12
+ },
+ {
+  "deck_id": 50,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "random",
+  "wins": 2,
+  "games": 16
+ },
+ {
+  "deck_id": 50,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "spotlight",
+  "wins": 2,
+  "games": 6
+ },
+ {
+  "deck_id": 55,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "banded",
+  "wins": 4,
+  "games": 16
+ },
+ {
+  "deck_id": 55,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "core",
+  "wins": 3,
+  "games": 20
+ },
+ {
+  "deck_id": 55,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "random",
+  "wins": 7,
+  "games": 19
+ },
+ {
+  "deck_id": 55,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "spotlight",
+  "wins": 1,
+  "games": 6
+ },
+ {
+  "deck_id": 62,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "banded",
+  "wins": 3,
+  "games": 12
+ },
+ {
+  "deck_id": 62,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "core",
+  "wins": 3,
+  "games": 12
+ },
+ {
+  "deck_id": 62,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "random",
+  "wins": 1,
+  "games": 15
+ },
+ {
+  "deck_id": 62,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "spotlight",
+  "wins": 0,
+  "games": 6
+ },
+ {
+  "deck_id": 53,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "banded",
+  "wins": 10,
+  "games": 15
+ },
+ {
+  "deck_id": 53,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "random",
+  "wins": 4,
+  "games": 10
+ },
+ {
+  "deck_id": 53,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "spotlight",
+  "wins": 4,
+  "games": 14
+ },
+ {
+  "deck_id": 42,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "banded",
+  "wins": 3,
+  "games": 7
+ },
+ {
+  "deck_id": 42,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "random",
+  "wins": 4,
+  "games": 13
+ },
+ {
+  "deck_id": 42,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "spotlight",
+  "wins": 9,
+  "games": 24
+ },
+ {
+  "deck_id": 38,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "banded",
+  "wins": 1,
+  "games": 19
+ },
+ {
+  "deck_id": 38,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "core",
+  "wins": 4,
+  "games": 15
+ },
+ {
+  "deck_id": 38,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "random",
+  "wins": 4,
+  "games": 18
+ },
+ {
+  "deck_id": 38,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "spotlight",
+  "wins": 2,
+  "games": 7
+ },
+ {
+  "deck_id": 21,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "banded",
+  "wins": 1,
+  "games": 12
+ },
+ {
+  "deck_id": 21,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "core",
+  "wins": 3,
+  "games": 12
+ },
+ {
+  "deck_id": 21,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "random",
+  "wins": 2,
+  "games": 14
+ },
+ {
+  "deck_id": 21,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "spotlight",
+  "wins": 0,
+  "games": 6
+ },
+ {
+  "deck_id": 23,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "banded",
+  "wins": 3,
+  "games": 15
+ },
+ {
+  "deck_id": 23,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "core",
+  "wins": 2,
+  "games": 12
+ },
+ {
+  "deck_id": 23,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "random",
+  "wins": 1,
+  "games": 13
+ },
+ {
+  "deck_id": 23,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "spotlight",
+  "wins": 1,
+  "games": 6
+ },
+ {
+  "deck_id": 14,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "banded",
+  "wins": 3,
+  "games": 14
+ },
+ {
+  "deck_id": 14,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "core",
+  "wins": 2,
+  "games": 19
+ },
+ {
+  "deck_id": 14,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "random",
+  "wins": 4,
+  "games": 12
+ },
+ {
+  "deck_id": 14,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "spotlight",
+  "wins": 0,
+  "games": 6
+ },
+ {
+  "deck_id": 24,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "banded",
+  "wins": 3,
+  "games": 18
+ },
+ {
+  "deck_id": 24,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "core",
+  "wins": 0,
+  "games": 16
+ },
+ {
+  "deck_id": 24,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "random",
+  "wins": 1,
+  "games": 15
+ },
+ {
+  "deck_id": 24,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "spotlight",
+  "wins": 0,
+  "games": 6
+ },
+ {
+  "deck_id": 29,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "banded",
+  "wins": 0,
+  "games": 16
+ },
+ {
+  "deck_id": 29,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "core",
+  "wins": 1,
+  "games": 13
+ },
+ {
+  "deck_id": 29,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "random",
+  "wins": 3,
+  "games": 14
+ },
+ {
+  "deck_id": 29,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "spotlight",
+  "wins": 0,
+  "games": 6
+ },
+ {
+  "deck_id": 57,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "banded",
+  "wins": 8,
+  "games": 13
+ },
+ {
+  "deck_id": 57,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "random",
+  "wins": 3,
+  "games": 8
+ },
+ {
+  "deck_id": 57,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "spotlight",
+  "wins": 2,
+  "games": 23
+ },
+ {
+  "deck_id": 11,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "banded",
+  "wins": 5,
+  "games": 14
+ },
+ {
+  "deck_id": 11,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "core",
+  "wins": 3,
+  "games": 15
+ },
+ {
+  "deck_id": 11,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "random",
+  "wins": 3,
+  "games": 12
+ },
+ {
+  "deck_id": 11,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "spotlight",
+  "wins": 2,
+  "games": 8
+ },
+ {
+  "deck_id": 31,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "banded",
+  "wins": 2,
+  "games": 17
+ },
+ {
+  "deck_id": 31,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "core",
+  "wins": 7,
+  "games": 18
+ },
+ {
+  "deck_id": 31,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "random",
+  "wins": 4,
+  "games": 13
+ },
+ {
+  "deck_id": 31,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "spotlight",
+  "wins": 0,
+  "games": 6
+ },
+ {
+  "deck_id": 64,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "banded",
+  "wins": 2,
+  "games": 13
+ },
+ {
+  "deck_id": 64,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "core",
+  "wins": 2,
+  "games": 16
+ },
+ {
+  "deck_id": 64,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "random",
+  "wins": 6,
+  "games": 22
+ },
+ {
+  "deck_id": 64,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "spotlight",
+  "wins": 0,
+  "games": 6
+ },
+ {
+  "deck_id": 1,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "banded",
+  "wins": 3,
+  "games": 12
+ },
+ {
+  "deck_id": 1,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "core",
+  "wins": 5,
+  "games": 15
+ },
+ {
+  "deck_id": 1,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "random",
+  "wins": 3,
+  "games": 13
+ },
+ {
+  "deck_id": 1,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "spotlight",
+  "wins": 0,
+  "games": 6
+ },
+ {
+  "deck_id": 12,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "banded",
+  "wins": 0,
+  "games": 12
+ },
+ {
+  "deck_id": 12,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "core",
+  "wins": 2,
+  "games": 14
+ },
+ {
+  "deck_id": 12,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "random",
+  "wins": 3,
+  "games": 15
+ },
+ {
+  "deck_id": 12,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "spotlight",
+  "wins": 2,
+  "games": 6
+ },
+ {
+  "deck_id": 26,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "banded",
+  "wins": 5,
+  "games": 17
+ },
+ {
+  "deck_id": 26,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "core",
+  "wins": 4,
+  "games": 16
+ },
+ {
+  "deck_id": 26,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "random",
+  "wins": 2,
+  "games": 14
+ },
+ {
+  "deck_id": 26,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "spotlight",
+  "wins": 11,
+  "games": 24
+ },
+ {
+  "deck_id": 59,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "banded",
+  "wins": 0,
+  "games": 6
+ },
+ {
+  "deck_id": 59,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "random",
+  "wins": 3,
+  "games": 13
+ },
+ {
+  "deck_id": 59,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "spotlight",
+  "wins": 1,
+  "games": 6
+ },
+ {
+  "deck_id": 8,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "banded",
+  "wins": 2,
+  "games": 12
+ },
+ {
+  "deck_id": 8,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "core",
+  "wins": 4,
+  "games": 16
+ },
+ {
+  "deck_id": 8,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "random",
+  "wins": 9,
+  "games": 23
+ },
+ {
+  "deck_id": 8,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "spotlight",
+  "wins": 3,
+  "games": 9
+ },
+ {
+  "deck_id": 4,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "banded",
+  "wins": 0,
+  "games": 15
+ },
+ {
+  "deck_id": 4,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "core",
+  "wins": 2,
+  "games": 17
+ },
+ {
+  "deck_id": 4,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "random",
+  "wins": 2,
+  "games": 13
+ },
+ {
+  "deck_id": 4,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "spotlight",
+  "wins": 0,
+  "games": 6
+ },
+ {
+  "deck_id": 6,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "banded",
+  "wins": 4,
+  "games": 19
+ },
+ {
+  "deck_id": 6,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "core",
+  "wins": 7,
+  "games": 15
+ },
+ {
+  "deck_id": 6,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "random",
+  "wins": 4,
+  "games": 18
+ },
+ {
+  "deck_id": 6,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "spotlight",
+  "wins": 1,
+  "games": 8
+ },
+ {
+  "deck_id": 40,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "banded",
+  "wins": 4,
+  "games": 15
+ },
+ {
+  "deck_id": 40,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "core",
+  "wins": 4,
+  "games": 14
+ },
+ {
+  "deck_id": 40,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "random",
+  "wins": 6,
+  "games": 12
+ },
+ {
+  "deck_id": 40,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "spotlight",
+  "wins": 2,
+  "games": 17
+ },
+ {
+  "deck_id": 61,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "banded",
+  "wins": 3,
+  "games": 10
+ },
+ {
+  "deck_id": 61,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "random",
+  "wins": 6,
+  "games": 16
+ },
+ {
+  "deck_id": 61,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "spotlight",
+  "wins": 4,
+  "games": 16
+ },
+ {
+  "deck_id": 18,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "banded",
+  "wins": 5,
+  "games": 14
+ },
+ {
+  "deck_id": 18,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "core",
+  "wins": 1,
+  "games": 14
+ },
+ {
+  "deck_id": 18,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "random",
+  "wins": 5,
+  "games": 15
+ },
+ {
+  "deck_id": 18,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "spotlight",
+  "wins": 1,
+  "games": 8
+ },
+ {
+  "deck_id": 56,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "banded",
+  "wins": 1,
+  "games": 19
+ },
+ {
+  "deck_id": 56,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "core",
+  "wins": 4,
+  "games": 13
+ },
+ {
+  "deck_id": 56,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "random",
+  "wins": 1,
+  "games": 13
+ },
+ {
+  "deck_id": 56,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "spotlight",
+  "wins": 0,
+  "games": 6
+ },
+ {
+  "deck_id": 60,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "banded",
+  "wins": 5,
+  "games": 14
+ },
+ {
+  "deck_id": 60,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "random",
+  "wins": 4,
+  "games": 13
+ },
+ {
+  "deck_id": 60,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "spotlight",
+  "wins": 9,
+  "games": 28
+ },
+ {
+  "deck_id": 22,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "banded",
+  "wins": 3,
+  "games": 17
+ },
+ {
+  "deck_id": 22,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "core",
+  "wins": 4,
+  "games": 18
+ },
+ {
+  "deck_id": 22,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "random",
+  "wins": 4,
+  "games": 15
+ },
+ {
+  "deck_id": 22,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "spotlight",
+  "wins": 0,
+  "games": 6
+ },
+ {
+  "deck_id": 9,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "banded",
+  "wins": 3,
+  "games": 12
+ },
+ {
+  "deck_id": 9,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "core",
+  "wins": 6,
+  "games": 15
+ },
+ {
+  "deck_id": 9,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "random",
+  "wins": 1,
+  "games": 13
+ },
+ {
+  "deck_id": 9,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "spotlight",
+  "wins": 0,
+  "games": 6
+ },
+ {
+  "deck_id": 25,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "banded",
+  "wins": 1,
+  "games": 12
+ },
+ {
+  "deck_id": 25,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "core",
+  "wins": 4,
+  "games": 16
+ },
+ {
+  "deck_id": 25,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "random",
+  "wins": 1,
+  "games": 13
+ },
+ {
+  "deck_id": 25,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "spotlight",
+  "wins": 1,
+  "games": 6
+ },
+ {
+  "deck_id": 37,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "banded",
+  "wins": 5,
+  "games": 16
+ },
+ {
+  "deck_id": 37,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "core",
+  "wins": 5,
+  "games": 16
+ },
+ {
+  "deck_id": 37,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "random",
+  "wins": 3,
+  "games": 17
+ },
+ {
+  "deck_id": 37,
+  "run_label": "gauntlet-2026-08-02",
+  "strategy": "spotlight",
+  "wins": 1,
+  "games": 6
+ }
+]

@@ -1,5 +1,12 @@
 [
   {
+    "version": "4.12.45",
+    "date": "2026-08-02",
+    "added": [
+      "Cartarch now holds empirical deck-strength data. The overnight AI gauntlet's results — 489 four-player games covering all 38 playgroup decks across four table types, including a core-playgroup meta — are stored per deck and per meta, and ship with the app the same way play profiles do: a new run is just a push. This is measured evidence for the bracket estimator and deck builder, with the honest caveat baked into the docs that AI pilots undervalue decks whose plans they cannot execute."
+    ]
+  },
+  {
     "version": "4.12.44",
     "date": "2026-08-02",
     "added": [

@@ -2613,6 +2613,46 @@ def seed_play_profiles(session: Session, seed_path: str = PLAY_PROFILE_SEED) -> 
     return {"seeded": seeded, "skipped_custom": skipped, "missing_decks": missing}
 
 
+SIM_RESULTS_SEED = os.path.join(os.path.dirname(__file__), "data", "sim_results_seed.json")
+
+
+def seed_sim_results(session: Session, seed_path: str = SIM_RESULTS_SEED) -> dict:
+    """Deploy-time seed for AI-simulation results (same pattern as play profiles).
+
+    Upserts on (deck_id, run_label, strategy) so re-boots are no-ops and a
+    corrected re-export of the same run overwrites in place. Rows are plain
+    measurements — there is no is_custom concept here. Missing decks skipped.
+    """
+    from app.models import DeckSimResult
+
+    if not os.path.exists(seed_path):
+        return {"seeded": 0, "missing_decks": 0}
+    with open(seed_path, encoding="utf-8") as fh:
+        data = json.load(fh)
+    seeded = missing = 0
+    for entry in data:
+        deck = session.get(Deck, entry["deck_id"])
+        if deck is None:
+            missing += 1
+            continue
+        row = (
+            session.query(DeckSimResult)
+            .filter(
+                DeckSimResult.deck_id == entry["deck_id"],
+                DeckSimResult.run_label == entry["run_label"],
+                DeckSimResult.strategy == entry["strategy"],
+            )
+            .first()
+        )
+        if row:
+            row.wins, row.games, row.updated_at = entry["wins"], entry["games"], utc_now()
+        else:
+            session.add(DeckSimResult(**entry))
+        seeded += 1
+    session.commit()
+    return {"seeded": seeded, "missing_decks": missing}
+
+
 def get_deck_by_share_token(session: Session, token: str) -> Deck | None:
     """The ONLY public lookup — strictly by token. Empty/None token never matches."""
     if not token:
@@ -5151,6 +5191,12 @@ def delete_deck(
     from app.models import DeckPlayProfile
 
     session.query(DeckPlayProfile).filter(DeckPlayProfile.deck_id == deck.id).delete(
+        synchronize_session=False
+    )
+    # Simulation results: same CASCADE-is-PG-only treatment.
+    from app.models import DeckSimResult
+
+    session.query(DeckSimResult).filter(DeckSimResult.deck_id == deck.id).delete(
         synchronize_session=False
     )
     # Drop the in-memory Deck.goals collection if a caller loaded it (the deck

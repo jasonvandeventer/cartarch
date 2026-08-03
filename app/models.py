@@ -617,6 +617,43 @@ class DeckPlayProfile(Base):
     deck: Mapped[Deck] = relationship()
 
 
+class DeckSimResult(Base):
+    """Aggregated AI-simulation results for a deck — empirical strength evidence.
+
+    One row per (deck, run_label, strategy): ``run_label`` names the simulation
+    batch (e.g. ``gauntlet-2026-08-02``), ``strategy`` the pod-selection meta it
+    was measured under (``random`` / ``banded`` / ``spotlight`` / ``core``), and
+    wins/games the aggregate. 4-seat Commander pods, so the null baseline is a
+    25% win rate. Produced by the Forge AI-player gauntlet and seeded at boot
+    from ``app/data/sim_results_seed.json`` (same deploy-like-code pattern as
+    the play-profile seed); consumers are the bracket estimator and the deck
+    builder's relative-strength signal.
+
+    Results are AI-piloted evidence, not ground truth: decks whose plan the
+    search AI cannot execute (combo sequencing, alt-win loops) read LOW.
+    ``deck_id`` CASCADE is PG defense-in-depth; ``delete_deck`` cleans up
+    explicitly for SQLite, same as every deck-scoped table.
+    """
+
+    __tablename__ = "deck_sim_results"
+    __table_args__ = (
+        UniqueConstraint("deck_id", "run_label", "strategy", name="uq_deck_sim_results_run"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    deck_id: Mapped[int] = mapped_column(
+        ForeignKey("decks.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    run_label: Mapped[str] = mapped_column(String(64), nullable=False)
+    strategy: Mapped[str] = mapped_column(String(32), nullable=False)
+    wins: Mapped[int] = mapped_column(Integer, nullable=False)
+    games: Mapped[int] = mapped_column(Integer, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utc_now)
+
+    deck: Mapped[Deck] = relationship()
+
+
 class VariantGroup(Base):
     __tablename__ = "variant_groups"
     __table_args__ = (UniqueConstraint("user_id", "name", name="uq_variant_groups_user_name"),)

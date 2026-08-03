@@ -227,6 +227,15 @@ async def lifespan(app: FastAPI):
         print(f"play-profile seed: {_seed_stats}")
     except Exception as exc:  # noqa: BLE001 — seed is best-effort, boot must survive it
         print(f"play-profile seed FAILED (continuing boot): {exc}")
+    # v4.12.45 — AI-simulation results (gauntlet win rates) ship and seed the
+    # same way: empirical deck-strength evidence for the bracket estimator and
+    # deck builder, updated by pushing a new seed export.
+    try:
+        with SessionLocal() as _seed_session:
+            _sim_stats = deck_service.seed_sim_results(_seed_session)
+        print(f"sim-results seed: {_sim_stats}")
+    except Exception as exc:  # noqa: BLE001 — same best-effort posture as above
+        print(f"sim-results seed FAILED (continuing boot): {exc}")
     for _target, _name in (
         (_price_refresh_loop, "price-refresh"),
         (_trait_backfill_loop, "trait-backfill"),
