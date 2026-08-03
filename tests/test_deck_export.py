@@ -268,3 +268,109 @@ def test_reimport_matches_existing_foil_inventory_row():
     )[0]
     assert normal_match["total_available"] == 0
     assert normal_match["recommended_action"] == "import_new"
+
+
+# --------------------------------------------------------------------------
+# #179 — the deck JSON export names the commander via the ONE definition.
+# --------------------------------------------------------------------------
+
+
+def test_json_export_reports_a_role_tagged_commander():
+    """The common case: 41 of 49 live decks carry a role='commander' row."""
+    sm = _fresh()
+    s = sm()
+    u = _user(s)
+    deck = deck_service.create_deck(s, u.id, "Atraxa")
+    atraxa = _card(s, "Atraxa, Praetors' Voice")
+    _place(s, u.id, atraxa, deck.storage_location_id, role="commander")
+    s.commit()
+
+    c = _client(sm, u)
+    try:
+        data = c.get(f"/decks/{deck.id}/export?format=json").json()
+    finally:
+        _clear_overrides()
+
+    assert [x["name"] for x in data["commanders"]] == ["Atraxa, Praetors' Voice"]
+
+
+def test_json_export_falls_back_to_the_deck_commanders_anchor():
+    """THE regression this exists to prevent (v4.12.40, in a fourth surface).
+
+    A deck whose commander lives ONLY in the #163 ``deck_commanders`` anchor has
+    no ``role='commander'`` inventory row, so a consumer reading commanders off
+    each card's ``role`` reports none — silently, with nothing distinguishing it
+    from a deck that genuinely has no commander. Measured on prod 2026-08-03:
+    **4 of 49 live decks are in exactly this state.**
+    """
+    from app.models import DeckCommander
+
+    sm = _fresh()
+    s = sm()
+    u = _user(s)
+    deck = deck_service.create_deck(s, u.id, "Anchor Only")
+    kenrith = _card(s, "Kenrith, the Returned King")
+    # A card in the deck, but NOTHING tagged as the commander role.
+    filler = _card(s, "Sol Ring")
+    _place(s, u.id, filler, deck.storage_location_id)
+    s.add(DeckCommander(deck_id=deck.id, card_id=kenrith.id))
+    s.commit()
+
+    c = _client(sm, u)
+    try:
+        data = c.get(f"/decks/{deck.id}/export?format=json").json()
+    finally:
+        _clear_overrides()
+
+    assert [x["name"] for x in data["commanders"]] == ["Kenrith, the Returned King"]
+    # The anchor commander has NO inventory row, so it is deliberately absent
+    # from `cards` — which is why it is a top-level key and not a card flag.
+    assert [x["name"] for x in data["cards"]] == ["Sol Ring"]
+
+
+def test_json_export_reports_no_commander_when_there_is_none():
+    """The control: an unknown commander must not be manufactured."""
+    sm = _fresh()
+    s = sm()
+    u = _user(s)
+    deck = deck_service.create_deck(s, u.id, "Bare")
+    _place(s, u.id, _card(s, "Sol Ring"), deck.storage_location_id)
+    s.commit()
+
+    c = _client(sm, u)
+    try:
+        data = c.get(f"/decks/{deck.id}/export?format=json").json()
+    finally:
+        _clear_overrides()
+
+    assert data["commanders"] == []
+
+
+def test_the_text_export_does_NOT_gain_the_anchor_fallback():
+    """Deliberate asymmetry, and it is load-bearing.
+
+    The text export is an MTGA round-trip format, so a ``Commander`` line there
+    asserts a card the deck CONTAINS. An anchor-only commander has no inventory
+    row, so emitting it would make export → re-import add a card that was never
+    in the deck. The JSON key is metadata; the text line is inventory.
+    """
+    from app.models import DeckCommander
+
+    sm = _fresh()
+    s = sm()
+    u = _user(s)
+    deck = deck_service.create_deck(s, u.id, "Anchor Only")
+    kenrith = _card(s, "Kenrith, the Returned King")
+    _place(s, u.id, _card(s, "Sol Ring"), deck.storage_location_id)
+    s.add(DeckCommander(deck_id=deck.id, card_id=kenrith.id))
+    s.commit()
+
+    c = _client(sm, u)
+    try:
+        text = c.get(f"/decks/{deck.id}/export").text
+    finally:
+        _clear_overrides()
+
+    assert "Kenrith" not in text
+    assert "Commander" not in text
+    assert "Sol Ring" in text

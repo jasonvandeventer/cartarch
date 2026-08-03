@@ -100,7 +100,7 @@ from app.dependencies import (
     render,
     safe_redirect_url,
 )
-from app.game_service import get_deck_record
+from app.game_service import deck_commander_cards, get_deck_record
 from app.import_service import normalize_finish
 from app.inventory_service import (
     apply_collection_search_filters,
@@ -1419,9 +1419,33 @@ def decks_export(
             mv = c["mana_value"]
             mv_key = "unknown" if mv is None else f"{mv:g}"
             mv_histogram[mv_key] = mv_histogram.get(mv_key, 0) + qty
+        # #179 — commanders come from game_service.deck_commander_cards, the ONE
+        # answer to "who is this deck's commander" (v4.12.40): role rows first,
+        # falling back to #163's deck_commanders ANCHOR.
+        #
+        # WITHOUT the fallback a consumer would have to read commanders off each
+        # card's `role`, which is the SAME defect v4.12.40 ended — a deck whose
+        # commander was never TAGGED as an inventory row reports none, silently,
+        # with nothing distinguishing it from a deck that genuinely has none.
+        # Measured on prod 2026-08-03: 41 of 49 live decks carry a role row, 4
+        # are anchor-only, 4 have no commander anywhere. Those 4 anchor-only
+        # decks are exactly the "intermittent" population, and shipping the
+        # role-only read would have recreated the bug in a fourth surface.
+        #
+        # A commander resolved from the anchor has NO row in `cards` (there is no
+        # inventory row to have one) — deliberate, and the reason this is a
+        # top-level key rather than a flag on a card. It states who the commander
+        # IS without claiming the deck physically holds a copy.
+        #
+        # The TEXT export above is deliberately NOT given the same treatment: it
+        # is an MTGA round-trip format, so a Commander line there asserts a card
+        # the deck contains, and emitting an anchor-only commander would make
+        # export → re-import add a card that was never in the deck.
+        commanders = [card_metadata(c) for c in deck_commander_cards(session, deck)]
         return JSONResponse(
             {
                 "deck": {"id": deck.id, "name": deck.name},
+                "commanders": commanders,
                 "rollup": {
                     "color_identity": sorted(color_union),
                     "type_counts": type_counts,

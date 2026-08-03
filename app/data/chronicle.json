@@ -1,5 +1,15 @@
 [
   {
+    "version": "4.12.47",
+    "date": "2026-08-03",
+    "added": [],
+    "refined": [
+      "A deck's machine-readable export now states who its commander is, and gets the answer right for every deck. Cartarch remembers a commander in two ways — the card can be marked inside the deck, or the deck can simply record which commander it is — and the export only knew about the first. Four decks name a commander that nothing in the export could see, so anything reading them was told there was no commander at all, with no way to tell that apart from a deck that truly has none. It now asks the same question the rest of the app asks. The plain-text export is deliberately left alone: that one is a list of cards you actually own, and a commander recorded without a card would come back as a card you never had."
+    ],
+    "resolved": [],
+    "archivist_note": "This one was found by re-reading an old design note rather than by anything going wrong. The note described a Discord bot somebody might write, and imagining how it would ask for a deck's commander was enough to notice that the obvious way to ask would give the wrong answer four times in fifty. It is the same fault we chased in July under the name 'the commander art is intermittent' — one question, several answers scattered about, and only some of them taught the whole truth. What is uncomfortable is how ordinary it looks each time: nothing errors, nothing is logged, the deck simply appears not to have a commander. We fixed the fourth copy and left the fifth alone on purpose, because there the same information would mean something different — a list of cards you own is not the place to mention a card you do not."
+  },
+  {
     "version": "4.12.46",
     "date": "2026-08-03",
     "added": [
