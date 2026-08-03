@@ -100,4 +100,41 @@
       <button type="submit">Update Password</button>
     </form>
   </section>
+  {# #179 — read-only API token. Token-as-toggle: present = /api/v1 is on. #}
+  <section class="panel">
+    <h3 class="panel-title">API access</h3>
+    <p class="muted" style="margin-top:0.5rem">
+      A read-only token for scripts and bots. Send it as
+      <code>Authorization: Bearer &lt;token&gt;</code> to
+      <code>/api/v1/me</code>, <code>/api/v1/collection</code>,
+      <code>/api/v1/decks</code> and <code>/api/v1/decks/{id}</code>.
+      Full reference at <a href="/docs">/docs</a>.
+    </p>
+    {% if current_user.api_token %}
+      <p class="muted" style="margin-top:0.5rem">
+        Anyone holding this token can read your collection and decks. Treat it
+        like a password — regenerating replaces it and invalidates the old one.
+      </p>
+      <input type="text"
+             readonly
+             value="{{ current_user.api_token }}"
+             onclick="this.select()"
+             style="width:100%;max-width:32rem;font-family:monospace;margin-top:0.5rem">
+      <div style="display:flex;gap:0.5rem;margin-top:0.75rem;flex-wrap:wrap">
+        <form action="/account/api-token" method="post">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <button type="submit" class="ghost-button btn">Regenerate</button>
+        </form>
+        <form action="/account/api-token/revoke" method="post">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <button type="submit" class="ghost-button btn">Revoke</button>
+        </form>
+      </div>
+    {% else %}
+      <form action="/account/api-token" method="post" style="margin-top:0.75rem">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <button type="submit">Generate API token</button>
+      </form>
+    {% endif %}
+  </section>
 {% endblock %}

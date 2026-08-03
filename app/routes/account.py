@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import secrets
+
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
@@ -98,3 +100,35 @@ def update_profile(
         session.commit()
 
     return RedirectResponse(url="/account?success=profile_updated", status_code=303)
+
+
+# #179 — the /api/v1 bearer token. Token-as-toggle (Deck.share_token,
+# User.wishlist_share_token, Game.join_code): generating enables the read-only
+# API for this user, revoking sets it back to NULL and 401s the next request.
+# Regenerate is just generate again — it overwrites, so a leaked token is
+# revoked by minting a new one.
+@router.post("/api-token")
+def generate_api_token(
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+    _: None = CsrfRequired,
+):
+    user = session.query(User).filter(User.id == current_user.id).first()
+    if user:
+        # 32 bytes → a 43-char URL-safe string, well inside String(64).
+        user.api_token = secrets.token_urlsafe(32)
+        session.commit()
+    return RedirectResponse(url="/account?success=api_token_generated", status_code=303)
+
+
+@router.post("/api-token/revoke")
+def revoke_api_token(
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+    _: None = CsrfRequired,
+):
+    user = session.query(User).filter(User.id == current_user.id).first()
+    if user:
+        user.api_token = None
+        session.commit()
+    return RedirectResponse(url="/account?success=api_token_revoked", status_code=303)

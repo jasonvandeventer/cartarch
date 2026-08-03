@@ -86,6 +86,16 @@ class User(Base):
     # the wishlist is publicly viewable at /w/{token}, NULL = private. Revoke =
     # NULL (link 404s at once). Nullable + UNIQUE so a token maps to one user.
     wishlist_share_token: Mapped[str | None] = mapped_column(String(64), nullable=True, unique=True)
+    # #179 — read-only API bearer token. The FOURTH token-as-toggle column
+    # (Deck.share_token, User.wishlist_share_token, Game.join_code): presence =
+    # /api/v1 access is on, NULL = off, revoke = NULL, regenerate = new value.
+    # Unlike the other three this one is NOT in a URL — it rides an
+    # ``Authorization: Bearer`` header and resolves WHICH USER is asking, which
+    # is why require_metrics_token's single shared env-var secret is the wrong
+    # precedent. Nullable + UNIQUE so a token maps to exactly one user; NULL is
+    # exempt from UNIQUE on both PG and SQLite, so any number of users may have
+    # the API switched off.
+    api_token: Mapped[str | None] = mapped_column(String(64), nullable=True, unique=True)
 
     inventory_rows: Mapped[list[InventoryRow]] = relationship(back_populates="user")
     decks: Mapped[list[Deck]] = relationship(back_populates="user")

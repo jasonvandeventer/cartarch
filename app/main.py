@@ -65,6 +65,7 @@ from app.password_reset_service import (
 from app.routes import (
     account,
     admin,
+    api,
     audit,
     auth,
     cards,
@@ -334,6 +335,11 @@ app.include_router(decks.router)
 app.include_router(collections.router)
 app.include_router(cards.router)
 app.include_router(imports.router)
+# #179 — read-only JSON API for non-browser clients. Registered LAST: its routes
+# are all under the literal /api/v1 prefix, so ordering is not load-bearing here
+# (unlike the overlapping path templates in cards.py), but keeping it at the end
+# keeps the page routers grouped.
+app.include_router(api.router)
 
 
 @app.exception_handler(ValueError)

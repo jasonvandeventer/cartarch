@@ -2,7 +2,7 @@
 
 Self-hosted web application for managing a physical Magic: The Gathering collection. (Identifies as **Cartarch** in user-facing UI as of v3.27.6; the in-repo project identifier was aligned to `cartarch` app-side on 2026-07-06. Some infrastructure names may still carry the old identifier pending the full rename near actual public launch.)
 
-**Current version: v4.12.45** · [Platform repo](https://github.com/jasonvandeventer/vanfreckle-platform)
+**Current version: v4.12.46** · [Platform repo](https://github.com/jasonvandeventer/vanfreckle-platform)
 
 ---
 
@@ -152,6 +152,13 @@ See [docs/screenshots/](docs/screenshots/) for capture guidelines and additional
 - Admin panel: create/delete users, toggle admin/active, reset passwords
 - Display names shown throughout the UI; email used as login identifier
 - Per-user data isolation; the drawer sorter is opt-in **by setup, not by account** — it activates once a user has at least one sorter rule or one drawer location, so nobody is on a hard-coded list
+
+### API
+
+- **Read-only JSON API** at `/api/v1` for scripts, spreadsheets and bots. Generate a token on `/account` and send it as `Authorization: Bearer <token>`; four endpoints cover identity (`/me`), your collection (`/collection`), your decks (`/decks`) and one deck's card list (`/decks/{id}`). Full reference at `/docs`
+- The collection endpoint accepts the **same `?search=` grammar the site's search box uses**, plus the colour/type/status/price facets — so a bot answering "do I own a Rhystic Study?" fetches one card rather than the whole collection
+- Owner-scoped and read-only by construction: a token reaches only its own user's data, nothing can be written through it, and another user's deck id is indistinguishable from one that does not exist
+- The token *is* the toggle, like the public deck and wishlist links: the API is off until you generate one, revoking clears it, and regenerating invalidates the old one immediately
 
 ### Playgroups, sharing & trading
 

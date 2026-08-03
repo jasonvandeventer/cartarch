@@ -1,5 +1,15 @@
 [
   {
+    "version": "4.12.46",
+    "date": "2026-08-03",
+    "added": [
+      "Cartarch now has a read-only API, so a program can look things up for you. Generate a token on your account page and a script, a spreadsheet, or a Discord bot can ask what you own, what your decks are, and what is in one of them — the same information the site shows you, in a form software can read. It only ever reads, and it only ever sees your own collection: nothing can be changed through it, and nobody else's cards are reachable with your token. The token is a switch as much as a key, so the API is off until you turn it on, and revoking or regenerating shuts the old one out immediately. A full reference to every question you can ask lives at /docs."
+    ],
+    "refined": [],
+    "resolved": [],
+    "archivist_note": "Somebody asked in chat whether we had an API, and the honest answer was 'not yet, but I mean to'. It turned out we very nearly did already: every page that shows you your collection could already hand the same data over in machine-readable form, and had been able to for months. What was missing was not the answer but the introduction — a way for something that is not a browser to say who it is. So this release is mostly one small gate and a token, and three of its four doors simply open onto rooms that were already furnished. The pleasing part is what we did not build. No second copy of the collection format to drift out of step with the first, no new vocabulary to learn, no versioned scaffolding waiting for features nobody has asked for. The search box you use on the site is the search a bot uses too. We did stop to consider what a token is for: it is a key, and keys get dropped. Making it a switch as well means the remedy for a lost one is a single click, which felt like the least a person should have to do."
+  },
+  {
     "version": "4.12.45",
     "date": "2026-08-02",
     "added": [
