@@ -1,5 +1,12 @@
 [
   {
+    "version": "4.13.3",
+    "date": "2026-08-04",
+    "added": [
+      "The home screen's Spotlight now has the same hover zoom as everywhere else: mouse over the newly-placed card and the large preview appears with its printing and price in the footer."
+    ]
+  },
+  {
     "version": "4.13.2",
     "date": "2026-08-04",
     "added": [

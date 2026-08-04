@@ -207,10 +207,17 @@
            v3.25.0 scryfall_cards bulk cache → request-path-safe (no live
            Scryfall on the dashboard request path). Renumbered from §V to §IV
            in the v3.28.5 pre-push rebalance. #}
-        <section class="panel dashboard-panel">
+        <section class="panel dashboard-panel"
+                 data-card-hover
+                 data-card-hover-target=".dashboard-spot">
           <div class="dashboard-panel-h">§ IV · Spotlight<span class="aux">newly placed</span></div>
           {% if dashboard.spotlight %}
-            <a href="/cards/{{ dashboard.spotlight.card_id }}" class="dashboard-spot">
+            <a href="/cards/{{ dashboard.spotlight.card_id }}" class="dashboard-spot"
+               {% if dashboard.spotlight.image_url and dashboard.spotlight.scryfall_id %}
+               data-card-image="{{ mirror_image_url(dashboard.spotlight.scryfall_id, 'large') }}"
+               data-card-image-alt="{{ scryfall_image_fallback(dashboard.spotlight.scryfall_id, 'large') }}"
+               data-card-info="{{ dashboard.spotlight.set_code | upper }} #{{ dashboard.spotlight.collector_number }}{% if dashboard.spotlight.price_usd %} · ${{ dashboard.spotlight.price_usd }}{% endif %}"
+               {% endif %}>
               <div class="dashboard-spot-art">
                 {% if dashboard.spotlight.image_url %}
                   <img src="{{ mirror_image_url(dashboard.spotlight.scryfall_id) }}"
@@ -376,4 +383,9 @@
       </section>
     </div>
   {% endif %}
+{% endblock %}
+
+{% block extra_scripts %}
+  {# Spotlight hover zoom: the shared #169 card-hover component. #}
+  <script src="/static/card-hover.js?v={{ static_v('card-hover.js') }}"></script>
 {% endblock %}
