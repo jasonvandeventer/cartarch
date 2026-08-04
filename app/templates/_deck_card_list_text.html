@@ -41,7 +41,8 @@
           <li class="deck-list-row"
               data-card-image="{{ mirror_image_url(item.card.scryfall_id, 'large') if item.card.image_url else '' }}"
               data-card-fallback="{{ scryfall_image_fallback(item.card.scryfall_id, 'large') if item.card.image_url else '' }}"
-              data-card-name="{{ item.card.name }}">
+              data-card-name="{{ item.card.name }}"
+              data-card-info="{{ (item.card.set_code or '?')|upper }} #{{ item.card.collector_number or '?' }} · ${{ '%.2f'|format(item.effective_price or 0) }}{% if item.is_proxy %} (proxy){% endif %}{% if item.finish and item.finish != 'normal' %} · {{ item.finish }}{% endif %}">
             <span class="dlr-qty">{{ item.quantity }}</span>
             <a class="dlr-name" href="/cards/{{ item.card.id }}">{{ item.card.name }}</a>
             {% if item.card.mana_cost %}<span class="dlr-mana">{{ item.card.mana_cost }}</span>{% endif %}
@@ -143,4 +144,8 @@
    the JS hover/tap handler can position/show it. Hidden by default. #}
 <div id="deck-list-image-preview" class="deck-list-image-preview" hidden>
   <img id="deck-list-image-preview-img" src="" alt="">
+  {# Footer: set/printing + price (playgroup request, Aug 2026) — populated by
+     the preview JS from the row's data-card-info; hidden when a surface
+     doesn't emit one. #}
+  <div id="deck-list-image-preview-info" class="deck-list-image-preview-info" hidden></div>
 </div>

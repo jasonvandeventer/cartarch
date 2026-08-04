@@ -41,6 +41,7 @@
   var GAP = 16; // cursor-to-preview offset, and the viewport margin for edge flips
   var preview = null;
   var img = null;
+  var footer = null;
 
   function ensurePreview() {
     if (preview) return preview;
@@ -50,6 +51,10 @@
     img = document.createElement("img");
     img.alt = "";
     preview.appendChild(img);
+    footer = document.createElement("div");
+    footer.className = "card-hover-preview-footer";
+    footer.hidden = true;
+    preview.appendChild(footer);
     document.body.appendChild(preview);
     return preview;
   }
@@ -84,6 +89,11 @@
         : null;
       img.src = src;
     }
+    // Optional footer (playgroup request, Aug 2026): set/printing + price.
+    // textContent only — this is attribute data, never HTML.
+    var info = el.getAttribute("data-card-info") || "";
+    footer.textContent = info;
+    footer.hidden = !info;
     preview.classList.add("is-visible");
     position(x, y);
   }

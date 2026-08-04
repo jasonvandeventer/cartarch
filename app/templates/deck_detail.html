@@ -1602,8 +1602,17 @@
           return true;
         }
 
+        function menuIsOpen() {
+          // An open row-actions menu owns the pointer's attention: the preview
+          // (z-index 1400) otherwise draws OVER the fixed-position menu (z 10)
+          // as the cursor moves toward it — the "dropdown doesn't work" report:
+          // the menu is there, invisible under the card art, clicks land blind.
+          return !!document.querySelector('.deck-list-row .collection-row-kebab[open]');
+        }
+
         function showPreview(row, event) {
           if (!ensurePreview()) return;
+          if (menuIsOpen()) return;
           var src = row.getAttribute('data-card-image');
           if (!src) return;
           // #44 — mirror-miss fallback: rows carry data-card-fallback (the
@@ -1616,6 +1625,12 @@
           };
           previewImg.src = src;
           previewImg.alt = row.getAttribute('data-card-name') || '';
+          var info = document.getElementById('deck-list-image-preview-info');
+          if (info) {
+            var text = row.getAttribute('data-card-info') || '';
+            info.textContent = text;   // textContent: attribute data, never HTML
+            info.hidden = !text;
+          }
           previewEl.hidden = false;
           if (DESKTOP.matches && event) {
             positionPreview(event);
@@ -1664,6 +1679,14 @@
           if (!row) return;
           showPreview(row, e);
         });
+
+        // Opening a row menu hides the preview immediately (toggle doesn't
+        // bubble — capture phase, same as the menu-positioning handler).
+        document.addEventListener('toggle', function (e) {
+          if (e.target.matches && e.target.matches('.deck-list-row .collection-row-kebab') && e.target.open) {
+            hidePreview();
+          }
+        }, true);
 
         document.addEventListener('mousemove', function (e) {
           if (!DESKTOP.matches) return;
@@ -1807,7 +1830,12 @@
           }
         } catch (e) { /* private mode / storage disabled — degrade to top */ }
         document.addEventListener('submit', function (e) {
-          if (!e.target.matches('.collection-search-form, .deck-add-form')) return;
+          // Row-menu actions (Move to Considering, Mark as Commander, Remove,
+          // tags, move-to-location) all 303 back to this page — without a saved
+          // position the user lands at the top of a long deck every time
+          // (reported for Move to Considering, applies to all of them).
+          if (!e.target.matches('.collection-search-form, .deck-add-form, '
+              + '.collection-row-kebab-body form, .card-actions-body form')) return;
           try { sessionStorage.setItem(KEY, String(window.scrollY)); } catch (e2) {}
         });
       })();

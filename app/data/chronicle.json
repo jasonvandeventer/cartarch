@@ -1,5 +1,12 @@
 [
   {
+    "version": "4.13.2",
+    "date": "2026-08-04",
+    "added": [
+      "Four pieces of playgroup feedback from the board, all shipped together. The deck builder's card popup now carries a footer with the printing and price — the detail the popup always promised. The row-actions menu no longer hides under that popup (the reported 'dropdown doesn't work on single-printing cards' — it was actually the card image drawing over the open menu on any row). Moving a card to Considering — and every other row-menu action — now returns you to the same place on the page instead of dumping you at the top. And in live games, the command zone shows every card in it like a battlefield zone, scrolling if needed, instead of hiding behind a Browse button."
+    ]
+  },
+  {
     "version": "4.13.1",
     "date": "2026-08-04",
     "added": [

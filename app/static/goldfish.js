@@ -919,6 +919,21 @@
   function renderPile(zoneKey, list) {
     const pile = document.getElementById("gf-pile-" + zoneKey);
     pile.innerHTML = "";
+    // Command zone shows EVERY card (playgroup request, Aug 2026): unlike
+    // graveyard/exile it holds a handful of always-relevant cards (commander,
+    // partner, background), so it renders like a battlefield zone — all cards,
+    // scrolling if needed — and drops the Browse button as redundant. Each
+    // card element keeps the pile context menu (cast / move / etc.).
+    if (zoneKey === "command" && list.length > 0) {
+      pile.classList.add("gf-pile-show-all");
+      for (const inst of list) {
+        const el = buildCardEl(inst, zoneKey);
+        el.classList.add("gf-pile-top"); // same context-menu hook as a pile top
+        pile.appendChild(el);
+      }
+      return;
+    }
+    pile.classList.remove("gf-pile-show-all");
     if (list.length === 0) {
       const empty = document.createElement("div");
       empty.className = "gf-pile-empty";

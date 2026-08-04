@@ -7167,6 +7167,13 @@ table.dmtx .dmtx-rowhead {
   width: 100%;
   height: auto;
 }
+.deck-list-image-preview-info {
+  padding: 0.35rem 0.6rem;
+  font-size: 0.8rem;
+  color: var(--muted, #b8a88a);
+  background: rgb(0 0 0 / 85%);
+  text-align: center;
+}
 @media (max-width: 768px) {
   .deck-list-image-preview {
     width: min(80vw, 320px);
@@ -7247,6 +7254,9 @@ table.dmtx .dmtx-rowhead {
   font-size: 0.85rem;
   max-height: 70vh;
   overflow-y: auto;
+  /* Above the hover preview (z 1400): an open menu must never be overdrawn
+     by the card-image tooltip. */
+  z-index: 1450;
   /* #145 — the rows live in a CSS multi-column container (.deck-list-rows),
      where a position:absolute popover has a broken containing block in
      Chromium (`position:relative` on the kebab does NOT establish it, so the
@@ -13616,6 +13626,14 @@ table.dmtx .dmtx-rowhead {
   color: var(--muted);
 }
 .gf-pile-browse { margin-top: 0.25rem; }
+/* Command zone shows all cards (no pile, no Browse): scroll when they
+   outgrow the rail instead of hiding behind a modal. */
+.gf-pile.gf-pile-show-all {
+  justify-content: flex-start;
+  overflow-y: auto;
+  max-height: 60vh;
+  scrollbar-width: thin;
+}
 
 .gf-card-back {
   width: 100px;
@@ -16118,6 +16136,15 @@ body.cmp-lobby-body { height: auto; min-height: 100dvh; overflow-y: auto; }
   max-width: 40vw;
   border-radius: 4.75% / 3.5%; /* MTG card corner ratio */
   box-shadow: 0 8px 24px rgb(0 0 0 / 55%);
+}
+.card-hover-preview-footer {
+  margin-top: 2px;
+  padding: 0.3rem 0.6rem;
+  font-size: 0.8rem;
+  color: var(--muted, #b8a88a);
+  background: rgb(0 0 0 / 85%);
+  border-radius: 5px;
+  text-align: center;
 }
 
 /* #178 — play-profile editor on the deck page.

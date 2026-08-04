@@ -205,6 +205,7 @@ onerror="this.onerror=null; this.src='{{ scryfall_image_fallback(scryfall_id, si
            {% if item.card.image_url and item.card.scryfall_id %}
            data-card-image="{{ mirror_image_url(item.card.scryfall_id, 'large') }}"
            data-card-image-alt="{{ scryfall_image_fallback(item.card.scryfall_id, 'large') }}"
+           data-card-info="{{ (item.card.set_code or '?')|upper }} #{{ item.card.collector_number or '?' }} · ${{ '%.2f'|format(item.effective_price or 0) }}{% if item.is_proxy %} (proxy){% endif %}"
            {% endif %}>
     <div class="inventory-card-media">
       {# Guard on BOTH: the mirror src is built from scryfall_id, so a card-like
