@@ -85,12 +85,40 @@
               <option value="{{ loc.id }}">{{ loc.name }} ({{ loc.type }})</option>
             {% endfor %}
           </select>
-          <label class="muted" style="font-size:0.85rem"><input type="checkbox" name="include_proxies" value="1"> Include proxies (listed at $0)</label>
-          <button type="submit" class="btn-like">Add everything from this location</button>
+          <button type="submit" class="btn-like">Mirror this location</button>
+          <p class="muted" style="font-size:0.8rem;margin:0">
+            Mirrored locations stay in step with the box: a card you file there appears
+            here, and a card you move out disappears. Hand-picked cards are unaffected.
+          </p>
         </form>
       {% endif %}
     </div>
   </section>
+
+  {# ── #135 — mirrored locations. Listed separately from the cards because the
+     unit you manage is the SOURCE, not each card it contributes. #}
+  {% if location_sources %}
+    <section class="panel">
+      <h3 class="panel-title">Mirrored locations</h3>
+      <p class="muted">
+        Every card in these stays in this Showcase automatically. Stop mirroring and
+        its cards leave at once — nothing was copied, so nothing is left behind.
+      </p>
+      <ul class="plain-list">
+        {% for src in location_sources %}
+          <li style="display:flex;align-items:center;gap:0.6rem;flex-wrap:wrap">
+            <strong>{{ src.location.name }}</strong>
+            <span class="muted">{{ src.location.type }} · {{ src.row_count }} card{{ '' if src.row_count == 1 else 's' }}</span>
+            <form method="post" action="/showcase/{{ showcase.id }}/remove-location" style="display:flex">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+              <input type="hidden" name="location_id" value="{{ src.location.id }}">
+              <button type="submit" class="ghost-button btn">Stop mirroring</button>
+            </form>
+          </li>
+        {% endfor %}
+      </ul>
+    </section>
+  {% endif %}
 
   {# ── Items ── #}
   <section class="panel">

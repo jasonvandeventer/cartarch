@@ -1461,6 +1461,13 @@ class Showcase(Base):
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utc_now, nullable=False)
 
+    # #135 — mirrored location sources. ORM-level cascade (Python-side), which
+    # is what actually fires: the project runs SQLite with PRAGMA foreign_keys
+    # OFF, so the DB-level CASCADE is Postgres defence-in-depth. Covers both
+    # ORM-delete paths at once — delete_showcase and admin delete_user.
+    location_sources: Mapped[list[ShowcaseLocationSource]] = relationship(
+        cascade="all, delete-orphan"
+    )
     items: Mapped[list[ShowcaseItem]] = relationship(
         back_populates="showcase", cascade="all, delete-orphan"
     )
@@ -1469,6 +1476,49 @@ class Showcase(Base):
     # will copy column users.id to column showcases.user_id, which
     # conflicts with relationship(s)" SAWarning at mapper-configure.
     user: Mapped[User] = relationship(back_populates="showcases")
+
+
+class ShowcaseLocationSource(Base):
+    """#135 — a StorageLocation a Showcase MIRRORS live.
+
+    **The structural distinction is the whole point of the locked design
+    (2026-06-14, Cluster C).** Curated-vs-mirrored lives in *different tables*
+    rather than a flag that every mutation site must remember to set correctly —
+    which removes the recon-Q9 root cause (a ShowcaseItem carries no provenance,
+    so nothing can tell a snapshot from a hand-pick) **by construction** instead
+    of patching one face of it.
+
+    Mirrored membership is COMPUTED at read time, so it can never be stale,
+    never orphaned, and needs no sync hooks:
+
+    * a card entering a sourced location appears — no hook;
+    * a card MOVED out disappears — no hook. This is the asymmetry that made the
+      original bug report. A move never removed a curated item (the item keys on
+      ``inventory_row_id``, which survives a move), so "removing it from the box
+      dropped it from the showcase" was only ever true when the row was DELETED
+      or merged away.
+
+    ``ShowcaseItem`` is kept for hand-curated single cards and is unchanged. On
+    cutover every existing ShowcaseItem is treated as **curated**: they carry no
+    provenance, so a snapshot cannot be told from a hand-pick, and guessing
+    would silently convert someone's deliberate picks into a live mirror. They
+    render exactly as they do today; a user who wants live behaviour adds the
+    location as a source.
+    """
+
+    __tablename__ = "showcase_location_sources"
+    __table_args__ = (
+        UniqueConstraint("showcase_id", "storage_location_id", name="uq_showcase_location_sources"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    showcase_id: Mapped[int] = mapped_column(
+        ForeignKey("showcases.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    storage_location_id: Mapped[int] = mapped_column(
+        ForeignKey("storage_locations.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    added_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utc_now)
 
 
 class ShowcaseItem(Base):

@@ -470,6 +470,15 @@ def delete_location(
                 "Cannot delete a location that still contains cards. Move or remove them first."
             )
 
+    # #135 — a showcase mirroring this location loses the source with it. Done
+    # EXPLICITLY: SQLite runs FKs OFF, so the DB CASCADE is Postgres
+    # defence-in-depth, and a dangling source would silently mirror nothing.
+    from app.models import ShowcaseLocationSource
+
+    session.query(ShowcaseLocationSource).filter(
+        ShowcaseLocationSource.storage_location_id == location_id
+    ).delete(synchronize_session=False)
+
     session.delete(location)
     session.commit()
 

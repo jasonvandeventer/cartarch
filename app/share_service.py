@@ -43,6 +43,7 @@ row goes, with the defensive read-skip in
 
 from __future__ import annotations
 
+from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, contains_eager, joinedload
 
@@ -54,6 +55,8 @@ from app.models import (
     Share,
     Showcase,
     ShowcaseItem,
+    ShowcaseLocationSource,
+    StorageLocation,
     User,
 )
 from app.pricing import effective_price
@@ -291,6 +294,175 @@ def _query_showcase_items(session: Session, showcase_id: int, search: str = ""):
     return q.all()
 
 
+def list_location_sources(session: Session, showcase_id: int) -> list[ShowcaseLocationSource]:
+    """The locations this showcase mirrors live."""
+    return (
+        session.query(ShowcaseLocationSource)
+        .filter(ShowcaseLocationSource.showcase_id == showcase_id)
+        .order_by(ShowcaseLocationSource.added_at.asc())
+        .all()
+    )
+
+
+def add_location_source(
+    session: Session, user_id: int, showcase_id: int, location_id: int
+) -> ShowcaseLocationSource | None:
+    """Mirror a location into a showcase. Idempotent; ownership-checked on BOTH sides.
+
+    Both halves matter: the showcase must be the caller's, and so must the
+    location — otherwise a forged id would mirror somebody else's box into a
+    showcase the caller shares to a playgroup, which is a disclosure with extra
+    steps.
+
+    A DECK location is refused. A deck is already publishable on its own terms
+    (``Deck.share_token``), and mirroring one here would route deck contents
+    through a surface whose privacy rules were written for loose inventory.
+    """
+    showcase = get_showcase(session, user_id, showcase_id)
+    if showcase is None:
+        return None
+    location = (
+        session.query(StorageLocation)
+        .filter(StorageLocation.id == location_id, StorageLocation.user_id == user_id)
+        .first()
+    )
+    if location is None or location.type in ("deck", "considering"):
+        return None
+    existing = (
+        session.query(ShowcaseLocationSource)
+        .filter(
+            ShowcaseLocationSource.showcase_id == showcase_id,
+            ShowcaseLocationSource.storage_location_id == location_id,
+        )
+        .first()
+    )
+    if existing:
+        return existing
+    row = ShowcaseLocationSource(showcase_id=showcase_id, storage_location_id=location_id)
+    session.add(row)
+    session.commit()
+    return row
+
+
+def remove_location_source(
+    session: Session, user_id: int, showcase_id: int, location_id: int
+) -> bool:
+    """Stop mirroring a location. The cards leave the showcase immediately —
+    they were never stored, only computed."""
+    if get_showcase(session, user_id, showcase_id) is None:
+        return False
+    deleted = (
+        session.query(ShowcaseLocationSource)
+        .filter(
+            ShowcaseLocationSource.showcase_id == showcase_id,
+            ShowcaseLocationSource.storage_location_id == location_id,
+        )
+        .delete(synchronize_session=False)
+    )
+    session.commit()
+    return bool(deleted)
+
+
+def location_source_row_count(session: Session, source: ShowcaseLocationSource) -> int:
+    """How many placed rows a mirrored location currently contributes.
+
+    Counted live for the same reason membership is computed live: a stored count
+    is exactly the drift #135 removes. Mirrors ``resolve_showcase_rows``'s
+    predicate — placed, non-zero, brew placeholders excluded — so the number the
+    page shows is the number the showcase actually gains.
+    """
+    from app.inventory_service import brew_placeholder_exclusion
+
+    showcase = session.query(Showcase).filter(Showcase.id == source.showcase_id).first()
+    if showcase is None:
+        return 0
+    return (
+        session.query(func.count(InventoryRow.id))
+        .filter(
+            InventoryRow.storage_location_id == source.storage_location_id,
+            InventoryRow.user_id == showcase.user_id,
+            InventoryRow.is_pending.is_(False),
+            InventoryRow.quantity > 0,
+            brew_placeholder_exclusion(showcase.user_id),
+        )
+        .scalar()
+        or 0
+    )
+
+
+def resolve_showcase_rows(session: Session, showcase_id: int, search: str = "") -> list[dict]:
+    """THE membership answer for a showcase — curated items UNION mirrored rows.
+
+    **One resolver, consumed by BOTH the owner view and the sanitized share
+    projection**, because those are exactly the two surfaces that must never
+    disagree about what is in a showcase. Returns dicts of
+    ``{row, item, offered, added_at, mirrored}``; ``item`` is None for a row
+    that is only mirrored.
+
+    Deduped by ``inventory_row_id`` — both representations resolve to an
+    InventoryRow, so the dedup is exact rather than heuristic. **A row that is
+    both curated and mirrored resolves to the MIRROR** (locked design): the
+    mirror shows the live ``row.quantity``, and the point of adding a location
+    is that it stops being a hand-managed number.
+
+    Mirrored membership is PLACED rows only (``is_pending`` false) and excludes
+    brew placeholders, matching ``add_rows_to_showcase``'s existing guards — a
+    card you do not own must not appear in a showcase merely because a brew deck
+    put a placeholder in a box you happen to mirror.
+    """
+    from app.inventory_service import apply_collection_search_filters, brew_placeholder_exclusion
+
+    by_row: dict[int, dict] = {}
+
+    for it in _query_showcase_items(session, showcase_id, search):
+        inv = it.inventory_row
+        if inv is None or inv.card is None:
+            continue
+        by_row[inv.id] = {
+            "row": inv,
+            "item": it,
+            "offered": it.quantity_offered,
+            "added_at": it.added_at,
+            "mirrored": False,
+        }
+
+    sources = list_location_sources(session, showcase_id)
+    if sources:
+        loc_ids = [s.storage_location_id for s in sources]
+        added_by_loc = {s.storage_location_id: s.added_at for s in sources}
+        showcase = session.query(Showcase).filter(Showcase.id == showcase_id).first()
+        q = (
+            session.query(InventoryRow)
+            .join(InventoryRow.card)
+            .options(contains_eager(InventoryRow.card))
+            .filter(
+                InventoryRow.storage_location_id.in_(loc_ids),
+                InventoryRow.is_pending.is_(False),
+                InventoryRow.quantity > 0,
+            )
+        )
+        if showcase is not None:
+            q = q.filter(
+                InventoryRow.user_id == showcase.user_id,
+                brew_placeholder_exclusion(showcase.user_id),
+            )
+        if search and search.strip():
+            q = apply_collection_search_filters(q, search)
+        for inv in q.all():
+            if inv.card is None:
+                continue
+            # Mirror WINS over a curated duplicate — see the docstring.
+            by_row[inv.id] = {
+                "row": inv,
+                "item": by_row.get(inv.id, {}).get("item"),
+                "offered": inv.quantity,
+                "added_at": added_by_loc.get(inv.storage_location_id),
+                "mirrored": True,
+            }
+
+    return list(by_row.values())
+
+
 def get_showcase_with_items(
     session: Session,
     user_id: int,
@@ -318,15 +490,19 @@ def get_showcase_with_items(
     showcase = get_showcase(session, user_id, showcase_id)
     if showcase is None:
         return None
-    items_q = _query_showcase_items(session, showcase.id, search)
+    # #135 — membership comes from the ONE resolver (curated ∪ mirrored), so the
+    # owner's page and the sanitized share view can never disagree about what is
+    # in a showcase.
+    resolved = resolve_showcase_rows(session, showcase.id, search)
     items: list[dict] = []
     total_value = 0.0
-    for it in items_q:
-        inv = it.inventory_row
+    for entry in resolved:
+        inv = entry["row"]
+        it = entry["item"]
         if inv is None or inv.card is None:
             # Dangling FK — defense in depth; §9 cleanup should have caught it.
             continue
-        available = min(it.quantity_offered, inv.quantity)
+        available = min(entry["offered"], inv.quantity)
         # Proxies carry $0 market value in Showcases/shares/trades (a shared
         # proxy must never read as the real card's price — trust decision,
         # ADR proxy-valuation-2026-06-12). is_proxy stays True for the badge.
@@ -335,19 +511,25 @@ def get_showcase_with_items(
         total_value += value
         items.append(
             {
-                "id": it.id,
-                "showcase_id": it.showcase_id,
+                # A mirrored-only row has NO ShowcaseItem, so no item id and no
+                # per-item controls — it is removed by dropping the location
+                # source, not by unpicking the card.
+                "id": it.id if it is not None else None,
+                "showcase_id": showcase.id,
                 "inventory_row_id": inv.id,
-                "quantity_offered": it.quantity_offered,
+                "quantity_offered": entry["offered"],
                 "available": available,
                 "effective_price": price,
                 "value": value,
-                "notes": it.notes,  # sharer-private; only on the OWN management view
+                # sharer-private; only on the OWN management view. None when the
+                # row is mirrored rather than curated.
+                "notes": it.notes if it is not None else None,
                 "card": inv.card,
                 "finish": inv.finish,
                 "language": inv.language or "en",
                 "is_proxy": bool(inv.is_proxy),
-                "added_at": it.added_at,
+                "added_at": entry["added_at"],
+                "mirrored": entry["mirrored"],
             }
         )
     # v3.36.11 — shared SORT control. The query yields added_at desc; re-sort the
@@ -824,10 +1006,15 @@ def build_share_display_items(
     render time (dangling FK — should be impossible after §9
     cleanup, defense in depth) are silently skipped from the list.
     """
-    items_q = _query_showcase_items(session, showcase.id, search)
+    # #135 — SAME resolver as the owner view. A mirrored row reaches this loop as
+    # an ordinary InventoryRow and goes through the identical projection below,
+    # so mirroring cannot widen what is exposed: a row with no ShowcaseItem has
+    # no ShowcaseItem.notes to leak in the first place.
+    resolved = resolve_showcase_rows(session, showcase.id, search)
     display: list[dict] = []
-    for it in items_q:
-        inv = it.inventory_row
+    for entry in resolved:
+        it = entry["item"]
+        inv = entry["row"]
         if inv is None:
             continue
         card = inv.card
@@ -842,13 +1029,14 @@ def build_share_display_items(
         # wrapper.
         card_proj = _ReadOnlyCardProjection(card)
         # Available — the only InventoryRow quantity surfaced.
-        available = max(0, min(it.quantity_offered, inv.quantity))
+        available = max(0, min(entry["offered"], inv.quantity))
         # Proxies carry $0 in the shared view (ADR proxy-valuation-2026-06-12).
         price = 0.0 if inv.is_proxy else (effective_price(card, inv.finish) or 0.0)
         total = price * available
         display.append(
             {
-                "id": it.id,  # ShowcaseItem id — surface-internal only
+                # ShowcaseItem id — surface-internal only; None when mirrored.
+                "id": it.id if it is not None else None,
                 "card": card_proj,
                 "finish": inv.finish,
                 "language": inv.language or "en",
@@ -862,7 +1050,7 @@ def build_share_display_items(
                 # v3.36.11 — ShowcaseItem add-time, for the shared SORT control's
                 # "Date Added" key only. NOT rendered (not a Card/InventoryRow
                 # leak field, not in the §8 forbidden list) — sort input only.
-                "added_at": it.added_at,
+                "added_at": entry["added_at"],
                 # Deliberately NOT set: drawer_label, slot, role,
                 # is_pending, notes, tags, storage_location_id,
                 # from_drawer, from_slot, created_at, updated_at,

@@ -1,5 +1,17 @@
 [
   {
+    "version": "4.12.53",
+    "date": "2026-08-04",
+    "added": [
+      "A Showcase can now mirror a storage location instead of copying it. Point one at your trade box and it keeps step with the box on its own: file a card there and it appears, take a card out and it goes, with nothing to remember and nothing to re-run. Cards you picked by hand still work exactly as before and are untouched by any of this — the two live side by side, and a card that is both shows once. Stop mirroring and those cards leave immediately, because they were never copied in, only looked up."
+    ],
+    "refined": [
+      "Adding a whole location to a Showcase used to take a snapshot, which quietly went out of date in both directions: a card added to the box never joined, and a card moved out never left. That button now sets up a live mirror instead."
+    ],
+    "resolved": [],
+    "archivist_note": "The original complaint was that taking a card out of a box did not take it out of the Showcase, and the interesting part is that the complaint was half wrong in a way that mattered. Removing the card had never been the trigger; destroying it had. A Showcase remembered a specific copy of a card and had no idea where that copy lived, so moving it changed nothing and deleting it changed everything — which is exactly the sort of behaviour that gets described as intermittent by the people living with it. The design that was agreed for this a while back put curated and mirrored cards in separate tables rather than marking them with a flag, on the grounds that a flag is something code has to remember to set and a table is something it cannot forget. That has proved its worth already: the mirrored cards needed no new privacy rules at all, because a mirrored card has no hand-written note attached to it to leak."
+  },
+  {
     "version": "4.12.52",
     "date": "2026-08-04",
     "added": [],

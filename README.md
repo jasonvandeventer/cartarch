@@ -2,7 +2,7 @@
 
 Self-hosted web application for managing a physical Magic: The Gathering collection. (Identifies as **Cartarch** in user-facing UI as of v3.27.6; the in-repo project identifier was aligned to `cartarch` app-side on 2026-07-06. Some infrastructure names may still carry the old identifier pending the full rename near actual public launch.)
 
-**Current version: v4.12.52** · [Platform repo](https://github.com/jasonvandeventer/vanfreckle-platform)
+**Current version: v4.12.53** · [Platform repo](https://github.com/jasonvandeventer/vanfreckle-platform)
 
 ---
 
@@ -179,6 +179,7 @@ See [docs/screenshots/](docs/screenshots/) for capture guidelines and additional
 ### Playgroups, sharing & trading
 
 - **Playgroups** are the social unit: join by code, and membership is what scopes the people picker, shared games, shared showcases and shared wishlists. A user belongs to many
+- **Showcases mirror a location live** — point one at your trade box and it stays in step: file a card there and it appears, move one out and it goes. No snapshot, no sync, nothing to re-run. Hand-picked cards coexist with mirrored ones and a card in both shows once; stop mirroring and its cards leave at once, because nothing was ever copied
 - **Showcases** — curate a subset of your inventory (a whole location, or the whole collection) and expose it read-only to one playgroup. A showcase item *references* an inventory row rather than copying it, so quantities and prices stay live. The read-only view is a sanitised projection: no notes, no storage locations, no ownership internals
 - **Wishlist sharing**, two ways and both names-only: an unguessable public link for anyone, or shared to a playgroup so co-members see it alongside theirs. Prices, targets and ownership counts are deliberately hidden — it reads as a gift registry. A logged-in viewer additionally sees which of the cards *they* already own
 - **Trades** are recorded, not brokered: propose from a co-member's showcase or from their wishlist, pick cards from both sides, and the running balance totals each side live. Proposing from a wishlist seeds the *offered* side, so there is no such thing as a one-sided gift trade. Cards already offered to someone show a `[pending]` badge on their wishlist — aggregate only, never who proposed it

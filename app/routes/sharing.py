@@ -129,6 +129,20 @@ def showcase_page(
     from app.location_service import list_locations
 
     locations = list_locations(session, user_id=current_user.id)
+    # #135 — mirrored location sources, with a live count of what each
+    # contributes. The count is computed here rather than stored: a stored one
+    # is the drift this feature exists to remove.
+    loc_by_id = {loc.id: loc for loc in locations}
+    location_sources = []
+    for src in share_service.list_location_sources(session, showcase_id):
+        loc = loc_by_id.get(src.storage_location_id)
+        if loc is None:
+            # The location is gone; delete_location drops its sources, so this is
+            # defence in depth rather than an expected state.
+            continue
+        location_sources.append(
+            {"location": loc, "row_count": share_service.location_source_row_count(session, src)}
+        )
     error = request.query_params.get("error")
     success = request.query_params.get("success")
     return render(
@@ -141,6 +155,7 @@ def showcase_page(
             "items": data["items"],
             "total_value": data["total_value"],
             "locations": locations,
+            "location_sources": location_sources,
             "search": search,
             "sort": sort,
             "direction": direction,
@@ -273,20 +288,42 @@ def showcase_add_location(
     current_user: User = Depends(get_current_user),
     _: None = CsrfRequired,
 ):
-    """v3.31.0 — bulk-add every placed row in one StorageLocation. Proxies
-    skipped unless ``include_proxies`` is ticked (ADR proxy-valuation-2026-06-12)."""
-    result = share_service.add_rows_to_showcase(
-        session,
-        current_user.id,
-        showcase_id,
-        location_id=location_id,
-        include_proxies=include_proxies,
-    )
-    if result is None:
+    """#135 — MIRROR a location live, rather than snapshotting it.
+
+    This route used to enumerate the location's rows and insert a ShowcaseItem
+    for each — a snapshot that then drifted: a card added to the box never
+    joined, and a card MOVED out never left (the item keys on
+    ``inventory_row_id``, which survives a move). Membership is now computed at
+    read time from the source, so both directions are live and there is nothing
+    to keep in sync.
+
+    ``include_proxies`` is accepted and ignored: mirroring reflects what is in
+    the box, and a proxy sitting in a mirrored location is part of what is
+    there. Proxies already carry $0 in every shared view
+    (ADR proxy-valuation-2026-06-12), and brew PLACEHOLDERS — cards the sharer
+    does not own — are excluded by the resolver.
+    """
+    source = share_service.add_location_source(session, current_user.id, showcase_id, location_id)
+    if source is None:
         return RedirectResponse(url="/showcases?error=not_found", status_code=303)
     return RedirectResponse(
-        url=f"/showcase/{showcase_id}?success=bulk_added&added={result['added']}",
-        status_code=303,
+        url=f"/showcase/{showcase_id}?success=location_mirrored", status_code=303
+    )
+
+
+@router.post("/showcase/{showcase_id}/remove-location")
+def showcase_remove_location(
+    showcase_id: int,
+    location_id: int = Form(...),
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+    _: None = CsrfRequired,
+):
+    """#135 — stop mirroring a location. Its cards leave the showcase at once;
+    they were never stored, only computed. Hand-picked items are untouched."""
+    share_service.remove_location_source(session, current_user.id, showcase_id, location_id)
+    return RedirectResponse(
+        url=f"/showcase/{showcase_id}?success=location_unmirrored", status_code=303
     )
 
 
