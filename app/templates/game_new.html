@@ -153,6 +153,15 @@
   <script>
 const users = {{ users_json | tojson }};
 const decksByUser = {{ decks_by_user_json | tojson }};
+// #166 — deck ids benched by the winning-deck-benched house rule, per playgroup.
+// Keyed by playgroup because bench state belongs to THAT playgroup's open
+// session and the playgroup is chosen on this same form.
+const benchedByPlaygroup = {{ benched_by_playgroup | tojson }};
+function benchedDeckIds() {
+  const sel = document.querySelector('select[name="playgroup_id"]');
+  const pg = sel ? sel.value : '';
+  return new Set(pg ? (benchedByPlaygroup[pg] || []) : []);
+}
 const currentUserId = {{ current_user_id }};
 let playerCount = 4;
 
@@ -173,9 +182,15 @@ function buildDeckOptions(seatUserId, selectedDeckId) {
     (decksByUser[uid] || []).forEach(d => borrowed.push(d));
   });
 
+  // A benched deck stays SELECTABLE and is labelled, never removed. The rule is
+  // the table's, not the app's, and a table that waives it must still be able to
+  // record what it actually played — a deck the picker hides is a game that gets
+  // logged wrong or not at all.
+  const benched = benchedDeckIds();
   const opt = d => {
     const sel = selectedDeckId === d.id ? ' selected' : '';
-    return `<option value="${d.id}"${sel}>${escHtml(d.name)}</option>`;
+    const mark = benched.has(d.id) ? ' — benched (won this session)' : '';
+    return `<option value="${d.id}"${sel}>${escHtml(d.name)}${mark}</option>`;
   };
 
   let html = own.map(opt).join('');
@@ -382,6 +397,19 @@ function escHtml(s) {
 }
 
 // Dismiss pending assign on outside click
+// #166 — bench state depends on which playgroup the game is linked to, and that
+// select sits on this same form, so changing it must redraw the deck options.
+// Applied at BOOT as well as on change: a browser restores a <select> value on
+// reload or back-navigation WITHOUT firing `change`, which would leave the
+// picker showing bench marks for the wrong playgroup (the documented
+// list-filter.js lesson).
+(function () {
+  const sel = document.querySelector('select[name="playgroup_id"]');
+  if (!sel) return;
+  sel.addEventListener('change', () => renderSeats());
+  document.addEventListener('DOMContentLoaded', () => renderSeats());
+})();
+
 document.addEventListener('click', e => {
   if (pendingAssignIdx !== null &&
       !e.target.closest('#seat-diagram') &&

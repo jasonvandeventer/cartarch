@@ -703,6 +703,28 @@ def delete_playgroup(
         {Game.playgroup_id: None},
         synchronize_session=False,
     )
+    # #166 — and its sessions with it. A session BELONGS to a playgroup, so it
+    # cannot outlive one. Done EXPLICITLY for the same reason the line above is:
+    # SQLite runs with FKs OFF, so neither the `game_sessions.playgroup_id`
+    # CASCADE nor the `games.session_id` SET NULL fires in production today —
+    # the DB clauses are Postgres defence-in-depth, not the mechanism.
+    #
+    # Null the games FIRST: deleting the sessions while games still reference
+    # them is exactly the autoflush-ordering trap #148 hit on Postgres, where a
+    # pending parent delete flushed while a child still pointed at it.
+    from app.models import GameSession
+
+    doomed = [
+        row.id
+        for row in session.query(GameSession.id).filter(GameSession.playgroup_id == playgroup_id)
+    ]
+    if doomed:
+        session.query(Game).filter(Game.session_id.in_(doomed)).update(
+            {Game.session_id: None}, synchronize_session=False
+        )
+        session.query(GameSession).filter(GameSession.id.in_(doomed)).delete(
+            synchronize_session=False
+        )
     session.delete(pg)
     session.commit()
     return True, None

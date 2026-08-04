@@ -124,6 +124,27 @@
     </div>
   </section>
 
+  {# ── Session (#166) — the evening in progress, and how to end it ────────── #}
+  {% if open_session %}
+    <section class="panel">
+      <h3 class="panel-title">Session in progress</h3>
+      <p class="muted">
+        Started {{ open_session.started_at.strftime('%A %d %B, %H:%M') }} —
+        {{ open_session_games }} game{{ '' if open_session_games == 1 else 's' }} so far.
+        New games linked to this playgroup join this session, and a deck that wins one
+        is marked benched in the deck picker for the rest of it.
+      </p>
+      <p class="muted">
+        Sessions end when someone says so, not on a timer — a session left open is a
+        smaller problem than one that closes mid-game.
+      </p>
+      <form action="/playgroups/{{ playgroup.id }}/end-session" method="post">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <button type="submit" class="ghost-button btn">End session</button>
+      </form>
+    </section>
+  {% endif %}
+
   {# ── Record (#152) — win-loss over games LINKED to this playgroup ────────── #}
   <section class="panel">
     <h3 class="panel-title">Record</h3>

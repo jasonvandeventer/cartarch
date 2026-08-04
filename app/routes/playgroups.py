@@ -145,6 +145,14 @@ def playgroups_detail(
     from app.watchlist_service import list_wishlist_shares_for_playgroup
 
     member_wishlists = list_wishlist_shares_for_playgroup(session, current_user.id, playgroup_id)
+    # #166 — the open session, so a member can END it. A session boundary is a
+    # SOCIAL fact, not a clock fact: no timeout can tell a midnight manual-log
+    # default from a real timestamp, and a session left open is a smaller problem
+    # than one that closes while people are still playing. So a person closes it.
+    from app import session_service
+
+    open_session = session_service.get_open_session(session, playgroup_id)
+    open_session_games = len(open_session.games) if open_session else 0
     return render(
         request,
         "playgroup_detail.html",
@@ -155,11 +163,42 @@ def playgroups_detail(
             "viewer_role": detail["viewer_role"],
             "members": detail["members"],
             "record": detail["record"],  # #152 — win-loss over games linked to this playgroup
+            "open_session": open_session,  # #166
+            "open_session_games": open_session_games,
             "shares": shares,
             "member_wishlists": member_wishlists,
             "error": error,
             "success": success,
         },
+    )
+
+
+@router.post("/{playgroup_id}/end-session")
+def playgroups_end_session(
+    playgroup_id: int,
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+    _: None = CsrfRequired,
+):
+    """#166 — close the playgroup's open session. Any MEMBER may, not just the owner.
+
+    Ending a session is a statement about an evening everyone at the table shared,
+    and the host is not reliably the person still awake at the end of it. Membership
+    is checked through ``get_playgroup_detail``, the same gate the page itself uses —
+    a non-member gets the page's own redirect rather than a distinct error that would
+    confirm the playgroup exists.
+    """
+    from app import session_service
+
+    if svc.get_playgroup_detail(session, playgroup_id, current_user.id) is None:
+        return RedirectResponse(url="/playgroups?error=not_a_member", status_code=303)
+    open_session = session_service.get_open_session(session, playgroup_id)
+    if open_session:
+        session_service.close_session(session, open_session)
+    # Idempotent: ending an already-ended session is a no-op, not an error. Two
+    # people tapping it as everyone packs up is the expected case.
+    return RedirectResponse(
+        url=f"/playgroups/{playgroup_id}?success=session_ended", status_code=303
     )
 
 

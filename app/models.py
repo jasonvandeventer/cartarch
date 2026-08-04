@@ -877,6 +877,16 @@ class Game(Base):
     playgroup_id: Mapped[int | None] = mapped_column(
         ForeignKey("playgroups.id", ondelete="SET NULL"), nullable=True, index=True
     )
+    # #166 — the play session (one evening at a table) this game belongs to.
+    # NULL is legitimate and permanent for a game with no playgroup: a session
+    # BELONGS to a playgroup, so an unaffiliated game has no session to join.
+    # Game 64 is exactly that case and is why the model is playgroup-scoped
+    # rather than date-scoped — see GameSession.
+    # ``SET NULL`` on delete: deleting a session must never take its games with
+    # it, the same posture ``playgroup_id`` takes one line above.
+    session_id: Mapped[int | None] = mapped_column(
+        ForeignKey("game_sessions.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     # Game-event history (issue: event log + analytics). Optional operator-picked
     # win condition captured at finalize (combat / commander / combo / attrition /
     # concession / other). NULL = not recorded.
@@ -902,6 +912,57 @@ class Game(Base):
     events: Mapped[list[GameEvent]] = relationship(
         back_populates="game", cascade="all, delete-orphan", order_by="GameEvent.id"
     )
+    session: Mapped[GameSession | None] = relationship(back_populates="games")
+
+
+class GameSession(Base):
+    """#166 — one evening at one table: an ordered set of games in a playgroup.
+
+    **A session belongs to a PLAYGROUP, not to a date, and that is the whole
+    design.** Sessions were previously derivable only by clustering `played_at`
+    dates, and that clustering is not merely imprecise — it is WRONG on real
+    data. 2026-06-28 holds four finalized games spanning 20.2 hours with a 16.2h
+    internal gap: game 64 is one member playing with non-members somewhere else
+    entirely (`playgroup_id` NULL, a `00:00:00` manual-log default stamp), and
+    the other three are a playgroup meetup from 16:10 to 20:09. Date grouping
+    folds a foreign game into a playgroup's session. Playgroup scoping excludes
+    it for free, because a game with no playgroup has no session to belong to.
+
+    **`ended_at` is set by a person, never by a clock.** A session boundary is a
+    social fact; no timeout can tell a midnight-default timestamp from a real
+    one, and a session left open is a smaller problem than one that closes while
+    people are still playing. NULL `ended_at` = the session is open, and there is
+    at most one open session per playgroup (enforced by a PARTIAL unique index,
+    the same posture as `uq_games_join_code` and `uq_decks_user_name`).
+
+    **There is deliberately NO benched-deck column.** The house rule — win a
+    game and that deck is out for the rest of the session — is fully COMPUTABLE
+    from the session's own games, and computing it cannot drift the way a stored
+    flag can. Un-finalize a game or correct a placement and a derived answer
+    follows; a stored one silently lies. See `session_service.benched_deck_ids`.
+    """
+
+    __tablename__ = "game_sessions"
+    __table_args__ = (
+        Index(
+            "uq_game_sessions_open_per_playgroup",
+            "playgroup_id",
+            unique=True,
+            sqlite_where=text("ended_at IS NULL"),
+            postgresql_where=text("ended_at IS NULL"),
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    playgroup_id: Mapped[int] = mapped_column(
+        ForeignKey("playgroups.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    started_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utc_now)
+    # NULL = open. Only a person closes a session (see the class docstring).
+    ended_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utc_now)
+
+    games: Mapped[list[Game]] = relationship(back_populates="session", order_by="Game.played_at")
 
 
 class GameSeat(Base):

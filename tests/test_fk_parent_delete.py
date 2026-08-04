@@ -847,6 +847,12 @@ KNOWN_NO_ENTRYPOINT = {
 }
 # Parents covered transitively by an existing entrypoint (not a direct parent here).
 TRANSITIVELY_COVERED = {
+    "game_sessions": "#166 — a session is never row-deleted by any user action: "
+    "ending one sets ended_at, it does not remove the row. Sessions die only with "
+    "their playgroup, and playgroup_service.delete_playgroup does it EXPLICITLY "
+    "(nulling games.session_id first, then deleting the sessions) because SQLite "
+    "runs FKs OFF — the game_sessions.playgroup_id CASCADE and games.session_id "
+    "SET NULL are Postgres defence-in-depth. Exercised by the playgroups entrypoint.",
     "showcase_items": "delete_showcase nulls trade_items.showcase_item_id via item cascade",
     "inventory_rows": "covered directly by delete_inventory_row",
 }

@@ -614,6 +614,20 @@ def set_game_playgroup(
         if is_member is None:
             return False
     game.playgroup_id = playgroup_id
+    # #166 — the playgroup link is what makes a session possible, so this is the
+    # seam that attaches one. Done HERE rather than in the create route because
+    # this is the shared mutator: it also covers a game linked to a playgroup
+    # after the fact, which the route could not.
+    #
+    # Clearing the link also clears the session — a session belongs to a
+    # playgroup, so a game that is no longer in one cannot still sit in that
+    # playgroup's evening.
+    from app import session_service
+
+    if playgroup_id is None:
+        game.session_id = None
+    else:
+        session_service.attach_game_to_session(session, game, commit=False)
     session.commit()
     return True
 

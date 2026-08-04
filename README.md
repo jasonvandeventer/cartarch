@@ -2,7 +2,7 @@
 
 Self-hosted web application for managing a physical Magic: The Gathering collection. (Identifies as **Cartarch** in user-facing UI as of v3.27.6; the in-repo project identifier was aligned to `cartarch` app-side on 2026-07-06. Some infrastructure names may still carry the old identifier pending the full rename near actual public launch.)
 
-**Current version: v4.12.48** · [Platform repo](https://github.com/jasonvandeventer/vanfreckle-platform)
+**Current version: v4.12.49** · [Platform repo](https://github.com/jasonvandeventer/vanfreckle-platform)
 
 ---
 
@@ -118,6 +118,12 @@ See [docs/screenshots/](docs/screenshots/) for capture guidelines and additional
 - **Brew mode** — a deck built from cards you may not own. Unowned cards become proxy rows inside the deck, so the list is complete while your collection totals stay honest; a buy-list splits what you have, what you're missing, and what you already own in another deck
 - **Collection-aware brew generator** at `/recommendations/commander` — pick an owned commander and it assembles a legal 100-card deck from cards you own, with a stated reason per card. Deterministic and entirely offline: every signal is a column already stored, so no external call happens on the request path
 - **Variant groups** link builds of the same deck that share one physical copy of many cards. Both builds render the full shared decklist with shared cards badged, without duplicating a single inventory row
+
+### Sessions and the benched-deck house rule
+
+- **A session is one evening at one table**, and it belongs to a **playgroup, not a date**. Two different meetups on the same day are two sessions; a game played outside the group is in neither. Sessions end when a member ends them, never on a timer
+- **Win a game and that deck is benched for the rest of the session** — the picker labels a benched deck rather than blocking it, because the rule belongs to the table, and a night it gets waived should still be recorded honestly. Bench state is computed from the games themselves, never stored, so correcting a mis-recorded result corrects the bench
+- **Decks carry a session record beside the game record** — sessions won over sessions played. The house rule caps game win rate structurally (a deck can win at most once per session, and the decks playing most games per night are the ones that keep losing), so for a deck that keeps winning the game figure is a floor rather than a measurement
 
 ### Play profiles
 

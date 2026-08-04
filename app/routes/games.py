@@ -150,10 +150,32 @@ def game_new_page(
     # lets every member view it (read-only). Only the user's own playgroups
     # are offered. Empty list → the template hides the picker.
     user_playgroups = playgroup_service.list_playgroups_for_user(session, current_user.id)
+    # #166 — the winning-deck-benched house rule, surfaced where the choice is
+    # made. Keyed by playgroup because bench state is a property of THAT
+    # playgroup's open session, and the playgroup is picked on this same form —
+    # a single flat list would mark a deck benched in a group it never played in.
+    #
+    # WARNS, never blocks (owner decision, recorded on #166): a hard block is
+    # faithful to the rule right up until the table waives it, and the app must
+    # not overrule the people at the table. A deck played while benched is
+    # recorded and readable back via session_service.bench_violations.
+    from app import session_service
+
+    benched_by_playgroup: dict[str, list[int]] = {}
+    for pg in user_playgroups:
+        # list_playgroups_for_user returns DICTS ({"playgroup": Playgroup, ...}),
+        # not Playgroup rows — the same shape the template reads as pg.playgroup.id.
+        pg_id = pg["playgroup"].id
+        open_sess = session_service.get_open_session(session, pg_id)
+        if open_sess:
+            ids = session_service.benched_deck_ids(session, open_sess.id)
+            if ids:
+                benched_by_playgroup[str(pg_id)] = sorted(ids)
     return render(
         request,
         "game_new.html",
         {
+            "benched_by_playgroup": benched_by_playgroup,
             "title": "New Game",
             "users_json": users_json,
             "decks_by_user_json": decks_by_user_json,
@@ -397,6 +419,12 @@ def manual_log_create(
         winner_index=winner_index,
         notes=notes[:500],
     )
+    # #166 — the manual log sets playgroup_id at CONSTRUCTION rather than through
+    # set_game_playgroup, so it does not pass the seam that attaches a session.
+    # Second call site, deliberately: two ways in existed before sessions did.
+    from app import session_service
+
+    session_service.attach_game_to_session(session, game)
     return RedirectResponse(f"/games/{game.id}", status_code=303)
 
 

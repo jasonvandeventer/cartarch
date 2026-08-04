@@ -20,7 +20,7 @@ from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse, RedirectResponse
 from sqlalchemy.orm import Session, joinedload
 
-from app import deck_service, sort_spec
+from app import deck_service, session_service, sort_spec
 from app.bracket_v2_service import (
     estimate_bracket_v2,
     gc_list_version,
@@ -160,6 +160,26 @@ def decks_page(
         # passed while the page rendered its empty state).
         deck.borrowed_games = stats.get("borrowed_games", 0)
         deck.last_played = stats.get("last_played")
+
+    # #166 — the SESSION-grained record, alongside the game-grained one rather
+    # than replacing it. Both are true and they answer different questions; the
+    # #156 lesson is that two surfaces quietly disagreeing is worse than either
+    # number alone, so neither is hidden.
+    #
+    # The house rule (win a game, that deck is benched for the rest of the
+    # evening) caps game-level win rate STRUCTURALLY: a deck can win at most once
+    # per session, and the decks playing the most games per session are the ones
+    # that keep losing. Raph and Mikey has won 5 of 5 sessions on 5 of 7 games —
+    # under the rule it could not have done better, and 71% is a floor rather
+    # than a measurement.
+    #
+    # Same key-by-key enumeration as above, and for the same reason.
+    session_stats = session_service.deck_session_stats(session, [d.id for d in decks])
+    for deck in decks:
+        s_stats = session_stats.get(deck.id, {})
+        deck.sessions_played = s_stats.get("sessions_played", 0)
+        deck.sessions_won = s_stats.get("sessions_won", 0)
+        deck.session_win_rate = s_stats.get("session_win_rate", 0)
 
     # issue #27 — variant-group share management surfaced in the deck-edit
     # popouts (decks.html, both the featured and per-row Edit forms). Gated on

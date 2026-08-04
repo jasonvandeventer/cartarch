@@ -127,6 +127,16 @@
                 {{ featured.borrowed_games }} lent out
               </div>
             {% endif %}
+            {# #166 — the session record, ALONGSIDE the game record, never instead
+               of it. The house rule caps game win rate structurally (a deck can
+               win at most once per session), so the game figure is a floor for a
+               deck that keeps winning. Both paths carry it, per the note above. #}
+            {% if featured.sessions_played | default(0) %}
+              <div class="decks-featured-record-last"
+                   title="Sessions won over sessions played. A deck that wins is benched for the rest of the session, so it can win at most one game per session — the game win rate is a floor, not a ceiling.">
+                {{ featured.sessions_won }} of {{ featured.sessions_played }} sessions won
+              </div>
+            {% endif %}
             {% if featured.last_played %}
               <div class="decks-featured-record-last">
                 Last played {{ featured.last_played | editorial_date }}
@@ -181,6 +191,16 @@
                   </div>
                 {% endif %}
               </div>
+              {% if deck.sessions_played | default(0) %}
+                <div class="decks-row-stat">
+                  <div class="decks-row-stat-l">Sessions</div>
+                  <div class="decks-row-stat-v">{{ deck.sessions_won }}/{{ deck.sessions_played }}</div>
+                  <div class="decks-row-stat-note muted"
+                       title="A deck that wins is benched for the rest of the session, so it can win at most one game per session. The game win rate is a floor.">
+                    {{ deck.session_win_rate }}% of sessions
+                  </div>
+                </div>
+              {% endif %}
               <div class="decks-row-stat">
                 <div class="decks-row-stat-l">Health</div>
                 <div class="decks-row-stat-v">

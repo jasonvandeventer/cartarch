@@ -1,5 +1,15 @@
 [
   {
+    "version": "4.12.49",
+    "date": "2026-08-04",
+    "added": [
+      "Cartarch now understands a play session — one evening at one table — and with it the house rule that a deck which wins is benched for the rest of the night. Decks gain a second record beside the usual one: sessions won out of sessions played. That matters because the rule quietly caps the old number. A deck can only win once a night, and the decks that play the most games in an evening are the ones that keep losing, so counting by game punishes exactly the decks it should reward. One deck in the playgroup has won every single session it has ever been played in; by games it reads 71%, which is not how well it did but as well as the rule allowed it to do. When you start a new game, a deck already benched that evening is labelled in the picker — labelled, not blocked, because the rule belongs to the table and a night the table waives it should still be recorded honestly. Sessions end when someone ends them, never on a timer."
+    ],
+    "refined": [],
+    "resolved": [],
+    "archivist_note": "The tempting way to find an evening in the records is to look at the calendar, and it would have worked five times out of six. The sixth is a Sunday in June with four games on it, three of them a night around one table and the fourth a member playing somewhere else entirely, filed at midnight because that is what a form does when nobody tells it a time. No rule about clocks can separate those two, and we tried before accepting it: a gap of sixteen hours inside one day is either two evenings or one very long one, and the timestamps cannot say which. What can say is who was there. So a session belongs to a group of people rather than to a date, and the foreign game simply has no session to join — not a gap in the data, just an honest answer about a game that was never part of that night. We also declined to store which decks are benched. It is a fact that follows from the games themselves, and a fact you write down separately is a fact that can start disagreeing with the thing it describes."
+  },
+  {
     "version": "4.12.48",
     "date": "2026-08-03",
     "added": [
