@@ -140,9 +140,14 @@
     {% endif %}
     {% if items %}
       <p class="muted">{{ items | length }} card{{ 's' if items | length != 1 else '' }}{{ ' match' if search else ' curated' }}. <em>Available</em> is the smaller of what you offered and what's currently in your inventory — it updates automatically when you sell or remove cards.</p>
-      <div class="showcase-items-grid">
+      <div class="showcase-items-grid" data-card-hover data-card-hover-target=".showcase-item">
         {% for item in items %}
-          <article class="showcase-item">
+          <article class="showcase-item"
+                   {% if item.card.image_url and item.card.scryfall_id %}
+                   data-card-image="{{ mirror_image_url(item.card.scryfall_id, 'large') }}"
+                   data-card-image-alt="{{ scryfall_image_fallback(item.card.scryfall_id, 'large') }}"
+                   data-card-info="{{ (item.card.set_code or '?')|upper }} #{{ item.card.collector_number or '?' }}"
+                   {% endif %}>
             <div class="showcase-item-art">
               {% if item.card.image_url %}
                 <img src="{{ mirror_image_url(item.card.scryfall_id) }}" {{ img_fallback(item.card.scryfall_id) }} alt="{{ item.card.name }}" loading="lazy">
@@ -208,4 +213,6 @@
   <section class="panel">
     <p class="muted">Ready to share? Head to the <a href="/shares">Shares</a> page to expose this Showcase to a playgroup, read-only.</p>
   </section>
+  {# Card hover zoom — shared #169 component. #}
+  <script src="/static/card-hover.js?v={{ static_v('card-hover.js') }}"></script>
 {% endblock %}

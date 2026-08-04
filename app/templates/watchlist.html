@@ -157,9 +157,14 @@
               <th></th>
             </tr>
           </thead>
-          <tbody>
+          <tbody data-card-hover data-card-hover-target="tr[data-card-image]">
             {% for item in items %}
               <tr data-filter-text="{{ item.display_name }}"
+                  {% if item.identity_mode == 'card' and item.card.image_url and item.card.scryfall_id %}
+                  data-card-image="{{ mirror_image_url(item.card.scryfall_id, 'large') }}"
+                  data-card-image-alt="{{ scryfall_image_fallback(item.card.scryfall_id, 'large') }}"
+                  data-card-info="{{ (item.card.set_code or '?')|upper }} #{{ item.card.collector_number or '?' }}"
+                  {% endif %}
                   data-colors="{{ item.filter_colors }}" data-types="{{ item.filter_types }}"
                   {% if item.target_met %}class="watchlist-row-target-met"{% endif %}>
                 <td>
@@ -348,4 +353,6 @@
       });
     })();
   </script>
+  {# Card hover zoom — shared #169 component. #}
+  <script src="/static/card-hover.js?v={{ static_v('card-hover.js') }}"></script>
 {% endblock %}

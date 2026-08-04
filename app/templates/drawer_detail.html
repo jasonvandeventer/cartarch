@@ -17,9 +17,14 @@
   </section>
   {% if items %}
     <section class="card-grid-section">
-      <div class="inventory-grid">
+      <div class="inventory-grid" data-card-hover data-card-hover-target=".inventory-card">
         {% for item in items %}
-          <article class="inventory-card inventory-card-compact">
+          <article class="inventory-card inventory-card-compact"
+                   {% if item.card.image_url and item.card.scryfall_id %}
+                   data-card-image="{{ mirror_image_url(item.card.scryfall_id, 'large') }}"
+                   data-card-image-alt="{{ scryfall_image_fallback(item.card.scryfall_id, 'large') }}"
+                   data-card-info="{{ (item.card.set_code or '?')|upper }} #{{ item.card.collector_number or '?' }}{% if item.card.price_usd %} · ${{ '%.2f'|format(item.card.price_usd) }}{% endif %}"
+                   {% endif %}>
             <div class="inventory-card-media">
               {% if item.card.image_url %}
                 <a href="/cards/{{ item.card.id }}">
@@ -60,4 +65,6 @@
       <p>No rows in this drawer.</p>
     </section>
   {% endif %}
+  {# Card hover zoom — shared #169 component. #}
+  <script src="/static/card-hover.js?v={{ static_v('card-hover.js') }}"></script>
 {% endblock %}

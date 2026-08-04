@@ -15,6 +15,10 @@ data-sort-price="{{ 0 if is_proxy else effective_price(card, finish) }}"
 data-sort-avail="{{ avail }}"
 {% set facets = card_filter_tokens(card) %}data-colors="{{ facets[0] }}" data-types="{{ facets[1] }}"
 data-filter-text="{{ card.name }}"
+{% if card.image_url and card.scryfall_id %}data-card-image="{{ mirror_image_url(card.scryfall_id, 'large') }}"
+data-card-image-alt="{{ scryfall_image_fallback(card.scryfall_id, 'large') }}"
+data-card-info="{{ (card.set_code or '?')|upper }} #{{ card.collector_number or '?' }}{% if not is_proxy and effective_price(card, finish) %} · ${{ '%.2f'|format(effective_price(card, finish)) }}{% elif is_proxy %} · proxy{% endif %}"
+{% endif %}
 {%- endmacro %}
 
 {# Per-card price in the picker. Same finish-aware effective_price the trade
@@ -151,7 +155,7 @@ data-filter-text="{{ card.name }}"
         <h3 class="panel-title">Their cards (requested)</h3>
         <p class="muted">Pick items from <strong>{{ pre_recipient.display_name or pre_recipient.username }}</strong>'s Showcase that's shared with <em>{{ pre_playgroup.name }}</em>. Toggle to add &mdash; quantities default to available, click to override.</p>
         {{ pick_tools('requested-grid') }}
-        <div class="trade-pick-grid" id="requested-grid">
+        <div class="trade-pick-grid" data-card-hover data-card-hover-target=".trade-pick-item" id="requested-grid">
           {% set seen_pre = [] %}
           {% for it in prefilled_requested %}
             <div class="trade-pick-item trade-pick-prefilled"
@@ -213,7 +217,7 @@ data-filter-text="{{ card.name }}"
         <p class="muted">Pick items from your own placed inventory to offer in exchange.</p>
         {% if options.proposer_inventory %}
           {{ pick_tools('offered-grid', with_location=true) }}
-          <div class="trade-pick-grid" id="offered-grid">
+          <div class="trade-pick-grid" data-card-hover data-card-hover-target=".trade-pick-item" id="offered-grid">
             {% for inv in options.proposer_inventory %}
               <div class="trade-pick-item{% if inv.inventory_row_id in prefilled_offered_row_ids %} trade-pick-prefilled{% endif %}"
                    data-inventory-row-id="{{ inv.inventory_row_id }}"
@@ -513,4 +517,6 @@ data-filter-text="{{ card.name }}"
       });
     })();
   </script>
+  {# Card hover zoom — shared #169 component. #}
+  <script src="/static/card-hover.js?v={{ static_v('card-hover.js') }}"></script>
 {% endblock %}

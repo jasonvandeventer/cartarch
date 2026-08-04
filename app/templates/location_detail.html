@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% from "_macros.html" import inventory_card, editorial_eyebrow, loc_type_label %}
 {% block content %}
+<div data-card-hover data-card-hover-target="label[data-card-image]">
   <section class="panel hero-panel compact-hero">
     <div class="hero-row">
       <div>
@@ -110,7 +111,12 @@
                             align-items: center;
                             gap: 0.4rem;
                             font-size: 0.875rem;
-                            cursor: pointer">
+                            cursor: pointer"
+                     {% if item.card.image_url and item.card.scryfall_id %}
+                     data-card-image="{{ mirror_image_url(item.card.scryfall_id, 'large') }}"
+                     data-card-image-alt="{{ scryfall_image_fallback(item.card.scryfall_id, 'large') }}"
+                     data-card-info="{{ (item.card.set_code or '?')|upper }} #{{ item.card.collector_number or '?' }}"
+                     {% endif %}>
                 <input type="checkbox" name="row_ids" value="{{ item.id }}" class="bulk-cb">
                 {{ item.card.name }}
                 {% if item.finish != 'normal' %}<span class="finish-badge">{{ item.finish }}</span>{% endif %}
@@ -221,4 +227,7 @@
       }
     </script>
   {% endif %}
+</div>
+  {# Card hover zoom — shared #169 component. #}
+  <script src="/static/card-hover.js?v={{ static_v('card-hover.js') }}"></script>
 {% endblock %}

@@ -100,9 +100,14 @@
                 <span class="pending-batch-date">{{ batch.date | editorial_date }}</span>
               {% endif %}
             </summary>
-            <div class="pending-list">
+            <div class="pending-list" data-card-hover data-card-hover-target=".pending-item">
               {% for item in batch.entries %}
                 <article class="pending-item unified-card-row cross-drawer"
+                         {% if item.card.image_url and item.card.scryfall_id %}
+                         data-card-image="{{ mirror_image_url(item.card.scryfall_id, 'large') }}"
+                         data-card-image-alt="{{ scryfall_image_fallback(item.card.scryfall_id, 'large') }}"
+                         data-card-info="{{ (item.card.set_code or '?')|upper }} #{{ item.card.collector_number or '?' }}{% if item.card.price_usd %} · ${{ '%.2f'|format(item.card.price_usd) }}{% endif %}"
+                         {% endif %}
                          id="pending-row-{{ item.id }}"
                          data-pending-group="batch-{{ batch.batch_id or 'manual' }}">
                   <div class="pending-thumb-wrap">
@@ -299,4 +304,6 @@
       });
     })();
   </script>
+  {# Card hover zoom — shared #169 component. #}
+  <script src="/static/card-hover.js?v={{ static_v('card-hover.js') }}"></script>
 {% endblock %}

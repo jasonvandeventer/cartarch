@@ -1,5 +1,12 @@
 [
   {
+    "version": "4.13.4",
+    "date": "2026-08-04",
+    "added": [
+      "The card hover zoom now works everywhere a card appears: Pending, the Wishlist, the Decklist Check's printings, the set browser, drawer and location contents, Showcases, the trade builder's pickers, and the printings list on every card page. Same preview everywhere — large image with the printing and price underneath. Surfaces that deliberately hide printing details from visitors, like public wishlists, stay as they are."
+    ]
+  },
+  {
     "version": "4.13.3",
     "date": "2026-08-04",
     "added": [

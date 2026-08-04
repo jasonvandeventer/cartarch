@@ -114,7 +114,7 @@
         <span>§ I · Printings</span>
         <span class="card-detail-panel-aux">{{ printings | length }} printings · {{ printings | selectattr('owned') | list | length }} owned</span>
       </h3>
-      <div class="card-detail-printings">
+      <div class="card-detail-printings" data-card-hover data-card-hover-target=".card-detail-printings-row[data-card-image]">
         <div class="card-detail-printings-row card-detail-printings-head">
           <span></span>
           <span>Set</span>
@@ -124,7 +124,12 @@
           <span></span>
         </div>
         {% for p in printings %}
-          <div class="card-detail-printings-row {% if p.is_current %}card-detail-printings-current{% endif %}">
+          <div class="card-detail-printings-row {% if p.is_current %}card-detail-printings-current{% endif %}"
+               {% if p.card.image_url and p.card.scryfall_id %}
+               data-card-image="{{ mirror_image_url(p.card.scryfall_id, 'large') }}"
+               data-card-image-alt="{{ scryfall_image_fallback(p.card.scryfall_id, 'large') }}"
+               data-card-info="{{ p.card.set_code|upper }} #{{ p.card.collector_number }}{% if p.card.price_usd %} · ${{ p.card.price_usd }}{% endif %}"
+               {% endif %}>
             <span class="card-detail-printings-ix">{{ ['i.', 'ii.', 'iii.', 'iv.', 'v.', 'vi.', 'vii.', 'viii.', 'ix.', 'x.'][loop.index0] if loop.index0 < 10 else loop.index ~ '.' }}</span>
             <span class="card-detail-printings-set">{{ p.card.set_code|upper }}</span>
             <span class="card-detail-printings-collector">
@@ -341,4 +346,6 @@
       <p class="muted">No inventory rows found.</p>
     {% endif %}
   </section>
+  {# Card hover zoom — shared #169 component. #}
+  <script src="/static/card-hover.js?v={{ static_v('card-hover.js') }}"></script>
 {% endblock %}

@@ -50,10 +50,11 @@
      via a batched scryfall_id → cards.id resolution. Cards never
      imported / never tokenized render without the link (no card_id =
      plain div). #}
-  <div class="card-grid">
+  <div class="card-grid" data-card-hover data-card-hover-target=".card-tile">
     {% for card in data.visible_cards %}
+      {% set _hover %}{% if card.image_url and card.scryfall_id %} data-card-image="{{ mirror_image_url(card.scryfall_id, 'large') }}" data-card-image-alt="{{ scryfall_image_fallback(card.scryfall_id, 'large') }}" data-card-info="#{{ card.collector_number }}{% if card.quantity_owned and card.quantity_owned > 0 %} · owned ×{{ card.quantity_owned }}{% else %} · missing{% endif %}"{% endif %}{% endset %}
       {% if card.card_id %}
-        <a class="card-tile card-tile-link" href="/cards/{{ card.card_id }}">
+        <a class="card-tile card-tile-link" href="/cards/{{ card.card_id }}"{{ _hover }}>
           {% if card.image_url %}<img src="{{ mirror_image_url(card.scryfall_id) }}" {{ img_fallback(card.scryfall_id) }} alt="{{ card.name }}" loading="lazy">{% endif %}
           <div class="card-name">{{ card.name }}</div>
           <div class="card-meta">
@@ -66,7 +67,7 @@
           </div>
         </a>
       {% else %}
-        <div class="card-tile">
+        <div class="card-tile"{{ _hover }}>
           {% if card.image_url %}<img src="{{ mirror_image_url(card.scryfall_id) }}" {{ img_fallback(card.scryfall_id) }} alt="{{ card.name }}" loading="lazy">{% endif %}
           <div class="card-name">{{ card.name }}</div>
           <div class="card-meta">
@@ -123,4 +124,6 @@
       </section>
     {% endif %}
   {% endif %}
+  {# Card hover zoom — shared #169 component. #}
+  <script src="/static/card-hover.js?v={{ static_v('card-hover.js') }}"></script>
 {% endblock %}
