@@ -772,6 +772,21 @@ def deck_detail_page(
             # which is the real condition (an empty deck has nothing to judge).
             deck_legality = check_deck_legality(session, deck, all_deck_rows)
 
+    # #178 — the play profile is how the deck wants to be PILOTED, so it is
+    # deliberately NOT gated on `all_deck_rows` the way the analytics block above
+    # is. A profile describes intent, not contents: a deck whose list nobody has
+    # typed in yet still has a plan, and the AI gauntlet pilots it from this.
+    play_profile = None
+    if deck:
+        _pp_row = deck_service.get_play_profile(session, deck.id)
+        if _pp_row:
+            play_profile = {
+                "profile": json.loads(_pp_row.profile_data),
+                "is_custom": _pp_row.is_custom,
+                "raw": _pp_row.profile_data,
+                "updated_at": _pp_row.updated_at,
+            }
+
     # #103 Phase B — hero bracket badge from the PERSISTED estimate only (the
     # request path never estimates; v3.27.9 invariant). Staleness = the deck's
     # current fingerprint differs from the one the daemon last evaluated.
@@ -922,6 +937,7 @@ def deck_detail_page(
             "health": health,
             "consistency": consistency,
             "deck_legality": deck_legality,
+            "play_profile": play_profile,
             "deck_record": deck_record,
             "goal_stats": deck_goal_stats(session, current_user.id, deck.id) if deck else [],
             "health_filter": health_filter if health_filter in _VALID_HEALTH_FILTERS else "",

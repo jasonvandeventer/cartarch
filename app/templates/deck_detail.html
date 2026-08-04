@@ -556,6 +556,83 @@
       {% endif %}
     </section>
   {% endif %}
+  {# #178 — the play profile: how this deck wants to be PILOTED, not how it was
+     built. Shown for any deck (not gated on card rows like the analytics panels)
+     because a plan exists independently of whether the list has been typed in.
+     The AI gauntlet pilots the deck from exactly this text, which is why a
+     medium-confidence profile is worth a pilot's attention. #}
+  {% if deck %}
+    <section class="panel play-profile-panel">
+      <h3 class="panel-title">
+        <span class="deck-detail-section-mark">§</span> How to pilot this deck
+        {% if play_profile %}
+          {% if play_profile.is_custom %}
+            <span class="pp-badge pp-badge-custom">yours</span>
+          {% elif play_profile.profile.confidence == 'high' %}
+            <span class="pp-badge pp-badge-high">pilot-stated</span>
+          {% else %}
+            <span class="pp-badge pp-badge-medium">inferred — unreviewed</span>
+          {% endif %}
+        {% endif %}
+      </h3>
+      {% if play_profile %}
+        {% if not play_profile.is_custom and play_profile.profile.confidence != 'high' %}
+          <p class="muted pp-nudge">
+            Cartarch guessed this from the decklist and nobody has checked it. The
+            simulated games that rate this deck are played from these notes, so
+            corrections here change what the ratings are worth.
+          </p>
+        {% endif %}
+        <p class="pp-role"><strong>Role:</strong> {{ play_profile.profile.role|default('—') }}</p>
+        {% for key, label in [('primary_plan', 'Primary plan'), ('secondary_plan', 'When it goes wrong'), ('hard_rules', 'Hard rules')] %}
+          {% set entries = play_profile.profile.get(key) or [] %}
+          {% if entries %}
+            <p class="pp-field-label">{{ label }}</p>
+            <ul class="pp-list">
+              {% for entry in entries %}<li>{{ entry }}</li>{% endfor %}
+            </ul>
+          {% endif %}
+        {% endfor %}
+      {% else %}
+        <p class="muted">No profile yet. Write one and the deck simulator will pilot this deck the way you do.</p>
+      {% endif %}
+      <details class="pp-editor-details">
+        <summary>{% if play_profile %}Edit{% else %}Write{% endif %} the profile</summary>
+        <form class="pp-editor stack-form"
+              data-deck-id="{{ deck.id }}"
+              data-original="{{ (play_profile.raw if play_profile else '{}')|e }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <label>Role
+            <input type="text" name="role" maxlength="64"
+                   value="{{ play_profile.profile.role|default('') if play_profile else '' }}"
+                   placeholder="e.g. value_tempo, voltron_politics">
+          </label>
+          {# One entry per LINE. A textarea-of-lines is what makes the duplicated
+             second primary_plan entry visible enough to delete — which 34 of the
+             38 seeded profiles need. #}
+          {% for key, label, hint in [
+               ('primary_plan', 'Primary plan', 'What this deck is actually trying to do. One idea per line.'),
+               ('secondary_plan', 'When it goes wrong', 'One per line.'),
+               ('hard_rules', 'Hard rules', 'Protect / expend freely / tutor priority / interaction priority. One per line.')] %}
+            <label>{{ label }}
+              <span class="pp-hint">{{ hint }}</span>
+              <textarea name="{{ key }}" rows="4">{{ ((play_profile.profile.get(key) or []) if play_profile else [])|join('\n') }}</textarea>
+            </label>
+          {% endfor %}
+          <label>Confidence
+            <select name="confidence">
+              <option value="high" selected>High — a pilot wrote this</option>
+              <option value="medium">Medium — still a guess</option>
+            </select>
+          </label>
+          <div class="pp-editor-actions">
+            <button type="submit">Save profile</button>
+            <span class="pp-status" aria-live="polite"></span>
+          </div>
+        </form>
+      </details>
+    </section>
+  {% endif %}
   {% if health %}
     <section class="panel health-panel">
       <h3 class="panel-title"><span class="deck-detail-section-mark">§</span> Deck Health</h3>
@@ -1679,4 +1756,60 @@
       })();
       </script>
     {% endif %}
+    {# #178 — play-profile editor. Submits via fetch so the SHIPPED JSON API
+       (POST /decks/{id}/play-profile, #177) stays exactly as it is: it answers
+       JSON, and a plain form post would land the pilot on a page of raw JSON.
+       Unknown keys are preserved by merging over the ORIGINAL payload — the
+       seed carries `source` today and may carry more tomorrow, and an editor
+       that silently drops what it does not render is how a profile quietly
+       loses information every time somebody fixes a typo. #}
+    <script>
+      (function () {
+        var form = document.querySelector('.pp-editor');
+        if (!form) return;
+        function lines(name) {
+          var el = form.querySelector('[name="' + name + '"]');
+          if (!el) return [];
+          return el.value.split('\n').map(function (l) { return l.trim(); })
+                   .filter(function (l) { return l.length > 0; });
+        }
+        form.addEventListener('submit', function (e) {
+          e.preventDefault();
+          var status = form.querySelector('.pp-status');
+          var button = form.querySelector('button[type="submit"]');
+          var original = {};
+          try { original = JSON.parse(form.dataset.original || '{}') || {}; } catch (err) { original = {}; }
+          var profile = Object.assign({}, original, {
+            role: form.querySelector('[name="role"]').value.trim(),
+            primary_plan: lines('primary_plan'),
+            secondary_plan: lines('secondary_plan'),
+            hard_rules: lines('hard_rules'),
+            confidence: form.querySelector('[name="confidence"]').value
+          });
+          var body = new URLSearchParams();
+          body.set('profile_data', JSON.stringify(profile));
+          body.set('csrf_token', form.querySelector('[name="csrf_token"]').value);
+          button.disabled = true;
+          status.textContent = 'Saving…';
+          fetch('/decks/' + form.dataset.deckId + '/play-profile', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: body.toString(),
+            credentials: 'same-origin'
+          }).then(function (r) {
+            if (!r.ok) throw new Error('HTTP ' + r.status);
+            return r.json();
+          }).then(function (data) {
+            // Re-seed the merge base so a second save in the same visit does not
+            // resurrect the values this one just replaced.
+            form.dataset.original = JSON.stringify(data.profile);
+            status.textContent = 'Saved. Reloading…';
+            location.reload();
+          }).catch(function (err) {
+            button.disabled = false;
+            status.textContent = 'Could not save (' + err.message + '). Nothing was changed.';
+          });
+        });
+      })();
+    </script>
   {% endblock %}

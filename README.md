@@ -2,7 +2,7 @@
 
 Self-hosted web application for managing a physical Magic: The Gathering collection. (Identifies as **Cartarch** in user-facing UI as of v3.27.6; the in-repo project identifier was aligned to `cartarch` app-side on 2026-07-06. Some infrastructure names may still carry the old identifier pending the full rename near actual public launch.)
 
-**Current version: v4.12.47** · [Platform repo](https://github.com/jasonvandeventer/vanfreckle-platform)
+**Current version: v4.12.48** · [Platform repo](https://github.com/jasonvandeventer/vanfreckle-platform)
 
 ---
 
@@ -118,6 +118,12 @@ See [docs/screenshots/](docs/screenshots/) for capture guidelines and additional
 - **Brew mode** — a deck built from cards you may not own. Unowned cards become proxy rows inside the deck, so the list is complete while your collection totals stay honest; a buy-list splits what you have, what you're missing, and what you already own in another deck
 - **Collection-aware brew generator** at `/recommendations/commander` — pick an owned commander and it assembles a legal 100-card deck from cards you own, with a stated reason per card. Deterministic and entirely offline: every signal is a column already stored, so no external call happens on the request path
 - **Variant groups** link builds of the same deck that share one physical copy of many cards. Both builds render the full shared decklist with shared cards badged, without duplicating a single inventory row
+
+### Play profiles
+
+- **"How to pilot this deck"** on every deck page — the deck's plan, what it protects, what it spends freely, and what it fetches first when a tutor resolves. The AI deck simulator plays each deck from exactly these notes, so they are the input to its strength ratings, not a description of them
+- Profiles ship with the app and reseed at every deploy, but **an edited profile is never overwritten** — saving marks it as yours
+- A profile Cartarch inferred rather than a pilot writing it is **badged as unreviewed**, because an unverified plan and a stated one are not the same evidence
 
 ### Watchlist
 

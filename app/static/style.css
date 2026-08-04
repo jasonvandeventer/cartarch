@@ -16119,3 +16119,94 @@ body.cmp-lobby-body { height: auto; min-height: 100dvh; overflow-y: auto; }
   border-radius: 4.75% / 3.5%; /* MTG card corner ratio */
   box-shadow: 0 8px 24px rgb(0 0 0 / 55%);
 }
+
+/* #178 — play-profile editor on the deck page.
+   The panel is NOT a warning panel, so it deliberately does not take
+   .legality-panel's red border; only the unreviewed badge carries colour, and
+   it is amber rather than red because an inferred profile is unverified, not
+   wrong. */
+.pp-badge {
+  font: 700 0.6rem "Montserrat", system-ui, sans-serif;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 0.1rem 0.45rem;
+  margin-left: 0.5rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  vertical-align: middle;
+}
+.pp-badge-medium {
+  border-color: rgba(245, 158, 11, 0.6);
+  color: #fbbf24;
+}
+.pp-badge-high,
+.pp-badge-custom {
+  border-color: rgba(34, 197, 94, 0.5);
+  color: #86efac;
+}
+.pp-nudge {
+  margin: 0.25rem 0 0.75rem;
+  font-size: 0.85rem;
+}
+.pp-role {
+  margin: 0.25rem 0 0.75rem;
+  font-size: 0.9rem;
+}
+.pp-field-label {
+  margin: 0.75rem 0 0.25rem;
+  font: 700 0.7rem "Montserrat", system-ui, sans-serif;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.7;
+}
+.pp-list {
+  margin: 0 0 0.5rem 1.1rem;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+.pp-editor-details {
+  margin-top: 1rem;
+}
+/* Nothing sets a font on <textarea>, so it inherits the UA monospace default —
+   the #173 finding. These hold prose, so they take the page font; the
+   decklist textarea is the one that legitimately wants monospace, which is why
+   this is scoped here and not on the base rule. Use font-family, NOT the font
+   shorthand: the shorthand also resets font-size and would defeat the mobile
+   16px floor that stops iOS auto-zooming on focus. */
+.pp-editor textarea {
+  font-family: inherit;
+  line-height: 1.5;
+}
+/* `.stack-form` stretches its own ITEMS, and here the items are the <label>s —
+   the controls are nested one level inside them, so they fell back to the UA
+   default `cols` and rendered 206px wide in a 997px panel. Measured in Chromium,
+   invisible in the CSS. This is the #173 finding in a new shape: a control is
+   only full-width when something makes it so, and being inside a .stack-form is
+   not enough once it is wrapped. */
+.pp-editor label {
+  display: block;
+}
+.pp-editor input[type="text"],
+.pp-editor textarea,
+.pp-editor select {
+  width: 100%;
+  box-sizing: border-box;
+}
+.pp-hint {
+  display: block;
+  font-size: 0.78rem;
+  opacity: 0.65;
+  font-weight: 400;
+  margin: 0.15rem 0;
+}
+.pp-editor-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-top: 0.75rem;
+}
+.pp-status {
+  font-size: 0.85rem;
+  opacity: 0.8;
+}

@@ -1,5 +1,15 @@
 [
   {
+    "version": "4.12.48",
+    "date": "2026-08-03",
+    "added": [
+      "Every deck page now has a \"How to pilot this deck\" panel, and you can edit it. Cartarch already held a short set of notes for each deck — its plan, what to protect, what to spend freely, what to fetch first — and the simulated games that rate your decks are played from exactly those notes. Until now there was no way to read them, let alone correct them. Most were written by Cartarch rather than by a person, and those are marked plainly as unreviewed, because a rating is only worth as much as the instructions behind it. Fixing a deck's notes changes how it gets played in every future simulation, and once you have written them yourself they are yours: no later update overwrites them."
+    ],
+    "refined": [],
+    "resolved": [],
+    "archivist_note": "There is a particular kind of unfinished that looks finished. The notes were being written, stored, shipped with every deploy, and read by the machine that rates the decks — a complete circuit with one missing piece, which was any way for the person who actually plays the deck to see what had been said about it. Thirty-eight decks had notes and not one had ever been looked at, which is not a statistic about neglect so much as about there being no door. What the numbers showed once we went looking was worth the trip: two decks as different as a stolen-value engine and a politics deck were carrying word-for-word identical instructions on what to protect and when to change plan. The specific part of each profile was one sentence; the rest was scaffolding. So the editor is arranged to put that one sentence first and make the padding obvious enough to delete, which is a smaller idea than it sounds and probably the whole value of the thing."
+  },
+  {
     "version": "4.12.47",
     "date": "2026-08-03",
     "added": [],
