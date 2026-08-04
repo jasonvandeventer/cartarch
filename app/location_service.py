@@ -1,6 +1,7 @@
 from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
+from app import sort_spec
 from app.models import Deck, InventoryRow, StorageLocation
 from app.pricing import effective_price
 
@@ -482,7 +483,7 @@ def list_rows_for_location(
     if location is None:
         raise ValueError("Location does not exist.")
 
-    return (
+    rows = (
         session.query(InventoryRow)
         .options(
             joinedload(InventoryRow.card),
@@ -492,9 +493,15 @@ def list_rows_for_location(
             InventoryRow.user_id == user_id,
             InventoryRow.storage_location_id == location_id,
         )
-        .order_by(InventoryRow.slot.asc())
+        .order_by(InventoryRow.id.asc())
         .all()
     )
+    # #132 — see drawer_service.list_rows_for_drawer: `slot` is a String holding
+    # `str(index)`, so ORDER BY slot is a TEXT sort (1, 10, 100, 1000, …). Sorted
+    # in Python through the one shared definition rather than a dialect-specific
+    # SQL cast.
+    rows.sort(key=lambda r: sort_spec.slot_sort_value(r.slot))
+    return rows
 
 
 def user_has_drawers(session: Session, user_id: int) -> bool:

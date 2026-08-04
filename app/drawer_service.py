@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from sqlalchemy.orm import Session, joinedload
 
+from app import sort_spec
 from app.models import InventoryRow, StorageLocation
 
 
@@ -47,7 +48,7 @@ def list_drawer_groups(session: Session, user_id: int) -> dict[str, list[Invento
 
 def list_rows_for_drawer(session: Session, drawer: str, user_id: int) -> list[InventoryRow]:
     """Return placed rows for one user's drawer."""
-    return (
+    rows = (
         session.query(InventoryRow)
         .options(joinedload(InventoryRow.card), joinedload(InventoryRow.storage_location))
         .filter(
@@ -55,6 +56,20 @@ def list_rows_for_drawer(session: Session, drawer: str, user_id: int) -> list[In
             InventoryRow.drawer == drawer,
             InventoryRow.is_pending.is_(False),
         )
-        .order_by(InventoryRow.slot.asc(), InventoryRow.id.asc())
+        .order_by(InventoryRow.id.asc())
         .all()
     )
+    # #132 — slot ordering happens in PYTHON, not SQL. `slot` is a String column
+    # holding `str(index)`, so `ORDER BY slot` is a text sort: after slot 1 comes
+    # slot 10, then 100, then the whole one-thousands run. On Drawer 3's 1,042
+    # rows that is what the page opened on, and this route is the one a user
+    # actually reaches from the nav.
+    #
+    # Python rather than a SQL cast: the route already materialises every row, a
+    # cast would be dialect-specific (the project keeps queries engine-agnostic),
+    # and `CAST('12a' AS INTEGER)` errors on Postgres. Going through
+    # `sort_spec.slot_sort_value` means ONE definition of slot order shared with
+    # the Locations grid — fixing this in one place and not the other is how the
+    # two pages come to disagree about where a card is.
+    rows.sort(key=lambda r: sort_spec.slot_sort_value(r.slot))
+    return rows

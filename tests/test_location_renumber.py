@@ -244,3 +244,76 @@ def test_the_button_renders_on_a_box_but_not_on_a_drawer(client, db, user, box):
     db.commit()
     drawer_page = client.get(f"/locations/{drawer.id}").text
     assert f"/locations/{drawer.id}/renumber" not in drawer_page
+
+
+# --------------------------------------------------------------------------
+# The pages themselves. These are the tests whose absence let v4.12.51 ship a
+# fix that did not reach the page a user actually opens.
+# --------------------------------------------------------------------------
+
+
+def _drawer_rows(db, user, count):
+    """Rows in Drawer 3, slotted 1..count, deliberately inserted OUT of order.
+
+    Inserting ascending would let an `ORDER BY id` fallback pass by accident —
+    the row order must not agree with the slot order, or the test proves nothing.
+    """
+    loc = StorageLocation(user_id=user.id, name="Drawer 3", type="drawer", mode="managed")
+    db.add(loc)
+    db.commit()
+    for n in [1000, 1, 100, 2, 10, 1001][:count]:
+        c = _card(db, f"Card {n}", "abc", str(n))
+        db.add(
+            InventoryRow(
+                user_id=user.id,
+                card_id=c.id,
+                quantity=1,
+                finish="normal",
+                storage_location_id=loc.id,
+                drawer="3",
+                slot=str(n),
+                is_pending=False,
+            )
+        )
+    db.commit()
+    return loc
+
+
+def test_the_DRAWERS_page_lists_slots_numerically(client, db, user):
+    """`/drawers/{n}` is the page reached from the nav, and it sorts in SQL.
+
+    `list_rows_for_drawer` used `ORDER BY slot`, a TEXT sort on a String column
+    holding `str(index)` — so Drawer 3's 1,042 rows opened on
+    `1, 10, 100, 1000, 1001, …`. v4.12.51 fixed the Python sorter behind
+    `/locations/{id}` and MISSED this route entirely; nothing failed, because
+    nothing tested it.
+    """
+    _drawer_rows(db, user, 6)
+    from app.drawer_service import list_rows_for_drawer
+
+    slots = [r.slot for r in list_rows_for_drawer(db, "3", user_id=user.id)]
+    assert slots == ["1", "2", "10", "100", "1000", "1001"]
+
+
+def test_the_drawer_page_renders_in_slot_order(client, db, user):
+    """Route-level, because the service returning a sorted list proves nothing
+    about what the template iterates (the #152 failure mode)."""
+    _drawer_rows(db, user, 6)
+    page = client.get("/drawers/3").text
+
+    positions = [page.index(f"Slot {n}") for n in ("1", "2", "10", "100", "1000", "1001")]
+    assert positions == sorted(positions), "drawer page is not in numeric slot order"
+
+
+def test_list_rows_for_location_is_also_numeric(db, user):
+    """`location_service` had the SAME `ORDER BY slot` — two SQL copies, one fix.
+
+    Grep for the QUESTION ("what orders slots?"), not the symptom: fixing one
+    copy and leaving the other is how two pages come to disagree about where a
+    card is.
+    """
+    from app.location_service import list_rows_for_location
+
+    loc = _drawer_rows(db, user, 6)
+    slots = [r.slot for r in list_rows_for_location(db, user_id=user.id, location_id=loc.id)]
+    assert slots == ["1", "2", "10", "100", "1000", "1001"]

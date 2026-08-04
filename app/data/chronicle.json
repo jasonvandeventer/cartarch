@@ -1,5 +1,15 @@
 [
   {
+    "version": "4.12.52",
+    "date": "2026-08-04",
+    "added": [],
+    "refined": [
+      "The drawer pages now really do list cards in slot order. The previous release fixed this for storage locations but missed the Drawers pages themselves — the ones reached from the menu — which put their cards in order by a different route that was never corrected. So a drawer still opened on slot 1, then 10, then 100, then a run of the one thousands. Both remaining paths now share the single definition of what slot order means."
+    ],
+    "resolved": [],
+    "archivist_note": "The previous entry claimed four thousand cards had been put back in order, and they had not. The ordering lives in four places, we found three, and the one we missed was the page anyone would actually open — which is the whole reason the mistake was visible within minutes of shipping. There is a rule we keep writing down after incidents like this, that a duplicated rule must be found by searching for the question rather than the symptom, and the honest reading is that we searched for it too late: the tests written for the fix covered the code that had been changed rather than the pages a person visits. What makes it a small embarrassment rather than a real one is that a screenshot settled it in seconds. The fix now has a test that opens the page and reads the order off it, which is what should have been there the first time."
+  },
+  {
     "version": "4.12.51",
     "date": "2026-08-04",
     "added": [
