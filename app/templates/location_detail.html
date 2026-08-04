@@ -16,11 +16,41 @@
         {% if location.type != "deck" %}
           <button type="button" class="btn-like" onclick="toggleQuickAddModal()">+ Quick add</button>
           <a href="/audit/start?location_id={{ location.id }}" class="btn">Audit</a>
+          {# #132 — file the box: sort by set + collector number and number every
+             card 1..N, the way the drawer sorter numbers a drawer. Not offered
+             for drawers (the sorter owns their slots) or decks (a deck is not
+             filed by set). Renumbering moves cards, so it is a button somebody
+             presses when they are ready to re-file — never an import side effect. #}
+          {% if location.type not in ("drawer", "deck", "considering") %}
+            {# display:flex, NOT inline: this <form> is the flex item in the
+               button row, so with `inline` the button inside it never stretches
+               and rendered 29px tall beside 38px siblings. A wrapper silently
+               breaking the layout contract its siblings rely on is the same
+               shape as #178's .stack-form finding — measured in Chromium, not
+               visible in the CSS. #}
+            <form action="/locations/{{ location.id }}/renumber" method="post" style="display:flex">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+              <button type="submit" class="btn-like"
+                      title="Sort this box by set and collector number, then number every card 1..N so you can walk it on the shelf.">
+                Re-file &amp; number
+              </button>
+            </form>
+          {% endif %}
         {% endif %}
         <a href="/locations/{{ location.id }}/export" class="btn">Export CSV</a>
         <a href="/locations" class="btn">Back to Locations</a>
       </div>
     </div>
+    {% if renumbered is not none %}
+      <p class="muted" style="margin-top:0.5rem">
+        {% if renumbered == "0" %}
+          Already in order — every card was already in its slot.
+        {% else %}
+          Re-filed: {{ renumbered }} card{{ '' if renumbered == "1" else 's' }} moved to a new slot.
+          Sort by <strong>Slot</strong> to walk the box in shelf order.
+        {% endif %}
+      </p>
+    {% endif %}
     <div id="location-stats" class="stat-grid collection-stats-grid">
       <div class="stat-card compact">
         <div class="stat-label">Total value</div>

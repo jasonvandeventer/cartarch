@@ -508,7 +508,28 @@ def drawer_sort_key(row: InventoryRow) -> tuple:
         # but guard against future drift by sorting after every named section.
         return (8, set_code, collector, name, row.id)
 
-    return (set_code, collector, name, row.id)
+    return shelf_sort_key(row)
+
+
+def shelf_sort_key(row: InventoryRow) -> tuple:
+    """Set, then collector number, then name — how a browsable box is filed.
+
+    This IS drawers 2-5's ordering, named and reusable: ``drawer_sort_key``
+    returns it for those drawers, so a Bulk box numbered with this key is filed
+    exactly the way the drawers are, and there is ONE definition of what "set and
+    collector order" means rather than two that can drift.
+
+    Collector number goes through ``collector_sort_key``, so 2 precedes 10 and a
+    suffix like ``12a`` lands after ``12``. Sorting it lexically would file the
+    box in an order nobody can walk — which is the whole point of the ordering.
+    """
+    card = row.card
+    return (
+        (card.set_code or "").strip().lower(),
+        collector_sort_key(card.collector_number),
+        (card.name or "").strip().lower(),
+        row.id,
+    )
 
 
 def get_or_create_card(
@@ -2107,6 +2128,67 @@ def move_inventory_row_to_location(
     )
     session.commit()
     return row
+
+
+def renumber_location_slots(session: Session, location_id: int, user_id: int) -> int:
+    """File a box: sort its rows by :func:`shelf_sort_key` and write ``slot`` 1..N.
+
+    #132 — the drawer sorter has always numbered drawers this way
+    (``resort_collection`` enumerates each bucket after sorting), but it
+    explicitly writes ``None`` for anything that is not a numbered drawer:
+    *"the drawer slot machinery only applies to numbered drawers."* So a Bulk box
+    holding 1,744 rows carried **zero** slots and could not be walked at all.
+
+    **This is a separate entry point on purpose, not a widening of
+    ``resort_collection``.** A Bulk box is deliberately ``manual`` mode so the
+    sorter never treats it as a SOURCE — a ``managed`` Bulk would be scooped
+    straight back into the drawers on the next sort. Being invisible to the
+    sorter is exactly why the sorter cannot be the thing that numbers it.
+
+    **Explicitly user-triggered, never automatic.** Renumbering shifts the
+    position of every card after the insertion point, so running it on every
+    import would silently invalidate a box somebody has already physically
+    filed. The user runs it when they are ready to re-file, which is the same
+    contract the drawer sorter has.
+
+    Refuses drawers (the sorter owns those, and racing it would fight
+    ``resort_collection`` for the same column) and deck / considering locations
+    (a deck is not filed by set — its ordering is the decklist). Returns the
+    number of rows whose slot actually CHANGED, so a caller can say "already in
+    order" rather than reporting work that did not happen.
+    """
+    location = (
+        session.query(StorageLocation)
+        .filter(StorageLocation.id == location_id, StorageLocation.user_id == user_id)
+        .first()
+    )
+    if location is None:
+        raise ValueError("Location not found")
+    if location.type in ("drawer", "deck", "considering"):
+        raise ValueError(f"A {location.type} location is not filed by set and collector number")
+
+    rows = (
+        session.query(InventoryRow)
+        .options(joinedload(InventoryRow.card))
+        .join(Card)
+        .filter(
+            InventoryRow.user_id == user_id,
+            InventoryRow.storage_location_id == location_id,
+            InventoryRow.is_pending.is_(False),
+        )
+        .all()
+    )
+    rows.sort(key=shelf_sort_key)
+
+    changed = 0
+    for index, row in enumerate(rows, start=1):
+        target = str(index)
+        if row.slot != target:
+            row.slot = target
+            changed += 1
+    if changed:
+        session.commit()
+    return changed
 
 
 def move_surplus_to_location(

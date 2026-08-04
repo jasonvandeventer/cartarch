@@ -57,6 +57,7 @@ from app.inventory_service import (
     list_pending_rows,
     move_inventory_row_to_location,
     move_surplus_to_location,
+    renumber_location_slots,
     repoint_inventory_row_printing,
     resolve_drawer_cull_candidates,
     resort_collection,
@@ -2042,6 +2043,28 @@ def edit_location_route(
     return RedirectResponse("/locations", status_code=303)
 
 
+@router.post("/locations/{location_id}/renumber")
+def renumber_location_route(
+    location_id: int,
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+    _: None = CsrfRequired,
+):
+    """#132 — file this box: sort by set + collector number and write slots 1..N.
+
+    Owner-scoped inside ``renumber_location_slots``, which also refuses drawers
+    (the sorter owns those) and deck / considering locations. A ValueError from
+    it surfaces through the app-wide handler as a clean 400, the same as every
+    other invalid location action.
+
+    Deliberately a POST the user presses, not something an import triggers:
+    renumbering shifts every card after the insertion point, so doing it
+    automatically would silently invalidate a box already filed on a shelf.
+    """
+    changed = renumber_location_slots(session, location_id, current_user.id)
+    return RedirectResponse(url=f"/locations/{location_id}?renumbered={changed}", status_code=303)
+
+
 @router.post("/locations/{location_id}/bulk-move")
 def bulk_move_location_cards(
     location_id: int,
@@ -2263,6 +2286,9 @@ def location_detail_page(
         {
             "title": location.name,
             "location": location,
+            # #132 — how many rows the last re-file actually MOVED. "0" is a real
+            # answer ("already in order"), so this is None-vs-present, not truthy.
+            "renumbered": request.query_params.get("renumbered"),
             "items": items,
             "total_quantity": total_quantity,
             "total_value": total_value,

@@ -1,5 +1,17 @@
 [
   {
+    "version": "4.12.51",
+    "date": "2026-08-04",
+    "added": [
+      "A box or binder can now be filed the way the drawers are. Press Re-file & number on any storage location and Cartarch sorts it by set and collector number, then numbers every card from one, so you can walk the box on the shelf and find a card by its number instead of leafing through it. The drawers have worked this way for a long time; a bulk box holding well over a thousand cards had no order at all. Nothing happens automatically — renumbering shifts every card that comes after the one you added, so it waits until you are actually ready to re-file."
+    ],
+    "refined": [
+      "Card slots now read in the order you would actually walk them. A drawer's positions were being sorted as text rather than numbers, so after slot 1 came slot 10, then 100, then a long run of the one thousands — on the page that opens by default when you look at a drawer. Over four thousand cards across the six drawers were affected."
+    ],
+    "resolved": [],
+    "archivist_note": "We set out to give a bulk box some order and found the drawers did not have any either — not really. They had been numbered correctly for months; it was the reading of those numbers that was wrong, sorting them as words, so a drawer of a thousand cards opened on a list that began one, ten, one hundred, one thousand. Nobody had reported it, which is the interesting part: it is the kind of wrongness that looks like a quirk of the app rather than a fault, and people route around a quirk without mentioning it. The fix for the box turned out to be four lines of new arithmetic and one shared with the drawers, which is the right ratio. What took longest was checking that the button we added was the same height as the buttons beside it, and it was not."
+  },
+  {
     "version": "4.12.50",
     "date": "2026-08-04",
     "added": [],

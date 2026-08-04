@@ -2,7 +2,7 @@
 
 Self-hosted web application for managing a physical Magic: The Gathering collection. (Identifies as **Cartarch** in user-facing UI as of v3.27.6; the in-repo project identifier was aligned to `cartarch` app-side on 2026-07-06. Some infrastructure names may still carry the old identifier pending the full rename near actual public launch.)
 
-**Current version: v4.12.50** · [Platform repo](https://github.com/jasonvandeventer/vanfreckle-platform)
+**Current version: v4.12.51** · [Platform repo](https://github.com/jasonvandeventer/vanfreckle-platform)
 
 ---
 
@@ -140,6 +140,9 @@ See [docs/screenshots/](docs/screenshots/) for capture guidelines and additional
 - Optional note per row for context ("for the Bello deck", "$3 target", etc.); inline edit via a popout
 
 ### Organization
+
+- **Re-file & number** any box or binder — sorts it by set and collector number and writes a slot on every card, so a bulk box is walkable on the shelf the way the drawers are. Explicitly a button, never an import side effect: renumbering shifts every card after the insertion point, so it waits until you're ready to physically re-file
+- Drawers and boxes share **one** definition of set-and-collector order, so a re-filed box and a sorted drawer are filed the same way
 
 - Drawer/slot system for physical organization — activates for any user who creates a sorter rule or a drawer location
 - Custom storage locations: create, edit (name/type/parent/sort order), and delete

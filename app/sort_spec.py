@@ -181,6 +181,29 @@ def _price_or_none(value):
     return value or None
 
 
+def slot_sort_value(slot: str | None) -> tuple[int, int, str]:
+    """Numeric-aware ordering for ``InventoryRow.slot``.
+
+    A slot is a **physical position** — ``resort_collection`` writes
+    ``str(index)`` for 1..N — so it is a number wearing a string's clothes, and
+    comparing it lexically puts slot 10 immediately after slot 1. On a real
+    drawer that is not cosmetic: Drawer 3 holds 1,042 slotted rows and ``slot``
+    is the DEFAULT sort for a location page, so the most-used storage view in
+    the app was ordered ``1, 10, 100, 1000, …, 2, 20`` — unusable for walking a
+    physical drawer, which is the only thing that ordering is for.
+
+    Non-numeric and empty slots sort AFTER every numbered one (leading 1),
+    keeping unslotted rows out of the numbered run rather than interleaved with
+    it. Distinct from ``inventory_service.collector_sort_key``, which parses a
+    printed collector number and must handle suffixes like ``12a``; a slot is
+    always an integer this app wrote.
+    """
+    text = (slot or "").strip()
+    if text.isdigit():
+        return (0, int(text), "")
+    return (1, 0, text.lower())
+
+
 # (key_fn, nulls_last). See _stable_sort for null handling.
 SHOWCASE_SORT_KEYS = {
     "added": (lambda it: it.get("added_at"), False),
@@ -239,7 +262,7 @@ ROW_SORT_KEYS = {
     "value": (_row_price, True),
     "available": (lambda r: r.quantity, False),
     "type": (lambda r: (r.card.type_line or "").lower(), False),
-    "slot": (lambda r: r.slot or "", False),
+    "slot": (lambda r: slot_sort_value(r.slot), False),
 }
 
 
