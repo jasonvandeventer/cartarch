@@ -30,7 +30,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.models import Deck, Game, GameSeat, GameSession
-from app.timeutil import utc_now
+from app.timeutil import local_date, utc_now
 
 # A game counts toward a session record only once it has a result. The same rule
 # #152's playgroup record uses, and for the same reason: a game still in progress
@@ -239,10 +239,21 @@ def deck_session_stats(session: Session, deck_ids: list[int]) -> dict[int, dict]
 
 
 def session_date_key(moment: datetime) -> date:
-    """The calendar date a session is filed under — backfill only.
+    """The calendar date a session is filed under — **local**, not UTC. Backfill only.
 
-    Deliberately NOT used at runtime. New games join their playgroup's OPEN
-    session, which is a social boundary; this exists solely so historical games,
-    recorded before sessions existed, can be grouped at all.
+    A calendar day is a LOCAL fact. Grouping on ``played_at::date`` in UTC splits
+    one evening in two the moment play runs past 19:00 Central (00:00 UTC), which
+    would hand the same night two sessions and let a deck win in both.
+
+    No game in prod has split yet — this playgroup plays Sunday *afternoons*,
+    11:00–16:12 Central, so every game's UTC and local dates agree. **Game 64
+    already shows the shift**, though: stored ``2026-06-28 00:00 UTC``, it is
+    **Saturday 2026-06-27 19:00** locally. It is excluded from sessions for a
+    different reason (no playgroup), so the bug has never bitten — but it is a
+    latent one, not a hypothetical.
+
+    Delegates to ``timeutil.local_date`` so the zone has ONE definition, shared
+    with the ``format_local_datetime`` display filter. Two copies is how a page
+    comes to say Sunday while the grouping says Monday.
     """
-    return moment.date()
+    return local_date(moment)

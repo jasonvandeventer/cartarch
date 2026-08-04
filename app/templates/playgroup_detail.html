@@ -129,7 +129,7 @@
     <section class="panel">
       <h3 class="panel-title">Session in progress</h3>
       <p class="muted">
-        Started {{ open_session.started_at.strftime('%A %d %B, %H:%M') }} —
+        Started {{ open_session.started_at | format_local_datetime('%A %d %B, %H:%M %Z') }} —
         {{ open_session_games }} game{{ '' if open_session_games == 1 else 's' }} so far.
         New games linked to this playgroup join this session, and a deck that wins one
         is marked benched in the deck picker for the rest of it.

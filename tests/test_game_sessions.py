@@ -420,3 +420,55 @@ def test_ending_a_session_is_member_gated(client, db, user, playgroup):
     resp = client.post(f"/playgroups/{playgroup.id}/end-session", follow_redirects=False)
     assert resp.status_code == 303
     assert session_service.get_open_session(db, playgroup.id) is None
+
+
+# --------------------------------------------------------------------------
+# A calendar day is a LOCAL fact (owner report 2026-08-04: "we play in CST").
+# --------------------------------------------------------------------------
+
+
+def test_session_date_key_is_local_not_utc():
+    """Game 64's REAL stored timestamp, which already shows the shift.
+
+    Stored ``2026-06-28 00:00:00+00:00``, it is **Saturday 2026-06-27 19:00**
+    in America/Chicago — a different calendar day. Grouping on the UTC date
+    files it under the 28th, alongside a playgroup meetup it had nothing to do
+    with.
+    """
+    from datetime import UTC
+
+    game_64 = datetime(2026, 6, 28, 0, 0, tzinfo=UTC)
+    assert game_64.date().isoformat() == "2026-06-28"  # the UTC answer
+    assert session_service.session_date_key(game_64).isoformat() == "2026-06-27"
+
+
+def test_one_evening_past_utc_midnight_stays_ONE_session(db, user, playgroup):
+    """The failure this prevents, and the reason it is worth fixing while latent.
+
+    An evening running 18:00–20:30 Central crosses 00:00 UTC. Under UTC grouping
+    those are two calendar days, so the night gets TWO sessions — and a deck
+    could then win in both, defeating the whole house rule the model exists to
+    record. This playgroup plays Sunday afternoons today, so it has not happened;
+    one later start is all it would take.
+    """
+    from datetime import UTC
+
+    evening = [
+        datetime(2026, 8, 9, 23, 30, tzinfo=UTC),  # 18:30 Central, Sunday
+        datetime(2026, 8, 10, 1, 15, tzinfo=UTC),  # 20:15 Central, still Sunday
+    ]
+    assert evening[0].date() != evening[1].date(), "the UTC dates differ — the trap"
+    keys = {session_service.session_date_key(m) for m in evening}
+    assert len(keys) == 1, f"one evening must be one local day, got {keys}"
+    assert next(iter(keys)).isoformat() == "2026-08-09"
+
+
+def test_the_local_zone_has_ONE_definition(db):
+    """`timeutil.LOCAL_TZ` is shared with the display filter.
+
+    Two copies is how a page comes to say Sunday while the grouping says Monday.
+    """
+    from app.dependencies import _LOCAL_TZ
+    from app.timeutil import LOCAL_TZ
+
+    assert _LOCAL_TZ is LOCAL_TZ

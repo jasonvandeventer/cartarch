@@ -1,5 +1,15 @@
 [
   {
+    "version": "4.12.50",
+    "date": "2026-08-04",
+    "added": [],
+    "refined": [
+      "Sessions now group by your local calendar day rather than the server's. A day is a local thing, and the server keeps time in UTC — so an evening that ran past seven o'clock would have been split down the middle into two sessions, which would have let one deck win twice in a night the house rule says it can only win once. Nothing in the record was affected, because this playgroup plays Sunday afternoons; it would have gone wrong the first time somebody started late. Session times now read in Central everywhere they are shown."
+    ],
+    "resolved": [],
+    "archivist_note": "Reported by the owner in the plainest possible terms — we play in CST — and it was the right thing to say, because the code had been grouping by the server's day without ever asking whose day it meant. The reassuring part is that the app already knew the answer: a timezone constant had been sitting in the display layer since last year, with a comment describing this exact confusion, used only to format dates on the admin page. So the fix was not to decide anything new but to stop having two ideas about it — one definition, read by the thing that shows you a date and by the thing that decides which day it belongs to. The record was never wrong. It was one late start away from being wrong, which is a distinction worth spending an afternoon on."
+  },
+  {
     "version": "4.12.49",
     "date": "2026-08-04",
     "added": [

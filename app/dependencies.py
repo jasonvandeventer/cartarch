@@ -9,7 +9,6 @@ import subprocess
 from collections.abc import Generator
 from datetime import UTC, date, datetime, timedelta
 from urllib.parse import quote, urlparse
-from zoneinfo import ZoneInfo
 
 from fastapi import Depends, Form, HTTPException, Request, status
 from fastapi.templating import Jinja2Templates
@@ -26,7 +25,7 @@ from app.location_service import (
 )
 from app.models import InventoryRow, StorageLocation, User
 from app.pricing import effective_price
-from app.timeutil import utc_now
+from app.timeutil import LOCAL_TZ, utc_now
 
 logger = logging.getLogger(__name__)
 
@@ -295,7 +294,9 @@ templates.env.globals["static_v"] = static_v
 # item — the cost of a project-wide sweep isn't worth taking on for a
 # single-tenant install. Upgrade path to per-user timezone is a one-line
 # filter swap if a wider user base demands it.
-_LOCAL_TZ = ZoneInfo("America/Chicago")
+# One definition, in ``timeutil`` — see the note there. Kept as a module alias
+# so existing readers of ``_LOCAL_TZ`` are unaffected.
+_LOCAL_TZ = LOCAL_TZ
 
 
 def format_local_datetime(dt: datetime | None, fmt: str = "%Y-%m-%d") -> str:

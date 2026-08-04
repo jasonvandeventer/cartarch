@@ -48,7 +48,8 @@ from collections import defaultdict
 
 from app.db import SessionLocal
 from app.models import Game, GameSession
-from app.session_service import FINALIZED
+from app.session_service import FINALIZED, session_date_key
+from app.timeutil import LOCAL_TZ
 
 
 def main() -> None:
@@ -72,17 +73,21 @@ def main() -> None:
         unaffiliated = [g for g in games if g.playgroup_id is None]
         for g in unaffiliated:
             print(
-                f"  NO SESSION game {g.id} @ {g.played_at} — no playgroup "
+                f"  NO SESSION game {g.id} @ {g.played_at.astimezone(LOCAL_TZ):%Y-%m-%d %H:%M %Z} "
+                f"— no playgroup "
                 f"(a session belongs to a playgroup; this is permanent, not pending)"
             )
 
-        # (playgroup, calendar date) is the historical grouping key. Runtime uses
-        # the open session instead — see the module docstring.
+        # (playgroup, LOCAL calendar date) is the historical grouping key —
+        # session_date_key, not played_at.date(). A calendar day is a local fact,
+        # and UTC grouping splits an evening that runs past 19:00 Central. Runtime
+        # uses the open session instead, so this is the only date-grained code in
+        # the feature — see the module docstring.
         buckets: dict[tuple[int, object], list[Game]] = defaultdict(list)
         for g in games:
             if g.playgroup_id is None:
                 continue
-            buckets[(g.playgroup_id, g.played_at.date())].append(g)
+            buckets[(g.playgroup_id, session_date_key(g.played_at))].append(g)
 
         created = attached = already = 0
         for (playgroup_id, day), bucket in sorted(buckets.items(), key=lambda kv: str(kv[0])):
@@ -112,7 +117,8 @@ def main() -> None:
                 created += 1
                 print(
                     f"  SESSION playgroup {playgroup_id} {day}: {len(bucket)} games "
-                    f"({bucket[0].played_at:%H:%M}–{bucket[-1].played_at:%H:%M})"
+                    f"({bucket[0].played_at.astimezone(LOCAL_TZ):%H:%M}"
+                    f"–{bucket[-1].played_at.astimezone(LOCAL_TZ):%H:%M %Z})"
                 )
             for g in bucket:
                 if g.session_id == target.id:
