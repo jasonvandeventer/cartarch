@@ -362,7 +362,7 @@
           <div class="collection-facet-group">
             <div class="collection-facet-label">Status</div>
             <div class="collection-facet-checks">
-              {% for s, label in [('placed', 'Placed'), ('pending', 'Pending'), ('in_deck', 'In deck'), ('watchlist', 'Wishlist')] %}
+              {% for s, label in [('placed', 'Placed'), ('pending', 'Pending'), ('in_deck', 'In deck'), ('not_in_deck', 'Not in deck'), ('watchlist', 'Wishlist')] %}
                 <label class="collection-facet-check">
                   <input type="checkbox" name="status" value="{{ s }}"
                          {% if s in facet_status_set %}checked{% endif %}>
@@ -408,7 +408,9 @@
     </aside>
 
     {# === CONTENT AREA — Grid or Rows view, with v3.27.19 grouping === #}
-    <section class="collection-content">
+    <section class="collection-content"
+             data-card-hover
+             data-card-hover-target=".collection-row, .inventory-card">
       {% if items %}
         {# Filter description (editorial). Shows what's active. #}
         {% set has_facets = facet_colors_set or facet_types_set or facet_status_set or facet_finishes_set or facet_price_min_raw or facet_price_max_raw %}
@@ -535,6 +537,8 @@
 {% endblock %}
 
 {% block extra_scripts %}
+  {# Card hover preview (#169 component): shared, desktop-only, one preview node. #}
+  <script src="/static/card-hover.js?v={{ static_v('card-hover.js') }}"></script>
   <script>
     // v4.0.2 — preserve scroll position across full-page Collection reloads.
     // The Collection page is plain GET/POST navigation (search/filter is a GET

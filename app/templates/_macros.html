@@ -201,7 +201,11 @@ onerror="this.onerror=null; this.src='{{ scryfall_image_fallback(scryfall_id, si
      proxy is rendered with the warning-accent badge and a "$0.00 (proxy)"
      price (the service already zeroes its value). Off everywhere else
      (Collection / Locations / Decks keep the neutral badge + market price). #}
-  <article class="inventory-card inventory-card-compact">
+  <article class="inventory-card inventory-card-compact"
+           {% if item.card.image_url and item.card.scryfall_id %}
+           data-card-image="{{ mirror_image_url(item.card.scryfall_id, 'large') }}"
+           data-card-image-alt="{{ scryfall_image_fallback(item.card.scryfall_id, 'large') }}"
+           {% endif %}>
     <div class="inventory-card-media">
       {# Guard on BOTH: the mirror src is built from scryfall_id, so a card-like
          object that exposes image_url but not scryfall_id (the sanitized

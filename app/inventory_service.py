@@ -1245,6 +1245,18 @@ def apply_collection_facet_filters(
                 StorageLocation.type == "deck",
             )
             status_clauses.append(InventoryRow.storage_location_id.in_(deck_loc_ids))
+        if "not_in_deck" in statuses:
+            deck_loc_ids_out = select(StorageLocation.id).where(
+                StorageLocation.user_id == user_id,
+                StorageLocation.type == "deck",
+            )
+            # NULL location is "not in a deck" too — NOT IN alone would drop it.
+            status_clauses.append(
+                or_(
+                    InventoryRow.storage_location_id.is_(None),
+                    InventoryRow.storage_location_id.not_in(deck_loc_ids_out),
+                )
+            )
         if "watchlist" in statuses:
             watch_card_ids = select(WatchlistItem.card_id).where(
                 WatchlistItem.user_id == user_id,
@@ -1363,6 +1375,18 @@ def get_collection_facet_counts(
                 case(
                     (
                         or_(
+                            InventoryRow.storage_location_id.is_(None),
+                            InventoryRow.storage_location_id.not_in(deck_loc_ids),
+                        ),
+                        1,
+                    ),
+                    else_=0,
+                )
+            ).label("s_not_in_deck"),
+            func.sum(
+                case(
+                    (
+                        or_(
                             InventoryRow.card_id.in_(watch_card_ids),
                             Card.name.in_(watch_names),
                         ),
@@ -1398,7 +1422,7 @@ def get_collection_facet_counts(
                 "Land": 0,
                 "Planeswalker": 0,
             },
-            "status": {"placed": 0, "pending": 0, "in_deck": 0, "watchlist": 0},
+            "status": {"placed": 0, "pending": 0, "in_deck": 0, "not_in_deck": 0, "watchlist": 0},
             "finishes": {"normal": 0, "foil": 0, "etched": 0},
             "total": 0,
         }
@@ -1424,6 +1448,7 @@ def get_collection_facet_counts(
             "placed": int(row.s_placed or 0),
             "pending": int(row.s_pending or 0),
             "in_deck": int(row.s_in_deck or 0),
+            "not_in_deck": int(row.s_not_in_deck or 0),
             "watchlist": int(row.s_watchlist or 0),
         },
         "finishes": {

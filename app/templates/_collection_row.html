@@ -13,7 +13,11 @@
    total_value, drawer_label, location_label, storage_location_id,
    has_price, price_status, owned_total. #}
 {% from "_macros.html" import img_fallback %}
-<article class="collection-row" data-row-id="{{ item.id }}">
+<article class="collection-row" data-row-id="{{ item.id }}"
+         {% if item.card.image_url and item.card.scryfall_id %}
+         data-card-image="{{ mirror_image_url(item.card.scryfall_id, 'large') }}"
+         data-card-image-alt="{{ scryfall_image_fallback(item.card.scryfall_id, 'large') }}"
+         {% endif %}>
   <a href="/cards/{{ item.card.id }}" class="collection-row-thumb">
     {% if item.card.image_url %}
       <img src="{{ mirror_image_url(item.card.scryfall_id) }}"

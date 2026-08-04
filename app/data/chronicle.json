@@ -1,5 +1,13 @@
 [
   {
+    "version": "4.13.1",
+    "date": "2026-08-04",
+    "added": [
+      "Hovering a card on the Collection screen now shows a large, high-quality preview of it next to the cursor — same quiet component the commander picker already used, now wired to both the row and grid views, desktop only so taps keep working as before.",
+      "The Collection filters gained a Not in Deck status, the natural complement to In Deck: rows in boxes, drawers, or nowhere at all — the cards actually available when building something new. Rows with no location count correctly."
+    ]
+  },
+  {
     "version": "4.13.0",
     "date": "2026-08-04",
     "added": [

@@ -16114,7 +16114,7 @@ body.cmp-lobby-body { height: auto; min-height: 100dvh; overflow-y: auto; }
 }
 .card-hover-preview img {
   display: block;
-  width: 240px;
+  width: 300px; /* collection hover asks for at-a-glance readability; sources use the 'large' mirror size */
   max-width: 40vw;
   border-radius: 4.75% / 3.5%; /* MTG card corner ratio */
   box-shadow: 0 8px 24px rgb(0 0 0 / 55%);
