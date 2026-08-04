@@ -1,5 +1,12 @@
 [
   {
+    "version": "4.12.46",
+    "date": "2026-08-04",
+    "added": [
+      "A second simulation run joins the deck-strength data: the same core playgroup tables replayed with the AI attacking the strongest seat instead of the weakest one. Every deck the playgroup could sanity-check moved toward its real-table reputation under the new behaviour, so the two runs now bracket reality — and comparing a deck's rating between them shows how much of its strength depends on going unnoticed."
+    ]
+  },
+  {
     "version": "4.12.53",
     "date": "2026-08-04",
     "added": [
