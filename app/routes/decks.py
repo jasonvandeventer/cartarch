@@ -807,6 +807,10 @@ def deck_detail_page(
                 "updated_at": _pp_row.updated_at,
             }
 
+    # Measured strength: AI-sim run labels + worldwide commander priors
+    # (read-only; None hides the panel, same posture as legality).
+    measured_strength = deck_service.measured_strength(session, deck) if deck else None
+
     # #103 Phase B — hero bracket badge from the PERSISTED estimate only (the
     # request path never estimates; v3.27.9 invariant). Staleness = the deck's
     # current fingerprint differs from the one the daemon last evaluated.
@@ -958,6 +962,7 @@ def deck_detail_page(
             "consistency": consistency,
             "deck_legality": deck_legality,
             "play_profile": play_profile,
+            "measured_strength": measured_strength,
             "deck_record": deck_record,
             "goal_stats": deck_goal_stats(session, current_user.id, deck.id) if deck else [],
             "health_filter": health_filter if health_filter in _VALID_HEALTH_FILTERS else "",

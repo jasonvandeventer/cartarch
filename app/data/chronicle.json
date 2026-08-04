@@ -1,5 +1,12 @@
 [
   {
+    "version": "4.12.56",
+    "date": "2026-08-04",
+    "added": [
+      "The deck page now shows what has been measured, not just what is believed. A new Measured Strength panel lists each AI-simulation run's win rate for the deck — with the core-playgroup meta broken out — plus the focus-fire delta between the two attack styles, which reveals how much of a deck's strength depends on going unnoticed. Below that, the commander's worldwide record from playgroup.gg. Sample sizes are shown everywhere, and the panel is honest about its limits: AI pilots undervalue decks that need a decisive combo turn."
+    ]
+  },
+  {
     "version": "4.12.55",
     "date": "2026-08-04",
     "added": [

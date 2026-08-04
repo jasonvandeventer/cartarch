@@ -92,3 +92,29 @@ def test_delete_deck_removes_sim_results():
     deck_service.delete_deck(s, deck.id, user.id)
     s.commit()
     assert s.query(DeckSimResult).count() == 0
+
+
+def test_measured_strength_grouping():
+    """Panel data: run labels grouped with core split, focus delta, hidden-when-empty."""
+    s = _fresh_session()
+    deck, _ = _deck(s)
+    assert deck_service.measured_strength(s, deck) is None  # nothing measured -> hidden
+
+    for strategy, wins, games in (("core", 3, 20), ("random", 7, 19)):
+        s.add(
+            DeckSimResult(
+                deck_id=deck.id, run_label="gauntlet-x", strategy=strategy, wins=wins, games=games
+            )
+        )
+    s.add(
+        DeckSimResult(deck_id=deck.id, run_label="archenemy-y", strategy="core", wins=6, games=13)
+    )
+    s.commit()
+
+    ms = deck_service.measured_strength(s, deck)
+    assert [r["label"] for r in ms["sim_runs"]] == ["archenemy-y", "gauntlet-x"]
+    g = ms["sim_runs"][1]
+    assert g["wins"] == 10 and g["games"] == 39  # pooled across strategies
+    assert g["core_wins"] == 3 and g["core_games"] == 20
+    assert abs(ms["focus_delta"] - (6 / 13 - 3 / 20)) < 1e-9
+    assert ms["global_stats"] == []  # no commander stats rows

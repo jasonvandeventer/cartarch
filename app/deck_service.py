@@ -2653,6 +2653,72 @@ def seed_sim_results(session: Session, seed_path: str = SIM_RESULTS_SEED) -> dic
     return {"seeded": seeded, "missing_decks": missing}
 
 
+def measured_strength(session: Session, deck: Deck) -> dict | None:
+    """Everything Cartarch has MEASURED about this deck's strength, for the deck
+    page's read-only panel: AI-simulation results grouped by run label (with the
+    core-meta split, the number the playgroup actually cares about) and the
+    worldwide per-commander priors harvested from playgroup.gg.
+
+    Returns None when there is nothing to show — the panel hides entirely, same
+    posture as the legality panel.
+    """
+    from app.models import Card, CommanderGlobalStat, DeckCommander, DeckSimResult
+
+    by_label: dict[str, dict] = {}
+    for r in session.query(DeckSimResult).filter(DeckSimResult.deck_id == deck.id):
+        e = by_label.setdefault(
+            r.run_label, {"wins": 0, "games": 0, "core_wins": None, "core_games": None}
+        )
+        e["wins"] += r.wins
+        e["games"] += r.games
+        if r.strategy == "core":
+            e["core_wins"], e["core_games"] = r.wins, r.games
+    sim_runs = []
+    for label in sorted(by_label):
+        e = by_label[label]
+        sim_runs.append(
+            {
+                "label": label,
+                **e,
+                "rate": e["wins"] / e["games"] if e["games"] else None,
+                "core_rate": (e["core_wins"] / e["core_games"] if e["core_games"] else None),
+            }
+        )
+
+    # The delta between a kill-the-weak run and a focus-the-leader run measures
+    # how much of the deck's strength depends on going unnoticed (ai-player
+    # notes §9.26). Only shown when exactly those two families are present.
+    focus_delta = None
+    gauntlet = next((r for r in sim_runs if r["label"].startswith("gauntlet")), None)
+    arch = next((r for r in sim_runs if r["label"].startswith("archenemy")), None)
+    if gauntlet and arch and gauntlet["core_rate"] is not None and arch["core_rate"] is not None:
+        focus_delta = arch["core_rate"] - gauntlet["core_rate"]
+
+    names = [
+        name
+        for (name,) in session.execute(
+            select(Card.name)
+            .join(DeckCommander, DeckCommander.card_id == Card.id)
+            .filter(DeckCommander.deck_id == deck.id)
+        )
+    ]
+    global_stats = [
+        row
+        for name in sorted(names)
+        if (
+            row := session.query(CommanderGlobalStat)
+            .filter(
+                CommanderGlobalStat.commander_name == name, CommanderGlobalStat.payload.isnot(None)
+            )
+            .first()
+        )
+    ]
+
+    if not sim_runs and not global_stats:
+        return None
+    return {"sim_runs": sim_runs, "focus_delta": focus_delta, "global_stats": global_stats}
+
+
 def get_deck_by_share_token(session: Session, token: str) -> Deck | None:
     """The ONLY public lookup — strictly by token. Empty/None token never matches."""
     if not token:

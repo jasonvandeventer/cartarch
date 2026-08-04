@@ -556,6 +556,63 @@
       {% endif %}
     </section>
   {% endif %}
+  {# Measured strength — everything Cartarch has MEASURED about this deck:
+     AI-simulation win rates per run label (core meta = the playgroup's own
+     tables) and the commander's worldwide record from playgroup.gg. Hidden
+     when nothing has been measured, same posture as legality. #}
+  {% if measured_strength %}
+    <section class="panel measured-strength-panel">
+      <h3 class="panel-title"><span class="deck-detail-section-mark">§</span> Measured strength</h3>
+      {% if measured_strength.sim_runs %}
+        <table class="stats-table">
+          <thead>
+            <tr><th>Simulation run</th><th>Core meta</th><th>All metas</th></tr>
+          </thead>
+          <tbody>
+            {% for run in measured_strength.sim_runs %}
+              <tr>
+                <td>{{ run.label }}</td>
+                <td>
+                  {% if run.core_rate is not none %}
+                    {{ (run.core_rate * 100) | round | int }}%
+                    <span class="legality-detail">{{ run.core_wins }}/{{ run.core_games }}</span>
+                  {% else %}—{% endif %}
+                </td>
+                <td>
+                  {% if run.rate is not none %}
+                    {{ (run.rate * 100) | round | int }}%
+                    <span class="legality-detail">{{ run.wins }}/{{ run.games }}</span>
+                  {% else %}—{% endif %}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% if measured_strength.focus_delta is not none %}
+          <p class="legality-detail">
+            Focus-fire delta: {{ '%+d' | format((measured_strength.focus_delta * 100) | round | int) }}%
+            — how the deck fares when the table attacks the leader instead of the
+            weakest seat. A large positive value means its baseline strength
+            depends on being left alone.
+          </p>
+        {% endif %}
+        <p class="legality-detail">
+          AI-piloted games at small sample sizes: a baseline seat wins 25%.
+          Decks that need a decisive combo turn read low.
+        </p>
+      {% endif %}
+      {% for g in measured_strength.global_stats %}
+        <p>
+          <strong>{{ g.commander_name }}</strong> worldwide (playgroup.gg):
+          {% if g.win_rate is not none %}{{ g.win_rate | round | int }}% win rate{% endif %}
+          {% if g.games_count %}over {{ g.games_count }} games{% endif %}
+          {% if g.decks_count %}across {{ g.decks_count }} decks{% endif %}{% if g.elo %},
+          ELO {{ g.elo }}{% endif %}{% if g.global_rank %} (rank #{{ g.global_rank }}){% endif %}{% if g.average_wins_by_turn %},
+          typical win on turn {{ g.average_wins_by_turn }}{% endif %}.
+        </p>
+      {% endfor %}
+    </section>
+  {% endif %}
   {# #178 — the play profile: how this deck wants to be PILOTED, not how it was
      built. Shown for any deck (not gated on card rows like the analytics panels)
      because a plan exists independently of whether the list has been typed in.
