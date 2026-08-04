@@ -627,6 +627,41 @@ class DeckPlayProfile(Base):
     deck: Mapped[Deck] = relationship()
 
 
+class CommanderGlobalStat(Base):
+    """Global per-commander statistics harvested from playgroup.gg's PUBLIC API.
+
+    One row per commander card name. This is the worldwide prior — win rate, ELO,
+    global rank, sample sizes — from every game playgroup.gg has recorded, no
+    authentication required (their /commanders endpoints are open; game-level
+    data is playgroup-scoped and NOT harvested — the playgroup has never used
+    playgroup.gg, so Cartarch's own games tables remain the only real-game
+    source). Refreshed by an in-app daemon loop on the price-ingest pattern;
+    ``payload`` keeps the raw response so new fields cost no migration.
+
+    Consumers: the bracket estimator and deck builder, as a third opinion beside
+    the pilot's declared brackets and the AI-simulation run labels.
+    """
+
+    __tablename__ = "commander_global_stats"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    commander_name: Mapped[str] = mapped_column(
+        String(256), nullable=False, unique=True, index=True
+    )
+    pg_commander_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    elo: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    global_rank: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    games_won: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    games_lost: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    win_rate: Mapped[float | None] = mapped_column(Float, nullable=True)
+    average_wins_by_turn: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    decks_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    games_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    payload: Mapped[str | None] = mapped_column(Text, nullable=True)
+    fetched_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utc_now)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utc_now)
+
+
 class DeckSimResult(Base):
     """Aggregated AI-simulation results for a deck — empirical strength evidence.
 

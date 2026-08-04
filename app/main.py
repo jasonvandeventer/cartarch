@@ -243,6 +243,7 @@ async def lifespan(app: FastAPI):
         (_bulk_data_loop, "bulk-data"),
         (_loyalty_defense_backfill_loop, "loyalty-backfill"),
         (_combo_refresh_loop, "combo-refresh"),
+        (_playgroup_stats_loop, "playgroup-stats"),
     ):
         thread = threading.Thread(target=_target, daemon=True, name=_name)
         thread.start()
@@ -752,6 +753,30 @@ def _combo_refresh_loop() -> None:
         processed = _run_combo_refresh_batch()
         shutdown_event.wait(
             _COMBO_REFRESH_BUSY_SECONDS if processed else _COMBO_REFRESH_IDLE_SECONDS
+        )
+
+
+# playgroup.gg global commander priors (v4.12.55). Weekly per-commander
+# staleness lives in app.playgroup_stats; this loop just paces the batches —
+# a few open-API requests per pass, hours apart once everything is fresh.
+_PLAYGROUP_STATS_BUSY_SECONDS = 30
+_PLAYGROUP_STATS_IDLE_SECONDS = 6 * 3600
+
+
+def _playgroup_stats_loop() -> None:
+    if shutdown_event.wait(90):  # after migrations/init; bail if stopping
+        return
+    from app import playgroup_stats
+
+    while not shutdown_event.is_set():
+        try:
+            with SessionLocal() as _session:
+                processed = playgroup_stats.refresh_batch(_session)
+        except Exception as exc:  # noqa: BLE001 — background loop must survive
+            print(f"playgroup-stats batch failed: {exc}")
+            processed = 0
+        shutdown_event.wait(
+            _PLAYGROUP_STATS_BUSY_SECONDS if processed else _PLAYGROUP_STATS_IDLE_SECONDS
         )
 
 

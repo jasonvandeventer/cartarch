@@ -1,5 +1,12 @@
 [
   {
+    "version": "4.12.55",
+    "date": "2026-08-04",
+    "added": [
+      "Cartarch now knows how every commander performs worldwide. A background loop quietly asks playgroup.gg's public statistics — no account or key needed — for each commander the collection actually plays: global win rate, ELO, rank, how many games and decks that's based on, and the typical winning turn. Refreshed weekly, one polite request at a time. This gives the bracket estimator and deck builder a third opinion alongside the pilot's declared brackets and the AI simulation results — for example, Anti-Venom's worldwide 25% win rate across 1,222 games now sits right next to what our own simulations measured."
+    ]
+  },
+  {
     "version": "4.12.54",
     "date": "2026-08-04",
     "added": [
