@@ -1,5 +1,12 @@
 [
   {
+    "version": "4.13.8",
+    "date": "2026-08-05",
+    "added": [
+      "Two hover-zoom gaps closed for real this time. The deck page's grid view had the hover wiring but not the floating preview element — it only existed in list view — so zooming silently did nothing there; the element now lives where both views share it. And the import flow's choose-a-printing search results now zoom too, straight from Scryfall's images, with set and price in the footer."
+    ]
+  },
+  {
     "version": "4.13.7",
     "date": "2026-08-05",
     "added": [

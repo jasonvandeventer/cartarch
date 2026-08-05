@@ -38,3 +38,13 @@
     </section>
   {% endif %}
 {% endif %}
+{# Floating image-preview element. Rendered by the DISPATCHER so BOTH view
+   modes have it — it lived in the list partial only, leaving grid view with
+   hover attrs (v4.13.1) and no element to show them in (v4.13.8 fix). Hidden by default. #}
+<div id="deck-list-image-preview" class="deck-list-image-preview" hidden>
+  <img id="deck-list-image-preview-img" src="" alt="">
+  {# Footer: set/printing + price (playgroup request, Aug 2026) — populated by
+     the preview JS from the row's data-card-info; hidden when a surface
+     doesn't emit one. #}
+  <div id="deck-list-image-preview-info" class="deck-list-image-preview-info" hidden></div>
+</div>

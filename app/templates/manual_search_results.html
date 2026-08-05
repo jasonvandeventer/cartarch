@@ -20,9 +20,21 @@
     </form>
   </section>
   {% if results %}
-    <div class="inventory-grid" style="margin-top: 1rem;">
+    <div class="inventory-grid" style="margin-top: 1rem;"
+         data-card-hover data-card-hover-target=".inventory-card">
       {% for card in results %}
-        <article class="inventory-card inventory-card-compact">
+        {% set _img = (card.image_uris.large if card.image_uris and card.image_uris.large
+                       else (card.card_faces[0].image_uris.large
+                             if card.card_faces and card.card_faces[0].image_uris else none)) %}
+        {% set _img_n = (card.image_uris.normal if card.image_uris
+                         else (card.card_faces[0].image_uris.normal
+                               if card.card_faces and card.card_faces[0].image_uris else none)) %}
+        <article class="inventory-card inventory-card-compact"
+                 {% if _img or _img_n %}
+                 data-card-image="{{ _img or _img_n }}"
+                 {% if _img and _img_n %}data-card-image-alt="{{ _img_n }}"{% endif %}
+                 data-card-info="{{ card.set|upper }} #{{ card.collector_number }}{% if card.prices and card.prices.usd %} · ${{ card.prices.usd }}{% endif %}"
+                 {% endif %}>
           <div class="inventory-card-media">
             {% if card.image_uris and card.image_uris.normal %}
               <img class="inventory-thumb"
@@ -72,4 +84,6 @@
       <p class="muted">No matching cards found. Try a different name or spelling.</p>
     </section>
   {% endif %}
+  {# Card hover zoom — shared #169 component. #}
+  <script src="/static/card-hover.js?v={{ static_v('card-hover.js') }}"></script>
 {% endblock %}
