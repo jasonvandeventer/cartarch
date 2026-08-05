@@ -231,3 +231,38 @@ def test_deck_member_card_ids_scopes_to_decks_and_user(db, user):
     assert in_deck.id in ids
     assert in_box.id not in ids
     assert other_deck_card.id not in ids
+
+
+def test_drawer_sort_key_uniform_shape_across_classes(db):
+    """Prod 500 regression (2026-08-05): a sorter-rule target bucket mixes rows
+    of every drawer class, and drawer_sort_key's branches used to return
+    differently-shaped tuples (drawer 6 led with an int section, drawers 1-5
+    with the set-code str) — the first mixed bucket died on
+    TypeError: '<' between int and str. Every class must sort together."""
+    from app.inventory_service import drawer_sort_key
+    from app.models import User
+
+    u = User(username=f"u{next(_seq)}", password_hash="x")
+    db.add(u)
+    db.flush()
+
+    normal = _row(db, u.id, _card(db, name="Normal Creature"))
+    token = _row(db, u.id, _card(db, name="Goblin Token", type_line="Token Creature — Goblin"))
+    proxy = _row(db, u.id, _card(db, name="Proxied Bomb"))
+    proxy.is_proxy = True
+    foreign = _row(db, u.id, _card(db, name="Auslandskarte"))
+    foreign.language = "de"
+    basic = _row(db, u.id, _card(db, name="Swamp", type_line="Basic Land — Swamp"))
+    premium = _row(
+        db, u.id, _card(db, name="Island", type_line="Basic Land — Island"), finish="foil"
+    )
+    oversized = _row(db, u.id, _card(db, name="Big Plane", type_line="Plane — Ravnica"))
+    rows = [normal, token, proxy, foreign, basic, premium, oversized]
+
+    keys = [drawer_sort_key(r) for r in rows]
+    shapes = {tuple(type(part) for part in k) for k in keys}
+    assert len(shapes) == 1, f"key shapes differ: {shapes}"
+    ordered = sorted(rows, key=drawer_sort_key)  # must not raise
+    # Plain cards before tokens/proxies, oversized last — the mixed-bucket order.
+    assert ordered.index(normal) < ordered.index(token) < ordered.index(proxy)
+    assert ordered[-1] is oversized

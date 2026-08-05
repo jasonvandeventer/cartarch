@@ -123,7 +123,10 @@ def test_drawer_sort_key_uses_the_same_definition(db, user, box):
 
     card = _card(db, "Ordinary", "abc", "7")
     row = _place(db, user, card, box)
-    assert drawer_sort_key(row) == shelf_sort_key(row)
+    # drawer_sort_key wraps every key in one uniform shape (the 2026-08-05
+    # mixed-bucket TypeError fix); the DEFINITION consistency this test pins
+    # is that its ordering tail IS shelf_sort_key, verbatim.
+    assert drawer_sort_key(row)[3:] == shelf_sort_key(row)
 
 
 # --------------------------------------------------------------------------

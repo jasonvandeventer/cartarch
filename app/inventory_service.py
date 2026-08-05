@@ -459,56 +459,61 @@ def drawer_sort_key(row: InventoryRow) -> tuple:
     top-to-bottom physical layout: 0=numeric sets, 1=foreign, 2=premium
     basics, 3=plain basics, 4=tokens, 5=substitutes, 6=proxies, 7=oversized
     (Plane/Phenomenon/Scheme/Vanguard — physically last, at the back).
+
+    EVERY branch returns the SAME 7-slot shape:
+        (section:int, sub:str, land:(int,str), set_code:str,
+         collector:(int,str,str), name:str, id:int)
+    because a sorter-rule target bucket mixes rows of every drawer class —
+    the shapes used to differ per class (drawer 6 led with an int, the rest
+    with the set-code str), and the first mixed bucket raised
+    TypeError: '<' not supported between 'int' and 'str' (prod 500 on
+    /collection/resort, 2026-08-05). Per-class relative order is unchanged;
+    mixed buckets order sections first, plain cards before tokens/proxies.
     """
+    _NO_LAND = (0, "")
     card = row.card
     drawer = assign_drawer(row)
     set_code = (card.set_code or "").strip().lower()
     collector = collector_sort_key(card.collector_number)
     name = (card.name or "").strip().lower()
 
-    if drawer == 1:
-        return (set_code, collector, name, row.id)
+    if drawer != 6:
+        # Drawer 1 and shelf drawers (2-5): shelf_sort_key IS the definition
+        # (one ordering rule for boxes and drawers — the consistency the
+        # renumber tests pin); the uniform prefix only makes the shape match
+        # drawer 6's sectioned keys.
+        return (0, "", _NO_LAND, *shelf_sort_key(row))
 
-    if drawer == 6:
-        # Section ordering matches the layout the drawer-sorter user
-        # physically arranged: numeric → foreign → premium → plain → tokens
-        # → substitutes → proxies. Same priority as assign_drawer but encoded
-        # as a sort prefix so all section-0 rows sort before section-1 rows.
-        first_char = set_code[:1]
-        is_numeric_set = bool(first_char) and first_char.isdigit()
-        language = (row.language or "en").lower()
-        is_foreign = language != "en"
-        is_premium = is_premium_basic(card, row.finish)
-        is_basic = is_basic_land_candidate(card, row.finish)
-        is_token = is_token_card(card)
-        is_substitute = is_substitute_card(card)
+    first_char = set_code[:1]
+    is_numeric_set = bool(first_char) and first_char.isdigit()
+    language = (row.language or "en").lower()
+    is_foreign = language != "en"
+    is_premium = is_premium_basic(card, row.finish)
+    is_basic = is_basic_land_candidate(card, row.finish)
+    is_token = is_token_card(card)
+    is_substitute = is_substitute_card(card)
 
-        # Highest-priority classifications win the section assignment when
-        # multiple apply (matches assign_drawer's first-match-wins ordering).
-        # Oversized first: its section number is the largest named section, so
-        # these sort to the very back of the drawer regardless of any other
-        # trait they carry.
-        if is_oversized_card(card):
-            return (7, set_code, collector, name, row.id)
-        if row.is_proxy:
-            return (6, set_code, collector, name, row.id)
-        if is_token:
-            return (4, set_code, collector, name, row.id)
-        if is_substitute:
-            return (5, set_code, collector, name, row.id)
-        if is_foreign:
-            return (1, language, set_code, collector, name, row.id)
-        if is_premium:
-            return (2, basic_land_type_sort_key(card), set_code, collector, name, row.id)
-        if is_basic:
-            return (3, basic_land_type_sort_key(card), set_code, collector, name, row.id)
-        if is_numeric_set:
-            return (0, set_code, collector, name, row.id)
-        # Fallback — shouldn't happen given assign_drawer's exhaustive rules,
-        # but guard against future drift by sorting after every named section.
-        return (8, set_code, collector, name, row.id)
-
-    return shelf_sort_key(row)
+    # Highest-priority classifications win the section assignment when
+    # multiple apply (matches assign_drawer's first-match-wins ordering).
+    if is_oversized_card(card):
+        return (7, "", _NO_LAND, set_code, collector, name, row.id)
+    if row.is_proxy:
+        return (6, "", _NO_LAND, set_code, collector, name, row.id)
+    if is_token:
+        return (4, "", _NO_LAND, set_code, collector, name, row.id)
+    if is_substitute:
+        return (5, "", _NO_LAND, set_code, collector, name, row.id)
+    if is_foreign:
+        return (1, language, _NO_LAND, set_code, collector, name, row.id)
+    if is_premium:
+        return (2, "", basic_land_type_sort_key(card), set_code, collector, name, row.id)
+    if is_basic:
+        return (3, "", basic_land_type_sort_key(card), set_code, collector, name, row.id)
+    if is_numeric_set:
+        return (0, "", _NO_LAND, set_code, collector, name, row.id)
+    # Fallback — shouldn't happen given assign_drawer's exhaustive rules,
+    # but guard against future drift by sorting after every named section.
+    return (8, "", _NO_LAND, set_code, collector, name, row.id)
 
 
 def shelf_sort_key(row: InventoryRow) -> tuple:

@@ -1,5 +1,12 @@
 [
   {
+    "version": "4.13.5",
+    "date": "2026-08-05",
+    "added": [
+      "Fixed the crash when applying the drawer sorter with a rule that targets one location. Sorting a bucket that mixed ordinary cards with tokens, proxies, basics, or foreign cards compared incompatible sort keys and failed with an internal server error — exactly what happens the first time a rule funnels a whole collection into a new location. All card classes now sort together: plain cards first, then special sections, oversized last, and the box-and-drawer ordering rule stays one definition."
+    ]
+  },
+  {
     "version": "4.13.4",
     "date": "2026-08-04",
     "added": [
