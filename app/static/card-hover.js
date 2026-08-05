@@ -98,27 +98,35 @@
     position(x, y);
   }
 
-  document.querySelectorAll("[data-card-hover]").forEach(function (container) {
+  // Document-level delegation (v4.13.7): containers used to get their own
+  // listeners at load time, which silently skipped any container inserted
+  // AFTER load — the import reconciliation panel arrives via HTMX and never
+  // activated. Resolving the container per event costs two closest() calls
+  // and works for every present and future surface, static or swapped-in.
+  function resolveTarget(e) {
+    if (!e.target || !e.target.closest) return null;
+    var container = e.target.closest("[data-card-hover]");
+    if (!container) return null;
     var selector = container.getAttribute("data-card-hover-target");
-    if (!selector) return;
+    if (!selector) return null;
+    var el = e.target.closest(selector);
+    return el && container.contains(el) ? { el: el, selector: selector } : null;
+  }
 
-    // ONE delegated listener per container, not one per row.
-    container.addEventListener("mouseover", function (e) {
-      var el = e.target.closest ? e.target.closest(selector) : null;
-      if (el && container.contains(el)) show(el, e.clientX, e.clientY);
-    });
-    container.addEventListener("mousemove", function (e) {
-      var el = e.target.closest ? e.target.closest(selector) : null;
-      if (el && container.contains(el) && preview && preview.classList.contains("is-visible")) {
-        position(e.clientX, e.clientY);
-      }
-    });
-    container.addEventListener("mouseout", function (e) {
-      var to = e.relatedTarget;
-      // Ignore moves WITHIN the same row; only a real exit hides.
-      if (!to || !to.closest || !to.closest(selector)) hide();
-    });
-    container.addEventListener("mouseleave", hide);
+  document.addEventListener("mouseover", function (e) {
+    var t = resolveTarget(e);
+    if (t) show(t.el, e.clientX, e.clientY);
+  });
+  document.addEventListener("mousemove", function (e) {
+    if (!preview || !preview.classList.contains("is-visible")) return;
+    if (resolveTarget(e)) position(e.clientX, e.clientY);
+  });
+  document.addEventListener("mouseout", function (e) {
+    var t = resolveTarget(e);
+    if (!t) return;
+    var to = e.relatedTarget;
+    // Ignore moves WITHIN the same row; only a real exit hides.
+    if (!to || !to.closest || to.closest(t.selector) !== t.el) hide();
   });
 
   // A row hidden by the filter under an open preview may never fire mouseleave.

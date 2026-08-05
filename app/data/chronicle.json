@@ -1,5 +1,12 @@
 [
   {
+    "version": "4.13.7",
+    "date": "2026-08-05",
+    "added": [
+      "The card hover zoom reached the two screens it had missed: Decks — where hovering a deck row now shows its commander's card — and the Import flow, both the pre-commit preview table and the reconciliation panel. Fixing the import screens uncovered why panels loaded after the page never zoomed: the component only looked for hover surfaces once, at page load. It now watches the whole document, so any panel that appears later works automatically."
+    ]
+  },
+  {
     "version": "4.13.6",
     "date": "2026-08-05",
     "added": [

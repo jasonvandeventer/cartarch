@@ -48,7 +48,7 @@
 #}
 {% set mode = reconcile_mode | default("deck") %}
 {% if rows and mode == "deck" %}
-  <section class="panel" style="margin-top: 0.75rem" id="reconciliation-content">
+  <section class="panel" style="margin-top: 0.75rem" id="reconciliation-content" data-card-hover data-card-hover-target="tr[data-card-image]">
     <h3 class="panel-title imports-step-title" style="margin-bottom: 0.4rem"><span class="deck-detail-section-mark">§</span> Reconciliation</h3>
     <p class="muted" style="margin-top: 0">
       {% if total_to_move > 0 and total_to_import_new > 0 %}
@@ -108,7 +108,11 @@
           </thead>
           <tbody>
             {% for row in rows %}
-              <tr>
+              <tr {% if row.scryfall_id %}
+                  data-card-image="{{ mirror_image_url(row.scryfall_id, 'large') }}"
+                  data-card-image-alt="{{ scryfall_image_fallback(row.scryfall_id, 'large') }}"
+                  data-card-info="{{ row.display_name or row.scryfall_id }}"
+                  {% endif %}>
                 <td>
                   {{ row.display_name or row.scryfall_id }}
                   {% if row.matches %}
@@ -276,7 +280,7 @@
      commit handler indexes by parsed_rows position, so dropping rows
      from the form would shift the actions onto the wrong cards. #}
   {% set _show_dupes_only = has_deck_only_dupes | default(false) %}
-  <section class="panel" style="margin-top: 0.75rem" id="reconciliation-content">
+  <section class="panel" style="margin-top: 0.75rem" id="reconciliation-content" data-card-hover data-card-hover-target="tr[data-card-image]">
     <h3 class="panel-title imports-step-title" style="margin-bottom: 0.4rem"><span class="deck-detail-section-mark">§</span> Reconciliation</h3>
     <p class="muted" style="margin-top: 0">
       {% set _to_skip = total_to_skip | default(0) %}
@@ -345,7 +349,12 @@
                  submission). #}
               {% set _row_class = "reconcile-row-dupe" if row.has_owned_match else "reconcile-row-fresh" %}
               {% set _row_class = _row_class ~ (" reconcile-row-deck-only" if row.is_deck_only_dupe else "") %}
-              <tr class="{{ _row_class }}">
+              <tr class="{{ _row_class }}"
+                  {% if row.scryfall_id %}
+                  data-card-image="{{ mirror_image_url(row.scryfall_id, 'large') }}"
+                  data-card-image-alt="{{ scryfall_image_fallback(row.scryfall_id, 'large') }}"
+                  data-card-info="{{ row.display_name or row.scryfall_id }}"
+                  {% endif %}>
                 <td>
                   {{ row.display_name or row.scryfall_id }}
                   {% if row.owned_breakdown %}

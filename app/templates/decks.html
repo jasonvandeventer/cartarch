@@ -74,9 +74,14 @@
        by name when no deck has logged games. The featured slot collapses to
        just the compact-row treatment when there's nothing to feature. #}
     {% if featured and featured.games > 0 %}
-      <section class="decks-featured">
+      <section class="decks-featured" data-card-hover data-card-hover-target=".decks-featured-grid">
         <div class="decks-featured-tag">Featured · Most active</div>
-        <div class="decks-featured-grid">
+        <div class="decks-featured-grid"
+             {% if featured.commander_card and featured.commander_card.image_url and featured.commander_card.scryfall_id %}
+             data-card-image="{{ mirror_image_url(featured.commander_card.scryfall_id, 'large') }}"
+             data-card-image-alt="{{ scryfall_image_fallback(featured.commander_card.scryfall_id, 'large') }}"
+             data-card-info="{{ featured.commander_card.name }}"
+             {% endif %}>
           <div class="decks-featured-art">
             {% if featured.color_identity %}
               <div class="decks-featured-art-pip">{{ mana_pips(featured.color_identity) }}</div>
@@ -153,9 +158,14 @@
        by name. The featured deck is filtered out of this list. #}
     {% set others = decks | rejectattr('id', 'equalto', (featured.id if featured and featured.games > 0 else 0)) | list %}
     {% if others %}
-      <section class="decks-rows">
+      <section class="decks-rows" data-card-hover data-card-hover-target=".decks-row">
         {% for deck in others %}
-          <article class="decks-row {% if deck.consistency and deck.consistency.tier == 'low' %}decks-row-attn{% endif %}">
+          <article class="decks-row {% if deck.consistency and deck.consistency.tier == 'low' %}decks-row-attn{% endif %}"
+                   {% if deck.commander_card and deck.commander_card.image_url and deck.commander_card.scryfall_id %}
+                   data-card-image="{{ mirror_image_url(deck.commander_card.scryfall_id, 'large') }}"
+                   data-card-image-alt="{{ scryfall_image_fallback(deck.commander_card.scryfall_id, 'large') }}"
+                   data-card-info="{{ deck.commander_card.name }}"
+                   {% endif %}>
             <div class="decks-row-copy">
               <h3 class="decks-row-name">
                 <a href="/decks/{{ deck.id }}">{{ deck.name }}</a>
@@ -374,4 +384,6 @@
       {% endfor %}
     </details>
   {% endif %}
+  {# Card hover zoom — shared #169 component. #}
+  <script src="/static/card-hover.js?v={{ static_v('card-hover.js') }}"></script>
 {% endblock %}

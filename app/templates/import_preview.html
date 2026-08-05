@@ -361,9 +361,13 @@
               <th>Warnings</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody data-card-hover data-card-hover-target="tr[data-card-image]">
             {% for row in valid_rows %}
-              <tr>
+              <tr {% if row.scryfall_id %}
+                  data-card-image="{{ mirror_image_url(row.scryfall_id, 'large') }}"
+                  data-card-image-alt="{{ scryfall_image_fallback(row.scryfall_id, 'large') }}"
+                  data-card-info="{{ (row.set_code or '?')|upper }} #{{ row.collector_number or '?' }} · {{ row.finish }}"
+                  {% endif %}>
                 <td>{{ row.line_number }}</td>
                 <td>{{ row.name or '-' }}</td>
                 <td>{{ row.set_code or '-' }}</td>
@@ -429,4 +433,6 @@
       </div>
     </section>
   {% endif %}
+  {# Card hover zoom — shared #169 component. #}
+  <script src="/static/card-hover.js?v={{ static_v('card-hover.js') }}"></script>
 {% endblock %}

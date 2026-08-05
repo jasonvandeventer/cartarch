@@ -181,6 +181,13 @@ def decks_page(
         deck.sessions_won = s_stats.get("sessions_won", 0)
         deck.session_win_rate = s_stats.get("session_win_rate", 0)
 
+    # Card hover zoom: a deck row previews its COMMANDER — the one card that
+    # names the deck. deck_commander_cards is the canonical resolver (both
+    # tagging mechanisms), so this can't disagree with the deck page.
+    for deck in decks:
+        _cmds = deck_commander_cards(session, deck, limit=1)
+        deck.commander_card = _cmds[0] if _cmds else None
+
     # issue #27 — variant-group share management surfaced in the deck-edit
     # popouts (decks.html, both the featured and per-row Edit forms). Gated on
     # variant_group_id so non-variant decks pay nothing. Each variant-group deck
