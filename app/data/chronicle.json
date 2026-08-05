@@ -1,5 +1,12 @@
 [
   {
+    "version": "4.13.9",
+    "date": "2026-08-05",
+    "added": [
+      "The daily price ingest now names the printings it couldn't match to MTGJSON instead of just counting them (capped at 50 lines), so mapping gaps — old white-border printings, double-faced cards like the Final Fantasy Yuna, borderless variants — are identifiable from the job log rather than needing database archaeology."
+    ]
+  },
+  {
     "version": "4.13.8",
     "date": "2026-08-05",
     "added": [
