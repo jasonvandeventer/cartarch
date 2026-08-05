@@ -320,3 +320,35 @@ def test_list_rows_for_location_is_also_numeric(db, user):
     loc = _drawer_rows(db, user, 6)
     slots = [r.slot for r in list_rows_for_location(db, user_id=user.id, location_id=loc.id)]
     assert slots == ["1", "2", "10", "100", "1000", "1001"]
+
+
+def test_confirm_all_confirms_direct_to_location_pending_rows(db, user, box):
+    """Live report 2026-08-05: rows imported directly INTO a location (no
+    drawer/slot — they never touched the drawer sorter) were skipped by
+    confirm_all_pending, making Confirm All a silent 303 no-op, and the
+    location's rows carried no slots. Direct rows must confirm in place and
+    the location must come out filed 1..N in shelf order."""
+    from app.inventory_service import confirm_all_pending
+
+    a = _place(db, user, _card(db, "Beta", "abc", "10"), box)
+    b = _place(db, user, _card(db, "Alpha", "abc", "2"), box)
+    a.is_pending = True
+    b.is_pending = True
+    homeless = InventoryRow(
+        user_id=user.id,
+        card_id=_card(db, "Homeless", "zzz", "9").id,
+        quantity=1,
+        finish="normal",
+        is_pending=True,
+    )
+    db.add(homeless)
+    db.commit()
+
+    confirmed = confirm_all_pending(db, user_id=user.id)
+    assert confirmed == 2
+    for r in (a, b, homeless):
+        db.refresh(r)
+    assert not a.is_pending and not b.is_pending
+    assert homeless.is_pending  # no location, no drawer/slot: still skipped
+    # Filed in shelf order: Alpha (#2) before Beta (#10).
+    assert (b.slot, a.slot) == ("1", "2")

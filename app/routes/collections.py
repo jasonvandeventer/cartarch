@@ -1699,8 +1699,11 @@ async def pending_confirm_all(
     current_user: User = Depends(get_current_user),
     _: None = CsrfRequired,
 ):
-    if has_sortable_setup(session, current_user.id):
-        confirm_all_pending(session, user_id=current_user.id)
+    # No sortable-setup gate: confirm_all_pending now also confirms rows
+    # imported directly into a location (no drawer/slot), which need no sorter
+    # at all — the gate made Confirm All a silent no-op for those users.
+    # Rows with neither a drawer/slot nor a location are still skipped inside.
+    confirm_all_pending(session, user_id=current_user.id)
     return RedirectResponse(url="/pending", status_code=303)
 
 

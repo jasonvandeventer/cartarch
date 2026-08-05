@@ -1,5 +1,12 @@
 [
   {
+    "version": "4.13.6",
+    "date": "2026-08-05",
+    "added": [
+      "Confirm All on the Pending screen now works for cards imported straight into a location. Those rows never pass through the drawer sorter, so they have no drawer or slot — and the old code silently skipped them while still reporting success. They now confirm in place, and their location is filed with walkable slot numbers in set-and-collector order the moment they land. The needless requirement that you have a sorter set up before Confirm All does anything is gone too."
+    ]
+  },
+  {
     "version": "4.13.5",
     "date": "2026-08-05",
     "added": [

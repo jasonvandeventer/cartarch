@@ -2945,9 +2945,35 @@ def confirm_all_pending(session: Session, user_id: int) -> int:
     )
     count = 0
     now = utc_now()
+    placed_locations: set[int] = set()
 
     for row in rows:
         if not row.drawer or not row.slot:
+            # Direct-to-location import: the row already knows WHERE it lives
+            # (a box/binder chosen at import time) and never went through the
+            # drawer sorter, so it has no drawer/slot — skipping it made
+            # Confirm All a silent no-op for exactly these rows (live report
+            # 2026-08-05: a fresh location's whole import stuck pending).
+            # Confirm in place; slots are filed per-location below.
+            if row.storage_location_id is not None:
+                loc = row.storage_location
+                row.is_pending = False
+                row.updated_at = now
+                log_transaction(
+                    session=session,
+                    user_id=user_id,
+                    event_type="placement_confirmed",
+                    card_id=row.card_id,
+                    finish=row.finish,
+                    quantity_delta=0,
+                    source_location="pending",
+                    destination_location=(loc.name if loc else str(row.storage_location_id)),
+                    inventory_row_id=row.id,
+                    note="Pending row confirmed in its import location",
+                    flush=False,
+                )
+                placed_locations.add(row.storage_location_id)
+                count += 1
             continue
 
         location = _get_or_create_drawer_location(session, user_id, row.drawer)
@@ -2972,6 +2998,10 @@ def confirm_all_pending(session: Session, user_id: int) -> int:
         count += 1
 
     session.commit()
+    # File each directly-confirmed location so the rows get walkable slots
+    # (shelf order, 1..N) — the "no slots assigned" half of the same report.
+    for loc_id in sorted(placed_locations):
+        renumber_location_slots(session, loc_id, user_id)
     return count
 
 
