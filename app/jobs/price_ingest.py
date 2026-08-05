@@ -135,13 +135,14 @@ def run_ingest(session) -> dict[str, int]:
         )
         # Name them (pilot asked "which cards?" and the count alone couldn't
         # answer). Bounded: log at most 50 — an upstream identifier outage
-        # would otherwise dump every printing into the job log.
-        with SessionLocal() as _s:
-            _rows = (
-                _s.query(Card.name, Card.set_code, Card.collector_number)
-                .filter(Card.scryfall_id.in_(sorted(unresolved)[:50]))
-                .all()
-            )
+        # would otherwise dump every printing into the job log. Uses the
+        # caller's session, NOT a fresh SessionLocal: the job runs against
+        # whatever engine it was handed (the tests hand it theirs).
+        _rows = (
+            session.query(Card.name, Card.set_code, Card.collector_number)
+            .filter(Card.scryfall_id.in_(sorted(unresolved)[:50]))
+            .all()
+        )
         for _name, _set, _cn in _rows:
             print(
                 f"[price-ingest]   unresolved: {_name} ({(_set or '?').upper()} #{_cn})", flush=True
