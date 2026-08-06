@@ -1011,15 +1011,15 @@
   "deck_id": 17,
   "run_label": "archenemy-2026-08-04",
   "strategy": "core",
-  "wins": 7,
-  "games": 14
+  "wins": 8,
+  "games": 18
  },
  {
   "deck_id": 16,
   "run_label": "archenemy-2026-08-04",
   "strategy": "core",
-  "wins": 5,
-  "games": 13
+  "wins": 7,
+  "games": 20
  },
  {
   "deck_id": 34,
@@ -1032,189 +1032,224 @@
   "deck_id": 30,
   "run_label": "archenemy-2026-08-04",
   "strategy": "core",
-  "wins": 3,
-  "games": 16
+  "wins": 6,
+  "games": 20
  },
  {
   "deck_id": 36,
   "run_label": "archenemy-2026-08-04",
   "strategy": "core",
   "wins": 3,
-  "games": 13
+  "games": 14
  },
  {
   "deck_id": 50,
   "run_label": "archenemy-2026-08-04",
   "strategy": "core",
   "wins": 2,
-  "games": 13
+  "games": 16
  },
  {
   "deck_id": 55,
   "run_label": "archenemy-2026-08-04",
   "strategy": "core",
-  "wins": 6,
-  "games": 13
+  "wins": 9,
+  "games": 21
  },
  {
   "deck_id": 62,
   "run_label": "archenemy-2026-08-04",
   "strategy": "core",
-  "wins": 4,
-  "games": 17
+  "wins": 5,
+  "games": 20
  },
  {
   "deck_id": 38,
   "run_label": "archenemy-2026-08-04",
   "strategy": "core",
-  "wins": 4,
-  "games": 16
+  "wins": 5,
+  "games": 23
  },
  {
   "deck_id": 21,
   "run_label": "archenemy-2026-08-04",
   "strategy": "core",
-  "wins": 5,
-  "games": 13
+  "wins": 8,
+  "games": 19
  },
  {
   "deck_id": 23,
   "run_label": "archenemy-2026-08-04",
   "strategy": "core",
-  "wins": 1,
-  "games": 12
+  "wins": 2,
+  "games": 18
  },
  {
   "deck_id": 14,
   "run_label": "archenemy-2026-08-04",
   "strategy": "core",
   "wins": 5,
-  "games": 17
+  "games": 21
  },
  {
   "deck_id": 24,
   "run_label": "archenemy-2026-08-04",
   "strategy": "core",
   "wins": 2,
-  "games": 15
+  "games": 16
  },
  {
   "deck_id": 29,
   "run_label": "archenemy-2026-08-04",
   "strategy": "core",
   "wins": 3,
-  "games": 14
+  "games": 18
  },
  {
   "deck_id": 11,
   "run_label": "archenemy-2026-08-04",
   "strategy": "core",
-  "wins": 3,
-  "games": 17
+  "wins": 4,
+  "games": 22
  },
  {
   "deck_id": 31,
   "run_label": "archenemy-2026-08-04",
   "strategy": "core",
-  "wins": 4,
-  "games": 13
+  "wins": 6,
+  "games": 18
  },
  {
   "deck_id": 64,
   "run_label": "archenemy-2026-08-04",
   "strategy": "core",
-  "wins": 7,
-  "games": 16
+  "wins": 8,
+  "games": 19
  },
  {
   "deck_id": 1,
   "run_label": "archenemy-2026-08-04",
   "strategy": "core",
   "wins": 2,
-  "games": 13
+  "games": 17
+ },
+ {
+  "deck_id": 89,
+  "run_label": "archenemy-2026-08-04",
+  "strategy": "core",
+  "wins": 1,
+  "games": 12
  },
  {
   "deck_id": 12,
   "run_label": "archenemy-2026-08-04",
   "strategy": "core",
   "wins": 2,
-  "games": 14
+  "games": 17
  },
  {
   "deck_id": 26,
   "run_label": "archenemy-2026-08-04",
   "strategy": "core",
-  "wins": 1,
-  "games": 12
+  "wins": 3,
+  "games": 19
  },
  {
   "deck_id": 8,
   "run_label": "archenemy-2026-08-04",
   "strategy": "core",
-  "wins": 6,
-  "games": 15
+  "wins": 9,
+  "games": 19
  },
  {
   "deck_id": 4,
-  "run_label": "archenemy-2026-08-04",
-  "strategy": "core",
-  "wins": 2,
-  "games": 15
- },
- {
-  "deck_id": 6,
   "run_label": "archenemy-2026-08-04",
   "strategy": "core",
   "wins": 3,
   "games": 18
  },
  {
-  "deck_id": 40,
+  "deck_id": 6,
   "run_label": "archenemy-2026-08-04",
   "strategy": "core",
   "wins": 4,
-  "games": 14
+  "games": 23
+ },
+ {
+  "deck_id": 40,
+  "run_label": "archenemy-2026-08-04",
+  "strategy": "core",
+  "wins": 6,
+  "games": 19
+ },
+ {
+  "deck_id": 88,
+  "run_label": "archenemy-2026-08-04",
+  "strategy": "core",
+  "wins": 5,
+  "games": 12
  },
  {
   "deck_id": 18,
   "run_label": "archenemy-2026-08-04",
   "strategy": "core",
   "wins": 1,
-  "games": 14
+  "games": 16
  },
  {
   "deck_id": 56,
   "run_label": "archenemy-2026-08-04",
   "strategy": "core",
   "wins": 2,
-  "games": 12
+  "games": 19
  },
  {
   "deck_id": 22,
   "run_label": "archenemy-2026-08-04",
   "strategy": "core",
-  "wins": 3,
-  "games": 14
+  "wins": 4,
+  "games": 18
+ },
+ {
+  "deck_id": 87,
+  "run_label": "archenemy-2026-08-04",
+  "strategy": "core",
+  "wins": 6,
+  "games": 13
  },
  {
   "deck_id": 9,
   "run_label": "archenemy-2026-08-04",
   "strategy": "core",
   "wins": 7,
-  "games": 17
+  "games": 20
  },
  {
   "deck_id": 25,
   "run_label": "archenemy-2026-08-04",
   "strategy": "core",
-  "wins": 4,
-  "games": 17
+  "wins": 6,
+  "games": 26
+ },
+ {
+  "deck_id": 83,
+  "run_label": "archenemy-2026-08-04",
+  "strategy": "core",
+  "wins": 3,
+  "games": 13
+ },
+ {
+  "deck_id": 81,
+  "run_label": "archenemy-2026-08-04",
+  "strategy": "core",
+  "wins": 2,
+  "games": 12
  },
  {
   "deck_id": 37,
   "run_label": "archenemy-2026-08-04",
   "strategy": "core",
   "wins": 4,
-  "games": 13
+  "games": 16
  }
 ]

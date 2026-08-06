@@ -1,5 +1,12 @@
 [
   {
+    "version": "4.13.11",
+    "date": "2026-08-05",
+    "added": [
+      "The focus-the-leader simulation now covers the complete five-player core playgroup: CptObvious' four newly-entered decks and the Whiplash brew joined the pool, bringing that run to 35 decks over 156 games. The Lord of Pain debuted second in the entire core meta. Every deck page's Measured Strength panel picks the new numbers up automatically."
+    ]
+  },
+  {
     "version": "4.13.10",
     "date": "2026-08-05",
     "added": [
