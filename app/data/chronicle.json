@@ -1,5 +1,12 @@
 [
   {
+    "version": "4.13.12",
+    "date": "2026-08-06",
+    "resolved": [
+      "Pending Placement — the \"Review now\" button on the dashboard — returned an Internal Server Error for anyone who files cards without drawers. The hover-zoom preview added on August 4th read a card's price straight from storage, where prices are kept as text, and formatting text as a dollar amount failed the whole page. Reported live today; the same fault had been quietly breaking the individual drawer pages since it shipped, and both are fixed."
+    ]
+  },
+  {
     "version": "4.13.11",
     "date": "2026-08-05",
     "added": [

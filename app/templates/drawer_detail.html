@@ -23,7 +23,7 @@
                    {% if item.card.image_url and item.card.scryfall_id %}
                    data-card-image="{{ mirror_image_url(item.card.scryfall_id, 'large') }}"
                    data-card-image-alt="{{ scryfall_image_fallback(item.card.scryfall_id, 'large') }}"
-                   data-card-info="{{ (item.card.set_code or '?')|upper }} #{{ item.card.collector_number or '?' }}{% if item.card.price_usd %} · ${{ '%.2f'|format(item.card.price_usd) }}{% endif %}"
+                   data-card-info="{{ (item.card.set_code or '?')|upper }} #{{ item.card.collector_number or '?' }}{% if item.effective_price %} · ${{ '%.2f'|format(item.effective_price) }}{% endif %}"
                    {% endif %}>
             <div class="inventory-card-media">
               {% if item.card.image_url %}
