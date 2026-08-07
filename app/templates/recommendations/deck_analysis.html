@@ -82,9 +82,17 @@
           <span style="color:#c0392b;font-weight:600">— {{ entry.min - entry.count }} below target</span>
         </h4>
         {% if suggestions %}
-          <ul style="list-style:none;padding:0;margin:0 0 0.75rem;display:grid;gap:0.4rem">
+          <ul style="list-style:none;padding:0;margin:0 0 0.75rem;display:grid;gap:0.4rem"
+              data-card-hover
+              data-card-hover-target=".upgrade-suggestion">
             {% for s in suggestions %}
-              <li style="display:flex;gap:0.6rem;align-items:flex-start">
+              <li class="upgrade-suggestion"
+                  {% if s.card.image_url and s.card.scryfall_id %}
+                  data-card-image="{{ mirror_image_url(s.card.scryfall_id, 'large') }}"
+                  data-card-image-alt="{{ scryfall_image_fallback(s.card.scryfall_id, 'large') }}"
+                  data-card-info="{{ (s.card.set_code or '?')|upper }} #{{ s.card.collector_number or '?' }}{% if effective_price(s.card, 'normal') %} · ${{ '%.2f'|format(effective_price(s.card, 'normal')) }}{% endif %}"
+                  {% endif %}
+                  style="display:flex;gap:0.6rem;align-items:flex-start">
                 {% if s.card.image_url %}
                   <img src="{{ mirror_image_url(s.card.scryfall_id) }}"
                        {{ img_fallback(s.card.scryfall_id) }}
@@ -180,4 +188,9 @@
   </section>
 
   <p><a href="/decks/{{ deck.id }}">← Back to deck</a></p>
+{% endblock %}
+
+{% block extra_scripts %}
+  {# Card hover zoom — shared #169 component. #}
+  <script src="/static/card-hover.js?v={{ static_v('card-hover.js') }}"></script>
 {% endblock %}
