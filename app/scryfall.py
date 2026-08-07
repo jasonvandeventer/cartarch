@@ -10,6 +10,7 @@ import gzip
 import json
 import time
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from functools import lru_cache
 from typing import Any
 
@@ -1066,6 +1067,57 @@ def refresh_bulk_cache() -> int:
     return total
 
 
+# Scryfall rebuilds ~daily and the loop polls every 24h, so one missed cycle is
+# normal and two is not. Past this age the catalog is stale enough that new
+# printings are missing from every surface that reads the cache.
+BULK_STALE_AFTER_DAYS = 2
+
+
+def bulk_cache_status() -> dict:
+    """Freshness of the ``scryfall_cards`` bulk catalog, for the admin page.
+
+    ``{updated_at, age_days, is_stale, detail}``. ``age_days`` is None when the
+    cache has never been populated or the stored stamp will not parse — both of
+    which count as STALE, because "no idea how old this is" is not reassurance.
+
+    **This exists because a broken ingest looked exactly like a healthy one.**
+    Scryfall changed the bulk export format on 2026-07-28 (v4.13.14); the loop
+    guarded on the missing key, logged one line and returned 0, every 24h for ten
+    days. Nothing surfaced it — it was found by accident chasing an unrelated
+    empty column. A daemon that reports success while doing nothing needs a
+    reading a person can see, not another log line.
+
+    Cheap: one indexed lookup on a 1-row table, no network.
+    """
+    raw = _bulk_meta_get(_BULK_META_KEY)
+    if not raw:
+        return {
+            "updated_at": None,
+            "age_days": None,
+            "is_stale": True,
+            "detail": "never populated",
+        }
+    try:
+        stamp = datetime.fromisoformat(raw)
+    except ValueError:
+        return {
+            "updated_at": raw,
+            "age_days": None,
+            "is_stale": True,
+            "detail": "unparseable timestamp",
+        }
+    if stamp.tzinfo is None:
+        stamp = stamp.replace(tzinfo=UTC)
+    age = (utc_now() - stamp).total_seconds() / 86400
+    stale = age > BULK_STALE_AFTER_DAYS
+    return {
+        "updated_at": raw,
+        "age_days": round(age, 1),
+        "is_stale": stale,
+        "detail": f"{age:.1f} days old" + (" — refresh is not running" if stale else ""),
+    }
+
+
 def _bulk_data_loop() -> None:
     if shutdown_event.wait(_BULK_INITIAL_SLEEP_SECONDS):  # bail if stopping
         return
@@ -1077,6 +1129,12 @@ def _bulk_data_loop() -> None:
                 f"[bulk-data] refresh error (will retry next cycle): {exc}",
                 flush=True,
             )
+        # Report staleness AFTER every pass, successful or not. The 2026-07-28
+        # outage produced a calm "skipping" line each cycle and nothing that said
+        # how far behind the catalog had fallen.
+        status = bulk_cache_status()
+        if status["is_stale"]:
+            print(f"[bulk-data] WARNING: cache is STALE ({status['detail']})", flush=True)
         shutdown_event.wait(_BULK_POLL_INTERVAL_SECONDS)
 
 

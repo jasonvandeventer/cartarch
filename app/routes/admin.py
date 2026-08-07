@@ -26,6 +26,7 @@ from app.models import (
     WatchlistItem,
     WishlistShare,
 )
+from app.scryfall import bulk_cache_status
 
 router = APIRouter(prefix="/admin")
 
@@ -80,6 +81,10 @@ def admin_page(
             "title": "Admin",
             "current_user": current_user,
             "user_rows": _build_user_rows(session),
+            # Catalog freshness. The 2026-07-28 bulk-ingest break ran for ten
+            # days because nothing showed how old the card data was; this is the
+            # reading that makes that visible without reading pod logs.
+            "bulk_cache": bulk_cache_status(),
         },
     )
 

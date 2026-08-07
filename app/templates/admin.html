@@ -20,7 +20,28 @@
         <div class="stat-value">{{ user_rows | sum(attribute='deck_count') }}</div>
         <div class="stat-label">Decks</div>
       </div>
+      {# Catalog freshness. A broken bulk ingest is INVISIBLE otherwise — it ran
+         ten days in 2026-07/08 while every page looked fine. #}
+      <div class="stat-card"{% if bulk_cache.is_stale %} style="border-color:#c0392b"{% endif %}>
+        <div class="stat-value"{% if bulk_cache.is_stale %} style="color:#c0392b"{% endif %}>
+          {% if bulk_cache.age_days is not none %}{{ bulk_cache.age_days }}d{% else %}—{% endif %}
+        </div>
+        <div class="stat-label">Card data age</div>
+      </div>
     </div>
+    {% if bulk_cache.is_stale %}
+      <p class="warning-text" style="margin-top:0.75rem">
+        <strong>Card catalog is stale — {{ bulk_cache.detail }}.</strong>
+        The Scryfall bulk refresh should run every 24h. New printings are missing
+        from the commander picker, unowned-card prices and commander resolution
+        until it recovers. Check the pod log for <code>[bulk-data]</code>.
+      </p>
+    {% else %}
+      <p class="muted" style="margin-top:0.75rem">
+        Card catalog refreshed {{ bulk_cache.detail }} (Scryfall bulk export
+        {{ bulk_cache.updated_at }}).
+      </p>
+    {% endif %}
   </section>
   {% set error = request.query_params.get('error') %}
   {% set success = request.query_params.get('success') %}
