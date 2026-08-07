@@ -149,8 +149,58 @@ def _record_live_action(
                 duration_ms,
                 overlap,
             )
+            _persist_live_conflict(
+                game_id, user_id, atype, v_read, v_written, previous, overlap, duration_ms
+            )
     except Exception:  # pragma: no cover — never let telemetry break a game
         logger.debug("live_action instrumentation failed", exc_info=True)
+
+
+def _persist_live_conflict(
+    game_id: int,
+    user_id: int | None,
+    atype: str,
+    v_read: int,
+    v_written: int,
+    already_written: int | None,
+    overlap: int,
+    duration_ms: float,
+) -> None:
+    """Write one detected lost update to ``live_action_conflicts``.
+
+    **Its own short session, never the caller's.** This runs AFTER the game's
+    commit; borrowing that session would put a diagnostic write inside the game's
+    transaction boundary, and a failure there could take the action with it. Same
+    posture the ingest jobs use.
+
+    Swallows everything — the caller already wraps this, but the contract that
+    instrumentation may never fail an action is worth stating where the DB write
+    actually happens. A lost conflict row is a lost diagnostic; a failed live
+    action is a broken game.
+    """
+    from app.db import SessionLocal
+    from app.models import LiveActionConflict
+
+    session = SessionLocal()
+    try:
+        session.add(
+            LiveActionConflict(
+                game_id=game_id,
+                user_id=user_id,
+                action_type=atype,
+                version_read=v_read,
+                version_written=v_written,
+                already_written=already_written,
+                concurrent=overlap,
+                duration_ms=duration_ms,
+            )
+        )
+        session.commit()
+    except Exception:  # pragma: no cover — diagnostics never break a game
+        session.rollback()
+        logger.debug("live conflict persist failed", exc_info=True)
+    finally:
+        session.close()
 
 
 # Momir Basic (format="momir") layers two extra actions on top of the shared

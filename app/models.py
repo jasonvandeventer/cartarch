@@ -1129,6 +1129,52 @@ class GameGoalResult(Base):
     game_seat: Mapped[GameSeat] = relationship(back_populates="goal_results")
 
 
+class LiveActionConflict(Base):
+    """One row per DETECTED lost update in a live game (#155, for #153).
+
+    **This table exists because the v4.12.7 instrumentation could not outlive the
+    question it was asked.** It writes to stdout; the cluster runs no log
+    aggregator, ``kubectl logs --previous`` is gone after one restart, and prod
+    restarts on every deploy. Measured 2026-08-07: **zero live games had been
+    played since the instrumentation shipped**, so it had never observed a single
+    action — and the first game's evidence would have been erased by the next
+    deploy. A diagnostic that survives neither the pod nor the question cannot
+    settle anything.
+
+    **Only CLOBBERS are persisted, not every action.** The per-action line stays
+    in the log: it is high-volume (822 events across 4 games), and its value is
+    offline correlation. The decisive fact — two requests read version N and both
+    wrote N+1, so the second discarded the first — is rare by construction and is
+    what a conclusion needs. The DENOMINATOR is free: ``game_events`` already
+    persists one row per applied action.
+
+    **No FK on ``game_id``, deliberately** (the ``card_prices.scryfall_id``
+    precedent). A record that a game lost a mutation should not evaporate when the
+    game is deleted, and a diagnostic must not add a new edge to the delete
+    topology ``tests/test_fk_parent_delete.py`` reasons about.
+
+    TEMPORARY, like the instrumentation it backs: drop both when #153 closes.
+    """
+
+    __tablename__ = "live_action_conflicts"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    game_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    # Nullable: the table token acts for a game, not a person.
+    user_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    action_type: Mapped[str] = mapped_column(String(64), nullable=False)
+    # THE decisive pair. Equal values across two requests mean the second commit
+    # overwrote the first's blob.
+    version_read: Mapped[int] = mapped_column(Integer, nullable=False)
+    version_written: Mapped[int] = mapped_column(Integer, nullable=False)
+    already_written: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # Sampled at ENTRY, not commit — any two overlapping requests have at least
+    # one that started while the other was in flight.
+    concurrent: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    duration_ms: Mapped[float | None] = mapped_column(Float, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utc_now)
+
+
 class GameLiveState(Base):
     """Companion mode — the live, mid-game working state of an in_progress game.
 
