@@ -251,6 +251,7 @@ def _parsed_rows_from_form(
     tags: list[str] | None = None,
     is_proxy: list[str] | None = None,
     is_brew: list[str] | None = None,
+    deck_format: list[str] | None = None,
 ) -> list[dict]:
     """Rebuild the parsed-row dicts from the parallel-array form fields.
 
@@ -272,6 +273,7 @@ def _parsed_rows_from_form(
     tags_list = tags or []
     is_proxy_list = is_proxy or []
     is_brew_list = is_brew or []
+    deck_format_list = deck_format or []
     for i in range(len(line_number)):
         # v3.30.16 — is_proxy form field carries the string "true"/"false";
         # parse_proxy_bool returns (bool, valid). Form values come from
@@ -301,6 +303,13 @@ def _parsed_rows_from_form(
                 "tags": tags_list[i] if i < len(tags_list) else "",
                 "is_proxy": proxy_value,
                 "is_brew": brew_value,
+                # #150 item 2 — free text, unlike the is_proxy/is_brew grammar.
+                # Absent array (an older preview page mid-session, or the
+                # reconcile-preview caller which does not send it) means "no
+                # format stated", never "clear the format".
+                "deck_format": (deck_format_list[i] if i < len(deck_format_list) else "").strip()[
+                    :64
+                ],
             }
         )
     return rows
@@ -419,12 +428,22 @@ def _build_line_to_location_map(
         name_to_is_brew = {
             (r.get("location") or "").strip().lower(): True for r in parsed_rows if r.get("is_brew")
         }
+        # #150 item 2 — restore Deck.format on an auto-created deck. First
+        # non-empty value per location name wins; an existing deck never
+        # consults this (its own format is the authority), same as is_brew.
+        name_to_deck_format: dict[str, str] = {}
+        for r in parsed_rows:
+            key = (r.get("location") or "").strip().lower()
+            fmt = (r.get("deck_format") or "").strip()
+            if key and fmt and key not in name_to_deck_format:
+                name_to_deck_format[key] = fmt
         created = auto_create_locations(
             session,
             user_id,
             auto_create_names,
             name_to_type=auto_create_type_overrides,
             name_to_is_brew=name_to_is_brew,
+            name_to_deck_format=name_to_deck_format,
         )
         name_to_id.update(created)
 
@@ -1191,6 +1210,7 @@ async def import_commit(
     tags: list[str] = Form([]),
     is_proxy: list[str] = Form([]),
     is_brew: list[str] = Form([]),
+    deck_format: list[str] = Form([]),
     target_location_id: int = Form(0),
     reconcile_action: list[str] = Form([]),
     reconcile_move_qty: list[str] = Form([]),
@@ -1218,6 +1238,7 @@ async def import_commit(
         tags,
         is_proxy,
         is_brew,
+        deck_format,
     )
 
     placed_in = None

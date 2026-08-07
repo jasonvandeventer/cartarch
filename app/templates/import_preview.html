@@ -60,6 +60,10 @@
           <input type="hidden" name="is_proxy" value="{{ 'true' if row.is_proxy else 'false' }}">
           {# issue #70 — brew signal for auto-created decks on the per-row path #}
           <input type="hidden" name="is_brew" value="{{ 'true' if row.is_brew|default(false) else 'false' }}">
+          {# #150 item 2 — Deck Format, so re-importing an export restores it on
+             an auto-created deck. Free text; the array must stay index-aligned
+             with the others, so it is emitted for EVERY row, empty or not. #}
+          <input type="hidden" name="deck_format" value="{{ row.deck_format|default('') }}">
         {% endfor %}
         {# v3.30.15 — per-distinct-Location parallel arrays. Single-match
            "clean" resolutions emit a hidden input with the existing

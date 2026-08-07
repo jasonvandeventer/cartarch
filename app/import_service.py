@@ -79,6 +79,12 @@ HEADER_ALIASES = {
     # auto-creates a NEW deck (existing decks keep their own is_brew flag).
     "isbrew": "is_brew",
     "is_brew": "is_brew",
+    # #150 item 2 — the export has emitted `Deck Format` since v4.11.33; the
+    # importer now reads it back, so a re-import of your own export no longer
+    # drops the format. Only consulted when the row's Location auto-creates a
+    # NEW deck — an existing deck's own format wins, exactly like is_brew.
+    "deckformat": "deck_format",
+    "deck_format": "deck_format",
     # Helvault: finish is in a column called "extras"
     "extras": "finish",
     # Moxfield: set code is in "Edition", foil status is in "Foil"
@@ -313,6 +319,7 @@ def _adapter_rows_to_pre_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]
                 "tags_raw": "",
                 "is_proxy_raw": "",
                 "is_brew_raw": "",
+                "deck_format_raw": "",
             }
         )
     return pre_rows
@@ -382,6 +389,7 @@ def _csv_pass1_pre_rows(reader: csv.DictReader) -> list[dict[str, Any]]:
         tags_raw = row.get("tags", "")
         is_proxy_raw = row.get("is_proxy", "")
         is_brew_raw = row.get("is_brew", "")
+        deck_format_raw = row.get("deck_format", "")
         pre_rows.append(
             {
                 "line_number": line_number,
@@ -399,6 +407,7 @@ def _csv_pass1_pre_rows(reader: csv.DictReader) -> list[dict[str, Any]]:
                 "tags_raw": tags_raw,
                 "is_proxy_raw": is_proxy_raw,
                 "is_brew_raw": is_brew_raw,
+                "deck_format_raw": deck_format_raw,
             }
         )
     return pre_rows
@@ -501,6 +510,11 @@ def _resolve_pre_rows(
             "tags": r.get("tags_raw", ""),
             "is_proxy": is_proxy_value,
             "is_brew": is_brew_value,
+            # #150 — free text (Deck.format is String(64) and deliberately not an
+            # enum; prod files a 75-card Pauper list as "Commander"). Truncated
+            # rather than rejected: a long value in a backup should not fail the
+            # import of the CARDS, which is what the row is actually for.
+            "deck_format": (r.get("deck_format_raw") or "").strip()[:64],
             "warnings": [],
         }
 
@@ -1179,6 +1193,7 @@ def auto_create_locations(
     names: list[str],
     name_to_type: dict[str, str] | None = None,
     name_to_is_brew: dict[str, bool] | None = None,
+    name_to_deck_format: dict[str, str] | None = None,
 ) -> dict[str, int]:
     """Create one StorageLocation per name and return a map of
     lowercased-name → new StorageLocation.id.
@@ -1218,6 +1233,7 @@ def auto_create_locations(
         return out
     name_to_type = name_to_type or {}
     name_to_is_brew = name_to_is_brew or {}
+    name_to_deck_format = name_to_deck_format or {}
     selectable_types = VALID_LOCATION_TYPES - {"root"}
     for raw in names:
         name = raw.strip()
@@ -1275,6 +1291,7 @@ def auto_create_locations(
                 session,
                 user_id=user_id,
                 name=name,
+                format_name=name_to_deck_format.get(name.lower(), ""),
                 is_brew=bool(name_to_is_brew.get(name.lower())),
             )
             # create_deck always pairs a StorageLocation — storage_location_id
