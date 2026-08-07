@@ -1,5 +1,12 @@
 [
   {
+    "version": "4.13.16",
+    "date": "2026-08-07",
+    "added": [
+      "The upgrade suggestions on a deck's analysis page now show the full card on hover, like every other card list in the app. The thumbnails there are small enough that deciding whether a suggestion is worth moving meant opening it in a new tab first."
+    ]
+  },
+  {
     "version": "4.13.15",
     "date": "2026-08-07",
     "added": [
