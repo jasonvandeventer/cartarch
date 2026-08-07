@@ -360,13 +360,27 @@ def build_game_analytics(session: Session, game_id: int) -> dict | None:
         row_map = cmd.get(recv, {})
         cells = []
         for atk in seat_ids:
-            value = int(row_map.get(atk, 0)) if atk != recv else 0
-            cells.append({"value": value, "lethal": value >= 21, "self": atk == recv})
+            # v4.13.21 — a source key is "<seat>" or "<seat>:<card>" (one per
+            # commander of a partner seat). The CELL shows the seat's total,
+            # which is what a damage matrix means; LETHAL is per source, since
+            # 21 is per commander and summing two partners is the bug this
+            # keying exists to end.
+            sources = [
+                int(v) for key, v in row_map.items() if key == atk or str(key).startswith(f"{atk}:")
+            ]
+            value = sum(sources) if atk != recv else 0
+            lethal = any(v >= 21 for v in sources) if atk != recv else False
+            cells.append({"value": value, "lethal": lethal, "self": atk == recv})
         matrix_rows.append({"label": labels[recv], "sid": recv, "cells": cells})
     cmd_matrix = {
         "columns": [{"label": labels[sid], "sid": sid, "color": colors[sid]} for sid in seat_ids],
         "rows": matrix_rows,
-        "any": any(int(cmd.get(r, {}).get(a, 0)) > 0 for r in seat_ids for a in seat_ids if a != r),
+        "any": any(
+            int(v) > 0
+            for r in seat_ids
+            for key, v in cmd.get(r, {}).items()
+            if str(key).split(":")[0] != r
+        ),
     }
 
     # ── 4. Pace: turn durations from turn-advance timestamps + total wall clock ─

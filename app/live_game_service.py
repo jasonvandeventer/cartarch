@@ -38,7 +38,12 @@ from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from app import live_game_events
-from app.game_service import get_game, get_viewable_game, multi_commander_seat_ids
+from app.game_service import (
+    get_game,
+    get_viewable_game,
+    multi_commander_seat_ids,
+    seat_damage_sources,
+)
 from app.models import Game, GameEvent, GameLiveState, GameSeat, OracleCatalog
 from app.timeutil import utc_now
 
@@ -606,7 +611,11 @@ def _first_seat_id(game: Game, ordered_seats: list[GameSeat]) -> int | None:
     return ordered_seats[0].id if ordered_seats else None
 
 
-def _initial_state(game: Game, partner_seat_ids: set[int] | None = None) -> dict:
+def _initial_state(
+    game: Game,
+    partner_seat_ids: set[int] | None = None,
+    damage_sources: dict[str, list[dict]] | None = None,
+) -> dict:
     """The live blob at start — mirrors the localStorage tracker shape. Object
     keys are seat-id STRINGS (JSON coerces them anyway; matches JS render).
 
@@ -625,8 +634,13 @@ def _initial_state(game: Game, partner_seat_ids: set[int] | None = None) -> dict
         "turn": 1,
         "currentTurnId": _first_seat_id(game, seats),
         "turnEvents": [],
-        # Seats whose deck has >1 commander. See _loss_cause.
+        # Seats whose deck has >1 commander. See _loss_cause. Kept for blobs in
+        # the v4.13.20 (stopgap) shape, where partners shared a bare seat key.
         "partnerSeats": sorted(str(sid) for sid in (partner_seat_ids or set())),
+        # Per-seat commander-damage SOURCES (game_service.seat_damage_sources).
+        # A partner seat contributes one entry PER COMMANDER, keyed
+        # "<seat>:<card>", so max(cmd values) >= 21 stops summing two commanders.
+        "cmdSources": damage_sources or {},
     }
     # Momir-only: seat-id-keyed map of summoned creature tokens + the per-seat
     # once-per-turn activation ledger (seat_id -> round it last activated).
@@ -664,7 +678,11 @@ def start_live_game(session: Session, game_id: int, user_id: int) -> GameLiveSta
         raise ValueError(f"Cannot start live mode for a game in status '{game.status}'")
 
     game.status = "in_progress"
-    init = _initial_state(game, multi_commander_seat_ids(session, game))
+    init = _initial_state(
+        game,
+        multi_commander_seat_ids(session, game),
+        seat_damage_sources(session, game),
+    )
     # #110 — the starting player draws on their first turn too (Momir multiplayer
     # rule: EVERY player draws, unlike paper MTG where the starter skips). Run the
     # starting seat's begin-of-turn now so its untap/land-reset/draw is applied.
@@ -874,7 +892,11 @@ def _apply_mutation(
 
     elif atype == "cmd":
         recv = str(_coerce_int(action["receiver_seat_id"]))
-        atk = str(_coerce_int(action["attacker_seat_id"]))
+        # The SOURCE key, not the seat: "<seat>" for a one-commander or unknown
+        # seat, "<seat>:<card>" for one commander of a partner seat. A client that
+        # sends only attacker_seat_id (the pre-v4.13.21 companion, or any seat
+        # with a single source) lands on the bare key — identical to before.
+        atk = _resolve_cmd_source(state, action)
         delta = _require_delta(action)
         recv_map = state["cmd"].setdefault(recv, {})
         prev = int(recv_map.get(atk, 0))
@@ -1458,6 +1480,31 @@ def _append_event(
 #     scoreboard corrects mis-taps); MANUAL eliminations never auto-revive.
 # Precedence follows the tracker's `||` order (life > poison > cmd), so a coupled
 # cmd hit that both reaches 21 AND drops life to 0 is a single "life" elimination.
+
+
+def _resolve_cmd_source(state: dict, action: dict) -> str:
+    """The commander-damage source key an action names.
+
+    Prefers an explicit ``attacker_source_key``, falling back to
+    ``attacker_seat_id``. **The key is validated against the game's own
+    ``cmdSources``** — an unknown key would otherwise mint a private counter that
+    no UI shows and no lethal check reasons about, which is a forged-input path
+    into the one number that eliminates people.
+
+    An unrecognised key degrades to the attacker's bare seat id rather than
+    raising: a mis-tap must not be able to fail a live action mid-game.
+    """
+    seat_key = str(_coerce_int(action.get("attacker_seat_id")))
+    supplied = action.get("attacker_source_key")
+    if not supplied:
+        return seat_key
+    supplied = str(supplied)
+    known = {
+        src.get("key") for entries in (state.get("cmdSources") or {}).values() for src in entries
+    }
+    if supplied in known:
+        return supplied
+    return seat_key
 
 
 def _loss_cause(state: dict, sid: str) -> str | None:

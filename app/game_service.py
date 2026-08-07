@@ -200,6 +200,46 @@ def deck_commander_cards(session: Session, deck: Deck | None, limit: int = 2) ->
     )
 
 
+def seat_damage_sources(session: Session, game) -> dict[str, list[dict]]:
+    """Per seat, the commander-damage SOURCES it can deal damage from.
+
+    ``{seat_id_str: [{"key", "label", "card_id"}, ...]}``. This is the full fix
+    for the per-seat/per-commander mismatch (v4.13.20 was the stopgap).
+
+    **The key format is what makes the lethal check correct by construction:**
+    a source key is ``"<seat_id>"`` for a seat with one commander or none, and
+    ``"<seat_id>:<card_id>"`` for each commander of a seat with several. Partners
+    therefore land in SEPARATE map entries, so ``max(values) >= 21`` — unchanged
+    arithmetic — stops summing two commanders together. No special case survives
+    into the rule itself.
+
+    **Single-commander and unknown seats keep exactly today's shape** (a bare
+    seat-id key, one counter, eliminating at 21). Owner decision 2026-08-07: a
+    seat with one commander must not gain a tap at the table, and a guest seat, a
+    #164 placeholder, or a seat with no deck at all (game 45's seat 205) has
+    nothing to attribute to — it falls back rather than blocking the game.
+
+    Labels are the commander's card name for a multi-commander seat, else the
+    player name, so a client never has to decide what to call a source.
+    """
+    out: dict[str, list[dict]] = {}
+    for seat in getattr(game, "seats", []) or []:
+        cards = deck_commander_cards(session, getattr(seat, "deck", None), limit=2)
+        if len(cards) > 1:
+            out[str(seat.id)] = [
+                {"key": f"{seat.id}:{c.id}", "label": c.name, "card_id": c.id} for c in cards
+            ]
+        else:
+            out[str(seat.id)] = [
+                {
+                    "key": str(seat.id),
+                    "label": seat.player_name or f"Seat {seat.seat_number}",
+                    "card_id": None,
+                }
+            ]
+    return out
+
+
 def multi_commander_seat_ids(session: Session, game) -> set[int]:
     """Seats whose deck has MORE THAN ONE commander — Partners, Backgrounds, a
     Doctor's companion.
