@@ -1,5 +1,13 @@
 [
   {
+    "version": "4.13.20",
+    "date": "2026-08-07",
+    "resolved": [
+      "A player using a Partner commander pair had both commanders' damage added into a single counter, and the tracker knocked opponents out when that combined total reached 21. Commander damage is counted per commander — 21 from each — so the combined figure means nothing on its own. Those counters now show an asterisk and an explanation instead of eliminating anyone, and the table decides. Damage from a single commander still eliminates at 21 exactly as before."
+    ],
+    "archivist_note": "This is a stopgap and we would rather say so. The honest fix is to record which commander dealt the damage, which needs a change to how a game in progress is stored and a step at the table to attribute each hit; that work is starting now. What went out today only stops the app from making a call it does not have the information to make. It matters because it has already happened once: a game in May ended with a player eliminated on a combined 24, and because we never recorded which commander dealt it, nobody can now say whether that was right."
+  },
+  {
     "version": "4.13.19",
     "date": "2026-08-07",
     "resolved": [
