@@ -1,5 +1,13 @@
 [
   {
+    "version": "4.13.14",
+    "date": "2026-08-07",
+    "resolved": [
+      "Card data had quietly stopped updating on July 28th. Scryfall changed the format of their nightly card export — and the address it lives at — and our downloader, finding the address missing, logged a polite note and did nothing, every night for ten days. Anything new printed in that window was invisible: absent from the commander suggestion list, priced as unknown on watchlists, unfindable when resolving a commander nobody owns. The downloader now speaks the new format, and the same fault was found and fixed in the separate catalog job that feeds Momir, Planechase and Archenemy — it had been failing outright on every run for the same reason."
+    ],
+    "archivist_note": "This surfaced by luck, which is the uncomfortable part. Yesterday's popularity ranks stayed stubbornly empty, and chasing that led to a ten-day-old outage nothing had flagged: the job was doing exactly what it was told, reporting success, and skipping the work. A failure that logs a sentence nobody reads is indistinguishable from health. Two small changes came out of it — the skip now prints what it actually received, so the next reshape is one line to diagnose, and the fix was checked against the live export rather than a fixture, which is how we know 87% of cards carry a rank instead of merely hoping so."
+  },
+  {
     "version": "4.13.13",
     "date": "2026-08-06",
     "added": [

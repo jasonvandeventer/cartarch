@@ -6,13 +6,13 @@ responses into the Card model shape used by the rest of the app.
 
 from __future__ import annotations
 
+import gzip
 import json
 import time
 from dataclasses import dataclass, field
 from functools import lru_cache
 from typing import Any
 
-import ijson
 import requests
 from requests.adapters import HTTPAdapter
 from sqlalchemy import bindparam, func, text
@@ -988,9 +988,21 @@ def refresh_bulk_cache() -> int:
         print("[bulk-data] no default_cards entry in /bulk-data response", flush=True)
         return 0
     updated_at = entry.get("updated_at")
-    download_uri = entry.get("download_uri")
+    # Scryfall replaced `download_uri` (one ~2 GB JSON ARRAY) with
+    # `jsonl_download_uri` (gzipped JSON LINES) — a breaking change to BOTH the
+    # key and the format, which froze this cache from 2026-07-28 to 2026-08-07.
+    # The old key is deliberately NOT accepted as a fallback: it names an array
+    # this function can no longer parse, so honouring it would trade a loud
+    # skip for a silent mis-parse.
+    download_uri = entry.get("jsonl_download_uri")
     if not updated_at or not download_uri:
-        print("[bulk-data] default_cards entry missing updated_at/download_uri", flush=True)
+        # Name the keys we actually got, so the NEXT shape change is one log
+        # line to diagnose instead of ten days of quiet no-ops.
+        print(
+            "[bulk-data] default_cards entry missing updated_at/jsonl_download_uri; "
+            f"keys present: {sorted(entry)}",
+            flush=True,
+        )
         return 0
 
     if _bulk_meta_get(_BULK_META_KEY) == updated_at:
@@ -1004,16 +1016,26 @@ def refresh_bulk_cache() -> int:
     _throttle()
     resp = _session.get(download_uri, headers=HEADERS, stream=True, timeout=(30, 600))
     resp.raise_for_status()
-    resp.raw.decode_content = True  # transparently inflate gzip/deflate
+    # Transport-level Content-Encoding only. The export is served as
+    # `content-type: application/gzip` with NO `Content-Encoding` (verified
+    # against data.scryfall.io 2026-08-07), so this is a no-op for it and the
+    # gzip member below must be inflated explicitly. Kept because it is still
+    # correct if a proxy ever applies a transfer encoding.
+    resp.raw.decode_content = True
 
     total = 0
     batch: list[dict[str, Any]] = []
     try:
-        # Stream one card object at a time — the export is a single ~2 GB
-        # JSON array; it is NEVER json.load()ed. use_float=True yields float
-        # (not Decimal) so cmc round-trips byte-identically with the API path.
-        for card in ijson.items(resp.raw, "item", use_float=True):
-            normalized = _normalize_card_payload(card)
+        # Stream one card per LINE — the export is gzipped JSON Lines (~77 MB
+        # compressed, ~2 GB raw); it is NEVER read whole. json.loads per line
+        # yields float for numbers natively, so cmc round-trips byte-identically
+        # with the API path (the guarantee ijson's use_float=True used to give
+        # while this was a streamed JSON array).
+        for line in gzip.GzipFile(fileobj=resp.raw):
+            line = line.strip()
+            if not line:
+                continue  # tolerate a trailing newline / blank line
+            normalized = _normalize_card_payload(json.loads(line))
             if not normalized.get("scryfall_id"):
                 continue  # PK cannot be NULL — skip malformed/idless entries
             batch.append(normalized)

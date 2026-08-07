@@ -124,14 +124,21 @@ def test_stream_sends_non_default_user_agent(monkeypatch):
             pass
 
         def json(self):
-            return {"data": [{"type": "oracle_cards", "download_uri": "http://x/oracle.json"}]}
+            return {
+                "data": [
+                    {
+                        "type": "oracle_cards",
+                        "jsonl_download_uri": "http://x/oracle.jsonl.gz",
+                    }
+                ]
+            }
 
     def _fake_get(url, headers=None, **kw):
         seen.append(headers or {})
         return _Resp()
 
     monkeypatch.setattr(oracle_ingest.requests, "get", _fake_get)
-    monkeypatch.setattr(oracle_ingest, "_stream_json_array", lambda uri: iter(()))
+    monkeypatch.setattr(oracle_ingest, "_stream_jsonl", lambda uri: iter(()))
     list(oracle_ingest.stream_oracle_cards())
 
     assert seen, "no HTTP request was made"

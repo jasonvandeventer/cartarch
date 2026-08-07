@@ -8,7 +8,7 @@ Invoke via:
 Drives the REAL ``refresh_bulk_cache`` with zero network: ``_get_json`` and
 ``_session`` are monkeypatched to feed a BytesIO body, and ``engine`` is
 pointed at a throwaway temp SQLite file. So the freshness guard, the real
-``ijson.items(..., use_float=True)`` streaming parse, the real
+gzipped-JSON-Lines streaming parse, the real
 ``_BULK_UPSERT_SQL`` ON CONFLICT upsert, per-batch commit, and the
 meta-only-after-success ordering are all exercised exactly as in production.
 
@@ -27,6 +27,7 @@ Pins four contract properties:
 
 from __future__ import annotations
 
+import gzip
 import io
 import json
 import os
@@ -90,7 +91,7 @@ _BASE_FIXTURES = [RAW_NORMAL, RAW_MULTIFACE, RAW_LEGALITIES_COLORLESS, RAW_FULLA
 
 
 class _FakeRaw(io.BytesIO):
-    """BytesIO subclass: ijson can .read() it AND the daemon can set
+    """BytesIO subclass: gzip.GzipFile can .read() it AND the daemon can set
     .decode_content on it (plain io.BytesIO forbids attribute assignment).
     """
 
@@ -106,13 +107,19 @@ class _FakeResp:
         self.raw.close()
 
 
-def _json_array(cards: list[dict], *, terminated: bool = True) -> bytes:
-    """Serialize cards as a JSON array. terminated=False omits the closing
-    ``]`` so a real ijson stream raises IncompleteJSONError after yielding
-    every complete object (the mid-population failure case).
+def _jsonl_gz(cards: list[dict], *, terminated: bool = True) -> bytes:
+    """Serialize cards as a GZIPPED JSON Lines body — the real export format.
+
+    ``terminated=False`` appends one unparseable line, so ``json.loads`` raises
+    after every valid card has been yielded (the mid-population failure case).
+    The pre-2026-08 harness truncated a JSON array to make ijson raise; a
+    truncated GZIP member fails at an unpredictable point, so a bad trailing
+    line is used instead — same property, deterministic yield count.
     """
-    body = b"[" + b",".join(json.dumps(c).encode() for c in cards)
-    return body + b"]" if terminated else body
+    body = b"\n".join(json.dumps(c).encode() for c in cards)
+    if not terminated:
+        body += b"\n{ this is not json"
+    return gzip.compress(body)
 
 
 def _temp_engine():
@@ -144,7 +151,7 @@ def _run_refresh(eng, body: bytes, updated_at: str, flush_sizes: list[int] | Non
                 {
                     "type": "default_cards",
                     "updated_at": updated_at,
-                    "download_uri": "http://offline/default-cards.json",
+                    "jsonl_download_uri": "http://offline/default-cards.jsonl.gz",
                 }
             ]
         }
@@ -214,7 +221,7 @@ def test_stream_byte_identical():
     passed = failed = 0
     eng, path = _temp_engine()
     try:
-        n = _run_refresh(eng, _json_array(_BASE_FIXTURES), "2026-05-16T00:00:00Z")
+        n = _run_refresh(eng, _jsonl_gz(_BASE_FIXTURES), "2026-05-16T00:00:00Z")
         if n == len(_BASE_FIXTURES) and _count(eng) == len(_BASE_FIXTURES):
             print(f"  [OK] populated {n} cards")
             passed += 1
@@ -252,7 +259,7 @@ def test_idempotent_rerun_and_freshness_skip():
     passed = failed = 0
     eng, path = _temp_engine()
     try:
-        body = _json_array(_BASE_FIXTURES)
+        body = _jsonl_gz(_BASE_FIXTURES)
         _run_refresh(eng, body, "A")
         count_a = _count(eng)
         snapshot = {
@@ -307,7 +314,7 @@ def test_partial_write_recovery():
     """
     passed = failed = 0
 
-    # 1100 cards, UNterminated array -> real ijson yields 1100 then raises
+    # 1100 cards + a bad trailing line -> json.loads yields 1100 then raises
     # IncompleteJSONError. batch=1000: one batch commits (1000 durable),
     # 100 buffered are lost, meta write never reached.
     cards = _clone(RAW_NORMAL, 1100)
@@ -317,7 +324,7 @@ def test_partial_write_recovery():
     try:
         raised = False
         try:
-            _run_refresh(eng, _json_array(cards, terminated=False), "NEW")
+            _run_refresh(eng, _jsonl_gz(cards, terminated=False), "NEW")
         except Exception:
             raised = True
         if raised and _meta(eng) is None and _count(eng) == 1000:
@@ -344,7 +351,7 @@ def test_partial_write_recovery():
                 )
             )
         try:
-            _run_refresh(eng, _json_array(cards, terminated=False), "NEW")
+            _run_refresh(eng, _jsonl_gz(cards, terminated=False), "NEW")
         except Exception:
             pass
         if _meta(eng) == "OLD":
@@ -368,7 +375,7 @@ def test_batch_boundary_no_trailing_loss():
     try:
         cards = _clone(RAW_NORMAL, 1500)
         flushes: list[int] = []
-        n = _run_refresh(eng, _json_array(cards), "D", flush_sizes=flushes)
+        n = _run_refresh(eng, _jsonl_gz(cards), "D", flush_sizes=flushes)
         if flushes == [1000, 500]:
             print("  [OK] flush boundary fired exactly at 1000 then 500")
             passed += 1

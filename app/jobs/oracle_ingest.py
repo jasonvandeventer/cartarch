@@ -9,17 +9,17 @@ Invokable as ``python -m app.jobs.oracle_ingest`` — this IS the standing manua
 invocation (catalog refresh is occasional, NOT scheduled; no CronJob, unlike the
 daily price ingest).
 
-Network is confined to :func:`stream_oracle_cards`, streamed with ijson so the
-~180 MB file is never ``json.load()``ed. Tests pass an in-memory iterable to
+Network is confined to :func:`stream_oracle_cards`, streamed line-by-line from a
+gzipped JSON Lines export so the ~180 MB file is never ``json.load()``ed. Tests pass an in-memory iterable to
 :func:`run_ingest` so the pipeline runs with no live network.
 """
 
 from __future__ import annotations
 
+import gzip
 import json
 from collections.abc import Iterable, Iterator
 
-import ijson
 import requests
 
 from app.db import SessionLocal
@@ -39,29 +39,39 @@ _HEADERS = {"User-Agent": "Cartarch/1.0 (+https://cartarch.com)", "Accept": "app
 _EXCLUDED_LAYOUTS = {"token", "emblem", "art_series", "double_faced_token"}
 
 
-def _stream_json_array(url: str) -> Iterator[dict]:
-    """Yield each object from a top-level JSON array without materializing it.
+def _stream_jsonl(url: str) -> Iterator[dict]:
+    """Yield each object from a gzipped JSON Lines export without materializing it.
 
-    Scryfall bulk files are a bare ``[ {...}, {...} ]`` array, so ``ijson.items``
-    over the ``item`` path streams one card at a time. ``decode_content``
-    transparently inflates gzip."""
+    Scryfall bulk files WERE a bare ``[ {...}, {...} ]`` array; they are now
+    gzipped JSON Lines, one card per line (see ``scryfall.refresh_bulk_cache``
+    for the same change and the outage it caused). The file is served as
+    ``content-type: application/gzip`` with NO ``Content-Encoding``, so
+    ``decode_content`` does not inflate it and the gzip member is unwrapped
+    explicitly."""
     resp = requests.get(url, headers=_HEADERS, stream=True, timeout=(30, 600))
     resp.raise_for_status()
     resp.raw.decode_content = True
     try:
-        yield from ijson.items(resp.raw, "item")
+        for line in gzip.GzipFile(fileobj=resp.raw):
+            line = line.strip()
+            if line:
+                yield json.loads(line)
     finally:
         resp.close()
 
 
 def stream_oracle_cards() -> Iterator[dict]:
     """Resolve the current oracle_cards download URI from the bulk index, then
-    stream every card object from it."""
+    stream every card object from it.
+
+    ``jsonl_download_uri``, NOT ``download_uri`` — Scryfall removed the latter,
+    and reading it here raised KeyError (a hard failure, unlike the bulk cache's
+    quiet skip)."""
     resp = requests.get(BULK_INDEX_URL, headers=_HEADERS, timeout=(30, 60))
     resp.raise_for_status()
     index = resp.json()
-    uri = next(e["download_uri"] for e in index["data"] if e["type"] == "oracle_cards")
-    yield from _stream_json_array(uri)
+    uri = next(e["jsonl_download_uri"] for e in index["data"] if e["type"] == "oracle_cards")
+    yield from _stream_jsonl(uri)
 
 
 def _is_momir_legal(card: dict, type_line: str) -> bool:
