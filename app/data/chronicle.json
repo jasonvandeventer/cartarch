@@ -1,5 +1,18 @@
 [
   {
+    "version": "4.13.18",
+    "date": "2026-08-07",
+    "resolved": [
+      "Switch Printing: scrolling the owned-printings list on a phone pushed the \"In your collection\" heading up behind the window's title bar, leaving a half-cut line of text. The heading now stays put and only the printings move. Reported today with a screenshot; reproduced and re-checked at four screen sizes."
+    ],
+    "added": [
+      "Re-importing a collection export now restores each deck's format instead of dropping it. The export has carried the format for months; the importer simply never read it back. It applies only to decks the import creates — a deck you already have keeps its own format, so an old backup can never quietly re-label a live deck."
+    ],
+    "refined": [
+      "The live-game diagnostic that watches for two devices overwriting each other now records what it finds to the database instead of only the log. Logs vanish on every deploy, so the evidence it exists to gather was being erased before anyone could read it — it has, in fact, not yet seen a single game."
+    ]
+  },
+  {
     "version": "4.13.17",
     "date": "2026-08-07",
     "added": [
