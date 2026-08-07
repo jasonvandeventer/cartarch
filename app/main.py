@@ -509,6 +509,11 @@ def _run_price_refresh_batch() -> None:
                 card.keywords = fresh.get("keywords")
                 # #100 — produced_mana, same ride (goldfish auto-mana).
                 card.produced_mana = fresh.get("produced_mana")
+                # #180 — edhrec_rank, same ride (brew recommender prior). THIS
+                # is the loop that backfills it for cards already populated:
+                # _run_trait_backfill_batch only selects `set_type IS NULL`, so
+                # it never revisits a card, while this one cycles on staleness.
+                card.edhrec_rank = fresh.get("edhrec_rank")
                 card.updated_at = now
                 updated += 1
         session.commit()
@@ -592,6 +597,8 @@ def _run_trait_backfill_batch() -> int:
                 card.keywords = fresh.get("keywords")
                 # #100 — produced_mana, same ride (goldfish auto-mana).
                 card.produced_mana = fresh.get("produced_mana")
+                # #180 — edhrec_rank, same ride (brew recommender prior).
+                card.edhrec_rank = fresh.get("edhrec_rank")
                 card.updated_at = now
             else:
                 # Scryfall didn't return it — mark done (non-NULL) so the

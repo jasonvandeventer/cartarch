@@ -164,7 +164,7 @@ game_changer_cards = Table(
 )
 
 # ---------------------------------------------------------------------------
-# migrate_v3_25_0_scryfall_cards.py — the Scryfall bulk cache seam (27 columns,
+# migrate_v3_25_0_scryfall_cards.py — the Scryfall bulk cache seam (29 columns,
 # fixed order; see CLAUDE.md "scryfall_cards seam is byte-identical").
 # ---------------------------------------------------------------------------
 
@@ -212,6 +212,9 @@ scryfall_cards = Table(
     Column("keywords", Text),
     # #100 — produced_mana (Alembic a7b8c9d0e1f2), 28th seam column.
     Column("produced_mana", Text),
+    # #180 — edhrec_rank (Alembic 63ccafbb292e), 29th seam column. INTEGER, not
+    # Text: it is a rank, and the recommender compares it numerically.
+    Column("edhrec_rank", Integer),
     Index("ix_scryfall_cards_set_collector", "set_code", "collector_number"),
     Index("ix_scryfall_cards_name", "name"),
 )

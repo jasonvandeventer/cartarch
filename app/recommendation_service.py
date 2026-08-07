@@ -67,6 +67,43 @@ NEED_BOOST = 2.5
 # never out-rank a live one).
 RELEVANCE_SCORE_ADJUST = {"very_low": -25.0, "low": -2.0, "medium": 0.0, "high": 2.0}
 
+# #180 — EDHREC popularity prior, read from ``Card.edhrec_rank`` (Scryfall's
+# licensed bulk field; 1 = most-played card in Commander, rising into the tens
+# of thousands).
+#
+# Deliberately capped BELOW the theme match (+3.0) and the need boost (+2.5).
+# The rank is GLOBAL: it knows a card is widely played and nothing whatsoever
+# about whether it fits THIS commander. So it breaks ties among cards the rest
+# of the engine already likes, and must never outvote fit — a top-500 staple
+# that does nothing for the deck's plan should still lose to an on-theme card.
+#
+# A NULL rank contributes 0.0, NOT a penalty. Scryfall omits the field for
+# tokens, non-EDH-legal cards and brand-new printings, and — more common here —
+# for any owned card whose row predates the backfill. Missing data must not read
+# as "unpopular", or the engine would quietly punish the un-refreshed half of a
+# collection. Ordered most-played first; the first matching tier wins.
+EDHREC_RANK_TIERS: tuple[tuple[int, float, str], ...] = (
+    (500, 1.5, "Top-500 most-played card in Commander"),
+    (2500, 1.0, "Widely played in Commander"),
+    (10000, 0.5, "Commonly played in Commander"),
+)
+
+
+def edhrec_rank_bonus(card: Card) -> tuple[float, str | None]:
+    """Score contribution + reason for a card's global EDHREC rank.
+
+    ``(0.0, None)`` when the card has no rank — see EDHREC_RANK_TIERS on why
+    that is neutral rather than negative.
+    """
+    rank = card.edhrec_rank
+    if rank is None or rank <= 0:
+        return 0.0, None
+    for ceiling, bonus, reason in EDHREC_RANK_TIERS:
+        if rank <= ceiling:
+            return bonus, f"{reason} (#{rank:,})"
+    return 0.0, None
+
+
 # Basic-land card name by WUBRG color (commander-color fill).
 BASIC_LAND_BY_COLOR = {
     "W": "Plains",
@@ -436,6 +473,12 @@ def score_candidate(
     # Curve: gentle preference for cheaper non-lands.
     if not _is_land(card) and card.cmc is not None and card.cmc <= 3:
         score += 0.5
+
+    # #180 — global EDHREC popularity prior. Bounded, tie-breaking only.
+    edhrec_bonus, edhrec_reason = edhrec_rank_bonus(card)
+    if edhrec_reason:
+        score += edhrec_bonus
+        reasons.append(edhrec_reason)
 
     # Availability — a loose copy is better than one already committed.
     if cand.available_quantity > 0:

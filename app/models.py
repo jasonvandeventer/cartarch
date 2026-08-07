@@ -188,6 +188,13 @@ class Card(Base):
     # = produces nothing vs NULL = not yet backfilled, same contract as keywords).
     # Lets the goldfish auto-add mana on a land tap instead of prompting for color.
     produced_mana: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # #180 — Scryfall's EDHREC popularity rank (1 = most-played in Commander).
+    # The one licensed, explicitly-offered play-frequency signal in the feed —
+    # EDHREC itself has no official API and playgroup.gg's public API is
+    # commander-level only. GLOBAL, so it ranks a card's general strength and
+    # says nothing about fit with a particular commander. NULL = EDHREC has no
+    # rank for the printing, which is missing data, not a low rank.
+    edhrec_rank: Mapped[int | None] = mapped_column(Integer, nullable=True)
     updated_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utc_now)
 
     inventory_rows: Mapped[list[InventoryRow]] = relationship(back_populates="card")

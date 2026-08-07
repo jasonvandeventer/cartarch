@@ -204,6 +204,16 @@ def _normalize_card_payload(raw: dict[str, Any]) -> dict[str, Any]:
         # populated — same contract as keywords). Root-level in Scryfall
         # (aggregated across faces), so no first-face fallback.
         "produced_mana": json.dumps(raw.get("produced_mana") or []),
+        # #180 — 29th key, appended LAST. A Card ORM column (not stripped).
+        # Scryfall's EDHREC popularity rank: 1 = most-played card in Commander,
+        # rising into the tens of thousands. INTEGER, not JSON text. NULL means
+        # EDHREC has no rank for this printing (tokens, non-EDH-legal cards, and
+        # brand-new printings) — absence of data, NOT "unpopular", which is why
+        # the recommender scores a NULL as neutral rather than as a penalty.
+        # This is the ONLY licensed, explicitly-offered popularity signal in the
+        # feed; it is GLOBAL, so it says a card is strong, never that it is
+        # strong for a particular commander.
+        "edhrec_rank": raw.get("edhrec_rank"),
     }
 
 
@@ -479,7 +489,7 @@ _CACHE_COLUMNS = (
     "image_url, type_line, oracle_text, price_usd, price_usd_foil, "
     "price_usd_etched, colors, color_identity, mana_cost, cmc, legalities, "
     "full_art, frame_effects, set_type, layout, produced_tokens, "
-    "loyalty, defense, power, toughness, keywords, produced_mana"
+    "loyalty, defense, power, toughness, keywords, produced_mana, edhrec_rank"
 )
 
 
@@ -542,6 +552,9 @@ def _cached_row_to_payload(m) -> dict[str, Any]:
         "keywords": m["keywords"],
         # #100 — 28th field, stored JSON array text, verbatim like keywords.
         "produced_mana": m["produced_mana"],
+        # #180 — 29th field. INTEGER, round-trips as int|None (the only other
+        # non-text seam column is cmc/REAL). NULL passes through as None.
+        "edhrec_rank": m["edhrec_rank"],
     }
 
 
