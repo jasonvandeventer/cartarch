@@ -7434,7 +7434,18 @@ table.dmtx .dmtx-rowhead {
 .switch-printing-section {
   padding: 0.75rem 1.25rem;
   border-bottom: 1px solid var(--border);
-  overflow-y: auto;
+  /* The SECTION must not be the scroller. Its own <h4> + blurb live inside it,
+     so `overflow-y: auto` here scrolled the heading away with the list — and
+     straight up under the opaque modal header, which reads as "the header is
+     hiding the section" (reported 2026-08-07, reproduced at scrollTop=40 on a
+     412px viewport: heading top 102 vs section top 130). The list below is the
+     scroller instead, so the heading stays put and only the rows move.
+     `min-height: 0` at BOTH levels — the v4.12.5 sidebar lesson: one missing
+     level anywhere in a flex-shrink chain defeats the internal scroll. */
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
 }
 .switch-printing-section:last-of-type {
   border-bottom: none;
@@ -7460,6 +7471,9 @@ table.dmtx .dmtx-rowhead {
   display: flex;
   flex-direction: column;
   gap: 0.4rem;
+  /* The scroller (see .switch-printing-section). */
+  overflow-y: auto;
+  min-height: 0;
 }
 .switch-printing-row {
   display: grid;
