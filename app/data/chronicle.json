@@ -1,5 +1,13 @@
 [
   {
+    "version": "4.13.13",
+    "date": "2026-08-06",
+    "added": [
+      "The brew generator now knows how widely played a card is. Every card Scryfall tracks carries an EDHREC popularity rank, and that rank now nudges the generator's choices and shows up in a card's reasons — \"Top-500 most-played card in Commander\" — so a suggestion explains itself in terms a player recognises. The nudge is deliberately small: the rank is a worldwide figure that says a card is good in general, never that it suits your commander, so a card that fits the deck's plan still beats a famous one that doesn't. Cards with no rank are treated as unknown rather than unpopular. Ranks fill in over roughly a day as the collection refreshes."
+    ],
+    "archivist_note": "The question asked was for a source that explicitly offers most-played-cards-per-commander, and the honest answer is that none does. We checked rather than assumed: playgroup.gg's public API carries no card-level data whatsoever, EDHREC — which has precisely the figures we wanted — runs no official API, and Archidekt, the one service that openly welcomes this use, hands out raw decklists and quietly ignores the filter that would have narrowed them to a commander. What remains is the rank Scryfall already licenses and we already download nightly. It is a coarser instrument than the per-commander inclusion rates, and we would rather ship the honest coarse thing, capped so it cannot outvote the deck's own plan, than scrape a finer one on nobody's permission. Asking EDHREC directly is the next move."
+  },
+  {
     "version": "4.13.12",
     "date": "2026-08-06",
     "resolved": [
