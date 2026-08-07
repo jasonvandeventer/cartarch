@@ -1,5 +1,16 @@
 [
   {
+    "version": "4.13.17",
+    "date": "2026-08-07",
+    "added": [
+      "The admin page now shows how old the card catalog is, and says so plainly when the nightly refresh has stopped running. Yesterday's ten-day outage was invisible precisely because nothing reported this — every page rendered normally while the underlying data sat frozen."
+    ],
+    "refined": [
+      "A test now refuses any page that formats a stored price as a number without converting it first. Prices are kept as text, and doing arithmetic on them directly is what took the Pending page down earlier this week; each past instance had its own test, but nothing stopped a new page making the same mistake."
+    ],
+    "archivist_note": "Both of these are guards rather than features, and they exist because two problems this week shared a shape: the code was wrong in a way that looked completely normal from outside. A frozen catalog renders fine. A page that crashes for one kind of user is healthy for everyone else. Neither was caught by the tests written at the time, because those tests asked whether the change worked rather than whether the next change could break the same way."
+  },
+  {
     "version": "4.13.16",
     "date": "2026-08-07",
     "added": [
