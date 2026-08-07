@@ -1,5 +1,12 @@
 [
   {
+    "version": "4.13.15",
+    "date": "2026-08-07",
+    "added": [
+      "The popularity ranks introduced two releases ago now arrive all at once instead of trickling in. They were set to fill as each card came up for its routine refresh, which turned out to mean up to a week of half-populated suggestions — and, until yesterday's fix, never, because the source they copy from was itself frozen. A maintenance tool now tops up every card from data already held locally, no downloads involved. Around 14,500 cards gain a rank; the 700 that do not are basic lands, tokens and Planes, which have no ranking anywhere, and the deck builder treats those as unknown rather than unpopular."
+    ]
+  },
+  {
     "version": "4.13.14",
     "date": "2026-08-07",
     "resolved": [
