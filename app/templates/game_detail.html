@@ -1193,19 +1193,13 @@ function clearReconnecting() { const el = document.getElementById('live-reconnec
 // clockwiseSeats is the SAME grid_position ordering the server derives, so the
 // optimistic hop and the SSE echo agree (was: seat_number order → mismatch).
 function liveAdvanceTurnOptimistic() {
-  const bySeat = clockwiseSeats.map(s => s.id);
-  if (!bySeat.length) return;
-  let start = bySeat.indexOf(firstSeatId); if (start < 0) start = 0;
-  const rot = bySeat.slice(start).concat(bySeat.slice(0, start));
-  let i = rot.indexOf(state.currentTurnId); if (i < 0) i = 0;
-  for (let step = 1; step <= rot.length; step++) {
-    const j = (i + step) % rot.length;
-    if (!state.eliminated[rot[j]]) {
-      state.currentTurnId = rot[j];
-      if (j <= i) state.turn = (state.turn || 1) + 1;
-      return;
-    }
-  }
+  // Shares advanceInRotation with the local tracker — this was the only one of
+  // the three client copies that got the rotation right, so it became the
+  // definition rather than being left as a fourth.
+  const step = advanceInRotation(state.currentTurnId);
+  if (!step) return;
+  state.currentTurnId = step.nextId;
+  if (step.wrapped) state.turn = (state.turn || 1) + 1;
 }
 function copyCompanionUrl() {
   const el = document.getElementById('companion-url');
@@ -1402,6 +1396,32 @@ function toggleEliminate(seatId) {
   save(); render();
 }
 
+// ONE definition of turn rotation on the client, mirroring the server's
+// turn_rotation() / next_seat_in_rotation() pair (v4.12.4: "never re-derive
+// rotation in a third place"). There were THREE client copies and only the live
+// one was right — see advanceInRotation below.
+function rotationIds() {
+  const bySeat = clockwiseSeats.map(s => s.id);
+  if (!bySeat.length) return [];
+  let start = bySeat.indexOf(firstSeatId);
+  if (start < 0) start = 0;
+  return bySeat.slice(start).concat(bySeat.slice(0, start));
+}
+
+// → {nextId, wrapped}. `wrapped` means the rotation passed the FIRST seat, i.e.
+// a new round — the server's `j <= i` rule. Returns null when everyone is out.
+function advanceInRotation(currentId) {
+  const rot = rotationIds();
+  if (!rot.length) return null;
+  let i = rot.indexOf(currentId);
+  if (i < 0) i = 0;
+  for (let step = 1; step <= rot.length; step++) {
+    const j = (i + step) % rot.length;
+    if (!state.eliminated[rot[j]]) return { nextId: rot[j], wrapped: j <= i };
+  }
+  return null;
+}
+
 function nextTurn() {
   if (LIVE) {
     liveAdvanceTurnOptimistic();
@@ -1409,14 +1429,20 @@ function nextTurn() {
     postAction({ type: 'turn' });
     return;
   }
-  const alive = clockwiseSeats.filter(s => !state.eliminated[s.id]);
-  if (!alive.length) return;
-  const curIdx = alive.findIndex(s => s.id === state.currentTurnId);
-  const nextIdx = (curIdx + 1) % alive.length;
+  // Was: index arithmetic over a filtered `alive` array in raw clockwiseSeats
+  // order, incrementing the round on wrap to clockwiseSeats[0]. That is the
+  // wrong boundary whenever the host picked a first seat that is not the
+  // clockwise-first (v4.12.26 made that reachable) — the round counter, which
+  // is submitted at finalize, ticked over at the wrong player.
+  const step = advanceInRotation(state.currentTurnId);
+  if (!step) return;
   const prevTurnId = state.currentTurnId;
-  if (nextIdx === 0) state.turn = (state.turn || 1) + 1;
-  state.currentTurnId = alive[nextIdx].id;
-  pushHistory({ type: 'nextTurn', seatId: state.currentTurnId, prevTurnId, delta: 0 });
+  if (step.wrapped) state.turn = (state.turn || 1) + 1;
+  state.currentTurnId = step.nextId;
+  // `wrapped` is recorded so undo does not have to re-derive it — the alive set
+  // may have changed since, which is exactly how the old undo desynced.
+  // Additive optional field: NOT a gameFingerprint() bump (see its comment).
+  pushHistory({ type: 'nextTurn', seatId: state.currentTurnId, prevTurnId, wrapped: step.wrapped, delta: 0 });
   (state.turnEvents = state.turnEvents || []).push({
     ts: Date.now(), seatId: state.currentTurnId,
   });
@@ -1489,8 +1515,13 @@ function undoLast() {
       (state.cmd[last.seatId][last.senderId] || 0) - last.delta);
     state.lives[last.seatId] += last.delta;
   } else if (last.type === 'nextTurn') {
-    const nextIdx = clockwiseSeats.findIndex(s => s.id === last.seatId);
-    if (nextIdx === 0) state.turn = Math.max(1, (state.turn || 1) - 1);
+    // Undo the round increment iff the advance actually made one. This used to
+    // look up the seat's index in the UNFILTERED clockwiseSeats while nextTurn
+    // had computed its index over the eliminated-filtered list, so after any
+    // elimination the two disagreed and the round counter drifted. Entries
+    // written before this fix carry no `wrapped`; treat them as not-wrapped
+    // rather than guessing — a stale localStorage game undoes conservatively.
+    if (last.wrapped) state.turn = Math.max(1, (state.turn || 1) - 1);
     state.currentTurnId = last.prevTurnId;
     if (state.turnEvents && state.turnEvents.length > 1) {
       state.turnEvents.pop();
