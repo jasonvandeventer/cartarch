@@ -38,7 +38,7 @@ from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from app import live_game_events
-from app.game_service import get_game, get_viewable_game
+from app.game_service import get_game, get_viewable_game, multi_commander_seat_ids
 from app.models import Game, GameEvent, GameLiveState, GameSeat, OracleCatalog
 from app.timeutil import utc_now
 
@@ -606,9 +606,15 @@ def _first_seat_id(game: Game, ordered_seats: list[GameSeat]) -> int | None:
     return ordered_seats[0].id if ordered_seats else None
 
 
-def _initial_state(game: Game) -> dict:
+def _initial_state(game: Game, partner_seat_ids: set[int] | None = None) -> dict:
     """The live blob at start — mirrors the localStorage tracker shape. Object
-    keys are seat-id STRINGS (JSON coerces them anyway; matches JS render)."""
+    keys are seat-id STRINGS (JSON coerces them anyway; matches JS render).
+
+    ``partner_seat_ids`` (game_service.multi_commander_seat_ids) is recorded as
+    ``partnerSeats`` so :func:`_loss_cause` can refuse to auto-eliminate on their
+    SHARED commander-damage counter. Additive and optional: a blob written before
+    this simply has no key, and the check then behaves exactly as it did.
+    """
     seats = _clockwise_seats(game)
     state = {
         "lives": {str(s.id): s.starting_life for s in seats},
@@ -619,6 +625,8 @@ def _initial_state(game: Game) -> dict:
         "turn": 1,
         "currentTurnId": _first_seat_id(game, seats),
         "turnEvents": [],
+        # Seats whose deck has >1 commander. See _loss_cause.
+        "partnerSeats": sorted(str(sid) for sid in (partner_seat_ids or set())),
     }
     # Momir-only: seat-id-keyed map of summoned creature tokens + the per-seat
     # once-per-turn activation ledger (seat_id -> round it last activated).
@@ -656,7 +664,7 @@ def start_live_game(session: Session, game_id: int, user_id: int) -> GameLiveSta
         raise ValueError(f"Cannot start live mode for a game in status '{game.status}'")
 
     game.status = "in_progress"
-    init = _initial_state(game)
+    init = _initial_state(game, multi_commander_seat_ids(session, game))
     # #110 — the starting player draws on their first turn too (Momir multiplayer
     # rule: EVERY player draws, unlike paper MTG where the starter skips). Run the
     # starting seat's begin-of-turn now so its untap/land-reset/draw is applied.
@@ -1468,7 +1476,13 @@ def _loss_cause(state: dict, sid: str) -> str | None:
     )
     if poison >= 10:
         return "poison"
-    cmd_map = state.get("cmd", {}).get(sid, {})
+    # A seat with TWO commanders shares one counter here, but the rules track 21
+    # from EACH commander separately — so its total crossing 21 proves nothing
+    # and must not auto-eliminate anyone. The UI flags those cells instead.
+    # Missing key (a blob written before v4.13.20) = no partner seats = the old
+    # behaviour, unchanged.
+    partners = set(state.get("partnerSeats") or [])
+    cmd_map = {a: v for a, v in state.get("cmd", {}).get(sid, {}).items() if a not in partners}
     if cmd_map and max(int(v) for v in cmd_map.values()) >= 21:
         return "cmd"
     return None

@@ -200,6 +200,38 @@ def deck_commander_cards(session: Session, deck: Deck | None, limit: int = 2) ->
     )
 
 
+def multi_commander_seat_ids(session: Session, game) -> set[int]:
+    """Seats whose deck has MORE THAN ONE commander — Partners, Backgrounds, a
+    Doctor's companion.
+
+    **Commander damage is tracked per SEAT, and the rules track it per COMMANDER
+    (21 from each, separately).** So a shared counter crossing 21 for one of
+    these seats is not a rules event, and auto-eliminating on it is wrong. This
+    is the seat set the loss check must refuse to kill on; the full fix is to key
+    the counter on the commander, which needs a state-shape change and a
+    table-side attribution step.
+
+    **It has already produced a suspect result.** Game 45: seat 207 played
+    *Haldan, Avid Arcanist + Pako, Arcane Retriever* and dealt 24 commander
+    damage to seat 206 on one counter. That seat was auto-eliminated with cause
+    `cmd` on 11 life. Whether it was correct is UNKNOWABLE — if the 24 split
+    across both partners, nobody reached 21. The app never recorded which
+    commander dealt it, which is the gap itself.
+
+    Counts through :func:`deck_commander_cards`, the ONE answer to "who is this
+    deck's commander" (v4.12.40) — so a deck whose commanders live on the
+    `deck_commanders` anchor rather than tagged rows counts correctly.
+    """
+    out: set[int] = set()
+    for seat in getattr(game, "seats", []) or []:
+        deck = getattr(seat, "deck", None)
+        if deck is None:
+            continue
+        if len(deck_commander_cards(session, deck, limit=2)) > 1:
+            out.add(seat.id)
+    return out
+
+
 def _capture_deck_identity(session: Session, deck_id: int | None) -> tuple[str | None, str | None]:
     """Snapshot deck name + commander names for a seat (v3.27.0b-1).
 

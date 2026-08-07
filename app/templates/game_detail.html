@@ -830,6 +830,12 @@ const clockwiseSeats = seatDefs.slice().sort((a, b) => a.turnOrder - b.turnOrder
 
 // v3.25.1 — explicit first player (preserved).
 const firstSeatNumber = {{ game.first_seat_number | tojson }};
+// Seats whose deck has >1 commander. Their commander-damage counter is SHARED
+// across both commanders while the rules track 21 from EACH, so it must not
+// auto-eliminate anyone — the cells are flagged instead. Server-derived
+// (game_service.multi_commander_seat_ids); the live blob carries the same set
+// as `partnerSeats` for the authoritative check.
+const PARTNER_SEAT_IDS = new Set(({{ partner_seat_ids | default([]) | tojson }}).map(String));
 
 // v4.12.26 — the dice roll, moved here with the picker. Animates across the
 // server-rendered chips and then submits the one it landed on, so the result is
@@ -1233,7 +1239,10 @@ function checkElimination(seatId) {
   const poisonCounter = counters.find(c => c.type === 'poison');
   const poison = poisonCounter ? (poisonCounter.value || 0) : 0;
   const cmdMap = state.cmd[seatId] || {};
-  const cmdValues = Object.values(cmdMap);
+  // Skip partner seats: one counter, two commanders, 21 from each is the rule.
+  const cmdValues = Object.entries(cmdMap)
+    .filter(([atk]) => !PARTNER_SEAT_IDS.has(String(atk)))
+    .map(([, v]) => v);
   const maxCmd = cmdValues.length ? Math.max(...cmdValues) : 0;
   if ((life !== undefined && life <= 0) || poison >= 10 || maxCmd >= 21) {
     state.eliminated[seatId] = true;
@@ -1252,7 +1261,9 @@ function liveLossCause(seatId) {
   const counters = state.extraCounters[seatId] || [];
   const pc = counters.find(c => c.type === 'poison');
   if (pc && (pc.value || 0) >= 10) return 'poison';
-  const vals = Object.values(state.cmd[seatId] || {});
+  const vals = Object.entries(state.cmd[seatId] || {})
+    .filter(([atk]) => !PARTNER_SEAT_IDS.has(String(atk)))
+    .map(([, v]) => v);
   if (vals.length && Math.max(...vals) >= 21) return 'cmd';
   return null;
 }
@@ -1835,8 +1846,16 @@ function render() {
       if (!el) return;
       const val = (state.cmd[s.id] || {})[oid] || 0;
       el.textContent = val;
+      const shared = PARTNER_SEAT_IDS.has(String(oid));
       el.className = 'tc-cmd-cell-val' +
         (val >= 21 ? ' tc-counter-danger' : val >= 16 ? ' tc-counter-warn' : '');
+      // A partner seat's total is two commanders' damage added together, so it
+      // is NOT a 21-damage kill on its own. Say so rather than acting on it.
+      el.title = shared && val >= 21
+        ? 'Two commanders share this counter — 21 is per commander, so this is '
+          + 'not automatic. Eliminate manually if one commander dealt 21.'
+        : '';
+      el.textContent = shared && val >= 21 ? val + '*' : val;
     });
 
     const elimPill = document.getElementById(`elim-pill-${s.id}`);

@@ -44,6 +44,7 @@ from app.game_service import (
     list_games,
     list_user_decks_for_companion,
     log_game,
+    multi_commander_seat_ids,
     normalize_game_format,
     record_goal_results,
     seat_commander_scryfall_id,
@@ -545,6 +546,12 @@ def game_detail_page(
             if any(not s.deck_id and not s.commander_name_at_game for s in game.seats)
             else []
         ),
+        # Seats whose deck has >1 commander. The tracker shares ONE commander-
+        # damage counter per attacking seat, but the rules track 21 from EACH
+        # commander — so these seats' counters must not auto-eliminate anyone.
+        # Same helper the live blob's `partnerSeats` comes from, so the server's
+        # authoritative check and the two client mirrors cannot disagree.
+        "partner_seat_ids": sorted(multi_commander_seat_ids(session, game)),
     }
 
     # v3.33.2 — finalized games render a read-only summary (final standings,
