@@ -1,5 +1,13 @@
 [
   {
+    "version": "4.13.19",
+    "date": "2026-08-07",
+    "resolved": [
+      "The game tracker counted rounds from the wrong player whenever the host chose a starting seat other than the first one clockwise — the round ticked over as play passed that first seat rather than returning to whoever actually started. The round number is part of what gets recorded when a game is finalised. Undo had a matching fault: after anyone was eliminated it could hand back a round the turn never took."
+    ],
+    "archivist_note": "These sat on the known-problems list for months described as untested, unexecuted, localStorage-only trivia. All three of those characterisations were wrong — the code runs on the page every time a game is tracked without going live. The cause turned out to be one the project has written down before: the same rule implemented in three places, with only one of them right. It is now implemented once."
+  },
+  {
     "version": "4.13.18",
     "date": "2026-08-07",
     "resolved": [
