@@ -1,5 +1,16 @@
 [
   {
+    "version": "4.13.21",
+    "date": "2026-08-07",
+    "added": [
+      "Commander damage is now tracked per commander rather than per player. A Partner pair gets a counter each — in the damage matrix, on the tablet's damage strip, and on each player's phone — so 21 means what the rules say it means. Last week's stopgap stopped the tracker eliminating anyone on a partner pair's combined total; this restores the other half, so a single commander reaching 21 knocks a player out again, correctly and automatically."
+    ],
+    "refined": [
+      "Players with a single commander see no change at all: one counter, one tap, exactly as before. Guests and decks we have no commander recorded for keep a single counter too, rather than being blocked from playing."
+    ],
+    "archivist_note": "Any game left half-tracked in a browser will start fresh after this update — the shape of the saved game changed, and restoring an old one would quietly put a Partner pair back on a shared counter. We took the reset deliberately, on a week with no games scheduled. Worth recording what the work actually cost: the rule that decides whether a player is eliminated lived in four places, and last week's fix reached three of them. The phone kept knocking partner players out on the combined total until the server corrected it a second later. Four copies of one rule is the recurring shape of nearly every defect in this project."
+  },
+  {
     "version": "4.13.20",
     "date": "2026-08-07",
     "resolved": [
