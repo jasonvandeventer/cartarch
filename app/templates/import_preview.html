@@ -38,7 +38,7 @@
         <input type="hidden" name="filename" value="{{ filename }}">
         {% for row in valid_rows %}
           <input type="hidden" name="line_number" value="{{ row.line_number }}">
-          <input type="hidden" name="name" value="{{ row.name or '' }}">
+          <input type="hidden" name="name" value="{{ row.name|default('') }}">
           <input type="hidden" name="scryfall_id" value="{{ row.scryfall_id }}">
           <input type="hidden" name="set_code" value="{{ row.set_code }}">
           <input type="hidden"
@@ -54,10 +54,10 @@
              strings round-trip the v3.30.14-and-earlier 6-column shape
              (the importer falls back to model defaults for empty values
              per Decision 13). #}
-          <input type="hidden" name="location_type" value="{{ row.location_type or '' }}">
-          <input type="hidden" name="role" value="{{ row.role or '' }}">
-          <input type="hidden" name="tags" value="{{ row.tags or '' }}">
-          <input type="hidden" name="is_proxy" value="{{ 'true' if row.is_proxy else 'false' }}">
+          <input type="hidden" name="location_type" value="{{ row.location_type|default('') }}">
+          <input type="hidden" name="role" value="{{ row.role|default('') }}">
+          <input type="hidden" name="tags" value="{{ row.tags|default('') }}">
+          <input type="hidden" name="is_proxy" value="{{ 'true' if row.is_proxy|default(false) else 'false' }}">
           {# issue #70 — brew signal for auto-created decks on the per-row path #}
           <input type="hidden" name="is_brew" value="{{ 'true' if row.is_brew|default(false) else 'false' }}">
           {# #150 item 2 — Deck Format, so re-importing an export restores it on
@@ -310,6 +310,10 @@
           </label>
         {% endif %}
         <div class="filter-row imports-destination-row" style="margin: 0">
+          {# Carries the import SOURCE through the HTMX round trip (hx-include
+             picks it up) and on to the commit post. A pasted list defaults the
+             reconciliation to acquisition semantics; a CSV keeps sync. #}
+          <input type="hidden" name="import_source" value="{{ import_source|default('csv') }}">
           <label class="imports-destination-label">Destination</label>
           <select name="target_location_id"
                   id="import-destination-select"

@@ -225,6 +225,9 @@ async def import_list_preview(
             "invalid_rows": result["invalid_rows"],
             "format_name": result["format_name"],
             "filename": "pasted list",
+            # A pasted list is an ACQUISITION ("here are cards I just opened"),
+            # not a sync of an exported collection — see the reconcile default.
+            "import_source": "list",
             "current_user": current_user,
             "use_drawer_sorter": has_sortable_setup(session, current_user.id),
             "locations": list_locations(session, current_user.id),
@@ -522,6 +525,11 @@ def _annotate_collection_dupes(rows: list[dict]) -> None:
 async def import_reconcile_preview(
     request: Request,
     target_location_id: int = Form(0),
+    # "list" (pasted) or "csv" (uploaded). Carried through the HTMX round trip
+    # by a hidden input on import_preview.html; decides whether the action
+    # select defaults to acquisition or sync semantics. Defaults to "csv" so an
+    # older cached page keeps the behaviour it was rendered with.
+    import_source: str = Form("csv"),
     line_number: list[str] = Form([]),
     name: list[str] = Form([]),
     scryfall_id: list[str] = Form([]),
@@ -669,7 +677,15 @@ async def import_reconcile_preview(
             "total_to_skip": total_to_skip,
             "total_to_delta": total_to_delta,
             "total_to_new": total_to_new,
-            "manual_mode": False,
+            # Acquisition semantics: default the action select to import_new
+            # instead of skip_already_owned. TRUE for a pasted list, FALSE for a
+            # CSV. A CSV is usually a collection export being re-synced, where
+            # skipping what you already own is right; a pasted list is somebody
+            # typing in cards they just acquired, where skipping them is exactly
+            # wrong — the copies never become InventoryRows, so
+            # `route_intake_to_bulk` never sees them and the surplus that the
+            # drawer-vs-bulk routing exists to handle is silently dropped.
+            "acquisition_default": import_source == "list",
             "has_deck_only_dupes": has_deck_only_dupes,
             "bulk_routing": _intake_routing_preview(
                 session, current_user, target_location_id, matches_rows
@@ -1689,14 +1705,15 @@ async def manual_import_reconcile_preview(
     """HTMX endpoint for the single-card (manual) import preview.
 
     Dispatch shape mirrors /import/reconcile-preview (deck vs non-deck),
-    but for the manual flow we always set `manual_mode=True` in the
+    but for the manual flow we always set `acquisition_default=True` in the
     collection-mode render context. That flips the action-select default
     to `import_new` (acquisition semantics) instead of `skip_already_owned`,
     per design doc §5.5: manual single-card entries are usually
-    acquisitions, not sync operations.
+    acquisitions, not sync operations. The PASTED-LIST flow now sets the same
+    flag (v4.13.23) for the same reason.
 
     For deck destinations the manual flow uses the same defaults as the
-    CSV flow — manual_mode is collection-mode-only.
+    CSV flow — acquisition_default is collection-mode-only.
     """
     parsed_rows = [
         {
@@ -1751,7 +1768,7 @@ async def manual_import_reconcile_preview(
             },
         )
 
-    # Non-deck destination — collection mode with manual_mode=True.
+    # Non-deck destination — collection mode with acquisition_default=True.
     matches_rows = find_inventory_matches_for_collection_import(
         session, current_user.id, parsed_rows
     )
@@ -1789,7 +1806,7 @@ async def manual_import_reconcile_preview(
             "total_to_skip": total_to_skip,
             "total_to_delta": total_to_delta,
             "total_to_new": total_to_new,
-            "manual_mode": True,  # default flips to import_new
+            "acquisition_default": True,  # a manual single-card add is an acquisition
             "has_deck_only_dupes": has_deck_only_dupes,
             "bulk_routing": _intake_routing_preview(
                 session, current_user, target_location_id, matches_rows

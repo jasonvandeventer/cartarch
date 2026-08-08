@@ -21,7 +21,7 @@
       rows:         list of dicts from the per-mode reconciliation function
       deck_name:    str | None (deck mode: name of target deck; collection
                                 mode: name of target storage location)
-      manual_mode:  bool (collection mode only — flips the action-select
+      acquisition_default: bool (collection mode only — flips the action-select
                           default to import_new for the single-card manual
                           flow per design doc §5.5)
 
@@ -267,7 +267,7 @@
   {# Collection-mode branch: sync semantics. Per-row output has
      owned_breakdown / total_user_owned; action select offers
      skip_already_owned / import_delta / import_new. Default is
-     `recommended_action` unless manual_mode is True, in which case the
+     `recommended_action` unless acquisition_default is True, in which case the
      default flips to import_new (acquisition semantics for single-card
      manual entry, per design doc §5.5).
 
@@ -313,9 +313,17 @@
                 background: rgba(244, 158, 76, 0.12);
                 border: 1px solid rgba(244, 158, 76, 0.35)">
         <strong>Some of these cards are already in your collection</strong>
-        (a few may be allocated to decks). They'll be skipped by default —
-        usually what you want. Review the list below only if you'd like to
-        import extra copies of any of them.
+        (a few may be allocated to decks).
+        {% if acquisition_default|default(false) %}
+          They'll be imported as EXTRA copies by default — a pasted list is
+          normally cards you just acquired. Surplus copies auto-sort to Bulk
+          unless they're staples or deck cards. Switch any row to
+          <em>skip</em> below if you were re-syncing instead.
+        {% else %}
+          They'll be skipped by default — usually what you want when
+          re-importing a collection export. Review the list below if these are
+          extra copies you actually acquired.
+        {% endif %}
       </p>
     {% endif %}
     <details style="margin-top: 0.5rem" {% if _show_dupes_only %}open{% endif %}>
@@ -376,11 +384,11 @@
                 </td>
                 <td>
                   {# Default action selection logic:
-                     - manual_mode flips to import_new (acquisition default
+                     - acquisition_default flips to import_new (acquisition default
                        for single-card manual entry)
                      - otherwise, use the function's recommended_action #}
                   {% set rec = row.recommended_action %}
-                  {% set default_action = "import_new" if manual_mode else rec %}
+                  {% set default_action = "import_new" if acquisition_default|default(false) else rec %}
                   <select name="reconcile_action" class="reconcile-action-select">
                     {% if row.total_user_owned >= row.quantity_needed %}
                       <option value="skip_already_owned"
