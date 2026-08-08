@@ -1,5 +1,16 @@
 [
   {
+    "version": "4.13.24",
+    "date": "2026-08-08",
+    "added": [
+      "Pending Placement now lets drawer-sorter users file a card somewhere other than the drawer the sorter picked — Bulk, a box, a binder. The assigned drawer stays the default and one-click confirm is unchanged, so this only appears when you want it. Decks are deliberately not offered; cards join a deck through the deck page so the collection stays reconciled."
+    ],
+    "resolved": [
+      "A card filed to Bulk would have kept claiming it was in its old drawer — counted under that drawer on the Collection overview, and recorded as going there in its history, while physically sitting somewhere else. Found while building the above, and unreachable before it."
+    ],
+    "archivist_note": "The page was written when a sorter user only ever had one answer: the drawer the sorter chose. Then the surplus-to-Bulk routing arrived and made a second answer normal, and nobody reconciled the two — the destination simply wasn't offered, which reads as a missing box rather than a decision. The more interesting half is the bug that was waiting behind it: the placement code assumed a drawer assignment and a physical location could never disagree, which was true right up until this feature made it false."
+  },
+  {
     "version": "4.13.23",
     "date": "2026-08-08",
     "resolved": [
