@@ -1486,7 +1486,49 @@ body::after {
   color: var(--muted);
 }
 
-nav {
+/* SCOPED from a bare `nav {}` selector (v4.13.22). That rule is a retired v3.x
+   horizontal site-header leftover, and it silently contributed one property to
+   every <nav> in the app while each component overrode the rest — the exact
+   shape of the v4.12.5 sidebar bug, where `.sidebar-nav` overrode display,
+   direction and gap but NOT `flex-wrap`, becoming a WRAPPING column that put
+   `.nav-donate` in a second column past the sidebar edge, where
+   `overflow: hidden` erased it.
+
+   Deliberately kept as one rule listing the five existing navs, at the SAME
+   position in the file, rather than pushed down into each component: that makes
+   the cascade byte-identical (verified — zero computed-style differences across
+   all five navs on landing + authed pages at 1280x900 and 390x844) while
+   removing the hazard, because a NEW <nav> no longer inherits any of it.
+
+   What each one actually takes from here, measured rather than assumed:
+     .landing-header-nav  margin-top, flex-wrap
+     .landing-footer-nav  margin-top
+     .sidebar-nav         margin-top          (declares flex-wrap: nowrap itself)
+     .bottom-nav          margin-top, gap     (the mobile grid gap is real)
+     .more-menu-list      margin-top, flex-wrap, and display/gap on desktop
+                                              (invisible there — .more-menu is
+                                              display:none — but preserved so
+                                              this change proves zero drift)
+
+   `:where()` is REQUIRED, not stylistic. The bare `nav` selector was
+   specificity (0,0,1) and lost to every one of these class rules; a plain class
+   list is (0,1,0) and TIES them, so being later in the file it started WINNING —
+   measured: `.sidebar-nav` flipped to `flex-wrap: wrap` and `gap: 16px`, which
+   is the v4.12.5 sidebar bug reintroduced by the very change meant to prevent
+   it. `:where()` contributes ZERO specificity, so the cascade is unchanged.
+   Same fix, same reason, as `:where(.filter-row) button` in #174.
+
+   `nav a {}` immediately below is the SAME hazard and is deliberately NOT
+   touched here: it contributes --link colour and font-weight 500 to several
+   navs, it has never caused a defect, and folding it in would double the
+   surface of a change whose whole value is being provably inert. */
+:where(
+  .landing-header-nav,
+  .landing-footer-nav,
+  .sidebar-nav,
+  .bottom-nav,
+  .more-menu-list
+) {
   margin-top: 0.85rem;
   display: flex;
   flex-wrap: wrap;
