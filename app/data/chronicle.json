@@ -1,5 +1,13 @@
 [
   {
+    "version": "4.13.22",
+    "date": "2026-08-08",
+    "refined": [
+      "A stylesheet rule left over from an old page layout was quietly applying itself to every navigation bar in the app, including ones written years later that never asked for it. It caused the vanishing Donate button back in June and would have caused the next one too. It now applies only to the five bars that actually want it, and nothing new inherits it by accident. Nothing on screen changed — that was checked rather than assumed, across two pages and two screen sizes."
+    ],
+    "archivist_note": "The first version of this fix broke the thing it was fixing. Narrowing the rule to a named list made it stronger than the components it sits beside, so the sidebar quietly reverted to the exact broken behaviour from June — invisible in the code, obvious the moment the browser was asked to compare before and after. That comparison is the only reason this is a cleanup rather than a repeat. Reading CSS tells you what a rule says; only measuring tells you which rule wins."
+  },
+  {
     "version": "4.13.21",
     "date": "2026-08-07",
     "added": [
