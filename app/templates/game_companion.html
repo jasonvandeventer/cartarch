@@ -466,17 +466,23 @@
     lifeEl.textContent = myLife;
     lifeEl.classList.toggle('cmp-life-dead', myLife <= 0);
 
-    // Commander damage received by me, one row per opponent.
+    // Commander damage received by me, one row per SOURCE. A seat with one
+    // commander (or none we can name) has exactly one source and reads as it
+    // always did; a partner seat contributes one row per commander, because 21
+    // is per commander and a shared row cannot say who dealt what.
     const recv = (st.cmd && st.cmd[K(MY_SEAT_ID)]) || {};
-    document.getElementById('cmp-cmd').innerHTML = others.map(s => {
-      const v = recv[K(s.id)] || 0;
-      const danger = v >= 21 ? ' cmp-cmd-danger' : v >= 16 ? ' cmp-cmd-warn' : '';
-      return `<div class="cmp-cmd-row">
-        <span class="cmp-cmd-from">from ${escapeHtml(s.name)}</span>
-        <button type="button" class="cmp-btn-sm" onclick="adjCmd(${s.id}, -1)">−</button>
+    document.getElementById('cmp-cmd').innerHTML = others.flatMap(s => {
+      return cmdSourcesFor(s).map(src => {
+        const v = recv[src.key] || 0;
+        const danger = v >= 21 ? ' cmp-cmd-danger' : v >= 16 ? ' cmp-cmd-warn' : '';
+        const label = src.key === K(s.id) ? s.name : `${s.name} · ${src.label}`;
+        return `<div class="cmp-cmd-row">
+        <span class="cmp-cmd-from">from ${escapeHtml(label)}</span>
+        <button type="button" class="cmp-btn-sm" onclick="adjCmd('${src.key}', ${s.id}, -1)">−</button>
         <span class="cmp-cmd-val${danger}">${v}</span>
-        <button type="button" class="cmp-btn-sm" onclick="adjCmd(${s.id}, 1)">+</button>
+        <button type="button" class="cmp-btn-sm" onclick="adjCmd('${src.key}', ${s.id}, 1)">+</button>
       </div>`;
+      });
     }).join('');
 
     // Counter pills.
@@ -800,7 +806,13 @@
     if (life !== undefined && life <= 0) return 'life';
     const pc = ((st.extraCounters && st.extraCounters[K(id)]) || []).find(c => c.type === 'poison');
     if (pc && (pc.value || 0) >= 10) return 'poison';
-    const vals = Object.values((st.cmd && st.cmd[K(id)]) || {});
+    // Per-source keys make max() correct by construction. A blob still in the
+    // v4.13.20 stopgap shape shares one key per partner SEAT, so those are
+    // skipped exactly as the server skips them — this copy was missed then.
+    const partners = new Set(st.partnerSeats || []);
+    const vals = Object.entries((st.cmd && st.cmd[K(id)]) || {})
+      .filter(([k]) => !partners.has(String(k)))
+      .map(([, v]) => v);
     if (vals.length && Math.max(...vals) >= 21) return 'cmd';
     return null;
   }
@@ -845,18 +857,29 @@
     render();
     postAction({ type: 'life', seat_id: MY_SEAT_ID, delta });
   };
-  window.adjCmd = function (fromId, delta) {
+  // The damage sources a seat can deal from, server-derived (cmdSources). A blob
+  // written before per-commander keying has none — fall back to the bare seat id,
+  // which is exactly the shape those blobs use.
+  function cmdSourcesFor(seat) {
+    const list = (st.cmdSources || {})[K(seat.id)];
+    return (list && list.length) ? list : [{ key: K(seat.id), label: seat.name }];
+  }
+
+  window.adjCmd = function (sourceKey, fromId, delta) {
     snapshot();
     if (!st.cmd[K(MY_SEAT_ID)]) st.cmd[K(MY_SEAT_ID)] = {};
-    const cur = st.cmd[K(MY_SEAT_ID)][K(fromId)] || 0;
-    st.cmd[K(MY_SEAT_ID)][K(fromId)] = Math.max(0, cur + delta);
+    const cur = st.cmd[K(MY_SEAT_ID)][sourceKey] || 0;
+    st.cmd[K(MY_SEAT_ID)][sourceKey] = Math.max(0, cur + delta);
     // cmd is coupled to life (matching the tracker + server): lose the actual
     // (post-floor) cmd increase; a decrement symmetrically restores life.
-    const actual = st.cmd[K(MY_SEAT_ID)][K(fromId)] - cur;
+    const actual = st.cmd[K(MY_SEAT_ID)][sourceKey] - cur;
     st.lives[K(MY_SEAT_ID)] = ((st.lives[K(MY_SEAT_ID)]) || 0) - actual;
     cmpAutoEliminate(MY_SEAT_ID);
     render();
-    postAction({ type: 'cmd', receiver_seat_id: MY_SEAT_ID, attacker_seat_id: fromId, delta });
+    postAction({
+      type: 'cmd', receiver_seat_id: MY_SEAT_ID, attacker_seat_id: fromId,
+      attacker_source_key: sourceKey, delta,
+    });
   };
   window.addCounter = function (type) {
     if (!COUNTER_TYPES.includes(type)) return;

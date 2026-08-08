@@ -48,6 +48,7 @@ from app.game_service import (
     normalize_game_format,
     record_goal_results,
     seat_commander_scryfall_id,
+    seat_damage_sources,
     set_game_playgroup,
     set_own_seat_deck,
     toggle_seat_art_background,
@@ -552,6 +553,9 @@ def game_detail_page(
         # Same helper the live blob's `partnerSeats` comes from, so the server's
         # authoritative check and the two client mirrors cannot disagree.
         "partner_seat_ids": sorted(multi_commander_seat_ids(session, game)),
+        # Per-seat damage SOURCES for the tracker (the live blob carries the same
+        # map; this serves a game that has not gone live yet).
+        "cmd_sources": seat_damage_sources(session, game),
     }
 
     # v3.33.2 — finalized games render a read-only summary (final standings,

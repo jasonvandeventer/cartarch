@@ -313,3 +313,58 @@ def test_the_matrix_totals_the_seat_but_flags_lethal_per_commander(db):
     assert cell["value"] == 24, "the cell shows the seat total"
     assert cell["lethal"] is False, "but 13 and 11 are each below 21"
     assert matrix["any"] is True
+
+
+# --- the FOURTH elimination path: the phone (v4.13.20 missed it) ------------------
+
+
+def _companion_src() -> str:
+    text = (
+        pathlib.Path(__file__).resolve().parents[1] / "app" / "templates" / "game_companion.html"
+    ).read_text()
+    start = text.index("function cmpLossCause(")
+    depth = 0
+    for i in range(text.index("{", start), len(text)):
+        if text[i] == "{":
+            depth += 1
+        elif text[i] == "}":
+            depth -= 1
+            if depth == 0:
+                return text[start : i + 1]
+    raise AssertionError("unbalanced braces extracting cmpLossCause")
+
+
+def _run_companion(cmd, partner_seats, life=40):
+    js = f"""
+const st = {
+        json.dumps(
+            {
+                "lives": {"1": life},
+                "cmd": {"1": cmd},
+                "extraCounters": {"1": []},
+                "partnerSeats": partner_seats,
+            }
+        )
+    };
+function K(x) {{ return String(x); }}
+{_companion_src()}
+console.log(JSON.stringify({{cause: cmpLossCause(1)}}));
+"""
+    proc = subprocess.run(["node", "-e", js], capture_output=True, text=True, timeout=30)
+    assert proc.returncode == 0, proc.stderr
+    return json.loads(proc.stdout)["cause"]
+
+
+@pytestmark_node
+def test_the_phone_stops_eliminating_on_a_shared_counter():
+    """v4.13.20 fixed the server and two clients and MISSED this one, so a
+    partner-seat player saw a false 'eliminated' until the SSE echo corrected it."""
+    assert _run_companion({"2": 24}, partner_seats=["2"]) is None
+    assert _run_companion({"2": 24}, partner_seats=[]) == "cmd"
+
+
+@pytestmark_node
+def test_the_phone_reads_per_commander_keys():
+    """New-shape blob: two partners below 21 each kill nobody; one at 21 does."""
+    assert _run_companion({"2:100": 13, "2:101": 11}, partner_seats=[]) is None
+    assert _run_companion({"2:100": 21, "2:101": 3}, partner_seats=[]) == "cmd"

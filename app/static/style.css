@@ -5592,6 +5592,13 @@ body.game-mode .tracker-card.tc-active-turn {
 table.dmtx {
   border-collapse: collapse;
   width: 100%;
+  /* v4.13.21 — a partner seat contributes one COLUMN PER COMMANDER, so a 5-seat
+     pod with two partner decks is 7 source columns, not 5. `width: 100%` alone
+     squashes those into ~45px on a phone, where each cell holds − value +.
+     `.damage-matrix-grid` already scrolls; this makes the table use it rather
+     than compress below legibility. Wide screens are unaffected: max-content is
+     narrower than the 920px panel there, so `width: 100%` still wins. */
+  min-width: max-content;
   color: var(--text);
 }
 table.dmtx th,

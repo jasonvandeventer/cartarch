@@ -835,6 +835,16 @@ const firstSeatNumber = {{ game.first_seat_number | tojson }};
 // auto-eliminate anyone — the cells are flagged instead. Server-derived
 // (game_service.multi_commander_seat_ids); the live blob carries the same set
 // as `partnerSeats` for the authoritative check.
+// Damage SOURCES per seat: "<seat>" for one commander or none, "<seat>:<card>"
+// per commander of a partner seat. Server-derived (game_service.seat_damage_sources);
+// the live blob carries the same map as `cmdSources`.
+const CMD_SOURCES = {{ cmd_sources | default({}) | tojson }};
+function cmdSourcesFor(seatId) {
+  const list = (state.cmdSources || CMD_SOURCES || {})[String(seatId)];
+  if (list && list.length) return list;
+  const seat = seatDefs.find(s => String(s.id) === String(seatId));
+  return [{ key: String(seatId), label: seat ? seat.name : String(seatId) }];
+}
 const PARTNER_SEAT_IDS = new Set(({{ partner_seat_ids | default([]) | tojson }}).map(String));
 
 // v4.12.26 — the dice roll, moved here with the picker. Animates across the
@@ -1068,7 +1078,15 @@ function freshState() {
 // fully backward-compatible. Bumping would mid-game-wipe every live tracker
 // — the exact mistake v3.25.1 warned against.
 function gameFingerprint() {
-  return seatDefs.map(s => `${s.id}:${s.startingLife}:${s.name}`).join('|');
+  // v4.13.21 — BUMPED, deliberately and for the documented reason: the SAVED
+  // STATE SHAPE changed. `state.cmd[receiver]` was keyed by attacking SEAT and is
+  // now keyed by damage SOURCE ("<seat>" or "<seat>:<card>", one per commander of
+  // a partner seat). A restored pre-bump blob would put a partner seat's damage
+  // back on a shared key, which is exactly the counter that eliminated someone on
+  // a total nobody actually dealt. Every rule in this file's header applies —
+  // this is NOT a backend change, NOT an additive optional field, and the cost
+  // (in-progress trackers reset) was accepted with no games scheduled for a week.
+  return 'v2|' + seatDefs.map(s => `${s.id}:${s.startingLife}:${s.name}`).join('|');
 }
 
 let state;
@@ -1368,26 +1386,32 @@ function removeCounter(seatId, counterIdx) {
   save(); render();
 }
 
-function adjustCmd(receiverId, senderId, delta) {
+function adjustCmd(receiverId, senderId, delta, sourceKey) {
+  // The KEY is what the counter lives under: a partner seat's two commanders
+  // are separate keys, so nothing sums them and 21 stays per commander.
+  const key = sourceKey || String(senderId);
   if (!state.cmd[receiverId]) state.cmd[receiverId] = {};
   if (LIVE) {
     // cmd is COUPLED to life in live mode too (matching the localStorage tracker
     // below and the server). Optimistically apply the same actual-delta life
     // change; the SSE echo confirms it.
-    const p = state.cmd[receiverId][senderId] || 0;
-    state.cmd[receiverId][senderId] = Math.max(0, p + delta);
-    const ad = state.cmd[receiverId][senderId] - p;
+    const p = state.cmd[receiverId][key] || 0;
+    state.cmd[receiverId][key] = Math.max(0, p + delta);
+    const ad = state.cmd[receiverId][key] - p;
     state.lives[receiverId] = (state.lives[receiverId] || 0) - ad;
     liveAutoEliminate(receiverId);
     render();
-    postAction({ type: 'cmd', receiver_seat_id: receiverId, attacker_seat_id: senderId, delta });
+    postAction({
+      type: 'cmd', receiver_seat_id: receiverId, attacker_seat_id: senderId,
+      attacker_source_key: key, delta,
+    });
     return;
   }
-  const prev = state.cmd[receiverId][senderId] || 0;
-  state.cmd[receiverId][senderId] = Math.max(0, prev + delta);
-  const actualDelta = state.cmd[receiverId][senderId] - prev;
+  const prev = state.cmd[receiverId][key] || 0;
+  state.cmd[receiverId][key] = Math.max(0, prev + delta);
+  const actualDelta = state.cmd[receiverId][key] - prev;
   state.lives[receiverId] = (state.lives[receiverId] || 0) - actualDelta;
-  pushHistory({ type: 'cmd', seatId: receiverId, senderId, delta: actualDelta });
+  pushHistory({ type: 'cmd', seatId: receiverId, senderId, sourceKey: key, delta: actualDelta });
   checkElimination(receiverId);
   save(); render();
 }
@@ -1522,8 +1546,9 @@ function undoLast() {
     const ec = counters.find(c => c.type === targetType);
     if (ec) ec.value = Math.max(0, (ec.value || 0) - last.delta);
   } else if (last.type === 'cmd') {
-    state.cmd[last.seatId][last.senderId] = Math.max(0,
-      (state.cmd[last.seatId][last.senderId] || 0) - last.delta);
+    const undoKey = last.sourceKey || String(last.senderId);
+    state.cmd[last.seatId][undoKey] = Math.max(0,
+      (state.cmd[last.seatId][undoKey] || 0) - last.delta);
     state.lives[last.seatId] += last.delta;
   } else if (last.type === 'nextTurn') {
     // Undo the round increment iff the advance actually made one. This used to
@@ -1774,25 +1799,31 @@ function renderDamageMatrix() {
   const host = document.getElementById('damage-matrix-grid');
   if (!host) return;
   const seats = seatDefs;
+  // One column per SOURCE. A one-commander seat is one column exactly as before;
+  // a partner seat gets a column per commander, because 21 is per commander.
+  const cols = seats.flatMap(sender =>
+    cmdSourcesFor(sender.id).map(src => ({ sender, src })));
   let html = '<table class="dmtx"><thead><tr><th></th>';
-  seats.forEach(sender => {
-    html += `<th><span class="dmtx-name">${sender.name}</span></th>`;
+  cols.forEach(({ sender, src }) => {
+    const sub = src.key === String(sender.id) ? '' :
+      `<span class="dmtx-sub">${src.label}</span>`;
+    html += `<th><span class="dmtx-name">${sender.name}</span>${sub}</th>`;
   });
   html += '</tr></thead><tbody>';
   seats.forEach(receiver => {
     const focusCls = (_damageMatrixFocusReceiver === receiver.id) ? ' dmtx-row-focus' : '';
     html += `<tr class="dmtx-row${focusCls}"><th class="dmtx-rowhead"><span class="dmtx-name">${receiver.name}</span></th>`;
-    seats.forEach(sender => {
+    cols.forEach(({ sender, src }) => {
       if (sender.id === receiver.id) {
         html += '<td class="dmtx-cell dmtx-cell-self">—</td>';
       } else {
-        const val = (state.cmd[receiver.id] || {})[sender.id] || 0;
+        const val = (state.cmd[receiver.id] || {})[src.key] || 0;
         const dangerCls = val >= 21 ? ' tc-counter-danger' : val >= 16 ? ' tc-counter-warn' : '';
         html += `
           <td class="dmtx-cell">
-            <button type="button" class="dmtx-btn" onclick="adjustCmd(${receiver.id}, ${sender.id}, -1)">−</button>
+            <button type="button" class="dmtx-btn" onclick="adjustCmd(${receiver.id}, ${sender.id}, -1, '${src.key}')">−</button>
             <span class="dmtx-val${dangerCls}">${val}</span>
-            <button type="button" class="dmtx-btn" onclick="adjustCmd(${receiver.id}, ${sender.id}, 1)">+</button>
+            <button type="button" class="dmtx-btn" onclick="adjustCmd(${receiver.id}, ${sender.id}, 1, '${src.key}')">+</button>
           </td>`;
       }
     });
@@ -1844,18 +1875,24 @@ function render() {
     s.otherIds.forEach(oid => {
       const el = document.getElementById(`cmd-${s.id}-${oid}`);
       if (!el) return;
-      const val = (state.cmd[s.id] || {})[oid] || 0;
+      // The strip is a per-SEAT summary, so it totals that seat's sources; the
+      // matrix is where per-commander numbers live.
+      const row = state.cmd[s.id] || {};
+      const val = Object.keys(row)
+        .filter(k => k === String(oid) || k.startsWith(String(oid) + ':'))
+        .reduce((n, k) => n + (row[k] || 0), 0);
       el.textContent = val;
-      const shared = PARTNER_SEAT_IDS.has(String(oid));
+      // Lethality is per SOURCE — a seat total of 24 split 13/11 kills nobody.
+      const sources = cmdSourcesFor(oid);
+      const worst = Math.max(0, ...sources.map(src => row[src.key] || 0));
+      const multi = sources.length > 1;
       el.className = 'tc-cmd-cell-val' +
-        (val >= 21 ? ' tc-counter-danger' : val >= 16 ? ' tc-counter-warn' : '');
-      // A partner seat's total is two commanders' damage added together, so it
-      // is NOT a 21-damage kill on its own. Say so rather than acting on it.
-      el.title = shared && val >= 21
-        ? 'Two commanders share this counter — 21 is per commander, so this is '
-          + 'not automatic. Eliminate manually if one commander dealt 21.'
+        (worst >= 21 ? ' tc-counter-danger' : worst >= 16 ? ' tc-counter-warn' : '');
+      el.title = multi
+        ? sources.map(src => `${src.label}: ${row[src.key] || 0}`).join(' · ')
+          + ' — 21 is per commander; open the matrix to adjust each.'
         : '';
-      el.textContent = shared && val >= 21 ? val + '*' : val;
+      el.textContent = multi ? val + '*' : val;
     });
 
     const elimPill = document.getElementById(`elim-pill-${s.id}`);
