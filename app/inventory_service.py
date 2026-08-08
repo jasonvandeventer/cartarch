@@ -2914,6 +2914,17 @@ def confirm_pending_row(
     # placed at its new home, so the FROM hints stop being useful.
     row.from_drawer = None
     row.from_slot = None
+    # An EXPLICIT destination overrides the sorter's assignment, so the drawer /
+    # slot it had proposed is no longer where this card lives. Clearing them
+    # matters beyond tidiness: `get_inventory_row_stats` is a drawer-FIRST
+    # cascade, so a row filed to Bulk while still carrying `drawer=3` would be
+    # counted under Drawer 3 on the Overview pills, and the audit line below
+    # would claim it went to a drawer it never reached. Only reachable since
+    # sorter users gained non-drawer destinations on /pending (v4.13.24) — a
+    # non-sorter user's pending rows never had a drawer to begin with.
+    if location_id is not None and location.type != "drawer":
+        row.drawer = None
+        row.slot = None
     row.updated_at = utc_now()
 
     if row.drawer:

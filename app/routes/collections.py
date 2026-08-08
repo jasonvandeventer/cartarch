@@ -1618,6 +1618,21 @@ def pending_page(
 
     use_drawer_sorter = has_sortable_setup(session, current_user.id)
     locations = [] if use_drawer_sorter else list_locations(session, current_user.id)
+    # A sorter user's rows confirm into their ASSIGNED drawer, which is the whole
+    # point of the drawer workflow — but since v3.38.0 "this surplus copy belongs
+    # in Bulk" is a normal outcome, and there was no way to say it from here.
+    # Non-drawer, non-deck locations are offered as an override (a deck
+    # destination would bypass pull_card_to_deck reconciliation, the same guard
+    # the non-sorter branch and the bulk-move route already apply).
+    alt_locations = (
+        [
+            loc
+            for loc in list_locations(session, current_user.id)
+            if loc.type not in ("root", "deck", "drawer")
+        ]
+        if use_drawer_sorter
+        else []
+    )
     view_model = build_pending_view_model(rows)
 
     # v3.28.7 — batch grouping for non-drawer-sorter users. Drawer-sorter users
@@ -1643,6 +1658,7 @@ def pending_page(
             "current_user": current_user,
             "use_drawer_sorter": use_drawer_sorter,
             "locations": locations,
+            "alt_locations": alt_locations,
         },
     )
 

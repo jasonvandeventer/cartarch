@@ -246,6 +246,19 @@
                           {% endif %}
                         {% endfor %}
                       </select>
+                    {% elif alt_locations|default([]) %}
+                      {# Sorter users confirm into the drawer the sorter assigned —
+                         that stays the default (value 0 → the drawer path in
+                         confirm_pending_row). Since v3.38.0 a surplus copy can
+                         legitimately belong in Bulk instead, and there was no way
+                         to say so from this page. Decks are excluded: that route
+                         must go through pull_card_to_deck. #}
+                      <select name="location_id" class="pending-alt-dest">
+                        <option value="0">Drawer {{ item.drawer or "—" }}{% if item.slot %} · slot {{ item.slot }}{% endif %}</option>
+                        {% for loc in alt_locations %}
+                          <option value="{{ loc.id }}">{{ loc.name }} ({{ loc.type }})</option>
+                        {% endfor %}
+                      </select>
                     {% endif %}
                     <button type="submit"
                             class="danger-button"
