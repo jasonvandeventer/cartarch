@@ -1,5 +1,13 @@
 [
   {
+    "version": "4.13.23",
+    "date": "2026-08-08",
+    "resolved": [
+      "Pasting in a list of cards you already own imported nothing. The paste box shared its settings with the CSV importer, which assumes you are re-uploading a collection export and so skips anything already in your collection. Typing in cards is the opposite — those are cards you just acquired — and the extra copies were being discarded before the sorter could file them into Bulk. A pasted list now adds the copies by default, and says so; uploading a CSV still skips duplicates, which is right for a re-import. Either default can be changed per card before committing."
+    ],
+    "archivist_note": "Two features were quietly disagreeing. The routing that keeps cheap surplus out of prime drawer slots only sees cards once they exist, and the import step was deciding they should never exist — so the feature built for exactly this case never got a look in. Nothing was broken in either half; the assumption connecting them was wrong, and only in one direction. The fix also uncovered that the paste screen had never once been exercised by a test, which is why a missing field there had gone unnoticed for months."
+  },
+  {
     "version": "4.13.22",
     "date": "2026-08-08",
     "refined": [
