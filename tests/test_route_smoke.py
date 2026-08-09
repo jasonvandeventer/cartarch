@@ -165,6 +165,25 @@ def test_authenticated_pages_render():
         (f"/showcase/{ids['showcase_id']}", 200),
         ("/shares", 200),
         (f"/shares/{ids['share_id']}", 200),
+        # v4.13.25 — added because tests/test_zz_template_coverage.py measured
+        # these templates as never RENDERED by any test. A template no test
+        # renders drifts silently: prod's Jinja is permissive, so a missing
+        # context key shows as empty rather than raising (#157). Each entry here
+        # is one line struck off that allowlist.
+        ("/chronicle", 200),
+        ("/privacy", 200),
+        ("/terms", 200),
+        ("/decklist", 200),
+        # 403 is CORRECT: the seeded user has no drawer locations, and
+        # /drawers is gated on user_has_drawers. Pinned rather than dropped —
+        # the gate is real behaviour. drawers.html therefore stays on the
+        # template-coverage allowlist with that reason.
+        ("/drawers", 403),
+        ("/playgroups", 200),
+        ("/trades", 200),
+        ("/tokens", 200),
+        ("/tokens/new", 200),
+        ("/watchlist", 200),
     ]
 
     failed = 0

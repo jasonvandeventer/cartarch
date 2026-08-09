@@ -49,28 +49,28 @@
       </div>
       <h2 class="chronicle-title">Chronicle of <b>Changes.</b></h2>
 
-      {% if entry.added %}
+      {% if entry.added|default(none) %}
       <section class="chronicle-section">
-        <h3><span>Added</span><span class="ct">{{ entry.added | length }} {{ "entry" if entry.added | length == 1 else "entries" }}</span></h3>
-        <ul>{% for item in entry.added %}<li>{{ item }}</li>{% endfor %}</ul>
+        <h3><span>Added</span><span class="ct">{{ entry.added|default([]) | length }} {{ "entry" if entry.added|default([]) | length == 1 else "entries" }}</span></h3>
+        <ul>{% for item in entry.added|default([]) %}<li>{{ item }}</li>{% endfor %}</ul>
       </section>
       {% endif %}
 
-      {% if entry.refined %}
+      {% if entry.refined|default(none) %}
       <section class="chronicle-section">
-        <h3><span>Refined</span><span class="ct">{{ entry.refined | length }} {{ "entry" if entry.refined | length == 1 else "entries" }}</span></h3>
-        <ul>{% for item in entry.refined %}<li>{{ item }}</li>{% endfor %}</ul>
+        <h3><span>Refined</span><span class="ct">{{ entry.refined|default([]) | length }} {{ "entry" if entry.refined|default([]) | length == 1 else "entries" }}</span></h3>
+        <ul>{% for item in entry.refined|default([]) %}<li>{{ item }}</li>{% endfor %}</ul>
       </section>
       {% endif %}
 
-      {% if entry.resolved %}
+      {% if entry.resolved|default(none) %}
       <section class="chronicle-section">
-        <h3><span>Resolved</span><span class="ct">{{ entry.resolved | length }} {{ "entry" if entry.resolved | length == 1 else "entries" }}</span></h3>
-        <ul>{% for item in entry.resolved %}<li>{{ item }}</li>{% endfor %}</ul>
+        <h3><span>Resolved</span><span class="ct">{{ entry.resolved|default([]) | length }} {{ "entry" if entry.resolved|default([]) | length == 1 else "entries" }}</span></h3>
+        <ul>{% for item in entry.resolved|default([]) %}<li>{{ item }}</li>{% endfor %}</ul>
       </section>
       {% endif %}
 
-      {% if entry.archivist_note %}
+      {% if entry.archivist_note|default(none) %}
       <div class="chronicle-note">
         <div class="chronicle-note-label">Notes from the Archivist</div>
         <p>{{ entry.archivist_note }}</p>

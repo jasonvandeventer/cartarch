@@ -187,3 +187,36 @@ def _reset_live_overlap_registry():
     live_game_service._last_written_version.clear()
     live_game_service._live_in_flight.clear()
     yield
+
+
+# ---------------------------------------------------------------------------
+# Template render tracking — feeds tests/test_template_coverage.py
+# ---------------------------------------------------------------------------
+#
+# A template no test ever RENDERS can drift indefinitely: prod's Jinja is
+# permissive (see #157), so a missing context key renders empty rather than
+# raising, and nothing surfaces it. That is exactly how import_preview.html came
+# to read `row.location_type` — a key `parse_text_list` never emits — and sit
+# that way for months until v4.13.23 finally loaded the page in a test and the
+# strict env raised.
+#
+# Hooking the LOADER rather than `get_template` is deliberate: `{% extends %}`
+# and `{% include %}` resolve through `loader.get_source`, so a partial reached
+# only via inheritance still counts as rendered.
+RENDERED_TEMPLATES: set[str] = set()
+
+
+def pytest_configure(config):  # noqa: D401 — pytest hook
+    from app.dependencies import templates
+
+    loader = templates.env.loader
+    if loader is None or getattr(loader, "_cartarch_tracked", False):
+        return
+    original = loader.get_source
+
+    def get_source(environment, template):
+        RENDERED_TEMPLATES.add(str(template))
+        return original(environment, template)
+
+    loader.get_source = get_source
+    loader._cartarch_tracked = True

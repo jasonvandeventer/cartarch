@@ -25,7 +25,7 @@
                 rows="14"
                 placeholder="1 Sol Ring (CMR) 333&#10;1 Arcane Signet (CMR) 297&#10;1 Counterspell&#10;...&#10;"
                 spellcheck="false"
-                autocomplete="off">{{ raw_decklist or '' }}</textarea>
+                autocomplete="off">{{ raw_decklist|default('') }}</textarea>
       <div class="decklist-form-actions">
         <button type="submit" class="btn-primary">Check collection</button>
         {% if submitted %}<a href="/decklist" class="btn-like btn-like-muted">Reset</a>{% endif %}
