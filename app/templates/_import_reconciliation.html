@@ -296,6 +296,37 @@
       {% if _to_delta > 0 %}<strong>{{ _to_delta }}</strong> partial (your collection is short),{% endif %}
       {% if _to_skip > 0 %}<strong>{{ _to_skip }}</strong> already owned (will skip).{% endif %}
     </p>
+    {# v4.13.26 — ADD vs SYNC, stated instead of inferred.
+
+       The per-path default (acquisition for a pasted list / manual add, sync for
+       a CSV) is a good guess, not a fact: pasting a decklist to CHECK coverage
+       is a re-sync, and uploading a CSV of a box you just bought is an
+       acquisition. This makes the assumption visible and reversible in one
+       click, without touching merge semantics — it only sets the per-row action
+       the panel already supports, so nothing here can double a quantity or
+       delete a row. True restore semantics stay in #150 item 1.
+
+       Rendered only when at least one row is already owned; with nothing owned
+       both modes produce the same import and the control would be noise. #}
+    {% if _to_skip > 0 or _to_delta > 0 %}
+      <div class="reconcile-intent" style="margin-top: 0.6rem">
+        <span class="muted">These cards are</span>
+        <label style="margin-left: 0.5rem">
+          <input type="radio"
+                 name="reconcile_intent"
+                 value="add"
+                 {% if acquisition_default|default(false) %}checked{% endif %}>
+          newly acquired — <strong>add</strong> the extra copies
+        </label>
+        <label style="margin-left: 0.75rem">
+          <input type="radio"
+                 name="reconcile_intent"
+                 value="sync"
+                 {% if not acquisition_default|default(false) %}checked{% endif %}>
+          a re-sync — <strong>skip</strong> what I already own
+        </label>
+      </div>
+    {% endif %}
     {% if bulk_routing %}
       {# v3.38.0 — auto-sort intake routing verdict (drawer-sorter, auto-sort path
          only). Never silent: cheap non-staple surplus heads to Bulk, not drawers. #}
@@ -445,6 +476,26 @@
           } else {
             hiddenNew.value = needed;
           }
+        });
+      });
+
+      // The ADD/SYNC toggle sets every row's action, then dispatches the SAME
+      // change event the per-row handler above listens for — so the quantity
+      // recalculation has exactly one implementation. Rows the user has already
+      // set by hand are overwritten deliberately: the toggle is a statement
+      // about the whole import, which is the point of having it.
+      document.querySelectorAll('input[name="reconcile_intent"]').forEach(function (radio) {
+        radio.addEventListener('change', function () {
+          if (!radio.checked) return;
+          var wanted = radio.value === 'add' ? 'import_new' : 'skip_already_owned';
+          document.querySelectorAll('.reconcile-action-select').forEach(function (sel) {
+            // Only rows that OFFER the option — a row with nothing owned has no
+            // skip choice, and forcing one would submit a value the server
+            // would have to second-guess.
+            if (!sel.querySelector('option[value="' + wanted + '"]')) return;
+            sel.value = wanted;
+            sel.dispatchEvent(new Event('change'));
+          });
         });
       });
     })();
