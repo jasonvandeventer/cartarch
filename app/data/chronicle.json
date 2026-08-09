@@ -1,5 +1,16 @@
 [
   {
+    "version": "4.13.25",
+    "date": "2026-08-09",
+    "resolved": [
+      "The public Chronicle page and the Decklist checker each referred to information that is not always present — a release with no \"Refined\" section, a decklist form that has not been submitted yet. Neither ever misbehaved for a reader, because the page builder fills a blank in silently, but both were one small change away from doing so."
+    ],
+    "refined": [
+      "Twenty-two percent of the app's pages and fragments had never once been drawn during testing, which is how the two above went unnoticed. Ten more pages are now checked on every run, and anything still uncovered is written down with a reason instead of being invisible — a new page cannot join that list by accident."
+    ],
+    "archivist_note": "The measurement is the point here. 'Some pages probably aren't tested' is a shrug; '21 of 95, and here they are' is a task list. Two of the untested ones turned out to be carrying real defects, one of them on a page anybody can visit without logging in. Worth admitting that the first version of the check was wrong twice — it ran too early to see the whole picture, and it failed when anyone tested a single file — and that running it, rather than reading it, is what showed both."
+  },
+  {
     "version": "4.13.24",
     "date": "2026-08-08",
     "added": [
