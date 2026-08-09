@@ -1,5 +1,13 @@
 [
   {
+    "version": "4.13.26",
+    "date": "2026-08-09",
+    "added": [
+      "The import reconciliation step now asks outright whether these are cards you just acquired or a list you are re-syncing, with the answer preselected from how you imported them. One click flips every row between adding the extra copies and skipping what you already own. It appears only when you already own some of what you are importing — the one case where the two answers differ."
+    ],
+    "archivist_note": "Last week's fix guessed for you: a pasted list means new cards, an uploaded file means a re-sync. That guess is right most of the time and wrong in ways nobody would notice — pasting a decklist to check what you own is a re-sync, and a spreadsheet of a box you just bought is not. A guess that cannot be seen or corrected is the part worth removing, so the guess is now the starting position rather than the decision. Deliberately no more than that: nothing here changes how quantities merge, which is a harder question still waiting on a proper answer."
+  },
+  {
     "version": "4.13.25",
     "date": "2026-08-09",
     "resolved": [
