@@ -72,8 +72,15 @@ def _make_test_engine(tmp_path, filename, *, fk_on):
 
 @pytest.fixture
 def db_engine(tmp_path):
-    """A temp-FILE SQLite engine (or Postgres via TEST_DATABASE_URL) with the full schema."""
-    engine = _make_test_engine(tmp_path, "test.db", fk_on=False)
+    """A temp-FILE SQLite engine (or Postgres via TEST_DATABASE_URL) with the full schema.
+
+    **FKs are ENFORCED**, matching production Postgres. They used to be off, so
+    fixtures could reference parents that did not exist — `audit_session_id=1`,
+    `showcase_id=1`, `source_deck_id=1` — and eight tests passed on SQLite while
+    failing on every Postgres run, which made the PG suite useless as a gate.
+    A test that genuinely needs a dangling reference takes `no_fk_db`.
+    """
+    engine = _make_test_engine(tmp_path, "test.db", fk_on=True)
     try:
         yield engine
     finally:
@@ -101,6 +108,44 @@ def user(db):
     db.add(u)
     db.commit()
     return u
+
+
+@pytest.fixture
+def row_reference_parents(db, user):
+    """Real parent rows for everything that can reference an InventoryRow.
+
+    Returns a namespace: ``.showcase``, ``.trade``, ``.variant_group``,
+    ``.source_deck``, ``.target_deck``.
+
+    Three "references survive this operation" tests built their references with
+    magic ids — ``showcase_id=1``, ``trade_id=1``, ``source_deck_id=1`` — and
+    said so in a comment: "FK enforcement is off in the default db fixture, so
+    placeholder deck/group ids are fine". True on SQLite, which runs foreign
+    keys OFF; on Postgres every one is a ForeignKeyViolation, so those tests
+    failed on every PG run and the PG suite could never be a clean gate. The
+    parents' identities are incidental to what the tests assert — but they have
+    to exist.
+    """
+    from types import SimpleNamespace
+
+    from app.models import Deck, Showcase, Trade, VariantGroup
+
+    showcase = Showcase(user_id=user.id, name="Refs")
+    trade = Trade(status="proposed")
+    vg = VariantGroup(user_id=user.id, name="Variants")
+    db.add_all([showcase, trade, vg])
+    db.flush()
+    source = Deck(user_id=user.id, name="Share Source", variant_group_id=vg.id)
+    target = Deck(user_id=user.id, name="Share Target", variant_group_id=vg.id)
+    db.add_all([source, target])
+    db.flush()
+    return SimpleNamespace(
+        showcase=showcase,
+        trade=trade,
+        variant_group=vg,
+        source_deck=source,
+        target_deck=target,
+    )
 
 
 @pytest.fixture(autouse=True)
@@ -142,6 +187,37 @@ def client(db_engine, user):
     finally:
         for dep in (get_db_session, get_current_user, require_csrf_token):
             main.app.dependency_overrides.pop(dep, None)
+
+
+@pytest.fixture
+def no_fk_db_engine(tmp_path):
+    """FK enforcement OFF — for the two tests whose SUBJECT is an orphan row.
+
+    The default `db_engine` enforces foreign keys, matching production Postgres.
+    A test that must CREATE a dangling reference (the orphan sweep, the
+    "[orphaned location]" stats branch) cannot do that under enforcement, so it
+    opts out here rather than the whole suite opting out for it — which is how
+    a fixture bug like `audit_session_id=1` stayed invisible for a year.
+
+    On Postgres `fk_on` is a no-op (FKs are always enforced), so a test needing
+    a real orphan must additionally skip there; that is a true statement about
+    production, not a gap.
+    """
+    engine = _make_test_engine(tmp_path, "no_fk_test.db", fk_on=False)
+    try:
+        yield engine
+    finally:
+        engine.dispose()
+
+
+@pytest.fixture
+def no_fk_db(no_fk_db_engine):
+    """A Session on the non-enforcing engine (see ``no_fk_db_engine``)."""
+    session = sessionmaker(bind=no_fk_db_engine, expire_on_commit=False)()
+    try:
+        yield session
+    finally:
+        session.close()
 
 
 @pytest.fixture

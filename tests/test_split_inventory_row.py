@@ -118,17 +118,21 @@ def test_split_copies_null_fields_as_null(db, user):
     assert new_row.storage_location_id is None
 
 
-def test_references_stay_on_original_row(db, user):
+def test_references_stay_on_original_row(db, user, row_reference_parents):
+    refs = row_reference_parents
     card = _card(db)
     row = _row(db, user.id, card, quantity=3)
-    sc_item = ShowcaseItem(showcase_id=1, inventory_row_id=row.id, quantity_offered=1)
-    tr_item = TradeItem(
-        trade_id=1, side="offer", inventory_row_id=row.id, quantity=1, finish="normal"
+    sc_item = ShowcaseItem(
+        showcase_id=refs.showcase.id, inventory_row_id=row.id, quantity_offered=1
     )
-    # FK enforcement is off in the default `db` fixture, so placeholder deck/group
-    # ids are fine — we only assert the inventory_row_id ref is left intact.
+    tr_item = TradeItem(
+        trade_id=refs.trade.id, side="offer", inventory_row_id=row.id, quantity=1, finish="normal"
+    )
     dcs = DeckCardShare(
-        inventory_row_id=row.id, source_deck_id=1, target_deck_id=2, variant_group_id=1
+        inventory_row_id=row.id,
+        source_deck_id=refs.source_deck.id,
+        target_deck_id=refs.target_deck.id,
+        variant_group_id=refs.variant_group.id,
     )
     db.add_all([sc_item, tr_item, dcs])
     db.commit()

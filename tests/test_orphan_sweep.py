@@ -24,8 +24,10 @@ from app.models import (
 from scripts.sweep_fk_orphans import find_orphans, sweep_fk_orphans
 
 
-def test_sweep_remediates_and_is_idempotent(db):
-    s = db
+def test_sweep_remediates_and_is_idempotent(no_fk_db):
+    # no_fk_db, not db: this test CREATES the orphan it then sweeps, which
+    # enforcement makes impossible. The default engine enforces FKs.
+    s = no_fk_db
     u = User(username="owner@example.com", password_hash="x")
     other = User(username="other@example.com", password_hash="x")
     s.add_all([u, other])

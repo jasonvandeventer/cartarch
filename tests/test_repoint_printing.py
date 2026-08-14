@@ -82,7 +82,8 @@ def test_happy_path_repoints_and_audits(db, user, monkeypatch):
     assert logs[0].card_id == new_card.id
 
 
-def test_row_identity_and_references_survive(db, user, monkeypatch):
+def test_row_identity_and_references_survive(db, user, monkeypatch, row_reference_parents):
+    refs = row_reference_parents
     loc = StorageLocation(user_id=user.id, name="Drawer 1", type="drawer", mode="managed")
     db.add(loc)
     db.flush()
@@ -91,10 +92,13 @@ def test_row_identity_and_references_survive(db, user, monkeypatch):
         db, user.id, old, storage_location_id=loc.id, drawer="1", slot="5", tags="x", notes="n"
     )
     row_id, created = row.id, row.created_at
-    sc = ShowcaseItem(showcase_id=1, inventory_row_id=row.id, quantity_offered=1)
+    sc = ShowcaseItem(showcase_id=refs.showcase.id, inventory_row_id=row.id, quantity_offered=1)
     tr = TradeItem(trade_id=1, side="offer", inventory_row_id=row.id, quantity=1, finish="normal")
     dcs = DeckCardShare(
-        inventory_row_id=row.id, source_deck_id=1, target_deck_id=2, variant_group_id=1
+        inventory_row_id=row.id,
+        source_deck_id=refs.source_deck.id,
+        target_deck_id=refs.target_deck.id,
+        variant_group_id=refs.variant_group.id,
     )
     db.add_all([sc, tr, dcs])
     db.commit()

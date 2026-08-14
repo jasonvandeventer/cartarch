@@ -82,17 +82,21 @@ def test_update_preserves_row_identity_and_fields(db, user):
     assert row.updated_at >= created
 
 
-def test_references_still_point_at_row(db, user):
+def test_references_still_point_at_row(db, user, row_reference_parents):
+    refs = row_reference_parents
     card = _card(db)
     row = _row(db, user.id, card, finish="foil")
-    sc_item = ShowcaseItem(showcase_id=1, inventory_row_id=row.id, quantity_offered=1)
-    tr_item = TradeItem(
-        trade_id=1, side="offer", inventory_row_id=row.id, quantity=1, finish="foil"
+    sc_item = ShowcaseItem(
+        showcase_id=refs.showcase.id, inventory_row_id=row.id, quantity_offered=1
     )
-    # FK enforcement is off in the default `db` fixture, so placeholder deck/group
-    # ids are fine — we only assert the inventory_row_id ref is left intact.
+    tr_item = TradeItem(
+        trade_id=refs.trade.id, side="offer", inventory_row_id=row.id, quantity=1, finish="foil"
+    )
     dcs = DeckCardShare(
-        inventory_row_id=row.id, source_deck_id=1, target_deck_id=2, variant_group_id=1
+        inventory_row_id=row.id,
+        source_deck_id=refs.source_deck.id,
+        target_deck_id=refs.target_deck.id,
+        variant_group_id=refs.variant_group.id,
     )
     db.add_all([sc_item, tr_item, dcs])
     db.commit()

@@ -12,7 +12,7 @@ import itertools
 from datetime import timedelta
 
 from app import audit_service
-from app.models import AuditLog, Card, InventoryRow, StorageLocation, User
+from app.models import AuditLog, AuditSession, Card, InventoryRow, StorageLocation, User
 from app.timeutil import utc_now
 
 _seq = itertools.count(1)
@@ -68,8 +68,21 @@ def _row(db, user_id, loc_id, qty) -> InventoryRow:
 
 
 def _log(db, user_id, loc_id, *, seen=0, missing=0, extras=0, expected=0, when, actions="[]"):
+    # An AuditLog is the record of a COMPLETED audit, so it gets the session it
+    # completed. This used to hardcode ``audit_session_id=1`` with no such row,
+    # which only worked because SQLite runs foreign keys OFF — on Postgres it is
+    # a ForeignKeyViolation, and four tests here failed on every PG run.
+    audit = AuditSession(
+        user_id=user_id,
+        storage_location_id=loc_id,
+        status="completed",
+        snapshot_hash="x",
+        started_at=when,
+    )
+    db.add(audit)
+    db.flush()
     log = AuditLog(
-        audit_session_id=1,
+        audit_session_id=audit.id,
         user_id=user_id,
         storage_location_id=loc_id,
         cards_expected=expected,

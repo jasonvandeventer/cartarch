@@ -10,7 +10,7 @@ from __future__ import annotations
 import pytest
 
 from app.inventory_service import get_inventory_row_stats
-from app.models import Card, InventoryRow, StorageLocation
+from app.models import Card, InventoryRow, StorageLocation, User
 
 
 @pytest.fixture
@@ -139,10 +139,32 @@ def test_same_name_different_ids_merge(db, user, make_card, make_loc):
     assert s["non_drawer_location_counts"] == {"Cube": 6}
 
 
-def test_orphaned_location_does_not_crash(db, user, make_card):
-    # REQ-008 + test #10 — non-null FK that doesn't resolve (FK enforcement off)
-    _row(db, user, make_card(), storage_location_id=999999)
-    s = _stats(db, user)
+def test_orphaned_location_does_not_crash(no_fk_db):
+    """REQ-008 + test #10 — a non-null storage_location_id that doesn't resolve.
+
+    Takes `no_fk_db` because the row it needs is a DANGLING FK, which the
+    default (enforcing) engine makes unrepresentable — and so does production:
+    `inventory_rows.storage_location_id` carries no `ondelete`, so Postgres
+    rejects the INSERT and blocks a location delete that would orphan rows.
+
+    The `[orphaned location]` branch is therefore defensive-only on prod
+    Postgres and cannot fire there; the orphan class it was written for (the
+    v3.39.x sweep) was an artifact of SQLite running FKs OFF. It still guards
+    the SQLite dev path, so it keeps real coverage here — but do not read this
+    test as evidence that prod can reach that state.
+    """
+    if no_fk_db.bind.dialect.name != "sqlite":
+        pytest.skip("a dangling FK is unrepresentable under enforced FKs — see docstring")
+
+    u = User(username="orphan-owner@example.com", password_hash="x")
+    no_fk_db.add(u)
+    no_fk_db.flush()
+    card = Card(scryfall_id="orphan-sid", name="Sol Ring", set_code="cmr", collector_number="1")
+    no_fk_db.add(card)
+    no_fk_db.flush()
+    _row(no_fk_db, u, card, storage_location_id=999999)
+
+    s = _stats(no_fk_db, u)
     assert s["non_drawer_location_counts"] == {"[orphaned location]": 1}
 
 
