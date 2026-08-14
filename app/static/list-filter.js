@@ -18,7 +18,9 @@
 // so the filter SEMANTICS live once in Python; this only compares.
 //
 // Used by: showcases.html, shares.html, showcase.html, share_view.html,
-// watchlist.html, wishlist_public.html, playgroup_detail.html, trade_new.html.
+// watchlist.html, wishlist_public.html, playgroup_detail.html, trade_new.html,
+// commander_picker.html, sets.html (v4.13.28 — name OR code, both in
+// data-filter-text).
 (function () {
   function colorMatches(token, want) {
     if (!want) return true;

@@ -425,11 +425,26 @@ def audit_card_search(
     # scoped audit doesn't badge out-of-scope printings as expected.
     expected_card_ids = {r.card_id for r in audit_service._audit_expected_rows(session, audit)}
 
+    # Ownership as an EXISTS, NOT a join + DISTINCT.
+    #
+    # v4.13.27 added the relevance ORDER BY to the previous `join(...).distinct()`
+    # form and that is INVALID ON POSTGRES: "for SELECT DISTINCT, ORDER BY
+    # expressions must appear in select list". SQLite accepts it, so the whole
+    # SQLite suite stayed green while the route 500'd in prod. EXISTS is the
+    # root-cause fix rather than a workaround — the join only ever existed to
+    # test ownership, and it yielded one row per InventoryRow (hence the
+    # DISTINCT), so removing it makes one-row-per-card structural.
+    owns_it = (
+        session.query(InventoryRow.id)
+        .filter(
+            InventoryRow.card_id == Card.id,
+            InventoryRow.user_id == current_user.id,
+        )
+        .exists()
+    )
     cards = (
         session.query(Card)
-        .join(InventoryRow, InventoryRow.card_id == Card.id)
-        .filter(InventoryRow.user_id == current_user.id, Card.name.ilike(f"%{q}%"))
-        .distinct()
+        .filter(Card.name.ilike(f"%{q}%"), owns_it)
         # Relevance decides WHICH 30 SURVIVE THE CAP, not the display order —
         # the expected-first sort below owns that and is deliberate. Without
         # it, substring + LIMIT + alphabetical means a fully-typed name can

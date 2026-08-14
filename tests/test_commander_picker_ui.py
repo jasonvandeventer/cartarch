@@ -21,6 +21,8 @@ import re
 
 from app.models import Card, InventoryRow, User
 
+_LOADS_ENGINE = re.compile(r"""<script[^>]*\ssrc=["'][^"']*list-filter\.js""")
+
 
 def _commander(db, user, name, scryfall_id, collector="1"):
     card = Card(
@@ -88,9 +90,26 @@ def test_every_template_emitting_the_filter_also_loads_the_engine(client, db, us
         # A partial may rely on its including page; only flag full pages.
         if "{% extends" not in text:
             continue
-        if "list-filter.js" not in text:
+        # Require an actual <script src=…list-filter.js>, NOT the bare string.
+        # A plain `"list-filter.js" not in text` check is satisfied by a Jinja
+        # COMMENT that merely names the file — which sets.html's own comment
+        # does — so a template could ship a dead control and still pass. Caught
+        # 2026-08-14 while mutation-testing the /sets filter: the page rendered
+        # with no engine and this guard stayed green.
+        if not _LOADS_ENGINE.search(text):
             offenders.append(str(path.relative_to(root)))
     assert not offenders, f"emit data-list-filter but never load the engine: {offenders}"
+
+
+# Self-check: the regex must match a real tag and reject a bare mention, or the
+# guard above silently stops guarding.
+def test_the_engine_load_regex_discriminates_tag_from_mention():
+    assert _LOADS_ENGINE.search(
+        "<script src=\"/static/list-filter.js?v={{ static_v('list-filter.js') }}\"></script>"
+    )
+    assert _LOADS_ENGINE.search('<script defer src="/static/list-filter.js"></script>')
+    assert not _LOADS_ENGINE.search("{# the case list-filter.js exists for #}")
+    assert not _LOADS_ENGINE.search("// see list-filter.js for the contract")
 
 
 # ── #169: hover data comes from the server ──────────────────────────────────

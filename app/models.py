@@ -1267,6 +1267,18 @@ class TokenInventory(Base):
     back_image_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     back_set_code: Mapped[str | None] = mapped_column(String(32), nullable=True)
     back_collector_number: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    # v4.13.28 — same three canonical values as ``inventory_rows.finish``
+    # (``FINISH_OPTIONS``), NOT a token-specific vocabulary: a foil token is
+    # foil in the same sense a foil card is, and one set means one label map
+    # and one normalizer. ``server_default`` is what lets the migration add a
+    # NOT NULL column to existing rows.
+    #
+    # Unlike ``inventory_rows``, finish is NOT part of any merge key here —
+    # ``create_token`` always INSERTs and never merges, so a foil and a normal
+    # printing of the same token were already separate rows.
+    finish: Mapped[str] = mapped_column(
+        String(32), default="normal", server_default="normal", nullable=False
+    )
     # ``ondelete="SET NULL"`` recovers a prod raw-SQL invariant the ORM omitted
     # (the migration created this FK with ON DELETE SET NULL — a deleted location
     # nulls the token's placement, keeps the token). SQLite doesn't enforce it

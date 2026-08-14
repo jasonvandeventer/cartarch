@@ -431,6 +431,7 @@ def tokens_create(
     collector_number: str = Form(""),
     scryfall_id: str = Form(""),
     notes: str = Form(""),
+    finish: str = Form("normal"),
     session: Session = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
     _: None = CsrfRequired,
@@ -458,6 +459,7 @@ def tokens_create(
             collector_number=collector_number,
             scryfall_id=scryfall_id,
             notes=notes,
+            finish=finish,
         )
     except ValueError:
         return RedirectResponse(url="/tokens/new", status_code=303)
@@ -478,6 +480,7 @@ def tokens_edit(
     back_set_code: str = Form(""),
     back_collector_number: str = Form(""),
     notes: str = Form(""),
+    finish: str = Form("normal"),
     session: Session = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
     _: None = CsrfRequired,
@@ -501,6 +504,7 @@ def tokens_edit(
         back_set_code=back_set_code,
         back_collector_number=back_collector_number,
         notes=notes,
+        finish=finish,
     )
     return RedirectResponse(url="/tokens", status_code=303)
 

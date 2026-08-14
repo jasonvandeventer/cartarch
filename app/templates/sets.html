@@ -27,10 +27,28 @@
     </div>
   </section>
 
+  {# Instant filter over the shared #169 engine — one input, no query param, no
+     round trip. The set list is bounded and fully rendered, which is exactly
+     the case list-filter.js exists for. `data-filter-text` carries the CODE and
+     the NAME so either matches what the user types; the engine lowercases both
+     sides, so the uppercased display code is not a trap. #}
+  {% if sets %}
+    <div class="list-filter-wrap">
+      <input type="text" class="list-filter-input" placeholder="Filter sets by name or code…"
+             aria-label="Filter sets by name or code"
+             data-mobile-placeholder="Filter sets…"
+             data-list-filter
+             data-list-filter-target=".sets-card-editorial"
+             data-list-filter-empty="#sets-filter-empty">
+      <p id="sets-filter-empty" class="list-filter-empty" hidden>No sets match that name or code.</p>
+    </div>
+  {% endif %}
+
   <div class="sets-grid-editorial">
     {% for s in sets %}
       <a href="/sets/{{ s.set_code }}"
-         class="editorial-card sets-card-editorial">
+         class="editorial-card sets-card-editorial"
+         data-filter-text="{{ s.set_code }} {{ s.set_name }}">
         <p class="sets-card-eyebrow">Set</p>
         <div class="sets-card-code">{{ s.set_code.upper() }}</div>
         <div class="sets-card-name">{{ s.set_name }}</div>
@@ -43,4 +61,9 @@
       </a>
     {% endfor %}
   </div>
+{% endblock %}
+{% block extra_scripts %}
+  {# #168 — emitting data-list-filter without loading the engine is a silent
+     dead control; tests/test_commander_picker_ui.py fails the build for it. #}
+  <script src="/static/list-filter.js?v={{ static_v('list-filter.js') }}"></script>
 {% endblock %}

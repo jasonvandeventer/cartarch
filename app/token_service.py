@@ -136,7 +136,12 @@ def create_token(
     collector_number: str | None = None,
     scryfall_id: str | None = None,
     notes: str | None = None,
+    finish: str = "normal",
 ) -> TokenInventory:
+    # Lazy import: app.import_service imports from here at module load, so a
+    # top-level import is a circular one. Same convention routes/decks.py uses.
+    from app.import_service import normalize_finish
+
     if not name.strip():
         raise ValueError("Token name is required")
     if quantity < 0:
@@ -161,6 +166,10 @@ def create_token(
         back_collector_number=back_collector_number.strip() if back_collector_number else None,
         storage_location_id=storage_location_id,
         notes=notes.strip() if notes else None,
+        # normalize_finish maps the aliases and floors anything unknown to
+        # "normal", so a hand-posted value can never write a finish the price
+        # join and the label map do not know about.
+        finish=normalize_finish(finish),
     )
     session.add(token)
     session.commit()
@@ -174,11 +183,20 @@ def update_token(
     user_id: int,
     **fields,
 ) -> TokenInventory | None:
+    from app.import_service import normalize_finish
+
     token = get_token(session, token_id, user_id)
     if not token:
         return None
     for k, v in fields.items():
         if not hasattr(token, k):
+            continue
+        # finish is NOT NULL and closed-vocabulary, so it cannot go through the
+        # generic string handling below: that maps "" to None (a NOT NULL
+        # violation) and would write any unrecognised value verbatim. Same
+        # normalizer create_token uses — one definition, both write paths.
+        if k == "finish":
+            setattr(token, k, normalize_finish(v))
             continue
         if isinstance(v, str):
             v = v.strip() or None

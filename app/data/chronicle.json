@@ -1,5 +1,18 @@
 [
   {
+    "version": "4.13.28",
+    "date": "2026-08-14",
+    "added": [
+      "The Sets page has a filter bar. Type part of a set name or its code and the grid narrows as you type — no page reload, and either half matches.",
+      "Tokens can record a finish. Adding or editing a token now offers the same Nonfoil / Foil / Etched choice a card gets, and a non-standard finish is badged in the token list."
+    ],
+    "refined": [],
+    "resolved": [
+      "Card search inside an audit had stopped working — it returned a server error instead of results. Introduced the same day by the search-ranking change and fixed within the hour; audits themselves were never affected, only the card-search box inside one."
+    ],
+    "archivist_note": "The audit search break is ours and worth naming plainly: yesterday's ranking fix reordered a query in a way SQLite accepts and PostgreSQL rejects, so every test passed and the live page failed. We found it running the suite against a real PostgreSQL before shipping today's work, which is the only reason it was hours rather than weeks. The fix removes the construct rather than patching around it. The two features either side of it were the easy kind — one was a filter box the app already had an engine for, and the other was a column the tokens table simply never got."
+  },
+  {
     "version": "4.13.27",
     "date": "2026-08-14",
     "added": [],

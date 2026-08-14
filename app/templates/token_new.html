@@ -47,6 +47,15 @@
       <div id="token-search-results" class="token-search-results"></div>
       <label>Quantity</label>
       <input type="number" name="quantity" value="1" min="0">
+      {# Same three canonical finishes a card gets, from the one FINISH_OPTIONS
+         Jinja global — a token-specific list here would be a second source of
+         truth for the same vocabulary. #}
+      <label for="token-field-finish">Finish</label>
+      <select id="token-field-finish" name="finish">
+        {% for f in finish_options %}
+          <option value="{{ f }}">{{ f|capitalize }}</option>
+        {% endfor %}
+      </select>
       <label>
         Subtype <span class="muted">(for grouping)</span>
       </label>

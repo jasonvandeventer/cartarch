@@ -134,7 +134,12 @@
                     </details>
                   {% endif %}
                 </td>
-                <td class="col-priority-low">{{ t.subtype or '—' }}</td>
+                <td class="col-priority-low">
+                  {{ t.subtype or '—' }}
+                  {% if t.finish and t.finish != 'normal' %}
+                    <span class="finish-badge">{{ t.finish }}</span>
+                  {% endif %}
+                </td>
                 <td>
                   <strong>{{ t.quantity }}</strong>
                 </td>
@@ -152,6 +157,13 @@
                         <input type="text" name="subtype" value="{{ t.subtype or '' }}">
                         <label>Quantity</label>
                         <input type="number" name="quantity" value="{{ t.quantity }}" min="0">
+                        <label>Finish</label>
+                        <select name="finish">
+                          {% for f in finish_options %}
+                            <option value="{{ f }}"
+                                    {% if (t.finish or 'normal') == f %}selected{% endif %}>{{ f|capitalize }}</option>
+                          {% endfor %}
+                        </select>
                         <label>Storage location</label>
                         <select name="storage_location_id">
                           <option value="">— None —</option>
