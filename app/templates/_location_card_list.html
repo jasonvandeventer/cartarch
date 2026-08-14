@@ -20,10 +20,14 @@
     </div>
   </div>
 {% endif %}
-{% if items %}
+{# `items` is the WHOLE location (the stat block above and the bulk lists on the
+   full page need it); `page_items` is the slice this grid renders. Both callers
+   pass both — no |default here, because a silently-unpaged grid is the 9.5 MB
+   bug this split exists to prevent, and StrictUndefined should catch it. #}
+{% if page_items %}
   <section class="card-grid-section">
     <div class="inventory-grid">
-      {% for item in items %}
+      {% for item in page_items %}
         {{ inventory_card(item, csrf_token,
                   show_collection_actions=true,
                   locations=locations,

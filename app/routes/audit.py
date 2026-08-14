@@ -16,6 +16,7 @@ from fastapi.responses import JSONResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
 from app import audit_service
+from app.deck_service import name_relevance_rank
 from app.dependencies import CsrfRequired, get_current_user, get_db_session, render
 from app.import_service import normalize_finish
 from app.location_service import get_location
@@ -429,7 +430,12 @@ def audit_card_search(
         .join(InventoryRow, InventoryRow.card_id == Card.id)
         .filter(InventoryRow.user_id == current_user.id, Card.name.ilike(f"%{q}%"))
         .distinct()
-        .order_by(Card.name.asc())
+        # Relevance decides WHICH 30 SURVIVE THE CAP, not the display order —
+        # the expected-first sort below owns that and is deliberate. Without
+        # it, substring + LIMIT + alphabetical means a fully-typed name can
+        # fall off the end behind 30 unrelated names that merely contain it.
+        # ONE definition, shared with the Add-tab search (deck_service).
+        .order_by(name_relevance_rank(Card.name, q), Card.name.asc())
         .limit(30)
         .all()
     )

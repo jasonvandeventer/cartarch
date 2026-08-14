@@ -1,5 +1,18 @@
 [
   {
+    "version": "4.13.27",
+    "date": "2026-08-14",
+    "added": [],
+    "refined": [
+      "Card search in the deck Add tab now ranks results instead of listing them alphabetically. The card you typed comes first, then names that start with it, then names that contain it. Previously a search matched anywhere in the name and the alphabetically-first match won, so a partial search could put a completely unrelated card at the top of the list — and a fully-typed name could be pushed off the end of the results by unrelated cards that merely contained it. The audit card picker got the same treatment.",
+      "A storage location with a lot of cards now shows its grid one page at a time, the way the Collection page always has. A location holding around fourteen hundred cards was building a single page roughly nine and a half megabytes in size with fourteen hundred card images on it, which could leave the page unresponsive for over a minute — long enough that the quick-add button on it could not be clicked. Bulk Move and Bulk Delete still list every card in the location, so selecting all of them still means all of them."
+    ],
+    "resolved": [
+      "A card nobody chose could end up in a deck. With results ordered alphabetically rather than by relevance, one click on the top of a search list added a card unrelated to what was typed."
+    ],
+    "archivist_note": "Both of these came from the same afternoon and the same member, and both were reported as something stranger than they were. A card appearing in a deck unbidden sounds like corruption; it was a search box answering \"what did you type\" with \"whatever sorts first among everything containing it\". A page that will not respond to a click sounds like a broken script; it was nine and a half megabytes of HTML being handed to a browser all at once. Neither was mysterious once measured, which is the argument for measuring first. The deck in question is a chaos deck, so a stray card arguably suited it, but we have removed it anyway."
+  },
+  {
     "version": "4.13.26",
     "date": "2026-08-09",
     "added": [

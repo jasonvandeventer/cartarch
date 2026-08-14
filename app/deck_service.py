@@ -5,7 +5,7 @@ import os
 import re
 import secrets
 
-from sqlalchemy import Float, and_, bindparam, cast, func, or_, select, text
+from sqlalchemy import Float, and_, bindparam, case, cast, func, or_, select, text
 from sqlalchemy.orm import Session, joinedload
 
 from app.audit_service import log_transaction
@@ -5422,6 +5422,28 @@ def _sc_price(finish: str):
     return cast(func.nullif(col, ""), Float)
 
 
+def name_relevance_rank(col, q: str):
+    """Ordering for a name-search picker: exact > prefix > word-start > anywhere.
+
+    THE definition, shared by every capped substring name search (the Add-tab
+    grouped search and the audit card picker). A ``%q%`` match combined with a
+    LIMIT and an alphabetical sort answers "what did you type" with "whatever
+    sorts first among everything containing it": ``test`` returned *Contest of
+    Claws* in slot 1, and a fully-typed name can be pushed off the end by
+    unrelated names that merely contain it. Order by this, THEN by name.
+
+    Engine-agnostic: ``ilike`` compiles to ILIKE on Postgres and
+    ``lower() LIKE lower()`` on SQLite. The word-start tier accepts a hyphen
+    as well as a space — MTG names are full of them (Dark-Dweller Oracle).
+    """
+    return case(
+        (func.lower(col) == q.lower(), 0),
+        (col.ilike(f"{q}%"), 1),
+        (or_(col.ilike(f"% {q}%"), col.ilike(f"%-{q}%")), 2),
+        else_=3,
+    )
+
+
 def grouped_card_search(
     session: Session, query: str, *, finish: str = "normal", limit: int = 25
 ) -> list[dict]:
@@ -5432,6 +5454,18 @@ def grouped_card_search(
     Each group row carries its cheapest printing for the selected finish
     (null/empty prices sort last, so an unpriced name still gets an image)
     and the printing count for the expand affordance.
+
+    Ordered by RELEVANCE, not alphabetically. The match is a substring
+    (``%q%``) and the result set is capped, so an alphabetical sort put the
+    alphabetically-first name containing the fragment in slot 1 regardless of
+    what was typed — ``test`` returned *Contest of Claws* first, and a
+    fully-typed name could be pushed off the bottom entirely by 25 unrelated
+    names that merely contain it. That is how an off-colour card nobody
+    searched for ended up one click from being added to a deck (2026-07-18).
+    Tiers are exact > prefix > word-start > substring-anywhere, alphabetical
+    within each — see ``name_relevance_rank``. The sibling per-printing
+    endpoint (``/decks/api/card-autocomplete``) is unaffected: it queries
+    Scryfall by exact name and takes Scryfall's own ordering.
     """
     from app.legacy_tables import scryfall_cards as sc
 
@@ -5457,6 +5491,7 @@ def grouped_card_search(
             sc.c.image_url,
             price.label("from_price"),
             func.count().over(partition_by=sc.c.name).label("printings"),
+            name_relevance_rank(sc.c.name, q).label("relevance"),
             rn,
         )
         .where(
@@ -5469,7 +5504,14 @@ def grouped_card_search(
         .subquery()
     )
     rows = (
-        session.execute(select(inner).where(inner.c.rn == 1).order_by(inner.c.name).limit(limit))
+        session.execute(
+            select(inner)
+            .where(inner.c.rn == 1)
+            # Relevance FIRST — the LIMIT is applied after this ordering, so
+            # ordering by name alone is what let the cap drop the exact match.
+            .order_by(inner.c.relevance, inner.c.name)
+            .limit(limit)
+        )
         .mappings()
         .all()
     )

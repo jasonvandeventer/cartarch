@@ -216,3 +216,70 @@ def test_grouped_autocomplete_endpoint(client, db):
     data = resp.json()
     assert data and data[0]["name"] == "Opt"
     assert data[0]["from_price"] == 0.2
+
+
+# --- search relevance ordering ------------------------------------------------
+#
+# The Add-tab search matches a substring ANYWHERE in the name and is capped.
+# Ordering those alphabetically answers "what did you type" with "whatever
+# sorts first among everything containing it". On 2026-07-18 that put an
+# off-colour green sorcery one click from being added to a Mardu deck: the
+# real prod corpus returns "Contest of Claws" as result #1 for the query
+# "test". These pin the fix; each fails if the order_by drops relevance.
+
+
+def test_an_exact_match_outranks_an_alphabetically_earlier_substring(db):
+    """The incident, reproduced: 'Contest of Claws' must not win the word 'test'."""
+    _sc(db, "Contest of Claws", price="0.10")
+    _sc(db, "Test of Endurance", price="0.10")
+    db.commit()
+
+    names = [r["name"] for r in grouped_card_search(db, "Test of Endurance")]
+    assert names[0] == "Test of Endurance"
+
+    # ...and on the bare fragment, the card that STARTS with it comes first,
+    # even though "Contest of Claws" sorts earlier alphabetically.
+    names = [r["name"] for r in grouped_card_search(db, "test")]
+    assert names == ["Test of Endurance", "Contest of Claws"]
+
+
+def test_the_result_cap_cannot_drop_the_exact_match(db):
+    """A fully-typed name is useless if 25 alphabetically-earlier names bury it."""
+    for i in range(30):
+        _sc(db, f"Aaa Filler Bolt {i:02d}", price="0.10")
+    _sc(db, "Bolt", price="0.10")
+    db.commit()
+
+    rows = grouped_card_search(db, "Bolt", limit=25)
+    assert len(rows) == 25  # still capped
+    assert rows[0]["name"] == "Bolt"  # but the thing you typed survives it
+
+
+def test_relevance_tiers_are_exact_then_prefix_then_word_start_then_anywhere(db):
+    # Named so the relevance order is the REVERSE-ish of the alphabetical one.
+    # The first draft used Bolt/Lightning Bolt/Thunderbolt, where the two
+    # orderings happen to coincide — it passed with the fix reverted.
+    _sc(db, "Cazapper", price="0.10")  # substring, mid-word
+    _sc(db, "Aether Zap", price="0.10")  # word start (space)
+    _sc(db, "Zapper Drone", price="0.10")  # prefix
+    _sc(db, "Battle-Zap Rider", price="0.10")  # word start (hyphen)
+    _sc(db, "Zap", price="0.10")  # exact
+    db.commit()
+
+    assert [r["name"] for r in grouped_card_search(db, "zap")] == [
+        "Zap",
+        "Zapper Drone",
+        "Aether Zap",
+        "Battle-Zap Rider",  # a hyphen starts a word too — MTG names are full of them
+        "Cazapper",
+    ]
+
+
+def test_relevance_ordering_survives_the_endpoint(client, db):
+    """A service that sorts right proves nothing about the route that serves it."""
+    _sc(db, "Contest of Claws", price="0.10")
+    _sc(db, "Test of Endurance", price="0.10")
+    db.commit()
+
+    data = client.get("/decks/api/card-autocomplete-grouped?q=test&finish=normal").json()
+    assert [c["name"] for c in data] == ["Test of Endurance", "Contest of Claws"]

@@ -281,6 +281,21 @@ def test_route_card_search_prioritizes_expected(db, client, user):
     assert data[1]["expected"] is False
 
 
+def test_route_card_search_cap_cannot_drop_the_exact_match(db, client, user):
+    """Relevance decides which 30 survive the LIMIT; expected-first still owns display."""
+    loc = _loc(db, user.id)
+    for i in range(35):
+        _row(db, user.id, _card(db, name=f"Aaa Filler Bolt {i:02d}"), loc.id, qty=1)
+    _row(db, user.id, _card(db, name="Bolt"), loc.id, qty=1)
+    db.commit()
+    audit, _ = audit_service.start_audit(db, user.id, loc.id)
+    db.commit()
+
+    data = client.get(f"/audit/api/card-search?session_id={audit.id}&q=Bolt").json()
+    assert len(data) == 30  # still capped
+    assert "Bolt" in [c["name"] for c in data]  # the typed name is not truncated away
+
+
 def test_route_non_owner_gets_404(db, client, user):
     other = User(username="other@example.com", password_hash="x")
     db.add(other)

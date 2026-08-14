@@ -16300,3 +16300,17 @@ body.cmp-lobby-body { height: auto; min-height: 100dvh; overflow-y: auto; }
   font-size: 0.85rem;
   opacity: 0.8;
 }
+
+/* v4.13.27 — the two bulk <details> lists on a location page render one label
+   per row for the WHOLE location (deliberately: that is how a box gets
+   emptied, and paging "Select all" would silently narrow its scope). At 1,409
+   rows the identical inline style declaration was repeated 1,409 times per
+   list — ~95 bytes each, ~270 KB of duplicated CSS across both. Same rule,
+   declared once. */
+.bulk-pick-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.875rem;
+  cursor: pointer;
+}

@@ -2181,6 +2181,29 @@ def bulk_delete_location_commit(
     return RedirectResponse(f"/locations/{location_id}", status_code=303)
 
 
+# v4.13.27 — the location grid renders a full ``inventory_card`` per row with
+# its actions drawer INLINE (~6 KB each — the same per-card cost the deck grid
+# already documents). Unpaginated, a 1,409-row box shipped 9.5 MB of HTML and 1,412 image
+# elements**: DOMContentLoaded 1.34 min, and the page could not be interacted
+# with until it settled (reported 2026-08-14 on "Unused Cards"). Matches the
+# size the Collection grid has always paginated at.
+LOCATION_PAGE_SIZE = 50
+
+
+def _paginate_items(items: list, page: int, per_page: int) -> tuple[list, int, int]:
+    """Slice an already-sorted, fully-materialised list into one page.
+
+    Sliced in Python, NOT SQL, deliberately: ``_build_location_items`` has to
+    materialise every row anyway to sort through ``sort_spec`` (the Price and
+    Color keys are computed, not columns) and to total the location. The cost
+    that broke the page was rendering 1,409 cards into HTML, not fetching them.
+    """
+    total_pages = max(1, math.ceil(len(items) / per_page))
+    page = max(1, min(page, total_pages))
+    start = (page - 1) * per_page
+    return items[start : start + per_page], page, total_pages
+
+
 def _build_location_items(
     session: Session,
     location_id: int,
@@ -2255,6 +2278,7 @@ def location_detail_page(
     search: str = "",
     sort: str = "",
     direction: str = "asc",
+    page: int = 1,
     session: Session = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
 ):
@@ -2275,6 +2299,12 @@ def location_detail_page(
         sort=sort,
         direction=direction,
     )
+    # Only the GRID is paged. The two bulk <details> lists keep every row on
+    # purpose: they are how a whole box is emptied, and silently narrowing
+    # "Select all" to the visible 50 would be a scope regression nobody could
+    # see. They are checkbox labels inside a CLOSED disclosure — parsed, never
+    # laid out, no images — so they were never the thing that froze the page.
+    page_items, page, total_pages = _paginate_items(items, page, LOCATION_PAGE_SIZE)
 
     all_locations = list_locations(session, user_id=current_user.id)
     decks = list_decks_basic(session, user_id=current_user.id)
@@ -2309,6 +2339,10 @@ def location_detail_page(
             # answer ("already in order"), so this is None-vs-present, not truthy.
             "renumbered": request.query_params.get("renumbered"),
             "items": items,
+            "page_items": page_items,
+            "page": page,
+            "total_pages": total_pages,
+            "total_count": len(items),
             "total_quantity": total_quantity,
             "total_value": total_value,
             "search": search,
@@ -2371,6 +2405,10 @@ def location_add_card(
         items, total_value, total_quantity, _ = _build_location_items(
             session, location_id, current_user.id
         )
+        # Page it here too, or adding one card to a 1,409-row box re-ships the
+        # whole 9.5 MB grid through the swap — the same freeze, on every add,
+        # from the very modal the user opened the page to reach.
+        page_items, _pg, _tp = _paginate_items(items, 1, LOCATION_PAGE_SIZE)
         location = get_location(session, location_id=location_id, user_id=current_user.id)
         from app import share_service
 
@@ -2380,6 +2418,7 @@ def location_add_card(
             {
                 "location": location,
                 "items": items,
+                "page_items": page_items,
                 "total_value": total_value,
                 "total_quantity": total_quantity,
                 "current_user": current_user,
