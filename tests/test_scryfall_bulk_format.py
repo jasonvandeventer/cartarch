@@ -4,9 +4,16 @@ Scryfall removed ``download_uri`` from ``/bulk-data`` and replaced it with
 ``jsonl_download_uri``, changing the FORMAT at the same time. The bulk cache
 guarded on the missing key and logged a skip, so it silently served a frozen
 catalog from 2026-07-28 to 2026-08-07 (10 days); ``oracle_ingest`` indexed the
-key directly and raised KeyError. Both call sites are pinned here — this is the
-"grep for the question, not the symptom" rule: the same upstream change broke
-two modules, and only one of them was reported.
+key directly and raised KeyError. This is the "grep for the question, not the
+symptom" rule: the same upstream change broke THREE modules, and only one was
+reported.
+
+The third — ``scripts/scryfall_image_mirror.py`` — is why the consumer list
+below is DISCOVERED rather than hardcoded. It lived outside the repo, so the
+v4.13.14 sweep never reached it and this guard could not see it; it was still
+dying on ``KeyError: 'download_uri'`` on 2026-08-15, weeks after the other two
+were fixed. A hardcoded tuple only ever guards the copies you already knew
+about, which is exactly the copy that is never the problem.
 """
 
 import gzip
@@ -17,15 +24,38 @@ import types
 import app.legacy_tables  # noqa
 from app.jobs import oracle_ingest
 
-_APP = pathlib.Path(__file__).resolve().parents[1] / "app"
-_STREAMERS = (_APP / "scryfall.py", _APP / "jobs" / "oracle_ingest.py")
+_ROOT = pathlib.Path(__file__).resolve().parents[1]
+# Every consumer of the Scryfall bulk-data contract, found by what it touches
+# rather than by a list someone has to remember to update.
+# Both markers are code-only on purpose: a bare "bulk-data" also matches English
+# prose ("the bulk-data daemon" in deck_service/main), and a discovery rule that
+# drags in commentary makes the guard fail on files that never touch Scryfall.
+_MARKERS = ("api.scryfall.com/bulk-data", "download_uri")
+_KNOWN = {"scryfall.py", "oracle_ingest.py", "scryfall_image_mirror.py"}
 
 
-def test_no_streamer_reads_the_removed_download_uri_key():
+def _bulk_consumers() -> list[pathlib.Path]:
+    return sorted(
+        p
+        for d in ("app", "scripts")
+        for p in (_ROOT / d).rglob("*.py")
+        if any(m in p.read_text() for m in _MARKERS)
+    )
+
+
+def test_discovery_finds_the_known_consumers():
+    """Self-check: a discovery rule that silently matches nothing is a guard
+    that passes forever. If a consumer is renamed or moved, fix the rule —
+    do not let the set quietly shrink."""
+    found = {p.name for p in _bulk_consumers()}
+    assert _KNOWN <= found, f"bulk-data consumers went missing from discovery: {_KNOWN - found}"
+
+
+def test_no_consumer_reads_the_removed_download_uri_key():
     """``download_uri`` no longer exists in the listing. Reading it is either a
     permanent skip or a KeyError, and both failed quietly enough to run for
-    days — so the key must not reappear in either streamer."""
-    for path in _STREAMERS:
+    days — so the key must not reappear in any consumer."""
+    for path in _bulk_consumers():
         src = path.read_text()
         for line in src.splitlines():
             code = line.split("#", 1)[0]
