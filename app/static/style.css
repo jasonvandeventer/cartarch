@@ -7118,6 +7118,23 @@ table.dmtx .dmtx-rowhead {
   line-height: 1.55;
   break-inside: avoid;
   cursor: default;
+  /* Establishes a block formatting context, which stops Firefox fragmenting
+     the row's controls at a column boundary.
+ 
+     Without it, the FIRST row of the LAST column loses its ⇄ button: the
+     element is in the DOM with `width: 24px`, but Firefox gives it a 0x0 box
+     and a used width of 2px (its borders and nothing else). The ⋮ beside it
+     then sits where the ⇄ should be, so clicking "the actions button" hits
+     the wrong control — reported 8/3 and again 8/14 as "on cards with only a
+     single printing the actions dropdown doesn't work". Printings had nothing
+     to do with it; it was whichever card happened to start the last column.
+     Chromium never showed it, which is why it survived a round of fixing.
+ 
+     `overflow: clip` does NOT work — measured. The cure is the formatting
+     context `hidden` creates, not the clipping, so do not "modernise" this.
+     Nothing is actually clipped (scrollWidth == clientWidth), and the kebab
+     popover is `position: fixed`, so it still escapes the row. */
+  overflow: hidden;
 }
 .deck-list-row:hover {
   background: rgba(255, 255, 255, 0.04);

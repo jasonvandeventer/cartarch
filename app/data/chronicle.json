@@ -1,5 +1,15 @@
 [
   {
+    "version": "4.13.29",
+    "date": "2026-08-14",
+    "added": [],
+    "refined": [],
+    "resolved": [
+      "In a deck's list view, one card per section — always the first one at the top of the rightmost column — was missing its switch-printing button, and its actions menu opened in the wrong place. Reported twice; the first fix addressed a different cause and the real one survived it. Firefox only, which is why it was hard to see from here."
+    ],
+    "archivist_note": "This one was reported as \"on cards with only a single printing the actions dropdown doesn't work\", and printings had nothing to do with it — the member who reported it worked that out himself and told us it was the first item of the last column, which is what finally made it findable. Rebuilt his actual deck locally, drove it in Firefox across every window width, and the browser was handing one button per section a box of zero width while insisting it was twenty-four pixels wide. Chromium never did it, which is the whole reason a fix shipped in August and the bug did not go away. Fixed by giving each row its own formatting context."
+  },
+  {
     "version": "4.13.28",
     "date": "2026-08-14",
     "added": [
