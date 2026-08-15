@@ -742,6 +742,22 @@ def add_card_to_location(
         # #131 — preserve existing notes on merge (see create_or_merge_inventory_row).
         if notes and not existing.notes:
             existing.notes = notes
+        # A merge is the branch that most needs a record: it changes a quantity
+        # on a row the user did not name, and the row it lands on is chosen by a
+        # 7-part key (finish included). Without this entry a "quick add did the
+        # wrong thing" report is unreconstructable — the only trace is a bumped
+        # updated_at. That is exactly how the 2026-08-15 Stoneskin report went.
+        log_transaction(
+            session=session,
+            user_id=user_id,
+            event_type="quick_add",
+            card_id=card.id,
+            finish=finish,
+            quantity_delta=quantity,
+            destination_location=location.name,
+            inventory_row_id=existing.id,
+            note=f"Quick-add merged into an existing {finish} row (now {existing.quantity})",
+        )
         session.commit()
         return existing
 
@@ -759,6 +775,18 @@ def add_card_to_location(
         updated_at=now,
     )
     session.add(row)
+    session.flush()  # need row.id for the log entry
+    log_transaction(
+        session=session,
+        user_id=user_id,
+        event_type="quick_add",
+        card_id=card.id,
+        finish=finish,
+        quantity_delta=quantity,
+        destination_location=location.name,
+        inventory_row_id=row.id,
+        note=f"Quick-add created a new {finish} row",
+    )
     session.commit()
     return row
 

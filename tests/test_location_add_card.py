@@ -345,3 +345,64 @@ def test_route_renders_and_adds():
         main.app.dependency_overrides.pop(get_current_user, None)
         main.app.dependency_overrides.pop(require_csrf_token, None)
     assert failed == 0
+
+
+def test_quick_add_is_auditable_on_both_branches():
+    """Quick-add wrote NO TransactionLog on either branch until 2026-08-15.
+
+    Every other inventory mutation logs (28 event types: import, pull_to_deck,
+    correct_finish, split_row, location_updated...). Quick-add was the only
+    acquisition path with no trail, so a "quick add did the wrong thing" report
+    left nothing to reconstruct but a bumped ``updated_at`` — which is exactly
+    how the Stoneskin report could not be answered from the record.
+
+    The merge branch is the one that matters: it changes a quantity on a row the
+    user never named, picked by a 7-part key.
+    """
+    from app.models import TransactionLog
+
+    s = _fresh_session()
+    u = _seed_user(s)
+    loc = _seed_location(s, u.id)
+    card = _seed_card(s)
+    common = dict(user_id=u.id, location_id=loc.id, scryfall_id=card.scryfall_id)
+
+    add_card_to_location(s, quantity=1, finish="foil", **common)
+    add_card_to_location(s, quantity=2, finish="foil", **common)
+
+    logs = s.query(TransactionLog).filter_by(user_id=u.id, event_type="quick_add").all()
+    assert len(logs) == 2, f"both branches must log, got {len(logs)}"
+
+    created, merged = logs
+    assert created.quantity_delta == 1 and merged.quantity_delta == 2
+    assert created.destination_location == loc.name
+    # The finish is the field the report was about — it must be on the record.
+    assert created.finish == "foil" and merged.finish == "foil"
+    # And each entry must point at the row it actually touched.
+    row = _rows(s, u.id)[0]
+    assert created.inventory_row_id == row.id and merged.inventory_row_id == row.id
+    assert row.quantity == 3
+
+
+def test_a_different_finish_is_logged_as_its_own_row_not_a_merge():
+    """The reported symptom was "adding a non-foil overwrote my foil". It does
+    not — finish is in the merge key — but the LOG is what makes that provable
+    to a user after the fact, so pin that the two adds are recorded separately.
+    """
+    from app.models import TransactionLog
+
+    s = _fresh_session()
+    u = _seed_user(s)
+    loc = _seed_location(s, u.id)
+    card = _seed_card(s)
+    common = dict(user_id=u.id, location_id=loc.id, scryfall_id=card.scryfall_id, quantity=1)
+
+    foil = add_card_to_location(s, finish="foil", **common)
+    normal = add_card_to_location(s, finish="normal", **common)
+
+    assert foil.id != normal.id, "different finishes must not share a row"
+    assert foil.finish == "foil", "the pre-existing foil row must not be rewritten"
+
+    logs = s.query(TransactionLog).filter_by(user_id=u.id, event_type="quick_add").all()
+    assert [lg.finish for lg in logs] == ["foil", "normal"]
+    assert {lg.inventory_row_id for lg in logs} == {foil.id, normal.id}
