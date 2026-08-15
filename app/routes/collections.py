@@ -2328,6 +2328,9 @@ def location_detail_page(
         }
         for a in audit_logs
     ]
+    location_activity = audit_service.recent_location_activity(
+        session, current_user.id, location.name, limit=10
+    )
 
     return render(
         request,
@@ -2354,6 +2357,7 @@ def location_detail_page(
             "decks": decks,
             "showcases": showcases,
             "audit_history": audit_history,
+            "location_activity": location_activity,
             "last_audited": audit_logs[0].completed_at if audit_logs else None,
         },
     )

@@ -5,7 +5,7 @@ import json
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session, joinedload
 
 from app.models import (
@@ -69,6 +69,60 @@ def log_transaction(
     if flush:
         session.flush()
     return log
+
+
+def recent_location_activity(
+    session: Session,
+    user_id: int,
+    location_name: str,
+    limit: int = 10,
+) -> list[dict]:
+    """Recent inventory events touching a location, newest first.
+
+    Exists because a user could not see what a quick-add had just done. The
+    2026-08-15 Stoneskin report was "adding a non-foil overwrote my foil"; the
+    record showed the foil was fine and a non-foil row had existed since May,
+    on a page of a ~1,400-row location the reporter had no reason to scroll to.
+    Nothing on the page could have told him that, so the page tells him now.
+
+    Matched on the location NAME in either direction, because ``TransactionLog``
+    stores free text and has no location FK — so this deliberately catches
+    cards that left as well as cards that arrived (the foil's departure is the
+    entry that would have explained the whole report). The cost is that
+    renaming a location orphans its history here; that is the schema's
+    constraint, not a choice, and it fails quiet rather than wrong.
+    """
+    rows = (
+        session.query(TransactionLog, Card.name, Card.set_code)
+        .outerjoin(Card, TransactionLog.card_id == Card.id)
+        .filter(
+            TransactionLog.user_id == user_id,
+            or_(
+                TransactionLog.source_location == location_name,
+                TransactionLog.destination_location == location_name,
+            ),
+        )
+        .order_by(TransactionLog.created_at.desc(), TransactionLog.id.desc())
+        .limit(limit)
+        .all()
+    )
+    return [
+        {
+            "id": t.id,
+            "event_type": t.event_type,
+            "created_at": t.created_at,
+            "finish": t.finish,
+            "quantity_delta": t.quantity_delta,
+            "source_location": t.source_location,
+            "destination_location": t.destination_location,
+            "card_name": card_name,
+            "set_code": set_code,
+            # Which way the card went, resolved server-side: the template must
+            # not re-derive it and get a third answer.
+            "left_here": t.source_location == location_name,
+        }
+        for t, card_name, set_code in rows
+    ]
 
 
 def list_transaction_logs(session: Session, user_id: int) -> list[TransactionLog]:

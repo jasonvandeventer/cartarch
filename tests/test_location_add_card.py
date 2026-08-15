@@ -406,3 +406,103 @@ def test_a_different_finish_is_logged_as_its_own_row_not_a_merge():
     logs = s.query(TransactionLog).filter_by(user_id=u.id, event_type="quick_add").all()
     assert [lg.finish for lg in logs] == ["foil", "normal"]
     assert {lg.inventory_row_id for lg in logs} == {foil.id, normal.id}
+
+
+def test_the_location_page_shows_what_just_happened():
+    """The page must SHOW the activity, not merely record it (failure mode #1:
+    a service test cannot see a route bug — the route enumerates context keys,
+    so `location_activity` needs a route line as well as a service function).
+
+    Pins the two events the Stoneskin report needed and could not get: the
+    quick-add that landed, and a card that LEFT for somewhere else.
+    """
+    from fastapi.testclient import TestClient
+
+    from app import main
+    from app.audit_service import log_transaction
+    from app.dependencies import get_current_user, get_db_session, require_csrf_token
+
+    engine = create_engine(
+        "sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool
+    )
+    Base.metadata.create_all(engine)
+    sm = sessionmaker(bind=engine, expire_on_commit=False)
+    s = sm()
+    u = _seed_user(s)
+    loc = _seed_location(s, u.id)
+    card = _seed_card(s, name="Stoneskin")
+    s.commit()
+
+    # A foil copy leaves for another location — the event that explained the report.
+    log_transaction(
+        session=s,
+        user_id=u.id,
+        event_type="location_updated",
+        card_id=card.id,
+        finish="foil",
+        quantity_delta=0,
+        source_location=loc.name,
+        destination_location="Trade-in",
+        note="Card moved to new storage location",
+    )
+    s.commit()
+
+    def _override_db():
+        db = sm()
+        try:
+            yield db
+        finally:
+            db.close()
+
+    main.app.dependency_overrides[get_db_session] = _override_db
+    main.app.dependency_overrides[get_current_user] = lambda: u
+    main.app.dependency_overrides[require_csrf_token] = lambda: None
+    try:
+        c = TestClient(main.app, follow_redirects=False)
+        c.post(
+            f"/locations/{loc.id}/add-card",
+            data={
+                "scryfall_id": card.scryfall_id,
+                "finish": "normal",
+                "quantity": "1",
+                "language": "en",
+                "csrf_token": "x",
+            },
+            headers={"HX-Request": "true"},
+        )
+
+        page = c.get(f"/locations/{loc.id}").text
+        assert "Recent activity" in page, "the activity panel must render"
+        # The add is visible as an add...
+        assert "Quick add" in page.replace("quick_add", "Quick add")
+        # ...and the departure is visible, naming where it went. That is the
+        # line that would have answered "where did my foil go?".
+        assert "Trade-in" in page, "a card that LEFT must still appear here"
+        assert "Location updated" in page
+    finally:
+        main.app.dependency_overrides.clear()
+
+
+def test_the_activity_panel_is_owner_scoped():
+    """A location name is not unique across users — matching on free text must
+    not leak another account's history into this page."""
+    from app.audit_service import log_transaction, recent_location_activity
+
+    s = _fresh_session()
+    mine = _seed_user(s, username="mine")
+    theirs = _seed_user(s, username="theirs")
+    loc = _seed_location(s, mine.id)
+    card = _seed_card(s, name="Stoneskin")
+    log_transaction(
+        session=s,
+        user_id=theirs.id,
+        event_type="quick_add",
+        card_id=card.id,
+        finish="foil",
+        quantity_delta=1,
+        destination_location=loc.name,  # same NAME, different owner
+    )
+    s.commit()
+
+    assert recent_location_activity(s, mine.id, loc.name) == []
+    assert len(recent_location_activity(s, theirs.id, loc.name)) == 1
