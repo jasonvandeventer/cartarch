@@ -136,7 +136,7 @@ def _user_display(user: User | None) -> str | None:
     """Project-wide convention for the user's display string."""
     if user is None:
         return None
-    name = (user.display_name or user.username or "").strip()
+    name = user.player_label
     return name or None
 
 
@@ -940,7 +940,7 @@ def get_construction_options(
                 Share.user_id != proposer_user_id,
                 User.is_active.is_(True),
             )
-            .order_by(User.display_name, User.username, Playgroup.name)
+            .order_by(User.player_label_expr(), Playgroup.name)
             .all()
         )
         for share, user, playgroup, showcase in share_rows:

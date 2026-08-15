@@ -97,7 +97,7 @@
           <label>Your name <span class="muted">(optional)</span></label>
           <input type="text"
                  name="display_name"
-                 placeholder="{{ current_user.display_name or current_user.username }}"
+                 placeholder="{{ current_user.player_label }}"
                  maxlength="128">
         {% else %}
           <label>Your name</label>

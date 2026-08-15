@@ -64,6 +64,19 @@
              maxlength="64"
              value="{{ current_user.display_name or '' }}"
              placeholder="Shown in nav, decks, games">
+      {# v4.13.30 — the name people at your table know you by. SEPARATE from the
+         handle on purpose: the handle is what the public wishlist link shows,
+         and this must never appear there. #}
+      <label>Real name <span class="muted">(optional)</span></label>
+      <input type="text"
+             name="real_name"
+             maxlength="64"
+             value="{{ current_user.real_name or '' }}"
+             placeholder="Shown to your playgroup instead of your handle">
+      <p class="muted small-text" style="margin:0.2rem 0 0">
+        Used on playgroup pages, game seats and pickers. Never shown on a public
+        share link — those keep your display name.
+      </p>
       {# #99 — opt in to watchlist price-alert emails (a watched card reaching its target). #}
       <label style="display:flex;align-items:center;gap:0.5rem;margin-top:0.75rem;font-weight:normal">
         <input type="checkbox" name="price_alerts_enabled" value="true"

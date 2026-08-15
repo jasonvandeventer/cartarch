@@ -715,5 +715,5 @@ def list_wishlist_shares_for_playgroup(
             c["trade_pending"] = (c["name"] or "").lower() in covered
         view["can_propose"] = s.user_id in targets
         out.append({"sharer": s.user, "view": view})
-    out.sort(key=lambda r: (r["sharer"].display_name or r["sharer"].username or "").lower())
+    out.sort(key=lambda r: r["sharer"].player_label.lower())
     return out

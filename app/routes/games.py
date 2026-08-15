@@ -136,13 +136,13 @@ def game_new_page(
     pickable_user_ids = {u.id for u in all_users} | {current_user.id}
     all_decks = deck_service.list_pickable_decks(session, pickable_user_ids)
     # JSON-safe: users list and deck lookup by user_id for JS filtering
-    users_json = [{"id": u.id, "name": u.display_name or u.username} for u in all_users]
+    users_json = [{"id": u.id, "name": u.player_label} for u in all_users]
     # #156 — a seat records a pilot and a deck independently, so a borrowed deck
     # is representable and the server already accepts it. Carry the owner's name
     # so the dropdown can offer other players' decks under a "Borrowed from…"
     # group rather than the UI silently implying you may only play your own.
-    user_name_by_id = {u.id: (u.display_name or u.username) for u in all_users}
-    user_name_by_id.setdefault(current_user.id, current_user.display_name or current_user.username)
+    user_name_by_id = {u.id: u.player_label for u in all_users}
+    user_name_by_id.setdefault(current_user.id, current_user.player_label)
     decks_by_user_json = {}
     for d in all_decks:
         decks_by_user_json.setdefault(str(d.user_id), []).append(

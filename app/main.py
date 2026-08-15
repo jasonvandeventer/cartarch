@@ -1202,7 +1202,10 @@ def public_wishlist_view(
         from app.trade_service import wishlist_propose_targets
 
         view["can_propose"] = owner.id in wishlist_propose_targets(session, viewer.id)
-    owner_name = owner.display_name  # display_name only — username is the email
+    # display_name ONLY. Never username (it is the email), and never
+    # player_label / real_name — this page is ANONYMOUS, and the whole point of
+    # keeping real_name a separate column is that it must not leak here.
+    owner_name = owner.display_name
     return render(
         request,
         "wishlist_public.html",

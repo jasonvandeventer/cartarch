@@ -71,6 +71,7 @@ def update_profile(
     request: Request,
     email: str = Form(...),
     display_name: str = Form(""),
+    real_name: str = Form(""),
     price_alerts_enabled: bool = Form(False),  # #99 — checkbox: present only when on
     session: Session = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
@@ -81,6 +82,9 @@ def update_profile(
     # store a mixed-case username and lock the user out at login.
     email = email.strip().lower()
     display_name = display_name.strip() or None
+    # Member-facing only — never rendered on /w/{token} or /d/{token}. Blank
+    # clears it and the handle takes over again (User.player_label).
+    real_name = real_name.strip() or None
 
     if "@" not in email or "." not in email.split("@", 1)[1]:
         return RedirectResponse(url="/account?error=bad_email", status_code=303)
@@ -96,6 +100,7 @@ def update_profile(
     if user:
         user.username = email
         user.display_name = display_name
+        user.real_name = real_name
         user.price_alerts_enabled = bool(price_alerts_enabled)  # #99
         session.commit()
 

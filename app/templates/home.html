@@ -57,7 +57,7 @@
     <header class="dashboard-masthead">
       <div class="dashboard-masthead-left">
         {{ editorial_eyebrow("Dashboard") }}
-        <h1 class="dashboard-masthead-title">{{ dashboard.masthead.greeting }}, <b>{{ current_user.display_name or current_user.username }}.</b></h1>
+        <h1 class="dashboard-masthead-title">{{ dashboard.masthead.greeting }}, <b>{{ current_user.player_label }}.</b></h1>
         <div class="dashboard-masthead-insight">
           <span>{{ dashboard.masthead.insight_html | safe }}</span>
         </div>

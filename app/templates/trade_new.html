@@ -109,7 +109,7 @@ data-card-info="{{ (card.set_code or '?')|upper }} #{{ card.collector_number or 
     <section class="panel trade-new-context">
       <p>
         Proposing a trade to
-        <strong>{{ pre_recipient.display_name or pre_recipient.username }}</strong>
+        <strong>{{ pre_recipient.player_label }}</strong>
         in <em>{{ pre_playgroup.name }}</em>.
       </p>
     </section>
@@ -124,7 +124,7 @@ data-card-info="{{ (card.set_code or '?')|upper }} #{{ card.collector_number or 
           {% for cand in options.recipients %}
             <option value="{{ cand.user.id }}|{{ cand.playgroup.id }}"
               {% if pre_recipient and pre_playgroup and pre_recipient.id == cand.user.id and pre_playgroup.id == cand.playgroup.id %}selected{% endif %}>
-              {{ cand.user.display_name or cand.user.username }} — {{ cand.playgroup.name }}
+              {{ cand.user.player_label }} — {{ cand.playgroup.name }}
             </option>
           {% endfor %}
         </select>
@@ -153,7 +153,7 @@ data-card-info="{{ (card.set_code or '?')|upper }} #{{ card.collector_number or 
 
       <section class="panel">
         <h3 class="panel-title">Their cards (requested)</h3>
-        <p class="muted">Pick items from <strong>{{ pre_recipient.display_name or pre_recipient.username }}</strong>'s Showcase that's shared with <em>{{ pre_playgroup.name }}</em>. Toggle to add &mdash; quantities default to available, click to override.</p>
+        <p class="muted">Pick items from <strong>{{ pre_recipient.player_label }}</strong>'s Showcase that's shared with <em>{{ pre_playgroup.name }}</em>. Toggle to add &mdash; quantities default to available, click to override.</p>
         {{ pick_tools('requested-grid') }}
         <div class="trade-pick-grid" data-card-hover data-card-hover-target=".trade-pick-item" id="requested-grid">
           {% set seen_pre = [] %}

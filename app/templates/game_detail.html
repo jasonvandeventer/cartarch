@@ -147,7 +147,7 @@
            style="margin:0 0 0.75rem;border-left:3px solid var(--brand-gold, #b8860b)">
         <p class="muted" style="margin:0">
           You're viewing a game recorded by
-          <strong>{{ game.user.display_name or game.user.username if game.user else 'another player' }}</strong>
+          <strong>{{ game.user.player_label if game.user else 'another player' }}</strong>
           — read-only.
         </p>
       </div>

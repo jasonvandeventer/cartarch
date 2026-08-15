@@ -18,8 +18,8 @@
      a "Trade agreed" panel pointing at existing Move + Adjust-
      quantity affordances. No "mark exchange completed" control. #}
 
-  {% set proposer_label = trade.proposer.display_name or trade.proposer.username if trade.proposer else (trade.proposer_name_at_trade or 'Unknown') %}
-  {% set recipient_label = trade.recipient.display_name or trade.recipient.username if trade.recipient else (trade.recipient_name_at_trade or 'Unknown') %}
+  {% set proposer_label = trade.proposer.player_label if trade.proposer else (trade.proposer_name_at_trade or 'Unknown') %}
+  {% set recipient_label = trade.recipient.player_label if trade.recipient else (trade.recipient_name_at_trade or 'Unknown') %}
 
   <section class="panel pagehead trade-detail-hero">
     {{ editorial_eyebrow("Play · Trades · Detail") }}

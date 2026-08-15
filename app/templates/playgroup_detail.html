@@ -97,7 +97,7 @@
           {% for row in members %}
             <tr>
               <td data-label="Name">
-                {{ row.user.display_name or row.user.username }}
+                {{ row.user.player_label }}
                 {% if row.user.id == current_user.id %}<span class="muted">(you)</span>{% endif %}
               </td>
               <td data-label="Role">
@@ -112,7 +112,7 @@
                           style="display:inline">
                       <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                       <button type="submit" class="btn-danger-small"
-                              onclick="return confirm('Remove {{ row.user.display_name or row.user.username }} from this playgroup?')">Remove</button>
+                              onclick="return confirm('Remove {{ row.user.player_label }} from this playgroup?')">Remove</button>
                     </form>
                   {% endif %}
                 </td>
@@ -200,7 +200,7 @@
           <article class="share-list-item">
             <div class="share-list-meta">
               <a class="share-list-name" href="/shares/{{ row.share.id }}">{{ row.showcase.name }}</a>
-              <div class="muted">by {{ row.sharer.display_name or row.sharer.username }} · shared {{ row.share.created_at | editorial_date }}</div>
+              <div class="muted">by {{ row.sharer.player_label }} · shared {{ row.share.created_at | editorial_date }}</div>
             </div>
             <a class="btn-like" href="/shares/{{ row.share.id }}">View →</a>
           </article>
@@ -226,7 +226,7 @@
         {% for row in member_wishlists %}
           <details class="wl-member-item">
             <summary class="wl-member-summary">
-              <strong>{{ row.sharer.display_name or row.sharer.username }}</strong>
+              <strong>{{ row.sharer.player_label }}</strong>
               <span class="muted">· {{ row.view.count }} card{{ 's' if row.view.count != 1 else '' }}</span>
               {% if row.view.viewer_owns and row.view.owned_count %}
                 <span class="wl-owned-badge">you own {{ row.view.owned_count }}</span>
@@ -288,7 +288,7 @@
               <select id="pg-transfer-target" name="new_owner_user_id" required>
                 <option value="">— choose a member —</option>
                 {% for row in other_members %}
-                  <option value="{{ row.user.id }}">{{ row.user.display_name or row.user.username }}</option>
+                  <option value="{{ row.user.id }}">{{ row.user.player_label }}</option>
                 {% endfor %}
               </select>
               <button type="submit" class="btn-like">Transfer ownership</button>

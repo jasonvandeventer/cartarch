@@ -140,8 +140,25 @@
           {% for row in user_rows %}
             <tr>
               <td>
-                <strong>{{ row.user.display_name or row.user.username }}</strong>
+                <strong>{{ row.user.player_label }}</strong>
+                {% if row.user.real_name %}<div class="muted">{{ row.user.display_name or row.user.username }}</div>{% endif %}
                 {% if row.user.display_name %}<div class="muted">{{ row.user.username }}</div>{% endif %}
+                {# v4.13.30 — seed the name the playgroup knows this person by.
+                   Blank clears it and the handle takes over again. #}
+                <form action="/admin/users/{{ row.user.id }}/real-name"
+                      method="post"
+                      class="inline-form"
+                      style="display:flex;gap:0.3rem;margin-top:0.35rem">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                  <input type="text"
+                         name="real_name"
+                         maxlength="64"
+                         value="{{ row.user.real_name or '' }}"
+                         placeholder="Real name"
+                         aria-label="Real name for {{ row.user.display_name or row.user.username }}"
+                         style="max-width:11rem">
+                  <button type="submit" class="btn-like">Save</button>
+                </form>
               </td>
               <td>
                 {% if row.user.is_active %}

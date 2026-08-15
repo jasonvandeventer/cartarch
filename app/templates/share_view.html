@@ -26,7 +26,7 @@
     {{ editorial_eyebrow("Play · Shares · " + showcase.name) }}
     <h1 class="pagehead-title">{{ showcase.name }}</h1>
     <p class="pagehead-tagline">
-      Shared by <strong>{{ sharer.display_name or sharer.username }}</strong> with the <a href="/playgroups/{{ playgroup.id }}">{{ playgroup.name }}</a> playgroup.
+      Shared by <strong>{{ sharer.player_label }}</strong> with the <a href="/playgroups/{{ playgroup.id }}">{{ playgroup.name }}</a> playgroup.
     </p>
     {% if showcase.description %}
       <p class="share-view-description"><em>{{ showcase.description }}</em></p>

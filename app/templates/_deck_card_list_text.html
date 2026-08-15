@@ -32,7 +32,7 @@
           </div>
         {% endif %}
       </header>
-      <ul class="deck-list-rows">
+      <ul class="deck-list-rows" data-card-hover data-card-hover-target=".deck-list-row">
         {% for item in group.rows %}
           {% set tl = (item.card.type_line or '')|lower %}
           {% set is_basic = 'basic' in tl and (
@@ -40,7 +40,7 @@
                     or 'mountain' in tl or 'forest' in tl or 'wastes' in tl) %}
           <li class="deck-list-row"
               data-card-image="{{ mirror_image_url(item.card.scryfall_id, 'large') if item.card.image_url else '' }}"
-              data-card-fallback="{{ scryfall_image_fallback(item.card.scryfall_id, 'large') if item.card.image_url else '' }}"
+              data-card-image-alt="{{ scryfall_image_fallback(item.card.scryfall_id, 'large') if item.card.image_url else '' }}"
               data-card-name="{{ item.card.name }}"
               data-card-info="{{ (item.card.set_code or '?')|upper }} #{{ item.card.collector_number or '?' }} · ${{ '%.2f'|format(item.effective_price or 0) }}{% if item.is_proxy %} (proxy){% endif %}{% if item.finish and item.finish != 'normal' %} · {{ item.finish }}{% endif %}">
             <span class="dlr-qty">{{ item.quantity }}</span>

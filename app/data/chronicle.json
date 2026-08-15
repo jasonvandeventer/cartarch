@@ -1,5 +1,17 @@
 [
   {
+    "version": "4.13.30",
+    "date": "2026-08-15",
+    "added": [
+      "You can record a real name alongside your handle, and playgroup pages, game seats and the people pickers use it. Setting one up front means a new game's seats are already labelled with the names people use at the table, instead of handles someone has to translate. Set your own on your account page; an admin can fill them in for the group. Leave it blank and your handle is used exactly as before — and it is never shown on a public share link, which keeps using your display name."
+    ],
+    "refined": [
+      "The deck page now uses the same card-image hover preview as every other page, instead of its own private copy. Behaviour is the same, with one fix that came along for free: on any page, opening a row's actions menu now hides the card preview, so the menu can never end up hidden underneath a card image."
+    ],
+    "resolved": [],
+    "archivist_note": "The name field is the smaller of these two and the one that was actually asked for. The other is housekeeping we owed: the deck page had grown its own copy of the hover preview, which is exactly why a fix to the shared one never reached it — and why yesterday's dropdown bug could be reported as fixed and then come back. One copy now, and the guard that copy had invented is the shared one's, so every page with a row menu gets it."
+  },
+  {
     "version": "4.13.29",
     "date": "2026-08-14",
     "added": [],

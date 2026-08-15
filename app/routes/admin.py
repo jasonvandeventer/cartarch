@@ -106,6 +106,30 @@ def toggle_active(
     return RedirectResponse(url="/admin", status_code=303)
 
 
+@router.post("/users/{user_id}/real-name")
+def set_real_name(
+    user_id: int,
+    real_name: str = Form(""),
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(require_admin),
+    _: None = CsrfRequired,
+):
+    """Seed a member's real name so the playgroup surfaces read as people.
+
+    Admin-settable because the names are wanted NOW and waiting for five people
+    to log in would leave the feature empty; each user can still change their
+    own on /account. Blank clears it and the handle takes over again.
+
+    Member-facing only — `User.player_label` is what renders it, and the
+    anonymous /w/{token} and /d/{token} pages deliberately keep `display_name`.
+    """
+    target = session.query(User).filter(User.id == user_id).first()
+    if target:
+        target.real_name = real_name.strip() or None
+        session.commit()
+    return RedirectResponse(url="/admin", status_code=303)
+
+
 @router.post("/users/{user_id}/toggle-admin")
 def toggle_admin(
     user_id: int,
@@ -307,7 +331,7 @@ def delete_user(
     # snapshot the read-only banner degrades to "another player"). The game survives
     # as shared history for its seat-attributed players / linked playgroup. Explicit
     # (not relying on the DB SET NULL) so it is correct on prod SQLite (FK off) too.
-    recorder_name = target.display_name or target.username
+    recorder_name = target.player_label
     for game in session.query(Game).filter(Game.user_id == user_id).all():
         if game.user_name_at_game is None:
             game.user_name_at_game = recorder_name

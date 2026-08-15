@@ -105,7 +105,7 @@
                  (button still says Logout) and full identity comes back
                  above the breakpoint. #}
               <button type="submit" class="nav-logout-button">
-                Logout<span class="nav-logout-suffix"> ({{ current_user.display_name or current_user.username }})</span>
+                Logout<span class="nav-logout-suffix"> ({{ current_user.player_label }})</span>
               </button>
             </form>
           {% endif %}
@@ -655,7 +655,7 @@
             <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
             <button type="submit">
               Logout
-              <span class="logout-display-name">({{ current_user.display_name or current_user.username }})</span>
+              <span class="logout-display-name">({{ current_user.player_label }})</span>
             </button>
           </form>
           {# Issue #40 — visible build stamp in the mobile More menu. The

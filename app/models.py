@@ -53,6 +53,13 @@ class User(Base):
     username: Mapped[str] = mapped_column(String(255), unique=True, index=True)
     password_hash: Mapped[str] = mapped_column(String(255))
     display_name: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    # v4.13.29 — the person's actual name, for people who play together.
+    # SEPARATE from display_name on purpose: display_name is the pseudonymous
+    # handle, and it is what the ANONYMOUS wishlist page (/w/{token}) shows.
+    # Writing real names into it would turn a public pseudonymous surface into
+    # a first-name one for anyone holding the link. This field is member-facing
+    # ONLY — see `player_label`, and never render it on a public projection.
+    real_name: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
@@ -141,6 +148,26 @@ class User(Base):
     @classmethod
     def _is_guest_expression(cls):
         return cls.username.like("%" + _GUEST_USERNAME_SUFFIX)
+
+    @property
+    def player_label(self) -> str:
+        """THE name to show a CO-MEMBER: real name, else handle, else login.
+
+        `display_name or username` was open-coded at ten sites before this, so
+        adding a third field meant changing ten places — the multi-copy trap.
+        Route every member-facing surface through this.
+
+        **Never use it on an anonymous surface.** /w/{token} and /d/{token}
+        deliberately show `display_name` only; that guard is in main.py.
+        """
+        return (self.real_name or self.display_name or self.username or "").strip()
+
+    @classmethod
+    def player_label_expr(cls):
+        """SQL form of `player_label`, for ORDER BY (a property can't sort)."""
+        from sqlalchemy import func
+
+        return func.coalesce(cls.real_name, cls.display_name, cls.username)
 
 
 class Card(Base):

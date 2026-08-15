@@ -49,7 +49,7 @@
           <li class="trades-row">
             <a class="trades-row-link" href="/trades/{{ t.id }}">
               <span class="trades-row-headline">
-                <strong>{{ t.proposer.display_name or t.proposer.username if t.proposer else (t.proposer_name_at_trade or 'Unknown') }}</strong>
+                <strong>{{ t.proposer.player_label if t.proposer else (t.proposer_name_at_trade or 'Unknown') }}</strong>
                 proposes a trade
               </span>
               <span class="trades-row-meta">
@@ -79,7 +79,7 @@
             <a class="trades-row-link" href="/trades/{{ t.id }}">
               <span class="trades-row-headline">
                 You proposed a trade to
-                <strong>{{ t.recipient.display_name or t.recipient.username if t.recipient else (t.recipient_name_at_trade or 'Unknown') }}</strong>
+                <strong>{{ t.recipient.player_label if t.recipient else (t.recipient_name_at_trade or 'Unknown') }}</strong>
               </span>
               <span class="trades-row-meta">
                 in <em>{{ t.playgroup.name if t.playgroup else '(playgroup gone)' }}</em>
@@ -108,9 +108,9 @@
             <a class="trades-row-link" href="/trades/{{ t.id }}">
               <span class="trades-row-headline">
                 {% if t.proposer_user_id == current_user.id %}
-                  You proposed a trade to <strong>{{ t.recipient_name_at_trade or (t.recipient.display_name or t.recipient.username if t.recipient else 'Unknown') }}</strong>
+                  You proposed a trade to <strong>{{ t.recipient_name_at_trade or (t.recipient.player_label if t.recipient else 'Unknown') }}</strong>
                 {% else %}
-                  <strong>{{ t.proposer_name_at_trade or (t.proposer.display_name or t.proposer.username if t.proposer else 'Unknown') }}</strong>
+                  <strong>{{ t.proposer_name_at_trade or (t.proposer.player_label if t.proposer else 'Unknown') }}</strong>
                   proposed a trade to you
                 {% endif %}
               </span>

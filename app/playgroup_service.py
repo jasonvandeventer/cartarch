@@ -165,15 +165,27 @@ def co_members_of(
         .where(PlaygroupMember.user_id == user_id)
         .scalar_subquery()
     )
-    stmt = (
-        select(User)
-        .join(PlaygroupMember, User.id == PlaygroupMember.user_id)
+    # Membership as an EXISTS, NOT a join + DISTINCT.
+    #
+    # `ORDER BY <expression>` on a SELECT DISTINCT is invalid on Postgres —
+    # "ORDER BY expressions must appear in select list" — and ordering by
+    # `player_label_expr()` (a coalesce) is exactly that. SQLite accepts it, so
+    # the SQLite suite stays green while every people-picker 500s. This is the
+    # SECOND time in two days: v4.13.28 fixed the same shape in the audit card
+    # search. The join here only ever proved membership and its duplicate rows
+    # were the only reason for the DISTINCT, so EXISTS removes both at once.
+    member_of_a_shared_playgroup = (
+        select(PlaygroupMember.id)
         .where(
-            User.is_active.is_(True),
+            PlaygroupMember.user_id == User.id,
             PlaygroupMember.playgroup_id.in_(pg_subq),
         )
-        .distinct()
-        .order_by(User.display_name, User.username)
+        .exists()
+    )
+    stmt = (
+        select(User)
+        .where(User.is_active.is_(True), member_of_a_shared_playgroup)
+        .order_by(User.player_label_expr())
     )
     if not include_self:
         stmt = stmt.where(User.id != user_id)
@@ -206,7 +218,7 @@ def get_pickable_users(session: Session, current_user_id: int) -> list[User]:
             # guest who is deliberately added to a playgroup still shows, because
             # `scoped` (co_members_of) is not filtered — only the blunt fallback is.
             .filter(User.is_active.is_(True), ~User.is_guest)
-            .order_by(User.display_name, User.username)
+            .order_by(User.player_label_expr())
             .all()
         )
     return scoped
@@ -321,27 +333,27 @@ def playgroup_record(session: Session, playgroup_id: int) -> list[dict]:
     rows = (
         session.query(
             GameSeat.user_id,
-            User.display_name,
-            User.username,
+            User.player_label_expr().label("label"),
             func.count().label("played"),
             func.sum(case((GameSeat.placement == 1, 1), else_=0)).label("wins"),
         )
         .join(Game, Game.id == GameSeat.game_id)
         .outerjoin(User, User.id == GameSeat.user_id)
         .filter(Game.playgroup_id == playgroup_id, GameSeat.placement.isnot(None))
-        .group_by(GameSeat.user_id, User.display_name, User.username)
+        .group_by(GameSeat.user_id, User.real_name, User.display_name, User.username)
         .all()
     )
 
     record = []
-    for user_id, display_name, username, played, wins in rows:
+    for user_id, label, played, wins in rows:
         played, wins = int(played), int(wins or 0)
         record.append(
             {
                 "user_id": user_id,
-                # Same name convention as the Members table on this page. A guest has
-                # no account, so it can only ever be the label.
-                "label": (display_name or username) if user_id is not None else GUESTS_LABEL,
+                # Same name convention as the Members table on this page — the one
+                # `player_label` definition. A guest has no account, so it can only
+                # ever be the GUESTS_LABEL.
+                "label": label if user_id is not None else GUESTS_LABEL,
                 "played": played,
                 "wins": wins,
                 "losses": played - wins,

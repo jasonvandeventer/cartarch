@@ -74,7 +74,23 @@
     preview.style.top = Math.max(GAP, Math.min(top, window.innerHeight - h - GAP)) + "px";
   }
 
+  // An open row-actions menu owns the pointer's attention, and the preview
+  // would draw straight over it: the preview lives on <body> at z-index 9999
+  // while .app-shell establishes a stacking context at z-index 1, so it
+  // outranks ANY in-shell popover no matter what z-index that popover sets.
+  // The menu is then there but invisible under the card art and clicks land
+  // blind — reported twice on the deck page as "the actions dropdown doesn't
+  // work". The deck page used to carry its own copy of this guard alongside
+  // its own copy of the whole preview; that duplication is why fixing one did
+  // not fix the other (v4.13.30 collapsed them into this file).
+  function popoverIsOpen() {
+    return !!document.querySelector(
+      "details.collection-row-kebab[open], details.card-actions-drawer[open]"
+    );
+  }
+
   function show(el, x, y) {
+    if (popoverIsOpen()) return;
     var src = el.getAttribute("data-card-image");
     if (!src) return; // nothing to show is not an error — just do nothing
     ensurePreview();
@@ -97,6 +113,20 @@
     preview.classList.add("is-visible");
     position(x, y);
   }
+
+  // The other direction: the guard above only stops the preview APPEARING.
+  // Opening a menu while it is already up has to hide it, or the same overdraw
+  // happens in the other order. Capture phase because `toggle` does not bubble.
+  document.addEventListener(
+    "toggle",
+    function (e) {
+      var t = e.target;
+      if (t && t.open && t.matches && t.matches("details.collection-row-kebab, details.card-actions-drawer")) {
+        hide();
+      }
+    },
+    true
+  );
 
   // Document-level delegation (v4.13.7): containers used to get their own
   // listeners at load time, which silently skipped any container inserted

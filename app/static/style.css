@@ -7214,41 +7214,6 @@ table.dmtx .dmtx-rowhead {
   color: #fca5a5;
 }
 
-/* Floating image-preview tooltip — fixed positioned by JS. Desktop: floats
-   near the cursor; mobile: centered modal-style overlay. z-index sits ABOVE
-   the switch-printing modal (1300) so hovering a printing row inside the
-   modal still surfaces the card image instead of being occluded. */
-.deck-list-image-preview {
-  position: fixed;
-  z-index: 1400;
-  pointer-events: none;
-  width: 240px;
-  border-radius: 12px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
-  overflow: hidden;
-  background: #000;
-}
-.deck-list-image-preview img {
-  display: block;
-  width: 100%;
-  height: auto;
-}
-.deck-list-image-preview-info {
-  padding: 0.35rem 0.6rem;
-  font-size: 0.8rem;
-  color: var(--muted, #b8a88a);
-  background: rgb(0 0 0 / 85%);
-  text-align: center;
-}
-@media (max-width: 768px) {
-  .deck-list-image-preview {
-    width: min(80vw, 320px);
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    pointer-events: auto;
-  }
-}
 
 /* ============================================================================
    In-place card editing (v3.21.0)

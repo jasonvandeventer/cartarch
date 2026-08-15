@@ -311,9 +311,10 @@ def _capture_user_attribution(
     non-blocking philosophy for ``first_seat_number`` and the v3.27.2
     one for ``format``).
 
-    The snapshot value uses ``user.display_name or user.username``,
-    matching the project-wide template convention ("display name
-    falls back to username"). Captured AT CREATION TIME so it
+    The snapshot value is ``user.player_label`` — real name, else handle,
+    else login (v4.13.30; it was ``display_name or username``). This is what
+    makes a new game's seats default to the names people actually use at the
+    table. Captured AT CREATION TIME so it
     survives later display-name edits and account deletion — same
     capture-at-game-start pattern as the v3.27.1 deck/commander
     snapshot.
@@ -334,7 +335,7 @@ def _capture_user_attribution(
     user = session.query(User).filter(User.id == user_id).first()
     if user is None:
         return None, None
-    name = (user.display_name or user.username or "").strip() or None
+    name = user.player_label or None
     return user.id, name
 
 
@@ -1272,7 +1273,7 @@ def claim_seat(
     seat.user_id = user_id
     resolved_name = (display_name or "").strip()
     if not resolved_name and user is not None:
-        resolved_name = (user.display_name or user.username or "").strip()
+        resolved_name = user.player_label
     if resolved_name:
         seat.player_name = resolved_name[:128]
     seat.user_name_at_game = seat.player_name

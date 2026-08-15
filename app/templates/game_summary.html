@@ -55,7 +55,7 @@
     {% if not is_owner %}
       <p class="muted" style="margin:0.5rem 0 0;border-left:3px solid var(--brand-gold, #b8860b);padding-left:0.6rem">
         You're viewing a game recorded by
-        <strong>{{ game.user.display_name or game.user.username if game.user else 'another player' }}</strong> — read-only.
+        <strong>{{ game.user.player_label if game.user else 'another player' }}</strong> — read-only.
       </p>
     {% endif %}
   </section>

@@ -58,7 +58,7 @@
               {% endif %}
               {% for u in pickable_users %}
                 <option value="{{ u.id }}"
-                        {% if seat.user_id == u.id %}selected{% endif %}>{{ u.display_name or u.username }}</option>
+                        {% if seat.user_id == u.id %}selected{% endif %}>{{ u.player_label }}</option>
               {% endfor %}
             </select>
             <button type="submit">Save</button>
