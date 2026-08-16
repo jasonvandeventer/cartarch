@@ -102,7 +102,17 @@ class User(Base):
     # precedent. Nullable + UNIQUE so a token maps to exactly one user; NULL is
     # exempt from UNIQUE on both PG and SQLite, so any number of users may have
     # the API switched off.
-    api_token: Mapped[str | None] = mapped_column(String(64), nullable=True, unique=True)
+    # Stores the SHA-256 HEX of the token, never the token (#182). The plaintext
+    # is shown once at generation and is unrecoverable afterwards, so a database
+    # read — a backup, a support query, a dump — no longer yields working
+    # credentials for every user's whole collection. 64 hex chars fits String(64)
+    # exactly, and UNIQUE still means one token maps to one user.
+    #
+    # A plain SHA-256 is the right hash HERE and a bcrypt/argon2 would be
+    # cargo-culted: the input is a 256-bit `secrets.token_urlsafe`, not a
+    # human-chosen password, so there is no dictionary to attack and no need for
+    # a work factor. What matters is that the stored value is not replayable.
+    api_token_hash: Mapped[str | None] = mapped_column(String(64), nullable=True, unique=True)
 
     inventory_rows: Mapped[list[InventoryRow]] = relationship(back_populates="user")
     decks: Mapped[list[Deck]] = relationship(back_populates="user")

@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from app.auth import hash_password, validate_password_strength, verify_password
 from app.dependencies import CsrfRequired, get_current_user, get_db_session, render
 from app.models import User
+from app.routes.api import hash_api_token
 
 router = APIRouter(prefix="/account")
 
@@ -20,6 +21,9 @@ def account_page(
 ):
     error = request.query_params.get("error")
     success = request.query_params.get("success")
+    # One-shot: POP it, so a refresh does not redisplay the secret and a shared
+    # screen does not keep it up. Showing it once is the cost of not storing it.
+    new_api_token = request.session.pop("new_api_token", None)
     return render(
         request,
         "account.html",
@@ -28,6 +32,7 @@ def account_page(
             "current_user": current_user,
             "error": error,
             "success": success,
+            "new_api_token": new_api_token,
         },
     )
 
@@ -114,15 +119,25 @@ def update_profile(
 # revoked by minting a new one.
 @router.post("/api-token")
 def generate_api_token(
+    request: Request,
     session: Session = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
     _: None = CsrfRequired,
 ):
+    """Mint a token, store only its hash, and hand the plaintext back ONCE (#182).
+
+    The raw value rides the **session cookie**, not the redirect URL. A secret in
+    a query string lands in access logs, in the browser's history, and in the
+    Referer of the next request — which would undo most of what hashing at rest
+    just bought.
+    """
     user = session.query(User).filter(User.id == current_user.id).first()
     if user:
         # 32 bytes → a 43-char URL-safe string, well inside String(64).
-        user.api_token = secrets.token_urlsafe(32)
+        raw = secrets.token_urlsafe(32)
+        user.api_token_hash = hash_api_token(raw)
         session.commit()
+        request.session["new_api_token"] = raw
     return RedirectResponse(url="/account?success=api_token_generated", status_code=303)
 
 
@@ -134,6 +149,6 @@ def revoke_api_token(
 ):
     user = session.query(User).filter(User.id == current_user.id).first()
     if user:
-        user.api_token = None
+        user.api_token_hash = None
         session.commit()
     return RedirectResponse(url="/account?success=api_token_revoked", status_code=303)

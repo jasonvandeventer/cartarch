@@ -8,10 +8,12 @@ columns, no Scryfall call on the request path. Building a parallel set of JSON
 views would have been rebuilding the half that already works.
 
 The one thing missing was a way for a client with no session cookie to say who
-it is, which is what ``users.api_token`` + :func:`require_api_user` are.
+it is, which is what ``users.api_token_hash`` + :func:`require_api_user` are.
 """
 
 from __future__ import annotations
+
+import hashlib
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from fastapi.responses import JSONResponse
@@ -27,11 +29,30 @@ from app.routes.decks import decks_export
 router = APIRouter(prefix="/api/v1", tags=["api"])
 
 
+def hash_api_token(raw: str) -> str:
+    """SHA-256 hex of an API token — THE one definition, used by both the mint
+    and the lookup (#182).
+
+    **A plain SHA-256 rather than bcrypt/argon2, deliberately.** Password
+    hashing exists to make a work factor stand between an attacker and a
+    guessable secret. This input is a 256-bit ``secrets.token_urlsafe``: there
+    is no dictionary, no reuse across sites, and no user memory involved, so a
+    work factor would buy nothing and cost a slow hash on every API request.
+    What hashing buys here is that the stored value is **not replayable** — a
+    backup or a support query no longer hands over live credentials.
+
+    Deterministic and unsalted ON PURPOSE: the lookup has to find the row from
+    the token alone, and a per-row salt would force a full table scan. Two users
+    cannot collide on a 256-bit random value, so the UNIQUE constraint holds.
+    """
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
 def require_api_user(
     request: Request,
     session: Session = Depends(get_db_session),
 ) -> User:
-    """Resolve ``Authorization: Bearer <users.api_token>`` to a User, or 401.
+    """Resolve ``Authorization: Bearer <token>`` to a User, or 401.
 
     **Bearer only — it deliberately does NOT also accept the session cookie.**
     One way in means no ambient-credential path, which (with every route here
@@ -50,15 +71,15 @@ def require_api_user(
     env var, whereas this must resolve *which user* is asking, since every route
     below is owner-scoped.
 
-    **An empty credential must never authenticate.** ``api_token`` is NULL for
+    **An empty credential must never authenticate.** ``api_token_hash`` is NULL for
     every user who has not enabled the API, and while ``NULL = ''`` is NULL (not
     true) in SQL, the guard is explicit rather than relying on that: a missing
     header must fail on its own terms, not on a dialect's null semantics.
 
-    ponytail: plaintext token compared by an indexed lookup, not
-    ``hmac.compare_digest`` — the value is a 256-bit ``secrets.token_urlsafe``
-    and the scope is read-only over card data. Hash it (and show it once at
-    generation) if the API ever gains writes.
+    **The stored value is a SHA-256 hex digest, not the token** (#182). We look
+    up by the hash of what was supplied, which is still one indexed equality —
+    hashing costs a microsecond and buys that a database read yields nothing
+    replayable. See ``hash_api_token`` for why a plain SHA-256 is correct here.
     """
     auth = request.headers.get("Authorization", "")
     scheme, _, supplied = auth.partition(" ")
@@ -67,7 +88,7 @@ def require_api_user(
 
     user = None
     if supplied:
-        user = session.query(User).filter(User.api_token == supplied).first()
+        user = session.query(User).filter(User.api_token_hash == hash_api_token(supplied)).first()
 
     if user is None or not user.is_active:
         raise HTTPException(

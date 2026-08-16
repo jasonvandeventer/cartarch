@@ -123,16 +123,33 @@
       <code>/api/v1/decks</code> and <code>/api/v1/decks/{id}</code>.
       Full reference at <a href="/docs">/docs</a>.
     </p>
-    {% if current_user.api_token %}
+    {# #182 — only the HASH is stored, so the token can be displayed exactly
+       once, here, right after it is minted. Reloading this page loses it for
+       good; that is the point, and the copy says so rather than letting someone
+       discover it later. #}
+    {% if new_api_token %}
+      <p style="margin-top:0.5rem"><strong>Copy this now — it will not be shown again.</strong></p>
+      <p class="muted">
+        Only a fingerprint of the token is stored, so we cannot show it to you a
+        second time. If you lose it, generate a new one; that replaces the old
+        one immediately.
+      </p>
+      <input type="text"
+             id="new-api-token"
+             readonly
+             value="{{ new_api_token }}"
+             onclick="this.select()"
+             style="width:100%;max-width:32rem;font-family:monospace;margin-top:0.5rem">
+    {% endif %}
+    {% if current_user.api_token_hash %}
       <p class="muted" style="margin-top:0.5rem">
+        {% if not new_api_token %}
+          API access is <strong>on</strong>. The token itself is not stored, so it
+          cannot be shown again — generate a new one if you no longer have it.
+        {% endif %}
         Anyone holding this token can read your collection and decks. Treat it
         like a password — regenerating replaces it and invalidates the old one.
       </p>
-      <input type="text"
-             readonly
-             value="{{ current_user.api_token }}"
-             onclick="this.select()"
-             style="width:100%;max-width:32rem;font-family:monospace;margin-top:0.5rem">
       <div style="display:flex;gap:0.5rem;margin-top:0.75rem;flex-wrap:wrap">
         <form action="/account/api-token" method="post">
           <input type="hidden" name="csrf_token" value="{{ csrf_token }}">

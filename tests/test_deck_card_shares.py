@@ -956,3 +956,44 @@ def test_unshare_still_removes_the_share():
     assert s.query(DeckCardShare).count() == 0
     s.refresh(row)
     assert row.storage_location_id == a.storage_location_id
+
+
+def test_a_shared_in_row_does_not_offer_unshare_as_the_move_button(client, db, user):
+    """#183 — Unshare was the ONLY control on a shared-in row, so it became the
+    button people pressed when they meant "move this card to another deck".
+
+    Reported 2026-08-15: a user hit it intending to move a card, the card left
+    the decklist, and he read that as the deck losing a card. Unshare touches no
+    physical card — it drops a membership reference. The row must say where the
+    card actually lives, and the button must not read like a move.
+
+    Both views are asserted because the indicator on these rows has a history of
+    being fixed in one view and left broken in the other.
+    """
+    g, a, b = _group_with_two_decks(db, user)
+    card = _card(db, "Ingenious Artillerist")
+    row = _place(db, user.id, card, a.storage_location_id)
+    db.commit()
+    deck_service.share_card_to_deck(db, user.id, inventory_row_id=row.id, target_deck_id=b.id)
+    db.commit()
+
+    for view in ("grid", "list"):
+        user.deck_view_mode = view
+        db.commit()
+        page = client.get(f"/decks/{b.id}").text
+        assert "Ingenious Artillerist" in page, view
+        # The source deck is named, so "where is it really?" is answerable here.
+        assert a.name in page, f"{view}: the row must name the deck the card lives in"
+        # And the destructive-looking control no longer reads as a move.
+        assert "decklist only" in page, f"{view}: the button must scope itself"
+
+    # The action itself is unchanged — this is wording, not behaviour.
+    resp = client.post(
+        f"/decks/{b.id}/unshare-card",
+        data={"inventory_row_id": row.id, "target_deck_id": b.id},
+        follow_redirects=False,
+    )
+    assert resp.status_code == 303
+    assert db.query(DeckCardShare).count() == 0
+    db.refresh(row)
+    assert row.storage_location_id == a.storage_location_id, "the physical card must not move"

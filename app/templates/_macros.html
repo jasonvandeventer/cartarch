@@ -450,6 +450,15 @@ onerror="this.onerror=null; this.src='{{ scryfall_image_fallback(scryfall_id, si
            (one-card-one-location), so none of the deck/move/return/delete
            actions are offered — only dropping the share (Unshare), which never
            touches the physical row. The "SHARED FROM …" badge renders above. #}
+        {# #183 — Unshare was the ONLY control here, so it became the button
+           people pressed when they meant "move this card somewhere else". It
+           does not move anything: the physical card lives in the source deck
+           and stays there. Say so, and point at where the card actually is. #}
+        <p class="muted small-text" style="margin-top: 0.35rem">
+          The card itself lives in
+          {% if item.shared_from %}<strong>{{ item.shared_from }}</strong>{% else %}another deck{% endif %}.
+          To move it, open that deck.
+        </p>
         <form action="/decks/{{ deck.id }}/unshare-card"
               method="post"
               class="inline-form"
@@ -457,7 +466,10 @@ onerror="this.onerror=null; this.src='{{ scryfall_image_fallback(scryfall_id, si
           <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
           <input type="hidden" name="inventory_row_id" value="{{ item.id }}">
           <input type="hidden" name="target_deck_id" value="{{ deck.id }}">
-          <button type="submit">Unshare</button>
+          <button type="submit"
+                  title="Removes this card from THIS decklist only. The card stays where it is.">
+            Remove from this list
+          </button>
         </form>
       {% elif show_deck_actions and deck %}
         {% set leg = item.get('legality_status') %}

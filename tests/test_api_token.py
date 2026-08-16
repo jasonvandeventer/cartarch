@@ -8,9 +8,12 @@ mistaken for a good one, and the owner scoping of what a good one reaches.
 
 from __future__ import annotations
 
+import re
+
 import pytest
 
 from app.models import Card, Deck, InventoryRow, StorageLocation, User
+from app.routes.api import hash_api_token
 
 TOKEN = "test-api-token-aaaaaaaaaaaaaaaaaaaaaaa"
 OTHER_TOKEN = "test-api-token-bbbbbbbbbbbbbbbbbbbbbbb"
@@ -24,7 +27,9 @@ def _bearer(token: str) -> dict[str, str]:
 
 @pytest.fixture
 def tokened_user(db, user):
-    user.api_token = TOKEN
+    # #182 — the column holds the HASH; the fixture must store what a real
+    # mint stores, or it would test a lookup path production never takes.
+    user.api_token_hash = hash_api_token(TOKEN)
     db.commit()
     return user
 
@@ -103,14 +108,15 @@ def test_malformed_authorization_is_rejected(client, tokened_user, header):
 def test_an_empty_credential_never_authenticates(client, db, user):
     """The ``if supplied:`` guard, tested where it actually bites.
 
-    A NULL ``api_token`` alone would not prove this: ``NULL = ''`` is NULL, not
+    A NULL ``api_token_hash`` alone would not prove this: ``NULL = ''`` is NULL, not
     true, in both dialects, so an unguarded query happens to miss and the test
     passes vacuously. An EMPTY-STRING token is the case the guard exists for —
     without it, one degenerate row would authenticate every client that sends a
     bare ``Bearer`` (or, once the scheme check blanks a bad scheme, any client
     at all).
     """
-    user.api_token = ""
+    # An empty STORED value, which is the degenerate row the guard exists for.
+    user.api_token_hash = ""
     db.commit()
 
     for header in ({}, {"Authorization": "Bearer "}, {"Authorization": "Basic x"}):
@@ -253,7 +259,11 @@ def test_deck_detail_returns_cards_and_rollup(client, db, tokened_user):
 
 @pytest.fixture
 def other_user(db):
-    u = User(username="other@example.com", password_hash="x", api_token=OTHER_TOKEN)
+    u = User(
+        username="other@example.com",
+        password_hash="x",
+        api_token_hash=hash_api_token(OTHER_TOKEN),
+    )
     db.add(u)
     db.commit()
     return u
@@ -282,19 +292,34 @@ def test_a_token_never_reads_another_users_deck(client, db, tokened_user, other_
 # --------------------------------------------------------------------------
 
 
+def _mint_token(client) -> str:
+    """Generate a token and read it back the ONLY way anyone can — off the page,
+    once, right after minting (#182).
+
+    The plaintext is never stored, so a test cannot fish it out of the model.
+    That makes this the honest path: if the show-once display breaks, a user has
+    no way to obtain their token, and this helper fails with them.
+    """
+    client.post("/account/api-token", follow_redirects=False)
+    page = client.get("/account").text
+    # Anchored on the input's id, NOT on "a long random-looking value" — the
+    # csrf_token is 64 hex chars and renders first, so a loose pattern silently
+    # returns THAT and the test fails as a 401 with no hint why.
+    m = re.search(r'id="new-api-token"[^>]*?value="([^"]+)"', page, re.S)
+    assert m, "the freshly minted token was not displayed — it is now unobtainable"
+    return m.group(1)
+
+
 def test_generate_then_revoke_flips_api_access(client, db, user):
     """The token IS the toggle — revoking must 401 the very next request."""
     assert client.get("/api/v1/me", follow_redirects=False).status_code == 401
 
-    client.post("/account/api-token", follow_redirects=False)
-    db.refresh(user)
-    token = user.api_token
-    assert token
+    token = _mint_token(client)
     assert client.get("/api/v1/me", headers=_bearer(token)).status_code == 200
 
     client.post("/account/api-token/revoke", follow_redirects=False)
     db.refresh(user)
-    assert user.api_token is None
+    assert user.api_token_hash is None
     assert (
         client.get("/api/v1/me", headers=_bearer(token), follow_redirects=False).status_code == 401
     )
@@ -302,13 +327,8 @@ def test_generate_then_revoke_flips_api_access(client, db, user):
 
 def test_regenerating_invalidates_the_previous_token(client, db, user):
     """Regenerate is the revocation story for a leaked token — the old one must die."""
-    client.post("/account/api-token", follow_redirects=False)
-    db.refresh(user)
-    first = user.api_token
-
-    client.post("/account/api-token", follow_redirects=False)
-    db.refresh(user)
-    second = user.api_token
+    first = _mint_token(client)
+    second = _mint_token(client)
 
     assert first != second
     assert (
@@ -324,8 +344,44 @@ def test_the_account_page_renders_the_token_controls(client, db, user):
     assert "/account/api-token" in page
     assert "Generate API token" in page
 
-    client.post("/account/api-token", follow_redirects=False)
+    _mint_token(client)
+    # The conftest pins get_current_user to a fixed object, so the template's
+    # `current_user` does not see the write until we refresh it. Production
+    # reloads the user per request; this is harness bookkeeping, not behaviour.
     db.refresh(user)
-    page = client.get("/account").text
-    assert user.api_token in page
-    assert "/account/api-token/revoke" in page
+    assert "/account/api-token/revoke" in client.get("/account").text
+
+
+def test_the_token_is_shown_once_and_then_never_again(client, db, user):
+    """#182 — the plaintext must appear exactly once, on the render right after
+    minting, and be gone on the next load.
+
+    This is the user-visible cost of hashing at rest, so it is pinned rather
+    than left to chance. A page that kept redisplaying it would mean the
+    plaintext was still reachable somewhere, which is the thing we removed.
+    """
+    token = _mint_token(client)
+
+    db.refresh(user)  # see the note in the previous test
+    later = client.get("/account").text
+    assert token not in later, "the token survived past its one-shot display"
+    assert 'id="new-api-token"' not in later
+    # The toggle is still visibly ON — losing the value must not read as revoked.
+    assert "/account/api-token/revoke" in later
+    assert user.api_token_hash and user.api_token_hash != token
+
+    # And the token still authenticates — it is unreadable, not invalidated.
+    assert client.get("/api/v1/me", headers=_bearer(token)).status_code == 200
+
+
+def test_the_stored_value_is_not_the_credential(client, db, user):
+    """The point of the whole change: a database read must not yield something
+    replayable. Sending the STORED value as a bearer token must 401."""
+    token = _mint_token(client)
+    db.refresh(user)
+    stored = user.api_token_hash
+
+    assert stored != token
+    assert (
+        client.get("/api/v1/me", headers=_bearer(stored), follow_redirects=False).status_code == 401
+    )

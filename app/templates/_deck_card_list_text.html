@@ -79,7 +79,12 @@
                   <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                   <input type="hidden" name="inventory_row_id" value="{{ item.id }}">
                   <input type="hidden" name="target_deck_id" value="{{ deck.id }}">
-                  <button type="submit" class="dlr-switch-btn" title="Unshare">Unshare</button>
+                  {# #183 — same wording fix as the grid macro. A dense row has
+                     no space for the explanation, so it rides the tooltip; the
+                     LABEL still has to stop reading as "move this card". #}
+                  <button type="submit"
+                          class="dlr-switch-btn"
+                          title="Removes this card from THIS decklist only. The card itself stays in {{ item.shared_from | default('its own deck', true) }}.">Remove</button>
                 </form>
               {% else %}
               {% if is_basic %}
