@@ -3375,6 +3375,42 @@ td {
   margin-left: 0.2rem;
 }
 
+/* Variant-group share badge (issue #27). Reported 2026-08-15 as "shared card
+   indicators are kinda messy": this class was emitted by the inventory_card
+   macro but had NO rule at all, so "SHARED FROM <deck>" rendered as bare prose
+   beside three properly-shaped sibling pills — and on a variant deck nearly
+   every row carries one (55 of 96 on the reported deck), so the whole list read
+   as noise.
+
+   Blue-grey keeps it distinct from finish (gold), language (amber) and proxy
+   (neutral). The deck name is the long part, so it gets its own span that
+   truncates: the badge stays one pill of predictable width in a narrow
+   multicol row, and the full name is still on the title attribute. */
+.share-badge {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.25rem;
+  max-width: 14rem;
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  background: rgba(96, 132, 180, 0.18);
+  border: 1px solid rgba(96, 132, 180, 0.55);
+  color: #8fb0d9;
+  letter-spacing: 0.04em;
+  margin-left: 0.2rem;
+  vertical-align: baseline;
+}
+
+.share-badge .share-badge-deck {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
 /* Stronger warning-accent proxy badge for trust-sensitive surfaces —
    shared Showcase views, trade construction, and trade detail. A proxy
    in a shared/traded list must read clearly, not as muted neutral.
@@ -7212,6 +7248,18 @@ table.dmtx .dmtx-rowhead {
   background: rgba(239, 68, 68, 0.2);
   border-color: rgba(239, 68, 68, 0.6);
   color: #fca5a5;
+}
+/* The list-view half of the "shared card indicators are kinda messy" report
+   (2026-08-15). `.share-badge` in the grid macro and `.dlr-tag.share` here are
+   TWO implementations of one question, and BOTH shipped unstyled — this variant
+   fell through to the neutral base while every sibling (lang/finish/proxy/warn/
+   bad) carried a colour, so on a variant deck the row that is MOST different
+   looked the most default. Blue-grey deliberately matches .share-badge so the
+   two views read as the same thing. */
+.dlr-tag.share {
+  background: rgba(96, 132, 180, 0.18);
+  border-color: rgba(96, 132, 180, 0.55);
+  color: #8fb0d9;
 }
 
 

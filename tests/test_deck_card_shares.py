@@ -874,3 +874,85 @@ def test_57_resolver_never_crosses_users():
     rows = deck_service.resolved_deck_rows(s, b, u1.id)
     assert all(r.user_id == u1.id for r in rows)
     assert "Foreign" not in {r.card.name for r in rows}
+
+
+# --------------------------------------------------------------------------- #
+# Audit trail — share/unshare changed a decklist and recorded nothing
+# --------------------------------------------------------------------------- #
+
+
+def test_share_and_unshare_are_auditable():
+    """Neither wrote a TransactionLog until 2026-08-15.
+
+    A share moves no physical card, so the ONLY evidence it happened was the
+    card appearing (or vanishing) from a decklist. When a user reported that a
+    deck "lost a card" after an unshare, nothing in the record could confirm the
+    unshare had even occurred, let alone which card or which decks — the whole
+    question had to be answered by querying prod. quantity_delta stays 0 because
+    no copy changes hands; the DECKS are the information.
+    """
+    from app.models import TransactionLog
+
+    s = _fresh_session()
+    u = _user(s)
+    _g, a, b = _group_with_two_decks(s, u)
+    card = _card(s, name="Ingenious Artillerist")
+    row = _place(s, u.id, card, a.storage_location_id)
+
+    deck_service.share_card_to_deck(s, u.id, inventory_row_id=row.id, target_deck_id=b.id)
+    deck_service.unshare_card_from_deck(s, u.id, inventory_row_id=row.id, target_deck_id=b.id)
+
+    logs = (
+        s.query(TransactionLog)
+        .filter(TransactionLog.user_id == u.id)
+        .order_by(TransactionLog.id)
+        .all()
+    )
+    kinds = [lg.event_type for lg in logs]
+    assert kinds == ["share_card", "unshare_card"], kinds
+
+    shared, unshared = logs
+    # Both name the card and BOTH decks, in the direction the change went.
+    assert shared.card_id == card.id and unshared.card_id == card.id
+    assert shared.source_location == f"deck:{a.name}"
+    assert shared.destination_location == f"deck:{b.name}"
+    # Unshare reads the opposite way: it left B's list, the card stays in A.
+    assert unshared.source_location == f"deck:{b.name}"
+    assert unshared.destination_location == f"deck:{a.name}"
+    # No physical copy moved, either way.
+    assert shared.quantity_delta == 0 and unshared.quantity_delta == 0
+    assert shared.inventory_row_id == row.id and unshared.inventory_row_id == row.id
+
+
+def test_an_unshare_that_matches_nothing_logs_nothing():
+    """Idempotent no-op must stay a no-op — a log entry for a share that never
+    existed would invent history."""
+    from app.models import TransactionLog
+
+    s = _fresh_session()
+    u = _user(s)
+    _g, a, b = _group_with_two_decks(s, u)
+    card = _card(s)
+    row = _place(s, u.id, card, a.storage_location_id)
+
+    assert deck_service.unshare_card_from_deck(s, u.id, row.id, b.id) is False
+    assert s.query(TransactionLog).count() == 0
+
+
+def test_unshare_still_removes_the_share():
+    """Guard the behaviour the logging was bolted onto: the delete must still
+    happen, and the physical row must be untouched."""
+    from app.models import DeckCardShare
+
+    s = _fresh_session()
+    u = _user(s)
+    _g, a, b = _group_with_two_decks(s, u)
+    card = _card(s)
+    row = _place(s, u.id, card, a.storage_location_id)
+
+    deck_service.share_card_to_deck(s, u.id, inventory_row_id=row.id, target_deck_id=b.id)
+    assert s.query(DeckCardShare).count() == 1
+    assert deck_service.unshare_card_from_deck(s, u.id, row.id, b.id) is True
+    assert s.query(DeckCardShare).count() == 0
+    s.refresh(row)
+    assert row.storage_location_id == a.storage_location_id

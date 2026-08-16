@@ -3209,6 +3209,21 @@ def share_card_to_deck(
         variant_group_id=target_deck.variant_group_id,
     )
     session.add(share)
+    # A share moves NO physical card, so quantity_delta is 0 — but it does change
+    # what a decklist contains and what the header counts, which is precisely the
+    # kind of change a user later asks "what happened to my deck?" about.
+    log_transaction(
+        session=session,
+        user_id=user_id,
+        event_type="share_card",
+        card_id=row.card_id,
+        finish=row.finish,
+        quantity_delta=0,
+        source_location=f"deck:{source_deck.name}",
+        destination_location=f"deck:{target_deck.name}",
+        inventory_row_id=inventory_row_id,
+        note=f"Shared into {target_deck.name} (card stays in {source_deck.name})",
+    )
     session.commit()
     return share
 
@@ -3227,16 +3242,43 @@ def unshare_card_from_deck(
     target_deck = get_deck(session, deck_id=target_deck_id, user_id=user_id)
     if target_deck is None:
         return False
-    deleted = (
+    # Read the share BEFORE deleting it — the source deck and the card are only
+    # knowable from the record being destroyed, and without them the log entry
+    # cannot say which card left which decklist.
+    share = (
         session.query(DeckCardShare)
         .filter(
             DeckCardShare.inventory_row_id == inventory_row_id,
             DeckCardShare.target_deck_id == target_deck_id,
         )
-        .delete(synchronize_session=False)
+        .first()
+    )
+    if share is None:
+        return False
+    row = session.get(InventoryRow, inventory_row_id)
+    source_deck = session.get(Deck, share.source_deck_id)
+    session.delete(share)
+    # Unsharing REMOVES a card from this decklist while touching no physical
+    # card, so the only evidence it ever happened would otherwise be the card's
+    # absence. That is what made the 2026-08-15 "the deck lost a card" report
+    # unreconstructable.
+    log_transaction(
+        session=session,
+        user_id=user_id,
+        event_type="unshare_card",
+        card_id=row.card_id if row else None,
+        finish=row.finish if row else None,
+        quantity_delta=0,
+        source_location=f"deck:{target_deck.name}",
+        destination_location=(f"deck:{source_deck.name}" if source_deck else None),
+        inventory_row_id=inventory_row_id,
+        note=(
+            f"Removed from {target_deck.name}'s list"
+            + (f" (card remains in {source_deck.name})" if source_deck else "")
+        ),
     )
     session.commit()
-    return bool(deleted)
+    return True
 
 
 # --------------------------------------------------------------------------- #
