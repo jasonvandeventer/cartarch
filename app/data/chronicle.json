@@ -1,5 +1,19 @@
 [
   {
+    "version": "4.13.31",
+    "date": "2026-08-15",
+    "added": [
+      "A location page now shows Recent activity — the last ten things that happened there: what was added, what arrived from somewhere else, and what left, with the name of where it went. A big location only shows fifty cards at a time, so a card you already own can easily sit on a page you never scroll to, and a card that has moved away leaves no trace on the page at all. When something is not where you expect it, the page can now tell you what happened instead of leaving you to work it out."
+    ],
+    "refined": [
+      "Shared-card indicators now look like the labels around them. On a deck that shares cards with another build of itself, nearly every row carries one — and they were being drawn as plain text beside properly shaped badges, so a list that was mostly shared cards read as clutter rather than information. Grid and list views now use the same badge, and a long deck name is trimmed so every badge stays the same size; the full name is still there if you hover."
+    ],
+    "resolved": [
+      "Quick-adding a card, sharing one into another deck, and unsharing it again now each leave an entry in your history. These were the last ways to change what a location or a decklist contains without recording anything, which meant that when the result looked surprising there was nothing to look back at. Nothing about what these actions do has changed."
+    ],
+    "archivist_note": "Three reports arrived in one day, and two of them turned out to be the app being right and unable to say so. A card that looked overwritten had in fact been moved by hand ten minutes earlier; a deck that looked like it had lost a card had genuinely had that card unshared. Both answers existed, but only in the database, and getting them meant going and asking it directly. We would rather the page simply told you — so the fix for both is the same fix: write down the things that were quietly not being written down, then show them where the question gets asked. The third report was the cosmetic one, and it was the most instructive. The shared-card badge is drawn by two different pieces of code depending on which view you are looking at, and both had shipped with no styling of their own. We styled the first one we found, and it would have changed nothing for the person who reported it, because their screenshot was of the other one."
+  },
+  {
     "version": "4.13.30",
     "date": "2026-08-15",
     "added": [
