@@ -1822,6 +1822,53 @@ textarea {
   display: flex;
   align-items: start;
 }
+
+/* Containing block for the flip button, sized to the ARTWORK. Measured in
+   Chromium: anchoring to .inventory-card-media (a flex row wider than the
+   138px thumb) put the button 7px past the card's right edge. */
+.card-thumb-wrap {
+  position: relative;
+  display: inline-block;
+  line-height: 0; /* kill the inline-image descender gap under the card */
+}
+
+/* Flip control for a double-faced card (requested 2026-08-16: "a little flip
+   icon on the corner of the card"). Rendered only where the card genuinely has
+   a second image — see dependencies.has_back_face. */
+.card-flip-btn {
+  position: absolute;
+  top: 0.3rem;
+  right: 0.3rem;
+  z-index: 2;
+  width: 1.6rem;
+  height: 1.6rem;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  font-size: 0.95rem;
+  line-height: 1;
+  border-radius: 999px;
+  cursor: pointer;
+  /* Legible over both a dark border and light card art. */
+  background: rgba(18, 18, 22, 0.72);
+  border: 1px solid rgba(220, 220, 230, 0.45);
+  color: #f1f1f4;
+}
+
+.card-flip-btn:hover,
+.card-flip-btn:focus-visible {
+  background: rgba(18, 18, 22, 0.92);
+  border-color: rgba(220, 220, 230, 0.8);
+}
+
+/* Flipped state reads without relying on the icon alone. */
+.card-flip-btn[aria-pressed="true"] {
+  background: rgba(96, 132, 180, 0.85);
+  border-color: rgba(96, 132, 180, 0.95);
+}
+
+/* The mobile rule below centres the media; the button stays pinned to the
+   thumbnail because it is positioned against this container, not the flex row. */
 .inventory-thumb {
   width: 138px;
   aspect-ratio: 0.716 / 1;

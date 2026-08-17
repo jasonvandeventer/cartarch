@@ -215,13 +215,39 @@ onerror="this.onerror=null; this.src='{{ scryfall_image_fallback(scryfall_id, si
          attribute into Undefined rather than erroring, so this must be guarded,
          not assumed. #}
       {% if item.card.image_url and item.card.scryfall_id %}
-        <a href="/cards/{{ item.card.id }}">
-          <img class="inventory-thumb"
-               src="{{ mirror_image_url(item.card.scryfall_id) }}"
-               {{ img_fallback(item.card.scryfall_id) }}
-               alt="{{ item.card.name }}"
-               loading="lazy">
-        </a>
+        {# The wrapper exists to SHRINK TO THE ARTWORK. .inventory-card-media is
+           a flex row wider than the 138px thumb, so a button positioned against
+           it sat 7px off the card's right edge (measured in Chromium). The
+           control was asked for "on the corner of the card", so it has to
+           anchor to the image, not to the row. #}
+        <div class="card-thumb-wrap">
+          <a href="/cards/{{ item.card.id }}">
+            <img class="inventory-thumb"
+                 src="{{ mirror_image_url(item.card.scryfall_id) }}"
+                 {{ img_fallback(item.card.scryfall_id) }}
+                 alt="{{ item.card.name }}"
+                 loading="lazy">
+          </a>
+        {# Flip control — a SIBLING of the <a>, never inside it. A <button>
+           nested in an anchor is the invalid markup swept in #174, and the
+           whole tile is already a link to the card page. Rendered only when
+           the card actually HAS a second image (has_back_face), so it can
+           never point at a 404. #}
+        {% if has_back_face(item.card) %}
+          <button type="button"
+                  class="card-flip-btn"
+                  aria-label="Show the other side of {{ item.card.name }}"
+                  aria-pressed="false"
+                  data-card-flip
+                  data-front="{{ mirror_image_url(item.card.scryfall_id) }}"
+                  data-back="{{ mirror_image_url(item.card.scryfall_id, 'normal', 'back') }}"
+                  data-front-large="{{ mirror_image_url(item.card.scryfall_id, 'large') }}"
+                  data-back-large="{{ mirror_image_url(item.card.scryfall_id, 'large', 'back') }}"
+                  data-front-alt="{{ scryfall_image_fallback(item.card.scryfall_id) }}"
+                  data-back-alt="{{ scryfall_image_fallback(item.card.scryfall_id, 'normal', 'back') }}"
+                  title="Show the other side">⟳</button>
+        {% endif %}
+        </div>
       {% else %}
         <a href="/cards/{{ item.card.id }}" class="inventory-thumb placeholder"></a>
       {% endif %}

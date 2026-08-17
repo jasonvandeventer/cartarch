@@ -95,3 +95,6 @@
     <p class="muted"><em>Read-only share</em> — glance-only; no edit or action affordances.</p>
   </section>
 {% endblock %}
+{% block extra_scripts %}
+  <script src="/static/card-flip.js?v={{ static_v('card-flip.js') }}"></script>
+{% endblock %}

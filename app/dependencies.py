@@ -203,8 +203,44 @@ def scryfall_image_fallback(scryfall_id: str, size: str = "normal", face: str = 
     return url + "&face=back" if face == "back" else url
 
 
+# Layouts that genuinely have a SECOND IMAGE, so a flip control has something to
+# show. Measured against the live mirror on 2026-08-16, one card per layout —
+# not taken from memory, because the answer is counter-intuitive:
+#
+#     transform  200   adventure  404
+#     modal_dfc  200   split      404
+#     art_series 200   prepare    404
+#     reversible_card    200      flip       404
+#     double_faced_token 200
+#
+# **`layout == "flip"` has NO back image.** A flip card (Nezumi Graverobber) is
+# one printed face read upside-down, so the name is a trap for exactly this
+# feature. Same family of error as #160, where a combined `type_line` made
+# Battles and Sagas look like double-faced cards.
+#
+# The discriminator MUST be layout, never `" // " in type_line`: 161 of the 335
+# multi-face cards in the catalog (adventure/split/prepare/flip) carry the
+# separator and have one image, so a type_line test would put a broken control
+# on nearly half of them.
+BACKED_LAYOUTS = frozenset(
+    {"transform", "modal_dfc", "double_faced_token", "reversible_card", "art_series"}
+)
+
+
+def has_back_face(card) -> bool:
+    """True when ``card`` has a second face the mirror can serve.
+
+    THE one definition — the macro, the card page and any future surface ask
+    this, so the layout set never gets re-derived (and re-guessed) elsewhere.
+    Tolerant of a missing/NULL layout and of the sanitized projections, which
+    expose no layout at all: unknown means no control, never a broken image.
+    """
+    return (getattr(card, "layout", None) or "").strip().lower() in BACKED_LAYOUTS
+
+
 templates.env.globals["mirror_image_url"] = mirror_image_url
 templates.env.globals["scryfall_image_fallback"] = scryfall_image_fallback
+templates.env.globals["has_back_face"] = has_back_face
 
 # Sort keys for surfaces that sort client-side (the trade construction picker —
 # a page reload would drop the in-progress selection, so its sort is JS over
