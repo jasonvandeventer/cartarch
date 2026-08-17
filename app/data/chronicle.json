@@ -1,5 +1,15 @@
 [
   {
+    "version": "4.13.34",
+    "date": "2026-08-17",
+    "added": [
+      "Your wishlist can leave the site as a shopping list. Two buttons above the list: Buy on TCGPlayer opens their Mass Entry with every card already filled in, and Download as text gives you a plain list — one card per line — that TCGPlayer, Moxfield and Archidekt all accept if you would rather paste it. Both follow whichever filter you have on, so switching to \"Not owned yet\" first gives you a list of only the cards you still need. No set codes are included, so you are never steered away from a cheaper printing."
+    ],
+    "refined": [],
+    "resolved": [],
+    "archivist_note": "The interesting part of this one was a number. We first capped the TCGPlayer link at the length everyone quotes as safe for a web address, then measured the wishlist that prompted the request: it came to fifteen characters under that cap. It would have worked perfectly for him on the day and then quietly stopped the next time he added a card, which is the sort of failure nobody reports because it looks like the feature was never there. So we asked TCGPlayer what it would actually accept, found the real ceiling to be several times higher, and set it there. Past that the link steps aside and the text download — which has no limit at all — does the job."
+  },
+  {
     "version": "4.13.33",
     "date": "2026-08-16",
     "added": [
