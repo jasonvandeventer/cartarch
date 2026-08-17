@@ -14,7 +14,7 @@ from __future__ import annotations
 import hashlib
 import json
 import time
-from urllib.parse import urlencode
+from urllib.parse import parse_qsl, urlencode, urlsplit
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse, RedirectResponse
@@ -121,6 +121,55 @@ from app.token_service import deck_token_status, list_tokens
 from app.watchlist_service import add_names_to_watchlist
 
 router = APIRouter()
+
+
+# --------------------------------------------------------------------------- #
+# Redirecting back to the deck page WITHOUT throwing away the view (#184)
+# --------------------------------------------------------------------------- #
+
+# The deck page's view axes, as read by ``deck_detail_page``. ``materialized``
+# and ``remaining`` are deliberately ABSENT: they report the outcome of one
+# specific action, so carrying them onto an unrelated redirect would re-announce
+# a stale result.
+_DECK_VIEW_PARAMS = (
+    "search",
+    "sort",
+    "direction",
+    "group",
+    "collection_search",
+    "health_filter",
+)
+
+
+def _deck_redirect(request: Request, deck_id: int) -> RedirectResponse:
+    """303 back to the deck page, KEEPING the view the user was looking at.
+
+    Reported 2026-08-16: moving a card to Considering "sorta reloads the page —
+    it resets the sort order". Every POST on this page answered with a bare
+    ``/decks/{id}``, so any sort / group / search in the URL was discarded and
+    the page came back in default order. **It was 17 routes, not one** — the
+    reported action was just the one someone happened to use.
+
+    The POST's own URL carries no query (the forms post to action paths), so the
+    view can only come from the **Referer**. That is safe here because the target
+    is BUILT LOCALLY: the path is always ``/decks/{deck_id}``, and only known
+    view keys are copied across, so a forged Referer can at worst set the
+    victim's own sort order. It can never redirect them off-site — the classic
+    Referer-redirect hazard ``safe_redirect_url`` exists for, which is why this
+    does not reuse that helper (it returns the Referer ITSELF).
+    """
+    target = f"/decks/{deck_id}"
+    referer = request.headers.get("referer", "")
+    if referer:
+        parsed = urlsplit(referer)
+        same_host = not parsed.netloc or parsed.netloc == request.url.netloc
+        if same_host and parsed.path == target:
+            keep = [
+                (k, v) for k, v in parse_qsl(parsed.query) if k in _DECK_VIEW_PARAMS and v != ""
+            ]
+            if keep:
+                target = f"{target}?{urlencode(keep)}"
+    return RedirectResponse(url=target, status_code=303)
 
 
 @router.get("/decks")
@@ -643,7 +692,7 @@ async def decks_share(
 ):
     """Owner-only: (re)generate the deck's public share token, then back to detail."""
     generate_deck_share_token(session, deck_id=deck_id, user_id=current_user.id)
-    return RedirectResponse(url=f"/decks/{deck_id}", status_code=303)
+    return _deck_redirect(request, deck_id)
 
 
 @router.post("/decks/{deck_id}/unshare")
@@ -656,7 +705,7 @@ async def decks_unshare(
 ):
     """Owner-only: revoke the public share link (NULL the token → /d/{token} 404s)."""
     revoke_deck_share_token(session, deck_id=deck_id, user_id=current_user.id)
-    return RedirectResponse(url=f"/decks/{deck_id}", status_code=303)
+    return _deck_redirect(request, deck_id)
 
 
 @router.post("/decks/{deck_id}/wishlist")
@@ -1553,6 +1602,7 @@ def decks_export(
 
 @router.post("/decks/{deck_id}/share-card")
 def decks_share_card(
+    request: Request,
     deck_id: int,
     inventory_row_id: int = Form(...),
     target_deck_id: int = Form(...),
@@ -1573,11 +1623,12 @@ def decks_share_card(
         )
     except ValueError:
         pass
-    return RedirectResponse(url=f"/decks/{deck_id}", status_code=303)
+    return _deck_redirect(request, deck_id)
 
 
 @router.post("/decks/{deck_id}/unshare-card")
 def decks_unshare_card(
+    request: Request,
     deck_id: int,
     inventory_row_id: int = Form(...),
     target_deck_id: int = Form(...),
@@ -1593,11 +1644,12 @@ def decks_unshare_card(
         inventory_row_id=inventory_row_id,
         target_deck_id=target_deck_id,
     )
-    return RedirectResponse(url=f"/decks/{deck_id}", status_code=303)
+    return _deck_redirect(request, deck_id)
 
 
 @router.post("/decks/pull")
 async def decks_pull(
+    request: Request,
     inventory_row_id: int = Form(...),
     deck_id: int = Form(...),
     quantity: int = Form(...),
@@ -1613,7 +1665,7 @@ async def decks_pull(
         quantity=quantity,
     )
 
-    return RedirectResponse(url=f"/decks/{deck_id}", status_code=303)
+    return _deck_redirect(request, deck_id)
 
 
 @router.get("/decks/api/card-autocomplete")
@@ -1776,7 +1828,7 @@ async def decks_add_card(
             response.headers["X-Add-Resolution"] = json.dumps(toast)
         return response
 
-    return RedirectResponse(url=f"/decks/{deck_id}", status_code=303)
+    return _deck_redirect(request, deck_id)
 
 
 # --------------------------------------------------------------------------- #
@@ -1894,7 +1946,7 @@ async def decks_considering_add(
                 "You don't own that card — mark this deck as a brew to stage unowned cards."
             )
         return response
-    return RedirectResponse(url=f"/decks/{deck_id}", status_code=303)
+    return _deck_redirect(request, deck_id)
 
 
 @router.post("/decks/{deck_id}/considering/{row_id}/promote")
@@ -1909,7 +1961,7 @@ async def decks_considering_promote(
     """Promote a Considering row into the deck's main list. Crosses zones (both the
     deck list and the section change) so it does a full 303 re-render."""
     promote_from_considering(session, current_user.id, row_id)
-    return RedirectResponse(url=f"/decks/{deck_id}", status_code=303)
+    return _deck_redirect(request, deck_id)
 
 
 @router.post("/decks/{deck_id}/considering/{row_id}/remove")
@@ -1929,7 +1981,7 @@ async def decks_considering_remove(
         if not deck:
             raise HTTPException(status_code=404, detail="Deck not found")
         return _considering_section_response(request, session, current_user, deck)
-    return RedirectResponse(url=f"/decks/{deck_id}", status_code=303)
+    return _deck_redirect(request, deck_id)
 
 
 @router.post("/decks/{deck_id}/rows/{row_id}/demote")
@@ -1944,7 +1996,7 @@ async def decks_row_demote(
     """Demote a deck main-list row into the deck's Considering area (full 303
     re-render — both the deck list and the section change)."""
     demote_to_considering(session, current_user.id, row_id)
-    return RedirectResponse(url=f"/decks/{deck_id}", status_code=303)
+    return _deck_redirect(request, deck_id)
 
 
 @router.get("/decks/{deck_id}/rows/{row_id}/printings-modal")
@@ -2044,7 +2096,7 @@ async def deck_row_switch_printing(
 
     if request.headers.get("HX-Request"):
         return _deck_cards_partial_response(request, session, current_user, deck_id)
-    return RedirectResponse(url=f"/decks/{deck_id}", status_code=303)
+    return _deck_redirect(request, deck_id)
 
 
 @router.post("/decks/{deck_id}/rows/{row_id}/bump-qty")
@@ -2078,7 +2130,7 @@ async def deck_row_bump_qty(
 
     if request.headers.get("HX-Request"):
         return _deck_cards_partial_response(request, session, current_user, deck_id)
-    return RedirectResponse(url=f"/decks/{deck_id}", status_code=303)
+    return _deck_redirect(request, deck_id)
 
 
 @router.post("/decks/{deck_id}/intent")
@@ -2203,6 +2255,7 @@ def deck_bracket_refresh(
 
 @router.post("/decks/{deck_id}/retag")
 def decks_retag(
+    request: Request,
     deck_id: int,
     session: Session = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
@@ -2252,11 +2305,12 @@ def decks_retag(
     if changed:
         session.commit()
 
-    return RedirectResponse(url=f"/decks/{deck_id}", status_code=303)
+    return _deck_redirect(request, deck_id)
 
 
 @router.post("/decks/return")
 async def decks_return(
+    request: Request,
     deck_id: int = Form(...),
     deck_row_id: int = Form(...),
     drawer: str = Form(""),
@@ -2276,7 +2330,7 @@ async def decks_return(
     if has_sortable_setup(session, current_user.id):
         resort_collection(session, user_id=current_user.id)
 
-    return RedirectResponse(url=f"/decks/{deck_id}", status_code=303)
+    return _deck_redirect(request, deck_id)
 
 
 @router.post("/decks/rows/{row_id}/toggle-commander")
@@ -2326,7 +2380,7 @@ async def toggle_commander(
                 flush=True,
             )
 
-    return RedirectResponse(url=f"/decks/{deck_id}", status_code=303)
+    return _deck_redirect(request, deck_id)
 
 
 @router.post("/decks/rows/{row_id}/tags")
@@ -2348,7 +2402,7 @@ async def update_row_tags(
         set_row_tags(row, [t for t in tags if t in CARD_ROLE_TAGS])
         row.updated_at = utc_now()
         session.commit()
-    return RedirectResponse(url=f"/decks/{deck_id}", status_code=303)
+    return _deck_redirect(request, deck_id)
 
 
 @router.post("/decks/{deck_id}/rows/{row_id}/review-tag")
@@ -2445,4 +2499,4 @@ async def review_tag_action(
             {"deck": deck, "review_tag_items": items},
         )
 
-    return RedirectResponse(url=f"/decks/{deck_id}", status_code=303)
+    return _deck_redirect(request, deck_id)

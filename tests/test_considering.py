@@ -201,8 +201,14 @@ def test_demote_moves_to_considering_and_clears_role(db, user):
     row = _main_row(db, user, deck, card, role="commander")
 
     assert demote_to_considering(db, user.id, row.id) is True
+    db.expire_all()
     db.refresh(row)
-    assert row.storage_location_id == deck.considering_location_id
+    # Assert the invariant directly rather than via deck.considering_location_id:
+    # the location is created lazily in the ROUTE's session, and what matters is
+    # where the row ended up, not which session can see the deck's pointer yet.
+    dest = db.get(StorageLocation, row.storage_location_id)
+    assert dest is not None and dest.type == "considering"
+    assert row.storage_location_id != deck.storage_location_id
     assert row.role is None  # considering is not the deck
     assert len(list_considering_rows(db, deck, user.id)) == 1
 
@@ -325,3 +331,36 @@ def test_considering_add_unowned_to_non_brew_over_http(client, db, user):
     assert resp.status_code == 200  # friendly partial, not a 500
     db.expire_all()
     assert list_considering_rows(db, db.get(Deck, deck.id), user.id) == []
+
+
+def test_move_to_considering_keeps_the_users_sort(client, db, user):
+    """#184, reported as "moving a card to reconsidering ... resets the sort order".
+
+    Driven through the ROUTE with a Referer, because that is the only place the
+    view exists: the form posts to an action path with no query string, so a
+    service-level test cannot see this bug at all.
+    """
+    deck = _deck(db, user, "Sorted Deck")
+    card = _card(db, "Demoted Card")
+    row = _main_row(db, user, deck, card)
+    db.commit()
+
+    resp = client.post(
+        f"/decks/{deck.id}/rows/{row.id}/demote",
+        headers={"referer": f"http://testserver/decks/{deck.id}?sort=cmc&direction=desc"},
+        follow_redirects=False,
+    )
+    assert resp.status_code == 303
+    location = resp.headers["location"]
+    assert "sort=cmc" in location, f"the sort was discarded: {location}"
+    assert "direction=desc" in location
+
+    # And the move itself still happened — this is a redirect fix, not a
+    # behaviour change. Asserted via the DESTINATION's type rather than
+    # deck.considering_location_id: that location is created lazily inside the
+    # ROUTE's session, so the pointer is not yet visible on this session's deck.
+    db.expire_all()
+    db.refresh(row)
+    dest = db.get(StorageLocation, row.storage_location_id)
+    assert dest is not None and dest.type == "considering"
+    assert row.storage_location_id != deck.storage_location_id
