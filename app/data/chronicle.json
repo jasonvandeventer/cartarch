@@ -1,5 +1,18 @@
 [
   {
+    "version": "4.13.32",
+    "date": "2026-08-16",
+    "added": [],
+    "refined": [
+      "Doing anything on a deck page no longer resets how the page is sorted. Moving a card to Considering, removing one, switching a printing, retagging, changing a quantity — all of them used to drop you back at the default order, losing whatever sort, grouping or search you had set. They now return you to the view you were actually looking at. This was one line repeated across seventeen actions, so the one that got reported was only the one someone happened to use.",
+      "On a card shared in from another build of the same deck, the button no longer says Unshare. It says Remove from this list, and the row now names the deck the card physically lives in. Unshare sounded like a way to move a card somewhere else; it never was, and someone reasonably read the card disappearing from the list as the deck losing it."
+    ],
+    "resolved": [
+      "Your API token is now stored as a fingerprint rather than as the token itself, so a copy of the database no longer contains anything that can be used to read your collection. Tokens already in use keep working and nothing needs to be reissued. The one change you will notice: the token is shown once, when you generate it, and cannot be displayed again afterwards. If you no longer have yours written down, generate a new one — that takes effect immediately and retires the old one."
+    ],
+    "archivist_note": "The sort-order fix is the kind we like: one report, seventeen places, and the reporter had no way of knowing the other sixteen existed. Somebody moving a card to Considering told us the page forgot how it was sorted, and the same forgetting was sitting behind every other button on that page. Chasing only the named action would have shipped the identical complaint back to them a week later under a different name. The token change is the opposite sort of work — nothing was broken, nobody reported it, and the only visible result is that we can no longer show you something we used to. We think that is the right trade. A token is a key to your whole collection, and a key we cannot read is a key that cannot leak from our side."
+  },
+  {
     "version": "4.13.31",
     "date": "2026-08-15",
     "added": [
