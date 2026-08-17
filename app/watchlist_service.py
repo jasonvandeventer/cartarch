@@ -717,3 +717,106 @@ def list_wishlist_shares_for_playgroup(
         out.append({"sharer": s.user, "view": view})
     out.sort(key=lambda r: r["sharer"].player_label.lower())
     return out
+
+
+# --------------------------------------------------------------------------- #
+# Export — a text list, and a one-click TCGPlayer basket (#185)
+# --------------------------------------------------------------------------- #
+
+WISHLIST_SHOW_OPTIONS = ("all", "target_met", "unowned", "owned")
+
+# TCGPlayer's Mass Entry takes its list in a `c=` query param, entries separated
+# by `||`. Verified 2026-08-17: the endpoint answers 200 with a payload attached.
+TCGPLAYER_MASSENTRY_BASE = "https://www.tcgplayer.com/massentry?productline=Magic"
+
+# A URL is not an unbounded transport, but the usual "2000 chars" figure is an
+# IE-era number and would have been actively wrong here. MEASURED 2026-08-17:
+# TCGPlayer answers 200 for payloads of 2k, 4k and 8k, and the requester's real
+# 66-card wishlist encodes to 1,985 — fifteen characters under a 2000 cap. That
+# boundary would have given him a link today and silently removed it on the next
+# card he added, which is a worse failure than never offering one.
+#
+# 8000 is the measured-safe ceiling (also comfortably inside nginx's default 8k
+# header buffer and every modern browser's limit). Past it the link is hidden
+# and the text export — which has no ceiling — does the job.
+#
+# NOTE the length that matters is the ENCODED one: every space becomes %20 and
+# each `||` becomes %7C%7C, so the raw payload (1,333 for that wishlist) is a
+# ~50% underestimate.
+TCGPLAYER_URL_MAX = 8000
+
+
+def filter_wishlist_by_show(items: list[dict], show: str) -> list[dict]:
+    """Apply the ``?show=`` facet. ONE definition, shared by the page and the
+    export — an export that silently ignored the filter would hand someone a
+    shopping list for cards they already own.
+
+    An unrecognised value falls through to "all" rather than emptying the list,
+    matching how the page has always behaved.
+    """
+    if show == "target_met":
+        return [it for it in items if it["target_met"]]
+    if show == "unowned":
+        return [it for it in items if not it["placed_count"] and not it["pending_count"]]
+    if show == "owned":
+        return [it for it in items if it["placed_count"] or it["pending_count"]]
+    return items
+
+
+def wishlist_export_names(items: list[dict]) -> list[str]:
+    """The wishlist as card names, de-duplicated, in the order given.
+
+    **Deduplicated by name on purpose.** A user can hold both a printing-specific
+    watch and a printing-agnostic one for the same card; that is two ways of
+    wanting ONE card, not a want for two. Emitting it twice would put a second
+    copy in somebody's cart.
+
+    ``display_name`` is the right field: a name-only watch has no ``Card`` at
+    all, so ``card.name`` would be None for it.
+
+    **A multi-face name is emitted VERBATIM, and that is verified, not assumed.**
+    TCGPlayer's own catalog names these inconsistently — transform, modal_dfc and
+    adventure products carry the FRONT face only (``Urabrask``,
+    ``Bala Ged Recovery``, ``Realm-Cloaked Giant``) while split and flip carry the
+    full form (``Dusk // Dawn``, ``Nezumi Graverobber // Nighteyes the
+    Desecrator``) — but **Mass Entry's matcher is tolerant of either**, confirmed
+    by hand on 2026-08-17 with the three real double-faced cards on the
+    requesting user's wishlist.
+
+    So no front-face conversion. Note it would NOT have been a reuse of
+    ``has_back_face`` even if needed: that predicate says adventure=False and
+    flip=False, which is the OPPOSITE of the naming split above. Two rules that
+    look like one.
+    """
+    seen: set[str] = set()
+    names: list[str] = []
+    for item in items:
+        name = (item.get("display_name") or "").strip()
+        if not name:
+            continue
+        key = name.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        names.append(name)
+    return names
+
+
+def wishlist_export_text(items: list[dict]) -> str:
+    """Plain text, one ``1 Card Name`` per line — the format TCGPlayer Mass
+    Entry, Moxfield and Archidekt all accept on paste. No set codes: a wishlist
+    is a want for the CARD, and pinning a printing would refuse cheaper ones."""
+    return "".join(f"1 {name}\n" for name in wishlist_export_names(items))
+
+
+def tcgplayer_massentry_url(items: list[dict]) -> str | None:
+    """A Mass Entry link that opens the whole wishlist in a TCGPlayer basket, or
+    None when the list is empty or too long to survive as a URL."""
+    from urllib.parse import quote
+
+    names = wishlist_export_names(items)
+    if not names:
+        return None
+    payload = "||".join(f"1 {name}" for name in names)
+    url = f"{TCGPLAYER_MASSENTRY_BASE}&c={quote(payload, safe='')}"
+    return url if len(url) <= TCGPLAYER_URL_MAX else None

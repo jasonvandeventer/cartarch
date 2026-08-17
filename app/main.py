@@ -22,6 +22,7 @@ from fastapi.responses import (
     HTMLResponse,
     JSONResponse,
     RedirectResponse,
+    Response,
 )
 from fastapi.staticfiles import StaticFiles
 from prometheus_fastapi_instrumentator import Instrumentator
@@ -92,6 +93,7 @@ from app.watchlist_service import (
     add_to_watchlist,
     annotate_wishlist_ownership,
     build_public_wishlist_view,
+    filter_wishlist_by_show,
     generate_wishlist_share_token,
     get_user_by_wishlist_token,
     list_watchlist,
@@ -99,9 +101,12 @@ from app.watchlist_service import (
     remove_from_watchlist,
     revoke_wishlist_share_token,
     share_wishlist_to_playgroup,
+    tcgplayer_massentry_url,
     unshare_wishlist_from_playgroup,
     update_note,
     update_target_price,
+    wishlist_export_names,
+    wishlist_export_text,
 )
 
 _daemon_threads: list[threading.Thread] = []
@@ -1138,12 +1143,10 @@ def watchlist_page(
     # the by-name search stays client-side (list-filter.js), same as the other
     # name-filtered lists. An unknown `show` value falls through to "all" rather
     # than showing an empty page.
-    if show == "target_met":
-        items = [it for it in items if it["target_met"]]
-    elif show == "unowned":
-        items = [it for it in items if not it["placed_count"] and not it["pending_count"]]
-    elif show == "owned":
-        items = [it for it in items if it["placed_count"] or it["pending_count"]]
+    # #185 — the facet moved into watchlist_service so the EXPORT applies the
+    # same one. A shopping list that quietly ignored "unowned" would be a list
+    # of cards you already have.
+    items = filter_wishlist_by_show(items, show)
     items = sort_spec.sort_wishlist_items(items, sort, direction)
     # #146 — wishlist-sharing controls: the public token + the user's playgroups
     # with which ones the wishlist is currently shared to (for the picker).
@@ -1171,6 +1174,38 @@ def watchlist_page(
             "my_playgroups": my_playgroups,
             "wl_outcome": request.query_params.get("wl", ""),
             "wl_name": request.query_params.get("name", ""),
+            # #185 — built from the SAME filtered+sorted list the page renders,
+            # so what you buy is what you are looking at. None when the list is
+            # empty or too long to ride in a URL; the text export has no cap.
+            "tcgplayer_url": tcgplayer_massentry_url(items),
+            "export_count": len(wishlist_export_names(items)),
+        },
+    )
+
+
+@app.get("/watchlist/export")
+def watchlist_export(
+    show: str = "all",
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+):
+    """The wishlist as a plain-text buy list (#185).
+
+    ``1 Card Name`` per line — what TCGPlayer Mass Entry, Moxfield and Archidekt
+    all accept on paste. Honours ``?show=`` for the same reason the collection
+    export honours its filter: the export and the page must agree.
+
+    Deliberately NO set codes. A wishlist is a want for the CARD; pinning a
+    printing would make the buy list refuse a cheaper one.
+    """
+    items = filter_wishlist_by_show(list_watchlist(session, current_user.id), show)
+    body = wishlist_export_text(items)
+    return Response(
+        content=body,
+        media_type="text/plain; charset=utf-8",
+        headers={
+            "Content-Disposition": 'attachment; filename="cartarch-wishlist.txt"',
+            "Cache-Control": "no-store",
         },
     )
 

@@ -16243,6 +16243,16 @@ body.cmp-lobby-body { height: auto; min-height: 100dvh; overflow-y: auto; }
 /* Shared instant colour/type/name filter bar (v4.12.1) — wishlist page, public
    wishlist, playgroup members' wishlists. Sits below any server-side Apply
    toolbar; these controls take effect as you change them. */
+/* Wishlist export actions (#185). Same shape as the filter bar directly below
+   it so the two read as one toolbar rather than two competing rows. */
+.wl-export-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin: 0.6rem 0 0.8rem;
+}
+
 .wl-filter-bar {
   display: flex;
   align-items: center;

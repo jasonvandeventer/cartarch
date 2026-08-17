@@ -127,6 +127,31 @@
         </label>
         <button type="submit" class="btn-like">Apply</button>
       </form>
+      {# #185 — take the wishlist somewhere you can buy it. Both routes carry the
+         CURRENT ?show= so the buy list matches the list on screen; "Not owned
+         yet" is the one people will actually shop from. The TCGPlayer link is
+         absent (not disabled) when the list is empty or too long to survive as
+         a URL — the text export has no such ceiling and always works. #}
+      {% if export_count %}
+        <div class="wl-export-bar">
+          {% if tcgplayer_url %}
+            <a class="btn" href="{{ tcgplayer_url }}" target="_blank" rel="noopener noreferrer"
+               title="Opens TCGPlayer Mass Entry with these {{ export_count }} cards">
+              Buy on TCGPlayer ({{ export_count }})
+            </a>
+          {% endif %}
+          <a class="btn" href="/watchlist/export?show={{ show }}"
+             title="Plain text, one card per line — paste into TCGPlayer, Moxfield or Archidekt">
+            Download as text
+          </a>
+          {% if not tcgplayer_url %}
+            <span class="muted small-text">
+              Too many cards for a single TCGPlayer link — download the text and paste it
+              into their Mass Entry box.
+            </span>
+          {% endif %}
+        </div>
+      {% endif %}
       {# Instant filters live OUTSIDE the Apply form on purpose: they take effect
          as you change them, and being inside would imply they need Apply (and
          they carry no name=, so a submit would silently reset them). #}
