@@ -1,5 +1,17 @@
 [
   {
+    "version": "4.13.33",
+    "date": "2026-08-16",
+    "added": [
+      "Double-faced cards have a flip button. A small ⟳ sits in the corner of the card art; click it to see the other side, click again to come back. It appears on your collection, deck and location pages, on a shared showcase, in trade detail, and on a card's own page — and only on cards that genuinely have a second face. Adventures, Splits and the old upside-down flip cards print everything on one side, so they get no button rather than a button that shows nothing."
+    ],
+    "refined": [
+      "Doing anything on a deck page no longer sends you back to the default sort. This was fixed for one action in the previous release; it turned out every button on the page had the same problem, and all of them now return you to the view you were looking at."
+    ],
+    "resolved": [],
+    "archivist_note": "The flip button looks like a small thing and mostly was — the images have been sitting on our servers all along, both faces, because the mirror has always downloaded them. The work was deciding which cards get the button, and the honest answer took a measurement rather than a memory. Nearly half the cards whose names contain a slash have only one printed side, and — our favourite detail — the layout Magic actually calls \"flip\" is one of them. A flip card is a single face you read upside-down. Had we trusted the name, the one card type the feature is named after would have been the one it broke on."
+  },
+  {
     "version": "4.13.32",
     "date": "2026-08-16",
     "added": [],
