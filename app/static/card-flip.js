@@ -36,7 +36,12 @@
   function flip(btn) {
     var media = btn.parentElement;
     if (!media) return;
-    var img = media.querySelector("img.inventory-thumb");
+    // Any <img> inside the wrapper, NOT a specific class: the grid tile uses
+    // .inventory-thumb and the card-detail page uses .card-detail-art-img, and
+    // a class-specific selector silently made the button inert on the second
+    // surface. The wrapper holds exactly the artwork and this button, so there
+    // is nothing else to match.
+    var img = media.querySelector("img");
     if (!img) return;
 
     var showingBack = btn.getAttribute("aria-pressed") === "true";

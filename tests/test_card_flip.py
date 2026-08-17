@@ -165,3 +165,61 @@ def test_the_button_is_not_nested_inside_the_card_link():
     assert before.rindex("</a>") > before.rindex("<a href"), (
         "the flip button appears to be inside the card's <a> — invalid nesting (#174)"
     )
+
+
+def test_the_script_does_not_look_for_a_class_specific_image():
+    """The grid tile's image is .inventory-thumb; the card-detail page's is
+    .card-detail-art-img. The first cut queried the former by class, which made
+    the button silently INERT on card detail — it rendered, it was clickable,
+    and nothing happened. The wrapper holds only the artwork and the button, so
+    a bare `img` selector is both correct and unambiguous."""
+    src = (
+        pathlib.Path(__file__).resolve().parents[1] / "app" / "static" / "card-flip.js"
+    ).read_text()
+    assert 'querySelector("img")' in src
+    assert "img.inventory-thumb" not in src, (
+        "a class-specific image selector makes the control inert on any surface "
+        "using a different image class"
+    )
+
+
+def test_card_detail_renders_the_button_for_a_two_faced_card(client, db):
+    """Route-level, on the surface added last. #152's failure mode: a template
+    change that never gets rendered by a test can drift indefinitely."""
+    from app.models import Card
+
+    card = Card(
+        scryfall_id="b5c9649e-9ae5-4926-bf08-71ba23aa37f1",
+        name="Aberrant Researcher // Perfected Form",
+        set_code="soi",
+        collector_number="52",
+        type_line="Creature — Human Insect",
+        image_url="http://x/y.jpg",
+        layout="transform",
+    )
+    db.add(card)
+    db.commit()
+
+    page = client.get(f"/cards/{card.id}").text
+    assert "data-card-flip" in page
+    # The displayed image on this page is `large`, so the swap targets must be too.
+    assert "/large.jpg" in page and "/back/large.jpg" in page
+    assert "card-flip.js" in page, "the button is inert without its engine (#168)"
+
+
+def test_card_detail_shows_no_button_for_a_single_faced_card(client, db):
+    from app.models import Card
+
+    card = Card(
+        scryfall_id="00000000-0000-0000-0000-0000000000aa",
+        name="Elite Interceptor // Rejoinder",
+        set_code="tst",
+        collector_number="1",
+        type_line="Creature — Soldier // Instant",
+        image_url="http://x/y.jpg",
+        layout="prepare",  # carries " // " and has ONE image
+    )
+    db.add(card)
+    db.commit()
+
+    assert "data-card-flip" not in client.get(f"/cards/{card.id}").text

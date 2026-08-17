@@ -20,7 +20,25 @@
     <div class="card-detail-hero-grid">
       <div class="card-detail-art">
         {% if card.image_url %}
-          <img src="{{ mirror_image_url(card.scryfall_id, 'large') }}" {{ img_fallback(card.scryfall_id, 'large') }} alt="{{ card.name }}" loading="lazy" class="card-detail-art-img">
+          {# Same shrink-to-fit wrapper the grid tile uses, so the flip button
+             anchors to the ARTWORK rather than to the hero column. The image
+             here is `large` (not `normal`), so the button's data-* URLs are the
+             large ones — the script swaps exactly what it is handed. #}
+          <div class="card-thumb-wrap">
+            <img src="{{ mirror_image_url(card.scryfall_id, 'large') }}" {{ img_fallback(card.scryfall_id, 'large') }} alt="{{ card.name }}" loading="lazy" class="card-detail-art-img">
+            {% if has_back_face(card) %}
+              <button type="button"
+                      class="card-flip-btn"
+                      aria-label="Show the other side of {{ card.name }}"
+                      aria-pressed="false"
+                      data-card-flip
+                      data-front="{{ mirror_image_url(card.scryfall_id, 'large') }}"
+                      data-back="{{ mirror_image_url(card.scryfall_id, 'large', 'back') }}"
+                      data-front-alt="{{ scryfall_image_fallback(card.scryfall_id, 'large') }}"
+                      data-back-alt="{{ scryfall_image_fallback(card.scryfall_id, 'large', 'back') }}"
+                      title="Show the other side">⟳</button>
+            {% endif %}
+          </div>
         {% else %}
           <div class="card-detail-art-placeholder"></div>
         {% endif %}
@@ -348,4 +366,5 @@
   </section>
   {# Card hover zoom — shared #169 component. #}
   <script src="/static/card-hover.js?v={{ static_v('card-hover.js') }}"></script>
+  <script src="/static/card-flip.js?v={{ static_v('card-flip.js') }}"></script>
 {% endblock %}
