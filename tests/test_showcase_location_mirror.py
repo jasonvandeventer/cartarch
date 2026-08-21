@@ -327,3 +327,38 @@ def test_the_row_count_matches_what_the_mirror_contributes(db, user, showcase, b
 
     assert share_service.location_source_row_count(db, src) == 1
     assert len(share_service.resolve_showcase_rows(db, showcase.id)) == 1
+
+
+# --------------------------------------------------------------------------
+# The sort tiebreaker must survive a mirrored row (2026-08-21 prod 500).
+# --------------------------------------------------------------------------
+
+
+def test_a_curated_and_a_mirrored_copy_of_one_card_still_sort(db, user, showcase, box):
+    """A mirrored row has NO ShowcaseItem, so its item dict carries ``id: None``.
+
+    The sort tiebreaker is ``(name, id)``. Two rows of the SAME card — one
+    curated, one only mirrored — make Python compare ``None`` with an int, and
+    the page 500s. Reported 2026-08-21: mirroring a location broke
+    /showcase/{id} AND /showcases (which sorts every showcase), while a search
+    narrow enough to match one row still worked, because a one-element sort
+    never compares anything.
+
+    Owning two copies of a card and having curated one of them is ordinary.
+    """
+    card = _card(db, "Llanowar Elves")
+    curated_row = _row(db, user, card, box)
+    _row(db, user, card, box)
+    db.add(
+        ShowcaseItem(showcase_id=showcase.id, inventory_row_id=curated_row.id, quantity_offered=1)
+    )
+    db.add(ShowcaseLocationSource(showcase_id=showcase.id, storage_location_id=box.id))
+    db.commit()
+
+    data = share_service.get_showcase_with_items(db, user.id, showcase.id)
+    assert len(data["items"]) == 2
+
+    # The sanitized share projection sorts the same way — same crash, wider
+    # blast radius (every viewer of the share, not just the owner).
+    shared = share_service.build_share_display_items(db, showcase)
+    assert len(shared) == 2

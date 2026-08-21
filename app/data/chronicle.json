@@ -1,5 +1,15 @@
 [
   {
+    "version": "4.13.36",
+    "date": "2026-08-21",
+    "added": [],
+    "refined": [],
+    "resolved": [
+      "Mirroring a location into a showcase no longer breaks the showcase. If the showcase already held a card by hand and the mirrored box held another copy of that same card, both the showcase page and the showcases list stopped loading with an Internal Server Error. Searching still worked, which made it look intermittent — a search that matched a single card avoided the problem entirely. Nothing was lost: the mirror had saved correctly all along and the pages were only failing to draw it."
+    ],
+    "archivist_note": "Two copies of one card, added two different ways, and the page could not decide which came first. When two cards share a name our sorter falls back to the order they were added to the showcase — but a mirrored card is never added to anything, that being the point of a mirror, so it has no such number to compare. Basic lands made it certain: twenty-five Plains in the box, twenty-three of them picked by hand. The tell was that searching worked. A search narrow enough to leave one card standing sorts nothing, compares nothing, and so cannot fail — which reads as random until you notice it is the most reliable clue in the report."
+  },
+  {
     "version": "4.13.35",
     "date": "2026-08-20",
     "added": [],

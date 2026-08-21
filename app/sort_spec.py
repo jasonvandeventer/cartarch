@@ -234,7 +234,13 @@ def sort_showcase_items(items: list[dict], sort: str, direction: str) -> list[di
         primary,
         nulls_last,
         reverse=(direction == "desc"),
-        tiebreak=lambda it: ((it["card"].name or "").lower(), it["id"]),
+        # ``id`` is the ShowcaseItem id and is None for a MIRRORED row (#135 —
+        # membership computed, no ShowcaseItem to carry an id), so two rows of
+        # one card, one curated and one mirrored, compared None with an int and
+        # 500'd the page. `or 0` keeps the tiebreak total; mirrored rows tie with
+        # each other and the sort is stable, so the order still holds across
+        # requests and HTMX swaps.
+        tiebreak=lambda it: ((it["card"].name or "").lower(), it.get("id") or 0),
     )
 
 
