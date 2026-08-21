@@ -2516,6 +2516,34 @@ td {
   gap: 0.45rem;
   margin-top: 0.5rem;
 }
+
+/* A <select> has an intrinsic `min-width: auto`, so an .inline-form row with a
+   long deck/location/showcase name refuses to shrink and paints PAST the card
+   (.inventory-card is overflow: visible) — measured in Chromium at up to 132px
+   over, where the spilled half of the dropdown hit-tests to the NEXT card in
+   the grid, so clicking the control you can see does nothing. These three rules
+   were the cure and already existed, trapped inside @media (max-width: 768px),
+   which is why the spill vanished at phone widths and only bit desktop. They
+   apply at every width now; the mobile block no longer carries them. */
+.card-actions-body .inline-form {
+  width: 100%;
+  flex-wrap: wrap;
+}
+.card-actions-body .inline-form label {
+  flex: 1 0 100%; /* the label heads its own line, so its select and that
+                     select's button always wrap together, never apart. */
+}
+.card-actions-body .inline-form select,
+.card-actions-body .inline-form input[type="text"] {
+  flex: 0 1 auto; /* shrink, never GROW — flex-grow:1 stretched the select to
+                     the full row and pushed its button onto the next line,
+                     which is exactly the "no way to tell the dropdown is
+                     connected to that button" confusion issue #52 just fixed. */
+  min-width: 0;
+}
+.card-actions-body .inline-form button {
+  flex: 0 0 auto;
+}
 .card-actions-row {
   display: flex;
   flex-wrap: wrap;
@@ -6766,8 +6794,9 @@ table.dmtx .dmtx-rowhead {
      per row. Single-column rule for cards <768px stays in place.
    - .pending-action: form + select fill the row on mobile so the location
      picker isn't squeezed under the 72px thumb.
-   - .card-actions-body inline-forms: select/qty inputs use min-width:0 + flex
-     so the "Add to Deck" / "Move" dropdowns don't blow past 100% width.
+   - (the .card-actions-body inline-form rules that used to live here now apply
+     at EVERY width — see the block by .card-actions-body; the desktop spill
+     they cure is the reason they moved.)
    - .hero-row + .hero-stats-inline: stack vertically below 480px so the
      bracket badge and stats don't crowd the deck title on small phones.
    - Inline button-rows (deck hero, location hero, card_detail Actions) wrap
@@ -6786,18 +6815,6 @@ table.dmtx .dmtx-rowhead {
   .pending-action form {
     flex-direction: column;
     align-items: stretch;
-  }
-  .card-actions-body .inline-form {
-    width: 100%;
-    flex-wrap: wrap;
-  }
-  .card-actions-body .inline-form select,
-  .card-actions-body .inline-form input[type="text"] {
-    flex: 1 1 auto;
-    min-width: 0;
-  }
-  .card-actions-body .inline-form button {
-    flex: 0 0 auto;
   }
 }
 

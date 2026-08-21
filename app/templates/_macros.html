@@ -408,18 +408,26 @@ onerror="this.onerror=null; this.src='{{ scryfall_image_fallback(scryfall_id, si
               </form>
               {# issue #52 — in-place finish correction (Normal/Foil/Etched).
                  UPDATEs the row, preserving id + location + tags + deck links
-                 + history, instead of delete-and-readd. #}
+                 + history, instead of delete-and-readd.
+
+                 The CURRENT finish is deliberately NOT an option: it was the
+                 preselected default, so the commonest click submitted a no-op
+                 and the page came back unchanged — reported as "I click it and
+                 nothing happens" (Alex, 2026-08-20). A "change to" list has no
+                 no-op to submit, and the leading label is what says the
+                 dropdown belongs to the button beside it. #}
               <form action="/inventory/rows/{{ item.id }}/correct-finish"
                     method="post"
                     class="inline-form"
                     title="Correct this row's finish in place">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                <select name="finish">
-                  {% for f in finish_options %}
-                    <option value="{{ f }}" {% if item.finish == f %}selected{% endif %}>{{ f|capitalize }}</option>
+                <label for="finish-{{ item.id }}">Change finish to</label>
+                <select name="finish" id="finish-{{ item.id }}">
+                  {% for f in finish_options if f != item.finish %}
+                    <option value="{{ f }}">{{ f|capitalize }}</option>
                   {% endfor %}
                 </select>
-                <button type="submit">Fix Finish</button>
+                <button type="submit">Apply</button>
               </form>
               {# issue #77 — quantity split. Peels N copies into a new
                  independent row; the original keeps its id, placement, and

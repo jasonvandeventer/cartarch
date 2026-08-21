@@ -1,5 +1,16 @@
 [
   {
+    "version": "4.13.35",
+    "date": "2026-08-20",
+    "added": [],
+    "refined": [
+      "The finish corrector on a card's Actions panel now says what it does. It reads \"Change finish to\", and the dropdown beside it lists only the finishes you can change to — a foil card offers Normal and Etched, not Foil. Previously the dropdown opened on the finish the card already had, so the likeliest click asked for no change at all and the page came back looking untouched.",
+      "The dropdowns in that same panel no longer run off the side of the card. A deck, box or showcase with a long name pushed its dropdown past the card's edge, and the part that overhung was covered by the next card in the grid — so clicking the half you could plainly see did nothing at all. They now fit whatever the name's length, on a phone and on a wide monitor alike."
+    ],
+    "resolved": [],
+    "archivist_note": "Two ways for a button to look broken, reported an hour apart, with nothing in common but the panel they live in. The first was not broken at all: it did precisely what it was asked, which was nothing, because the menu beside it was already set to the answer the card had. A control whose commonest use is a no-op is a control that teaches people it is dead, so we removed the option to ask for nothing. The second was genuinely unclickable, and it hid for years behind a stylesheet rule that only applied to phones — the fix already existed in the file, addressed to the wrong screens. We measured it in a real browser at every width from a phone to a wide monitor rather than reading the stylesheet and reasoning about it, which is the only way that class of bug ever gets found."
+  },
+  {
     "version": "4.13.34",
     "date": "2026-08-17",
     "added": [

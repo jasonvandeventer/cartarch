@@ -187,3 +187,27 @@ def test_route_other_users_row_is_404(client, db, user):
         follow_redirects=False,
     )
     assert resp.status_code == 404
+
+
+def test_picker_offers_only_the_other_finishes(client, db, user):
+    """The picker is a "change to" list — the row's CURRENT finish is not an
+    option, so the default selection can never submit a no-op.
+
+    Reported 2026-08-20: "I click it and nothing happens." The button worked;
+    the preselected value was the finish the row already had. Drives the PAGE,
+    because the rule lives in a Jinja loop filter.
+    """
+    loc = StorageLocation(user_id=user.id, name="Binder", type="binder", mode="managed")
+    db.add(loc)
+    db.flush()
+    card = _card(db)
+    row = _row(db, user.id, card, finish="foil", storage_location_id=loc.id, is_pending=False)
+    db.commit()
+
+    page = client.get("/collection")
+    assert page.status_code == 200
+    form = page.text.split(f"/inventory/rows/{row.id}/correct-finish")[1].split("</form>")[0]
+    assert '<option value="normal"' in form
+    assert '<option value="etched"' in form
+    assert '<option value="foil"' not in form  # the row's own finish
+    assert "Change finish to" in form  # the label that ties select to button
