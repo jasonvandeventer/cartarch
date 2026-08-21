@@ -15,7 +15,10 @@ from __future__ import annotations
 import itertools
 import json
 import logging
+import os
+import threading
 
+import pytest
 from sqlalchemy.orm import sessionmaker
 
 from app import live_game_service
@@ -88,38 +91,53 @@ def test_every_applied_action_emits_a_record_with_the_required_fields(db_engine,
     assert not _warnings(caplog)
 
 
-def test_a_real_lost_update_is_flagged(db_engine, caplog):
-    """Two requests read version N and both write N+1; the second discarded the
-    first's mutation. That is the #153 hypothesis, and it must be visible in the
-    log without correlating two lines by hand."""
+def test_a_stale_reader_no_longer_loses_the_other_writers_change(db_engine):
+    """THE FIX (v4.14.1). This is the exact setup that used to lose a write.
+
+    Two sessions each hold the live row at version 1 — strong refs, because the
+    identity map is weak and an unreferenced instance would be silently re-read.
+    The second action is computed from a snapshot taken before the first
+    committed, which is precisely the production race: five of these were
+    recorded on 2026-08-16, every one a `life` tap.
+
+    ``apply_live_action`` now re-reads the row under a lock (``populate_existing``
+    on a ``with_for_update`` query), so the second writer applies -3 on top of the
+    committed -5 instead of on top of its own stale copy. 40 - 5 - 3 = 32; the bug
+    produced 37, having thrown the -5 away.
+    """
     _reset_state()
     Sess, (gid, uid, seats) = _setup(db_engine)
     a, b = Sess(), Sess()
-    # Strong refs: the identity map is a WeakValueDictionary, so an unreferenced
-    # instance is collected and the next query silently re-reads fresh rows.
     held = [s.query(GameLiveState).filter(GameLiveState.game_id == gid).first() for s in (a, b)]
-    assert [h.version for h in held] == [1, 1]
+    assert [h.version for h in held] == [1, 1], "both sessions must start from the same version"
 
+    apply_live_action(a, gid, uid, {"type": "life", "seat_id": seats[0], "delta": -5}, TABLE)
+    apply_live_action(b, gid, uid, {"type": "life", "seat_id": seats[0], "delta": -3}, TABLE)
+
+    chk = Sess()
+    assert json.loads(chk.get(Game, gid).live_state.state)["lives"][str(seats[0])] == 32
+    assert chk.get(Game, gid).live_state.version == 3, "both writes landed"
+    chk.close()
+    a.close()
+    b.close()
+
+
+def test_the_detector_still_reports_a_clobber_if_one_ever_happens(db_engine, caplog):
+    """The instrumentation outlives the fix until it has soaked, so it still has
+    to work. Driven at the recorder, because the write path can no longer produce
+    the condition — which is the point of the change above."""
+    _reset_state()
     with caplog.at_level(logging.INFO, logger="app.live_game_service"):
-        apply_live_action(a, gid, uid, {"type": "life", "seat_id": seats[0], "delta": -5}, TABLE)
-        apply_live_action(b, gid, uid, {"type": "life", "seat_id": seats[0], "delta": -3}, TABLE)
+        live_game_service._record_live_action(99, 1, "life", 1, 2, "start", 0.0, 1)
+        live_game_service._record_live_action(99, 2, "life", 1, 2, "start", 0.0, 1)
 
     recs = _records(caplog)
     assert len(recs) == 2
     assert "lost_update=False" in recs[0].getMessage()
     assert "lost_update=True" in recs[1].getMessage()
-
-    warns = _warnings(caplog)
-    assert len(warns) == 1
-    w = warns[0].getMessage()
-    assert "v_read=1" in w and "v_written=2" in w and "already_written=2" in w
-
-    # And the loss is real: only the second write's mutation survived.
-    chk = Sess()
-    assert json.loads(chk.get(Game, gid).live_state.state)["lives"][str(seats[0])] == 37
-    chk.close()
-    a.close()
-    b.close()
+    w = _warnings(caplog)
+    assert len(w) == 1
+    assert "v_read=1" in w[0].getMessage() and "already_written=2" in w[0].getMessage()
 
 
 def test_sequential_actions_are_never_flagged(db_engine, caplog):
@@ -186,3 +204,47 @@ def test_the_game_map_is_bounded(db_engine):
     assert 0 not in live_game_service._last_written_version
     assert (cap + 49) in live_game_service._last_written_version
     _reset_state()
+
+
+@pytest.mark.skipif(
+    not os.getenv("TEST_DATABASE_URL"),
+    reason="genuine concurrency needs Postgres — SQLite serialises writers itself, "
+    "so this can only be proven where prod actually runs",
+)
+def test_two_concurrent_writers_lose_nothing_on_postgres(db_engine):
+    """The lock, under real threads. A single-process stale-read test cannot see
+    this: it proves the re-read, not the serialisation.
+
+    Two threads tap the same seat 25 times each. Every tap is a read-mutate-write
+    of one JSON blob, so without ``FOR UPDATE`` the two transactions interleave
+    (READ COMMITTED lets both read the same version) and taps go missing — the
+    production signature. With it, the second writer waits, re-reads, and applies
+    on top: 40 - 50 = -10, and 50 version bumps.
+    """
+    Sess, (gid, uid, seats) = _setup(db_engine)
+    errors: list[Exception] = []
+
+    def tap(n):
+        s = Sess()
+        try:
+            for _ in range(n):
+                apply_live_action(
+                    s, gid, uid, {"type": "life", "seat_id": seats[0], "delta": -1}, TABLE
+                )
+        except Exception as exc:  # surfaced below — a thread's raise is invisible
+            errors.append(exc)
+        finally:
+            s.close()
+
+    threads = [threading.Thread(target=tap, args=(25,)) for _ in range(2)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join(timeout=60)
+
+    assert not errors, f"a writer failed: {errors[0]!r}"
+    chk = Sess()
+    live = chk.get(Game, gid).live_state
+    assert json.loads(live.state)["lives"][str(seats[0])] == -10, "a tap was lost"
+    assert live.version == 51, "every write must bump the version exactly once"
+    chk.close()

@@ -20,7 +20,7 @@ from sqlalchemy.orm import sessionmaker
 from app import live_game_service
 from app.game_analytics_service import check_life_consistency, scan_life_consistency
 from app.game_service import end_game
-from app.models import Game, GameLiveState, GameSeat, User
+from app.models import Game, GameSeat, User
 
 TABLE = "TABLETOK"
 _seq = itertools.count(1)
@@ -89,18 +89,23 @@ def test_clean_game_reconciles_on_all_three_artifacts(db):
 # ── the mechanism: a lost update writes an event whose mutation does not survive ─
 
 
-def _stale_write_pair(db_engine, delta_a, delta_b):
-    """Two concurrent requests that both READ the blob before either COMMITS.
+def _lost_write_shape(db_engine, delta_a, delta_b, seats=None):
+    """A game whose event stream records two mutations but whose blob kept only
+    the second — the historical shape this checker exists to find.
 
-    Models the interleaving `apply_live_action` permits: it json.loads the whole
-    blob, mutates, re-serialises and commits, with no optimistic locking (the
-    `version` bump is for SSE ordering, not conflict rejection). Each request gets
-    its own Session, so once both have loaded the GameLiveState row, the second to
-    commit writes a state derived from the PRE-first-commit snapshot — discarding
-    the first writer's mutation while its event row survives.
+    Until v4.14.1 this was produced by ACTUALLY racing two sessions: both read the
+    blob, the second wrote from its stale snapshot, and the first writer's change
+    was discarded. `apply_live_action` now takes a row lock and re-reads under it,
+    so that race can no longer be staged through the app — which is the point of
+    the fix, and is pinned in `test_live_action_overlap.py`.
 
-    Deterministic rather than threaded: holding a loaded, unexpired object in a
-    second Session's identity map reproduces the same stale read without a race.
+    So the divergence is now WRITTEN DIRECTLY: both actions are applied normally
+    (both events survive, as they always did — the event append shares the
+    mutation's transaction), then the blob is rolled back to the value it would
+    have had if A's write had been thrown away. The checker's input is prod rows
+    written before the fix; fabricating that input is more honest than keeping a
+    fixture that depends on a bug being present.
+
     Returns (game_id, seat_id, owner_id, baseline).
     """
     Sess = sessionmaker(bind=db_engine)
@@ -113,31 +118,26 @@ def _stale_write_pair(db_engine, delta_a, delta_b):
     setup.commit()
     setup.close()
 
-    a, b = Sess(), Sess()
-    # BOTH load the live row before either writes — the concurrent-request window.
-    # The `held` refs are load-bearing: SQLAlchemy's identity map is a
-    # WeakValueDictionary, so an unreferenced instance is garbage-collected and the
-    # next query silently re-reads fresh rows, dissolving the stale snapshot this
-    # test depends on. A real request holds its loaded objects for its duration.
-    held = [s.query(GameLiveState).filter(GameLiveState.game_id == gid).first() for s in (a, b)]
-    assert [json.loads(h.state)["lives"][str(sid)] for h in held] == [baseline, baseline]
-
+    s = Sess()
     live_game_service.apply_live_action(
-        a, gid, oid, {"type": "life", "seat_id": sid, "delta": delta_a}, TABLE
+        s, gid, oid, {"type": "life", "seat_id": sid, "delta": delta_a}, TABLE
     )
-    # b still holds its pre-A snapshot, so its write is computed from the old blob.
     live_game_service.apply_live_action(
-        b, gid, oid, {"type": "life", "seat_id": sid, "delta": delta_b}, TABLE
+        s, gid, oid, {"type": "life", "seat_id": sid, "delta": delta_b}, TABLE
     )
-    a.close()
-    b.close()
+    live = s.get(Game, gid).live_state
+    state = json.loads(live.state)
+    state["lives"][str(sid)] = baseline + delta_b  # as if A's mutation never landed
+    live.state = json.dumps(state)
+    s.commit()
+    s.close()
     return gid, sid, oid, baseline
 
 
 def test_concurrent_write_loses_a_mutation_while_keeping_its_event(db_engine):
     """The standing #153 hypothesis, reproduced: two events are recorded, only one
     mutation survives, so replay and blob disagree by exactly the lost delta."""
-    gid, sid, oid, baseline = _stale_write_pair(db_engine, -5, -3)
+    gid, sid, oid, baseline = _lost_write_shape(db_engine, -5, -3)
     Sess = sessionmaker(bind=db_engine)
     s = Sess()
     g = s.get(Game, gid)
@@ -158,7 +158,7 @@ def test_concurrent_write_loses_a_mutation_while_keeping_its_event(db_engine):
 def test_lost_life_GAIN_makes_replay_read_higher_than_the_blob(db_engine):
     """#153 records divergence in BOTH directions. A lost gain inverts the sign,
     so direction alone does not distinguish this mechanism from another."""
-    gid, sid, oid, baseline = _stale_write_pair(db_engine, +6, -2)
+    gid, sid, oid, baseline = _lost_write_shape(db_engine, +6, -2)
     Sess = sessionmaker(bind=db_engine)
     s = Sess()
     g = s.get(Game, gid)
@@ -185,20 +185,27 @@ def test_one_lost_write_can_diverge_several_seats_at_once(db_engine):
     setup.commit()
     setup.close()
 
-    a, b = Sess(), Sess()
-    # Strong refs — see the note in _stale_write_pair on the weak identity map.
-    held = [s.query(GameLiveState).filter(GameLiveState.game_id == gid).first() for s in (a, b)]
-    assert len(held) == 2
-    # A hits two different seats; B (stale) then clobbers the blob for both.
+    # A hits two different seats; the losing writer re-serialised the WHOLE blob,
+    # so BOTH of those seats revert while its own seat's change stands. Written
+    # directly for the reason given in _lost_write_shape — the app can no longer
+    # stage the race, and this is the shape of the rows already in prod.
+    s = Sess()
+    baselines = {}
     for seat_id in (ids[0], ids[1]):
+        baselines[seat_id] = json.loads(s.get(Game, gid).live_state.state)["lives"][str(seat_id)]
         live_game_service.apply_live_action(
-            a, gid, oid, {"type": "life", "seat_id": seat_id, "delta": -4}, TABLE
+            s, gid, oid, {"type": "life", "seat_id": seat_id, "delta": -4}, TABLE
         )
     live_game_service.apply_live_action(
-        b, gid, oid, {"type": "life", "seat_id": ids[2], "delta": -1}, TABLE
+        s, gid, oid, {"type": "life", "seat_id": ids[2], "delta": -1}, TABLE
     )
-    a.close()
-    b.close()
+    live = s.get(Game, gid).live_state
+    state = json.loads(live.state)
+    for seat_id, was in baselines.items():
+        state["lives"][str(seat_id)] = was
+    live.state = json.dumps(state)
+    s.commit()
+    s.close()
 
     s = Sess()
     g = s.get(Game, gid)
@@ -252,7 +259,7 @@ def test_game_without_events_is_not_judged(db):
 
 
 def test_scan_reports_only_judgeable_games_and_finds_the_diverged_one(db_engine):
-    gid, sid, oid, _baseline = _stale_write_pair(db_engine, -5, -3)
+    gid, sid, oid, _baseline = _lost_write_shape(db_engine, -5, -3)
     Sess = sessionmaker(bind=db_engine)
     s = Sess()
     g = s.get(Game, gid)

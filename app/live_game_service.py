@@ -1619,9 +1619,13 @@ def apply_live_action(
 
     Raises ``LookupError`` (→ 404) if the game/live-state is not viewable/absent,
     ``PermissionError`` (→ 403) on authorization failure, ``ValueError`` (→ 400)
-    on an invalid action. ponytail: last-write-wins on the blob — no optimistic
-    locking. Acceptable at a single physical table's write rate; the ``version``
-    bump is for SSE ordering + client staleness display, not conflict rejection.
+    on an invalid action.
+
+    Writers to one game's blob are SERIALISED by a row lock taken in the inner
+    function (see the comment there). The ``version`` bump remains what it always
+    was — SSE ordering and client staleness display, not conflict rejection: with
+    the lock, the second writer applies its change on top of the first rather
+    than being told to retry.
     """
     # #155 instrumentation — the clock starts here because the read that can go
     # stale (get_viewable_game → game.live_state) happens below, so this is the
@@ -1650,10 +1654,8 @@ def _apply_live_action_inner(
     game = get_viewable_game(session, game_id, user_id)
     if game is None:
         raise LookupError("Game not found or not viewable")
-    live = game.live_state
-    if live is None:
+    if game.live_state is None:
         raise LookupError("No live state for this game")
-    version_read = live.version
 
     atype = (action or {}).get("type")
     if atype not in _MUTATING_TYPES:
@@ -1665,6 +1667,33 @@ def _apply_live_action_inner(
 
     seats_by_id = {s.id: s for s in game.seats}
     _validate_action_seats(atype, action, seats_by_id)  # 400 on bad seat, table path included
+
+    # #155/#153 — TAKE THE ROW LOCK BEFORE READING THE BLOB, and re-read it under
+    # the lock. This is a read-mutate-write of one whole JSON document, so two
+    # overlapping requests used to read the same version, each apply their own
+    # change to their own copy, and the second commit would silently discard the
+    # first. Instrumentation caught five of those in production on 2026-08-16 —
+    # all `life` taps, all with `already_written == version_written`, which is
+    # that race observed directly rather than inferred.
+    #
+    # ``populate_existing()`` is load-bearing: the identity map already holds
+    # this row from ``get_viewable_game`` above, so without it SQLAlchemy hands
+    # back the STALE instance and the lock protects a value we never re-read.
+    #
+    # Serialising is the right shape here rather than optimistic retry: the
+    # contended window is one physical table's tap rate, and the measured
+    # handler runs 6–15 ms. SQLite ignores FOR UPDATE (it serialises writers
+    # anyway); Postgres is where this matters and where its test runs.
+    live = (
+        session.query(GameLiveState)
+        .filter(GameLiveState.game_id == game_id)
+        .with_for_update()
+        .populate_existing()
+        .one_or_none()
+    )
+    if live is None:
+        raise LookupError("No live state for this game")
+    version_read = live.version
 
     state = json.loads(live.state)
     has_table = bool(table_token) and table_token == game.client_token

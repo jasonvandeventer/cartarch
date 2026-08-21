@@ -1,5 +1,15 @@
 [
   {
+    "version": "4.14.1",
+    "date": "2026-08-21",
+    "added": [],
+    "refined": [],
+    "resolved": [
+      "Two people tapping the live game tracker at the same moment can no longer lose one of the taps. When two changes arrived within milliseconds of each other, each was worked out from the board as it stood before the other landed, and whichever finished second wrote its version over the top — so a life change could vanish while the game log still recorded it. That is why a finished game's Final standings and its analytics could disagree by a point or two. Changes to a game are now applied one at a time, so the second one builds on the first instead of replacing it."
+    ],
+    "archivist_note": "We have been chasing this one since July, and the honest position for most of that time was that we could not prove it. The code plainly allowed it, but two attempts to find it in the data came back empty, so rather than guess we added a recorder that watches for the exact fingerprint — one change writing over a version another had already written — and left it running. It caught five, at three different tables, all of them life totals, all during one evening's games. That turned a hypothesis into a measurement, and the fix is the ordinary one: hold the game while a change is being applied, so the next change reads what actually happened rather than what was true a moment ago. Games already finished are unaffected; the record of them is what it is."
+  },
+  {
     "version": "4.14.0",
     "date": "2026-08-21",
     "added": [
