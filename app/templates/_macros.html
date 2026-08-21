@@ -21,6 +21,20 @@
 {% macro img_fallback(scryfall_id, size="normal", face="front") -%}
 onerror="this.onerror=null; this.src='{{ scryfall_image_fallback(scryfall_id, size, face) }}'"
 {%- endmacro %}
+
+{# A grid thumb is ~140px wide and was ALWAYS fetching `normal` — 488x680,
+   152 KB, for a box a third that size. The mirror's sizes are measured, not
+   assumed: small 146x204 / 18 KB, normal 488x680 / 152 KB, large 672x936.
+
+   `srcset` + `sizes` lets the BROWSER pick per device-pixel-ratio: a 1x screen
+   needs ~140px and takes small (8.4x fewer bytes), a 2x screen needs ~280px and
+   still takes normal, so nothing gets softer on a retina display. `src` stays
+   `normal` for anything that ignores srcset, and img_fallback still covers a
+   mirror 404. Reported 2026-08-21: a shared showcase on the trade screen pulled
+   3,282 images / 40.9 MB and took 1.77 minutes to settle. #}
+{% macro thumb_srcset(scryfall_id, width="140px") -%}
+srcset="{{ mirror_image_url(scryfall_id, 'small') }} 146w, {{ mirror_image_url(scryfall_id) }} 488w" sizes="{{ width }}"
+{%- endmacro %}
 {% macro editorial_eyebrow(crumb) -%}
 <div class="eyebrow"><span class="ln" aria-hidden="true"></span><span>{{ crumb }}</span></div>
 {%- endmacro %}
@@ -224,6 +238,7 @@ onerror="this.onerror=null; this.src='{{ scryfall_image_fallback(scryfall_id, si
           <a href="/cards/{{ item.card.id }}">
             <img class="inventory-thumb"
                  src="{{ mirror_image_url(item.card.scryfall_id) }}"
+                 {{ thumb_srcset(item.card.scryfall_id, "138px") }}
                  {{ img_fallback(item.card.scryfall_id) }}
                  alt="{{ item.card.name }}"
                  loading="lazy">

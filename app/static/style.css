@@ -12957,7 +12957,12 @@ table.dmtx .dmtx-rowhead {
   color: var(--brand-gold);
 }
 .trade-pick-grid.is-visual {
-  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  /* 146px is the mirror's `small` width, and the thumb's `sizes` says so — a
+     stretched 1fr tile would push a 1x screen back onto the 152 KB `normal`.
+     More cards per row is the second win: less scrolling through a
+     several-thousand-card showcase. */
+  grid-template-columns: repeat(auto-fill, 146px);
+  justify-content: space-between;
 }
 .trade-pick-grid.is-visual .trade-pick-item {
   flex-direction: column;

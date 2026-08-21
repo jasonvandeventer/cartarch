@@ -1,4 +1,4 @@
-{% from "_macros.html" import editorial_eyebrow, img_fallback %}
+{% from "_macros.html" import editorial_eyebrow, img_fallback, thumb_srcset %}
 {% extends "base.html" %}
 
 {# Sort keys for the client-side picker sort. Values come from sort_spec /
@@ -32,9 +32,15 @@ data-card-info="{{ (card.set_code or '?')|upper }} #{{ card.collector_number or 
 {%- else %}<span class="muted">— no price</span>{% endif %}{% endif %}
 {%- endmacro %}
 
+{# The picker is the surface that reported this: a 4,472-card shared showcase
+   plus your own inventory is ~6,000 tiles, and every one of them was fetching a
+   488px 152 KB image into a ~150px box. srcset lets a 1x screen take the 18 KB
+   small instead; the visual tile is 146px CSS so `sizes` is the truth, not a
+   hint that happens to work. #}
 {% macro pick_thumb(card) -%}
 {% if card.image_url and card.scryfall_id %}
   <img class="trade-pick-thumb" src="{{ mirror_image_url(card.scryfall_id) }}"
+       {{ thumb_srcset(card.scryfall_id, "146px") }}
        {{ img_fallback(card.scryfall_id) }} alt="{{ card.name }}" loading="lazy">
 {% endif %}
 {%- endmacro %}
@@ -270,6 +276,13 @@ data-card-info="{{ (card.set_code or '?')|upper }} #{{ card.collector_number or 
     </form>
   {% endif %}
 
+  {# The picks you had made when a submit was REJECTED. The construction page
+     re-renders instead of redirecting, so the error never wipes the proposal;
+     the script below seeds its Maps from this blob. Data, not code — parsed
+     with JSON.parse, never executed. #}
+  {% if restore_picks %}
+    <script type="application/json" id="trade-restore">{{ restore_picks | tojson }}</script>
+  {% endif %}
   <script src="/static/list-filter.js?v={{ static_v('list-filter.js') }}"></script>
   <script>
     (function () {
@@ -282,6 +295,23 @@ data-card-info="{{ (card.set_code or '?')|upper }} #{{ card.collector_number or 
       if (!form) return;
       var offered = new Map(); // inventory_row_id -> {quantity}
       var requested = new Map(); // showcase_item_id -> {quantity}
+
+      // A rejected submit comes back as a re-render carrying the picks it was
+      // rejecting, so an error costs you the message and nothing else. A
+      // malformed blob must never break the picker — an empty selection is
+      // recoverable, a dead page is not.
+      var restoreEl = document.getElementById('trade-restore');
+      if (restoreEl) {
+        try {
+          var restore = JSON.parse(restoreEl.textContent || '{}');
+          (restore.offered || []).forEach(function (e) {
+            if (e && e.id) offered.set(e.id, { quantity: e.quantity || 1 });
+          });
+          (restore.requested || []).forEach(function (e) {
+            if (e && e.id) requested.set(e.id, { quantity: e.quantity || 1 });
+          });
+        } catch (err) { /* fall through with an empty selection */ }
+      }
 
       // Proxy notice: shown whenever any SELECTED item (either side) is a
       // proxy. Proxy pick items carry data-proxy="1" (ADR proxy-valuation).
@@ -369,15 +399,21 @@ data-card-info="{{ (card.set_code or '?')|upper }} #{{ card.collector_number or 
 
       // Click handlers: Add buttons on the requested + offered grids.
       document.querySelectorAll('#requested-grid .trade-pick-add').forEach(function (btn) {
-        btn.addEventListener('click', function () {
-          var id = parseInt(btn.getAttribute('data-showcase-item-id'), 10);
-          var available = parseInt(btn.getAttribute('data-available'), 10) || 1;
-          if (!id) return;
-          requested.set(id, { quantity: Math.min(1, available) });
+        var id = parseInt(btn.getAttribute('data-showcase-item-id'), 10);
+        var available = parseInt(btn.getAttribute('data-available'), 10) || 1;
+        if (!id) return;
+        function markAdded() {
           btn.disabled = true;
           btn.textContent = 'Added';
+        }
+        btn.addEventListener('click', function () {
+          requested.set(id, { quantity: Math.min(1, available) });
+          markAdded();
           updateProxyNotice();
         });
+        // A pick restored after a rejected submit — paint it as chosen, or the
+        // page offers to Add a card that is already in the proposal.
+        if (requested.has(id)) markAdded();
       });
       // Offered Add is a TOGGLE (unlike the requested side, which has its own
       // Remove buttons) — the wishlist entry prefills this side, so a card you

@@ -80,6 +80,45 @@ def trades_inbox(
     )
 
 
+def _construction_response(
+    request: Request,
+    current_user: User,
+    options: dict,
+    *,
+    pre_locked: bool = False,
+    pre_recipient=None,
+    pre_playgroup=None,
+    prefilled_requested: list | None = None,
+    prefilled_offered_row_ids: list[int] | None = None,
+    error: str | None = None,
+    restore_picks: dict | None = None,
+):
+    """ONE context for the construction page — three callers reach it.
+
+    The third is the POST's rejection path, which RE-RENDERS rather than
+    redirecting (#: "an error when creating a trade proposal should not wipe out
+    the trade"). A redirect to /trades/new dropped the recipient, the playgroup
+    and every pick, because the in-progress selection lives only in the page's
+    JS Maps. ``restore_picks`` hands those picks back to the page.
+    """
+    return render(
+        request,
+        "trade_new.html",
+        {
+            "title": "New trade",
+            "current_user": current_user,
+            "pre_locked": pre_locked,
+            "pre_recipient": pre_recipient,
+            "pre_playgroup": pre_playgroup,
+            "options": options,
+            "prefilled_requested": prefilled_requested or [],
+            "prefilled_offered_row_ids": prefilled_offered_row_ids or [],
+            "error": error,
+            "restore_picks": restore_picks,
+        },
+    )
+
+
 # ── Construction ────────────────────────────────────────────────
 
 
@@ -164,20 +203,15 @@ def trades_new_page(
                     pre_playgroup = cand["playgroup"]
                     break
         # Render with these options.
-        return render(
+        return _construction_response(
             request,
-            "trade_new.html",
-            {
-                "title": "New trade",
-                "current_user": current_user,
-                "pre_locked": False,
-                "pre_recipient": pre_recipient,
-                "pre_playgroup": pre_playgroup,
-                "options": opts,
-                "prefilled_requested": prefilled_requested,
-                "prefilled_offered_row_ids": prefilled_offered_row_ids,
-                "error": request.query_params.get("error"),
-            },
+            current_user,
+            opts,
+            pre_recipient=pre_recipient,
+            pre_playgroup=pre_playgroup,
+            prefilled_requested=prefilled_requested,
+            prefilled_offered_row_ids=prefilled_offered_row_ids,
+            error=request.query_params.get("error"),
         )
 
     options = trade_service.get_construction_options(
@@ -186,20 +220,16 @@ def trades_new_page(
         pre_recipient.id if pre_recipient else None,
         pre_playgroup.id if pre_playgroup else None,
     )
-    return render(
+    return _construction_response(
         request,
-        "trade_new.html",
-        {
-            "title": "New trade",
-            "current_user": current_user,
-            "pre_locked": pre_locked,
-            "pre_recipient": pre_recipient,
-            "pre_playgroup": pre_playgroup,
-            "options": options,
-            "prefilled_requested": prefilled_requested,
-            "prefilled_offered_row_ids": prefilled_offered_row_ids,
-            "error": request.query_params.get("error"),
-        },
+        current_user,
+        options,
+        pre_locked=pre_locked,
+        pre_recipient=pre_recipient,
+        pre_playgroup=pre_playgroup,
+        prefilled_requested=prefilled_requested,
+        prefilled_offered_row_ids=prefilled_offered_row_ids,
+        error=request.query_params.get("error"),
     )
 
 
@@ -225,9 +255,27 @@ def trades_create(
         offered = json.loads(offered_json or "[]")
         requested = json.loads(requested_json or "[]")
     except json.JSONDecodeError:
-        return RedirectResponse(url="/trades/new?error=invalid_submission", status_code=303)
+        return _reject_creation(
+            request,
+            session,
+            current_user,
+            recipient_user_id,
+            playgroup_id,
+            "invalid_submission",
+            [],
+            [],
+        )
     if not isinstance(offered, list) or not isinstance(requested, list):
-        return RedirectResponse(url="/trades/new?error=invalid_submission", status_code=303)
+        return _reject_creation(
+            request,
+            session,
+            current_user,
+            recipient_user_id,
+            playgroup_id,
+            "invalid_submission",
+            [],
+            [],
+        )
     try:
         trade = trade_service.create_trade(
             session,
@@ -240,11 +288,85 @@ def trades_create(
         )
     except ValueError as err:
         logger.info("create_trade validation error: %s", err)
-        return RedirectResponse(
-            url=f"/trades/new?error={_safe_error_code(str(err))}",
-            status_code=303,
+        return _reject_creation(
+            request,
+            session,
+            current_user,
+            recipient_user_id,
+            playgroup_id,
+            _safe_error_code(str(err)),
+            offered,
+            requested,
         )
     return RedirectResponse(url=f"/trades/{trade.id}?success=proposed", status_code=303)
+
+
+def _pick_ids(entries: list, key: str) -> list[dict]:
+    """Submitted picks → ``[{"id": int, "quantity": int}]``, junk dropped.
+
+    The payload is client-built and has already failed validation once, so
+    every entry is treated as hostile: a non-dict, a missing id or an
+    unparseable quantity is skipped rather than raising a SECOND error on the
+    page whose job is to show the FIRST one.
+    """
+    out = []
+    for e in entries if isinstance(entries, list) else []:
+        if not isinstance(e, dict):
+            continue
+        try:
+            item_id = int(e.get(key))
+            qty = int(e.get("quantity") or 1)
+        except (TypeError, ValueError):
+            continue
+        out.append({"id": item_id, "quantity": max(1, qty)})
+    return out
+
+
+def _reject_creation(
+    request: Request,
+    session: Session,
+    current_user: User,
+    recipient_user_id: int | None,
+    playgroup_id: int | None,
+    error: str,
+    offered: list,
+    requested: list,
+):
+    """Re-render the construction page with the error AND the picks intact.
+
+    Reported 2026-08-21: "an error when creating a trade proposal should not
+    wipe out the trade". It redirected to a bare /trades/new, and the selection
+    lives only in the page's JS Maps, so every pick — plus the recipient and
+    playgroup — was gone by the time the message was readable.
+
+    The picks are handed back as ``restore_picks``; the page seeds its Maps from
+    it at boot. NOTHING is trusted from the payload beyond ids and quantities,
+    and the ids only select among the options the server itself renders — an id
+    for a card that is not on the page simply restores nothing.
+    """
+    options = trade_service.get_construction_options(
+        session, current_user.id, recipient_user_id, playgroup_id
+    )
+    pre_recipient = None
+    pre_playgroup = None
+    for cand in options["recipients"]:
+        if cand["user"].id == recipient_user_id and cand["playgroup"].id == playgroup_id:
+            pre_recipient = cand["user"]
+            pre_playgroup = cand["playgroup"]
+            break
+    restore = {
+        "offered": _pick_ids(offered, "inventory_row_id"),
+        "requested": _pick_ids(requested, "showcase_item_id"),
+    }
+    return _construction_response(
+        request,
+        current_user,
+        options,
+        pre_recipient=pre_recipient,
+        pre_playgroup=pre_playgroup,
+        error=error,
+        restore_picks=restore,
+    )
 
 
 def _safe_error_code(message: str) -> str:

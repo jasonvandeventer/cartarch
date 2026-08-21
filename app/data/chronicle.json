@@ -1,5 +1,17 @@
 [
   {
+    "version": "4.13.37",
+    "date": "2026-08-21",
+    "added": [],
+    "refined": [
+      "A trade you are building survives its own error message. If a proposal was rejected — no cards on one side, a card that is no longer on offer — the page used to come back empty, so a small mistake cost you every card you had picked. The message now appears on the page you were already on, with your picks, your recipient and your playgroup exactly as you left them, ready to fix and send."
+    ],
+    "resolved": [
+      "The trade screen loads a large shared showcase far faster. Every card thumbnail was fetching a full-size image — eight times the file it needed for the size it is drawn at — so a several-thousand-card showcase pulled tens of megabytes. Thumbnails now come in the size they are shown at, and more of them fit per row. Higher-resolution screens still get the sharper image, so nothing looks worse than before."
+    ],
+    "archivist_note": "The picture in the report was a browser's own network log: 3,282 requests, 40.9 megabytes, one minute and forty-six seconds to settle. Card images come in three sizes and the page had always asked for the middle one, which is 488 pixels wide, to fill a box about 140 pixels wide — so roughly seven-eighths of everything downloaded was thrown away before it was drawn. The browser can pick the right one itself if you tell it what sizes exist and how big the box is, which is what it now does; on a high-resolution screen it still picks the larger file, because there the extra pixels are actually used. Worth saying plainly: the page still builds every card of a large showcase at once, and that is the next thing to change here."
+  },
+  {
     "version": "4.13.36",
     "date": "2026-08-21",
     "added": [],
