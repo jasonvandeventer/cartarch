@@ -34,7 +34,7 @@ from sqlalchemy.pool import StaticPool
 import app.legacy_tables  # noqa: F401 — registers deck_bracket_* for delete_deck cleanup
 from app import deck_service, inventory_service, share_service
 from app.db import Base
-from app.models import Card, InventoryRow, StorageLocation, User
+from app.models import Card, Deck, InventoryRow, StorageLocation, User
 
 _seq = itertools.count(1)
 
@@ -269,3 +269,69 @@ def test_add_showcase_item_rejects_brew_placeholder():
     showcase = share_service.get_or_create_showcase(s, u.id)
 
     assert share_service.add_showcase_item(s, u.id, placeholder.id, showcase.id) is None
+
+
+def test_a_brew_placeholder_is_not_offered_in_the_trade_picker(db):
+    """The trade picker listed cards that could not be traded (SaintWacko,
+    2026-08-21): ``create_trade`` has always REFUSED a brew placeholder, so
+    offering one was an error message waiting to happen — and until v4.13.37 it
+    also cost you every other pick on the page.
+
+    A real proxy in an ordinary deck is NOT a placeholder and stays offerable;
+    that distinction is the whole reason this uses the shared discriminator
+    rather than a local ``is_proxy`` check.
+    """
+    from app import trade_service
+    from app.models import Playgroup, PlaygroupMember, Share, Showcase, ShowcaseItem
+
+    owner = _user(db, "owner@x.com")
+    other = _user(db, "other@x.com")
+    pg = Playgroup(name="Pod", created_by=owner.id)
+    db.add(pg)
+    db.flush()
+    db.add_all(
+        [
+            PlaygroupMember(playgroup_id=pg.id, user_id=owner.id, role="owner"),
+            PlaygroupMember(playgroup_id=pg.id, user_id=other.id, role="member"),
+        ]
+    )
+
+    binder = _loc(db, owner.id, "Binder")
+    brew_loc = _loc(db, owner.id, "Brew", type_="deck")
+    db.add(Deck(user_id=owner.id, name="Brew", storage_location_id=brew_loc.id, is_brew=True))
+    plain_loc = _loc(db, owner.id, "Real deck", type_="deck")
+    db.add(Deck(user_id=owner.id, name="Real deck", storage_location_id=plain_loc.id))
+    db.flush()
+
+    real = _place(db, owner.id, _card(db, "Sol Ring"), binder.id)
+    placeholder = _place(db, owner.id, _card(db, "Mana Crypt"), brew_loc.id, proxy=True)
+    deck_proxy = _place(db, owner.id, _card(db, "Gaea's Cradle"), plain_loc.id, proxy=True)
+
+    # The recipient needs a shared showcase for the picker to resolve at all.
+    their_loc = _loc(db, other.id, "Theirs")
+    theirs = _place(db, other.id, _card(db, "Rhystic Study"), their_loc.id)
+    sc = Showcase(user_id=other.id, name="SC")
+    db.add(sc)
+    db.flush()
+    db.add(ShowcaseItem(showcase_id=sc.id, inventory_row_id=theirs.id, quantity_offered=1))
+    db.add(Share(user_id=other.id, showcase_id=sc.id, playgroup_id=pg.id))
+    db.commit()
+
+    opts = trade_service.get_construction_options(db, owner.id, other.id, pg.id)
+    offered_row_ids = {i["inventory_row_id"] for i in opts["proposer_inventory"]}
+
+    assert real.id in offered_row_ids
+    assert deck_proxy.id in offered_row_ids, "an ordinary deck's proxy is still tradeable"
+    assert placeholder.id not in offered_row_ids
+
+    # And the service still refuses it, so the two agree rather than one covering
+    # for the other.
+    with pytest.raises(ValueError, match="brew placeholder"):
+        trade_service.create_trade(
+            db,
+            proposer_user_id=owner.id,
+            recipient_user_id=other.id,
+            playgroup_id=pg.id,
+            offered=[{"inventory_row_id": placeholder.id, "quantity": 1}],
+            requested=[{"showcase_item_id": db.query(ShowcaseItem).first().id, "quantity": 1}],
+        )

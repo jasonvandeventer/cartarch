@@ -1297,6 +1297,15 @@ def get_construction_options(
                     )
                 break
 
+    # #140 — a brew placeholder is a card you do NOT own: an is_proxy row that
+    # exists only inside a brew deck, standing in for something you plan to buy.
+    # ``create_trade`` has always refused one, so listing them here offered cards
+    # that could not be traded and answered the attempt with an error (reported
+    # 2026-08-21). The ONE discriminator, same as the other enforcement points —
+    # never a hand-rolled is_proxy check, which would also drop the real proxies
+    # people legitimately trade.
+    from app.inventory_service import brew_placeholder_exclusion
+
     inv_q = (
         session.query(InventoryRow)
         .join(Card, InventoryRow.card_id == Card.id)
@@ -1304,6 +1313,7 @@ def get_construction_options(
             InventoryRow.user_id == proposer_user_id,
             InventoryRow.is_pending.is_(False),
             InventoryRow.quantity > 0,
+            brew_placeholder_exclusion(proposer_user_id),
         )
         .options(joinedload(InventoryRow.card), joinedload(InventoryRow.storage_location))
         .order_by(Card.name, InventoryRow.finish)

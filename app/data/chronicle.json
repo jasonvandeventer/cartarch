@@ -1,5 +1,15 @@
 [
   {
+    "version": "4.14.2",
+    "date": "2026-08-21",
+    "added": [],
+    "refined": [],
+    "resolved": [
+      "Placeholder cards no longer appear in the trade offer list. A brew deck's placeholders stand in for cards you do not own yet, and a trade has never been allowed to include one — but they were still listed among the cards you could pick, so choosing one only produced an error at the end. They are simply not offered now. Proxies you actually own, in an ordinary deck, are unaffected and remain tradeable."
+    ],
+    "archivist_note": "The rule was already right and already enforced; the list just had not been told. That is the recurring shape of this particular bug — a card that is deliberately invisible to the collection, the value totals and the showcases had one more list to be absent from, and each of those places asks the question separately. So the fix is the shared answer rather than a fresh test of whether something looks like a placeholder, because the difference between a placeholder and an ordinary proxy is exactly what a quick local check gets wrong, and people do trade proxies."
+  },
+  {
     "version": "4.14.1",
     "date": "2026-08-21",
     "added": [],
