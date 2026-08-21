@@ -1,5 +1,17 @@
 [
   {
+    "version": "4.14.0",
+    "date": "2026-08-21",
+    "added": [
+      "Trades can be negotiated. Either side can now open a trade, change what is on it and send it back as a counter-proposal — swap a card, adjust a quantity, drop something — and the other person sees exactly what changed, listed line by line, before accepting. Countering does not start a new trade: it stays the same trade, in the same place in both inboxes, and either of you can counter again as many times as it takes.",
+      "Declining a counter-proposal puts the trade back the way it was rather than ending it. The version that was turned down is kept, so the record shows what was asked for and refused, and the trade carries on from the point everyone last agreed on. Ending the trade outright is still there, and still separate.",
+      "A counter-proposal may leave one side empty — \"actually, just take it\" is a real trade. Opening a proposal still needs a card on each side."
+    ],
+    "refined": [],
+    "resolved": [],
+    "archivist_note": "The design question was not how to change a trade but what a trade IS once it can change. We settled on versions: a counter adds one, the trade keeps its identity, and nothing is overwritten — which makes both of the hard parts easy, because showing what changed is comparing two versions and putting it back is choosing the earlier one. The subtler problem was that the two of you do not see the same collection. The person who proposed picks from their own shelves; the person answering can only see what has been shared with the playgroup, and a proposal often includes a card its owner has not shared at all. So the answer keeps a handle on those cards without ever naming them, and can drop them or leave them, but cannot go looking for more. Whoever did not write the current version is the one who answers it, which on a trade nobody has countered is exactly the rule that was already there."
+  },
+  {
     "version": "4.13.37",
     "date": "2026-08-21",
     "added": [],

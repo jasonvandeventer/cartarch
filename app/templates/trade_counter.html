@@ -1,0 +1,241 @@
+{% from "_macros.html" import editorial_eyebrow, img_fallback, thumb_srcset %}
+{% extends "base.html" %}
+
+{# Counter-proposal editor.
+
+   Deliberately NOT trade_new.html with a mode flag: the sides mean the same
+   thing here but the AUTHOR names them differently (a countering recipient
+   cannot see the proposer's inventory rows), so every tile carries its own
+   identity key rather than the page implying one. That is the whole difference,
+   and it is why the picker here is a plain grid — the sort/hover/balance
+   machinery on the construction page belongs to a first proposal, where you are
+   choosing from everything you own rather than adjusting a handful of cards.
+
+   Filtering is the shared list-filter.js, so no rule is re-implemented. #}
+
+{% block content %}
+  {{ editorial_eyebrow("Trade") }}
+  <h2 class="page-title">Counter-proposal</h2>
+  <p class="muted">
+    Adjust either side and send it back to
+    <strong>{{ other_party.player_label if other_party else "them" }}</strong>.
+    They can accept it, decline it — which puts the trade back the way it is now —
+    or counter again.
+  </p>
+
+  {% if error %}
+    <section class="panel trades-flash trades-flash-error">
+      <p>
+        {% if error == 'invalid_submission' %}The submission was malformed.
+        {% elif error == 'a_counter-proposal_needs_at_least_one_card_on_one_side' %}A counter needs at least one card on one side.
+        {% elif error == 'that_counter-proposal_is_identical_to_the_current_trade' %}Nothing changed — adjust a card or a quantity before sending.
+        {% else %}{{ error | replace('_', ' ') }}
+        {% endif %}
+      </p>
+    </section>
+  {% endif %}
+
+  <form method="post" action="/trades/{{ trade.id }}/counter" id="counter-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <input type="hidden" name="offered_json" id="counter-offered-json" value="[]">
+    <input type="hidden" name="requested_json" id="counter-requested-json" value="[]">
+
+    <section class="panel">
+      <h3 class="panel-title">
+        {% if options.author_is_proposer %}Your cards (offered){% else %}Their cards (offered){% endif %}
+      </h3>
+      {% if not options.author_is_proposer %}
+        <p class="muted">
+          You can drop or reduce anything they offered. To ask for something else of
+          theirs, it has to be in the Showcase they've shared with this playgroup.
+        </p>
+      {% endif %}
+      <input type="search" class="trade-pick-namebox" placeholder="Filter by name…"
+             aria-label="Filter offered cards by name"
+             data-list-filter data-list-filter-target="#counter-offered .trade-pick-item">
+      <div class="trade-pick-grid" id="counter-offered">
+        {% if options.author_is_proposer %}
+          {% for inv in options.offered_rows %}
+            <div class="trade-pick-item" data-pick-kind="inventory_row_id"
+                 data-pick-id="{{ inv.inventory_row_id }}" data-available="{{ inv.quantity }}"
+                 data-filter-text="{{ inv.card.name }}">
+              {{ pick_body(inv.card, inv.finish, inv.quantity, inv.is_proxy) }}
+            </div>
+          {% endfor %}
+        {% else %}
+          {# The trade's OWN offered lines: the only handle a recipient has on a
+             card the proposer offered but does not publicly share. #}
+          {% for it in current_offered %}
+            <div class="trade-pick-item" data-pick-kind="trade_item_id"
+                 data-pick-id="{{ it.id }}" data-available="{{ it.quantity }}"
+                 data-filter-text="{{ it.card.name if it.card else 'card' }}">
+              {{ pick_body(it.card, it.finish, it.quantity, false) }}
+            </div>
+          {% endfor %}
+          {% for share_item in options.offered_share_items %}
+            <div class="trade-pick-item" data-pick-kind="showcase_item_id"
+                 data-pick-id="{{ share_item.showcase_item_id }}"
+                 data-available="{{ share_item.available }}"
+                 data-filter-text="{{ share_item.card.name }}">
+              {{ pick_body(share_item.card, share_item.finish, share_item.available, share_item.is_proxy) }}
+            </div>
+          {% endfor %}
+          {% if not current_offered and not options.offered_share_items %}
+            <p class="trades-empty">They haven't shared a Showcase with this playgroup, so there's nothing of theirs to add.</p>
+          {% endif %}
+        {% endif %}
+      </div>
+    </section>
+
+    <section class="panel">
+      <h3 class="panel-title">
+        {% if options.author_is_proposer %}Their cards (requested){% else %}Your cards (requested){% endif %}
+      </h3>
+      <input type="search" class="trade-pick-namebox" placeholder="Filter by name…"
+             aria-label="Filter requested cards by name"
+             data-list-filter data-list-filter-target="#counter-requested .trade-pick-item">
+      <div class="trade-pick-grid" id="counter-requested">
+        {% for share_item in options.requested_share_items %}
+          <div class="trade-pick-item" data-pick-kind="showcase_item_id"
+               data-pick-id="{{ share_item.showcase_item_id }}"
+               data-available="{{ share_item.available }}"
+               data-filter-text="{{ share_item.card.name }}">
+            {{ pick_body(share_item.card, share_item.finish, share_item.available, share_item.is_proxy) }}
+          </div>
+        {% endfor %}
+        {% if not options.requested_share_items %}
+          <p class="trades-empty">Nothing is available in that Showcase right now.</p>
+        {% endif %}
+      </div>
+    </section>
+
+    <section class="panel">
+      <h3 class="panel-title">Note (optional)</h3>
+      <textarea name="note" rows="3"
+                placeholder="Why the change — 'swapped the Sol Ring, mine's the foil'."></textarea>
+    </section>
+
+    <section class="panel">
+      <div class="trade-new-submit">
+        <button type="submit" class="btn-like">Send counter-proposal</button>
+        <a class="btn-like-secondary" href="/trades/{{ trade.id }}">Cancel</a>
+      </div>
+    </section>
+  </form>
+
+  {# The trade as it stands, so the editor opens on it rather than on nothing.
+     Same restore mechanism the construction page uses for a rejected submit. #}
+  <script type="application/json" id="counter-restore">{{ restore_picks | tojson }}</script>
+  <script src="/static/list-filter.js?v={{ static_v('list-filter.js') }}"></script>
+  <script>
+    (function () {
+      // Selection lives in one Map keyed "<kind>:<id>", because the offered grid
+      // mixes three id spaces (inventory rows, showcase items, and this trade's
+      // own lines) that would otherwise collide on a bare integer.
+      var form = document.getElementById('counter-form');
+      if (!form) return;
+      var picked = new Map();
+
+      function keyOf(el) {
+        return el.getAttribute('data-pick-kind') + ':' + el.getAttribute('data-pick-id');
+      }
+      function paint(el) {
+        var k = keyOf(el);
+        var on = picked.has(k);
+        el.classList.toggle('is-picked', on);
+        var btn = el.querySelector('.js-pick-toggle');
+        if (btn) btn.textContent = on ? 'Remove' : 'Add';
+        var qty = el.querySelector('.js-pick-qty');
+        if (qty) {
+          qty.hidden = !on;
+          if (on) qty.value = picked.get(k).quantity;
+        }
+      }
+      function serializeGrid(gridId) {
+        var out = [];
+        document.querySelectorAll('#' + gridId + ' .trade-pick-item').forEach(function (el) {
+          var k = keyOf(el);
+          if (!picked.has(k)) return;
+          var entry = { quantity: picked.get(k).quantity };
+          entry[el.getAttribute('data-pick-kind')] = parseInt(el.getAttribute('data-pick-id'), 10);
+          out.push(entry);
+        });
+        return out;
+      }
+
+      // Restore: the current trade on a fresh open, or the picks that were just
+      // rejected. Both arrive in the same shape — one mechanism, not two.
+      var restoreEl = document.getElementById('counter-restore');
+      var restore = { offered: [], requested: [] };
+      try { restore = JSON.parse(restoreEl.textContent || '{}'); } catch (err) { /* empty */ }
+      // Scoped per grid: a showcase item id can appear on BOTH sides (their
+      // showcase supplies one, yours the other), so an unscoped lookup would
+      // restore a pick onto the wrong half of the trade.
+      [['offered', 'counter-offered'], ['requested', 'counter-requested']].forEach(function (pair) {
+        (restore[pair[0]] || []).forEach(function (e) {
+          if (!e) return;
+          ['inventory_row_id', 'showcase_item_id', 'trade_item_id'].forEach(function (kind) {
+            if (!e[kind]) return;
+            var el = document.querySelector(
+              '#' + pair[1] + ' .trade-pick-item[data-pick-kind="' + kind +
+              '"][data-pick-id="' + e[kind] + '"]');
+            if (el) picked.set(keyOf(el), { quantity: e.quantity || 1 });
+          });
+        });
+      });
+
+      document.querySelectorAll('.trade-pick-item').forEach(function (el) {
+        var available = parseInt(el.getAttribute('data-available'), 10) || 1;
+        var btn = el.querySelector('.js-pick-toggle');
+        if (btn) {
+          btn.addEventListener('click', function () {
+            var k = keyOf(el);
+            if (picked.has(k)) picked.delete(k);
+            else picked.set(k, { quantity: Math.min(1, available) });
+            paint(el);
+          });
+        }
+        var qty = el.querySelector('.js-pick-qty');
+        if (qty) {
+          qty.addEventListener('change', function () {
+            var k = keyOf(el);
+            var v = Math.max(1, Math.min(available, parseInt(qty.value, 10) || 1));
+            qty.value = v;
+            if (picked.has(k)) picked.set(k, { quantity: v });
+          });
+        }
+        paint(el);
+      });
+
+      form.addEventListener('submit', function () {
+        document.getElementById('counter-offered-json').value =
+          JSON.stringify(serializeGrid('counter-offered'));
+        document.getElementById('counter-requested-json').value =
+          JSON.stringify(serializeGrid('counter-requested'));
+      });
+    })();
+  </script>
+{% endblock %}
+
+{% macro pick_body(card, finish, available, is_proxy) -%}
+  <div class="trade-pick-card">
+    {% if card and card.image_url and card.scryfall_id %}
+      <img class="trade-pick-thumb" src="{{ mirror_image_url(card.scryfall_id) }}"
+           {{ thumb_srcset(card.scryfall_id, "146px") }}
+           {{ img_fallback(card.scryfall_id) }} alt="{{ card.name }}" loading="lazy">
+    {% endif %}
+    <div class="trade-pick-name">
+      {{ card.name if card else "Unknown card" }}
+      {% if is_proxy %}<span class="proxy-badge proxy-badge-warn" title="Proxy — carries no market value">PROXY</span>{% endif %}
+    </div>
+    <div class="trade-pick-meta">
+      {% if card %}{{ (card.set_code or '?') | upper }} #{{ card.collector_number or '?' }} &middot; {% endif %}
+      {{ (finish or 'normal') | capitalize }} &middot; up to {{ available }}
+    </div>
+  </div>
+  <div class="trade-pick-controls">
+    <button type="button" class="btn-like js-pick-toggle">Add</button>
+    <input type="number" class="js-pick-qty" min="1" max="{{ available }}" value="1"
+           aria-label="Quantity" hidden>
+  </div>
+{%- endmacro %}

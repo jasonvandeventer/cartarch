@@ -387,6 +387,177 @@ def _safe_error_code(message: str) -> str:
     )
 
 
+# ── Counter-proposals ───────────────────────────────────────────
+
+
+@router.get("/{trade_id}/counter")
+def trade_counter_page(
+    trade_id: int,
+    request: Request,
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+):
+    """The counter editor: the construction picker, seeded with the trade as it
+    currently stands, for either party.
+
+    Non-parties get the same non-leaky redirect a non-party gets everywhere else
+    — never a 403, which would confirm the trade exists.
+    """
+    detail = trade_service.get_trade_detail(session, current_user.id, trade_id)
+    if detail is None:
+        return RedirectResponse(url="/trades?error=trade_unavailable", status_code=303)
+    trade = detail["trade"]
+    if trade.status != "proposed":
+        return RedirectResponse(url=f"/trades/{trade_id}?error=trade_is_closed", status_code=303)
+
+    opts = trade_service.counter_options(session, trade, current_user.id)
+    return _counter_response(request, current_user, trade, opts, session)
+
+
+@router.post("/{trade_id}/counter")
+def trade_counter_submit(
+    trade_id: int,
+    request: Request,
+    offered_json: str = Form("[]"),
+    requested_json: str = Form("[]"),
+    note: str = Form(""),
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+    _: None = CsrfRequired,
+):
+    detail = trade_service.get_trade_detail(session, current_user.id, trade_id)
+    if detail is None:
+        return RedirectResponse(url="/trades?error=trade_unavailable", status_code=303)
+    trade = detail["trade"]
+    try:
+        offered = json.loads(offered_json or "[]")
+        requested = json.loads(requested_json or "[]")
+    except json.JSONDecodeError:
+        offered, requested = [], []
+        return _reject_counter(request, session, current_user, trade, "invalid_submission", [], [])
+    if not isinstance(offered, list) or not isinstance(requested, list):
+        return _reject_counter(request, session, current_user, trade, "invalid_submission", [], [])
+    try:
+        trade_service.counter_trade(
+            session,
+            trade_id=trade_id,
+            author_user_id=current_user.id,
+            offered=offered,
+            requested=requested,
+            note=note,
+        )
+    except ValueError as err:
+        logger.info("counter_trade validation error: %s", err)
+        return _reject_counter(
+            request,
+            session,
+            current_user,
+            trade,
+            _safe_error_code(str(err)),
+            offered,
+            requested,
+        )
+    return RedirectResponse(url=f"/trades/{trade_id}?success=countered", status_code=303)
+
+
+@router.post("/{trade_id}/decline-counter")
+def trade_decline_counter(
+    trade_id: int,
+    request: Request,
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+    _: None = CsrfRequired,
+):
+    """Reject the open counter — the trade goes back to what it was before it."""
+    try:
+        trade_service.decline_counter(session, trade_id, current_user.id)
+    except ValueError as err:
+        logger.info("decline_counter error: %s", err)
+        return RedirectResponse(
+            url=f"/trades/{trade_id}?error={_safe_error_code(str(err))}", status_code=303
+        )
+    return RedirectResponse(url=f"/trades/{trade_id}?success=counter_declined", status_code=303)
+
+
+def _counter_response(
+    request: Request,
+    current_user: User,
+    trade,
+    opts: dict,
+    session: Session,
+    *,
+    error: str | None = None,
+    restore_picks: dict | None = None,
+):
+    """ONE context for the counter editor — the GET and the rejection path both
+    land here, for the same reason /trades/new has a single builder: two
+    hand-assembled contexts for one template drift."""
+    other = trade.recipient if current_user.id == trade.proposer_user_id else trade.proposer
+    if restore_picks is None:
+        restore_picks = trade_service.current_picks_for_restore(trade, opts["author_is_proposer"])
+    return render(
+        request,
+        "trade_counter.html",
+        {
+            "title": "Counter-proposal",
+            "current_user": current_user,
+            "trade": trade,
+            "other_party": other,
+            "options": opts,
+            "current_offered": trade_service._items_by_side(trade, "offered"),
+            "restore_picks": restore_picks,
+            "error": error,
+        },
+    )
+
+
+def _sanitize_picks(entries: list) -> list[dict]:
+    """Submitted counter picks, reduced to the three identity keys the resolver
+    understands plus a quantity. A pick names itself — the editor lists the
+    proposer's inventory, the proposer's shared showcase and the trade's own
+    lines in one grid, and those id spaces would collide if the key were
+    implied by position rather than carried.
+
+    Anything else is dropped: the payload has already failed validation once.
+    """
+    keys = ("inventory_row_id", "showcase_item_id", "trade_item_id")
+    out = []
+    for e in entries if isinstance(entries, list) else []:
+        if not isinstance(e, dict):
+            continue
+        key = next((k for k in keys if e.get(k)), None)
+        if key is None:
+            continue
+        try:
+            item_id = int(e[key])
+            qty = max(1, int(e.get("quantity") or 1))
+        except (TypeError, ValueError):
+            continue
+        out.append({key: item_id, "quantity": qty})
+    return out
+
+
+def _reject_counter(
+    request: Request,
+    session: Session,
+    current_user: User,
+    trade,
+    error: str,
+    offered: list,
+    requested: list,
+):
+    """Same rule as a rejected proposal: show the message on the page that has
+    the work, never a redirect that throws the picks away."""
+    opts = trade_service.counter_options(session, trade, current_user.id)
+    restore = {
+        "offered": _sanitize_picks(offered),
+        "requested": _sanitize_picks(requested),
+    }
+    return _counter_response(
+        request, current_user, trade, opts, session, error=error, restore_picks=restore
+    )
+
+
 # ── Detail + transitions ────────────────────────────────────────
 
 
@@ -414,6 +585,16 @@ def trades_detail(
             "has_proxy": detail["has_proxy"],
             "viewer_is_proposer": detail["viewer_is_proposer"],
             "viewer_is_recipient": detail["viewer_is_recipient"],
+            # Counter-proposals. The template enumerates its context key by key
+            # (failure mode 1), so every one of these needs its line here.
+            "revision_count": len(detail["trade"].revisions),
+            "current_revision": trade_service.current_revision(detail["trade"]),
+            "revision_diff": trade_service.trade_revision_diff(detail["trade"]),
+            "viewer_authored_current": (
+                trade_service.current_revision(detail["trade"]) is not None
+                and trade_service.current_revision(detail["trade"]).author_user_id
+                == current_user.id
+            ),
             "error": request.query_params.get("error"),
             "success": request.query_params.get("success"),
         },

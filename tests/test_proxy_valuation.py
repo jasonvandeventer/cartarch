@@ -25,6 +25,7 @@ from app.models import (
     ShowcaseItem,
     Trade,
     TradeItem,
+    TradeRevision,
 )
 
 _seq = itertools.count(1)
@@ -117,9 +118,13 @@ def test_proxy_contributes_zero_to_both_trade_side_totals():
     t = Trade(proposer_user_id=1, recipient_user_id=2, status="proposed")
     s.add(t)
     s.flush()
+    rev = TradeRevision(trade_id=t.id)
+    s.add(rev)
+    s.flush()
     s.add(
         TradeItem(
             trade_id=t.id,
+            revision_id=rev.id,
             side="offered",
             inventory_row_id=off_proxy.id,
             card_id=off_proxy.card_id,
@@ -130,6 +135,7 @@ def test_proxy_contributes_zero_to_both_trade_side_totals():
     s.add(
         TradeItem(
             trade_id=t.id,
+            revision_id=rev.id,
             side="offered",
             inventory_row_id=off_real.id,
             card_id=off_real.card_id,
@@ -140,6 +146,7 @@ def test_proxy_contributes_zero_to_both_trade_side_totals():
     s.add(
         TradeItem(
             trade_id=t.id,
+            revision_id=rev.id,
             side="requested",
             inventory_row_id=req_proxy.id,
             card_id=req_proxy.card_id,

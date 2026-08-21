@@ -21,6 +21,7 @@ from app.models import (
     StorageLocation,
     Trade,
     TradeItem,
+    TradeRevision,
     User,
 )
 from app.routes.collections import _delete_blast_radius, _is_unfiltered
@@ -172,8 +173,12 @@ def test_bulk_delete_cleans_references_fk_on(fk_db):
     t = Trade(proposer_user_id=u.id, recipient_user_id=other.id, status="proposed")
     s.add(t)
     s.flush()
+    rev = TradeRevision(trade_id=t.id)
+    s.add(rev)
+    s.flush()
     ti = TradeItem(
         trade_id=t.id,
+        revision_id=rev.id,
         side="offered",
         inventory_row_id=row.id,
         card_id=row.card_id,

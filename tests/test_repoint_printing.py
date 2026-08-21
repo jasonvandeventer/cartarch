@@ -93,7 +93,14 @@ def test_row_identity_and_references_survive(db, user, monkeypatch, row_referenc
     )
     row_id, created = row.id, row.created_at
     sc = ShowcaseItem(showcase_id=refs.showcase.id, inventory_row_id=row.id, quantity_offered=1)
-    tr = TradeItem(trade_id=1, side="offer", inventory_row_id=row.id, quantity=1, finish="normal")
+    tr = TradeItem(
+        trade_id=refs.trade.id,
+        revision_id=refs.trade_revision.id,
+        side="offer",
+        inventory_row_id=row.id,
+        quantity=1,
+        finish="normal",
+    )
     dcs = DeckCardShare(
         inventory_row_id=row.id,
         source_deck_id=refs.source_deck.id,

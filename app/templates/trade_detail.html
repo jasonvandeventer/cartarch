@@ -126,7 +126,62 @@
     </section>
   {% endif %}
 
+  {# Counter-proposals: what the CURRENT version changed, and who answers it.
+     Rendered only when there is more than one version — an unchanged trade has
+     nothing to diff and a panel saying so is noise. #}
+  {% if revision_count > 1 and revision_diff.has_diff %}
+    <section class="panel trade-diff-panel">
+      <h3 class="panel-title">
+        Counter-proposal from
+        {{ revision_diff.author.player_label if revision_diff.author else "the other party" }}
+      </h3>
+      {% if current_revision and current_revision.note %}
+        <p><em>{{ current_revision.note }}</em></p>
+      {% endif %}
+      {% for side, label in [('offered', proposer_label ~ ' offers'),
+                             ('requested', proposer_label ~ ' requests')] %}
+        {% set rows = revision_diff[side] | selectattr('change', 'ne', 'unchanged') | list %}
+        {% if rows %}
+          <h4 class="trade-diff-side">{{ label }}</h4>
+          <ul class="trade-diff-list">
+            {% for row in rows %}
+              <li class="trade-diff-{{ row.change }}">
+                {% if row.change == 'added' %}<span class="trade-diff-mark">+</span>
+                {% elif row.change == 'removed' %}<span class="trade-diff-mark">&minus;</span>
+                {% else %}<span class="trade-diff-mark">&plusmn;</span>{% endif %}
+                {{ row.item.card.name if row.item.card else row.item.card_name_at_trade or "card" }}
+                {% if row.change == 'quantity' %}
+                  &mdash; {{ row.was_quantity }} &rarr; {{ row.item.quantity }}
+                {% elif row.item.quantity > 1 %}
+                  &times;{{ row.item.quantity }}
+                {% endif %}
+              </li>
+            {% endfor %}
+          </ul>
+        {% endif %}
+      {% endfor %}
+    </section>
+  {% endif %}
+
   {% if trade.status == 'proposed' %}
+    {% if revision_count > 1 and not viewer_authored_current %}
+      <section class="panel trade-actions-panel">
+        <h3 class="panel-title">This counter-proposal</h3>
+        <p class="muted">
+          Declining the changes puts the trade back to how it was before this
+          counter — it does not end the trade.
+        </p>
+        <form method="post" action="/trades/{{ trade.id }}/decline-counter" class="inline-form">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <button type="submit" class="btn-danger-small">Decline the changes</button>
+        </form>
+      </section>
+    {% endif %}
+    <section class="panel trade-actions-panel">
+      <h3 class="panel-title">Counter</h3>
+      <p class="muted">Change either side and send it back for them to accept.</p>
+      <a class="btn-like" href="/trades/{{ trade.id }}/counter">Build a counter-proposal</a>
+    </section>
     {% if viewer_is_recipient %}
       <section class="panel trade-actions-panel">
         <h3 class="panel-title">Accept or decline</h3>

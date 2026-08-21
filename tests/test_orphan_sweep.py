@@ -19,6 +19,7 @@ from app.models import (
     StorageLocation,
     Trade,
     TradeItem,
+    TradeRevision,
     User,
 )
 from scripts.sweep_fk_orphans import find_orphans, sweep_fk_orphans
@@ -57,8 +58,12 @@ def test_sweep_remediates_and_is_idempotent(no_fk_db):
     t = Trade(proposer_user_id=u.id, recipient_user_id=other.id, status="proposed")
     s.add(t)
     s.flush()
+    rev = TradeRevision(trade_id=t.id)
+    s.add(rev)
+    s.flush()
     ti = TradeItem(
         trade_id=t.id,
+        revision_id=rev.id,
         side="offered",
         inventory_row_id=row.id,
         card_id=c.id,

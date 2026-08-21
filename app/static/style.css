@@ -12860,6 +12860,74 @@ table.dmtx .dmtx-rowhead {
   background: var(--brand-gold-soft);
   border-color: var(--brand-gold);
 }
+
+/* Counter-proposal editor. A picked tile reuses the prefilled highlight rather
+   than inventing a second "this one is selected" colour; the grid there is
+   always the card-thumb layout, since you are adjusting a handful of cards
+   rather than scanning a whole collection. */
+.trade-pick-item.is-picked {
+  background: var(--brand-gold-soft);
+  border-color: var(--brand-gold);
+}
+#counter-offered,
+#counter-requested {
+  grid-template-columns: repeat(auto-fill, 146px);
+  justify-content: space-between;
+  margin-top: 0.6rem;
+}
+#counter-offered .trade-pick-item,
+#counter-requested .trade-pick-item {
+  flex-direction: column;
+  align-items: stretch;
+}
+#counter-offered .trade-pick-thumb,
+#counter-requested .trade-pick-thumb {
+  display: block;
+  width: 100%;
+  aspect-ratio: 5 / 7;
+  object-fit: cover;
+  margin-bottom: 0.4rem;
+  border-radius: 4.75% / 3.5%;
+}
+.js-pick-qty {
+  width: 100%;
+  margin-top: 0.35rem;
+}
+
+/* The diff panel: what the current counter changed. Colour carries the same
+   meaning it does in a diff anywhere else, and the mark carries it again for
+   anyone who cannot see the colour. */
+.trade-diff-side {
+  margin: 0.8rem 0 0.3rem;
+  font-size: 0.95rem;
+  color: var(--muted);
+}
+.trade-diff-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+.trade-diff-mark {
+  display: inline-block;
+  width: 1.1em;
+  font-weight: 700;
+}
+.trade-diff-added .trade-diff-mark {
+  color: var(--success, #6bbf59);
+}
+.trade-diff-removed .trade-diff-mark {
+  color: var(--danger, #d97070);
+}
+.trade-diff-removed {
+  text-decoration: line-through;
+  color: var(--muted);
+}
+.trade-diff-quantity .trade-diff-mark {
+  color: var(--brand-gold);
+}
 .trade-pick-card {
   flex: 1 1 auto;
   min-width: 0;

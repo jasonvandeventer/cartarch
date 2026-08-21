@@ -1904,9 +1904,62 @@ class Trade(Base):
     items: Mapped[list[TradeItem]] = relationship(
         back_populates="trade", cascade="all, delete-orphan"
     )
+    # Counter-proposals (#): every trade has at least ONE revision, written by
+    # create_trade, so "the current items" has one definition from day one
+    # rather than a null-revision special case bolted on later.
+    revisions: Mapped[list[TradeRevision]] = relationship(
+        back_populates="trade", cascade="all, delete-orphan", order_by="TradeRevision.id"
+    )
     proposer: Mapped[User | None] = relationship(foreign_keys=[proposer_user_id])
     recipient: Mapped[User | None] = relationship(foreign_keys=[recipient_user_id])
     playgroup: Mapped[Playgroup | None] = relationship()
+
+
+class TradeRevision(Base):
+    """One version of a Trade's item sets — the counter-proposal unit (#).
+
+    **A counter does not mutate the trade; it appends a revision.** The Trade
+    keeps its id, its status and its place in both inboxes, and the items of
+    every version are still on disk, which is what makes two things cheap that
+    are otherwise expensive: showing a diff, and "decline it and the trade
+    returns to its original state".
+
+    ``declined_at`` is how a rejected counter steps back: the revision stays
+    (it is history, and the diff that was rejected is worth keeping) but stops
+    being current, so the previous revision takes over again. Deleting it would
+    make "current = the last row" simpler and the record poorer.
+
+    The author is either party — both may counter, and neither is limited to
+    one (owner decision, 2026-08-21).
+    """
+
+    __tablename__ = "trade_revisions"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    trade_id: Mapped[int] = mapped_column(
+        ForeignKey("trades.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    # Who issued this version. Revision 1's author is always the proposer.
+    # NOT a SET NULL: the account-deletion path abandons a party's pending
+    # trades before the user row goes, so a live revision cannot outlive its
+    # author (``author_name_at_revision`` carries the name into the record).
+    author_user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    author_name_at_revision: Mapped[str | None] = mapped_column(Text, nullable=True)
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utc_now, nullable=False)
+    # Set when this counter is rejected; the previous revision becomes current
+    # again. NULL on every revision that has not been rejected, including
+    # superseded ones — "current" is the LAST non-declined revision.
+    declined_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
+
+    trade: Mapped[Trade] = relationship(back_populates="revisions")
+    author: Mapped[User | None] = relationship(foreign_keys=[author_user_id])
+    # The relationship is what tells SQLAlchemy that trade_items depends on
+    # trade_revisions, so a session.delete(trade) empties the items BEFORE the
+    # revisions they point at rather than tripping the FK.
+    items: Mapped[list[TradeItem]] = relationship(back_populates="revision")
 
 
 class TradeItem(Base):
@@ -1947,6 +2000,15 @@ class TradeItem(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     trade_id: Mapped[int] = mapped_column(ForeignKey("trades.id"), nullable=False, index=True)
+    # Which revision of the trade this line belongs to (counter-proposals).
+    # NOT NULL: an item with no revision could never be shown or hidden
+    # correctly, and every existing row was backfilled onto revision 1.
+    # CASCADE, because a revision's items have no meaning without it — a
+    # declined counter is marked declined, never deleted, so this cascade only
+    # fires when the whole trade goes.
+    revision_id: Mapped[int] = mapped_column(
+        ForeignKey("trade_revisions.id", ondelete="CASCADE"), nullable=False, index=True
+    )
     # Service-layer canonical enum (CANONICAL_TRADE_ITEM_SIDES). Indexed
     # for the composite (trade_id, side) per-side render query.
     side: Mapped[str] = mapped_column(String(16), nullable=False, index=True)
@@ -1985,6 +2047,7 @@ class TradeItem(Base):
     quantity_at_trade: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     trade: Mapped[Trade] = relationship(back_populates="items")
+    revision: Mapped[TradeRevision] = relationship(back_populates="items")
     inventory_row: Mapped[InventoryRow | None] = relationship()
     card: Mapped[Card | None] = relationship()
     showcase_item: Mapped[ShowcaseItem | None] = relationship()

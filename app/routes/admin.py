@@ -20,6 +20,7 @@ from app.models import (
     StorageLocation,
     TokenInventory,
     Trade,
+    TradeRevision,
     TransactionLog,
     User,
     VariantGroup,
@@ -425,6 +426,16 @@ def delete_user(
     )
     session.query(Trade).filter(Trade.recipient_user_id == user_id).update(
         {Trade.recipient_user_id: None},
+        synchronize_session=False,
+    )
+    # Counter-proposals — the same SET-NULL discipline for revision authorship
+    # on surviving (terminal) trades. The DB FK says SET NULL, but SQLite runs
+    # foreign keys OFF, so the application does it explicitly or the reference
+    # dangles; the parent-delete harness caught exactly that. The revision's
+    # ``author_name_at_revision`` is what keeps "who proposed this version" in
+    # the record, the same trade the *_at_trade columns make one table over.
+    session.query(TradeRevision).filter(TradeRevision.author_user_id == user_id).update(
+        {TradeRevision.author_user_id: None},
         synchronize_session=False,
     )
     # v3.27.12 — watchlist rows are per-user with no historical retention

@@ -44,7 +44,6 @@ _ALLOWED_UNRENDERED = {
     # token_new), which route smoke now renders.
     "drawers.html": "index is gated on user_has_drawers; smoke pins the 403 instead",
     "playgroup_join.html": "join-by-code page",
-    "trade_detail.html": "one trade; needs a seeded trade fixture",
     "token_detail.html": "one token",
     "token_bulk_add.html": "token bulk add form",
     "set_detail.html": "per-set page",

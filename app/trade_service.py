@@ -88,6 +88,7 @@ from app.models import (
     StorageLocation,
     Trade,
     TradeItem,
+    TradeRevision,
     User,
 )
 from app.pricing import effective_price
@@ -140,8 +141,50 @@ def _user_display(user: User | None) -> str | None:
     return name or None
 
 
-def _items_by_side(trade: Trade, side: str) -> list[TradeItem]:
-    return [item for item in trade.items if item.side == side]
+def current_revision(trade: Trade) -> TradeRevision | None:
+    """THE definition of "which version of this trade is live".
+
+    The LAST revision that has not been declined. A declined counter stays on
+    disk (it is the record of what was rejected) but stops being current, which
+    is how "decline it and the trade returns to its original state" is a lookup
+    rather than a replay.
+    """
+    live = [r for r in trade.revisions if r.declined_at is None]
+    return live[-1] if live else None
+
+
+def _current_author_id(trade: Trade) -> int | None:
+    """Who issued the version now on the table. Falls back to the proposer when
+    the revision's author row is gone (account deletion NULLs it) — the trade
+    still has to be answerable by somebody."""
+    rev = current_revision(trade)
+    if rev is None or rev.author_user_id is None:
+        return trade.proposer_user_id
+    return rev.author_user_id
+
+
+def previous_revision(trade: Trade) -> TradeRevision | None:
+    """The revision the trade would fall back to if the current one were
+    declined — the one before it, skipping revisions already declined."""
+    live = [r for r in trade.revisions if r.declined_at is None]
+    return live[-2] if len(live) > 1 else None
+
+
+def _items_by_side(
+    trade: Trade, side: str, revision: TradeRevision | None = None
+) -> list[TradeItem]:
+    """Items on one side of ONE revision — by default the current one.
+
+    Every render path goes through here, so scoping it is what keeps a superseded
+    version out of the detail page, the totals and the terminal snapshot.
+    """
+    rev = revision if revision is not None else current_revision(trade)
+    if rev is None:
+        # A trade written before counter-proposals existed cannot occur (the
+        # migration backfilled revision 1), but a half-built object in a test
+        # can — fall back to every item rather than rendering nothing.
+        return [item for item in trade.items if item.side == side]
+    return [item for item in trade.items if item.side == side and item.revision_id == rev.id]
 
 
 def _share_visible_to_recipient_playgroup(
@@ -200,7 +243,14 @@ def write_trade_terminal_snapshot(session: Session, trade: Trade) -> None:
     # resolvable; fall back to existing values for already-snapshotted
     # fields (defensive — if the inventory was deleted before the
     # cleanup hook ran, we still want to capture whatever we can).
-    for item in trade.items:
+    # ONLY the current revision (counter-proposals). A countered trade holds
+    # every version's items, and snapshotting all of them would freeze a record
+    # of a trade nobody agreed to — two Sol Rings where one was traded.
+    rev = current_revision(trade)
+    snapshot_items = (
+        [i for i in trade.items if i.revision_id == rev.id] if rev is not None else trade.items
+    )
+    for item in snapshot_items:
         inv = item.inventory_row
         card = item.card
         if inv is not None and card is None:
@@ -256,75 +306,170 @@ def create_trade(
 
     Returns the persisted ``Trade`` in ``proposed`` status.
     """
-    # Lazy import to avoid module-load cycle (see module docstring).
-    from app import playgroup_service
-
-    if proposer_user_id == recipient_user_id:
-        raise ValueError("Proposer and recipient must be different users.")
-
-    # Membership checks for both parties.
-    proposer_membership = playgroup_service.require_membership(
-        session, proposer_user_id, playgroup_id, min_role="member"
-    )
-    if proposer_membership is None:
-        raise ValueError("Proposer is not a member of that playgroup.")
-    recipient_membership = playgroup_service.require_membership(
-        session, recipient_user_id, playgroup_id, min_role="member"
-    )
-    if recipient_membership is None:
-        raise ValueError("Recipient is not a member of that playgroup.")
-
-    # Recipient must have an active Share targeting this playgroup —
-    # otherwise there are no requested items the proposer can pick from.
-    recipient_share = (
-        session.query(Share)
-        .filter(
-            Share.user_id == recipient_user_id,
-            Share.playgroup_id == playgroup_id,
-        )
-        .first()
-    )
-    if recipient_share is None:
-        raise ValueError("Recipient has not shared a Showcase with that playgroup.")
+    _require_trade_context(session, proposer_user_id, recipient_user_id, playgroup_id)
 
     if not offered:
         raise ValueError("At least one offered item is required.")
     if not requested:
         raise ValueError("At least one requested item is required.")
 
+    resolved_offered = _resolve_offered_items(session, proposer_user_id, playgroup_id, offered)
+    resolved_requested = _resolve_requested_items(
+        session, recipient_user_id, playgroup_id, requested
+    )
+
+    now = utc_now()
+    note = (proposer_note or "").strip() or None
+    trade = Trade(
+        proposer_user_id=proposer_user_id,
+        recipient_user_id=recipient_user_id,
+        playgroup_id=playgroup_id,
+        status="proposed",
+        proposer_note=note,
+        created_at=now,
+        updated_at=now,
+    )
+    # Revision 1 — written for EVERY trade, so "the current items" needs no
+    # null-revision branch anywhere downstream.
+    proposer = session.query(User).filter(User.id == proposer_user_id).first()
+    revision = TradeRevision(
+        author_user_id=proposer_user_id,
+        author_name_at_revision=proposer.player_label if proposer else None,
+        created_at=now,
+    )
+    trade.revisions.append(revision)
+    for item in resolved_offered + resolved_requested:
+        item.revision = revision
+        trade.items.append(item)
+    session.add(trade)
+    session.commit()
+    session.refresh(trade)
+    return trade
+
+
+def _require_trade_context(
+    session: Session,
+    proposer_user_id: int,
+    recipient_user_id: int,
+    playgroup_id: int,
+) -> None:
+    """The preconditions BOTH a proposal and a counter share: two different
+    users, both members, and the recipient sharing a Showcase to the playgroup
+    (without it there is nothing for the requested side to point at).
+
+    Extracted rather than copied — a counter that validated its context
+    differently from a proposal is exactly how a rule grows a second, wrong
+    implementation."""
+    # Lazy import to avoid module-load cycle (see module docstring).
+    from app import playgroup_service
+
+    if proposer_user_id == recipient_user_id:
+        raise ValueError("Proposer and recipient must be different users.")
+
+    if (
+        playgroup_service.require_membership(
+            session, proposer_user_id, playgroup_id, min_role="member"
+        )
+        is None
+    ):
+        raise ValueError("Proposer is not a member of that playgroup.")
+    if (
+        playgroup_service.require_membership(
+            session, recipient_user_id, playgroup_id, min_role="member"
+        )
+        is None
+    ):
+        raise ValueError("Recipient is not a member of that playgroup.")
+
+    recipient_share = (
+        session.query(Share)
+        .filter(Share.user_id == recipient_user_id, Share.playgroup_id == playgroup_id)
+        .first()
+    )
+    if recipient_share is None:
+        raise ValueError("Recipient has not shared a Showcase with that playgroup.")
+
     proposer = session.query(User).filter(User.id == proposer_user_id).first()
     recipient = session.query(User).filter(User.id == recipient_user_id).first()
     if proposer is None or recipient is None:
         raise ValueError("Proposer or recipient not found.")
 
-    # Resolve + validate every item before persisting any.
-    resolved_offered: list[TradeItem] = []
-    resolved_requested: list[TradeItem] = []
 
+def _resolve_offered_items(
+    session: Session,
+    proposer_user_id: int,
+    playgroup_id: int,
+    offered: list[dict],
+    current_offered: dict[int, TradeItem] | None = None,
+) -> list[TradeItem]:
+    """The OFFERED side is always the proposer's cards, whoever is authoring.
+
+    THREE ways to name the same card, because the two parties see the proposer's
+    collection differently:
+
+    * ``inventory_row_id`` — the proposer picking from their own inventory.
+    * ``showcase_item_id`` — a countering RECIPIENT adding something the
+      proposer has SHARED with this playgroup. Refused unless that Showcase
+      really is shared here: a counter must never reach into inventory its
+      author cannot see.
+    * ``trade_item_id`` — a line ALREADY on the trade's current revision, which
+      is how a countering recipient keeps an offered card they can't otherwise
+      name. Without it, re-sending the offered side would silently drop every
+      card the proposer offered but does not publicly share.
+    """
+    from app.inventory_service import is_brew_placeholder_row
+
+    resolved: list[TradeItem] = []
     for raw in offered:
+        inv = None
         inv_row_id = int(raw.get("inventory_row_id") or 0)
-        if inv_row_id <= 0:
-            raise ValueError("Offered item missing inventory_row_id.")
-        inv = (
-            session.query(InventoryRow)
-            .filter(
-                InventoryRow.id == inv_row_id,
-                InventoryRow.user_id == proposer_user_id,
+        showcase_item_id = int(raw.get("showcase_item_id") or 0)
+        trade_item_id = int(raw.get("trade_item_id") or 0)
+        if trade_item_id > 0 and current_offered is not None:
+            existing = current_offered.get(trade_item_id)
+            if existing is None:
+                raise ValueError("Offered item is not part of this trade.")
+            inv = existing.inventory_row
+            if inv is None or inv.user_id != proposer_user_id:
+                raise ValueError("An offered card is no longer available.")
+        elif inv_row_id > 0:
+            inv = (
+                session.query(InventoryRow)
+                .filter(
+                    InventoryRow.id == inv_row_id,
+                    InventoryRow.user_id == proposer_user_id,
+                )
+                .first()
             )
-            .first()
-        )
-        if inv is None:
-            raise ValueError("Offered item references a card you don't own.")
+            if inv is None:
+                raise ValueError("Offered item references a card you don't own.")
+        elif showcase_item_id > 0:
+            # A countering recipient picks the proposer's cards out of the
+            # proposer's OWN shared Showcase — same C2 check as the requested
+            # side, pointed the other way.
+            showcase_item = (
+                session.query(ShowcaseItem).filter(ShowcaseItem.id == showcase_item_id).first()
+            )
+            if showcase_item is None or not _share_visible_to_recipient_playgroup(
+                session, showcase_item, proposer_user_id, playgroup_id
+            ):
+                raise ValueError(
+                    "Offered item is not in their Showcase shared with this playgroup."
+                )
+            inv = showcase_item.inventory_row
+            if inv is None or inv.user_id != proposer_user_id:
+                raise ValueError("Offered item's source row is unavailable.")
+        else:
+            raise ValueError("Offered item missing inventory_row_id.")
+
         # #140 — a brew placeholder is an unowned proxy that exists only in its
         # deck; it can't be offered in a trade.
-        from app.inventory_service import is_brew_placeholder_row
-
         if is_brew_placeholder_row(session, inv):
             raise ValueError("You can't offer a brew placeholder in a trade.")
         qty = max(1, int(raw.get("quantity") or 1))
         if qty > inv.quantity:
             raise ValueError(f"Offered quantity {qty} exceeds your held quantity ({inv.quantity}).")
-        resolved_offered.append(
+        resolved.append(
             TradeItem(
                 side="offered",
                 inventory_row_id=inv.id,
@@ -334,7 +479,20 @@ def create_trade(
                 quantity=qty,
             )
         )
+    return resolved
 
+
+def _resolve_requested_items(
+    session: Session,
+    recipient_user_id: int,
+    playgroup_id: int,
+    requested: list[dict],
+) -> list[TradeItem]:
+    """The REQUESTED side is always the recipient's cards, and always comes from
+    their Showcase shared with this playgroup (decision C2) — unchanged by
+    counter-proposals, including when the recipient is the one countering and
+    adding their own cards to it."""
+    resolved: list[TradeItem] = []
     for raw in requested:
         showcase_item_id = int(raw.get("showcase_item_id") or 0)
         if showcase_item_id <= 0:
@@ -363,7 +521,7 @@ def create_trade(
             raise ValueError("Requested item has no available quantity.")
         if qty > available:
             qty = available
-        resolved_requested.append(
+        resolved.append(
             TradeItem(
                 side="requested",
                 inventory_row_id=inv.id,
@@ -373,24 +531,170 @@ def create_trade(
                 quantity=qty,
             )
         )
+    return resolved
 
-    now = utc_now()
-    note = (proposer_note or "").strip() or None
-    trade = Trade(
-        proposer_user_id=proposer_user_id,
-        recipient_user_id=recipient_user_id,
-        playgroup_id=playgroup_id,
-        status="proposed",
-        proposer_note=note,
-        created_at=now,
-        updated_at=now,
+
+# ── Counter-proposals ───────────────────────────────────────────
+
+
+def counter_trade(
+    session: Session,
+    trade_id: int,
+    author_user_id: int,
+    offered: list[dict],
+    requested: list[dict],
+    note: str | None = None,
+) -> Trade:
+    """Issue a counter-proposal: a NEW revision of both sides, by either party.
+
+    The trade keeps its id, its status and its place in both inboxes — only
+    which revision is current changes. Nothing about the previous version is
+    destroyed, which is what makes the diff and the fall-back cheap.
+
+    Rules (owner decisions, 2026-08-21):
+
+    * **Either party may counter, without limit.** A counter answers a counter;
+      the revision list is the negotiation.
+    * **A side may be EMPTY on a counter** — "actually, just take it" is a real
+      trade — while an opening proposal still requires both (decision A6 holds
+      where it was made, so the wishlist flow's no-one-sided-gift rule is
+      untouched).
+    * **Only a live trade can be countered.** A terminal one is the record.
+    * **Countering something identical is refused** — an empty diff would put a
+      "they countered" badge on an unchanged trade.
+
+    Sides keep their meaning regardless of who authors: OFFERED is always the
+    proposer's cards, REQUESTED always the recipient's. What changes is how the
+    author names them — see ``_resolve_offered_items``.
+    """
+    trade = session.query(Trade).filter(Trade.id == trade_id).first()
+    if trade is None:
+        raise ValueError("Trade not found.")
+    if author_user_id not in (trade.proposer_user_id, trade.recipient_user_id):
+        raise ValueError("Only a party to the trade can counter it.")
+    if trade.status != "proposed":
+        raise ValueError(f"A {trade.status} trade can no longer be countered.")
+
+    _require_trade_context(
+        session, trade.proposer_user_id, trade.recipient_user_id, trade.playgroup_id
     )
+    current_offered = {it.id: it for it in _items_by_side(trade, "offered")}
+    resolved_offered = _resolve_offered_items(
+        session, trade.proposer_user_id, trade.playgroup_id, offered, current_offered
+    )
+    resolved_requested = _resolve_requested_items(
+        session, trade.recipient_user_id, trade.playgroup_id, requested
+    )
+    if not resolved_offered and not resolved_requested:
+        raise ValueError("A counter-proposal needs at least one card on one side.")
+    if not _differs_from_current(trade, resolved_offered + resolved_requested):
+        raise ValueError("That counter-proposal is identical to the current trade.")
+
+    author = session.query(User).filter(User.id == author_user_id).first()
+    now = utc_now()
+    revision = TradeRevision(
+        author_user_id=author_user_id,
+        author_name_at_revision=author.player_label if author else None,
+        note=(note or "").strip() or None,
+        created_at=now,
+    )
+    trade.revisions.append(revision)
     for item in resolved_offered + resolved_requested:
+        item.revision = revision
         trade.items.append(item)
-    session.add(trade)
+    trade.updated_at = now
     session.commit()
     session.refresh(trade)
     return trade
+
+
+def _item_signature(items: list[TradeItem]) -> set[tuple]:
+    """Comparable identity for a set of trade items — side, row, printing,
+    finish and quantity. Used to refuse a counter that changes nothing, and to
+    build the diff."""
+    return {(it.side, it.inventory_row_id, it.card_id, it.finish, it.quantity) for it in items}
+
+
+def _differs_from_current(trade: Trade, proposed: list[TradeItem]) -> bool:
+    rev = current_revision(trade)
+    if rev is None:
+        return True
+    live = [it for it in trade.items if it.revision_id == rev.id]
+    return _item_signature(live) != _item_signature(proposed)
+
+
+def decline_counter(session: Session, trade_id: int, actor_user_id: int) -> Trade:
+    """Reject the current counter — the trade returns to its previous state.
+
+    The declined revision is KEPT and marked, so the record still shows what was
+    proposed and refused; the previous revision simply becomes current again.
+
+    **Only the party who did NOT write it may decline it** (declining your own
+    counter is a withdrawal, and would need to be called that), and revision 1
+    can never be declined — there is nothing behind it, and rejecting the
+    ORIGINAL proposal is what ``transition_trade(..., "declined")`` is for.
+    """
+    trade = session.query(Trade).filter(Trade.id == trade_id).first()
+    if trade is None:
+        raise ValueError("Trade not found.")
+    if actor_user_id not in (trade.proposer_user_id, trade.recipient_user_id):
+        raise ValueError("Only a party to the trade can decline a counter-proposal.")
+    if trade.status != "proposed":
+        raise ValueError(f"A {trade.status} trade can no longer be changed.")
+    rev = current_revision(trade)
+    if rev is None or previous_revision(trade) is None:
+        raise ValueError("There is no counter-proposal to decline.")
+    if rev.author_user_id == actor_user_id:
+        raise ValueError("You can't decline your own counter-proposal.")
+
+    now = utc_now()
+    rev.declined_at = now
+    trade.updated_at = now
+    session.commit()
+    session.refresh(trade)
+    return trade
+
+
+def trade_revision_diff(trade: Trade) -> dict:
+    """What the current revision changed, against the one before it.
+
+    Returns ``{"has_diff", "author", "offered": [...], "requested": [...]}``
+    where each entry is ``{"item", "change"}`` and change is ``added`` /
+    ``removed`` / ``quantity`` / ``unchanged``. A removed entry carries the
+    PREVIOUS revision's item, since that is the only copy of it.
+
+    Matching is on the inventory row plus printing and finish, NOT the item id —
+    every revision writes fresh TradeItem rows, so ids never match across two of
+    them and an id-based diff would report every line as both added and removed.
+    """
+    rev = current_revision(trade)
+    prev = previous_revision(trade)
+    if rev is None or prev is None:
+        return {"has_diff": False, "author": None, "offered": [], "requested": []}
+
+    def key(it: TradeItem) -> tuple:
+        return (it.inventory_row_id, it.card_id, it.finish)
+
+    out: dict = {"has_diff": False, "author": rev.author, "offered": [], "requested": []}
+    for side in ("offered", "requested"):
+        now_items = {key(i): i for i in trade.items if i.revision_id == rev.id and i.side == side}
+        was_items = {key(i): i for i in trade.items if i.revision_id == prev.id and i.side == side}
+        rows = []
+        for k, item in now_items.items():
+            was = was_items.get(k)
+            if was is None:
+                rows.append({"item": item, "change": "added", "was_quantity": None})
+            elif was.quantity != item.quantity:
+                rows.append({"item": item, "change": "quantity", "was_quantity": was.quantity})
+            else:
+                rows.append({"item": item, "change": "unchanged", "was_quantity": None})
+        for k, was in was_items.items():
+            if k not in now_items:
+                rows.append({"item": was, "change": "removed", "was_quantity": was.quantity})
+        out[side] = rows
+        if any(r["change"] != "unchanged" for r in rows):
+            out["has_diff"] = True
+    return out
 
 
 # ── State-machine transition ────────────────────────────────────
@@ -445,12 +749,20 @@ def transition_trade(
         # System-only — user code paths must not hit this branch.
         raise ValueError("Abandonment is system-only; use a cleanup helper.")
 
-    # Actor gating.
+    # Actor gating. Counter-proposals generalise the rule without changing it
+    # for a trade nobody has countered: **the party who did NOT write the
+    # current version answers it, and the one who DID may withdraw it.** On
+    # revision 1 the author is the proposer, so this reduces exactly to
+    # "recipient accepts or declines, proposer cancels".
+    author_id = _current_author_id(trade)
+    responder_id = (
+        trade.recipient_user_id if author_id == trade.proposer_user_id else trade.proposer_user_id
+    )
     if new_status in ("accepted", "declined"):
-        if actor_user_id != trade.recipient_user_id:
+        if actor_user_id != responder_id:
             raise ValueError("Only the recipient can accept or decline this trade.")
     elif new_status == "cancelled":
-        if actor_user_id != trade.proposer_user_id:
+        if actor_user_id != author_id:
             raise ValueError("Only the proposer can cancel this trade.")
 
     # Optional recipient note (only meaningful on recipient-side
@@ -1036,6 +1348,76 @@ def get_construction_options(
         "recipient_share_items": recipient_share_items,
         "proposer_inventory": proposer_inventory,
     }
+
+
+def counter_options(session: Session, trade: Trade, author_user_id: int) -> dict:
+    """The two pick lists for a counter, oriented for whoever is authoring it.
+
+    **Sides never swap.** OFFERED is the proposer's cards and REQUESTED the
+    recipient's, whichever party is editing — otherwise "they offered" would
+    mean something different on each screen. What changes is where the author's
+    options come from:
+
+    * OFFERED — the proposer picks from their own inventory (row ids). A
+      countering RECIPIENT can only see what the proposer has SHARED with this
+      playgroup (showcase item ids), and gets an empty list if they share
+      nothing: they can still drop or reduce what was offered, just not reach
+      into inventory they cannot see.
+    * REQUESTED — always the recipient's Showcase shared with this playgroup
+      (decision C2), which the recipient can also pick from when countering,
+      since it is their own.
+
+    Returns ``{"offered_rows", "offered_share_items", "requested_share_items",
+    "author_is_proposer"}``.
+    """
+    author_is_proposer = author_user_id == trade.proposer_user_id
+    forward = get_construction_options(
+        session, trade.proposer_user_id, trade.recipient_user_id, trade.playgroup_id
+    )
+    offered_rows: list[dict] = []
+    offered_share_items: list[dict] = []
+    if author_is_proposer:
+        offered_rows = forward["proposer_inventory"]
+    else:
+        reverse = get_construction_options(
+            session, trade.recipient_user_id, trade.proposer_user_id, trade.playgroup_id
+        )
+        offered_share_items = reverse["recipient_share_items"]
+    return {
+        "offered_rows": offered_rows,
+        "offered_share_items": offered_share_items,
+        "requested_share_items": forward["recipient_share_items"],
+        "author_is_proposer": author_is_proposer,
+    }
+
+
+def current_picks_for_restore(trade: Trade, author_is_proposer: bool) -> dict:
+    """The current revision as the picker's restore blob, so opening the counter
+    editor starts from the trade as it stands rather than from nothing.
+
+    Same shape the rejected-submit path uses — one restore mechanism, not two.
+    An OFFERED line restores by inventory row for the proposer and by showcase
+    item for the recipient, matching whichever list that author is picking from.
+    """
+    if author_is_proposer:
+        offered = [
+            {"inventory_row_id": it.inventory_row_id, "quantity": it.quantity}
+            for it in _items_by_side(trade, "offered")
+            if it.inventory_row_id
+        ]
+    else:
+        # The recipient's editor lists the offered side as the trade's OWN lines
+        # (they cannot name the proposer's rows), so restore by trade item id.
+        offered = [
+            {"trade_item_id": it.id, "quantity": it.quantity}
+            for it in _items_by_side(trade, "offered")
+        ]
+    requested = [
+        {"showcase_item_id": it.showcase_item_id, "quantity": it.quantity}
+        for it in _items_by_side(trade, "requested")
+        if it.showcase_item_id
+    ]
+    return {"offered": offered, "requested": requested}
 
 
 # ── §10 cleanup helpers ─────────────────────────────────────────

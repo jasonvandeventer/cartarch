@@ -128,12 +128,17 @@ def row_reference_parents(db, user):
     """
     from types import SimpleNamespace
 
-    from app.models import Deck, Showcase, Trade, VariantGroup
+    from app.models import Deck, Showcase, Trade, TradeRevision, VariantGroup
 
     showcase = Showcase(user_id=user.id, name="Refs")
     trade = Trade(status="proposed")
     vg = VariantGroup(user_id=user.id, name="Variants")
     db.add_all([showcase, trade, vg])
+    db.flush()
+    # Counter-proposals: a TradeItem belongs to a REVISION (NOT NULL), so a
+    # reference-parent trade needs one the way it needs an id.
+    trade_revision = TradeRevision(trade_id=trade.id, author_user_id=user.id)
+    db.add(trade_revision)
     db.flush()
     source = Deck(user_id=user.id, name="Share Source", variant_group_id=vg.id)
     target = Deck(user_id=user.id, name="Share Target", variant_group_id=vg.id)
@@ -142,6 +147,7 @@ def row_reference_parents(db, user):
     return SimpleNamespace(
         showcase=showcase,
         trade=trade,
+        trade_revision=trade_revision,
         variant_group=vg,
         source_deck=source,
         target_deck=target,

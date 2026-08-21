@@ -126,7 +126,12 @@ def test_references_stay_on_original_row(db, user, row_reference_parents):
         showcase_id=refs.showcase.id, inventory_row_id=row.id, quantity_offered=1
     )
     tr_item = TradeItem(
-        trade_id=refs.trade.id, side="offer", inventory_row_id=row.id, quantity=1, finish="normal"
+        trade_id=refs.trade.id,
+        revision_id=refs.trade_revision.id,
+        side="offer",
+        inventory_row_id=row.id,
+        quantity=1,
+        finish="normal",
     )
     dcs = DeckCardShare(
         inventory_row_id=row.id,

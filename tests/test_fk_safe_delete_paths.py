@@ -26,6 +26,7 @@ from app.models import (
     StorageLocation,
     Trade,
     TradeItem,
+    TradeRevision,
     TransactionLog,
     User,
 )
@@ -86,8 +87,12 @@ def _reference_row(s, user, card, row):
     t = Trade(proposer_user_id=user.id, recipient_user_id=other.id, status="proposed")
     s.add(t)
     s.flush()
+    rev = TradeRevision(trade_id=t.id)
+    s.add(rev)
+    s.flush()
     ti = TradeItem(
         trade_id=t.id,
+        revision_id=rev.id,
         side="offered",
         inventory_row_id=row.id,
         card_id=card.id,

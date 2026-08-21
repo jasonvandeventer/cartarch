@@ -94,6 +94,7 @@ from app.models import (
     TokenInventory,
     Trade,
     TradeItem,
+    TradeRevision,
     TransactionLog,
     User,
     VariantGroup,
@@ -298,8 +299,12 @@ def _trade_item_on(s, proposer, recipient, card, row, status="proposed") -> tupl
     t = Trade(proposer_user_id=proposer.id, recipient_user_id=recipient.id, status=status)
     s.add(t)
     s.flush()
+    rev = TradeRevision(trade_id=t.id, author_user_id=proposer.id)
+    s.add(rev)
+    s.flush()
     ti = TradeItem(
         trade_id=t.id,
+        revision_id=rev.id,
         side="offered",
         inventory_row_id=row.id,
         card_id=card.id,
@@ -491,7 +496,34 @@ def seed_delete_user(s) -> Seeded:
     # the pending-trade pre-cleanup does NOT delete it — it must SURVIVE the user
     # delete with its inventory_row_id NULLed (the durable *_at_trade snapshot is the
     # record). This is the genuine leak the old bulk inventory-delete orphaned.
-    _t, ti = _trade_item_on(s, other, owner, card, row, status="accepted")
+    terminal_trade, ti = _trade_item_on(s, other, owner, card, row, status="accepted")
+    # A COUNTER on that terminal trade, authored by the user being deleted. The
+    # revision must SURVIVE with author_user_id NULLed — author_name_at_revision
+    # is what carries "who proposed this" into the record, exactly like the
+    # *_at_trade snapshots one table over.
+    owner_counter = TradeRevision(
+        trade_id=terminal_trade.id,
+        author_user_id=owner.id,
+        author_name_at_revision="Owner",
+    )
+    s.add(owner_counter)
+    s.flush()
+    counter_item = TradeItem(
+        trade_id=terminal_trade.id,
+        revision_id=owner_counter.id,
+        side="offered",
+        inventory_row_id=row.id,
+        card_id=card.id,
+        finish="normal",
+        quantity=2,
+    )
+    s.add(counter_item)
+    s.flush()
+    # A PENDING trade involving the user: delete_user abandons then DELETES it,
+    # so its revision and that revision's items must go with it rather than
+    # orphaning. This is the pair the new schema adds.
+    pending_trade, pending_item = _trade_item_on(s, owner, other, card, row)
+    pending_rev_id = pending_item.revision_id
 
     vg = VariantGroup(user_id=owner.id, name=f"VG{_uniq()}")
     s.add(vg)
@@ -606,6 +638,32 @@ def seed_delete_user(s) -> Seeded:
             "SET NULL",
             ti.id,
             "cross-user TERMINAL trade — must survive, ref nulled",
+        ),
+        ChildFK(
+            "trade_revisions.author_user_id->users",
+            "trade_revisions",
+            "author_user_id",
+            "SET NULL",
+            owner_counter.id,
+            "counter authored by the deleted user — revision survives, author nulled",
+        ),
+        ChildFK(
+            "trade_revisions.trade_id->trades",
+            "trade_revisions",
+            "trade_id",
+            "CASCADE",
+            pending_rev_id,
+            "revision of a PENDING trade — goes with the trade",
+            expect_survives=False,
+        ),
+        ChildFK(
+            "trade_items.revision_id->trade_revisions",
+            "trade_items",
+            "revision_id",
+            "CASCADE",
+            pending_item.id,
+            "item of a PENDING trade's revision — goes with it",
+            expect_survives=False,
         ),
         ChildFK(
             "deck_bracket_estimates.deck_id->decks",
@@ -740,8 +798,12 @@ def seed_delete_showcase(s) -> Seeded:
     trade = Trade(proposer_user_id=owner.id, recipient_user_id=member.id, status="proposed")
     s.add(trade)
     s.flush()
+    trade_rev = TradeRevision(trade_id=trade.id, author_user_id=owner.id)
+    s.add(trade_rev)
+    s.flush()
     ti = TradeItem(
         trade_id=trade.id,
+        revision_id=trade_rev.id,
         side="offered",
         inventory_row_id=row.id,
         card_id=card.id,
@@ -854,6 +916,14 @@ TRANSITIVELY_COVERED = {
     "runs FKs OFF — the game_sessions.playgroup_id CASCADE and games.session_id "
     "SET NULL are Postgres defence-in-depth. Exercised by the playgroups entrypoint.",
     "showcase_items": "delete_showcase nulls trade_items.showcase_item_id via item cascade",
+    "trades": "counter-proposals — a trade is never row-deleted by a user action "
+    "(terminal statuses ARE the record); the one delete is admin delete_user, which "
+    "abandons then ORM-deletes a party's PENDING trades, taking Trade.revisions and "
+    "Trade.items with them via delete-orphan. Exercised by the users entrypoint.",
+    "trade_revisions": "counter-proposals — a revision is never row-deleted either: a "
+    "declined counter is MARKED declined (the rejected version is part of the record). "
+    "It dies only with its trade, and its items follow via the CASCADE seeded under the "
+    "users entrypoint.",
     "inventory_rows": "covered directly by delete_inventory_row",
 }
 
@@ -910,6 +980,9 @@ _EXPECTED_ONDELETE = {
     "game_seats.deck_id->decks": "RESTRICT",  # #163 — was SET NULL
     "showcase_items.inventory_row_id->inventory_rows": "CASCADE",
     "trade_items.inventory_row_id->inventory_rows": "SET NULL",
+    "trade_items.revision_id->trade_revisions": "CASCADE",
+    "trade_revisions.trade_id->trades": "CASCADE",
+    "trade_revisions.author_user_id->users": "SET NULL",
     "games.user_id->users": "SET NULL",  # gate-#5 amendment (was NO ACTION)
     "game_seats.user_id->users": "RESTRICT",  # #163 — was SET NULL
     "token_inventory.user_id->users": "CASCADE",
