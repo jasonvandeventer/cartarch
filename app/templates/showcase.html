@@ -137,9 +137,23 @@
         <button type="submit" class="btn-like">Apply</button>
         {% if search %}<a class="btn-like" href="/showcase/{{ showcase.id }}">Clear</a>{% endif %}
       </form>
+      {# Grid/List toggle. Same shape as the deck one: a POST to the single
+         writer of the stored preference, then 303 back here — view mode is a
+         preference, never a URL axis (see the route's docstring). #}
+      <form action="/account/showcase-view-pref" method="post" class="deck-view-toggle"
+            style="display:inline-flex">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <button type="submit" name="view" value="grid"
+                class="deck-view-toggle-btn {% if view_mode == 'grid' %}active{% endif %}">Grid</button>
+        <button type="submit" name="view" value="list"
+                class="deck-view-toggle-btn {% if view_mode == 'list' %}active{% endif %}">List</button>
+      </form>
     {% endif %}
     {% if items %}
       <p class="muted">{{ items | length }} card{{ 's' if items | length != 1 else '' }}{{ ' match' if search else ' curated' }}. <em>Available</em> is the smaller of what you offered and what's currently in your inventory — it updates automatically when you sell or remove cards.</p>
+      {% if view_mode == 'list' %}
+        {% include "_showcase_card_list.html" %}
+      {% else %}
       <div class="showcase-items-grid" data-card-hover data-card-hover-target=".showcase-item">
         {% for item in items %}
           <article class="showcase-item"
@@ -185,6 +199,19 @@
                   — <span class="muted">(no price)</span>
                 {% endif %}
               </div>
+              {# A MIRRORED card has nothing per-card to update or remove — it
+                 leaves by dropping the location source above. Gated on
+                 `mirrored` rather than on `item.id`: a mirrored-ONLY row has no
+                 id and used to render both forms pointed at
+                 /showcase/items/None/… (controls that could only fail), while a
+                 card that is BOTH curated and mirrored keeps its id but has its
+                 quantity governed by the mirror — so its Update wrote a number
+                 the page ignores. #}
+              {% if item.mirrored %}
+                <div class="showcase-item-actions">
+                  <span class="muted" style="font-size:0.78rem">Mirrored from a location — stop mirroring it above to remove this card.</span>
+                </div>
+              {% else %}
               <div class="showcase-item-actions">
                 <form method="post" action="/showcase/items/{{ item.id }}/quantity" class="inline-form">
                   <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
@@ -198,10 +225,12 @@
                   <button type="submit" class="btn-danger-small">Remove</button>
                 </form>
               </div>
+              {% endif %}
             </div>
           </article>
         {% endfor %}
       </div>
+      {% endif %}
     {% elif search %}
       <p class="showcase-empty">No cards in this Showcase match <strong>{{ search }}</strong>. <a href="/showcase/{{ showcase.id }}">Clear search</a>.</p>
     {% else %}

@@ -1,5 +1,17 @@
 [
   {
+    "version": "4.15.0",
+    "date": "2026-08-22",
+    "added": [
+      "A Showcase can be shown as a list instead of card art. The Grid/List toggle sits beside the search box and works like the one on a deck: one row per card with its set, finish, price, how many are available and the same Offered and Remove controls, and the card image on hover rather than taking up the row. Your choice is remembered, separately from the deck one, so you can keep art for a deck and a list for a Showcase of a few thousand cards."
+    ],
+    "refined": [],
+    "resolved": [
+      "A card that is in your Showcase because you mirror the location it lives in no longer shows Offered and Remove controls. Those did nothing: a mirrored card takes its quantity from your inventory and leaves when you stop mirroring the location, so the buttons either failed outright or quietly changed a number the page does not use. The row now says it is mirrored, and the way to remove it — stop mirroring the location — is on the same page."
+    ],
+    "archivist_note": "The list view is worth the most on exactly the Showcases where art is worth the least: a couple of thousand cards, where you already know what they look like and want to check what is in there. Those pages now draw with no card images at all — the hover preview covers the one you are actually looking at. The mirrored-card fix came out of building it. Laying every row on one line makes an inconsistency obvious that a wall of tiles hides, and there it was: two controls on a card that neither of them could affect. One of the two cases had been shipping a button wired to a nonexistent card for as long as mirroring has existed."
+  },
+  {
     "version": "4.14.2",
     "date": "2026-08-21",
     "added": [],

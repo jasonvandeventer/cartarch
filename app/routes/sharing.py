@@ -35,10 +35,40 @@ from app.dependencies import (
     get_current_user,
     get_db_session,
     render,
+    safe_redirect_url,
 )
 from app.models import User
 
 router = APIRouter()
+
+
+# The two ways a Showcase can be rendered. Mirrors DECK_VIEW_MODES rather than
+# importing it — the two surfaces happen to offer the same pair today, and
+# coupling them would mean a third mode on one silently appearing on the other.
+SHOWCASE_VIEW_MODES = ("grid", "list")
+
+
+@router.post("/account/showcase-view-pref")
+def showcase_view_pref(
+    request: Request,
+    view: str = Form(""),
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+    _: None = CsrfRequired,
+):
+    """THE ONE WRITER of ``users.showcase_view_mode`` — same shape as the deck
+    toggle, and for the same reason.
+
+    View mode is a stored preference, **not a URL axis**. The deck version of
+    this learned that the hard way: a hidden ``view=`` input put ``?view=list``
+    into the page URL, the GET preferred the param, and the partial wrote it
+    back, so the toggle looked dead. One writer, read from the user row, and the
+    303 goes back to whichever Showcase you were on.
+    """
+    if view in SHOWCASE_VIEW_MODES and current_user.showcase_view_mode != view:
+        current_user.showcase_view_mode = view
+        session.commit()
+    return RedirectResponse(url=safe_redirect_url(request), status_code=303)
 
 
 # ── Showcase management ─────────────────────────────────────────
@@ -160,6 +190,7 @@ def showcase_page(
             "sort": sort,
             "direction": direction,
             "sort_options": sort_spec.SHOWCASE_SORT_OPTIONS,
+            "view_mode": current_user.showcase_view_mode or "grid",
             "added": request.query_params.get("added"),
             "error": error,
             "success": success,

@@ -66,6 +66,12 @@ class User(Base):
 
     deck_view_mode: Mapped[str] = mapped_column(String(16), default="grid", nullable=False)
     deck_group_by: Mapped[str] = mapped_column(String(16), default="type", nullable=False)
+    # A SEPARATE column from deck_view_mode, deliberately: someone can want art
+    # tiles for a 100-card deck and a dense list for a 1,400-card showcase, and
+    # one shared column would make each surface silently change the other.
+    showcase_view_mode: Mapped[str] = mapped_column(
+        String(16), default="grid", server_default="grid", nullable=False
+    )
 
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utc_now)
     # v3.27.4 — replaces the misleading "last activity" proxy on the Admin

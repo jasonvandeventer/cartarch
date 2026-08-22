@@ -12554,6 +12554,126 @@ table.dmtx .dmtx-rowhead {
   gap: 0.85rem;
   margin-top: 0.85rem;
 }
+
+/* ── Showcase LIST view ──────────────────────────────────────────────────────
+   One row per card, one column — NOT the deck list's three. A showcase row
+   carries an editable offered quantity, a price and two buttons; fragmenting
+   that across narrow columns is unreadable, and staying single-column also
+   avoids the Firefox multicol bug the deck list needed a formatting context to
+   survive (see .deck-list-row). No art per row: the shared hover preview shows
+   the card, so a 1,400-card showcase renders with zero <img> tags. */
+.showcase-list {
+  list-style: none;
+  margin: 0.85rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+.showcase-list-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.3rem 0.4rem;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.9rem;
+}
+.showcase-list-row:last-child {
+  border-bottom: none;
+}
+.showcase-list-row:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+.scl-qty {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  min-width: 2.2ch;
+  text-align: right;
+  flex: 0 0 auto;
+  color: var(--muted);
+}
+.scl-name {
+  flex: 1 1 auto;
+  min-width: 0; /* or a long name refuses to shrink and pushes the row wide */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.scl-set {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+}
+.scl-tags {
+  display: flex;
+  gap: 0.3rem;
+  flex: 0 0 auto;
+}
+.scl-price {
+  flex: 0 0 auto;
+  min-width: 6ch;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.scl-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex: 0 0 auto;
+}
+.scl-form {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+.scl-offered-label {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+.scl-offered-input {
+  width: 56px;
+}
+.scl-btn {
+  font-size: 0.8rem;
+  padding: 0.25rem 0.5rem;
+}
+.scl-mirrored-note {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-style: italic;
+}
+.scl-warn {
+  color: var(--brand-gold);
+  font-size: 0.78rem;
+  flex: 0 0 auto;
+}
+
+/* Below tablet the controls wrap under the card rather than squeezing the name
+   to nothing — the same trade the actions drawer makes. */
+@media (max-width: 768px) {
+  .showcase-list-row {
+    flex-wrap: wrap;
+  }
+  .scl-name {
+    flex: 1 1 60%;
+  }
+  .scl-actions {
+    flex: 1 1 100%;
+    justify-content: flex-end;
+  }
+  /* Once the row wraps, the price and the over-offered warning start a new
+     line and were landing hard LEFT, reading as though they belonged to the
+     next card rather than this one — measured at 509px and 553px adrift.
+     Pushing both to the right edge costs no height (642px of rows either way,
+     Chromium at 700px) and keeps the numbers in one column down the page. */
+  .scl-price {
+    margin-left: auto;
+  }
+  .scl-warn {
+    flex: 1 1 100%;
+    text-align: right;
+  }
+}
 .showcase-item {
   display: flex;
   gap: 0.75rem;
