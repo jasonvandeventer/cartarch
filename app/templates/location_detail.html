@@ -178,37 +178,10 @@
   <div id="location-card-list">
     {% include "_location_card_list.html" %}
   </div>
-  {% if total_pages > 1 %}
-    <section class="panel controls-panel" style="margin-top: 1rem;">
-      <div class="hero-row"
-           style="align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap">
-        <div class="muted">Page {{ page }} of {{ total_pages }} · {{ total_count }} rows in this location</div>
-        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center">
-          {% set qs = '&search=' ~ search|urlencode ~ '&sort=' ~ sort ~ '&direction=' ~ direction %}
-          {% if page > 1 %}
-            <a href="/locations/{{ location.id }}?page={{ page - 1 }}{{ qs }}" class="btn">Previous</a>
-          {% endif %}
-          {% for p in range(1, total_pages + 1) %}
-            {% if p == 1 or p == total_pages or (p >= page - 2 and p <= page + 2) %}
-              {# The emphasis is the CURRENT-page indicator and must stay
-                 conditional — applied to every number it stops marking
-                 anything (the #174 regression). #}
-              <a href="/locations/{{ location.id }}?page={{ p }}{{ qs }}"
-                 class="btn"
-                 {% if p == page %}style="font-weight: bold; opacity: 0.8;"{% endif %}>{{ p }}</a>
-            {% elif p == 2 and page > 4 %}
-              <span class="muted">…</span>
-            {% elif p == total_pages - 1 and page < total_pages - 3 %}
-              <span class="muted">…</span>
-            {% endif %}
-          {% endfor %}
-          {% if page < total_pages %}
-            <a href="/locations/{{ location.id }}?page={{ page + 1 }}{{ qs }}" class="btn">Next</a>
-          {% endif %}
-        </div>
-      </div>
-    </section>
-  {% endif %}
+  {% set pager_base = "/locations/" ~ location.id %}
+  {% set pager_qs = "&search=" ~ search|urlencode ~ "&sort=" ~ sort ~ "&direction=" ~ direction %}
+  {% set pager_label = total_count ~ " rows in this location" %}
+  {% include "_pager.html" %}
   {# Recent activity — added after a report where a quick-add looked like it had
      overwritten a card. It had not, but nothing on this page could show that:
      the grid pages at 50, so an existing row and a card that left earlier are

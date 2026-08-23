@@ -39,6 +39,11 @@ from app.dependencies import (
 )
 from app.models import User
 
+# One pager, one page size, one slicing helper — the location grid solved this
+# first (v4.13.27) and a second copy is how two surfaces drift.
+from app.routes.collections import LOCATION_PAGE_SIZE as SHARE_PAGE_SIZE
+from app.routes.collections import _paginate_items
+
 router = APIRouter()
 
 
@@ -451,6 +456,19 @@ def shares_view(
     )
     if view is None:
         return RedirectResponse(url="/shares?error=share_unavailable", status_code=303)
+    # #184 — the page used to render EVERY card of the showcase, so a 1,426-card
+    # share shipped that many tiles and that many image requests, and changing
+    # the search or sort rebuilt all of it. Paged like the location grid, with
+    # the same helper and the same page size: the search narrows, the pager
+    # covers the rest, and a small showcase is unchanged because it fits on one
+    # page. Sliced in PYTHON after the privacy projection and the sort, so the
+    # projection still runs over the whole set and cannot be widened by paging.
+    try:
+        page = int(request.query_params.get("page", "1"))
+    except ValueError:
+        page = 1
+    all_items = view["items"]
+    page_items, page, total_pages = _paginate_items(all_items, page, SHARE_PAGE_SIZE)
     return render(
         request,
         "share_view.html",
@@ -461,8 +479,15 @@ def shares_view(
             "showcase": view["showcase"],
             "sharer": view["sharer"],
             "playgroup": view["playgroup"],
-            "items": view["items"],
+            "items": page_items,
+            # Whole-share figures: the total value and the count describe the
+            # SHARE, not the page you happen to be on (same call the location
+            # hero makes).
             "total_value": view["total_value"],
+            "total_count": len(all_items),
+            "page": page,
+            "total_pages": total_pages,
+            "page_size": SHARE_PAGE_SIZE,
             "search": search,
             "sort": sort,
             "direction": direction,

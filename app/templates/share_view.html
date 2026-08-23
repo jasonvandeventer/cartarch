@@ -61,6 +61,21 @@
       </form>
     {% endif %}
     {% if items %}
+      {# #184 — the page is a PAGE now, so it has to say so: a silent cap reads
+         as "this is everything" when it is not. The count and the total value
+         above describe the whole share; this line describes what is on screen. #}
+      {% set first = ((page - 1) * page_size) + 1 %}
+      {% set last = ((page - 1) * page_size) + items|length %}
+      <p class="muted share-view-count">
+        {%- if total_pages > 1 -%}
+          Showing {{ first }}–{{ last }} of {{ total_count }}
+          {%- if search %} matching <strong>{{ search }}</strong>{% endif -%}.
+          {%- if not search %} Search to narrow it down.{% endif -%}
+        {%- else -%}
+          {{ total_count }} card{{ '' if total_count == 1 else 's' }}
+          {%- if search %} matching <strong>{{ search }}</strong>{% endif -%}.
+        {%- endif -%}
+      </p>
       {# v3.29.2 — propose-from-share link. Each item gets a small
          "Propose trade for this" link that hops to /trades/new with
          the ShowcaseItem id, which the trade construction page
@@ -88,6 +103,10 @@
           </div>
         {% endfor %}
       </div>
+      {% set pager_base = "/shares/" ~ share.id %}
+      {% set pager_qs = "&search=" ~ search|urlencode ~ "&sort=" ~ sort ~ "&direction=" ~ direction %}
+      {% set pager_label = total_count ~ " cards shared" %}
+      {% include "_pager.html" %}
     {% elif search %}
       <p class="muted">No cards in this Showcase match <strong>{{ search }}</strong>. <a href="/shares/{{ share.id }}">Clear search</a>.</p>
     {% else %}

@@ -1,5 +1,15 @@
 [
   {
+    "version": "4.15.3",
+    "date": "2026-08-22",
+    "added": [],
+    "refined": [],
+    "resolved": [
+      "A shared Showcase with thousands of cards opens quickly, and searching or re-sorting it no longer takes a minute. The page now shows fifty cards at a time with page controls underneath, exactly like a location's card grid, and says which fifty of how many you are looking at. Searching narrows the whole Showcase first, so what you are counting is what matched. The card count and total value at the top still describe the entire Showcase, not the page. A Showcase small enough to fit on one page looks exactly as it did."
+    ],
+    "archivist_note": "A page that draws fourteen hundred cards has to fetch fourteen hundred pictures, and it does that again every time you change the sort. Measured on a Showcase the size of the one that prompted this: three megabytes of page became a seventh of a megabyte, twenty-two thousand elements became a thousand, and scrolling from top to bottom went from two thousand eight hundred and fifty-three image requests to a hundred and one. The rest of the cards are a click away rather than all arriving at once, which is the trade a card binder makes on paper too. This is the easiest of the three screens that share the problem — a read-only page has nothing half-finished to preserve while it re-draws — so it went first; the trade screens are the same idea with more care needed."
+  },
+  {
     "version": "4.15.2",
     "date": "2026-08-22",
     "added": [],

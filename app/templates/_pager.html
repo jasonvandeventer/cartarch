@@ -1,0 +1,44 @@
+{# Shared page controls for a paginated card list.
+
+   Extracted from location_detail.html when the share view needed the same
+   thing (#184). One definition, because the two things that make this markup
+   correct are both easy to lose in a copy: the current-page emphasis is
+   CONDITIONAL (applied to every number it stops marking anything — the #174
+   regression), and the existing query string has to survive every hop or
+   paging silently resets the search and sort.
+
+   Caller supplies:
+     pager_base   — the path, e.g. "/locations/12" or "/shares/3"
+     page         — current page (1-based)
+     total_pages  — how many pages there are
+     pager_qs     — the rest of the query string, already url-encoded, each
+                    parameter prefixed with "&"
+     pager_label  — the line on the left, e.g. "1,426 cards shared"
+#}
+{% if total_pages > 1 %}
+  <section class="panel controls-panel" style="margin-top: 1rem;">
+    <div class="hero-row"
+         style="align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap">
+      <div class="muted">Page {{ page }} of {{ total_pages }}{% if pager_label %} · {{ pager_label }}{% endif %}</div>
+      <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center">
+        {% if page > 1 %}
+          <a href="{{ pager_base }}?page={{ page - 1 }}{{ pager_qs }}" class="btn">Previous</a>
+        {% endif %}
+        {% for p in range(1, total_pages + 1) %}
+          {% if p == 1 or p == total_pages or (p >= page - 2 and p <= page + 2) %}
+            <a href="{{ pager_base }}?page={{ p }}{{ pager_qs }}"
+               class="btn"
+               {% if p == page %}style="font-weight: bold; opacity: 0.8;"{% endif %}>{{ p }}</a>
+          {% elif p == 2 and page > 4 %}
+            <span class="muted">…</span>
+          {% elif p == total_pages - 1 and page < total_pages - 3 %}
+            <span class="muted">…</span>
+          {% endif %}
+        {% endfor %}
+        {% if page < total_pages %}
+          <a href="{{ pager_base }}?page={{ page + 1 }}{{ pager_qs }}" class="btn">Next</a>
+        {% endif %}
+      </div>
+    </div>
+  </section>
+{% endif %}
