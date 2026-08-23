@@ -281,11 +281,21 @@
   }
 
   // The balance reads the SELECTION, never the DOM — that is the whole point.
+  // The balance is VIEWER-relative, and the two screens disagree about which
+  // side that is. "Offered" always means the PROPOSER's cards, so on the
+  // construction page (you are the proposer) offered is what you give — but a
+  // RECIPIENT countering gives the requested side. The bar carries
+  // `data-give-side`, or the numbers come out backwards and "in your favour"
+  // says the opposite of the truth, which is what it did on the counter editor
+  // until 2026-08-23.
   window.__tradePickerBalance = function () {
-    var give = pickers.offered ? pickers.offered.total() : 0;
-    var get = pickers.requested ? pickers.requested.total() : 0;
-    var giveEl = document.querySelector('[data-pick-total="offered"]');
-    var getEl = document.querySelector('[data-pick-total="requested"]');
+    var bar = document.querySelector("[data-give-side]");
+    var giveSide = bar ? bar.getAttribute("data-give-side") : "offered";
+    var getSide = giveSide === "offered" ? "requested" : "offered";
+    var give = pickers[giveSide] ? pickers[giveSide].total() : 0;
+    var get = pickers[getSide] ? pickers[getSide].total() : 0;
+    var giveEl = document.querySelector('[data-pick-total="give"]');
+    var getEl = document.querySelector('[data-pick-total="get"]');
     var diffEl = document.querySelector('[data-pick-total="diff"]');
     if (giveEl) giveEl.textContent = moneyText(give);
     if (getEl) getEl.textContent = moneyText(get);
@@ -306,9 +316,13 @@
     }
     // Round to cents first so float noise cannot push an exact $1.00 gap over
     // the threshold; card prices are not precise enough to treat small change
-    // as a real difference.
+    // as a real difference. The threshold itself comes from the SERVER
+    // (`data-even-within`), so the static banner on a proposed trade and this
+    // live one cannot disagree about what "even" means.
+    var evenWithin = bar ? parseFloat(bar.getAttribute("data-even-within")) : 1;
+    if (!(evenWithin >= 0)) evenWithin = 1;
     var delta = Math.round((give - get) * 100) / 100;
-    if (Math.abs(delta) <= 1) {
+    if (Math.abs(delta) <= evenWithin) {
       diffEl.textContent = "Even — within " + moneyText(Math.abs(delta));
       diffEl.className = "trade-balance-diff is-even";
     } else {

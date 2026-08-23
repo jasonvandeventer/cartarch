@@ -242,7 +242,19 @@ img {
 @media (max-width: 768px) {
   html,
   body {
-    overflow-x: hidden;
+    /* `clip`, NOT `hidden` (2026-08-23). `overflow-x: hidden` makes the element
+       a SCROLL CONTAINER, and a scroll container is where `position: sticky`
+       looks for its scrollport — body's own box never scrolls, so every sticky
+       element inside it silently stopped sticking below 769px. The pinned trade
+       balance scrolled away from the first screenful while working perfectly at
+       770px, which is exactly how invisible this is.
+
+       `clip` prevents the horizontal scroll this hammer exists for WITHOUT
+       creating a scroll container, so sticky keeps working. Note this is the
+       opposite call from `.deck-list-row`, which needs `hidden` precisely
+       BECAUSE of the formatting context it creates — same two keywords, two
+       different jobs; do not "unify" them. */
+    overflow-x: clip;
     max-width: 100vw;
   }
 

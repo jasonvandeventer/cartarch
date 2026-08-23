@@ -45,7 +45,9 @@
     {# The counter editor never showed a running total, which mattered less when
        it listed everything and matters more now that it pages. The engine
        already computes both sides, so it is the same include. #}
-    {% include "_trade_balance_bar.html" %}
+    {% with give_side=("offered" if options.author_is_proposer else "requested"),
+            even_within=trade_even_within %}{% include "_trade_balance_bar.html" %}{% endwith %}
+    {% with pick_panes=true %}{% include "_trade_view_toggle.html" %}{% endwith %}
 
     {# #184 — both sides are SEARCHED, PAGED panes swapped by HTMX, and the
        selection lives in the shared trade-picker.js. Same engine and same grid
@@ -70,10 +72,13 @@
         <h4 class="trade-tray-title">On this side</h4>
         <div data-pick-tray="offered"></div>
       </div>
-      <div id="offered-pane">
+      <div id="offered-pane"
+           hx-get="{{ offered_pane.endpoint }}" hx-trigger="refresh"
+           hx-target="this" hx-swap="innerHTML">
         {% with pick_side="offered", pick_items=offered_pane.cards, pick_page=offered_pane.page,
                 pick_total_pages=offered_pane.total_pages, pick_total=offered_pane.total,
-                pick_search="", pick_endpoint=offered_pane.endpoint %}
+                pick_search="", pick_endpoint=offered_pane.endpoint,
+                pick_view_mode=offered_pane.view_mode %}
           {% include "_trade_pick_grid.html" %}
         {% endwith %}
       </div>
@@ -92,10 +97,13 @@
         <h4 class="trade-tray-title">On this side</h4>
         <div data-pick-tray="requested"></div>
       </div>
-      <div id="requested-pane">
+      <div id="requested-pane"
+           hx-get="{{ requested_pane.endpoint }}" hx-trigger="refresh"
+           hx-target="this" hx-swap="innerHTML">
         {% with pick_side="requested", pick_items=requested_pane.cards, pick_page=requested_pane.page,
                 pick_total_pages=requested_pane.total_pages, pick_total=requested_pane.total,
-                pick_search="", pick_endpoint=requested_pane.endpoint %}
+                pick_search="", pick_endpoint=requested_pane.endpoint,
+                pick_view_mode=requested_pane.view_mode %}
           {% include "_trade_pick_grid.html" %}
         {% endwith %}
       </div>

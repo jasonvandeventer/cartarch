@@ -1,0 +1,27 @@
+{# Grid/List for a trade's cards.
+
+   On the PICKER screens this must NOT reload the page: the in-progress
+   selection lives in trade-picker.js, and a round-trip would take it with it —
+   the whole hazard #184 was about. So the toggle posts the preference with
+   HTMX (`hx-swap="none"`) and then asks each pane to re-fetch itself, which
+   re-renders the cards in the new shape while the picks stay put.
+
+   `hx-on::after-request` fires the panes' own `refresh` trigger; the panes
+   declare that trigger next to their hx-get, so this file names no endpoint.
+
+   On the trade DETAIL page there is nothing to lose, so it posts normally and
+   the 303 brings you back (`pick_panes` false). #}
+<section class="panel trade-view-toggle-panel">
+  <form action="/account/trade-view-pref" method="post" class="deck-view-toggle"
+        style="display:inline-flex"
+        {% if pick_panes %}
+        hx-post="/account/trade-view-pref" hx-swap="none"
+        hx-on::after-request="htmx.trigger('#offered-pane', 'refresh'); htmx.trigger('#requested-pane', 'refresh')"
+        {% endif %}>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <button type="submit" name="view" value="grid"
+            class="deck-view-toggle-btn {% if view_mode == 'grid' %}active{% endif %}">Grid</button>
+    <button type="submit" name="view" value="list"
+            class="deck-view-toggle-btn {% if view_mode == 'list' %}active{% endif %}">List</button>
+  </form>
+</section>

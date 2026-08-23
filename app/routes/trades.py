@@ -84,7 +84,7 @@ def trades_inbox(
     )
 
 
-def _pane_context(items: list[dict], endpoint: str, page: int = 1) -> dict:
+def _pane_context(items: list[dict], endpoint: str, page: int = 1, view_mode: str = "grid") -> dict:
     """First-page context for one picker pane, in the shape the partial wants."""
     page_items, page, total_pages = _paginate_items(items, page, PICK_PAGE_SIZE)
     return {
@@ -96,6 +96,7 @@ def _pane_context(items: list[dict], endpoint: str, page: int = 1) -> dict:
         "total_pages": total_pages,
         "total": len(items),
         "endpoint": endpoint,
+        "view_mode": view_mode,
     }
 
 
@@ -180,6 +181,7 @@ def _construction_response(
     )
     # A prefilled or rejected pick becomes a TRAY entry, hydrated from the
     # server's own lists — its tile is very often not on the first page.
+    view_mode = current_user.trade_view_mode or "grid"
     tray = restore_picks or {}
     if prefilled_requested:
         tray = dict(tray)
@@ -215,9 +217,13 @@ def _construction_response(
             "pre_playgroup": pre_playgroup,
             "options": options,
             "requested_pane": _pane_context(
-                requested_items, f"/trades/picker/requested{endpoint_base}"
+                requested_items, f"/trades/picker/requested{endpoint_base}", view_mode=view_mode
             ),
-            "offered_pane": _pane_context(offered_items, f"/trades/picker/offered{endpoint_base}"),
+            "offered_pane": _pane_context(
+                offered_items, f"/trades/picker/offered{endpoint_base}", view_mode=view_mode
+            ),
+            "view_mode": view_mode,
+            "trade_even_within": trade_service.TRADE_EVEN_WITHIN,
             "prefilled_requested": prefilled_requested or [],
             "prefilled_offered_row_ids": prefilled_offered_row_ids or [],
             "error": error,
@@ -525,6 +531,7 @@ def _pick_pane(
     page: int,
     search: str,
     endpoint: str,
+    view_mode: str = "grid",
 ):
     """Render ONE side's grid + status + pager.
 
@@ -538,6 +545,9 @@ def _pick_pane(
         "_trade_pick_grid.html",
         {
             "pick_side": side,
+            # Same stored preference the trade detail page uses — "how I want a
+            # trade's cards shown" is one answer, not one per screen.
+            "pick_view_mode": view_mode,
             "pick_items": page_items,
             "pick_page": page,
             "pick_total_pages": total_pages,
@@ -617,7 +627,9 @@ def trade_picker_pane(
         trade_id=trade_id,
         search=q,
     )
-    return _pick_pane(request, side, items, page, q, endpoint)
+    return _pick_pane(
+        request, side, items, page, q, endpoint, current_user.trade_view_mode or "grid"
+    )
 
 
 # ── Counter-proposals ───────────────────────────────────────────
@@ -728,12 +740,22 @@ def _counter_response(
     other = trade.recipient if current_user.id == trade.proposer_user_id else trade.proposer
     if restore_picks is None:
         restore_picks = trade_service.current_picks_for_restore(trade, opts["author_is_proposer"])
+    view_mode = current_user.trade_view_mode or "grid"
     offered_items = opts["offered_rows"] or opts["offered_share_items"]
     requested_items = opts["requested_share_items"]
     # A recipient's counter names the trade's OWN lines for cards the proposer
     # does not publicly share, so those become pickable tiles in their own right.
     if not opts["author_is_proposer"]:
-        offered_items = _counter_line_items(trade) + offered_items
+        lines = _counter_line_items(trade)
+        # DEDUPE by the underlying row. A card the proposer both offered AND
+        # shares publicly reaches this list twice — once as the trade's own line
+        # and once as a showcase item — and picking both would put the same
+        # physical card on the trade twice. The LINE wins: it is the handle that
+        # works whether or not the card is shared.
+        on_trade = {i["inventory_row_id"] for i in lines if i.get("inventory_row_id")}
+        offered_items = lines + [
+            i for i in offered_items if i.get("inventory_row_id") not in on_trade
+        ]
     return render(
         request,
         "trade_counter.html",
@@ -744,11 +766,15 @@ def _counter_response(
             "other_party": other,
             "options": opts,
             "offered_pane": _pane_context(
-                offered_items, f"/trades/picker/offered?trade_id={trade.id}"
+                offered_items, f"/trades/picker/offered?trade_id={trade.id}", view_mode=view_mode
             ),
             "requested_pane": _pane_context(
-                requested_items, f"/trades/picker/requested?trade_id={trade.id}"
+                requested_items,
+                f"/trades/picker/requested?trade_id={trade.id}",
+                view_mode=view_mode,
             ),
+            "view_mode": view_mode,
+            "trade_even_within": trade_service.TRADE_EVEN_WITHIN,
             "restore_picks": {
                 "offered": _hydrate_picks(offered_items, restore_picks.get("offered") or []),
                 "requested": _hydrate_picks(requested_items, restore_picks.get("requested") or []),
@@ -862,6 +888,15 @@ def trades_detail(
             "viewer_is_proposer": detail["viewer_is_proposer"],
             "viewer_is_recipient": detail["viewer_is_recipient"],
             "view_mode": current_user.trade_view_mode or "grid",
+            # The banner on a PROPOSED trade is static (nothing changes on this
+            # page), but it has to say the same thing the live one would — hence
+            # the shared summary and the shared threshold.
+            "bal": trade_service.trade_balance_summary(
+                detail["offered_total"],
+                detail["requested_total"],
+                detail["viewer_is_proposer"],
+            ),
+            "trade_even_within": trade_service.TRADE_EVEN_WITHIN,
             # Counter-proposals. The template enumerates its context key by key
             # (failure mode 1), so every one of these needs its line here.
             "revision_count": len(detail["trade"].revisions),

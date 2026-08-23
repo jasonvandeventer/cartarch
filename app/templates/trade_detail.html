@@ -77,18 +77,18 @@
     </section>
   {% endif %}
 
+  {# What the two sides are worth, from YOUR side of the table. Static here —
+     nothing changes on a proposed trade — but computed by the same summary the
+     live picker's bar uses, so the two can never disagree about "even". #}
+  {% with give_side=("offered" if viewer_is_proposer else "requested"),
+          even_within=trade_even_within %}
+    {% include "_trade_balance_bar.html" %}
+  {% endwith %}
+
   {# Grid/List toggle for the cards ON this trade (2026-08-23). Same stored-pref
-     shape as the deck and showcase toggles, its own column, one shared writer. #}
-  <section class="panel trade-view-toggle-panel">
-    <form action="/account/trade-view-pref" method="post" class="deck-view-toggle"
-          style="display:inline-flex">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-      <button type="submit" name="view" value="grid"
-              class="deck-view-toggle-btn {% if view_mode == 'grid' %}active{% endif %}">Grid</button>
-      <button type="submit" name="view" value="list"
-              class="deck-view-toggle-btn {% if view_mode == 'list' %}active{% endif %}">List</button>
-    </form>
-  </section>
+     shape as the deck and showcase toggles, its own column, one shared writer.
+     A plain POST here: this page has no in-progress selection to protect. #}
+  {% with pick_panes=false %}{% include "_trade_view_toggle.html" %}{% endwith %}
 
   <section class="panel">
     <h3 class="panel-title">{{ proposer_label }} offers</h3>

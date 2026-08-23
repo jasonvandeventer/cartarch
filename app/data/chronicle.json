@@ -1,5 +1,19 @@
 [
   {
+    "version": "4.16.3",
+    "date": "2026-08-23",
+    "added": [
+      "A proposed trade now shows the same running total the building screens do, pinned at the top: what you give, what you get, and which way it leans.",
+      "The cards on either side of a trade can be shown as a list while you are building or countering it, not just on the finished proposal. The Grid/List choice is one setting for all of it, and switching keeps whatever you have already picked."
+    ],
+    "refined": [],
+    "resolved": [
+      "The totals banner said the wrong thing when you were the one being asked. It labelled the two sides by whose proposal it was rather than by who is reading it, so on a counter-proposal it showed the other person's cards as what you were giving — and therefore announced a trade as being in your favour when it was the reverse.",
+      "The banner also stopped staying at the top of the screen on narrow windows and phones. A rule that stops pages from scrolling sideways was quietly switching off every pinned element on the page below a certain width."
+    ],
+    "archivist_note": "Three corrections from one afternoon of looking at it, and the interesting one is the last. Keeping a bar pinned while you scroll is a single line of styling, and it worked perfectly on a wide window and not at all on a narrow one. The cause was a defensive rule from years of phone bugs — stop the page scrolling sideways, applied to the whole document — and the way browsers implement that is by making the page a scrollable box in its own right, which is precisely the thing a pinned element looks for and sticks inside. There is a newer keyword that clips the overflow without creating that box, and switching to it restored every pinned element on every narrow screen. The other two are the same lesson in a different key: a total has to be told whose side of the table it is being read from, or it will confidently tell you the opposite of the truth."
+  },
+  {
     "version": "4.16.2",
     "date": "2026-08-23",
     "added": [],

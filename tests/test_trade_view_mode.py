@@ -180,3 +180,56 @@ def test_the_three_view_prefs_are_independent(client, db, user, trade):
     assert user.trade_view_mode == "list"
     assert user.showcase_view_mode == "grid"
     assert user.deck_view_mode == "grid"
+
+
+def test_the_picker_honours_the_same_preference(client, db, user, trade):
+    """ "How I want a trade's cards shown" is one answer, not one per screen, so
+    the pickers read the same column the detail page does (2026-08-23)."""
+    action = _toggle_action(client.get(f"/trades/{trade.id}").text)
+
+    grid = client.get(f"/trades/{trade.id}/counter")
+    assert 'class="trade-pick-grid is-visual"' in grid.text
+    assert "trade-pick-list" not in grid.text
+
+    client.post(action, data={"view": "list", "csrf_token": "x"})
+    listed = client.get(f"/trades/{trade.id}/counter")
+    assert "trade-pick-list" in listed.text
+    assert 'class="trade-pick-grid is-visual"' not in listed.text
+    # The engine's contract is unchanged, so picking still works: rows carry the
+    # same class, the same identity attributes and the same toggle button.
+    assert listed.text.count('class="trade-pick-item card-list-row"') >= 1
+    assert "js-pick-toggle" in listed.text
+    assert "data-pick-kind=" in listed.text
+
+
+def test_the_picker_pane_endpoint_honours_it_too(client, db, user, trade):
+    """The pane is re-fetched by HTMX after the toggle, so if the endpoint
+    ignored the preference the switch would appear to do nothing."""
+    action = _toggle_action(client.get(f"/trades/{trade.id}").text)
+    client.post(action, data={"view": "list", "csrf_token": "x"})
+    pane = client.get(f"/trades/picker/requested?trade_id={trade.id}")
+    assert pane.status_code == 200
+    assert "trade-pick-list" in pane.text
+
+
+def test_the_picker_toggle_swaps_panes_instead_of_reloading(client, db, user, trade):
+    """A full reload would take the in-progress selection with it — the picks
+    live in JS. So on a picker screen the toggle is an HTMX post that then asks
+    each pane to re-fetch itself."""
+    page = client.get(f"/trades/{trade.id}/counter").text
+    form = page[page.index("trade-view-toggle-panel") : page.index("trade-view-toggle-panel") + 900]
+    assert 'hx-post="/account/trade-view-pref"' in form
+    assert 'hx-swap="none"' in form
+    assert "htmx.trigger('#offered-pane', 'refresh')" in form
+    assert "htmx.trigger('#requested-pane', 'refresh')" in form
+    # ...and the panes have to be listening for it.
+    for pane in ("offered-pane", "requested-pane"):
+        block = page[page.index(f'id="{pane}"') - 400 : page.index(f'id="{pane}"') + 200]
+        assert 'hx-trigger="refresh"' in block, f"{pane} does not listen for the refresh"
+
+
+def test_the_detail_page_toggle_is_a_plain_post(client, db, user, trade):
+    """Nothing to lose there, so it does not need the HTMX dance."""
+    page = client.get(f"/trades/{trade.id}").text
+    form = page[page.index("trade-view-toggle-panel") : page.index("trade-view-toggle-panel") + 900]
+    assert "hx-post" not in form

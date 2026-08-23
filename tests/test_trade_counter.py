@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import itertools
 import json
+import re
 
 import pytest
 
@@ -593,3 +594,32 @@ def test_a_countered_trade_still_carries_one_item_set_into_its_snapshot(db, worl
         if i.card_name_at_trade
     ]
     assert sorted(i.card_name_at_trade for i in snapshotted) == ["Mystic Remora", "Secret Card"]
+
+
+def test_a_card_already_on_the_trade_is_not_offered_twice(client, db, world):
+    """The recipient's offered pane lists the trade's OWN lines (the only handle
+    for a card the proposer does not share) alongside the proposer's shared
+    showcase. A card in both reached the list twice under two identities, and
+    picking both would have put one physical card on the trade twice.
+    """
+    trade = world["trade"]
+    # Share the very card that is already offered, so it qualifies for both.
+    from app.models import Share, Showcase, ShowcaseItem
+
+    offered_row_id = ts._items_by_side(trade, "offered")[0].inventory_row_id
+    sc = db.query(Showcase).filter(Showcase.user_id == world["proposer"].id).first()
+    db.add(ShowcaseItem(showcase_id=sc.id, inventory_row_id=offered_row_id, quantity_offered=1))
+    if not db.query(Share).filter(Share.showcase_id == sc.id).first():
+        db.add(Share(user_id=world["proposer"].id, showcase_id=sc.id, playgroup_id=world["pg"].id))
+    db.commit()
+
+    page = _as(client, world["recipient"]).get(f"/trades/{trade.id}/counter")
+    assert page.status_code == 200
+    rows = [
+        m for m in re.findall(r'data-pick-kind="([^"]+)" *\n? *data-pick-id="(\d+)"', page.text)
+    ]
+    # The card appears once, as the trade's own line.
+    line_id = ts._items_by_side(trade, "offered")[0].id
+    assert ("trade_item_id", str(line_id)) in rows
+    names = re.findall(r'data-name="([^"]+)"', page.text)
+    assert names.count("Secret Card") == 1, f"listed twice: {names}"

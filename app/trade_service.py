@@ -1325,6 +1325,39 @@ def resolve_propose_from_share_row(
     return None
 
 
+# Two sides within a dollar read as an even trade. Card prices are not precise
+# enough to treat small change as a real difference, and the number is rendered
+# into the balance bar (`data-even-within`) so the live picker and the static
+# banner on a proposed trade cannot disagree about what "even" means.
+TRADE_EVEN_WITHIN = 1.00
+
+
+def trade_balance_summary(
+    offered_total: float, requested_total: float, viewer_is_proposer: bool
+) -> dict:
+    """What the two sides are worth FROM THE VIEWER'S SIDE of the table.
+
+    "Offered" always means the proposer's cards, so the mapping flips for the
+    recipient — and getting that wrong does not merely mislabel a number, it
+    inverts "in your favour", which is the one thing the bar exists to say.
+    """
+    give = offered_total if viewer_is_proposer else requested_total
+    get = requested_total if viewer_is_proposer else offered_total
+    # Round to cents FIRST so float noise cannot push an exact $1.00 gap over
+    # the threshold (same order as the client).
+    delta = round(give - get, 2)
+    if abs(delta) <= TRADE_EVEN_WITHIN:
+        state, note = "is-even", f"Even — within ${abs(delta):.2f}"
+    elif delta > 0:
+        state, note = "is-uneven", f"${delta:.2f} in their favour"
+    else:
+        state, note = "is-uneven", f"${-delta:.2f} in your favour"
+    # "receive", NOT "get": Jinja resolves `bal.get` on a dict to the dict's own
+    # `get` METHOD, so the template formatted a builtin and 500'd. Same family as
+    # `.items` on the wishlist view and the picker pane.
+    return {"give": give, "receive": get, "delta": delta, "state": state, "note": note}
+
+
 def shared_pick_items(session: Session, showcase_id: int, search: str = "") -> list[dict]:
     """What the other party is actually offering — curated AND mirrored.
 

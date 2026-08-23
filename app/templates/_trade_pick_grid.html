@@ -15,6 +15,54 @@
    Caller supplies: pick_side, pick_items, pick_page, pick_total_pages,
    pick_total, pick_search, pick_endpoint (the hx-get target for paging). #}
 {% from "_macros.html" import img_fallback, thumb_srcset %}
+{# LIST mode renders the SAME contract — class `trade-pick-item`, the pick data
+   attributes, a `.js-pick-toggle` button — so trade-picker.js needs no branch:
+   it selects tiles by class and never by shape. Rows use the shared
+   `.card-list-*` family the showcase and trade-detail lists use. #}
+{% if pick_view_mode|default('grid') == 'list' %}
+<ul class="card-list trade-pick-list" data-pick-grid="{{ pick_side }}"
+    data-card-hover data-card-hover-target=".trade-pick-item"
+    id="{{ pick_side }}-grid">
+  {% for item in pick_items %}
+    {% set price = 0 if item.is_proxy else (effective_price(item.card, item.finish) or 0) %}
+    <li class="trade-pick-item card-list-row"
+        data-pick-kind="{{ item.pick_kind }}"
+        data-pick-id="{{ item.pick_id }}"
+        {% if item.pick_alt %}data-pick-alt="{{ item.pick_alt }}"{% endif %}
+        data-available="{{ item.available }}"
+        data-name="{{ item.card.name }}"
+        data-price="{{ price }}"
+        data-proxy="{{ '1' if item.is_proxy else '0' }}"
+        data-meta="{{ (item.card.set_code or '?')|upper }} #{{ item.card.collector_number or '?' }} · {{ (item.finish or 'normal')|capitalize }}"
+        {% if item.card.image_url and item.card.scryfall_id %}
+        data-card-image="{{ mirror_image_url(item.card.scryfall_id, 'large') }}"
+        data-card-image-alt="{{ scryfall_image_fallback(item.card.scryfall_id, 'large') }}"
+        {% endif %}>
+      <span class="cl-qty">{{ item.available }}</span>
+      <span class="cl-name">{{ item.card.name }}</span>
+      <span class="cl-set">{{ (item.card.set_code or '?')|upper }} #{{ item.card.collector_number or '?' }}</span>
+      <span class="cl-tags">
+        {% if item.finish and item.finish != 'normal' %}<span class="finish-badge">{{ item.finish|capitalize }}</span>{% endif %}
+        {% if item.is_proxy %}<span class="proxy-badge proxy-badge-warn">PROXY</span>{% endif %}
+      </span>
+      <span class="cl-price">
+        {% if item.is_proxy %}$0.00 <span class="proxy-price-note">(proxy)</span>
+        {% elif price %}${{ '%.2f'|format(price) }}
+        {% else %}<span class="muted">—</span>{% endif %}
+      </span>
+      <span class="cl-actions">
+        <button type="button" class="btn-like js-pick-toggle cl-btn">Add</button>
+      </span>
+    </li>
+  {% endfor %}
+  {% if not pick_items %}
+    <li class="trades-empty">
+      {% if pick_search %}Nothing matches <strong>{{ pick_search }}</strong>.
+      {% else %}Nothing available to pick here.{% endif %}
+    </li>
+  {% endif %}
+</ul>
+{% else %}
 <div class="trade-pick-grid is-visual" data-pick-grid="{{ pick_side }}"
      data-card-hover data-card-hover-target=".trade-pick-item"
      id="{{ pick_side }}-grid">
@@ -69,6 +117,7 @@
     </p>
   {% endif %}
 </div>
+{% endif %}
 
 {# The cap is stated, never silent: a truncated grid with no caption reads as
    "this is everything". #}

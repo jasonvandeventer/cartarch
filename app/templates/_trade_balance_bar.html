@@ -1,16 +1,32 @@
 {# The running value of both sides, pinned to the top of the trade.
 
-   It used to sit at the bottom of the form (sticky to the viewport FOOTER),
-   which was fine when the whole collection was on one page: you were already
-   near the submit button. Now that each side is searched and paged you spend
-   your time up in the panes, and the number you are steering by was off-screen
-   below them. Requested 2026-08-23.
+   It used to sit at the bottom of the construction form (sticky to the viewport
+   FOOTER), which was fine when the whole collection was on one page: you were
+   already near the submit button. Now that each side is searched and paged you
+   spend your time up in the panes, and the number you are steering by was
+   off-screen below them. Requested 2026-08-23.
 
-   The values are written by trade-picker.js through the `data-pick-total`
-   contract — this is the SELECTION's total, not a sum of what happens to be
-   rendered, so it keeps counting a card picked three pages ago. #}
-<div class="trade-balance trade-balance-pinned" id="trade-balance">
-  <span class="trade-balance-side">You give <strong data-pick-total="offered">$0.00</strong></span>
-  <span class="trade-balance-side">You get <strong data-pick-total="requested">$0.00</strong></span>
-  <span class="trade-balance-diff" data-pick-total="diff">Pick cards on both sides to compare.</span>
+   VIEWER-RELATIVE, not side-relative. "Offered" always means the PROPOSER's
+   cards, so on the construction page offered is what you give — but a RECIPIENT
+   countering gives the REQUESTED side. `give_side` drives both the live engine
+   (via data-give-side) and the static values, because labelling by side reads
+   "$0.15 in your favour" when the truth is $36.66 the other way.
+
+   Live pages leave `bal` unset and trade-picker.js fills the numbers from the
+   SELECTION (so a card picked three pages ago still counts). A proposed trade
+   passes `bal` from trade_service.trade_balance_summary and loads no JS. #}
+{# `bal` is genuinely optional — a live picker leaves it unset and the engine
+   fills the numbers — so it takes the |default idiom rather than a name that
+   raises under StrictUndefined the moment a picker page renders this. #}
+{% set bal = bal|default(none) %}
+<div class="trade-balance trade-balance-pinned" id="trade-balance"
+     data-give-side="{{ give_side|default('offered') }}"
+     data-even-within="{{ '%.2f'|format(even_within|default(1.00)) }}">
+  <span class="trade-balance-side">You give
+    <strong data-pick-total="give">{{ '$%.2f'|format(bal.give) if bal else '$0.00' }}</strong></span>
+  <span class="trade-balance-side">You get
+    <strong data-pick-total="get">{{ '$%.2f'|format(bal.receive) if bal else '$0.00' }}</strong></span>
+  <span class="trade-balance-diff {{ bal.state if bal else '' }}" data-pick-total="diff">
+    {{- bal.note if bal else 'Pick cards on both sides to compare.' -}}
+  </span>
 </div>
