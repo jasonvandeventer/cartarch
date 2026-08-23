@@ -1,5 +1,15 @@
 [
   {
+    "version": "4.17.1",
+    "date": "2026-08-23",
+    "added": [],
+    "refined": [],
+    "resolved": [
+      "The Accept button now appears for whoever has to answer the trade. Once someone sends a counter-proposal, it is the other person's turn to accept, decline or counter again — but the page was still deciding by who started the trade rather than by who sent the version currently on the table. So after you countered, the button sat on your screen doing nothing when pressed, and was missing entirely from theirs. The person who sent the current version now sees Withdraw instead, which is the action that was actually theirs."
+    ],
+    "archivist_note": "Countering changes whose turn it is, and half the application had learned that and half had not. The part that decides whether an accept is allowed was rewritten for counter-proposals; the part that decides whether to draw the button was not, so the two disagreed the moment a trade went back and forth — which is precisely when a trade screen matters most. Both now read the same answer to one question: who did not send the version on the table. The test that pins it does something worth keeping — for each participant it asks the page whether the button is shown and asks the rules whether the action would be allowed, and fails if those two ever differ."
+  },
+  {
     "version": "4.17.0",
     "date": "2026-08-23",
     "added": [

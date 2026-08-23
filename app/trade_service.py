@@ -816,10 +816,12 @@ def transition_trade(
     )
     if new_status in ("accepted", "declined"):
         if actor_user_id != responder_id:
-            raise ValueError("Only the recipient can accept or decline this trade.")
+            raise ValueError(
+                "Only the party who did not propose this version can accept or decline it."
+            )
     elif new_status == "cancelled":
         if actor_user_id != author_id:
-            raise ValueError("Only the proposer can cancel this trade.")
+            raise ValueError("Only the party who proposed this version can cancel it.")
 
     # Optional recipient note (only meaningful on recipient-side
     # transitions, but we accept it regardless and ignore on cancel).
@@ -899,6 +901,15 @@ def get_trade_detail(
         "has_proxy": has_proxy,
         "viewer_is_proposer": viewer_user_id == trade.proposer_user_id,
         "viewer_is_recipient": viewer_user_id == trade.recipient_user_id,
+        # WHO ANSWERS THE VERSION ON THE TABLE. transition_trade has gated on
+        # this since counter-proposals landed — the party who did NOT write the
+        # current revision accepts or declines it, the one who DID may withdraw
+        # it — but the page still asked "are you the recipient", so after a
+        # recipient's counter the Accept button rendered for the person the
+        # server would refuse and was missing for the person entitled to press
+        # it (reported 2026-08-23). One rule, one place to read it from.
+        "current_author_user_id": _current_author_id(trade),
+        "viewer_can_respond": viewer_user_id != _current_author_id(trade),
     }
 
 

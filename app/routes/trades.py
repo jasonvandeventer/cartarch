@@ -908,6 +908,7 @@ def trades_detail(
             "has_proxy": detail["has_proxy"],
             "viewer_is_proposer": detail["viewer_is_proposer"],
             "viewer_is_recipient": detail["viewer_is_recipient"],
+            "viewer_can_respond": detail["viewer_can_respond"],
             "view_mode": current_user.trade_view_mode or "grid",
             # The banner on a PROPOSED trade is static (nothing changes on this
             # page), but it has to say the same thing the live one would — hence

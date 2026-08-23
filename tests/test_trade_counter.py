@@ -376,7 +376,7 @@ def test_after_a_recipients_counter_the_PROPOSER_accepts(db, world):
         requested=[{"showcase_item_id": world["r_share_items"][1].id, "quantity": 1}],
     )
     # The author cannot accept their own counter...
-    with pytest.raises(ValueError, match="Only the recipient"):
+    with pytest.raises(ValueError, match="did not propose this version"):
         ts.transition_trade(
             db, trade_id=trade.id, actor_user_id=world["recipient"].id, new_status="accepted"
         )
@@ -392,11 +392,11 @@ def test_an_uncountered_trade_keeps_the_original_actor_rules(db, world):
     """The generalisation must reduce EXACTLY to the old rule on revision 1,
     where the author is the proposer."""
     trade = world["trade"]
-    with pytest.raises(ValueError, match="Only the recipient"):
+    with pytest.raises(ValueError, match="did not propose this version"):
         ts.transition_trade(
             db, trade_id=trade.id, actor_user_id=world["proposer"].id, new_status="accepted"
         )
-    with pytest.raises(ValueError, match="Only the proposer"):
+    with pytest.raises(ValueError, match="proposed this version"):
         ts.transition_trade(
             db, trade_id=trade.id, actor_user_id=world["recipient"].id, new_status="cancelled"
         )
@@ -623,3 +623,72 @@ def test_a_card_already_on_the_trade_is_not_offered_twice(client, db, world):
     assert ("trade_item_id", str(line_id)) in rows
     names = re.findall(r'data-name="([^"]+)"', page.text)
     assert names.count("Secret Card") == 1, f"listed twice: {names}"
+
+
+def test_the_page_offers_ACCEPT_to_whoever_must_answer_the_current_version(client, db, world):
+    """Reported 2026-08-23: "the accept trade button is missing now".
+
+    It was missing for the person entitled to press it and present for the
+    person the server refuses. `transition_trade` has gated on "did NOT write
+    the current revision" since counters landed; the PAGE still asked "am I the
+    recipient", so after a recipient's counter the proposer — the one who must
+    now answer — saw no Accept at all, while the recipient saw one that errored.
+
+    The uncountered case must be unchanged: recipient accepts, proposer cancels.
+    """
+    trade = world["trade"]
+
+    # 1. Uncountered: exactly as before.
+    recip = _as(client, world["recipient"]).get(f"/trades/{trade.id}").text
+    assert f"/trades/{trade.id}/accept" in recip
+    prop = _as(client, world["proposer"]).get(f"/trades/{trade.id}").text
+    assert f"/trades/{trade.id}/accept" not in prop
+    assert f"/trades/{trade.id}/cancel" in prop
+
+    # 2. The RECIPIENT counters — now the PROPOSER answers.
+    ts.counter_trade(
+        db,
+        trade_id=trade.id,
+        author_user_id=world["recipient"].id,
+        offered=[{"trade_item_id": ts._items_by_side(trade, "offered")[0].id, "quantity": 1}],
+        requested=[{"showcase_item_id": world["r_share_items"][1].id, "quantity": 1}],
+    )
+    db.refresh(trade)
+
+    prop = _as(client, world["proposer"]).get(f"/trades/{trade.id}").text
+    assert f"/trades/{trade.id}/accept" in prop, (
+        "the button is missing for the party who must answer"
+    )
+    assert "counter-proposal" in prop.lower()
+
+    author = _as(client, world["recipient"]).get(f"/trades/{trade.id}").text
+    assert f"/trades/{trade.id}/accept" not in author, "you cannot accept your own counter"
+    assert f"/trades/{trade.id}/cancel" in author, "the author withdraws instead"
+
+
+def test_the_page_and_the_service_agree_about_who_answers(client, db, world):
+    """The page must not offer an action the service will refuse — that is the
+    shape of the reported bug, and a template gate that drifts from the service
+    gate will always produce it."""
+    trade = world["trade"]
+    ts.counter_trade(
+        db,
+        trade_id=trade.id,
+        author_user_id=world["recipient"].id,
+        offered=[],
+        requested=[{"showcase_item_id": world["r_share_items"][1].id, "quantity": 1}],
+    )
+    db.refresh(trade)
+
+    for party, name in ((world["proposer"], "proposer"), (world["recipient"], "recipient")):
+        page = _as(client, party).get(f"/trades/{trade.id}").text
+        offered = f"/trades/{trade.id}/accept" in page
+        try:
+            ts.transition_trade(
+                db, trade_id=trade.id, actor_user_id=party.id, new_status="accepted"
+            )
+            allowed = True
+            db.rollback()
+        except ValueError:
+            allowed = False
+        assert offered == allowed, f"{name}: page offers accept={offered}, service allows={allowed}"

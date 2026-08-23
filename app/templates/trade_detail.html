@@ -40,7 +40,7 @@
     <section class="panel trades-flash trades-flash-error">
       <strong>That didn't work.</strong>
       {% if error == 'trade_is_already_accepted;_no_further_transitions_allowed' or error.startswith('trade_is_already_') %}This trade is already closed.
-      {% elif error.startswith('only_the_recipient') %}Only the recipient can accept or decline.
+      {% elif error.startswith('only_the_party') %}Only the other party can accept, decline or cancel the current version.
       {% elif error.startswith('only_the_proposer') %}Only the proposer can cancel.
       {% else %}{{ error | replace('_', ' ') }}
       {% endif %}
@@ -203,10 +203,16 @@
       <p class="muted">Change either side and send it back for them to accept.</p>
       <a class="btn-like" href="/trades/{{ trade.id }}/counter">Build a counter-proposal</a>
     </section>
-    {% if viewer_is_recipient %}
+    {# WHO ANSWERS is the party who did NOT write the version on the table — the
+       same rule transition_trade enforces. Gating this on "am I the recipient"
+       put the button in front of the person the server refuses and hid it from
+       the person entitled to press it, the moment a recipient countered. #}
+    {% if viewer_can_respond %}
       <section class="panel trade-actions-panel">
-        <h3 class="panel-title">Accept or decline</h3>
-        <p class="muted">A short note back is optional and goes to the proposer.</p>
+        <h3 class="panel-title">
+          {% if revision_count > 1 %}Accept or decline this counter-proposal{% else %}Accept or decline{% endif %}
+        </h3>
+        <p class="muted">A short note back is optional and goes to the other party.</p>
         <form method="post" action="/trades/{{ trade.id }}/accept" class="stack-form inline-form">
           <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
           <label for="accept-note">Optional reply</label>
@@ -220,9 +226,12 @@
           <button type="submit" class="btn-danger-small">Decline</button>
         </form>
       </section>
-    {% elif viewer_is_proposer %}
+    {% else %}
+      {# You wrote the version on the table, so yours is the withdrawal. #}
       <section class="panel trade-actions-panel">
-        <h3 class="panel-title">Cancel proposal</h3>
+        <h3 class="panel-title">
+          {% if revision_count > 1 %}Withdraw your counter-proposal{% else %}Cancel proposal{% endif %}
+        </h3>
         <form method="post" action="/trades/{{ trade.id }}/cancel" class="inline-form"
               onsubmit="return confirm('Cancel this proposal? The other party will no longer see it as actionable.')">
           <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
