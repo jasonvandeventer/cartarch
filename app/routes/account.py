@@ -7,7 +7,14 @@ from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
 from app.auth import hash_password, validate_password_strength, verify_password
-from app.dependencies import CsrfRequired, get_current_user, get_db_session, render
+from app.dependencies import (
+    CsrfRequired,
+    get_current_user,
+    get_db_session,
+    render,
+    safe_redirect_url,
+    set_view_pref,
+)
 from app.models import User
 from app.routes.api import hash_api_token
 
@@ -35,6 +42,29 @@ def account_page(
             "new_api_token": new_api_token,
         },
     )
+
+
+@router.post("/trade-view-pref")
+def trade_view_pref(
+    request: Request,
+    view: str = Form(""),
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+    _: None = CsrfRequired,
+):
+    """Grid/list for the cards ON a trade (v4.16.1).
+
+    Lives HERE, not in ``routes/trades.py``, because that router carries
+    ``prefix="/trades"`` — registered there the real path was
+    ``/trades/account/trade-view-pref`` while the toggle posted to
+    ``/account/trade-view-pref``, so the button 404'd. The test posted to the
+    ROUTE rather than to the page's own form action and passed against a dead
+    control; it now reads the action out of the rendered page.
+
+    Stored preference, never a URL axis; the shared writer validates the value.
+    """
+    set_view_pref(session, current_user, "trade_view_mode", view)
+    return RedirectResponse(url=safe_redirect_url(request), status_code=303)
 
 
 @router.post("/change-password")

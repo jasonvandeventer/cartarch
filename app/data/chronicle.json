@@ -1,5 +1,15 @@
 [
   {
+    "version": "4.16.2",
+    "date": "2026-08-23",
+    "added": [],
+    "refined": [],
+    "resolved": [
+      "The Grid/List toggle on a trade works. It went out yesterday pointing at an address that did not exist, so pressing either button produced a Not Found page instead of changing the view. The buttons now do what they say, and every other button in the app was checked for the same mistake — there were none, and there is now a check that fails the build if one appears."
+    ],
+    "archivist_note": "The toggle was wired to /account/trade-view-pref and the code behind it was filed under the trades section, which quietly makes its real address /trades/account/trade-view-pref. Two names for one thing, and the button had the wrong one. What is more interesting is that the tests passed: they pressed the address in the code rather than the address on the page, so they proved the handler worked while the control was dead. Tests now read the button's own target out of the page, which is the only version of that test worth having — and a new check walks every form in the application and fails if its target is not a real address, because a dead button is invisible until somebody presses it."
+  },
+  {
     "version": "4.16.1",
     "date": "2026-08-23",
     "added": [

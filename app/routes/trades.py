@@ -44,8 +44,6 @@ from app.dependencies import (
     get_current_user,
     get_db_session,
     render,
-    safe_redirect_url,
-    set_view_pref,
 )
 from app.models import User
 
@@ -513,20 +511,6 @@ def _safe_error_code(message: str) -> str:
         )
         or "validation_error"
     )
-
-
-@router.post("/account/trade-view-pref")
-def trade_view_pref(
-    request: Request,
-    view: str = Form(""),
-    session: Session = Depends(get_db_session),
-    current_user: User = Depends(get_current_user),
-    _: None = CsrfRequired,
-):
-    """Grid/list for the cards ON a trade. Stored preference, never a URL axis;
-    the shared writer validates it (see `set_view_pref`)."""
-    set_view_pref(session, current_user, "trade_view_mode", view)
-    return RedirectResponse(url=safe_redirect_url(request), status_code=303)
 
 
 # ── The paged picker (#184) ─────────────────────────────────────

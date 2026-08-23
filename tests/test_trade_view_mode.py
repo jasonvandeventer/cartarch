@@ -14,6 +14,7 @@ at the end, so a second CSS block would be two things to keep in step.
 from __future__ import annotations
 
 import itertools
+import re
 
 import pytest
 
@@ -101,6 +102,29 @@ def trade(db, user):
     )
 
 
+def _toggle_action(page_html: str) -> str:
+    """The URL the PAGE actually posts the toggle to.
+
+    Every test here goes through this rather than through a path typed from the
+    route, because the first version of this feature registered the route on the
+    ``/trades``-prefixed router — real path ``/trades/account/trade-view-pref``,
+    form action ``/account/trade-view-pref``. The button 404'd in production
+    while the tests passed, because they posted to the route instead of to the
+    page. A test that types its own URL is testing the route; a test that reads
+    the form is testing the control.
+    """
+    m = re.search(r'action="([^"]*trade-view-pref[^"]*)"', page_html)
+    assert m, "the trade page renders no view toggle"
+    return m.group(1)
+
+
+def test_the_toggle_posts_to_a_real_route(client, db, user, trade):
+    """The 404 this feature shipped with, pinned directly."""
+    action = _toggle_action(client.get(f"/trades/{trade.id}").text)
+    resp = client.post(action, data={"view": "list", "csrf_token": "x"}, follow_redirects=False)
+    assert resp.status_code == 303, f"{action} is not a registered route"
+
+
 def test_the_toggle_switches_both_sides_and_the_choice_sticks(client, db, user, trade):
     grid = client.get(f"/trades/{trade.id}")
     assert grid.status_code == 200
@@ -108,7 +132,7 @@ def test_the_toggle_switches_both_sides_and_the_choice_sticks(client, db, user, 
     assert "card-list-row" not in grid.text
 
     switch = client.post(
-        "/trades/account/trade-view-pref",
+        _toggle_action(grid.text),
         data={"view": "list", "csrf_token": "x"},
         follow_redirects=False,
     )
@@ -125,7 +149,8 @@ def test_the_toggle_switches_both_sides_and_the_choice_sticks(client, db, user, 
 
 
 def test_the_list_keeps_the_facts_that_change_what_a_trade_is_worth(client, db, user, trade):
-    client.post("/trades/account/trade-view-pref", data={"view": "list", "csrf_token": "x"})
+    action = _toggle_action(client.get(f"/trades/{trade.id}").text)
+    client.post(action, data={"view": "list", "csrf_token": "x"})
     page = client.get(f"/trades/{trade.id}").text
     row = page[page.index("Mana Crypt") - 400 : page.index("Mana Crypt") + 400]
     # A proxy priced as the real card would misprice the whole trade
@@ -141,7 +166,8 @@ def test_the_view_is_a_preference_not_a_url_axis(client, db, user, trade):
 
 
 def test_an_unknown_mode_is_ignored(client, db, user, trade):
-    client.post("/trades/account/trade-view-pref", data={"view": "spreadsheet", "csrf_token": "x"})
+    action = _toggle_action(client.get(f"/trades/{trade.id}").text)
+    client.post(action, data={"view": "spreadsheet", "csrf_token": "x"})
     assert user.trade_view_mode == "grid"
 
 
@@ -149,7 +175,8 @@ def test_the_three_view_prefs_are_independent(client, db, user, trade):
     """Separate columns, on purpose: a 1,400-card showcase and a three-card trade
     want different things, and one shared column would make each surface silently
     change the other."""
-    client.post("/trades/account/trade-view-pref", data={"view": "list", "csrf_token": "x"})
+    action = _toggle_action(client.get(f"/trades/{trade.id}").text)
+    client.post(action, data={"view": "list", "csrf_token": "x"})
     assert user.trade_view_mode == "list"
     assert user.showcase_view_mode == "grid"
     assert user.deck_view_mode == "grid"
