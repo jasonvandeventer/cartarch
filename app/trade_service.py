@@ -482,6 +482,32 @@ def _resolve_offered_items(
     return resolved
 
 
+def _mirrored_member_row(
+    session: Session, recipient_user_id: int, playgroup_id: int, row_id: int
+) -> InventoryRow | None:
+    """The recipient's InventoryRow ``row_id``, but ONLY if it is currently a
+    member of a Showcase they share with this playgroup.
+
+    Resolved through ``resolve_showcase_rows`` so membership has one definition
+    — the same one the share page renders from. A row id that names something
+    they own but do not share resolves to None, so a hand-crafted request cannot
+    reach into unshared inventory.
+    """
+    from app.share_service import resolve_showcase_rows
+
+    shares = (
+        session.query(Share)
+        .filter(Share.user_id == recipient_user_id, Share.playgroup_id == playgroup_id)
+        .all()
+    )
+    for share in shares:
+        for entry in resolve_showcase_rows(session, share.showcase_id):
+            inv = entry["row"]
+            if inv is not None and inv.id == row_id and inv.user_id == recipient_user_id:
+                return inv
+    return None
+
+
 def _resolve_requested_items(
     session: Session,
     recipient_user_id: int,
@@ -495,6 +521,36 @@ def _resolve_requested_items(
     resolved: list[TradeItem] = []
     for raw in requested:
         showcase_item_id = int(raw.get("showcase_item_id") or 0)
+        row_id = int(raw.get("inventory_row_id") or 0)
+        if showcase_item_id <= 0 and row_id > 0:
+            # A MIRRORED card: it is in the showcase because its location is
+            # mirrored, so it has no ShowcaseItem to point at. C2 is unchanged in
+            # substance — the card must be in the Showcase the recipient shares
+            # with this playgroup — only the membership test moves to the ONE
+            # resolver (#135) instead of the items table. `showcase_item_id`
+            # stays NULL on the TradeItem, which is a shape it already has: the
+            # link is navigation-only (C1) and §10 cleanup nulls it anyway.
+            inv = _mirrored_member_row(session, recipient_user_id, playgroup_id, row_id)
+            if inv is None:
+                raise ValueError(
+                    "Requested item is not in the recipient's Showcase shared with this playgroup."
+                )
+            qty = max(1, int(raw.get("quantity") or 1))
+            if qty > inv.quantity:
+                qty = inv.quantity
+            if qty <= 0:
+                raise ValueError("Requested item has no available quantity.")
+            resolved.append(
+                TradeItem(
+                    side="requested",
+                    inventory_row_id=inv.id,
+                    card_id=inv.card_id,
+                    showcase_item_id=None,
+                    finish=inv.finish,
+                    quantity=qty,
+                )
+            )
+            continue
         if showcase_item_id <= 0:
             raise ValueError(
                 "Requested items must be selected from the "
@@ -1207,6 +1263,114 @@ def resolve_propose_from_showcase_item(
     return None
 
 
+def resolve_propose_from_share_row(
+    session: Session,
+    proposer_user_id: int,
+    inventory_row_id: int | None,
+) -> dict | None:
+    """Propose-from-share for a MIRRORED card — the sibling of
+    ``resolve_propose_from_showcase_item`` for a card with no ShowcaseItem.
+
+    The share page used to point every card at ``?from_showcase_item={{ item.id
+    }}``, and a mirrored card's id is None, so the link rendered
+    ``from_showcase_item=None`` and answered **422**: a card the viewer could see,
+    with a button that could only error.
+
+    Same guards, one substitution — membership is resolved through
+    ``resolve_showcase_rows`` (#135's one answer) rather than by loading an item
+    that does not exist. Returns None on any miss, exactly like its sibling, so
+    the route degrades to a plain construction page.
+    """
+    from app import playgroup_service
+    from app.share_service import resolve_showcase_rows
+
+    if not inventory_row_id:
+        return None
+    row = (
+        session.query(InventoryRow)
+        .filter(InventoryRow.id == inventory_row_id)
+        .options(joinedload(InventoryRow.card))
+        .first()
+    )
+    if row is None or row.card is None or row.user_id == proposer_user_id:
+        return None  # missing, or your own card — you cannot trade with yourself
+
+    candidate_shares = (
+        session.query(Share, Playgroup, Showcase)
+        .join(Playgroup, Share.playgroup_id == Playgroup.id)
+        .join(Showcase, Share.showcase_id == Showcase.id)
+        .filter(Share.user_id == row.user_id)
+        .all()
+    )
+    for share, playgroup, showcase in candidate_shares:
+        if (
+            playgroup_service.require_membership(
+                session, proposer_user_id, playgroup.id, min_role="member"
+            )
+            is None
+        ):
+            continue
+        member_ids = {
+            e["row"].id for e in resolve_showcase_rows(session, showcase.id) if e["row"] is not None
+        }
+        if row.id in member_ids:
+            return {
+                "recipient": showcase.user,
+                "playgroup": playgroup,
+                "showcase_item": None,
+                "inventory_row": row,
+                "showcase": showcase,
+                "share": share,
+            }
+    return None
+
+
+def shared_pick_items(session: Session, showcase_id: int) -> list[dict]:
+    """What the other party is actually offering — curated AND mirrored.
+
+    **Membership comes from `share_service.resolve_showcase_rows`, THE one
+    answer (#135), not from a `ShowcaseItem` query.** The picker used to read
+    the items table directly, so a card that is in a showcase because its
+    LOCATION is mirrored — which has no ShowcaseItem at all — was visible to a
+    viewer on the share page and then absent from the trade screen. Mirroring a
+    box made its cards untradeable, silently, which is most of the point of
+    putting them in a showcase.
+
+    Each entry NAMES ITSELF: ``pick_kind`` is ``showcase_item_id`` for a curated
+    card and ``inventory_row_id`` for a mirrored one, because those are two id
+    spaces that would collide as bare integers. ``inventory_row_id`` is an
+    opaque id, not one of §8's forbidden InventoryRow FIELDS (notes, tags,
+    location, raw quantity) — the card itself still goes through the sanitized
+    projection.
+    """
+    from app.share_service import resolve_showcase_rows
+
+    out: list[dict] = []
+    for entry in resolve_showcase_rows(session, showcase_id):
+        inv = entry["row"]
+        if inv is None or inv.card is None:
+            continue
+        available = max(0, min(entry["offered"], inv.quantity))
+        if available <= 0:
+            continue
+        item = entry["item"]
+        out.append(
+            {
+                "showcase_item_id": item.id if item is not None else None,
+                "inventory_row_id": inv.id,
+                "pick_kind": "showcase_item_id" if item is not None else "inventory_row_id",
+                "pick_id": item.id if item is not None else inv.id,
+                "mirrored": bool(entry["mirrored"]),
+                "card": _ReadOnlyCardProjection(inv.card),
+                "finish": inv.finish,
+                "available": available,
+                "is_proxy": bool(inv.is_proxy),
+            }
+        )
+    out.sort(key=lambda d: ((d["card"].name or "").lower(), d["pick_id"]))
+    return out
+
+
 def get_construction_options(
     session: Session,
     proposer_user_id: int,
@@ -1270,31 +1434,7 @@ def get_construction_options(
         # Confirm the (recipient, playgroup) pair is among the candidates.
         for cand in recipients:
             if cand["user"].id == recipient_user_id and cand["playgroup"].id == playgroup_id:
-                items_q = (
-                    session.query(ShowcaseItem)
-                    .filter(ShowcaseItem.showcase_id == cand["showcase"].id)
-                    .options(
-                        joinedload(ShowcaseItem.inventory_row).joinedload(InventoryRow.card),
-                    )
-                    .order_by(ShowcaseItem.added_at.desc())
-                    .all()
-                )
-                for it in items_q:
-                    inv = it.inventory_row
-                    if inv is None or inv.card is None:
-                        continue
-                    available = max(0, min(it.quantity_offered, inv.quantity))
-                    if available <= 0:
-                        continue
-                    recipient_share_items.append(
-                        {
-                            "showcase_item_id": it.id,
-                            "card": _ReadOnlyCardProjection(inv.card),
-                            "finish": inv.finish,
-                            "available": available,
-                            "is_proxy": bool(inv.is_proxy),
-                        }
-                    )
+                recipient_share_items = shared_pick_items(session, cand["showcase"].id)
                 break
 
     # #140 — a brew placeholder is a card you do NOT own: an is_proxy row that

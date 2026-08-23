@@ -78,8 +78,12 @@
                               show_deck_actions=false,
                               proxy_warn=true) }}
             {% if current_user.id != sharer.id %}
+              {# A MIRRORED card has no ShowcaseItem, so its `id` is None and this
+                 link used to render `?from_showcase_item=None` — a 422 on a card
+                 the viewer can plainly see. Point at the row instead; the route
+                 resolves both through the same guards. #}
               <a class="btn-like share-view-propose-link"
-                 href="/trades/new?from_showcase_item={{ item.id }}">Propose trade for this</a>
+                 href="/trades/new?{% if item.id %}from_showcase_item={{ item.id }}{% else %}from_showcase_row={{ item.inventory_row_id }}{% endif %}">Propose trade for this</a>
             {% endif %}
           </div>
         {% endfor %}

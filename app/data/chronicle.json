@@ -1,5 +1,15 @@
 [
   {
+    "version": "4.15.2",
+    "date": "2026-08-22",
+    "added": [],
+    "refined": [],
+    "resolved": [
+      "Cards that are in a Showcase because you mirror a location can now be traded for. They have always been visible to the people you share with, but the trade screen listed only the cards you had picked by hand, and the \"Propose trade for this\" button on a mirrored card led to an error page. Mirroring a box therefore put its cards on display and quietly made them the only ones nobody could ask you for. Both screens now use the same answer to \"what is in this Showcase\", so what a viewer sees is what they can trade for."
+    ],
+    "archivist_note": "Two screens were asking the same question and reading it out of different places. A Showcase's contents have been a computed answer since mirroring arrived — hand-picked cards plus whatever lives in the mirrored locations — and the share page has always asked for that answer properly. The trade screen went straight to the table of hand-picked cards instead, which was correct right up until mirroring existed. The fix is not a special case for mirrored cards; it is the trade screen asking the question the same way, which is why it also had to learn to name a card by the copy rather than by the pick. Worth stating plainly: a card only becomes askable because it is genuinely in a Showcase shared with that playgroup, and the server re-checks that when the proposal arrives rather than trusting what came back from the browser."
+  },
+  {
     "version": "4.15.1",
     "date": "2026-08-22",
     "added": [],

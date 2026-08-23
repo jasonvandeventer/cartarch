@@ -126,6 +126,9 @@ def _construction_response(
 def trades_new_page(
     request: Request,
     from_showcase_item: int | None = None,
+    # A MIRRORED card has no ShowcaseItem, so the share page points at its ROW
+    # instead. Same resolution, same guards — see resolve_propose_from_share_row.
+    from_showcase_row: int | None = None,
     from_wishlist_user: int | None = None,
     recipient_user_id: int | None = None,
     playgroup_id: int | None = None,
@@ -164,22 +167,35 @@ def trades_new_page(
             pre_locked = True
             prefilled_offered_row_ids = resolved["offered_row_ids"]
 
-    if from_showcase_item:
-        resolved = trade_service.resolve_propose_from_showcase_item(
-            session, current_user.id, from_showcase_item
+    if from_showcase_item or from_showcase_row:
+        resolved = (
+            trade_service.resolve_propose_from_showcase_item(
+                session, current_user.id, from_showcase_item
+            )
+            if from_showcase_item
+            else trade_service.resolve_propose_from_share_row(
+                session, current_user.id, from_showcase_row
+            )
         )
         if resolved is not None:
             pre_recipient = resolved["recipient"]
             pre_playgroup = resolved["playgroup"]
             pre_locked = True
-            # Push the showcase_item_id as the prefilled requested item.
-            si = resolved["showcase_item"]
-            inv = si.inventory_row
+            # Prefill the requested side. A mirrored card resolves with no
+            # ShowcaseItem, so the row carries both the identity and the
+            # available quantity.
+            si = resolved.get("showcase_item")
+            inv = si.inventory_row if si is not None else resolved.get("inventory_row")
             if inv is not None and inv.card is not None:
-                available = max(0, min(si.quantity_offered, inv.quantity))
+                available = (
+                    max(0, min(si.quantity_offered, inv.quantity))
+                    if si is not None
+                    else inv.quantity
+                )
                 prefilled_requested.append(
                     {
-                        "showcase_item_id": si.id,
+                        "showcase_item_id": si.id if si is not None else None,
+                        "inventory_row_id": inv.id,
                         "card": inv.card,  # raw access only inside the prefill summary
                         "finish": inv.finish,
                         "available": available,

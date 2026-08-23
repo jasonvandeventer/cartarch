@@ -165,7 +165,8 @@ data-card-info="{{ (card.set_code or '?')|upper }} #{{ card.collector_number or 
           {% set seen_pre = [] %}
           {% for it in prefilled_requested %}
             <div class="trade-pick-item trade-pick-prefilled"
-                 data-showcase-item-id="{{ it.showcase_item_id }}"
+                 data-row-id="{{ it.inventory_row_id }}"
+                 data-showcase-item-id="{{ it.showcase_item_id or '' }}"
                  data-available="{{ it.available }}"
                  data-proxy="{{ '1' if it.is_proxy else '0' }}"
                  {{ pick_sort_attrs(it.card, it.finish, it.available, it.is_proxy) }}>
@@ -182,18 +183,25 @@ data-card-info="{{ (card.set_code or '?')|upper }} #{{ card.collector_number or 
                 <label>
                   Qty
                   <input type="number" min="1" max="{{ it.available }}" value="1"
-                         class="trade-pick-qty" data-showcase-item-id="{{ it.showcase_item_id }}">
+                         class="trade-pick-qty" data-row-id="{{ it.inventory_row_id }}">
                 </label>
                 <button type="button" class="btn-danger-small trade-pick-remove"
-                        data-showcase-item-id="{{ it.showcase_item_id }}">Remove</button>
+                        data-row-id="{{ it.inventory_row_id }}">Remove</button>
               </div>
             </div>
-            {% if seen_pre.append(it.showcase_item_id) %}{% endif %}
+            {% if seen_pre.append(it.inventory_row_id) %}{% endif %}
           {% endfor %}
           {% for share_item in options.recipient_share_items %}
-            {% if share_item.showcase_item_id not in seen_pre %}
+            {% if share_item.inventory_row_id not in seen_pre %}
+              {# The identity is the ROW, not the ShowcaseItem: a MIRRORED card is
+                 in this showcase because its location is, so it has no
+                 ShowcaseItem at all and used to be missing from this grid
+                 entirely — visible on the share page, untradeable here. The
+                 showcase item id rides along when there is one, so a curated
+                 pick keeps its provenance link on the trade. #}
               <div class="trade-pick-item"
-                   data-showcase-item-id="{{ share_item.showcase_item_id }}"
+                   data-row-id="{{ share_item.inventory_row_id }}"
+                   data-showcase-item-id="{{ share_item.showcase_item_id or '' }}"
                    data-available="{{ share_item.available }}"
                    data-proxy="{{ '1' if share_item.is_proxy else '0' }}"
                    {{ pick_sort_attrs(share_item.card, share_item.finish, share_item.available, share_item.is_proxy) }}>
@@ -207,7 +215,7 @@ data-card-info="{{ (card.set_code or '?')|upper }} #{{ card.collector_number or 
                   </div>
                 </div>
                 <button type="button" class="btn-like trade-pick-add"
-                        data-showcase-item-id="{{ share_item.showcase_item_id }}"
+                        data-row-id="{{ share_item.inventory_row_id }}"
                         data-available="{{ share_item.available }}">Add</button>
               </div>
             {% endif %}
@@ -294,7 +302,7 @@ data-card-info="{{ (card.set_code or '?')|upper }} #{{ card.collector_number or 
       var form = document.getElementById('trade-new-form');
       if (!form) return;
       var offered = new Map(); // inventory_row_id -> {quantity}
-      var requested = new Map(); // showcase_item_id -> {quantity}
+      var requested = new Map(); // inventory_row_id -> {quantity}
 
       // A rejected submit comes back as a re-render carrying the picks it was
       // rejecting, so an error costs you the message and nothing else. A
@@ -318,7 +326,7 @@ data-card-info="{{ (card.set_code or '?')|upper }} #{{ card.collector_number or 
       function anyProxySelected() {
         var hit = false;
         requested.forEach(function (_v, id) {
-          var el = document.querySelector('#requested-grid .trade-pick-item[data-showcase-item-id="' + id + '"]');
+          var el = document.querySelector('#requested-grid .trade-pick-item[data-row-id="' + id + '"]');
           if (el && el.getAttribute('data-proxy') === '1') hit = true;
         });
         offered.forEach(function (_v, id) {
@@ -349,7 +357,7 @@ data-card-info="{{ (card.set_code or '?')|upper }} #{{ card.collector_number or 
       function money(n) { return '$' + n.toFixed(2); }
       function updateBalance() {
         var give = sideTotal(offered, 'offered-grid', 'data-inventory-row-id');
-        var get = sideTotal(requested, 'requested-grid', 'data-showcase-item-id');
+        var get = sideTotal(requested, 'requested-grid', 'data-row-id');
         var giveEl = document.getElementById('trade-balance-offered');
         var getEl = document.getElementById('trade-balance-requested');
         var diffEl = document.getElementById('trade-balance-diff');
@@ -378,7 +386,7 @@ data-card-info="{{ (card.set_code or '?')|upper }} #{{ card.collector_number or 
 
       // Pre-fill requested from server-rendered prefilled rows.
       document.querySelectorAll('#requested-grid .trade-pick-prefilled').forEach(function (el) {
-        var id = parseInt(el.getAttribute('data-showcase-item-id'), 10);
+        var id = parseInt(el.getAttribute('data-row-id'), 10);
         var available = parseInt(el.getAttribute('data-available'), 10) || 1;
         if (id) requested.set(id, { quantity: Math.min(1, available) });
       });
@@ -392,14 +400,22 @@ data-card-info="{{ (card.set_code or '?')|upper }} #{{ card.collector_number or 
         );
         document.getElementById('requested-json').value = JSON.stringify(
           Array.from(requested.entries()).map(function (entry) {
-            return { showcase_item_id: entry[0], quantity: entry[1].quantity };
+            // Both ids: the server prefers the ShowcaseItem when there is
+            // one (keeping the curated card's provenance link) and falls
+            // back to the row for a mirrored card, which has no item.
+            var el = document.querySelector(
+              '#requested-grid .trade-pick-item[data-row-id="' + entry[0] + '"]');
+            var si = el ? parseInt(el.getAttribute('data-showcase-item-id'), 10) : 0;
+            var out = { inventory_row_id: entry[0], quantity: entry[1].quantity };
+            if (si) out.showcase_item_id = si;
+            return out;
           })
         );
       }
 
       // Click handlers: Add buttons on the requested + offered grids.
       document.querySelectorAll('#requested-grid .trade-pick-add').forEach(function (btn) {
-        var id = parseInt(btn.getAttribute('data-showcase-item-id'), 10);
+        var id = parseInt(btn.getAttribute('data-row-id'), 10);
         var available = parseInt(btn.getAttribute('data-available'), 10) || 1;
         if (!id) return;
         function markAdded() {
@@ -438,7 +454,7 @@ data-card-info="{{ (card.set_code or '?')|upper }} #{{ card.collector_number or 
       // Prefilled-item Remove + qty change handlers.
       document.querySelectorAll('#requested-grid .trade-pick-remove').forEach(function (btn) {
         btn.addEventListener('click', function () {
-          var id = parseInt(btn.getAttribute('data-showcase-item-id'), 10);
+          var id = parseInt(btn.getAttribute('data-row-id'), 10);
           requested.delete(id);
           var row = btn.closest('.trade-pick-item');
           if (row) row.style.display = 'none';
@@ -447,7 +463,7 @@ data-card-info="{{ (card.set_code or '?')|upper }} #{{ card.collector_number or 
       });
       document.querySelectorAll('#requested-grid .trade-pick-qty').forEach(function (input) {
         input.addEventListener('change', function () {
-          var id = parseInt(input.getAttribute('data-showcase-item-id'), 10);
+          var id = parseInt(input.getAttribute('data-row-id'), 10);
           var qty = parseInt(input.value, 10) || 1;
           if (requested.has(id)) requested.set(id, { quantity: qty });
           updateBalance();
@@ -509,7 +525,7 @@ data-card-info="{{ (card.set_code or '?')|upper }} #{{ card.collector_number or 
         if (!grid) return;
         var isOffered = grid.id === 'offered-grid';
         var map = isOffered ? offered : requested;
-        var attr = isOffered ? 'data-inventory-row-id' : 'data-showcase-item-id';
+        var attr = isOffered ? 'data-inventory-row-id' : 'data-row-id';
         var note = document.querySelector('.trade-pick-filter-note[data-grid="' + grid.id + '"]');
         if (box.checked && map.size === 0) {
           // Filtering to nothing would just look like a broken page.

@@ -1037,6 +1037,14 @@ def build_share_display_items(
             {
                 # ShowcaseItem id — surface-internal only; None when mirrored.
                 "id": it.id if it is not None else None,
+                # The row id, so a MIRRORED card (which has no ShowcaseItem) can
+                # still be pointed at by "Propose trade for this" — it used to
+                # emit ?from_showcase_item=None and answer 422. An opaque id, NOT
+                # one of §8's forbidden InventoryRow FIELDS (notes, tags,
+                # location, raw quantity); the card still goes through the
+                # projection below and `quantity` is still the computed
+                # available, never the raw row quantity.
+                "inventory_row_id": inv.id,
                 "card": card_proj,
                 "finish": inv.finish,
                 "language": inv.language or "en",
