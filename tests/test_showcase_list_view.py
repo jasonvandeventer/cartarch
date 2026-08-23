@@ -93,7 +93,7 @@ def test_the_toggle_switches_the_render_and_the_choice_sticks(client, db, user):
     grid = client.get(f"/showcase/{sc.id}")
     assert grid.status_code == 200
     assert "showcase-items-grid" in grid.text
-    assert "showcase-list-row" not in grid.text
+    assert "card-list-row" not in grid.text
 
     switch = client.post(
         "/account/showcase-view-pref",
@@ -110,14 +110,14 @@ def test_the_toggle_switches_the_render_and_the_choice_sticks(client, db, user):
     assert user.showcase_view_mode == "list"
 
     listed = client.get(f"/showcase/{sc.id}")
-    assert "showcase-list-row" in listed.text
+    assert "card-list-row" in listed.text
     assert "showcase-items-grid" not in listed.text
     # The card is still fully identified without its art.
     assert "Rhystic Study" in listed.text
     assert "CSP #33" in listed.text
     # ...and the row carries no image of its own; the shared hover preview owns
     # that, which is the point of the view on a big showcase.
-    rows = re.findall(r'<li class="showcase-list-row.*?</li>', listed.text, re.S)
+    rows = re.findall(r'<li class="card-list-row.*?</li>', listed.text, re.S)
     assert rows and not any("<img" in r for r in rows)
 
 
@@ -126,7 +126,7 @@ def test_the_view_is_a_preference_not_a_url_axis(client, db, user):
     a release because a param and the stored pref disagreed about who wins."""
     sc = _seed(db, user)
     page = client.get(f"/showcase/{sc.id}?view=list")
-    assert "showcase-list-row" not in page.text, "a URL param must not change the view"
+    assert "card-list-row" not in page.text, "a URL param must not change the view"
     assert "showcase-items-grid" in page.text
 
 

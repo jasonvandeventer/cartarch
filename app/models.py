@@ -72,6 +72,14 @@ class User(Base):
     showcase_view_mode: Mapped[str] = mapped_column(
         String(16), default="grid", server_default="grid", nullable=False
     )
+    # Third view preference, third column — same reasoning as the second: a
+    # trade holds a handful of cards and a showcase holds thousands, so wanting
+    # art on one and a list on the other is ordinary. They are set by one shared
+    # writer (`set_view_pref`), which is what keeps three columns from becoming
+    # three hand-rolled routes.
+    trade_view_mode: Mapped[str] = mapped_column(
+        String(16), default="grid", server_default="grid", nullable=False
+    )
 
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utc_now)
     # v3.27.4 — replaces the misleading "last activity" proxy on the Admin

@@ -1,0 +1,45 @@
+{# One side of a trade as a compact list instead of card art (2026-08-23).
+
+   Uses the SHARED `.card-list-*` family the showcase list introduced — the rows
+   are the same shape (quantity, name, printing, price) and only the tail
+   differs, so a second CSS block would be two things to keep in step.
+
+   Read-only by construction: a trade's cards carry no controls on either side
+   for either party. What each row must still say is what the grid says — the
+   proxy badge and the $0.00 that goes with it, because a proxy carrying the
+   real card's price would misprice the whole trade (ADR proxy-valuation).
+
+   Items are the sanitized projection dicts from get_trade_detail: card, finish,
+   language, is_proxy, quantity, effective_price, total_value. #}
+<ul class="card-list" data-card-hover data-card-hover-target=".card-list-row">
+  {% for item in trade_items %}
+    <li class="card-list-row"
+        {% if item.card.image_url and item.card.scryfall_id %}
+        data-card-image="{{ mirror_image_url(item.card.scryfall_id, 'large') }}"
+        data-card-image-alt="{{ scryfall_image_fallback(item.card.scryfall_id, 'large') }}"
+        data-card-info="{{ (item.card.set_code or '?')|upper }} #{{ item.card.collector_number or '?' }}"
+        {% endif %}>
+      <span class="cl-qty">{{ item.quantity }}</span>
+      <span class="cl-name">{{ item.card.name }}</span>
+      <span class="cl-set">{{ (item.card.set_code or '?')|upper }} #{{ item.card.collector_number or '?' }}</span>
+      <span class="cl-tags">
+        {% if item.finish and item.finish != 'normal' %}
+          <span class="finish-badge">{{ item.finish|capitalize }}</span>
+        {% endif %}
+        {% if item.language and item.language != 'en' %}
+          <span class="language-badge">{{ item.language|upper }}</span>
+        {% endif %}
+        {% if item.is_proxy %}<span class="proxy-badge proxy-badge-warn">PROXY</span>{% endif %}
+      </span>
+      <span class="cl-price">
+        {% if item.is_proxy %}
+          $0.00 <span class="proxy-price-note">(proxy)</span>
+        {% elif item.total_value %}
+          ${{ '%.2f'|format(item.total_value) }}
+        {% else %}
+          <span class="muted">—</span>
+        {% endif %}
+      </span>
+    </li>
+  {% endfor %}
+</ul>

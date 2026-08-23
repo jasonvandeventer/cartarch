@@ -44,6 +44,8 @@ from app.dependencies import (
     get_current_user,
     get_db_session,
     render,
+    safe_redirect_url,
+    set_view_pref,
 )
 from app.models import User
 
@@ -513,6 +515,20 @@ def _safe_error_code(message: str) -> str:
     )
 
 
+@router.post("/account/trade-view-pref")
+def trade_view_pref(
+    request: Request,
+    view: str = Form(""),
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+    _: None = CsrfRequired,
+):
+    """Grid/list for the cards ON a trade. Stored preference, never a URL axis;
+    the shared writer validates it (see `set_view_pref`)."""
+    set_view_pref(session, current_user, "trade_view_mode", view)
+    return RedirectResponse(url=safe_redirect_url(request), status_code=303)
+
+
 # ── The paged picker (#184) ─────────────────────────────────────
 
 PICK_PAGE_SIZE = 50
@@ -861,6 +877,7 @@ def trades_detail(
             "has_proxy": detail["has_proxy"],
             "viewer_is_proposer": detail["viewer_is_proposer"],
             "viewer_is_recipient": detail["viewer_is_recipient"],
+            "view_mode": current_user.trade_view_mode or "grid",
             # Counter-proposals. The template enumerates its context key by key
             # (failure mode 1), so every one of these needs its line here.
             "revision_count": len(detail["trade"].revisions),

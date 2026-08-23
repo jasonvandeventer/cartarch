@@ -90,6 +90,12 @@
         <p class="trade-proxy-notice">⚠ This trade includes proxies — they carry no market value.</p>
       </section>
 
+      {# Live value of both sides, pinned so it stays visible while you work
+         through the panes. Same finish-aware prices the trade detail page
+         totals with; proxies count as $0 (ADR proxy-valuation). Guidance only —
+         nothing validates against it. #}
+      {% include "_trade_balance_bar.html" %}
+
       {# #184 — each side is a SEARCHED, PAGED pane rather than the whole
          collection. Swapped by HTMX so the page never reloads: the selection
          lives in trade-picker.js, and a reload would take it with it. #}
@@ -145,15 +151,6 @@
         <textarea name="proposer_note" rows="3" placeholder="A short note for the recipient — context, deadlines, dealer's choice on which finish, whatever."></textarea>
       </section>
 
-
-      {# Live balance of the two sides while you pick. Same finish-aware prices
-         the trade detail page totals with; proxies count as $0 (ADR
-         proxy-valuation). Guidance only — nothing validates against it. #}
-      <div class="trade-balance" id="trade-balance">
-        <span class="trade-balance-side">You give <strong data-pick-total="offered">$0.00</strong></span>
-        <span class="trade-balance-side">You get <strong data-pick-total="requested">$0.00</strong></span>
-        <span class="trade-balance-diff" data-pick-total="diff">Pick cards on both sides to compare.</span>
-      </div>
 
       <section class="panel">
         <div class="trade-new-submit">

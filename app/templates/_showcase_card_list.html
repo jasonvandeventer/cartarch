@@ -15,18 +15,18 @@
    language, is_proxy, available, quantity_offered, effective_price, mirrored,
    and `id` — which is None for a MIRRORED row, because a mirrored card has no
    ShowcaseItem to edit or remove. #}
-<ul class="showcase-list" data-card-hover data-card-hover-target=".showcase-list-row">
+<ul class="card-list" data-card-hover data-card-hover-target=".card-list-row">
   {% for item in items %}
-    <li class="showcase-list-row{% if item.mirrored %} is-mirrored{% endif %}"
+    <li class="card-list-row{% if item.mirrored %} is-mirrored{% endif %}"
         {% if item.card.image_url and item.card.scryfall_id %}
         data-card-image="{{ mirror_image_url(item.card.scryfall_id, 'large') }}"
         data-card-image-alt="{{ scryfall_image_fallback(item.card.scryfall_id, 'large') }}"
         data-card-info="{{ (item.card.set_code or '?')|upper }} #{{ item.card.collector_number or '?' }}"
         {% endif %}>
-      <span class="scl-qty">{{ item.available }}</span>
-      <a class="scl-name" href="/cards/{{ item.card.id }}">{{ item.card.name }}</a>
-      <span class="scl-set">{{ (item.card.set_code or '?')|upper }} #{{ item.card.collector_number or '?' }}</span>
-      <span class="scl-tags">
+      <span class="cl-qty">{{ item.available }}</span>
+      <a class="cl-name" href="/cards/{{ item.card.id }}">{{ item.card.name }}</a>
+      <span class="cl-set">{{ (item.card.set_code or '?')|upper }} #{{ item.card.collector_number or '?' }}</span>
+      <span class="cl-tags">
         {% if item.finish and item.finish != 'normal' %}
           <span class="finish-badge">{{ item.finish|capitalize }}</span>
         {% endif %}
@@ -35,7 +35,7 @@
         {% endif %}
         {% if item.is_proxy %}<span class="proxy-badge">PROXY</span>{% endif %}
       </span>
-      <span class="scl-price">
+      <span class="cl-price">
         {% if item.is_proxy %}
           $0.00 <span class="proxy-price-note">(proxy)</span>
         {% elif item.effective_price %}
@@ -59,25 +59,25 @@
          it rendered both forms pointed at /showcase/items/None/…, which could
          only fail. Fixed there too. #}
       {% if not item.mirrored %}
-        <span class="scl-actions">
-          <form method="post" action="/showcase/items/{{ item.id }}/quantity" class="scl-form">
+        <span class="cl-actions">
+          <form method="post" action="/showcase/items/{{ item.id }}/quantity" class="cl-form">
             <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-            <label class="scl-offered-label" for="scl-qty-{{ item.id }}">Offered</label>
-            <input type="number" id="scl-qty-{{ item.id }}" name="quantity_offered"
-                   value="{{ item.quantity_offered }}" min="1" class="scl-offered-input">
-            <button type="submit" class="scl-btn">Update</button>
+            <label class="cl-offered-label" for="cl-qty-{{ item.id }}">Offered</label>
+            <input type="number" id="cl-qty-{{ item.id }}" name="quantity_offered"
+                   value="{{ item.quantity_offered }}" min="1" class="cl-offered-input">
+            <button type="submit" class="cl-btn">Update</button>
           </form>
-          <form method="post" action="/showcase/items/{{ item.id }}/remove" class="scl-form"
+          <form method="post" action="/showcase/items/{{ item.id }}/remove" class="cl-form"
                 onsubmit='return confirm({{ ("Remove " ~ item.card.name ~ " from your Showcase?") | tojson }})'>
             <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-            <button type="submit" class="btn-danger-small scl-btn">Remove</button>
+            <button type="submit" class="btn-danger-small cl-btn">Remove</button>
           </form>
         </span>
       {% else %}
-        <span class="scl-actions scl-mirrored-note" title="This card is here because you mirror the location it lives in. Stop mirroring that location to remove it.">mirrored</span>
+        <span class="cl-actions cl-mirrored-note" title="This card is here because you mirror the location it lives in. Stop mirroring that location to remove it.">mirrored</span>
       {% endif %}
       {% if not item.mirrored and item.available < item.quantity_offered %}
-        <span class="scl-warn" title="You offered {{ item.quantity_offered }}; your inventory only has {{ item.available }} now.">offered {{ item.quantity_offered }}</span>
+        <span class="cl-warn" title="You offered {{ item.quantity_offered }}; your inventory only has {{ item.available }} now.">offered {{ item.quantity_offered }}</span>
       {% endif %}
     </li>
   {% endfor %}

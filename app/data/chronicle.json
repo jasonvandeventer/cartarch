@@ -1,5 +1,16 @@
 [
   {
+    "version": "4.16.1",
+    "date": "2026-08-23",
+    "added": [
+      "The running value of both sides of a trade is now pinned to the top of the screen. It updates as you add and remove cards, and stays in view while you search through either side — it used to sit below both card lists, which was fine when everything was on one page and not much use now that each side is searched and paged. The counter-proposal editor has one too; it never showed a total at all.",
+      "The cards on a trade can be shown as a list instead of card art. A Grid/List toggle at the top of the trade switches both sides at once: one row per card with its set, finish, quantity and price, and the card image on hover. Your choice is remembered, separately from the deck and Showcase settings."
+    ],
+    "refined": [],
+    "resolved": [],
+    "archivist_note": "Both of these are the same observation from two directions: a trade is a thing you read while doing something else. The total belongs where your eyes already are rather than at the bottom of a page you have scrolled away from, and a trade of five cards is a list of five things — the art is lovely and is exactly what you do not need when you are checking whether the two sides balance. The list rows are the same rows a Showcase list uses, deliberately: they hold the same facts in the same order, and keeping one description of them means the day someone changes how a price is shown, it changes in both places. Two details that are not decoration and are worth naming: a proxy still shows as a proxy and still counts as nothing, because a proxy priced as the real card would misprice the whole trade; and the total counts what you have picked, not what happens to be on the screen, so a card chosen three pages ago is still in the sum."
+  },
+  {
     "version": "4.16.0",
     "date": "2026-08-22",
     "added": [],

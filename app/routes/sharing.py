@@ -36,6 +36,7 @@ from app.dependencies import (
     get_db_session,
     render,
     safe_redirect_url,
+    set_view_pref,
 )
 from app.models import User
 
@@ -70,9 +71,7 @@ def showcase_view_pref(
     back, so the toggle looked dead. One writer, read from the user row, and the
     303 goes back to whichever Showcase you were on.
     """
-    if view in SHOWCASE_VIEW_MODES and current_user.showcase_view_mode != view:
-        current_user.showcase_view_mode = view
-        session.commit()
+    set_view_pref(session, current_user, "showcase_view_mode", view)
     return RedirectResponse(url=safe_redirect_url(request), status_code=303)
 
 

@@ -12555,21 +12555,26 @@ table.dmtx .dmtx-rowhead {
   margin-top: 0.85rem;
 }
 
-/* ── Showcase LIST view ──────────────────────────────────────────────────────
+/* ── Shared compact CARD LIST (showcase v4.15.0, trade detail v4.16.2) ───────
+   One family, two surfaces: a showcase's cards and the cards on a trade are the
+   same shape of row — quantity, name, printing, price — differing only in what
+   sits at the end (editable controls vs nothing). A second copy of this block
+   is how the two drift, which this codebase has paid for more than once.
+
    One row per card, one column — NOT the deck list's three. A showcase row
    carries an editable offered quantity, a price and two buttons; fragmenting
    that across narrow columns is unreadable, and staying single-column also
    avoids the Firefox multicol bug the deck list needed a formatting context to
    survive (see .deck-list-row). No art per row: the shared hover preview shows
    the card, so a 1,400-card showcase renders with zero <img> tags. */
-.showcase-list {
+.card-list {
   list-style: none;
   margin: 0.85rem 0 0;
   padding: 0;
   display: flex;
   flex-direction: column;
 }
-.showcase-list-row {
+.card-list-row {
   display: flex;
   align-items: center;
   gap: 0.6rem;
@@ -12577,13 +12582,13 @@ table.dmtx .dmtx-rowhead {
   border-bottom: 1px solid var(--border);
   font-size: 0.9rem;
 }
-.showcase-list-row:last-child {
+.card-list-row:last-child {
   border-bottom: none;
 }
-.showcase-list-row:hover {
+.card-list-row:hover {
   background: rgba(255, 255, 255, 0.04);
 }
-.scl-qty {
+.cl-qty {
   font-variant-numeric: tabular-nums;
   font-weight: 600;
   min-width: 2.2ch;
@@ -12591,58 +12596,58 @@ table.dmtx .dmtx-rowhead {
   flex: 0 0 auto;
   color: var(--muted);
 }
-.scl-name {
+.cl-name {
   flex: 1 1 auto;
   min-width: 0; /* or a long name refuses to shrink and pushes the row wide */
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.scl-set {
+.cl-set {
   flex: 0 0 auto;
   color: var(--muted);
   font-size: 0.8rem;
   font-variant-numeric: tabular-nums;
 }
-.scl-tags {
+.cl-tags {
   display: flex;
   gap: 0.3rem;
   flex: 0 0 auto;
 }
-.scl-price {
+.cl-price {
   flex: 0 0 auto;
   min-width: 6ch;
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
-.scl-actions {
+.cl-actions {
   display: flex;
   align-items: center;
   gap: 0.4rem;
   flex: 0 0 auto;
 }
-.scl-form {
+.cl-form {
   display: flex;
   align-items: center;
   gap: 0.3rem;
 }
-.scl-offered-label {
+.cl-offered-label {
   color: var(--muted);
   font-size: 0.75rem;
 }
-.scl-offered-input {
+.cl-offered-input {
   width: 56px;
 }
-.scl-btn {
+.cl-btn {
   font-size: 0.8rem;
   padding: 0.25rem 0.5rem;
 }
-.scl-mirrored-note {
+.cl-mirrored-note {
   color: var(--muted);
   font-size: 0.78rem;
   font-style: italic;
 }
-.scl-warn {
+.cl-warn {
   color: var(--brand-gold);
   font-size: 0.78rem;
   flex: 0 0 auto;
@@ -12651,13 +12656,13 @@ table.dmtx .dmtx-rowhead {
 /* Below tablet the controls wrap under the card rather than squeezing the name
    to nothing — the same trade the actions drawer makes. */
 @media (max-width: 768px) {
-  .showcase-list-row {
+  .card-list-row {
     flex-wrap: wrap;
   }
-  .scl-name {
+  .cl-name {
     flex: 1 1 60%;
   }
-  .scl-actions {
+  .cl-actions {
     flex: 1 1 100%;
     justify-content: flex-end;
   }
@@ -12666,10 +12671,10 @@ table.dmtx .dmtx-rowhead {
      next card rather than this one — measured at 509px and 553px adrift.
      Pushing both to the right edge costs no height (642px of rows either way,
      Chromium at 700px) and keeps the numbers in one column down the page. */
-  .scl-price {
+  .cl-price {
     margin-left: auto;
   }
-  .scl-warn {
+  .cl-warn {
     flex: 1 1 100%;
     text-align: right;
   }
@@ -13158,6 +13163,9 @@ table.dmtx .dmtx-rowhead {
   position: sticky;
   bottom: 0;
   z-index: 5;
+  /* z-index 5 is deliberately low: the hover preview lives on <body> at 9999
+     and must stay above this bar, or moving the mouse over a tile near the top
+     of the pane would put the card art behind it. */
   display: flex;
   align-items: center;
   gap: 1.2rem;
@@ -13168,6 +13176,21 @@ table.dmtx .dmtx-rowhead {
   border: 1px solid var(--brand-gold);
   border-radius: var(--radius-sm);
   font-size: 0.9rem;
+}
+/* Pinned to the TOP of the trade rather than the bottom (2026-08-23). 72px is
+   the topbar's height — the same number .app-sidebar offsets by — so the bar
+   comes to rest directly beneath it instead of sliding under it. Below 769px
+   the topbar is not sticky, so the bar pins to the viewport top instead. */
+.trade-balance-pinned {
+  position: sticky;
+  top: 72px;
+  bottom: auto;
+  margin: 0 0 0.8rem;
+}
+@media (max-width: 768px) {
+  .trade-balance-pinned {
+    top: 0;
+  }
 }
 .trade-balance-side strong {
   font-variant-numeric: tabular-nums;

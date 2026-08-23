@@ -65,6 +65,29 @@ if os.getenv("PYTEST_CURRENT_TEST") or os.getenv("PYTEST_VERSION"):
 _REDIRECT_ALLOWED_HOSTS: frozenset[str] = frozenset({"cartarch.com", "www.cartarch.com"})
 
 
+VIEW_MODES = ("grid", "list")
+
+
+def set_view_pref(session, user, column: str, value: str) -> bool:
+    """THE writer for a per-surface grid/list preference. Returns True if changed.
+
+    Three surfaces now store one (`deck_view_mode`, `showcase_view_mode`,
+    `trade_view_mode`) and each keeps its own column deliberately — a 1,400-card
+    showcase and a three-card trade want different things. What they must NOT
+    each keep is their own copy of "validate the value and commit", which is how
+    one of them ends up accepting a mode the others reject.
+
+    View mode is a stored preference and NEVER a URL axis: the deck toggle once
+    looked dead because a `?view=` param and the stored pref disagreed about
+    which won.
+    """
+    if value not in VIEW_MODES or getattr(user, column) == value:
+        return False
+    setattr(user, column, value)
+    session.commit()
+    return True
+
+
 def safe_redirect_url(request: Request, default: str = "/collection") -> str:
     """Validate a Referer before reusing it as a redirect target.
 

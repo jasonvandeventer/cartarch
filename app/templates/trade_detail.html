@@ -77,9 +77,25 @@
     </section>
   {% endif %}
 
+  {# Grid/List toggle for the cards ON this trade (2026-08-23). Same stored-pref
+     shape as the deck and showcase toggles, its own column, one shared writer. #}
+  <section class="panel trade-view-toggle-panel">
+    <form action="/account/trade-view-pref" method="post" class="deck-view-toggle"
+          style="display:inline-flex">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <button type="submit" name="view" value="grid"
+              class="deck-view-toggle-btn {% if view_mode == 'grid' %}active{% endif %}">Grid</button>
+      <button type="submit" name="view" value="list"
+              class="deck-view-toggle-btn {% if view_mode == 'list' %}active{% endif %}">List</button>
+    </form>
+  </section>
+
   <section class="panel">
     <h3 class="panel-title">{{ proposer_label }} offers</h3>
     {% if offered_items %}
+      {% if view_mode == 'list' %}
+        {% with trade_items=offered_items %}{% include "_trade_card_list.html" %}{% endwith %}
+      {% else %}
       <div class="inventory-grid trade-items-grid">
         {% for item in offered_items %}
           {{ inventory_card(item, csrf_token,
@@ -89,6 +105,7 @@
                             proxy_warn=true) }}
         {% endfor %}
       </div>
+      {% endif %}
       <p class="muted trade-side-total">Side total: <strong>${{ '%.2f'|format(offered_total) }}</strong>{% if offered_items | selectattr('is_proxy') | list %} <span class="proxy-price-note">(proxies count as $0)</span>{% endif %}</p>
     {% else %}
       <p class="trades-empty">No offered items.</p>
@@ -98,6 +115,9 @@
   <section class="panel">
     <h3 class="panel-title">{{ proposer_label }} requests from {{ recipient_label }}</h3>
     {% if requested_items %}
+      {% if view_mode == 'list' %}
+        {% with trade_items=requested_items %}{% include "_trade_card_list.html" %}{% endwith %}
+      {% else %}
       <div class="inventory-grid trade-items-grid">
         {% for item in requested_items %}
           {{ inventory_card(item, csrf_token,
@@ -107,6 +127,7 @@
                             proxy_warn=true) }}
         {% endfor %}
       </div>
+      {% endif %}
       <p class="muted trade-side-total">Side total: <strong>${{ '%.2f'|format(requested_total) }}</strong>{% if requested_items | selectattr('is_proxy') | list %} <span class="proxy-price-note">(proxies count as $0)</span>{% endif %}</p>
     {% else %}
       <p class="trades-empty">No requested items.</p>

@@ -42,6 +42,11 @@
     <input type="hidden" name="offered_json" id="offered-json" value="[]">
     <input type="hidden" name="requested_json" id="requested-json" value="[]">
 
+    {# The counter editor never showed a running total, which mattered less when
+       it listed everything and matters more now that it pages. The engine
+       already computes both sides, so it is the same include. #}
+    {% include "_trade_balance_bar.html" %}
+
     {# #184 — both sides are SEARCHED, PAGED panes swapped by HTMX, and the
        selection lives in the shared trade-picker.js. Same engine and same grid
        partial as the construction page: this editor used to carry its own
