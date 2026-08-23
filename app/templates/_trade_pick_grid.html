@@ -1,0 +1,101 @@
+{# One page of pickable cards, for either side of a trade and either trade
+   screen (#184).
+
+   The grid is a PAGE now. A 4,472-card showcase used to render in full — six
+   thousand tiles across the two sides, and every one of them fetching an image
+   — so searching or scrolling cost minutes. Search runs server-side in the
+   app's own query language, the same parser the Collection bar uses; paging
+   covers whatever the search does not narrow.
+
+   Every tile carries its own name/price/proxy, because trade-picker.js copies
+   those into the selection at pick time: the tile is usually gone by the time
+   the trade is submitted, and a total that re-reads the DOM would quietly drop
+   the cards it can no longer see.
+
+   Caller supplies: pick_side, pick_items, pick_page, pick_total_pages,
+   pick_total, pick_search, pick_endpoint (the hx-get target for paging). #}
+{% from "_macros.html" import img_fallback, thumb_srcset %}
+<div class="trade-pick-grid is-visual" data-pick-grid="{{ pick_side }}"
+     data-card-hover data-card-hover-target=".trade-pick-item"
+     id="{{ pick_side }}-grid">
+  {% for item in pick_items %}
+    {% set price = 0 if item.is_proxy else (effective_price(item.card, item.finish) or 0) %}
+    <div class="trade-pick-item"
+         data-pick-kind="{{ item.pick_kind }}"
+         data-pick-id="{{ item.pick_id }}"
+         {% if item.pick_alt %}data-pick-alt="{{ item.pick_alt }}"{% endif %}
+         data-available="{{ item.available }}"
+         data-name="{{ item.card.name }}"
+         data-price="{{ price }}"
+         data-proxy="{{ '1' if item.is_proxy else '0' }}"
+         data-meta="{{ (item.card.set_code or '?')|upper }} #{{ item.card.collector_number or '?' }} · {{ (item.finish or 'normal')|capitalize }}"
+         {% if item.card.image_url and item.card.scryfall_id %}
+         data-card-image="{{ mirror_image_url(item.card.scryfall_id, 'large') }}"
+         data-card-image-alt="{{ scryfall_image_fallback(item.card.scryfall_id, 'large') }}"
+         {% endif %}>
+      <div class="trade-pick-card">
+        {% if item.card.image_url and item.card.scryfall_id %}
+          <img class="trade-pick-thumb" src="{{ mirror_image_url(item.card.scryfall_id) }}"
+               {{ thumb_srcset(item.card.scryfall_id, "146px") }}
+               {{ img_fallback(item.card.scryfall_id) }}
+               alt="{{ item.card.name }}" loading="lazy">
+        {% endif %}
+        <div class="trade-pick-name">
+          {{ item.card.name }}
+          {% if item.is_proxy %}<span class="proxy-badge proxy-badge-warn" title="Proxy — carries no market value">PROXY</span>{% endif %}
+        </div>
+        <div class="trade-pick-meta">
+          {{ (item.card.set_code or '?')|upper }} #{{ item.card.collector_number or '?' }} &middot;
+          {{ (item.finish or 'normal')|capitalize }} &middot;
+          {{ item.available }} available &middot;
+          {% if item.is_proxy %}<span class="proxy-price-note">$0 (proxy)</span>
+          {% elif price %}<span class="trade-pick-price">${{ '%.2f'|format(price) }}</span>
+          {% else %}<span class="muted">— no price</span>{% endif %}
+          {# Offered side only — the recipient's storage is private and never
+             leaves the sanitized projection, so this is genuinely optional and
+             takes the |default idiom rather than a silenced failure. #}
+          {% if item.location_label|default('') %}
+            <span class="trade-pick-loc{% if item.location_type|default('') == 'deck' %} is-deck{% endif %}">{{ item.location_label }}</span>
+          {% endif %}
+        </div>
+      </div>
+      <button type="button" class="btn-like js-pick-toggle">Add</button>
+    </div>
+  {% endfor %}
+  {% if not pick_items %}
+    <p class="trades-empty">
+      {% if pick_search %}Nothing matches <strong>{{ pick_search }}</strong>.
+      {% else %}Nothing available to pick here.{% endif %}
+    </p>
+  {% endif %}
+</div>
+
+{# The cap is stated, never silent: a truncated grid with no caption reads as
+   "this is everything". #}
+<div class="trade-pick-status muted">
+  {%- if pick_total_pages > 1 -%}
+    {%- set first = ((pick_page - 1) * 50) + 1 -%}
+    {%- set last = ((pick_page - 1) * 50) + pick_items|length -%}
+    Showing {{ first }}–{{ last }} of {{ pick_total }}
+    {%- if pick_search %} matching <strong>{{ pick_search }}</strong>{% endif -%}.
+    {%- if not pick_search %} Search to narrow it down.{% endif -%}
+  {%- elif pick_total -%}
+    {{ pick_total }} card{{ '' if pick_total == 1 else 's' }}{% if pick_search %} matching <strong>{{ pick_search }}</strong>{% endif %}.
+  {%- endif -%}
+</div>
+
+{% if pick_total_pages > 1 %}
+  <div class="trade-pick-pager">
+    {% if pick_page > 1 %}
+      <button type="button" class="btn"
+              hx-get="{{ pick_endpoint }}&page={{ pick_page - 1 }}&q={{ pick_search|urlencode }}"
+              hx-target="#{{ pick_side }}-pane" hx-swap="innerHTML">Previous</button>
+    {% endif %}
+    <span class="muted">Page {{ pick_page }} of {{ pick_total_pages }}</span>
+    {% if pick_page < pick_total_pages %}
+      <button type="button" class="btn"
+              hx-get="{{ pick_endpoint }}&page={{ pick_page + 1 }}&q={{ pick_search|urlencode }}"
+              hx-target="#{{ pick_side }}-pane" hx-swap="innerHTML">Next</button>
+    {% endif %}
+  </div>
+{% endif %}

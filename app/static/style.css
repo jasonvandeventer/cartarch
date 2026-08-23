@@ -12989,6 +12989,80 @@ table.dmtx .dmtx-rowhead {
   background: var(--brand-gold-soft);
   border-color: var(--brand-gold);
 }
+
+/* ── The paged picker (#184) ────────────────────────────────────────────────
+   The tray is the only place a pick is guaranteed to be visible: its tile is
+   usually on another page or behind a different search. It sits ABOVE the grid
+   for that reason — what you have chosen should not be something you scroll to
+   find. */
+.trade-pick-search {
+  width: 100%;
+  margin: 0.6rem 0 0.4rem;
+}
+.trade-pick-tray-wrap {
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.5rem 0.7rem;
+  margin-bottom: 0.7rem;
+}
+.trade-tray-title {
+  margin: 0 0 0.35rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.trade-tray-empty {
+  margin: 0;
+  font-size: 0.85rem;
+}
+.trade-tray-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.2rem 0;
+  font-size: 0.9rem;
+}
+.trade-tray-row + .trade-tray-row {
+  border-top: 1px solid var(--border);
+}
+.trade-tray-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.trade-tray-meta {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+.trade-tray-qty {
+  width: 56px;
+  flex: 0 0 auto;
+}
+.trade-tray-price {
+  flex: 0 0 auto;
+  min-width: 6ch;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.trade-tray-remove {
+  flex: 0 0 auto;
+}
+.trade-pick-status {
+  margin: 0.5rem 0 0;
+  font-size: 0.85rem;
+}
+.trade-pick-pager {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-top: 0.5rem;
+  flex-wrap: wrap;
+}
 #counter-offered,
 #counter-requested {
   grid-template-columns: repeat(auto-fill, 146px);

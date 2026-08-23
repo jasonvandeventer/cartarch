@@ -47,6 +47,10 @@ from app.dependencies import (
 )
 from app.models import User
 
+# One page size, one slicing helper — the location grid solved this first
+# (v4.13.27) and a second copy is how two surfaces drift.
+from app.routes.collections import _paginate_items
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/trades")
@@ -80,6 +84,70 @@ def trades_inbox(
     )
 
 
+def _pane_context(items: list[dict], endpoint: str, page: int = 1) -> dict:
+    """First-page context for one picker pane, in the shape the partial wants."""
+    page_items, page, total_pages = _paginate_items(items, page, PICK_PAGE_SIZE)
+    return {
+        # NOT "items": Jinja resolves `.items` on a dict to the dict METHOD, so
+        # `{% for x in pane.items %}` iterates a builtin and 500s the page. The
+        # wishlist view learned this the same way (`cards`, never `items`).
+        "cards": page_items,
+        "page": page,
+        "total_pages": total_pages,
+        "total": len(items),
+        "endpoint": endpoint,
+    }
+
+
+def _hydrate_picks(items: list[dict], entries: list[dict]) -> list[dict]:
+    """Turn submitted picks into tray entries carrying their own name/price.
+
+    The tray has to show a pick whose TILE is not on screen — another page, or
+    behind a different search — so the values come from the server's own list
+    rather than from a DOM lookup that would find nothing. An entry naming
+    something no longer pickable is dropped, which is the same answer the
+    validator would give it.
+    """
+    from app.pricing import effective_price
+
+    by_key = {(i["pick_kind"], i["pick_id"]): i for i in items}
+    also_by_row = {i.get("inventory_row_id"): i for i in items if i.get("inventory_row_id")}
+    also_by_item = {i.get("showcase_item_id"): i for i in items if i.get("showcase_item_id")}
+    out = []
+    for e in entries:
+        if not isinstance(e, dict):
+            continue
+        found = None
+        for kind in ("inventory_row_id", "showcase_item_id", "trade_item_id"):
+            if not e.get(kind):
+                continue
+            found = by_key.get((kind, int(e[kind])))
+            if found is None and kind == "inventory_row_id":
+                found = also_by_row.get(int(e[kind]))
+            if found is None and kind == "showcase_item_id":
+                found = also_by_item.get(int(e[kind]))
+            if found is not None:
+                break
+        if found is None:
+            continue
+        price = 0.0 if found["is_proxy"] else (effective_price(found["card"], found["finish"]) or 0)
+        out.append(
+            {
+                "kind": found["pick_kind"],
+                "id": found["pick_id"],
+                "alt": found.get("pick_alt", ""),
+                "name": found["card"].name,
+                "price": price,
+                "proxy": bool(found["is_proxy"]),
+                "meta": f"{(found['card'].set_code or '?').upper()} "
+                f"#{found['card'].collector_number or '?'}",
+                "quantity": max(1, int(e.get("quantity") or 1)),
+                "available": found.get("available") or 1,
+            }
+        )
+    return out
+
+
 def _construction_response(
     request: Request,
     current_user: User,
@@ -101,6 +169,41 @@ def _construction_response(
     and every pick, because the in-progress selection lives only in the page's
     JS Maps. ``restore_picks`` hands those picks back to the page.
     """
+    # #184 — each side is a paged pane now. The first page is rendered here so a
+    # cold load needs no round-trip; everything after that is an HTMX swap of
+    # the pane alone, which is what keeps the in-progress selection alive.
+    requested_items = options.get("recipient_share_items") or []
+    offered_items = options.get("proposer_inventory") or []
+    endpoint_base = (
+        f"?recipient_user_id={pre_recipient.id if pre_recipient else 0}"
+        f"&playgroup_id={pre_playgroup.id if pre_playgroup else 0}"
+    )
+    # A prefilled or rejected pick becomes a TRAY entry, hydrated from the
+    # server's own lists — its tile is very often not on the first page.
+    tray = restore_picks or {}
+    if prefilled_requested:
+        tray = dict(tray)
+        tray.setdefault(
+            "requested",
+            [
+                {
+                    "showcase_item_id": it.get("showcase_item_id"),
+                    "inventory_row_id": it.get("inventory_row_id"),
+                    "quantity": 1,
+                }
+                for it in prefilled_requested
+            ],
+        )
+    if prefilled_offered_row_ids:
+        tray = dict(tray)
+        tray.setdefault(
+            "offered",
+            [{"inventory_row_id": rid, "quantity": 1} for rid in prefilled_offered_row_ids],
+        )
+    hydrated = {
+        "requested": _hydrate_picks(requested_items, tray.get("requested") or []),
+        "offered": _hydrate_picks(offered_items, tray.get("offered") or []),
+    }
     return render(
         request,
         "trade_new.html",
@@ -111,10 +214,14 @@ def _construction_response(
             "pre_recipient": pre_recipient,
             "pre_playgroup": pre_playgroup,
             "options": options,
+            "requested_pane": _pane_context(
+                requested_items, f"/trades/picker/requested{endpoint_base}"
+            ),
+            "offered_pane": _pane_context(offered_items, f"/trades/picker/offered{endpoint_base}"),
             "prefilled_requested": prefilled_requested or [],
             "prefilled_offered_row_ids": prefilled_offered_row_ids or [],
             "error": error,
-            "restore_picks": restore_picks,
+            "restore_picks": hydrated if (hydrated["requested"] or hydrated["offered"]) else None,
         },
     )
 
@@ -334,7 +441,10 @@ def _pick_ids(entries: list, key: str) -> list[dict]:
             qty = int(e.get("quantity") or 1)
         except (TypeError, ValueError):
             continue
-        out.append({"id": item_id, "quantity": max(1, qty)})
+        # Emit the KIND key, not a bare "id": the hydration step matches picks
+        # against the server's own lists by (kind, id), and a bare id cannot say
+        # which id space it belongs to.
+        out.append({key: item_id, "quantity": max(1, qty)})
     return out
 
 
@@ -401,6 +511,113 @@ def _safe_error_code(message: str) -> str:
         )
         or "validation_error"
     )
+
+
+# ── The paged picker (#184) ─────────────────────────────────────
+
+PICK_PAGE_SIZE = 50
+
+
+def _pick_pane(
+    request: Request,
+    side: str,
+    items: list[dict],
+    page: int,
+    search: str,
+    endpoint: str,
+):
+    """Render ONE side's grid + status + pager.
+
+    The same partial serves the full page and the HTMX swap, so a searched page
+    and a first render cannot drift — the deck-card-list seam's lesson, applied
+    to the picker.
+    """
+    page_items, page, total_pages = _paginate_items(items, page, PICK_PAGE_SIZE)
+    return render(
+        request,
+        "_trade_pick_grid.html",
+        {
+            "pick_side": side,
+            "pick_items": page_items,
+            "pick_page": page,
+            "pick_total_pages": total_pages,
+            "pick_total": len(items),
+            "pick_search": search,
+            "pick_endpoint": endpoint,
+        },
+    )
+
+
+def _pick_items_for(
+    session: Session,
+    current_user: User,
+    side: str,
+    *,
+    recipient_user_id: int | None,
+    playgroup_id: int | None,
+    trade_id: int | None,
+    search: str,
+) -> tuple[list[dict], str]:
+    """The list for one side, plus the endpoint its pager should call.
+
+    Authorisation is NOT re-invented here: the construction and counter option
+    builders already answer "what may this person pick from", including the
+    membership and share checks, so an id that is not theirs to see resolves to
+    an empty list rather than to a 403 that would confirm it exists.
+    """
+    if trade_id:
+        detail = trade_service.get_trade_detail(session, current_user.id, trade_id)
+        if detail is None:
+            return [], ""
+        opts = trade_service.counter_options(session, detail["trade"], current_user.id)
+        endpoint = f"/trades/picker/{side}?trade_id={trade_id}"
+        if side == "offered":
+            items = opts["offered_rows"] or opts["offered_share_items"]
+        else:
+            items = opts["requested_share_items"]
+        if search.strip():
+            needle = search.strip().lower()
+            items = [i for i in items if needle in (i["card"].name or "").lower()]
+        return items, endpoint
+
+    endpoint = (
+        f"/trades/picker/{side}?recipient_user_id={recipient_user_id or 0}"
+        f"&playgroup_id={playgroup_id or 0}"
+    )
+    if side == "offered":
+        return trade_service.offered_pick_items(session, current_user.id, search), endpoint
+    opts = trade_service.get_construction_options(
+        session, current_user.id, recipient_user_id, playgroup_id, requested_search=search
+    )
+    return opts["recipient_share_items"], endpoint
+
+
+@router.get("/picker/{side}")
+def trade_picker_pane(
+    side: str,
+    request: Request,
+    recipient_user_id: int | None = None,
+    playgroup_id: int | None = None,
+    trade_id: int | None = None,
+    q: str = "",
+    page: int = 1,
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+):
+    """One side of a picker, searched and paged — the HTMX endpoint behind both
+    trade screens."""
+    if side not in ("offered", "requested"):
+        return RedirectResponse(url="/trades", status_code=303)
+    items, endpoint = _pick_items_for(
+        session,
+        current_user,
+        side,
+        recipient_user_id=recipient_user_id,
+        playgroup_id=playgroup_id,
+        trade_id=trade_id,
+        search=q,
+    )
+    return _pick_pane(request, side, items, page, q, endpoint)
 
 
 # ── Counter-proposals ───────────────────────────────────────────
@@ -511,6 +728,12 @@ def _counter_response(
     other = trade.recipient if current_user.id == trade.proposer_user_id else trade.proposer
     if restore_picks is None:
         restore_picks = trade_service.current_picks_for_restore(trade, opts["author_is_proposer"])
+    offered_items = opts["offered_rows"] or opts["offered_share_items"]
+    requested_items = opts["requested_share_items"]
+    # A recipient's counter names the trade's OWN lines for cards the proposer
+    # does not publicly share, so those become pickable tiles in their own right.
+    if not opts["author_is_proposer"]:
+        offered_items = _counter_line_items(trade) + offered_items
     return render(
         request,
         "trade_counter.html",
@@ -520,11 +743,48 @@ def _counter_response(
             "trade": trade,
             "other_party": other,
             "options": opts,
-            "current_offered": trade_service._items_by_side(trade, "offered"),
-            "restore_picks": restore_picks,
+            "offered_pane": _pane_context(
+                offered_items, f"/trades/picker/offered?trade_id={trade.id}"
+            ),
+            "requested_pane": _pane_context(
+                requested_items, f"/trades/picker/requested?trade_id={trade.id}"
+            ),
+            "restore_picks": {
+                "offered": _hydrate_picks(offered_items, restore_picks.get("offered") or []),
+                "requested": _hydrate_picks(requested_items, restore_picks.get("requested") or []),
+            },
             "error": error,
         },
     )
+
+
+def _counter_line_items(trade) -> list[dict]:
+    """The trade's existing offered lines, as pickable tiles.
+
+    A countering RECIPIENT cannot name the proposer's inventory rows and can
+    only see what the proposer has SHARED, so without these a counter would
+    silently drop every offered card the proposer keeps private (v4.14.0's
+    third identity, now rendered rather than implied).
+    """
+    from app.trade_service import _items_by_side, _ReadOnlyCardProjection
+
+    out = []
+    for it in _items_by_side(trade, "offered"):
+        if it.card is None:
+            continue
+        out.append(
+            {
+                "pick_kind": "trade_item_id",
+                "pick_id": it.id,
+                "pick_alt": "",
+                "available": it.quantity,
+                "card": _ReadOnlyCardProjection(it.card),
+                "finish": it.finish,
+                "is_proxy": False,
+                "inventory_row_id": it.inventory_row_id,
+            }
+        )
+    return out
 
 
 def _sanitize_picks(entries: list) -> list[dict]:

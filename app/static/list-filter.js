@@ -18,9 +18,13 @@
 // so the filter SEMANTICS live once in Python; this only compares.
 //
 // Used by: showcases.html, shares.html, showcase.html, share_view.html,
-// watchlist.html, wishlist_public.html, playgroup_detail.html, trade_new.html,
+// watchlist.html, wishlist_public.html, playgroup_detail.html,
 // commander_picker.html, sets.html (v4.13.28 — name OR code, both in
 // data-filter-text).
+//
+// NOT trade_new.html any more (#184): the picker is paged, so a client-side
+// filter could only ever have hidden the fifty cards on screen. Its search is
+// server-side in the app's query language instead.
 (function () {
   function colorMatches(token, want) {
     if (!want) return true;

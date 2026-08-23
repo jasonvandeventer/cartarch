@@ -15,6 +15,7 @@ Two independent asks over the shared wishlist surfaces:
 from __future__ import annotations
 
 import itertools
+import json
 import re
 
 from app import trade_service as ts
@@ -156,13 +157,14 @@ def test_prefilled_offered_reaches_the_construction_page(db, client, user):
     resp = client.get(f"/trades/new?from_wishlist_user={owner.id}")
     assert resp.status_code == 200
     body = resp.text
-    offered = body[body.index("offered-grid") :]
-    assert re.search(
-        rf'trade-pick-item trade-pick-prefilled"\s+data-inventory-row-id="{row.id}"', offered
-    )
+    # #184 — the picker is paged, so a prefilled card is delivered as a TRAY
+    # entry rather than as a marked tile: its tile may not be on the first page
+    # at all. The blob carries what the tray needs to draw it without one.
+    blob = json.loads(re.search(r'id="pick-restore">(.*?)</script>', body, re.S).group(1))
+    assert [e["id"] for e in blob["offered"]] == [row.id]
+    assert blob["offered"][0]["name"] == "Rhystic Study"
     # A6 untouched — nothing is prefilled on the requested side.
-    requested = body[body.index("requested-grid") : body.index("offered-grid")]
-    assert "trade-pick-prefilled" not in requested
+    assert blob["requested"] == []
 
 
 # --------------------------------------------------------------------------- #

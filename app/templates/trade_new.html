@@ -6,78 +6,11 @@
    are NOT re-implemented in JS — only the comparison is. Sort is client-side
    here (not the shared ?sort= param) because a reload would drop the
    in-progress selection, which lives only in the page's JS Maps. #}
-{% macro pick_sort_attrs(card, finish, avail, is_proxy) -%}
-data-sort-name="{{ (card.name or '') | lower }}"
-data-sort-cmc="{{ '' if card.cmc is none else card.cmc }}"
-data-sort-set="{{ card.set_code or '' }} {{ card.collector_number or '' }}"
-data-sort-rarity="{{ rarity_rank(card.rarity) }}"
-data-sort-price="{{ 0 if is_proxy else effective_price(card, finish) }}"
-data-sort-avail="{{ avail }}"
-{% set facets = card_filter_tokens(card) %}data-colors="{{ facets[0] }}" data-types="{{ facets[1] }}"
-data-filter-text="{{ card.name }}"
-{% if card.image_url and card.scryfall_id %}data-card-image="{{ mirror_image_url(card.scryfall_id, 'large') }}"
-data-card-image-alt="{{ scryfall_image_fallback(card.scryfall_id, 'large') }}"
-data-card-info="{{ (card.set_code or '?')|upper }} #{{ card.collector_number or '?' }}{% if not is_proxy and effective_price(card, finish) %} · ${{ '%.2f'|format(effective_price(card, finish)) }}{% elif is_proxy %} · proxy{% endif %}"
-{% endif %}
-{%- endmacro %}
-
-{# Per-card price in the picker. Same finish-aware effective_price the trade
-   detail page totals with, and the same three-branch convention the showcase
-   tiles use: proxy -> $0, priced -> $X.XX, uncached (0.0) -> neutral "no price"
-   (never "$0.00", which would read as free). #}
-{% macro pick_price(card, finish, is_proxy) -%}
-{% if is_proxy %}<span class="proxy-price-note">$0 (proxy)</span>
-{%- else %}{% set p = effective_price(card, finish) %}
-{%- if p %}<span class="trade-pick-price">${{ '%.2f' | format(p) }}</span>
-{%- else %}<span class="muted">— no price</span>{% endif %}{% endif %}
-{%- endmacro %}
-
-{# The picker is the surface that reported this: a 4,472-card shared showcase
-   plus your own inventory is ~6,000 tiles, and every one of them was fetching a
-   488px 152 KB image into a ~150px box. srcset lets a 1x screen take the 18 KB
-   small instead; the visual tile is 146px CSS so `sizes` is the truth, not a
-   hint that happens to work. #}
-{% macro pick_thumb(card) -%}
-{% if card.image_url and card.scryfall_id %}
-  <img class="trade-pick-thumb" src="{{ mirror_image_url(card.scryfall_id) }}"
-       {{ thumb_srcset(card.scryfall_id, "146px") }}
-       {{ img_fallback(card.scryfall_id) }} alt="{{ card.name }}" loading="lazy">
-{% endif %}
-{%- endmacro %}
-
-{% macro pick_tools(grid_id, with_location=false) -%}
-<div class="trade-pick-tools">
-  <label>Sort
-    <select class="js-pick-sort" data-grid="{{ grid_id }}">
-      <option value="">Default</option>
-      <option value="name">Name</option>
-      {% if with_location %}<option value="loc">Location</option>{% endif %}
-      <option value="cmc">Mana Value</option>
-      <option value="set">Set</option>
-      <option value="rarity">Rarity</option>
-      <option value="price">Price</option>
-      <option value="avail">Quantity Available</option>
-    </select>
-  </label>
-  <select class="js-pick-dir" data-grid="{{ grid_id }}" aria-label="Sort direction">
-    <option value="asc">Ascending</option>
-    <option value="desc">Descending</option>
-  </select>
-  <label class="trade-pick-visual-toggle">
-    <input type="checkbox" class="js-pick-visual" data-grid="{{ grid_id }}"> Card images
-  </label>
-  <label class="trade-pick-visual-toggle">
-    <input type="checkbox" class="js-pick-only" data-grid="{{ grid_id }}"> Picked only
-  </label>
-  {% set target = '#' + grid_id + ' .trade-pick-item' %}
-  {% include "_card_facets.html" with context %}
-  <input type="search" class="trade-pick-namebox" placeholder="Filter by name…"
-         aria-label="Filter by card name"
-         data-list-filter data-list-filter-target="{{ target }}">
-  <span class="trade-pick-filter-note" data-grid="{{ grid_id }}"></span>
-</div>
-{%- endmacro %}
-
+{# The client-side sort/filter/facet controls left with #184's paging: they
+   could only ever have reordered the fifty cards that happened to be on screen,
+   which is a more confusing thing than not offering them. Search is the app's
+   own query language and runs server-side over the whole set — `t:creature`,
+   `c:r`, `is:foil`, `cmc>=4` — so nothing it could express was lost. #}
 {% block content %}
   {# v3.29.2 — trade construction page. Two initiation modes feed this:
      - Standalone /trades/new: recipient+playgroup picker first, then
@@ -146,7 +79,7 @@ data-card-info="{{ (card.set_code or '?')|upper }} #{{ card.collector_number or 
   {% endif %}
 
   {% if pre_recipient and pre_playgroup %}
-    <form method="post" action="/trades" id="trade-new-form" class="stack-form trade-new-form">
+    <form method="post" action="/trades" id="trade-new-form" class="stack-form trade-new-form" data-pick-form>
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
       <input type="hidden" name="recipient_user_id" value="{{ pre_recipient.id }}">
       <input type="hidden" name="playgroup_id" value="{{ pre_playgroup.id }}">
@@ -157,107 +90,54 @@ data-card-info="{{ (card.set_code or '?')|upper }} #{{ card.collector_number or 
         <p class="trade-proxy-notice">⚠ This trade includes proxies — they carry no market value.</p>
       </section>
 
+      {# #184 — each side is a SEARCHED, PAGED pane rather than the whole
+         collection. Swapped by HTMX so the page never reloads: the selection
+         lives in trade-picker.js, and a reload would take it with it. #}
       <section class="panel">
         <h3 class="panel-title">Their cards (requested)</h3>
-        <p class="muted">Pick items from <strong>{{ pre_recipient.player_label }}</strong>'s Showcase that's shared with <em>{{ pre_playgroup.name }}</em>. Toggle to add &mdash; quantities default to available, click to override.</p>
-        {{ pick_tools('requested-grid') }}
-        <div class="trade-pick-grid" data-card-hover data-card-hover-target=".trade-pick-item" id="requested-grid">
-          {% set seen_pre = [] %}
-          {% for it in prefilled_requested %}
-            <div class="trade-pick-item trade-pick-prefilled"
-                 data-row-id="{{ it.inventory_row_id }}"
-                 data-showcase-item-id="{{ it.showcase_item_id or '' }}"
-                 data-available="{{ it.available }}"
-                 data-proxy="{{ '1' if it.is_proxy else '0' }}"
-                 {{ pick_sort_attrs(it.card, it.finish, it.available, it.is_proxy) }}>
-              <div class="trade-pick-card">
-                {{ pick_thumb(it.card) }}
-                <div class="trade-pick-name">{{ it.card.name }}{% if it.is_proxy %} <span class="proxy-badge proxy-badge-warn" title="Proxy — carries no market value">PROXY</span>{% endif %}</div>
-                <div class="trade-pick-meta">
-                  {{ it.card.set_code | upper }} #{{ it.card.collector_number }} &middot;
-                  {{ it.finish | capitalize }} &middot;
-                  available {{ it.available }} &middot; {{ pick_price(it.card, it.finish, it.is_proxy) }}
-                </div>
-              </div>
-              <div class="trade-pick-controls">
-                <label>
-                  Qty
-                  <input type="number" min="1" max="{{ it.available }}" value="1"
-                         class="trade-pick-qty" data-row-id="{{ it.inventory_row_id }}">
-                </label>
-                <button type="button" class="btn-danger-small trade-pick-remove"
-                        data-row-id="{{ it.inventory_row_id }}">Remove</button>
-              </div>
-            </div>
-            {% if seen_pre.append(it.inventory_row_id) %}{% endif %}
-          {% endfor %}
-          {% for share_item in options.recipient_share_items %}
-            {% if share_item.inventory_row_id not in seen_pre %}
-              {# The identity is the ROW, not the ShowcaseItem: a MIRRORED card is
-                 in this showcase because its location is, so it has no
-                 ShowcaseItem at all and used to be missing from this grid
-                 entirely — visible on the share page, untradeable here. The
-                 showcase item id rides along when there is one, so a curated
-                 pick keeps its provenance link on the trade. #}
-              <div class="trade-pick-item"
-                   data-row-id="{{ share_item.inventory_row_id }}"
-                   data-showcase-item-id="{{ share_item.showcase_item_id or '' }}"
-                   data-available="{{ share_item.available }}"
-                   data-proxy="{{ '1' if share_item.is_proxy else '0' }}"
-                   {{ pick_sort_attrs(share_item.card, share_item.finish, share_item.available, share_item.is_proxy) }}>
-                <div class="trade-pick-card">
-                  {{ pick_thumb(share_item.card) }}
-                  <div class="trade-pick-name">{{ share_item.card.name }}{% if share_item.is_proxy %} <span class="proxy-badge proxy-badge-warn" title="Proxy — carries no market value">PROXY</span>{% endif %}</div>
-                  <div class="trade-pick-meta">
-                    {{ share_item.card.set_code | upper }} #{{ share_item.card.collector_number }} &middot;
-                    {{ share_item.finish | capitalize }} &middot;
-                    available {{ share_item.available }} &middot; {{ pick_price(share_item.card, share_item.finish, share_item.is_proxy) }}
-                  </div>
-                </div>
-                <button type="button" class="btn-like trade-pick-add"
-                        data-row-id="{{ share_item.inventory_row_id }}"
-                        data-available="{{ share_item.available }}">Add</button>
-              </div>
-            {% endif %}
-          {% endfor %}
-          {% if not prefilled_requested and not options.recipient_share_items %}
-            <p class="trades-empty">No items to choose from in their shared Showcase.</p>
-          {% endif %}
+        <p class="muted">
+          From <strong>{{ pre_recipient.player_label }}</strong>'s Showcase shared with
+          <em>{{ pre_playgroup.name }}</em>. Search it, then add what you want.
+        </p>
+        <input type="search" class="trade-pick-search" name="q" placeholder="Search their showcase — name, t:creature, c:r, cmc>=4…"
+               aria-label="Search their showcase"
+               hx-get="/trades/picker/requested?recipient_user_id={{ pre_recipient.id }}&playgroup_id={{ pre_playgroup.id }}"
+               hx-target="#requested-pane" hx-swap="innerHTML"
+               hx-trigger="keyup changed delay:350ms, search">
+        <div class="trade-pick-tray-wrap">
+          <h4 class="trade-tray-title">Picked</h4>
+          <div data-pick-tray="requested"></div>
+        </div>
+        <div id="requested-pane">
+          {% with pick_side="requested", pick_items=requested_pane.cards,
+                  pick_page=requested_pane.page, pick_total_pages=requested_pane.total_pages,
+                  pick_total=requested_pane.total, pick_search="",
+                  pick_endpoint=requested_pane.endpoint %}
+            {% include "_trade_pick_grid.html" %}
+          {% endwith %}
         </div>
       </section>
 
       <section class="panel">
         <h3 class="panel-title">Your cards (offered)</h3>
-        <p class="muted">Pick items from your own placed inventory to offer in exchange.</p>
-        {% if options.proposer_inventory %}
-          {{ pick_tools('offered-grid', with_location=true) }}
-          <div class="trade-pick-grid" data-card-hover data-card-hover-target=".trade-pick-item" id="offered-grid">
-            {% for inv in options.proposer_inventory %}
-              <div class="trade-pick-item{% if inv.inventory_row_id in prefilled_offered_row_ids %} trade-pick-prefilled{% endif %}"
-                   data-inventory-row-id="{{ inv.inventory_row_id }}"
-                   data-available="{{ inv.quantity }}"
-                   data-proxy="{{ '1' if inv.is_proxy else '0' }}"
-                   {{ pick_sort_attrs(inv.card, inv.finish, inv.quantity, inv.is_proxy) }}
-                   data-sort-loc="{{ inv.location_label | lower }}">
-                <div class="trade-pick-card">
-                  {{ pick_thumb(inv.card) }}
-                  <div class="trade-pick-name">{{ inv.card.name }}{% if inv.is_proxy %} <span class="proxy-badge proxy-badge-warn" title="Proxy — carries no market value">PROXY</span>{% endif %}</div>
-                  <div class="trade-pick-meta">
-                    {{ inv.card.set_code | upper }} #{{ inv.card.collector_number }} &middot;
-                    {{ inv.finish | capitalize }} &middot;
-                    you own {{ inv.quantity }} &middot; {{ pick_price(inv.card, inv.finish, inv.is_proxy) }}
-                    <span class="trade-pick-loc{% if inv.location_type == 'deck' %} is-deck{% endif %}">{{ inv.location_label }}</span>
-                  </div>
-                </div>
-                <button type="button" class="btn-like trade-pick-add"
-                        data-inventory-row-id="{{ inv.inventory_row_id }}"
-                        data-available="{{ inv.quantity }}">Add</button>
-              </div>
-            {% endfor %}
-          </div>
-        {% else %}
-          <p class="trades-empty">You don't have any placed inventory to offer.</p>
-        {% endif %}
+        <p class="muted">From your own placed inventory. Search it, then add what you'll give.</p>
+        <input type="search" class="trade-pick-search" name="q" placeholder="Search your collection — name, t:creature, is:foil…"
+               aria-label="Search your collection"
+               hx-get="/trades/picker/offered"
+               hx-target="#offered-pane" hx-swap="innerHTML"
+               hx-trigger="keyup changed delay:350ms, search">
+        <div class="trade-pick-tray-wrap">
+          <h4 class="trade-tray-title">Picked</h4>
+          <div data-pick-tray="offered"></div>
+        </div>
+        <div id="offered-pane">
+          {% with pick_side="offered", pick_items=offered_pane.cards,
+                  pick_page=offered_pane.page, pick_total_pages=offered_pane.total_pages,
+                  pick_total=offered_pane.total, pick_search="",
+                  pick_endpoint=offered_pane.endpoint %}
+            {% include "_trade_pick_grid.html" %}
+          {% endwith %}
+        </div>
       </section>
 
       <section class="panel">
@@ -270,9 +150,9 @@ data-card-info="{{ (card.set_code or '?')|upper }} #{{ card.collector_number or 
          the trade detail page totals with; proxies count as $0 (ADR
          proxy-valuation). Guidance only — nothing validates against it. #}
       <div class="trade-balance" id="trade-balance">
-        <span class="trade-balance-side">You give <strong id="trade-balance-offered">$0.00</strong></span>
-        <span class="trade-balance-side">You get <strong id="trade-balance-requested">$0.00</strong></span>
-        <span class="trade-balance-diff" id="trade-balance-diff">Pick cards on both sides to compare.</span>
+        <span class="trade-balance-side">You give <strong data-pick-total="offered">$0.00</strong></span>
+        <span class="trade-balance-side">You get <strong data-pick-total="requested">$0.00</strong></span>
+        <span class="trade-balance-diff" data-pick-total="diff">Pick cards on both sides to compare.</span>
       </div>
 
       <section class="panel">
@@ -288,287 +168,13 @@ data-card-info="{{ (card.set_code or '?')|upper }} #{{ card.collector_number or 
      re-renders instead of redirecting, so the error never wipes the proposal;
      the script below seeds its Maps from this blob. Data, not code — parsed
      with JSON.parse, never executed. #}
+  {# The trade as it stands, or the picks a rejected submit came back with.
+     Hydrated server-side with name/price/available, because the tile a pick
+     came from is usually not on screen by the time the tray draws it. Data,
+     never code — parsed with JSON.parse. #}
   {% if restore_picks %}
-    <script type="application/json" id="trade-restore">{{ restore_picks | tojson }}</script>
+    <script type="application/json" id="pick-restore">{{ restore_picks | tojson }}</script>
   {% endif %}
-  <script src="/static/list-filter.js?v={{ static_v('list-filter.js') }}"></script>
-  <script>
-    (function () {
-      // Trade construction JS. Tracks selected items per side via Maps
-      // keyed on the identity id (showcase_item_id for requested,
-      // inventory_row_id for offered). Each entry stores the qty +
-      // available cap. On submit, serializes both Maps into the hidden
-      // JSON fields the route expects.
-      var form = document.getElementById('trade-new-form');
-      if (!form) return;
-      var offered = new Map(); // inventory_row_id -> {quantity}
-      var requested = new Map(); // inventory_row_id -> {quantity}
-
-      // A rejected submit comes back as a re-render carrying the picks it was
-      // rejecting, so an error costs you the message and nothing else. A
-      // malformed blob must never break the picker — an empty selection is
-      // recoverable, a dead page is not.
-      var restoreEl = document.getElementById('trade-restore');
-      if (restoreEl) {
-        try {
-          var restore = JSON.parse(restoreEl.textContent || '{}');
-          (restore.offered || []).forEach(function (e) {
-            if (e && e.id) offered.set(e.id, { quantity: e.quantity || 1 });
-          });
-          (restore.requested || []).forEach(function (e) {
-            if (e && e.id) requested.set(e.id, { quantity: e.quantity || 1 });
-          });
-        } catch (err) { /* fall through with an empty selection */ }
-      }
-
-      // Proxy notice: shown whenever any SELECTED item (either side) is a
-      // proxy. Proxy pick items carry data-proxy="1" (ADR proxy-valuation).
-      function anyProxySelected() {
-        var hit = false;
-        requested.forEach(function (_v, id) {
-          var el = document.querySelector('#requested-grid .trade-pick-item[data-row-id="' + id + '"]');
-          if (el && el.getAttribute('data-proxy') === '1') hit = true;
-        });
-        offered.forEach(function (_v, id) {
-          var el = document.querySelector('#offered-grid .trade-pick-item[data-inventory-row-id="' + id + '"]');
-          if (el && el.getAttribute('data-proxy') === '1') hit = true;
-        });
-        return hit;
-      }
-      function updateProxyNotice() {
-        var panel = document.getElementById('trade-proxy-notice-panel');
-        if (panel) panel.style.display = anyProxySelected() ? '' : 'none';
-        updateBalance();
-      }
-
-      // Live per-side value while picking, so you can aim for an even trade.
-      // Reads the SAME server-rendered data-sort-price the sort uses (finish-
-      // aware effective_price; 0 for proxies) — no price rule in JS.
-      function sideTotal(map, gridId, attr) {
-        var grid = document.getElementById(gridId);
-        if (!grid) return 0;
-        var sum = 0;
-        map.forEach(function (v, id) {
-          var el = grid.querySelector('.trade-pick-item[' + attr + '="' + id + '"]');
-          if (el) sum += (parseFloat(el.getAttribute('data-sort-price')) || 0) * (v.quantity || 1);
-        });
-        return sum;
-      }
-      function money(n) { return '$' + n.toFixed(2); }
-      function updateBalance() {
-        var give = sideTotal(offered, 'offered-grid', 'data-inventory-row-id');
-        var get = sideTotal(requested, 'requested-grid', 'data-row-id');
-        var giveEl = document.getElementById('trade-balance-offered');
-        var getEl = document.getElementById('trade-balance-requested');
-        var diffEl = document.getElementById('trade-balance-diff');
-        if (!giveEl || !getEl || !diffEl) return;
-        giveEl.textContent = money(give);
-        getEl.textContent = money(get);
-        if (offered.size === 0 && requested.size === 0) {
-          diffEl.textContent = 'Pick cards on both sides to compare.';
-          diffEl.className = 'trade-balance-diff';
-          return;
-        }
-        // Round to cents first so float noise can't push an exact $1.00 gap
-        // over the threshold. Within a dollar reads as even — card prices
-        // aren't precise enough to treat small change as a real difference.
-        var delta = Math.round((give - get) * 100) / 100;
-        if (Math.abs(delta) <= 1) {
-          diffEl.textContent = 'Even — within ' + money(Math.abs(delta));
-          diffEl.className = 'trade-balance-diff is-even';
-        } else {
-          diffEl.textContent = delta > 0
-            ? money(delta) + ' in their favour'
-            : money(-delta) + ' in your favour';
-          diffEl.className = 'trade-balance-diff is-uneven';
-        }
-      }
-
-      // Pre-fill requested from server-rendered prefilled rows.
-      document.querySelectorAll('#requested-grid .trade-pick-prefilled').forEach(function (el) {
-        var id = parseInt(el.getAttribute('data-row-id'), 10);
-        var available = parseInt(el.getAttribute('data-available'), 10) || 1;
-        if (id) requested.set(id, { quantity: Math.min(1, available) });
-      });
-      updateProxyNotice();
-
-      function serialize() {
-        document.getElementById('offered-json').value = JSON.stringify(
-          Array.from(offered.entries()).map(function (entry) {
-            return { inventory_row_id: entry[0], quantity: entry[1].quantity };
-          })
-        );
-        document.getElementById('requested-json').value = JSON.stringify(
-          Array.from(requested.entries()).map(function (entry) {
-            // Both ids: the server prefers the ShowcaseItem when there is
-            // one (keeping the curated card's provenance link) and falls
-            // back to the row for a mirrored card, which has no item.
-            var el = document.querySelector(
-              '#requested-grid .trade-pick-item[data-row-id="' + entry[0] + '"]');
-            var si = el ? parseInt(el.getAttribute('data-showcase-item-id'), 10) : 0;
-            var out = { inventory_row_id: entry[0], quantity: entry[1].quantity };
-            if (si) out.showcase_item_id = si;
-            return out;
-          })
-        );
-      }
-
-      // Click handlers: Add buttons on the requested + offered grids.
-      document.querySelectorAll('#requested-grid .trade-pick-add').forEach(function (btn) {
-        var id = parseInt(btn.getAttribute('data-row-id'), 10);
-        var available = parseInt(btn.getAttribute('data-available'), 10) || 1;
-        if (!id) return;
-        function markAdded() {
-          btn.disabled = true;
-          btn.textContent = 'Added';
-        }
-        btn.addEventListener('click', function () {
-          requested.set(id, { quantity: Math.min(1, available) });
-          markAdded();
-          updateProxyNotice();
-        });
-        // A pick restored after a rejected submit — paint it as chosen, or the
-        // page offers to Add a card that is already in the proposal.
-        if (requested.has(id)) markAdded();
-      });
-      // Offered Add is a TOGGLE (unlike the requested side, which has its own
-      // Remove buttons) — the wishlist entry prefills this side, so a card you
-      // didn't mean to offer has to be droppable.
-      document.querySelectorAll('#offered-grid .trade-pick-add').forEach(function (btn) {
-        var id = parseInt(btn.getAttribute('data-inventory-row-id'), 10);
-        var available = parseInt(btn.getAttribute('data-available'), 10) || 1;
-        if (!id) return;
-        function paint() {
-          btn.textContent = offered.has(id) ? 'Remove' : 'Add';
-          updateProxyNotice();
-        }
-        btn.addEventListener('click', function () {
-          if (offered.has(id)) offered.delete(id);
-          else offered.set(id, { quantity: Math.min(1, available) });
-          paint();
-        });
-        // Wishlist prefill (#146/#147 follow-up) — server marked the rows.
-        if (btn.closest('.trade-pick-prefilled')) offered.set(id, { quantity: Math.min(1, available) });
-        paint();
-      });
-      // Prefilled-item Remove + qty change handlers.
-      document.querySelectorAll('#requested-grid .trade-pick-remove').forEach(function (btn) {
-        btn.addEventListener('click', function () {
-          var id = parseInt(btn.getAttribute('data-row-id'), 10);
-          requested.delete(id);
-          var row = btn.closest('.trade-pick-item');
-          if (row) row.style.display = 'none';
-          updateProxyNotice();
-        });
-      });
-      document.querySelectorAll('#requested-grid .trade-pick-qty').forEach(function (input) {
-        input.addEventListener('change', function () {
-          var id = parseInt(input.getAttribute('data-row-id'), 10);
-          var qty = parseInt(input.value, 10) || 1;
-          if (requested.has(id)) requested.set(id, { quantity: qty });
-          updateBalance();
-        });
-      });
-
-      // Picker sort + image-grid toggle. Sorting is DOM reordering only — the
-      // selection Maps are keyed on ids, so reordering never disturbs a pick
-      // (which is why this is client-side: a ?sort= reload would drop them).
-      var NUMERIC = { cmc: 1, price: 1, avail: 1, rarity: 1 };
-      function sortGrid(grid, key, dir) {
-        if (!grid) return;
-        var items = Array.prototype.slice.call(grid.querySelectorAll('.trade-pick-item'));
-        if (!key) return;
-        var mul = dir === 'desc' ? -1 : 1;
-        function val(el) {
-          var raw = el.getAttribute('data-sort-' + key);
-          if (!NUMERIC[key]) return (raw || '').toLowerCase();
-          var n = parseFloat(raw);
-          // Missing / zero price + missing mana value sort last either way,
-          // matching sort_spec's nulls-last rule.
-          return isNaN(n) || (key === 'price' && n === 0) ? null : n;
-        }
-        items.sort(function (a, b) {
-          var av = val(a), bv = val(b);
-          if (av === null && bv === null) return 0;
-          if (av === null) return 1;
-          if (bv === null) return -1;
-          if (av < bv) return -1 * mul;
-          if (av > bv) return 1 * mul;
-          // Stable tiebreak on name, same as the server-side spec.
-          var an = a.getAttribute('data-sort-name') || '';
-          var bn = b.getAttribute('data-sort-name') || '';
-          return an < bn ? -1 : an > bn ? 1 : 0;
-        });
-        items.forEach(function (el) { grid.appendChild(el); });
-      }
-      function gridOf(el) { return document.getElementById(el.getAttribute('data-grid')); }
-      function applySort(gridId) {
-        var sel = document.querySelector('.js-pick-sort[data-grid="' + gridId + '"]');
-        var dir = document.querySelector('.js-pick-dir[data-grid="' + gridId + '"]');
-        sortGrid(document.getElementById(gridId), sel ? sel.value : '', dir ? dir.value : 'asc');
-      }
-      document.querySelectorAll('.js-pick-sort, .js-pick-dir').forEach(function (sel) {
-        function run() { applySort(sel.getAttribute('data-grid')); }
-        // Both events: every modern browser fires them for a <select>, but the
-        // sort is idempotent, so listening twice costs nothing and removes any
-        // "which event does this browser fire" doubt.
-        sel.addEventListener('change', run);
-        sel.addEventListener('input', run);
-      });
-      // "Picked only" — collapses a grid to just what's currently selected, so
-      // a wishlist-prefilled offer can be pruned without scrolling a whole
-      // collection. Deliberately a SNAPSHOT: it re-filters when you toggle it,
-      // NOT on every selection change, so un-picking a card doesn't make the
-      // row vanish out from under the click that un-picked it.
-      function applyOnlyPicked(box) {
-        var grid = gridOf(box);
-        if (!grid) return;
-        var isOffered = grid.id === 'offered-grid';
-        var map = isOffered ? offered : requested;
-        var attr = isOffered ? 'data-inventory-row-id' : 'data-row-id';
-        var note = document.querySelector('.trade-pick-filter-note[data-grid="' + grid.id + '"]');
-        if (box.checked && map.size === 0) {
-          // Filtering to nothing would just look like a broken page.
-          box.checked = false;
-          if (note) note.textContent = 'Nothing picked yet.';
-          return;
-        }
-        if (note) note.textContent = '';
-        grid.querySelectorAll('.trade-pick-item').forEach(function (el) {
-          var keep = !box.checked || map.has(parseInt(el.getAttribute(attr), 10));
-          el.classList.toggle('is-filtered-out', !keep);
-        });
-      }
-      document.querySelectorAll('.js-pick-only').forEach(function (box) {
-        box.addEventListener('change', function () { applyOnlyPicked(box); });
-      });
-
-      function applyVisual(box) {
-        var grid = gridOf(box);
-        if (grid) grid.classList.toggle('is-visual', box.checked);
-      }
-      document.querySelectorAll('.js-pick-visual').forEach(function (box) {
-        box.addEventListener('change', function () { applyVisual(box); });
-      });
-      // Apply whatever the controls currently say, at boot. On a reload (or a
-      // back-navigation) the browser RESTORES the previous <select>/checkbox
-      // values without firing `change` — so without this the dropdown reads
-      // "Name" while the grid sits in server order, and the feature looks dead.
-      document.querySelectorAll('.js-pick-sort').forEach(function (sel) {
-        applySort(sel.getAttribute('data-grid'));
-      });
-      document.querySelectorAll('.js-pick-visual').forEach(applyVisual);
-      document.querySelectorAll('.js-pick-only').forEach(applyOnlyPicked);
-
-      form.addEventListener('submit', function (e) {
-        serialize();
-        if (offered.size === 0 || requested.size === 0) {
-          e.preventDefault();
-          alert('You need at least one offered card and one requested card.');
-        }
-      });
-    })();
-  </script>
-  {# Card hover zoom — shared #169 component. #}
+  <script src="/static/trade-picker.js?v={{ static_v('trade-picker.js') }}"></script>
   <script src="/static/card-hover.js?v={{ static_v('card-hover.js') }}"></script>
 {% endblock %}

@@ -477,7 +477,8 @@ def test_the_counter_editor_renders_for_both_parties(client, db, world, user):
     for party in ("proposer", "recipient"):
         page = _as(client, world[party]).get(f"/trades/{trade.id}/counter")
         assert page.status_code == 200, party
-        assert "counter-restore" in page.text
+        # #184 — the shared picker's restore blob, hydrated server-side.
+        assert "pick-restore" in page.text
         # It opens ON the trade, not on an empty form.
         assert '"quantity": 1' in page.text
 

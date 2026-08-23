@@ -86,7 +86,10 @@ def _setup(db, user):
 
 
 def _restore_blob(page: str) -> dict:
-    m = re.search(r'id="trade-restore">(.*?)</script>', page, re.S)
+    """#184 — the blob is now HYDRATED: each entry carries the name, price and
+    cap the tray needs, because a paged picker cannot rely on the pick's tile
+    being on screen to read them off."""
+    m = re.search(r'id="pick-restore">(.*?)</script>', page, re.S)
     assert m, "the page carries no restore blob"
     return json.loads(m.group(1))
 
@@ -116,7 +119,9 @@ def test_a_rejected_proposal_comes_back_with_its_picks(client, db, user):
     assert "at least one requested item" in resp.text.lower()
     # The recipient context survived, so the requested-side picker is usable.
     assert "Rhystic Study" in resp.text
-    assert _restore_blob(resp.text)["offered"] == [{"id": mine.id, "quantity": 1}]
+    (kept,) = _restore_blob(resp.text)["offered"]
+    assert (kept["kind"], kept["id"], kept["quantity"]) == ("inventory_row_id", mine.id, 1)
+    assert kept["name"] == "Llanowar Elves", "the tray has to draw it without its tile"
     # Same render carries the picker grid, so it also pins the thumb's srcset
     # (see test_thumb_srcset.py — this is the surface that reported the weight).
     assert "/small.jpg 146w" in resp.text and 'sizes="146px"' in resp.text
@@ -150,8 +155,12 @@ def test_quantities_survive_and_junk_entries_are_dropped(client, db, user):
 
     assert resp.status_code == 200
     blob = _restore_blob(resp.text)
-    assert blob["offered"] == [{"id": mine.id, "quantity": 3}]
-    assert blob["requested"] == [{"id": si.id + 9999, "quantity": 1}]
+    (kept,) = blob["offered"]
+    assert (kept["id"], kept["quantity"]) == (mine.id, 3), "quantities survive"
+    # The bogus requested id names nothing pickable, so it is dropped — the same
+    # answer the validator gives it, rather than a tray entry for a card that
+    # cannot be traded.
+    assert blob["requested"] == []
 
 
 def test_a_malformed_submission_still_renders_the_page(client, db, user):

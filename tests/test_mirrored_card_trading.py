@@ -237,7 +237,10 @@ def test_proposing_from_a_mirrored_card_prefills_the_trade(client, db, user, wor
     )
     assert resp.status_code == 200
     assert "Mystic Remora" in resp.text
-    assert f'data-row-id="{world["mirrored_row"].id}"' in resp.text
+    # #184 — a prefilled pick arrives as a hydrated TRAY entry (its tile need not
+    # be on the first page), and the tile itself names the row id it is picked by.
+    assert f'data-pick-id="{world["mirrored_row"].id}"' in resp.text
+    assert '"kind": "inventory_row_id"' in resp.text
 
 
 def test_a_row_you_cannot_see_degrades_to_a_plain_page(client, db, user, world):

@@ -1,5 +1,17 @@
 [
   {
+    "version": "4.16.0",
+    "date": "2026-08-22",
+    "added": [],
+    "refined": [
+      "The trade screens now search instead of scroll. Both sides — their shared Showcase and your own collection — show fifty cards at a time with a search box above them, and the search runs on the server across everything, not just what is on screen. Type a name, or the same shorthand the Collection bar takes (t:creature, c:r, is:foil, cmc>=4). The cards you have picked sit in a list at the top of each side, with their quantity and price, so they stay in front of you no matter what you search for next. The counter-proposal editor works the same way, from the same code."
+    ],
+    "resolved": [
+      "Building a trade against a large Showcase no longer takes minutes. On the collection that prompted this — 4,472 cards shared, 1,607 of your own — the page went from eleven megabytes and six thousand card tiles to under two hundred kilobytes and a hundred, and from about three quarters of a second of layout to a twentieth of that."
+    ],
+    "archivist_note": "The hard part of paging a page like this is not the paging. Your half-built trade lived in the browser, and the running total was worked out by looking up each picked card among the tiles on screen — which is exact right up until the card you picked is on another page, at which point it quietly stops counting while remaining in the trade. So the first change was that a pick carries its own name, price and limit from the moment you make it, and the second was the list at the top showing you what you have chosen even when none of it is on screen. We checked the old way and the new way side by side in a browser: pick a card, go to the next page, adjust the quantity — the old way says the trade is worth nothing, the new way says what it is worth. The sort and filter chips came off these screens on the way through. They could only have reordered the fifty cards in front of you, which is a worse thing to offer than nothing, and the search covers everything they expressed."
+  },
+  {
     "version": "4.15.3",
     "date": "2026-08-22",
     "added": [],

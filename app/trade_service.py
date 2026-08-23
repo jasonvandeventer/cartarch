@@ -1325,7 +1325,7 @@ def resolve_propose_from_share_row(
     return None
 
 
-def shared_pick_items(session: Session, showcase_id: int) -> list[dict]:
+def shared_pick_items(session: Session, showcase_id: int, search: str = "") -> list[dict]:
     """What the other party is actually offering — curated AND mirrored.
 
     **Membership comes from `share_service.resolve_showcase_rows`, THE one
@@ -1345,8 +1345,11 @@ def shared_pick_items(session: Session, showcase_id: int) -> list[dict]:
     """
     from app.share_service import resolve_showcase_rows
 
+    # #184 — `search` is the app's boolean/Scryfall query language, applied
+    # SERVER-SIDE by the resolver (the same parser the Collection bar uses), so
+    # the picker no longer has to render a whole showcase for a filter to work.
     out: list[dict] = []
-    for entry in resolve_showcase_rows(session, showcase_id):
+    for entry in resolve_showcase_rows(session, showcase_id, search):
         inv = entry["row"]
         if inv is None or inv.card is None:
             continue
@@ -1360,6 +1363,10 @@ def shared_pick_items(session: Session, showcase_id: int) -> list[dict]:
                 "inventory_row_id": inv.id,
                 "pick_kind": "showcase_item_id" if item is not None else "inventory_row_id",
                 "pick_id": item.id if item is not None else inv.id,
+                # A curated card sends BOTH ids, so the trade keeps its
+                # provenance link (C1) while the row stays the thing the picker
+                # can always name.
+                "pick_alt": f"inventory_row_id:{inv.id}" if item is not None else "",
                 "mirrored": bool(entry["mirrored"]),
                 "card": _ReadOnlyCardProjection(inv.card),
                 "finish": inv.finish,
@@ -1371,11 +1378,89 @@ def shared_pick_items(session: Session, showcase_id: int) -> list[dict]:
     return out
 
 
+def offered_pick_items(session: Session, user_id: int, search: str = "") -> list[dict]:
+    """The user's own pickable inventory — the OFFERED side's source.
+
+    Extracted from ``get_construction_options`` when the picker became paged
+    (#184) so the page and the search endpoint build the list one way. Search is
+    server-side in the app's query language; a 1,600-row inventory no longer has
+    to reach the browser for a filter to work.
+    """
+    # #140 — a brew placeholder is a card you do NOT own: an is_proxy row that
+    # exists only inside a brew deck, standing in for something you plan to buy.
+    # ``create_trade`` has always refused one, so listing them here offered cards
+    # that could not be traded and answered the attempt with an error (reported
+    # 2026-08-21). The ONE discriminator, same as the other enforcement points —
+    # never a hand-rolled is_proxy check, which would also drop the real proxies
+    # people legitimately trade.
+    from app.inventory_service import apply_collection_search_filters, brew_placeholder_exclusion
+
+    inv_q = (
+        session.query(InventoryRow)
+        .join(Card, InventoryRow.card_id == Card.id)
+        .filter(
+            InventoryRow.user_id == user_id,
+            InventoryRow.is_pending.is_(False),
+            InventoryRow.quantity > 0,
+            brew_placeholder_exclusion(user_id),
+        )
+        .options(joinedload(InventoryRow.card), joinedload(InventoryRow.storage_location))
+    )
+    # #184 — the offered side is searched SERVER-SIDE with the same query
+    # language as the Collection bar, so a 1,600-row inventory no longer has to
+    # reach the browser for a filter to work.
+    if search and search.strip():
+        inv_q = apply_collection_search_filters(inv_q, search)
+    inv_q = inv_q.order_by(Card.name, InventoryRow.finish).all()
+    # Where each offered copy currently lives, so a card that would have to come
+    # out of a deck is obvious before it's offered. OFFERED SIDE ONLY — the
+    # recipient's locations are private and never leave the sanitized card
+    # projection. One batched parent fetch (locations are few even when the
+    # inventory is thousands of rows), then the SHARED label builder the
+    # decklist checker uses — not a second location-label format.
+    parent_ids = {
+        row.storage_location.parent_id
+        for row in inv_q
+        if row.storage_location is not None and row.storage_location.parent_id is not None
+    }
+    parent_chain: dict[int, StorageLocation] = {}
+    if parent_ids:
+        parent_chain = {
+            p.id: p
+            for p in session.query(StorageLocation).filter(StorageLocation.id.in_(parent_ids)).all()
+        }
+
+    proposer_inventory: list[dict] = []
+    for row in inv_q:
+        if row.card is None:
+            continue
+        loc = row.storage_location
+        proposer_inventory.append(
+            {
+                "inventory_row_id": row.id,
+                # Picker identity (#184): one id space on this side, so no alt.
+                "pick_kind": "inventory_row_id",
+                "pick_id": row.id,
+                "pick_alt": "",
+                "available": row.quantity,
+                "card": _ReadOnlyCardProjection(row.card),
+                "finish": row.finish,
+                "quantity": row.quantity,
+                "is_proxy": bool(row.is_proxy),
+                "location_label": _build_full_location_label(loc, parent_chain),
+                "location_type": (loc.type or "other").lower() if loc is not None else "",
+            }
+        )
+    return proposer_inventory
+
+
 def get_construction_options(
     session: Session,
     proposer_user_id: int,
     recipient_user_id: int | None,
     playgroup_id: int | None,
+    requested_search: str = "",
+    offered_search: str = "",
 ) -> dict:
     """Resolve construction-page options for a proposer.
 
@@ -1434,65 +1519,12 @@ def get_construction_options(
         # Confirm the (recipient, playgroup) pair is among the candidates.
         for cand in recipients:
             if cand["user"].id == recipient_user_id and cand["playgroup"].id == playgroup_id:
-                recipient_share_items = shared_pick_items(session, cand["showcase"].id)
+                recipient_share_items = shared_pick_items(
+                    session, cand["showcase"].id, requested_search
+                )
                 break
 
-    # #140 — a brew placeholder is a card you do NOT own: an is_proxy row that
-    # exists only inside a brew deck, standing in for something you plan to buy.
-    # ``create_trade`` has always refused one, so listing them here offered cards
-    # that could not be traded and answered the attempt with an error (reported
-    # 2026-08-21). The ONE discriminator, same as the other enforcement points —
-    # never a hand-rolled is_proxy check, which would also drop the real proxies
-    # people legitimately trade.
-    from app.inventory_service import brew_placeholder_exclusion
-
-    inv_q = (
-        session.query(InventoryRow)
-        .join(Card, InventoryRow.card_id == Card.id)
-        .filter(
-            InventoryRow.user_id == proposer_user_id,
-            InventoryRow.is_pending.is_(False),
-            InventoryRow.quantity > 0,
-            brew_placeholder_exclusion(proposer_user_id),
-        )
-        .options(joinedload(InventoryRow.card), joinedload(InventoryRow.storage_location))
-        .order_by(Card.name, InventoryRow.finish)
-        .all()
-    )
-    # Where each offered copy currently lives, so a card that would have to come
-    # out of a deck is obvious before it's offered. OFFERED SIDE ONLY — the
-    # recipient's locations are private and never leave the sanitized card
-    # projection. One batched parent fetch (locations are few even when the
-    # inventory is thousands of rows), then the SHARED label builder the
-    # decklist checker uses — not a second location-label format.
-    parent_ids = {
-        row.storage_location.parent_id
-        for row in inv_q
-        if row.storage_location is not None and row.storage_location.parent_id is not None
-    }
-    parent_chain: dict[int, StorageLocation] = {}
-    if parent_ids:
-        parent_chain = {
-            p.id: p
-            for p in session.query(StorageLocation).filter(StorageLocation.id.in_(parent_ids)).all()
-        }
-
-    proposer_inventory: list[dict] = []
-    for row in inv_q:
-        if row.card is None:
-            continue
-        loc = row.storage_location
-        proposer_inventory.append(
-            {
-                "inventory_row_id": row.id,
-                "card": _ReadOnlyCardProjection(row.card),
-                "finish": row.finish,
-                "quantity": row.quantity,
-                "is_proxy": bool(row.is_proxy),
-                "location_label": _build_full_location_label(loc, parent_chain),
-                "location_type": (loc.type or "other").lower() if loc is not None else "",
-            }
-        )
+    proposer_inventory = offered_pick_items(session, proposer_user_id, offered_search)
     return {
         "recipients": recipients,
         "recipient_share_items": recipient_share_items,
