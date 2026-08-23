@@ -287,9 +287,16 @@
                         method="post"
                         style="display: inline">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                    {# The message is built by `tojson`, and the attribute is
+                       SINGLE-quoted, because a card name is data: "Gaea's
+                       Cradle" closed the JS string, the handler failed to parse
+                       ("missing ) after argument list"), and the button removed
+                       the card with no dialog at all. Reported 2026-08-22 as
+                       "sometimes removing a card doesn't confirm" — the tell was
+                       that it was always the same cards. #}
                     <button type="submit"
                             class="btn-danger-small"
-                            onclick="return confirm('Remove {{ item.display_name }} from your wishlist?');">
+                            onclick='return confirm({{ ("Remove " ~ item.display_name ~ " from your wishlist?") | tojson }});'>
                       Remove
                     </button>
                   </form>

@@ -201,7 +201,7 @@
                       <button type="submit"
                               class="btn-danger-small"
                               style="background: #7f1d1d"
-                              onclick="return confirm('Delete {{ row.user.username }}? This removes all their cards, decks, and history. This cannot be undone.');">
+                              onclick='return confirm({{ ("Delete " ~ row.user.username ~ "? This removes all their cards, decks, and history. This cannot be undone.") | tojson }});'>
                         Delete
                       </button>
                     </form>

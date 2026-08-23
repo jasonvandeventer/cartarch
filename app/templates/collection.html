@@ -233,7 +233,7 @@
           {% endif %}
 
           <form action="/collection/bulk-move" method="post" class="collection-bulk-form inline-form"
-                onsubmit="return confirm('Move ' + {{ total_count }} + ' matching placed card(s) to the selected location? Pending cards are skipped.');">
+                onsubmit='return confirm({{ ("Move " ~ total_count ~ " matching placed card(s) to the selected location? Pending cards are skipped.") | tojson }});'>
             <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
             <input type="hidden" name="search" value="{{ search }}">
             <input type="hidden" name="colors" value="{{ facet_colors_set | sort | join('') }}">

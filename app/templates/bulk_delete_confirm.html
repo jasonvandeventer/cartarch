@@ -31,7 +31,7 @@
         {% for item in items %}<input type="hidden" name="row_ids" value="{{ item.id }}">{% endfor %}
         <button type="submit"
                 class="btn-danger-small"
-                onclick="return confirm('Permanently delete {{ items|length }} row{{ '' if items|length == 1 else 's' }}?');">
+                onclick='return confirm({{ ("Permanently delete " ~ items|length ~ " row" ~ ("" if items|length == 1 else "s") ~ "?") | tojson }});'>
           Confirm Delete ({{ items|length }})
         </button>
         <a href="{{ back_url }}" class="btn">Cancel</a>

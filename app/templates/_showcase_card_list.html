@@ -68,7 +68,7 @@
             <button type="submit" class="scl-btn">Update</button>
           </form>
           <form method="post" action="/showcase/items/{{ item.id }}/remove" class="scl-form"
-                onsubmit="return confirm('Remove {{ item.card.name }} from your Showcase?')">
+                onsubmit='return confirm({{ ("Remove " ~ item.card.name ~ " from your Showcase?") | tojson }})'>
             <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
             <button type="submit" class="btn-danger-small scl-btn">Remove</button>
           </form>

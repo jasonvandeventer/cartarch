@@ -112,7 +112,7 @@
                           style="display:inline">
                       <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                       <button type="submit" class="btn-danger-small"
-                              onclick="return confirm('Remove {{ row.user.player_label }} from this playgroup?')">Remove</button>
+                              onclick='return confirm({{ ("Remove " ~ row.user.player_label ~ " from this playgroup?") | tojson }})'>Remove</button>
                     </form>
                   {% endif %}
                 </td>

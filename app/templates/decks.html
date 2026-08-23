@@ -281,7 +281,7 @@
               <form action="/decks/{{ deck.id }}/delete" method="post" style="display: inline">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                 <button type="submit" class="btn-danger-small"
-                        onclick="return confirm('Delete {{ deck.name }}? Cards in this deck will be removed.');">
+                        onclick='return confirm({{ ("Delete " ~ deck.name ~ "? Cards in this deck will be removed.") | tojson }});'>
                   Delete
                 </button>
               </form>
@@ -338,7 +338,7 @@
         <form action="/decks/{{ featured.id }}/delete" method="post" style="display: inline">
           <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
           <button type="submit" class="btn-danger-small"
-                  onclick="return confirm('Delete {{ featured.name }}? Cards in this deck will be removed.');">
+                  onclick='return confirm({{ ("Delete " ~ featured.name ~ "? Cards in this deck will be removed.") | tojson }});'>
             Delete
           </button>
         </form>
@@ -376,7 +376,7 @@
           <form action="/decks/{{ deck.id }}/delete" method="post" style="margin-left:auto">
             <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
             <button type="submit" class="btn-danger-small"
-                    onclick="return confirm('Delete {{ deck.name }}? Games played with it keep their record.');">
+                    onclick='return confirm({{ ("Delete " ~ deck.name ~ "? Games played with it keep their record.") | tojson }});'>
               Delete
             </button>
           </form>

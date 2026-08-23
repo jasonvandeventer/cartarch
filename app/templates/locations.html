@@ -197,7 +197,7 @@
                       <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                       <button type="submit"
                               class="btn-danger-small"
-                              onclick="return confirm('Delete location \'{{ loc.name }}\'?');">Delete</button>
+                              onclick='return confirm({{ ("Delete location " ~ loc.name ~ "?") | tojson }});'>Delete</button>
                     </form>
                   {% elif summary.is_redirectable %}
                     {% set redirect_storage = locations | rejectattr("type", "equalto", "root") | rejectattr("type", "equalto", "deck") | rejectattr("id", "equalto", loc.id) | list %}
@@ -232,7 +232,7 @@
                             <button type="submit"
                                     class="btn-danger-small"
                                     style="margin-top: 0.25rem"
-                                    onclick="return confirm('Move {{ summary.row_count }} row{{ '' if summary.row_count == 1 else 's' }} and delete location \'{{ loc.name }}\'?');">
+                                    onclick='return confirm({{ ("Move " ~ summary.row_count ~ " row" ~ ("" if summary.row_count == 1 else "s") ~ " and delete location " ~ loc.name ~ "?") | tojson }});'>
                               Move {{ summary.row_count }} and delete
                             </button>
                           </form>

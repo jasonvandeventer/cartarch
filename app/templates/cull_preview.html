@@ -23,7 +23,7 @@
         <b>{{ target.name }}</b>.
       </p>
       <form action="/collection/cull-to-bulk" method="post" class="inline-form"
-            onsubmit="return confirm('Move {{ total_copies }} surplus copy(ies) to {{ target.name }}? One copy of each printing stays in the drawers.');">
+            onsubmit='return confirm({{ ("Move " ~ total_copies ~ " surplus copy(ies) to " ~ target.name ~ "? One copy of each printing stays in the drawers.") | tojson }});'>
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
         <input type="hidden" name="target_location_id" value="{{ target.id }}">
         <input type="hidden" name="search" value="{{ filter_params.search }}">

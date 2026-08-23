@@ -1,5 +1,15 @@
 [
   {
+    "version": "4.15.1",
+    "date": "2026-08-22",
+    "added": [],
+    "refined": [],
+    "resolved": [
+      "Confirmation dialogs no longer skip themselves on cards, decks, locations or people whose name contains an apostrophe. Removing Gaea's Cradle from your wishlist, or deleting a deck called Urza's Saga, went straight through with no \"are you sure?\" at all — while the same button on a card called Sol Ring asked normally. Every confirmation in the app was checked, not just the one reported: twelve of them had the same flaw, including delete deck, delete location, remove a playgroup member and delete a user account."
+    ],
+    "archivist_note": "The report said \"every once in a while\", which sounds like a race and is usually the hardest kind of bug to pin down. It was not random at all — it was the same cards every time, and the pattern was the apostrophe. The name was being pasted straight into the little piece of code that pops the dialog, so a name like Gaea's Cradle ended that code early, the browser threw the whole handler away as unreadable, and the button fell back to doing its plain job: submit the form. Magic being what it is, that is a great many cards. Two things followed. The name is now handed to the dialog as data rather than as code, which is the only way this is ever safe; and since a broken dialog is invisible by definition, there is now a check that fails the build if any confirmation in the app is written the old way again."
+  },
+  {
     "version": "4.15.0",
     "date": "2026-08-22",
     "added": [
