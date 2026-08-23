@@ -1,0 +1,38 @@
+{# Search + sort for one side of a picker (2026-08-23).
+
+   Both controls hit the SAME endpoint and include each other (`hx-include` over
+   the toolbar), or changing the sort would drop the search and vice versa. They
+   target the pane, never the page: a reload would take the in-progress
+   selection with it (#184).
+
+   Sort runs SERVER-SIDE over the whole set before the page is taken. The
+   client-side sort dropdown removed in #184 could only reorder the fifty cards
+   on screen; this is the version that means what it says. #}
+<div class="trade-pick-toolbar" id="{{ pick_side }}-toolbar">
+  <input type="search" class="trade-pick-search" name="q" value="{{ pick_search|default('') }}"
+         placeholder="{{ search_placeholder }}"
+         aria-label="{{ search_placeholder }}"
+         hx-get="{{ pick_endpoint }}"
+         hx-include="#{{ pick_side }}-toolbar"
+         hx-target="#{{ pick_side }}-pane" hx-swap="innerHTML"
+         hx-trigger="keyup changed delay:350ms, search">
+  <label class="trade-pick-sort-label">Sort
+    <select name="sort"
+            hx-get="{{ pick_endpoint }}"
+            hx-include="#{{ pick_side }}-toolbar"
+            hx-target="#{{ pick_side }}-pane" hx-swap="innerHTML"
+            hx-trigger="change">
+      {% for key, label in sort_options %}
+        <option value="{{ key }}" {% if key == pick_sort|default('name') %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <select name="direction" aria-label="Sort direction"
+          hx-get="{{ pick_endpoint }}"
+          hx-include="#{{ pick_side }}-toolbar"
+          hx-target="#{{ pick_side }}-pane" hx-swap="innerHTML"
+          hx-trigger="change">
+    <option value="asc" {% if pick_direction|default('asc') == 'asc' %}selected{% endif %}>Ascending</option>
+    <option value="desc" {% if pick_direction|default('asc') == 'desc' %}selected{% endif %}>Descending</option>
+  </select>
+</div>

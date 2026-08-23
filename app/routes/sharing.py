@@ -479,6 +479,10 @@ def shares_view(
             "sharer": view["sharer"],
             "playgroup": view["playgroup"],
             "items": page_items,
+            # The viewer's OWN showcase preference decides how someone else's
+            # showcase is drawn — "how do I want showcase cards shown" is one
+            # answer, and a share is still a showcase. No fourth column.
+            "view_mode": current_user.showcase_view_mode or "grid",
             # Whole-share figures: the total value and the count describe the
             # SHARE, not the page you happen to be on (same call the location
             # hero makes).

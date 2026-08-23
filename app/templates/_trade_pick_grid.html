@@ -137,13 +137,13 @@
   <div class="trade-pick-pager">
     {% if pick_page > 1 %}
       <button type="button" class="btn"
-              hx-get="{{ pick_endpoint }}&page={{ pick_page - 1 }}&q={{ pick_search|urlencode }}"
+              hx-get="{{ pick_endpoint }}&page={{ pick_page - 1 }}&q={{ pick_search|urlencode }}&sort={{ pick_sort|default('name') }}&direction={{ pick_direction|default('asc') }}"
               hx-target="#{{ pick_side }}-pane" hx-swap="innerHTML">Previous</button>
     {% endif %}
     <span class="muted">Page {{ pick_page }} of {{ pick_total_pages }}</span>
     {% if pick_page < pick_total_pages %}
       <button type="button" class="btn"
-              hx-get="{{ pick_endpoint }}&page={{ pick_page + 1 }}&q={{ pick_search|urlencode }}"
+              hx-get="{{ pick_endpoint }}&page={{ pick_page + 1 }}&q={{ pick_search|urlencode }}&sort={{ pick_sort|default('name') }}&direction={{ pick_direction|default('asc') }}"
               hx-target="#{{ pick_side }}-pane" hx-swap="innerHTML">Next</button>
     {% endif %}
   </div>

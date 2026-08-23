@@ -53,6 +53,17 @@ CARD_SORT_OPTIONS: list[tuple[str, str]] = [
 VALID_DIRECTIONS = ("asc", "desc")
 
 
+def normalize_sort(sort: str | None, options: list[tuple[str, str]]) -> str:
+    """Coerce an untrusted sort key to one this surface actually offers.
+
+    An unknown key would otherwise reach ``sort_showcase_items``, which leaves
+    the input order untouched — a control that silently does nothing rather than
+    an obviously ignored one. Falls back to the first option.
+    """
+    keys = {k for k, _label in options}
+    return sort if sort in keys else (options[0][0] if options else "name")
+
+
 def normalize_direction(direction: str | None) -> str:
     """Coerce an untrusted direction param to ``asc``/``desc`` (default desc)."""
     return direction if direction in VALID_DIRECTIONS else "desc"
@@ -115,6 +126,12 @@ def color_sort_value(card) -> tuple:
 SHOWCASE_SORT_OPTIONS: list[tuple[str, str]] = [
     ("added", "Date Added"),
 ] + CARD_SORT_OPTIONS
+
+# The trade picker's sort control (2026-08-23). The shared card keys WITHOUT
+# "Date Added": the requested side has an added_at and the offered side (plain
+# inventory rows) does not, and a control that silently does nothing on one of
+# the two panes is worse than not offering it.
+PICKER_SORT_OPTIONS: list[tuple[str, str]] = list(CARD_SORT_OPTIONS)
 
 # Live-query surfaces use "value" for Price and keep their own extras.
 _LIVE_CANONICAL: list[tuple[str, str]] = [

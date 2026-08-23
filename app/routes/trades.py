@@ -38,7 +38,7 @@ from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
-from app import trade_service
+from app import sort_spec, trade_service
 from app.dependencies import (
     CsrfRequired,
     get_current_user,
@@ -86,6 +86,7 @@ def trades_inbox(
 
 def _pane_context(items: list[dict], endpoint: str, page: int = 1, view_mode: str = "grid") -> dict:
     """First-page context for one picker pane, in the shape the partial wants."""
+    items = sort_spec.sort_showcase_items(list(items), "name", "asc")
     page_items, page, total_pages = _paginate_items(items, page, PICK_PAGE_SIZE)
     return {
         # NOT "items": Jinja resolves `.items` on a dict to the dict METHOD, so
@@ -97,6 +98,7 @@ def _pane_context(items: list[dict], endpoint: str, page: int = 1, view_mode: st
         "total": len(items),
         "endpoint": endpoint,
         "view_mode": view_mode,
+        "sort_options": sort_spec.PICKER_SORT_OPTIONS,
     }
 
 
@@ -532,6 +534,8 @@ def _pick_pane(
     search: str,
     endpoint: str,
     view_mode: str = "grid",
+    sort: str = "name",
+    direction: str = "asc",
 ):
     """Render ONE side's grid + status + pager.
 
@@ -539,6 +543,10 @@ def _pick_pane(
     and a first render cannot drift — the deck-card-list seam's lesson, applied
     to the picker.
     """
+    # Sorted with the SHARED spec over the WHOLE set, before the page is taken —
+    # sorting the fifty cards on screen would reorder a window, which is the
+    # thing #184 removed the client-side control for.
+    items = sort_spec.sort_showcase_items(list(items), sort, direction)
     page_items, page, total_pages = _paginate_items(items, page, PICK_PAGE_SIZE)
     return render(
         request,
@@ -554,6 +562,9 @@ def _pick_pane(
             "pick_total": len(items),
             "pick_search": search,
             "pick_endpoint": endpoint,
+            "pick_sort": sort,
+            "pick_direction": direction,
+            "pick_sort_options": sort_spec.PICKER_SORT_OPTIONS,
         },
     )
 
@@ -611,11 +622,13 @@ def trade_picker_pane(
     trade_id: int | None = None,
     q: str = "",
     page: int = 1,
+    sort: str = "name",
+    direction: str = "asc",
     session: Session = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
 ):
-    """One side of a picker, searched and paged — the HTMX endpoint behind both
-    trade screens."""
+    """One side of a picker, searched, SORTED and paged — the HTMX endpoint
+    behind both trade screens."""
     if side not in ("offered", "requested"):
         return RedirectResponse(url="/trades", status_code=303)
     items, endpoint = _pick_items_for(
@@ -628,7 +641,15 @@ def trade_picker_pane(
         search=q,
     )
     return _pick_pane(
-        request, side, items, page, q, endpoint, current_user.trade_view_mode or "grid"
+        request,
+        side,
+        items,
+        page,
+        q,
+        endpoint,
+        current_user.trade_view_mode or "grid",
+        sort_spec.normalize_sort(sort, sort_spec.PICKER_SORT_OPTIONS),
+        sort_spec.normalize_direction(direction),
     )
 
 

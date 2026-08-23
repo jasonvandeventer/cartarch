@@ -13012,9 +13012,25 @@ table.dmtx .dmtx-rowhead {
    usually on another page or behind a different search. It sits ABOVE the grid
    for that reason — what you have chosen should not be something you scroll to
    find. */
-.trade-pick-search {
-  width: 100%;
+.trade-pick-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
   margin: 0.6rem 0 0.4rem;
+}
+.trade-pick-search {
+  flex: 1 1 240px;
+  min-width: 0; /* or a long placeholder refuses to shrink and wraps the row */
+  margin: 0;
+}
+.trade-pick-sort-label {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+  flex: 0 0 auto;
 }
 .trade-pick-tray-wrap {
   background: var(--panel-2);

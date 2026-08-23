@@ -1405,6 +1405,13 @@ def shared_pick_items(session: Session, showcase_id: int, search: str = "") -> l
                 "finish": inv.finish,
                 "available": available,
                 "is_proxy": bool(inv.is_proxy),
+                # Finish-aware, and $0 for a proxy — the same value the picker
+                # renders and the balance totals, so the Price sort cannot
+                # disagree with the number beside the card.
+                "effective_price": 0.0
+                if inv.is_proxy
+                else (effective_price(inv.card, inv.finish) or 0.0),
+                "added_at": entry["added_at"],
             }
         )
     out.sort(key=lambda d: ((d["card"].name or "").lower(), d["pick_id"]))
@@ -1479,6 +1486,9 @@ def offered_pick_items(session: Session, user_id: int, search: str = "") -> list
                 "card": _ReadOnlyCardProjection(row.card),
                 "finish": row.finish,
                 "quantity": row.quantity,
+                "effective_price": 0.0
+                if row.is_proxy
+                else (effective_price(row.card, row.finish) or 0.0),
                 "is_proxy": bool(row.is_proxy),
                 "location_label": _build_full_location_label(loc, parent_chain),
                 "location_type": (loc.type or "other").lower() if loc is not None else "",

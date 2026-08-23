@@ -1,5 +1,19 @@
 [
   {
+    "version": "4.17.0",
+    "date": "2026-08-23",
+    "added": [
+      "A Showcase someone has shared with you can be read as a list, the same way your own Showcase can. The Grid/List choice is the one you already made for your own — a shared Showcase is still a Showcase — and the Propose trade button stays on every row.",
+      "The trade screens have a Sort control again, next to the search box on each side. It sorts the whole collection or Showcase you are picking from, not the fifty cards currently on screen, and it travels with the search rather than replacing it."
+    ],
+    "refined": [],
+    "resolved": [
+      "The Send counter-proposal button works again. Yesterday's Grid/List toggle was placed inside the counter form, and a form inside a form is not allowed: the browser ends the outer one early, so the button — and everything below it — no longer belonged to the form it was meant to submit. Pressing it did nothing at all.",
+      "Search on the counter-proposal screen works. The box was never told what to call the text you typed, so it asked the server for an unfiltered list every time and looked like it was ignoring you. The construction screen's box was named and worked, which is why it went unnoticed."
+    ],
+    "archivist_note": "The sort dropdown came off these screens when they started paging, and the reason is worth repeating now that it is back: sorting fifty cards out of four thousand by price gives you the dearest of the fifty, which looks like an answer and is not one. The version that returned does the ordering where the whole set is — so asking for the most expensive card in someone's Showcase now returns the most expensive card in it, even when that card is on page eleven. There is a test for exactly that, seeded so the honest answer and the misleading one are different cards. Date Added is deliberately absent from the picker's list: one side of a trade has that date and the other does not, and a control that quietly works on half a screen is worse than one that is not offered. Two things reported broken on the counter screen turned out to be a fair trade for the ones added: a toggle put inside a form it should have sat beside, and a search box that was never given a name to send its text under. The first is the more interesting failure, because nothing looks wrong in the page source — the browser silently repairs the impossible markup by ending the first form where the second one closes, and everything after that point quietly stops being part of it. Both now have checks that read the finished page rather than the template, which is the only place that repair is visible."
+  },
+  {
     "version": "4.16.3",
     "date": "2026-08-23",
     "added": [

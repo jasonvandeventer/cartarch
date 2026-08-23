@@ -79,6 +79,10 @@
   {% endif %}
 
   {% if pre_recipient and pre_playgroup %}
+    {# Outside the form on purpose — see trade_counter.html: a nested <form>
+       closes the outer one and orphans its submit button. #}
+    {% with pick_panes=true %}{% include "_trade_view_toggle.html" %}{% endwith %}
+
     <form method="post" action="/trades" id="trade-new-form" class="stack-form trade-new-form" data-pick-form>
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
       <input type="hidden" name="recipient_user_id" value="{{ pre_recipient.id }}">
@@ -95,7 +99,6 @@
          totals with; proxies count as $0 (ADR proxy-valuation). Guidance only —
          nothing validates against it. #}
       {% with give_side="offered", even_within=trade_even_within %}{% include "_trade_balance_bar.html" %}{% endwith %}
-      {% with pick_panes=true %}{% include "_trade_view_toggle.html" %}{% endwith %}
 
       {# #184 — each side is a SEARCHED, PAGED pane rather than the whole
          collection. Swapped by HTMX so the page never reloads: the selection
@@ -106,11 +109,11 @@
           From <strong>{{ pre_recipient.player_label }}</strong>'s Showcase shared with
           <em>{{ pre_playgroup.name }}</em>. Search it, then add what you want.
         </p>
-        <input type="search" class="trade-pick-search" name="q" placeholder="Search their showcase — name, t:creature, c:r, cmc>=4…"
-               aria-label="Search their showcase"
-               hx-get="/trades/picker/requested?recipient_user_id={{ pre_recipient.id }}&playgroup_id={{ pre_playgroup.id }}"
-               hx-target="#requested-pane" hx-swap="innerHTML"
-               hx-trigger="keyup changed delay:350ms, search">
+        {% with pick_side="requested", pick_endpoint=requested_pane.endpoint,
+                sort_options=requested_pane.sort_options,
+                search_placeholder="Search their showcase — name, t:creature, c:r, cmc>=4…" %}
+          {% include "_trade_pick_toolbar.html" %}
+        {% endwith %}
         <div class="trade-pick-tray-wrap">
           <h4 class="trade-tray-title">Picked</h4>
           <div data-pick-tray="requested"></div>
@@ -131,11 +134,11 @@
       <section class="panel">
         <h3 class="panel-title">Your cards (offered)</h3>
         <p class="muted">From your own placed inventory. Search it, then add what you'll give.</p>
-        <input type="search" class="trade-pick-search" name="q" placeholder="Search your collection — name, t:creature, is:foil…"
-               aria-label="Search your collection"
-               hx-get="/trades/picker/offered"
-               hx-target="#offered-pane" hx-swap="innerHTML"
-               hx-trigger="keyup changed delay:350ms, search">
+        {% with pick_side="offered", pick_endpoint=offered_pane.endpoint,
+                sort_options=offered_pane.sort_options,
+                search_placeholder="Search your collection — name, t:creature, is:foil…" %}
+          {% include "_trade_pick_toolbar.html" %}
+        {% endwith %}
         <div class="trade-pick-tray-wrap">
           <h4 class="trade-tray-title">Picked</h4>
           <div data-pick-tray="offered"></div>

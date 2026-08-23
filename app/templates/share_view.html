@@ -76,6 +76,20 @@
           {%- if search %} matching <strong>{{ search }}</strong>{% endif -%}.
         {%- endif -%}
       </p>
+      {# Grid/List — the viewer's own showcase preference, so a 1,426-card share
+         can be read as a list. Plain POST: this page has no in-progress state
+         to lose. #}
+      <form action="/account/showcase-view-pref" method="post" class="deck-view-toggle"
+            style="display:inline-flex">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <button type="submit" name="view" value="grid"
+                class="deck-view-toggle-btn {% if view_mode == 'grid' %}active{% endif %}">Grid</button>
+        <button type="submit" name="view" value="list"
+                class="deck-view-toggle-btn {% if view_mode == 'list' %}active{% endif %}">List</button>
+      </form>
+      {% if view_mode == 'list' %}
+        {% include "_share_card_list.html" %}
+      {% else %}
       {# v3.29.2 — propose-from-share link. Each item gets a small
          "Propose trade for this" link that hops to /trades/new with
          the ShowcaseItem id, which the trade construction page
@@ -103,6 +117,7 @@
           </div>
         {% endfor %}
       </div>
+      {% endif %}
       {% set pager_base = "/shares/" ~ share.id %}
       {% set pager_qs = "&search=" ~ search|urlencode ~ "&sort=" ~ sort ~ "&direction=" ~ direction %}
       {% set pager_label = total_count ~ " cards shared" %}

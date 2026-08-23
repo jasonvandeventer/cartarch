@@ -37,6 +37,12 @@
 
   {# The hidden field ids are the engine's contract (`<side>-json`), shared with
      the construction page so one script serves both. #}
+  {# The Grid/List toggle is its own <form>, so it lives OUTSIDE this one. A
+     nested form is invalid HTML: the parser drops the inner start tag and its
+     </form> closes the OUTER form, which orphaned every control after it —
+     including "Send counter-proposal", reported dead on 2026-08-23. #}
+  {% with pick_panes=true %}{% include "_trade_view_toggle.html" %}{% endwith %}
+
   <form method="post" action="/trades/{{ trade.id }}/counter" id="counter-form" data-pick-form>
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
     <input type="hidden" name="offered_json" id="offered-json" value="[]">
@@ -47,7 +53,6 @@
        already computes both sides, so it is the same include. #}
     {% with give_side=("offered" if options.author_is_proposer else "requested"),
             even_within=trade_even_within %}{% include "_trade_balance_bar.html" %}{% endwith %}
-    {% with pick_panes=true %}{% include "_trade_view_toggle.html" %}{% endwith %}
 
     {# #184 — both sides are SEARCHED, PAGED panes swapped by HTMX, and the
        selection lives in the shared trade-picker.js. Same engine and same grid
@@ -63,11 +68,11 @@
           of theirs, it has to be in the Showcase they've shared with this playgroup.
         </p>
       {% endif %}
-      <input type="search" class="trade-pick-search" placeholder="Search — name, t:creature, is:foil…"
-             aria-label="Search the offered side"
-             hx-get="/trades/picker/offered?trade_id={{ trade.id }}"
-             hx-target="#offered-pane" hx-swap="innerHTML"
-             hx-trigger="keyup changed delay:350ms, search">
+      {% with pick_side="offered", pick_endpoint=offered_pane.endpoint,
+              sort_options=offered_pane.sort_options,
+              search_placeholder="Search — name, t:creature, is:foil…" %}
+        {% include "_trade_pick_toolbar.html" %}
+      {% endwith %}
       <div class="trade-pick-tray-wrap">
         <h4 class="trade-tray-title">On this side</h4>
         <div data-pick-tray="offered"></div>
@@ -88,11 +93,11 @@
       <h3 class="panel-title">
         {% if options.author_is_proposer %}Their cards (requested){% else %}Your cards (requested){% endif %}
       </h3>
-      <input type="search" class="trade-pick-search" placeholder="Search — name, t:creature, is:foil…"
-             aria-label="Search the requested side"
-             hx-get="/trades/picker/requested?trade_id={{ trade.id }}"
-             hx-target="#requested-pane" hx-swap="innerHTML"
-             hx-trigger="keyup changed delay:350ms, search">
+      {% with pick_side="requested", pick_endpoint=requested_pane.endpoint,
+              sort_options=requested_pane.sort_options,
+              search_placeholder="Search — name, t:creature, is:foil…" %}
+        {% include "_trade_pick_toolbar.html" %}
+      {% endwith %}
       <div class="trade-pick-tray-wrap">
         <h4 class="trade-tray-title">On this side</h4>
         <div data-pick-tray="requested"></div>

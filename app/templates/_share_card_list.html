@@ -1,0 +1,48 @@
+{# A shared Showcase as a compact list (2026-08-23).
+
+   Same `.card-list-*` family as the owner's own list view and a trade's cards:
+   the rows hold the same facts in the same order, and a third copy is how three
+   things drift apart.
+
+   Read-only, like the rest of this page — the ONLY control is the propose-trade
+   link, which is the whole reason a viewer is here. Items are the SANITIZED
+   projection, so what a row can show is bounded by that projection and not by
+   this template. #}
+<ul class="card-list" data-card-hover data-card-hover-target=".card-list-row">
+  {% for item in items %}
+    <li class="card-list-row"
+        {% if item.card.image_url and item.card.scryfall_id %}
+        data-card-image="{{ mirror_image_url(item.card.scryfall_id, 'large') }}"
+        data-card-image-alt="{{ scryfall_image_fallback(item.card.scryfall_id, 'large') }}"
+        data-card-info="{{ (item.card.set_code or '?')|upper }} #{{ item.card.collector_number or '?' }}"
+        {% endif %}>
+      <span class="cl-qty">{{ item.quantity }}</span>
+      <span class="cl-name">{{ item.card.name }}</span>
+      <span class="cl-set">{{ (item.card.set_code or '?')|upper }} #{{ item.card.collector_number or '?' }}</span>
+      <span class="cl-tags">
+        {% if item.finish and item.finish != 'normal' %}
+          <span class="finish-badge">{{ item.finish|capitalize }}</span>
+        {% endif %}
+        {% if item.language and item.language != 'en' %}
+          <span class="language-badge">{{ item.language|upper }}</span>
+        {% endif %}
+        {% if item.is_proxy %}<span class="proxy-badge proxy-badge-warn">PROXY</span>{% endif %}
+      </span>
+      <span class="cl-price">
+        {% if item.is_proxy %}
+          $0.00 <span class="proxy-price-note">(proxy)</span>
+        {% elif item.total_value %}
+          ${{ '%.2f'|format(item.total_value) }}
+        {% else %}
+          <span class="muted">—</span>
+        {% endif %}
+      </span>
+      {% if current_user.id != sharer.id %}
+        <span class="cl-actions">
+          <a class="btn-like cl-btn"
+             href="/trades/new?{% if item.id %}from_showcase_item={{ item.id }}{% else %}from_showcase_row={{ item.inventory_row_id }}{% endif %}">Propose trade</a>
+        </span>
+      {% endif %}
+    </li>
+  {% endfor %}
+</ul>
