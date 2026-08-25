@@ -1,0 +1,15 @@
+{# The three deck hero numbers (unique / total / value).
+
+   Rendered inline on /decks/{id} AND swapped out-of-band by the quantity
+   mutation routes, so an in-place card-list swap can never leave "Total
+   Cards" reporting a count the list no longer shows.
+
+   The wrapper is display:contents so the spans stay direct flex items of
+   .hero-stats-inline in both contexts. #}
+<span id="deck-hero-numbers"
+      class="deck-hero-numbers"
+      {% if hero_numbers_oob | default(false) %}hx-swap-oob="true"{% endif %}>
+  <span>{{ deck_unique_cards }} Unique Cards</span>
+  <span>{{ deck_total_cards }} Total Cards</span>
+  <span>${{ '%.2f'|format(deck_total_value) }}</span>
+</span>

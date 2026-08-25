@@ -88,27 +88,27 @@
                 </form>
               {% else %}
               {% if is_basic %}
-                {# Basic land +/- controls. Hits the bump-qty route; HTMX swaps
-                   the whole card list so the row count updates in place. #}
+                {# Basic-land quantity box (v4.18.0). Replaces the +/- pair:
+                   one submit sets the count outright instead of one round
+                   trip per copy. 0 removes the row. HTMX swaps the list and
+                   the hero numbers in place — no page reload. #}
                 <form method="post"
                       class="dlr-qty-form"
-                      action="/decks/{{ deck.id }}/rows/{{ item.id }}/bump-qty"
-                      hx-post="/decks/{{ deck.id }}/rows/{{ item.id }}/bump-qty"
+                      action="/decks/{{ deck.id }}/rows/{{ item.id }}/set-qty"
+                      hx-post="/decks/{{ deck.id }}/rows/{{ item.id }}/set-qty"
                       hx-target="#deck-card-list"
                       hx-swap="innerHTML">
                   <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                  <input type="hidden" name="delta" value="-1">
-                  <button type="submit" class="dlr-qty-btn" aria-label="Decrement quantity">−</button>
-                </form>
-                <form method="post"
-                      class="dlr-qty-form"
-                      action="/decks/{{ deck.id }}/rows/{{ item.id }}/bump-qty"
-                      hx-post="/decks/{{ deck.id }}/rows/{{ item.id }}/bump-qty"
-                      hx-target="#deck-card-list"
-                      hx-swap="innerHTML">
-                  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                  <input type="hidden" name="delta" value="1">
-                  <button type="submit" class="dlr-qty-btn" aria-label="Increment quantity">+</button>
+                  <input type="number"
+                         class="dlr-qty-input"
+                         name="quantity"
+                         value="{{ item.quantity }}"
+                         min="0"
+                         max="99"
+                         step="1"
+                         inputmode="numeric"
+                         aria-label="Quantity of {{ item.card.name }} in deck">
+                  <button type="submit" class="dlr-qty-btn" aria-label="Set quantity">Set</button>
                 </form>
               {% endif %}
               {# Switch-printing trigger. Loads the modal contents into the

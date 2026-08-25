@@ -4384,28 +4384,25 @@ def switch_deck_row_printing(
     return True
 
 
-def bump_deck_row_quantity(
-    session: Session, user_id: int, deck_id: int, row_id: int, delta: int
+def set_deck_row_quantity(
+    session: Session, user_id: int, deck_id: int, row_id: int, quantity: int
 ) -> dict:
-    """Bump (or decrement) a deck row's quantity by ``delta`` (±1).
+    """Set a deck row's quantity to an absolute value.
 
-    Powers the basic-land +/- controls on the deck-detail page. Restricted
-    to deck-located rows owned by this user. When the new quantity reaches
-    zero the row is deleted entirely; the caller's UI is expected to
-    re-render the deck card list after.
+    Powers the basic-land quantity box on the deck-detail page (both views).
+    Restricted to deck-located rows owned by this user. A quantity of zero
+    deletes the row entirely; the caller's UI is expected to re-render the
+    deck card list after.
 
-    Returns ``{"row_id": id, "quantity": new_qty, "deleted": bool}`` so
-    the caller can decide whether to swap the row out of the rendered
-    list. Empty dict on validation failure (row not found, not in deck,
-    not owned by user) so the caller can 404.
+    Returns ``{"row_id": id, "quantity": new_qty, "deleted": bool}`` so the
+    caller can decide whether to swap the row out of the rendered list. Empty
+    dict on validation failure (row not found, not in deck, not owned by
+    user) so the caller can 404.
 
-    v1 keeps this simple — no cross-row inventory accounting. A `+` just
-    bumps the deck row's quantity by 1; user is responsible for physically
-    placing the additional copy.
+    No cross-row inventory accounting: setting a count just writes the deck
+    row's quantity; the user is responsible for physically placing the
+    copies. That is why the control is offered on basic lands only.
     """
-    if delta not in (-1, 1):
-        return {}
-
     deck = session.query(Deck).filter(Deck.id == deck_id, Deck.user_id == user_id).first()
     if not deck or not deck.storage_location_id:
         return {}
@@ -4422,16 +4419,15 @@ def bump_deck_row_quantity(
     if not row:
         return {}
 
-    new_qty = (row.quantity or 0) + delta
-    if new_qty <= 0:
+    if quantity <= 0:
         session.delete(row)
         session.commit()
         return {"row_id": row_id, "quantity": 0, "deleted": True}
 
-    row.quantity = new_qty
+    row.quantity = quantity
     row.updated_at = utc_now()
     session.commit()
-    return {"row_id": row_id, "quantity": new_qty, "deleted": False}
+    return {"row_id": row_id, "quantity": quantity, "deleted": False}
 
 
 def pull_card_to_deck(

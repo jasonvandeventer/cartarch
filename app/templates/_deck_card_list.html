@@ -14,6 +14,13 @@
      - 'grid' (default) → existing image-card grid via inventory_card macro
 #}
 {% from "_macros.html" import inventory_card %}
+{# The mutation routes (set-qty) render this partial with
+   hero_numbers_oob, which piggybacks an out-of-band swap of the hero
+   numbers on the list swap — the quantity that changed is counted there
+   too. Absent on the search/view GETs, which change no total. #}
+{% if hero_numbers_oob | default(false) %}
+  {% include "_deck_hero_numbers.html" %}
+{% endif %}
 {% if items %}
   {% if view_mode == 'list' %}
     {% include "_deck_card_list_text.html" %}

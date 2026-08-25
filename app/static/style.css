@@ -1612,6 +1612,12 @@ h2.panel-title strong {
   align-items: start;
   flex-wrap: wrap;
 }
+/* The three hero numbers live in their own wrapper so a quantity edit can
+   swap them out-of-band; display:contents keeps them direct flex items of
+   .hero-stats-inline, so the gap still applies. */
+.deck-hero-numbers {
+  display: contents;
+}
 .hero-stats-inline {
   display: flex;
   gap: 1.25rem;
@@ -7363,7 +7369,27 @@ table.dmtx .dmtx-rowhead {
   padding: 0;
 }
 .dlr-qty-form {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
+}
+/* Basic-land quantity box in a dense list row: a 22px-tall field wide
+   enough for two digits, and a "Set" button that (unlike its 22px square
+   siblings) sizes to its label. */
+.dlr-qty-input {
+  width: 3.1rem;
+  height: 22px;
+  padding: 0 0.3rem;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+  font-family: inherit;
+  text-align: right;
+}
+.dlr-qty-form .dlr-qty-btn {
+  width: auto;
+  padding: 0 0.4rem;
 }
 .dlr-qty-btn,
 .dlr-switch-btn {
@@ -7524,6 +7550,20 @@ table.dmtx .dmtx-rowhead {
    existing card-actions-drawer's card-actions-body. */
 .card-actions-body .basic-qty-form button {
   padding: 0.35rem 0.65rem;
+}
+/* Same shape as the drawer's other [control][button] rows (#173): the label
+   takes a full line, so the number field and its Set button always wrap
+   together, and the field shrinks rather than spilling past the card. */
+.card-actions-body .basic-qty-form label {
+  flex: 1 0 100%;
+  font-size: 0.85rem;
+}
+.card-actions-body .basic-qty-form input[type="number"] {
+  flex: 0 1 auto;
+  width: 4.5rem;
+  min-width: 0;
+  padding: 0.35rem 0.45rem;
+  font-family: inherit;
 }
 
 /* ---- Switch-printing modal ---- */

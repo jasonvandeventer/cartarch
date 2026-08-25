@@ -117,8 +117,8 @@ srcset="{{ mirror_image_url(scryfall_id, 'small') }} 146w, {{ mirror_image_url(s
             </form>
             {# In-place card edit affordances (v3.21.0). Switch-printing
                loads a modal listing every printing of this card name;
-               basic-land rows also get +/- quantity controls so users
-               don't have to delete-and-re-add to bump a Plains count. #}
+               basic-land rows also get a quantity box so users don't have
+               to delete-and-re-add to change a Plains count. #}
             <button type="button"
                     class="inline-form"
                     hx-get="/decks/{{ deck.id }}/rows/{{ item.id }}/printings-modal"
@@ -128,25 +128,28 @@ srcset="{{ mirror_image_url(scryfall_id, 'small') }} 146w, {{ mirror_image_url(s
             {% if 'basic' in _tl and (
               'plains' in _tl or 'island' in _tl or 'swamp' in _tl
               or 'mountain' in _tl or 'forest' in _tl or 'wastes' in _tl) %}
+              {# Basic-land quantity box (v4.18.0). Was a +/- pair, which cost
+                 one full list re-render per copy — going 4 -> 12 Forests meant
+                 eight round trips, each one closing this drawer. Type the
+                 number instead; 0 removes the row. HTMX swaps the list (and
+                 the hero numbers) in place, so the page never reloads. #}
               <form method="post"
                     class="inline-form basic-qty-form"
-                    action="/decks/{{ deck.id }}/rows/{{ item.id }}/bump-qty"
-                    hx-post="/decks/{{ deck.id }}/rows/{{ item.id }}/bump-qty"
+                    action="/decks/{{ deck.id }}/rows/{{ item.id }}/set-qty"
+                    hx-post="/decks/{{ deck.id }}/rows/{{ item.id }}/set-qty"
                     hx-target="#deck-card-list"
                     hx-swap="innerHTML">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                <input type="hidden" name="delta" value="-1">
-                <button type="submit" aria-label="Decrement quantity">−1</button>
-              </form>
-              <form method="post"
-                    class="inline-form basic-qty-form"
-                    action="/decks/{{ deck.id }}/rows/{{ item.id }}/bump-qty"
-                    hx-post="/decks/{{ deck.id }}/rows/{{ item.id }}/bump-qty"
-                    hx-target="#deck-card-list"
-                    hx-swap="innerHTML">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                <input type="hidden" name="delta" value="1">
-                <button type="submit" aria-label="Increment quantity">+1</button>
+                <label for="qty-{{ item.id }}">Quantity in deck</label>
+                <input type="number"
+                       id="qty-{{ item.id }}"
+                       name="quantity"
+                       value="{{ item.quantity }}"
+                       min="0"
+                       max="99"
+                       step="1"
+                       inputmode="numeric">
+                <button type="submit">Set</button>
               </form>
             {% endif %}
             <form action="/decks/return" method="post" class="return-form">

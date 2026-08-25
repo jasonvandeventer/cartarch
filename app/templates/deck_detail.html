@@ -141,9 +141,9 @@
           </div>
         </div>
         <div class="hero-stats-inline">
-          <span>{{ (commanders|length) + (items|length) }} Unique Cards</span>
-          <span>{{ deck_total_cards }} Total Cards</span>
-          <span>${{ '%.2f'|format(deck_total_value) }}</span>
+          {% with deck_unique_cards = (commanders|length) + (items|length) %}
+            {% include "_deck_hero_numbers.html" %}
+          {% endwith %}
           {% if deck_record.total > 0 %}
             <span class="deck-record">{{ deck_record.wins }}W–{{ deck_record.losses }}L</span>
           {% endif %}

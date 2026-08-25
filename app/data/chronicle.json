@@ -1,5 +1,17 @@
 [
   {
+    "version": "4.18.0",
+    "date": "2026-08-25",
+    "added": [
+      "Deck lands now take a quantity you type. The plus and minus buttons on a basic land have been replaced by a small box holding the current count: set it to twelve, press Set, and the deck list updates in place. Setting it to zero removes the card. Going from four Forests to twelve used to be eight separate clicks, each one reloading the whole card list — and in the image view, each one closed the actions panel the buttons were sitting in."
+    ],
+    "refined": [
+      "The deck's Total Cards and value at the top of the page now update along with the card list. They previously kept the old numbers until the page was reloaded, which rather defeated the point of editing without a reload."
+    ],
+    "resolved": [],
+    "archivist_note": "The controls were there; the arithmetic they demanded was the problem. A stepper is the right shape for a nudge and the wrong one for a decision already made — nobody wonders their way to twelve lands, they know the number before they reach for the control. Typing it is one exchange with the server instead of eight. The second half is quieter and mattered more to us: the page updated the list and left its own headline totals reading the old count. A number that is merely stale still presents itself with the same confidence as a correct one, so we made the totals travel with the edit that changes them."
+  },
+  {
     "version": "4.17.1",
     "date": "2026-08-23",
     "added": [],

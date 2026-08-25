@@ -37,7 +37,6 @@ from app.deck_service import (
     add_card_to_considering,
     assign_deck_variant_group,
     build_public_deck_view,
-    bump_deck_row_quantity,
     check_deck_legality,
     compute_consistency,
     compute_dead_cards,
@@ -83,6 +82,7 @@ from app.deck_service import (
     resolved_deck_rows,
     return_card_from_deck,
     revoke_deck_share_token,
+    set_deck_row_quantity,
     set_row_tags,
     share_card_to_deck,
     suggest_card_roles,
@@ -1070,7 +1070,7 @@ def _deck_cards_partial_response(
 ) -> HTMLResponse:
     """Render the deck-card-list partial for HTMX swap-in.
 
-    Used by mutation routes (switch-printing, bump-qty) that need to
+    Used by mutation routes (switch-printing, set-qty) that need to
     re-render the deck card display after the underlying row changes.
     Uses the user's persisted view/group prefs (not URL params — those
     only matter on the dedicated cards-partial GET endpoint).
@@ -1083,10 +1083,10 @@ def _deck_cards_partial_response(
         raise HTTPException(status_code=404, detail="Deck not found")
     view_mode = current_user.deck_view_mode or "grid"
     group_by = current_user.deck_group_by or "type"
-    items, _, _ = _build_deck_card_items(
+    items, deck_total_value, deck_total_cards = _build_deck_card_items(
         session, deck, current_user.id, search="", sort="name", direction="asc"
     )
-    _, items = _split_commanders(items)
+    commanders, items = _split_commanders(items)
     use_drawer_sorter = has_sortable_setup(session, current_user.id)
     return render(
         request,
@@ -1100,6 +1100,16 @@ def _deck_cards_partial_response(
             "commanders": [],
             "use_drawer_sorter": use_drawer_sorter,
             "locations": list_locations(session, user_id=current_user.id),
+            # Every caller of this helper is a MUTATION (set-qty, add-card,
+            # switch-printing), and all three move the hero numbers. Swapping
+            # the card list alone left "Total Cards" (and the value) reporting
+            # a figure the page no longer showed — a wrong number, not a stale
+            # one — until a reload. The search/view GET renders the same
+            # template without this flag and emits no out-of-band block.
+            "hero_numbers_oob": True,
+            "deck_unique_cards": len(commanders) + len(items),
+            "deck_total_cards": deck_total_cards,
+            "deck_total_value": deck_total_value,
         },
     )
 
@@ -2099,31 +2109,30 @@ async def deck_row_switch_printing(
     return _deck_redirect(request, deck_id)
 
 
-@router.post("/decks/{deck_id}/rows/{row_id}/bump-qty")
-async def deck_row_bump_qty(
+@router.post("/decks/{deck_id}/rows/{row_id}/set-qty")
+async def deck_row_set_qty(
     deck_id: int,
     row_id: int,
     request: Request,
-    delta: int = Form(...),
+    quantity: int = Form(...),
     session: Session = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
     _: None = CsrfRequired,
 ):
-    """Increment / decrement a deck row's quantity by ±1.
+    """Set a deck row's quantity outright.
 
-    Used by the basic-land +/- controls on the deck-detail page. Quantity
-    of 0 deletes the row. Anything other than ±1 is rejected so the
-    button can't accidentally page through quantities.
+    Powers the basic-land quantity box on the deck-detail page — typing 12
+    is one interaction where the old +/- pair was eight, each one a full
+    list re-render. Quantity 0 deletes the row; anything above 99 is
+    clamped rather than rejected, so a fat-fingered 120 doesn't cost the
+    edit.
     """
-    if delta not in (-1, 1):
-        raise HTTPException(status_code=400, detail="delta must be ±1")
-
-    result = bump_deck_row_quantity(
+    result = set_deck_row_quantity(
         session,
         user_id=current_user.id,
         deck_id=deck_id,
         row_id=row_id,
-        delta=delta,
+        quantity=max(0, min(quantity, 99)),
     )
     if not result:
         raise HTTPException(status_code=404, detail="Deck row not found")
