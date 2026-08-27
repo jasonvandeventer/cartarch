@@ -1,5 +1,16 @@
 [
   {
+    "version": "4.18.1",
+    "date": "2026-08-26",
+    "added": [],
+    "refined": [],
+    "resolved": [
+      "Cards from a set too new for our image library now fall back to Scryfall's own artwork instead of showing an empty frame. The fallback was always meant to be there, but a change we made in August to send smaller thumbnails to smaller screens quietly disabled it: a browser handed a list of image sizes will use that list and ignore the single fallback address entirely. Two cards from the August Secret Lair drop were the ones that showed it.",
+      "The card image library has been refreshed and now carries every printing Scryfall lists, including the newest Secret Lair cards."
+    ],
+    "archivist_note": "A safety net nobody watches is indistinguishable from one that is not there. This one was written the day the image library was, on the reasoning that a set will always arrive before we have mirrored it — and it worked, until an unrelated optimisation four months later gave the browser a better answer to the same question and the net stopped catching anything. Nothing failed loudly; the pages simply showed blank frames for cards too new to have been copied yet, which reads as a missing card rather than a missing file. We fixed the fallback and refreshed the library in the same afternoon, and we would rather have the fallback: the library will always be a little behind the game, and the whole point is that nobody should have to notice."
+  },
+  {
     "version": "4.18.0",
     "date": "2026-08-25",
     "added": [

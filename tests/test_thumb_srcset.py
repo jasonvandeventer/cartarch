@@ -61,3 +61,31 @@ def test_the_collection_grid_thumb_offers_both_sizes(client, db, user):
     # The plain src stays `normal` for anything that ignores srcset, and the
     # mirror-404 fallback is unchanged.
     assert "/normal.jpg" in tag and "onerror" in tag
+
+
+def test_the_mirror_404_fallback_survives_srcset(client, db, user):
+    """A srcset thumb must DROP srcset in onerror, or the fallback is inert.
+
+    An <img> selects its source from srcset whenever srcset is present and
+    ignores src entirely, so the v4.13.37 srcset silently killed the issue-#44
+    mirror-404 fallback on every grid thumb: assigning this.src re-selected
+    from the same 404ing candidates. Measured in Chromium against a genuinely
+    unmirrored printing — naturalWidth 0 with srcset, the real image without.
+
+    Mutation check: drop the removeAttribute from img_fallback and this fails.
+    """
+    _seed(db, user)
+    page = client.get("/collection")
+    assert page.status_code == 200
+
+    m = re.search(r'<img class="inventory-thumb".*?>', page.text, re.S)
+    assert m, "the collection grid has no inventory-thumb img"
+    tag = m.group(0)
+    assert "srcset=" in tag, tag
+    onerror = re.search(r'onerror="([^"]*)"', tag)
+    assert onerror, tag
+    handler = onerror.group(1)
+    assert "removeAttribute('srcset')" in handler, handler
+    # ...and it must happen BEFORE the src assignment, or the browser re-selects
+    # from srcset one more time before it is gone.
+    assert handler.index("removeAttribute") < handler.index("this.src="), handler

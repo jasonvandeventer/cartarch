@@ -17,9 +17,17 @@
 {# issue #44 — onerror attribute for mirror-served card <img> tags. The mirror
    404s on a printing it hasn't ingested yet; this swaps to Scryfall's API
    image redirect once (the this.onerror=null stops a loop if Scryfall also
-   404s). Pair with mirror_image_url() for the src; same size/face args. #}
+   404s). Pair with mirror_image_url() for the src; same size/face args.
+
+   **removeAttribute('srcset') is load-bearing.** An <img> picks its source
+   from srcset when srcset is present and IGNORES src entirely, so on a tag
+   carrying thumb_srcset (every grid thumb since v4.13.37) assigning this.src
+   changed nothing and the broken image stayed broken — the fallback the whole
+   mirror design leans on was dead on exactly the surfaces that show the most
+   cards. Dropping srcset first makes the browser re-select from src.
+   Chromium- and Firefox-verified against a genuinely unmirrored printing. #}
 {% macro img_fallback(scryfall_id, size="normal", face="front") -%}
-onerror="this.onerror=null; this.src='{{ scryfall_image_fallback(scryfall_id, size, face) }}'"
+onerror="this.onerror=null; this.removeAttribute('srcset'); this.src='{{ scryfall_image_fallback(scryfall_id, size, face) }}'"
 {%- endmacro %}
 
 {# A grid thumb is ~140px wide and was ALWAYS fetching `normal` — 488x680,
