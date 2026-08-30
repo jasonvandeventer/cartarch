@@ -182,41 +182,7 @@
   {% set pager_qs = "&search=" ~ search|urlencode ~ "&sort=" ~ sort ~ "&direction=" ~ direction %}
   {% set pager_label = total_count ~ " rows in this location" %}
   {% include "_pager.html" %}
-  {# Recent activity — added after a report where a quick-add looked like it had
-     overwritten a card. It had not, but nothing on this page could show that:
-     the grid pages at 50, so an existing row and a card that left earlier are
-     both invisible. This answers "what just happened here?" without a query. #}
-  {% if location_activity %}
-    <section class="panel">
-      <h3 class="panel-title">Recent activity</h3>
-      <table class="audit-history-table">
-        <thead>
-          <tr><th>When</th><th>Card</th><th>Finish</th><th>Change</th><th>What</th></tr>
-        </thead>
-        <tbody>
-          {% for e in location_activity %}
-            <tr>
-              <td>{{ e.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
-              <td>
-                {{ e.card_name | default('—', true) }}
-                {% if e.set_code %}<span class="muted small-text">{{ e.set_code | upper }}</span>{% endif %}
-              </td>
-              <td>{% if e.finish and e.finish != 'normal' %}{{ e.finish | capitalize }}{% else %}—{% endif %}</td>
-              <td>{% if e.quantity_delta %}{{ '%+d' | format(e.quantity_delta) }}{% else %}—{% endif %}</td>
-              <td>
-                {{ e.event_type | replace('_', ' ') | capitalize }}
-                {% if e.left_here and e.destination_location %}
-                  <span class="muted small-text">→ {{ e.destination_location }}</span>
-                {% elif not e.left_here and e.source_location %}
-                  <span class="muted small-text">← {{ e.source_location }}</span>
-                {% endif %}
-              </td>
-            </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </section>
-  {% endif %}
+  {% include "_activity_panel.html" %}
   {% if audit_history %}
     <section class="panel">
       <h3 class="panel-title">Audit history</h3>

@@ -4694,6 +4694,12 @@ def materialize_brew(session: Session, user_id: int, deck_id: int) -> dict | Non
             if deck_row:
                 deck_row.quantity += take
                 deck_row.updated_at = utc_now()
+                # The proxy row being replaced carries the deck's role marker.
+                # `role == "commander"` is THE deck page's answer to "who is the
+                # commander" (`_split_commanders`), so dropping it here demoted
+                # a materialized brew commander into the main deck list.
+                if proxy.role and not deck_row.role:
+                    deck_row.role = proxy.role
             else:
                 deck_row = InventoryRow(
                     user_id=user_id,
@@ -4706,6 +4712,7 @@ def materialize_brew(session: Session, user_id: int, deck_id: int) -> dict | Non
                     is_pending=False,
                     is_proxy=False,
                     tags=src.tags,
+                    role=proxy.role,
                     created_at=utc_now(),
                     updated_at=utc_now(),
                 )

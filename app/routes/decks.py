@@ -21,6 +21,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse, Red
 from sqlalchemy.orm import Session, joinedload
 
 from app import deck_service, session_service, sort_spec
+from app.audit_service import recent_location_activity
 from app.bracket_v2_service import (
     estimate_bracket_v2,
     gc_list_version,
@@ -978,12 +979,30 @@ def deck_detail_page(
     _considering_groups, _considering_total = (
         _build_considering_items(session, deck, current_user.id) if deck else ([], 0)
     )
+
+    # Recent activity, the same panel /locations/{id} carries. A deck is ONE
+    # place under three free-text labels in TransactionLog: the generic move
+    # primitive writes the bare location name, the deck primitives write
+    # `deck:<name>`, and the holding area writes `considering:<name>`. Match all
+    # three or a card moved in via Move shows up on the location page and
+    # nowhere on the deck's own.
+    location_activity = (
+        recent_location_activity(
+            session,
+            current_user.id,
+            [deck.name, f"deck:{deck.name}", f"considering:{deck.name}"],
+            limit=10,
+        )
+        if deck
+        else []
+    )
     return render(
         request,
         "deck_detail.html",
         {
             "title": deck.name if deck else "Deck",
             "deck": deck,
+            "location_activity": location_activity,
             "considering_groups": _considering_groups,
             "considering_total": _considering_total,
             "variant_group": deck.variant_group if deck else None,

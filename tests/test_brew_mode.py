@@ -1039,3 +1039,33 @@ def test_materialize_owner_scoped():
     brew = deck_service.create_deck(s, u.id, "Brew", is_brew=True)
     s.commit()
     assert deck_service.materialize_brew(s, other.id, brew.id) is None
+
+
+def test_materialize_preserves_the_commander_role():
+    """Reported 2026-08-29: "materializing" a placeholder commander removed it
+    as the commander.
+
+    `InventoryRow.role == "commander"` is THE deck page's answer to who the
+    commander is (`_split_commanders`), and materialize replaced the proxy row
+    with a fresh real row that carried no role — so the commander silently
+    dropped into the main deck list. Both branches are covered: the new-row
+    branch, and the merge branch where a real deck row of that printing already
+    exists.
+    """
+    for preexisting_real in (False, True):
+        s = _fresh()()
+        u = _user(s)
+        brew = deck_service.create_deck(s, u.id, "Brew", is_brew=True)
+        cmdr = _card(s, "Atraxa, Praetors' Voice")
+        binder = _loc(s, u.id, "Binder", type_="box")
+        _place(s, u.id, cmdr, binder.id, proxy=False)
+        proxy = _place(s, u.id, cmdr, brew.storage_location_id, proxy=True)
+        proxy.role = "commander"
+        if preexisting_real:
+            _place(s, u.id, cmdr, brew.storage_location_id, proxy=False)
+        s.commit()
+
+        assert deck_service.materialize_brew(s, u.id, brew.id)["claimed"] == 1
+        real = _deck_row(s, brew, cmdr.id, proxy=False)
+        assert real is not None
+        assert real.role == "commander", f"role lost (preexisting_real={preexisting_real})"

@@ -1,5 +1,17 @@
 [
   {
+    "version": "4.19.0",
+    "date": "2026-08-29",
+    "added": [
+      "A deck page now carries the same Recent activity panel storage locations have had: the last ten cards pulled in, moved in, put into Considering, or returned to the collection, newest first, each naming where it came from or went. Asked for after locations got theirs."
+    ],
+    "refined": [],
+    "resolved": [
+      "Materializing a brewed deck — claiming the real cards you own in place of its placeholders — no longer strips the commander. The claimed card kept its place in the deck but lost the marker that said it was the commander, so it dropped into the main card list and the deck read as having none."
+    ],
+    "archivist_note": "The two are less unrelated than they look. Both are about a record of a thing surviving the thing being changed. A deck is the most edited object in the archive and was the only major one that could not tell you what had recently happened to it — every card that arrived or left did so silently, and the only account of it lived on a page about a box. And when a placeholder became a real card, the swap carried the card, the finish and the printing across and quietly dropped the one attribute that was not about the card at all: that this row was the commander. We have written before that a rule with several implementations will disagree eventually; this is the quieter cousin, a rule with one implementation and a copy step that did not know it existed."
+  },
+  {
     "version": "4.18.1",
     "date": "2026-08-26",
     "added": [],

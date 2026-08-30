@@ -1,0 +1,39 @@
+{# Recent activity for one place (a location, or a deck) — ONE definition, two
+   surfaces. Added after a report where a quick-add looked like it had
+   overwritten a card. It had not, but nothing on the page could show that: the
+   grid pages at 50, so an existing row and a card that left earlier are both
+   invisible. This answers "what just happened here?" without a query.
+
+   Context: `location_activity`, from audit_service.recent_location_activity.
+   Used by: location_detail.html, deck_detail.html #}
+{% if location_activity %}
+  <section class="panel">
+    <h3 class="panel-title">Recent activity</h3>
+    <table class="audit-history-table">
+      <thead>
+        <tr><th>When</th><th>Card</th><th>Finish</th><th>Change</th><th>What</th></tr>
+      </thead>
+      <tbody>
+        {% for e in location_activity %}
+          <tr>
+            <td>{{ e.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+            <td>
+              {{ e.card_name | default('—', true) }}
+              {% if e.set_code %}<span class="muted small-text">{{ e.set_code | upper }}</span>{% endif %}
+            </td>
+            <td>{% if e.finish and e.finish != 'normal' %}{{ e.finish | capitalize }}{% else %}—{% endif %}</td>
+            <td>{% if e.quantity_delta %}{{ '%+d' | format(e.quantity_delta) }}{% else %}—{% endif %}</td>
+            <td>
+              {{ e.event_type | replace('_', ' ') | capitalize }}
+              {% if e.left_here and e.destination_location %}
+                <span class="muted small-text">→ {{ e.destination_location }}</span>
+              {% elif not e.left_here and e.source_location %}
+                <span class="muted small-text">← {{ e.source_location }}</span>
+              {% endif %}
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+{% endif %}

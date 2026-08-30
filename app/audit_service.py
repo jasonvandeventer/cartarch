@@ -74,7 +74,7 @@ def log_transaction(
 def recent_location_activity(
     session: Session,
     user_id: int,
-    location_name: str,
+    location_name: str | list[str],
     limit: int = 10,
 ) -> list[dict]:
     """Recent inventory events touching a location, newest first.
@@ -91,15 +91,22 @@ def recent_location_activity(
     entry that would have explained the whole report). The cost is that
     renaming a location orphans its history here; that is the schema's
     constraint, not a choice, and it fails quiet rather than wrong.
+
+    ``location_name`` accepts a LIST because a deck is one place under three
+    free-text labels: the generic move primitive writes the bare location name,
+    the deck primitives write ``deck:<name>``, and the holding area writes
+    ``considering:<name>``. A deck page passes all three; a location page still
+    passes one string.
     """
+    names = [location_name] if isinstance(location_name, str) else list(location_name)
     rows = (
         session.query(TransactionLog, Card.name, Card.set_code)
         .outerjoin(Card, TransactionLog.card_id == Card.id)
         .filter(
             TransactionLog.user_id == user_id,
             or_(
-                TransactionLog.source_location == location_name,
-                TransactionLog.destination_location == location_name,
+                TransactionLog.source_location.in_(names),
+                TransactionLog.destination_location.in_(names),
             ),
         )
         .order_by(TransactionLog.created_at.desc(), TransactionLog.id.desc())
@@ -119,7 +126,7 @@ def recent_location_activity(
             "set_code": set_code,
             # Which way the card went, resolved server-side: the template must
             # not re-derive it and get a third answer.
-            "left_here": t.source_location == location_name,
+            "left_here": t.source_location in names,
         }
         for t, card_name, set_code in rows
     ]
