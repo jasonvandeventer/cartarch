@@ -7,6 +7,7 @@
         {{ editorial_eyebrow("Storage · Drawers · " ~ drawer_label) }}
         <h2 class="panel-title">{{ drawer_label }}</h2>
         <p class="pagehead-tagline">Cards physically assigned to this drawer.</p>
+        {% if location_id %}<p><a href="/locations/{{ location_id }}">Manage location</a> · <a href="/audit/start?location_id={{ location_id }}">Audit this drawer</a></p>{% endif %}
       </div>
       <div class="hero-stats-inline">
         <span>{{ entry_count }} entries</span>

@@ -1,5 +1,19 @@
 [
   {
+    "version": "4.19.2",
+    "date": "2026-09-15",
+    "added": [
+      "Two six-drawer catalogs can now be set up as twelve native drawers, retaining existing drawer locations and inventory. The setup installs editable alphabetical filing rules, with separate drawers for basics and tokens and a separate location for oversized cards.",
+      "Every native drawer, including empty drawers, appears in numeric order with its filing label and a link to audit its contents."
+    ],
+    "refined": [
+      "Expanded catalogs keep all imported copies and file by set code and collector number, without price-based relocation or an automatic split into Bulk.",
+      "Pending placement, collection counts, and drawer labels now support drawers beyond six. Setup leaves existing cards untouched until the sorter is applied."
+    ],
+    "archivist_note": "A second cabinet should extend the collection, not require a second accounting system. We kept the original drawer addresses and added the new ones beside them. The filing rules can change without changing what someone owns, and setting up a cabinet remains separate from moving the cards into it.",
+    "resolved": []
+  },
+  {
     "version": "4.19.1",
     "date": "2026-09-09",
     "added": [],

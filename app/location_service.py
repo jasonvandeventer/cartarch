@@ -522,3 +522,31 @@ def user_has_drawers(session: Session, user_id: int) -> bool:
         .first()
         is not None
     )
+
+
+def drawer_number(location: StorageLocation) -> str | None:
+    """Stable native drawer address; the editable note holds its filing label."""
+    if location.type != "drawer":
+        return None
+    prefix, _, number = location.name.partition(" ")
+    if prefix == "Drawer" and number.isdigit() and int(number) > 0:
+        return str(int(number))
+    return None
+
+
+def numbered_drawers(session: Session, user_id: int) -> dict[str, StorageLocation]:
+    locations = (
+        session.query(StorageLocation)
+        .filter(StorageLocation.user_id == user_id, StorageLocation.type == "drawer")
+        .all()
+    )
+    return dict(
+        sorted(
+            ((n, loc) for loc in locations if (n := drawer_number(loc))),
+            key=lambda pair: int(pair[0]),
+        )
+    )
+
+
+def has_extended_drawers(session: Session, user_id: int) -> bool:
+    return any(int(n) > 6 for n in numbered_drawers(session, user_id))

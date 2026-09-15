@@ -42,7 +42,6 @@ _ALLOWED_UNRENDERED = {
     # Remaining plain GET pages — same treatment as the batch struck off in
     # v4.13.25 (chronicle, privacy, terms, decklist, playgroups, trades, tokens,
     # token_new), which route smoke now renders.
-    "drawers.html": "index is gated on user_has_drawers; smoke pins the 403 instead",
     "playgroup_join.html": "join-by-code page",
     "token_detail.html": "one token",
     "token_bulk_add.html": "token bulk add form",

@@ -1633,7 +1633,9 @@ def pending_page(
         if use_drawer_sorter
         else []
     )
-    view_model = build_pending_view_model(rows)
+    from app.location_service import numbered_drawers
+
+    view_model = build_pending_view_model(rows, numbered_drawers(session, current_user.id))
 
     # v3.28.7 — batch grouping for non-drawer-sorter users. Drawer-sorter users
     # keep their drawer-grouping (`grouped_drawers`) because that mirrors their
@@ -1676,7 +1678,9 @@ def _pending_stat_oob_response(session: Session, user_id: int) -> HTMLResponse:
     to the top" complaint.
     """
     rows = list_pending_rows(session, user_id=user_id)
-    view_model = build_pending_view_model(rows)
+    from app.location_service import numbered_drawers
+
+    view_model = build_pending_view_model(rows, numbered_drawers(session, user_id))
     pending_count = view_model.get("pending_count", 0)
     drawer_count = view_model.get("drawer_count", 0)
     total_copies = view_model.get("total_copies", 0)

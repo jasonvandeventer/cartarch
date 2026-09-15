@@ -9,6 +9,7 @@ from __future__ import annotations
 from sqlalchemy.orm import Session, joinedload
 
 from app import sort_spec
+from app.location_service import drawer_number, numbered_drawers
 from app.models import InventoryRow, StorageLocation
 
 
@@ -39,9 +40,11 @@ def list_drawer_groups(session: Session, user_id: int) -> dict[str, list[Invento
         .all()
     )
 
-    grouped: dict[str, list[InventoryRow]] = {}
+    grouped: dict[str, list[InventoryRow]] = dict(
+        (n, []) for n in numbered_drawers(session, user_id)
+    )
     for row in rows:
-        grouped.setdefault(row.drawer or "-", []).append(row)
+        grouped.setdefault(drawer_number(row.storage_location) or row.drawer or "-", []).append(row)
 
     return grouped
 

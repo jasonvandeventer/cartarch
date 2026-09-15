@@ -241,3 +241,86 @@ def delete_sorter_rule(session: Session, user_id: int, rule_id: int) -> None:
         raise ValueError("Rule not found")
     session.delete(rule)
     session.commit()
+
+
+TWELVE_DRAWER_LABELS = (
+    "A1 · Numbers + A–B",
+    "A2 · C",
+    "A3 · D–E",
+    "A4 · F–H",
+    "A5 · I–L",
+    "A6 · M",
+    "B1 · N–R",
+    "B2 · S",
+    "B3 · T–V",
+    "B4 · W–Z",
+    "B5 · Basic lands",
+    "B6 · Tokens & proxies",
+)
+
+
+def configure_twelve_drawers(session: Session, user_id: int) -> None:
+    """Stage the two-catalog layout without moving or verifying any inventory.
+
+    Caller commits. Existing native locations retain their IDs and contents;
+    existing custom rules require manual review rather than silent replacement.
+    """
+    if list_sorter_rules(session, user_id):
+        raise ValueError(
+            "You already have sorter rules. Edit them on Locations before changing layouts."
+        )
+    locations = {
+        loc.name: loc
+        for loc in session.query(StorageLocation).filter(StorageLocation.user_id == user_id)
+    }
+    targets = []
+    for number, label in enumerate(TWELVE_DRAWER_LABELS, 1):
+        name = f"Drawer {number}"
+        loc = locations.get(name)
+        if loc is not None and loc.type != "drawer":
+            raise ValueError(f"{name} already exists as a different location type.")
+        if loc is None:
+            loc = StorageLocation(user_id=user_id, name=name, type="drawer")
+            session.add(loc)
+        loc.mode = "managed"
+        loc.note = label
+        loc.sort_order = number
+        targets.append(loc)
+    oversized = locations.get("Oversized cards")
+    if oversized is not None and oversized.type in ("deck", "considering", "root", "drawer"):
+        raise ValueError("Oversized cards already exists as an incompatible location type.")
+    if oversized is None:
+        oversized = StorageLocation(
+            user_id=user_id, name="Oversized cards", type="other", mode="managed"
+        )
+        session.add(oversized)
+    oversized.mode = "managed"
+    session.flush()
+    rules = [
+        ('t:"plane —" or t:phenomenon or t:scheme or t:vanguard', oversized),
+        ("is:proxy or t:token or settype:token", targets[11]),
+        ("t:basic t:land", targets[10]),
+    ]
+    for letters, target in zip(
+        ("0123456789ab", "c", "de", "fgh", "ijkl", "m", "nopqr", "s", "tuv", "wxyz"),
+        targets[:10],
+        strict=True,
+    ):
+        rules.append((" or ".join(f"setprefix:{letter}" for letter in letters), target))
+    # An unknown/empty set goes to the first drawer for review, never the
+    # legacy $5 value drawer. This also covers future catalog set codes.
+    rules.append(("", targets[0]))
+    for position, (query, target) in enumerate(rules, 1):
+        error = validate_query(query)
+        if error:
+            raise ValueError(error)
+        session.add(
+            SorterRule(
+                user_id=user_id,
+                query=query,
+                target_location_id=target.id,
+                position=position,
+                is_active=True,
+            )
+        )
+    session.flush()

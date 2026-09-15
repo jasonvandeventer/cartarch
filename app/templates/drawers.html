@@ -42,7 +42,7 @@
             {% for drawer in drawer_summaries %}
               <tr>
                 <td>
-                  <strong>{{ drawer.drawer }}</strong>
+                  <strong>{{ drawer.label }}</strong>
                 </td>
                 <td>{{ drawer.card_count }}</td>
                 <td>${{ '%.2f'|format(drawer.total_value) }}</td>
@@ -58,4 +58,21 @@
       <p class="muted">No drawers with assigned inventory yet.</p>
     {% endif %}
   </section>
+  {% if can_setup_twelve %}
+    <section class="panel">
+      <details>
+        <summary>Set up two six-drawer catalogs</summary>
+        <p>Keep drawers 1–6 and add drawers 7–12. Cards file by set code, then collector number; price does not change their destination. All imported copies stay in the catalog instead of being split into Bulk.</p>
+        <ol>{% for label in twelve_labels %}<li>{{ label }}</li>{% endfor %}</ol>
+        <p>Oversized cards get a separate location. Existing cards stay where they are until you apply the sorter. Existing Bulk stays separate; move those cards when you are ready to file them.</p>
+        <form method="post" action="/drawers/setup-twelve" class="stack-form">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <label><input type="checkbox" name="acknowledge" value="true" required> Use these rules for future sorting. Applying the sorter may move cards out of sortable locations.</label>
+          <button type="submit">Set up twelve drawers</button>
+        </form>
+      </details>
+    </section>
+  {% else %}
+    <p><a href="/locations#sorter-rules">Edit filing rules and location labels</a></p>
+  {% endif %}
 {% endblock %}

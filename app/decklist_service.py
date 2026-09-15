@@ -399,7 +399,7 @@ def _build_full_location_label(
         # raw name if the drawer number can't be extracted.
         drawer_number = (name.replace("Drawer", "").strip()) if name else ""
         if drawer_number:
-            return get_drawer_label(drawer_number)
+            return get_drawer_label(drawer_number, loc)
         return name
     if loc_type == "deck":
         return f"Deck · {name}"

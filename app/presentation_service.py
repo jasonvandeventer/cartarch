@@ -6,8 +6,9 @@ from app.inventory_service import get_drawer_label, get_location_label
 from app.pricing import effective_price
 
 
-def build_pending_view_model(rows) -> dict:
+def build_pending_view_model(rows, drawer_locations=None) -> dict:
     """Build template payload pieces for the pending-placement page."""
+    drawer_locations = drawer_locations or {}
     items = []
     grouped = {}
     total_copies = 0
@@ -24,7 +25,7 @@ def build_pending_view_model(rows) -> dict:
         #      distinctly from a real-drawer source rather than collapsing
         #      onto the same label as TO.
         if row.from_drawer:
-            from_label = get_drawer_label(row.from_drawer)
+            from_label = get_drawer_label(row.from_drawer, drawer_locations.get(row.from_drawer))
         else:
             from_label = "New import"
         item = {
@@ -36,7 +37,7 @@ def build_pending_view_model(rows) -> dict:
             "quantity": row.quantity,
             "current_location_label": from_label,
             "from_slot": row.from_slot,
-            "target_location_label": get_drawer_label(row.drawer),
+            "target_location_label": get_location_label(row),
             "drawer": row.drawer,
             "slot": row.slot,
             "price": price,
@@ -56,7 +57,7 @@ def build_pending_view_model(rows) -> dict:
         grouped_drawers.append(
             {
                 "drawer": key,
-                "label": get_drawer_label(key),
+                "label": get_drawer_label(key, drawer_locations.get(key)),
                 "count": len(grouped[key]),
                 "entries": grouped[key],
             }

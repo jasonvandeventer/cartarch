@@ -13,7 +13,13 @@ from sqlalchemy.orm import Session, joinedload
 from app import sort_spec
 from app.audit_service import log_transaction
 from app.import_service import coerce_language_code_strict, normalize_finish
-from app.location_service import SORTABLE_SOURCE_MODES, get_location
+from app.location_service import (
+    SORTABLE_SOURCE_MODES,
+    drawer_number,
+    get_location,
+    has_extended_drawers,
+    numbered_drawers,
+)
 from app.models import Card, InventoryRow, ShowcaseItem, StorageLocation, TransactionLog
 from app.pricing import effective_price
 from app.scryfall import card_constructor_kwargs, fetch_card_by_scryfall_id, fetch_oracle_id
@@ -44,7 +50,9 @@ def collector_sort_key(value: str | None) -> tuple[int, str, str]:
     return (1, text, "")
 
 
-def get_drawer_label(drawer: str | None) -> str:
+def get_drawer_label(drawer: str | None, location: StorageLocation | None = None) -> str:
+    if location is not None and location.note:
+        return f"{location.name} – {location.note}"
     return DRAWER_LABELS.get(str(drawer or "").strip(), f"Drawer {drawer or '-'}")
 
 
@@ -53,8 +61,7 @@ def get_location_label(row: InventoryRow) -> str:
         location = row.storage_location
 
         if location.type == "drawer":
-            drawer_number = location.name.replace("Drawer", "").strip()
-            return get_drawer_label(drawer_number)
+            return get_drawer_label(drawer_number(location), location)
 
         return location.name
 
@@ -951,6 +958,10 @@ def _term_to_clause(key: str | None, value: str):
         return Card.oracle_text.ilike(f"%{value}%")
     if key in ("s", "set"):
         return Card.set_code.ilike(f"%{value}%")
+    if key == "setprefix":
+        return func.lower(Card.set_code).startswith(value.lower(), autoescape=True)
+    if key == "settype":
+        return func.lower(Card.set_type) == value.lower()
     if key in ("r", "rarity"):
         return Card.rarity.ilike(f"%{value}%")
     if key == "finish":
@@ -996,6 +1007,8 @@ def _term_to_clause(key: str | None, value: str):
     if key in ("n", "name"):
         return Card.name.ilike(f"%{value}%")
     if key == "is":
+        if value == "proxy":
+            return InventoryRow.is_proxy.is_(True)
         if value == "foil":
             return InventoryRow.finish == "foil"
         if value in ("nonfoil", "non-foil"):
@@ -1851,7 +1864,11 @@ def list_inventory_rows(
     elif sort == "placement":
         rows = base_query.all()
         rows.sort(
-            key=lambda r: (assign_drawer(r), drawer_sort_key(r)),
+            key=(
+                (lambda r: (sort_spec.slot_sort_value(r.drawer), sort_spec.slot_sort_value(r.slot)))
+                if has_extended_drawers(session, user_id)
+                else (lambda r: (assign_drawer(r), drawer_sort_key(r)))
+            ),
             reverse=reverse,
         )
         rows = rows[(page - 1) * per_page : (page - 1) * per_page + per_page]
@@ -1951,7 +1968,7 @@ def get_inventory_row_stats(
     pending_value = 0.0
     pending_cards = 0
     seen_names: set[str] = set()
-    drawer_counts = {str(i): 0 for i in range(1, 7)}
+    drawer_counts = dict.fromkeys([*DRAWER_LABELS, *numbered_drawers(session, user_id)], 0)
     non_drawer_location_counts: dict[str, int] = {}
     unassigned_count = 0
 
@@ -2403,6 +2420,14 @@ def route_intake_to_bulk(
     if not row_ids:
         return (0, 0)
 
+    if has_extended_drawers(session, user_id):
+        count = (
+            session.query(func.coalesce(func.sum(InventoryRow.quantity), 0))
+            .filter(InventoryRow.user_id == user_id, InventoryRow.id.in_(row_ids))
+            .scalar()
+        )
+        return (int(count), 0)
+
     deck_card_ids = deck_member_card_ids(session, user_id)
     bulk_location: StorageLocation | None = None
     drawer_bound = 0
@@ -2466,6 +2491,9 @@ def summarize_intake_routing(
     ]
     if not importable:
         return (0, 0)
+
+    if has_extended_drawers(session, user_id):
+        return (sum(qty for _cid, _finish, qty in importable), 0)
 
     card_ids = {cid for cid, _finish, _qty in importable}
     cards = {c.id: c for c in session.query(Card).filter(Card.id.in_(card_ids))}
@@ -2874,7 +2902,9 @@ def list_pending_rows(session: Session, user_id: int) -> list[InventoryRow]:
         )
         .all()
     )
-    rows.sort(key=lambda r: (assign_drawer(r), drawer_sort_key(r)))
+    rows.sort(
+        key=lambda r: (sort_spec.slot_sort_value(r.drawer), sort_spec.slot_sort_value(r.slot))
+    )
     return rows
 
 
@@ -2932,9 +2962,16 @@ def confirm_pending_row(
         if location is None:
             raise ValueError("Storage location not found.")
     else:
-        if not row.drawer or not row.slot:
+        if row.drawer and row.slot:
+            location = _get_or_create_drawer_location(session, user_id, row.drawer)
+        elif (
+            row.storage_location
+            and row.storage_location.user_id == user_id
+            and row.storage_location.type not in ("deck", "considering", "root")
+        ):
+            location = row.storage_location
+        else:
             raise ValueError("Pending row has no assigned drawer/slot yet.")
-        location = _get_or_create_drawer_location(session, user_id, row.drawer)
 
     row.storage_location_id = location.id
     row.is_pending = False
@@ -3616,19 +3653,9 @@ def resort_collection(
         loc.id: loc
         for loc in session.query(StorageLocation).filter(StorageLocation.user_id == user_id)
     }
-    drawer_loc_ids: dict[int, int | None] = {i: None for i in range(1, 7)}
-    drawer_number_of: dict[int, int] = {}  # location id -> drawer number
-    for loc in locs.values():
-        if loc.type != "drawer":
-            continue
-        try:
-            n = int(loc.name.replace("Drawer", "").strip())
-        except ValueError:
-            continue
-        if 1 <= n <= 6:
-            drawer_loc_ids[n] = loc.id
-            drawer_number_of[loc.id] = n
-    has_drawers = any(v is not None for v in drawer_loc_ids.values())
+    drawer_loc_ids = {int(n): loc.id for loc in locs.values() if (n := drawer_number(loc))}
+    drawer_number_of = {loc_id: n for n, loc_id in drawer_loc_ids.items()}
+    has_drawers = bool(drawer_loc_ids)
 
     # Decide each placed row's bucket = (storage_location_id, drawer_number|None).
     # A rule target wins; otherwise the legacy drawer sort, but only if the user
@@ -3640,7 +3667,7 @@ def resort_collection(
             placements[row.id] = (target_loc_id, drawer_number_of.get(target_loc_id))
         elif has_drawers:
             n = assign_drawer(row)
-            placements[row.id] = (drawer_loc_ids[n], n)
+            placements[row.id] = (drawer_loc_ids.get(n), n)
     if not placements:
         return 0
 
@@ -3649,20 +3676,28 @@ def resort_collection(
         if row.id in placements:
             grouped.setdefault(placements[row.id], []).append(row)
     for bucket_rows in grouped.values():
-        bucket_rows.sort(key=drawer_sort_key)
+        # Extended catalogs file by set/collector number, independent of price,
+        # language, or the old drawer-6 special sections.
+        bucket_rows.sort(
+            key=shelf_sort_key if any(n > 6 for n in drawer_loc_ids) else drawer_sort_key
+        )
 
     now = utc_now()
     bulk_updates: list[dict] = []
     audit_logs: list[dict] = []
 
-    for (loc_id, drawer_number), bucket_rows in grouped.items():
-        target_drawer = str(drawer_number) if drawer_number is not None else None
+    for (loc_id, target_number), bucket_rows in grouped.items():
+        target_drawer = str(target_number) if target_number is not None else None
         for index, row in enumerate(bucket_rows, start=1):
             # Non-drawer locations (binder/box) carry no slot — the drawer slot
             # machinery only applies to numbered drawers.
-            target_slot = str(index) if drawer_number is not None else None
+            target_slot = str(index) if target_number is not None else None
             if target_drawer is not None:
-                if row.drawer == target_drawer and row.slot == target_slot:
+                if (
+                    row.drawer == target_drawer
+                    and row.slot == target_slot
+                    and row.storage_location_id == loc_id
+                ):
                     continue
             elif row.storage_location_id == loc_id and row.drawer is None and row.slot is None:
                 continue
