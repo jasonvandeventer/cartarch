@@ -593,6 +593,19 @@ def _resolve_requested_items(
 # ── Counter-proposals ───────────────────────────────────────────
 
 
+def _lock_trade(session: Session, trade_id: int) -> Trade | None:
+    trade = (
+        session.query(Trade)
+        .filter(Trade.id == trade_id)
+        .with_for_update(of=Trade)
+        .populate_existing()
+        .first()
+    )
+    if trade is not None:
+        session.expire(trade, ["revisions", "items"])
+    return trade
+
+
 def counter_trade(
     session: Session,
     trade_id: int,
@@ -623,7 +636,7 @@ def counter_trade(
     proposer's cards, REQUESTED always the recipient's. What changes is how the
     author names them — see ``_resolve_offered_items``.
     """
-    trade = session.query(Trade).filter(Trade.id == trade_id).first()
+    trade = _lock_trade(session, trade_id)
     if trade is None:
         raise ValueError("Trade not found.")
     if author_user_id not in (trade.proposer_user_id, trade.recipient_user_id):
@@ -690,7 +703,7 @@ def decline_counter(session: Session, trade_id: int, actor_user_id: int) -> Trad
     can never be declined — there is nothing behind it, and rejecting the
     ORIGINAL proposal is what ``transition_trade(..., "declined")`` is for.
     """
-    trade = session.query(Trade).filter(Trade.id == trade_id).first()
+    trade = _lock_trade(session, trade_id)
     if trade is None:
         raise ValueError("Trade not found.")
     if actor_user_id not in (trade.proposer_user_id, trade.recipient_user_id):
@@ -780,19 +793,7 @@ def transition_trade(
     Raises ``ValueError`` on illegal transitions, illegal actors, or
     unknown trades.
     """
-    trade = (
-        session.query(Trade)
-        .filter(Trade.id == trade_id)
-        .options(
-            joinedload(Trade.items)
-            .joinedload(TradeItem.inventory_row)
-            .joinedload(InventoryRow.card),
-            joinedload(Trade.items).joinedload(TradeItem.card),
-            joinedload(Trade.proposer),
-            joinedload(Trade.recipient),
-        )
-        .first()
-    )
+    trade = _lock_trade(session, trade_id)
     if trade is None:
         raise ValueError("Trade not found.")
     if trade.status != "proposed":
@@ -1669,12 +1670,20 @@ def _abandon_query(session: Session, q) -> int:
     convention where ``handle_user_deletion`` doesn't commit and the
     admin route does the enclosing commit).
     """
-    pending_trades = q.options(
-        joinedload(Trade.items).joinedload(TradeItem.inventory_row).joinedload(InventoryRow.card),
-        joinedload(Trade.items).joinedload(TradeItem.card),
-        joinedload(Trade.proposer),
-        joinedload(Trade.recipient),
-    ).all()
+    pending_trades = (
+        q.order_by(Trade.id)
+        .with_for_update(of=Trade)
+        .populate_existing()
+        .options(
+            joinedload(Trade.items)
+            .joinedload(TradeItem.inventory_row)
+            .joinedload(InventoryRow.card),
+            joinedload(Trade.items).joinedload(TradeItem.card),
+            joinedload(Trade.proposer),
+            joinedload(Trade.recipient),
+        )
+        .all()
+    )
     now = utc_now()
     for trade in pending_trades:
         trade.status = "abandoned"

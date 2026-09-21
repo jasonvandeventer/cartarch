@@ -61,7 +61,7 @@ import hashlib
 import os
 import secrets
 import threading
-from collections import defaultdict
+from collections import OrderedDict
 from datetime import datetime, timedelta
 
 import requests
@@ -86,7 +86,8 @@ RESEND_REPLY_TO = "support@cartarch.com"
 # scale.
 RESET_RATE_LIMIT_WINDOW = timedelta(hours=1)
 RESET_RATE_LIMIT_MAX = 5
-_rate_log: dict[str, list[datetime]] = defaultdict(list)
+RESET_RATE_LIMIT_MAX_KEYS = 50_000
+_rate_log: OrderedDict[str, list[datetime]] = OrderedDict()
 _rate_lock = threading.Lock()
 
 
@@ -95,47 +96,37 @@ def _hash_token(raw_token: str) -> str:
     return hashlib.sha256(raw_token.encode("utf-8")).hexdigest()
 
 
-def _check_and_record_rate_limit(key: str) -> bool:
-    """Return True if within the limit, False if exceeded.
-
-    Time-windowed counter; prunes timestamps older than the window
-    on every check so the dict doesn't grow unbounded. Thread-safe
-    via the module lock (multiple daemon threads or concurrent
-    requests could otherwise race on the list mutation).
-    """
-    now = utc_now()
-    with _rate_lock:
-        log = _rate_log[key]
-        cutoff = now - RESET_RATE_LIMIT_WINDOW
-        # Prune in place.
-        log[:] = [ts for ts in log if ts > cutoff]
-        if len(log) >= RESET_RATE_LIMIT_MAX:
-            return False
-        log.append(now)
-        return True
-
-
 def check_rate_limits(email: str, client_ip: str | None) -> bool:
-    """Combined per-email + per-IP rate-limit check.
+    """Atomic per-IP/per-email check with a bounded LRU, like login throttling.
 
-    Returns True if BOTH limits have headroom, False otherwise. Both
-    sides record a request on success; one of them recording while
-    the other returns False would leak signal via remaining-quota
-    asymmetry. (Pragmatically the cost is one extra "request" being
-    counted toward the side that succeeded; acceptable.)
-
-    Callers should treat a False return as "silently drop this
-    reset request" — DO NOT change the response shape. Rate-limit
-    info must not become an enumeration oracle.
+    Check the IP first: blocked traffic must not allocate new email keys.
+    Responses stay neutral regardless of which limit was exceeded.
     """
-    email_key = f"email:{(email or '').strip().lower()}"
-    ip_key = f"ip:{(client_ip or '').strip() or 'unknown'}"
-    email_ok = _check_and_record_rate_limit(email_key)
-    ip_ok = _check_and_record_rate_limit(ip_key)
-    return email_ok and ip_ok
+    keys = (
+        f"ip:{(client_ip or '').strip() or 'unknown'}",
+        f"email:{(email or '').strip().lower()}",
+    )
+    now = utc_now()
+    cutoff = now - RESET_RATE_LIMIT_WINDOW
+    with _rate_lock:
+        for key in keys:
+            log = [ts for ts in _rate_log.get(key, []) if ts > cutoff]
+            if log:
+                _rate_log[key] = log
+                _rate_log.move_to_end(key)
+            else:
+                _rate_log.pop(key, None)
+            if len(log) >= RESET_RATE_LIMIT_MAX:
+                return False
+        for key in keys:
+            _rate_log.setdefault(key, []).append(now)
+            _rate_log.move_to_end(key)
+        while len(_rate_log) > RESET_RATE_LIMIT_MAX_KEYS:
+            _rate_log.popitem(last=False)
+    return True
 
 
-def _invalidate_existing_tokens(session: Session, user_id: int) -> None:
+def invalidate_reset_tokens(session: Session, user_id: int) -> None:
     """DELETE the user's unused tokens. Caller is responsible for commit.
 
     Used by ``create_reset_token`` to enforce at-most-one-outstanding.
@@ -158,7 +149,7 @@ def create_reset_token(session: Session, user: User) -> str:
     Invalidates the user's existing unused tokens first
     (at-most-one-outstanding invariant).
     """
-    _invalidate_existing_tokens(session, user.id)
+    invalidate_reset_tokens(session, user.id)
     raw_token = secrets.token_urlsafe(32)
     now = utc_now()
     row = PasswordResetToken(

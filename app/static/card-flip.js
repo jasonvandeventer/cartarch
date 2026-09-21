@@ -55,6 +55,8 @@
     // Re-arm the onerror fallback for the face we are switching TO. Without
     // this a back image that 404s would fall back to the FRONT's Scryfall URL
     // and silently show the wrong side rather than failing visibly.
+    img.removeAttribute("srcset");
+    img.onerror = null;
     if (alt) {
       img.onerror = function () {
         img.onerror = null;

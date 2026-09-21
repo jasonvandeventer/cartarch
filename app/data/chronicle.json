@@ -1,5 +1,20 @@
 [
   {
+    "version": "4.19.4",
+    "date": "2026-09-21",
+    "added": [],
+    "refined": [
+      "Unchanged Planechase and Archenemy images stay in place during tracker updates, preserving recovered artwork. Password-reset throttling now keeps bounded state."
+    ],
+    "resolved": [
+      "Import undo cannot subtract the same copies twice and follows copies merged into an existing row. Missing or changed inventory is reported instead of recording a false successful undo. Failed manual and CSV imports roll back together, including destination placement.",
+      "Conflicting trade actions cannot overwrite an accepted or otherwise closed trade. Changing a password, including through an administrator, invalidates older unused reset links.",
+      "Live companions no longer miss an update while connecting or receive an older queued state after their initial snapshot.",
+      "Double-faced card flipping, repeated Momir zoom, Switch Printing previews, and ongoing scheme images recover correctly when artwork requests fail."
+    ],
+    "archivist_note": "We followed the missing portraits into a wider check of the archive. Several failures shared a pattern: an earlier state survived after the operation that should have replaced it. We made import reversals durable, kept failed imports together, and ensured competing trade actions read the current record. We also checked recovery repeatedly, because an image that works once is not enough for a night of games."
+  },
+  {
     "version": "4.19.3",
     "date": "2026-09-21",
     "added": [],

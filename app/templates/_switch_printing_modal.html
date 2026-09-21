@@ -40,7 +40,7 @@
           {% for entry in owned_printings %}
             <li class="switch-printing-row owned"
                 data-card-image="{{ mirror_image_url(entry.scryfall_id, 'large') if entry.image_url else '' }}"
-                data-card-fallback="{{ scryfall_image_fallback(entry.scryfall_id, 'large') if entry.image_url else '' }}"
+                data-card-image-alt="{{ scryfall_image_fallback(entry.scryfall_id, 'large') if entry.image_url else '' }}"
                 data-card-name="{{ card_name }}">
               <span class="switch-printing-row-set">
                 {{ entry.set_name }}

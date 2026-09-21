@@ -864,6 +864,8 @@ class TransactionLog(Base):
     )
     inventory_row_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utc_now, index=True)
+    # Set on the original import event in the same transaction as its reversal.
+    reversed_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     user: Mapped[User] = relationship(back_populates="transaction_logs")

@@ -2584,6 +2584,14 @@ def place_imported_rows(
             .first()
         )
         if existing is not None:
+            # Import undo follows the surviving row, not the deleted temporary
+            # row. Historical non-import events keep their original row IDs.
+            session.query(TransactionLog).filter(
+                TransactionLog.user_id == user_id,
+                TransactionLog.event_type == "import",
+                TransactionLog.reversed_at.is_(None),
+                TransactionLog.inventory_row_id == row.id,
+            ).update({TransactionLog.inventory_row_id: existing.id}, synchronize_session="fetch")
             existing.quantity += row.quantity
             existing.updated_at = now
             # Merged-away row is deleted — FK-safe cleanup of its references first.
@@ -3487,51 +3495,75 @@ def bulk_delete_inventory_rows(session: Session, row_ids: list[int], user_id: in
     return len(rows)
 
 
-def undo_last_import(session: Session, user_id: int) -> bool:
-    last_import = (
-        session.query(TransactionLog)
-        .filter(
-            TransactionLog.user_id == user_id,
-            TransactionLog.event_type == "import",
-        )
-        .order_by(TransactionLog.id.desc())
-        .first()
-    )
-    if not last_import or not last_import.inventory_row_id:
-        return False
+def _undo_import_logs(
+    session: Session, logs: list[TransactionLog], user_id: int, *, batch: bool
+) -> int:
+    """Reverse each locked import once. Validate every target before changing any.
 
-    row = (
-        session.query(InventoryRow)
+    Unknown/deleted targets and quantities no longer present are refusals, not
+    successful undo records. We never guess a replacement row by card name.
+    """
+    pending = [log for log in logs if log.reversed_at is None]
+    rows = {
+        row.id: row
+        for row in session.query(InventoryRow)
         .filter(
-            InventoryRow.id == last_import.inventory_row_id,
             InventoryRow.user_id == user_id,
+            InventoryRow.id.in_([log.inventory_row_id for log in pending]),
         )
+        .order_by(InventoryRow.id)
+        .with_for_update()
+        .populate_existing()
+        .all()
+    }
+    required: dict[int, int] = {}
+    for log in pending:
+        row = rows.get(log.inventory_row_id)
+        if row is None or row.card_id != log.card_id or row.finish != log.finish:
+            raise ValueError("Cannot undo this import: its inventory row was removed or changed.")
+        required[row.id] = required.get(row.id, 0) + abs(log.quantity_delta)
+        if required[row.id] > row.quantity:
+            raise ValueError("Cannot undo this import: some of its copies are no longer present.")
+
+    now = utc_now()
+    for log in pending:
+        row = rows[log.inventory_row_id]
+        row.quantity -= abs(log.quantity_delta)
+        row.updated_at = now
+        log.reversed_at = now
+        log_transaction(
+            session=session,
+            user_id=user_id,
+            event_type="undo_batch_import" if batch else "undo_import",
+            card_id=log.card_id,
+            finish=log.finish,
+            quantity_delta=-abs(log.quantity_delta),
+            batch_id=log.batch_id,
+            inventory_row_id=row.id,
+            note=f"Undid import log {log.id}" + (f" from batch {log.batch_id}" if batch else ""),
+            flush=False,
+        )
+    for row_id in required:
+        row = rows[row_id]
+        if row.quantity == 0:
+            clean_inventory_row_references(session, [row_id])
+            session.delete(row)
+    session.commit()
+    return len(pending)
+
+
+def undo_last_import(session: Session, user_id: int) -> bool:
+    # Keep selecting the LAST original event, even if already reversed. A
+    # repeated click must not silently move backwards to an older acquisition.
+    log = (
+        session.query(TransactionLog)
+        .filter(TransactionLog.user_id == user_id, TransactionLog.event_type == "import")
+        .order_by(TransactionLog.id.desc())
+        .with_for_update()
+        .populate_existing()
         .first()
     )
-    if row:
-        row.quantity -= abs(last_import.quantity_delta)
-        row.updated_at = utc_now()
-        if row.quantity <= 0:
-            # FK-safe cleanup before the row goes (this path previously orphaned
-            # ShowcaseItem / TradeItem refs — see the investigation doc).
-            clean_inventory_row_references(session, [row.id])
-            session.delete(row)
-
-    session.flush()
-
-    log_transaction(
-        session=session,
-        user_id=user_id,
-        event_type="undo_import",
-        card_id=last_import.card_id,
-        finish=last_import.finish,
-        quantity_delta=-abs(last_import.quantity_delta),
-        batch_id=last_import.batch_id,
-        inventory_row_id=last_import.inventory_row_id,
-        note=f"Undid import log {last_import.id}",
-    )
-    session.commit()
-    return True
+    return bool(_undo_import_logs(session, [log] if log else [], user_id, batch=False))
 
 
 def undo_last_batch(session: Session, batch_id: int, user_id: int) -> int:
@@ -3542,44 +3574,12 @@ def undo_last_batch(session: Session, batch_id: int, user_id: int) -> int:
             TransactionLog.batch_id == batch_id,
             TransactionLog.event_type == "import",
         )
-        .order_by(TransactionLog.id.desc())
+        .order_by(TransactionLog.id)
+        .with_for_update()
+        .populate_existing()
         .all()
     )
-
-    undone = 0
-    for log in logs:
-        row = (
-            session.query(InventoryRow)
-            .filter(
-                InventoryRow.id == log.inventory_row_id,
-                InventoryRow.user_id == user_id,
-            )
-            .first()
-        )
-        if row:
-            row.quantity -= abs(log.quantity_delta)
-            row.updated_at = utc_now()
-            if row.quantity <= 0:
-                # FK-safe cleanup before the row goes (undo previously orphaned refs).
-                clean_inventory_row_references(session, [row.id])
-                session.delete(row)
-
-        log_transaction(
-            session=session,
-            user_id=user_id,
-            event_type="undo_batch_import",
-            card_id=log.card_id,
-            finish=log.finish,
-            quantity_delta=-abs(log.quantity_delta),
-            batch_id=log.batch_id,
-            inventory_row_id=log.inventory_row_id,
-            note=f"Undid import log {log.id} from batch {batch_id}",
-            flush=False,
-        )
-        undone += 1
-
-    session.commit()
-    return undone
+    return _undo_import_logs(session, logs, user_id, batch=True)
 
 
 def get_previous_location_for_row(session: Session, row_id: int, user_id: int) -> str | None:

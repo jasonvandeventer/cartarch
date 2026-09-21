@@ -16,6 +16,7 @@ from app.dependencies import (
     set_view_pref,
 )
 from app.models import User
+from app.password_reset_service import invalidate_reset_tokens
 from app.routes.api import hash_api_token
 
 router = APIRouter(prefix="/account")
@@ -96,6 +97,7 @@ def change_password(
     user = session.query(User).filter(User.id == current_user.id).first()
     if user:
         user.password_hash = hash_password(new_password)
+        invalidate_reset_tokens(session, user.id)
         session.commit()
 
     return RedirectResponse(url="/account?success=password_changed", status_code=303)

@@ -382,7 +382,7 @@
     const ongoing = st.ongoingSchemes || [];
     if (ongoing.length && !PC_HIDDEN) {
       html += '<div class="cmp-arch-ongoing">' +
-        ongoing.map(s => `<img src="${MIRROR_LARGE.replace('__SID__', s.scryfall_id)}" alt="${esc(s.name)}" title="${esc(s.name)}">`).join('') +
+        ongoing.map(s => `<img src="${MIRROR_LARGE.replace('__SID__', s.scryfall_id)}" alt="${esc(s.name)}" title="${esc(s.name)}" onerror="this.onerror=null;this.src='https://api.scryfall.com/cards/${s.scryfall_id}?format=image&version=normal'">`).join('') +
         '</div>';
     }
     // Only the archenemy sets schemes in motion (the backend allows any seated
@@ -391,7 +391,10 @@
       html += '<div class="pc-controls" style="margin-top:0.5rem">' +
         '<button type="button" class="cmp-btn" onclick="schemeSetMotion()">🗡 Set scheme in motion</button></div>';
     }
-    el.innerHTML = html;
+    if (el._renderedMarkup !== html) {
+      el.innerHTML = html;
+      el._renderedMarkup = html;
+    }
   }
 
   function renderCompanionPlanechase() {
@@ -420,7 +423,10 @@
       '<button type="button" class="cmp-btn" onclick="pcRoll()">🎲 Roll</button>' +
       '<button type="button" class="cmp-btn" onclick="pcWalk()">↪ Planeswalk</button></div>';
     if (st.lastRoll) html += `<div class="pc-roll pc-roll-${st.lastRoll}">Rolled: ${st.lastRoll}</div>`;
-    el.innerHTML = html;
+    if (el._renderedMarkup !== html) {
+      el.innerHTML = html;
+      el._renderedMarkup = html;
+    }
   }
 
   function render() {
@@ -941,11 +947,16 @@
   function initCmpZoom() {
     const zoom = document.getElementById('cmp-hover-zoom');
     if (!zoom) return;
-    zoom.onerror = () => {
-      const sid = zoom.dataset.sid;
-      if (sid) { zoom.onerror = null; zoom.src = `https://api.scryfall.com/cards/${sid}?format=image&version=large`; }
+    const show = (sid) => {
+      zoom.dataset.sid = sid;
+      // Each newly selected card gets its own one-shot mirror fallback.
+      zoom.onerror = () => {
+        zoom.onerror = null;
+        zoom.src = `https://api.scryfall.com/cards/${sid}?format=image&version=large`;
+      };
+      zoom.src = MIRROR_LARGE.replace('__SID__', sid);
+      zoom.style.display = 'block';
     };
-    const show = (sid) => { zoom.dataset.sid = sid; zoom.src = MIRROR_LARGE.replace('__SID__', sid); zoom.style.display = 'block'; };
     const hide = () => { zoom.style.display = 'none'; };
     if (window.matchMedia && window.matchMedia('(hover: hover)').matches) {
       document.addEventListener('mouseover', (e) => {

@@ -2009,11 +2009,15 @@ function renderPlanechase() {
   const plane = state.currentPlane;
   if (plane) {
     const img = MIRROR_LARGE.replace('__SID__', plane.scryfall_id);
-    center.innerHTML =
+    const html =
       `<div class="pc-center-imgwrap"><img class="pc-center-img" src="${img}" alt="${escHtml(plane.name)}" ` +
       `onerror="this.onerror=null;this.src='https://api.scryfall.com/cards/${plane.scryfall_id}?format=image&version=normal'"></div>` +
       `<div class="pc-center-name">${escHtml(plane.name)}</div>` +
       `<div class="pc-center-text">${escHtml(plane.text || '')}</div>`;
+    if (center._renderedMarkup !== html) {
+      center.innerHTML = html;
+      center._renderedMarkup = html;
+    }
     center.style.display = 'flex';
   } else {
     center.style.display = 'none';
@@ -2065,11 +2069,15 @@ function renderArchenemy() {
       '<div class="arch-ongoing">' +
       ongoing.map(s =>
         `<img class="arch-ongoing-img" src="${MIRROR_LARGE.replace('__SID__', s.scryfall_id)}" ` +
-        `alt="${escHtml(s.name)}" title="${escHtml(s.name)} — ongoing">`
+        `alt="${escHtml(s.name)}" title="${escHtml(s.name)} — ongoing" ` +
+        `onerror="this.onerror=null;this.src='https://api.scryfall.com/cards/${s.scryfall_id}?format=image&version=normal'">`
       ).join('') +
       '</div>';
   }
-  center.innerHTML = html;
+  if (center._renderedMarkup !== html) {
+    center.innerHTML = html;
+    center._renderedMarkup = html;
+  }
   center.style.display = (cur || ongoing.length || arch) ? 'flex' : 'none';
 }
 
@@ -2431,11 +2439,16 @@ function killTokenTablet(seatId, idx) {
 function initMomirHoverZoom() {
   const zoom = document.getElementById('momir-hover-zoom');
   if (!zoom) return;
-  zoom.onerror = () => {  // mirror miss → Scryfall fallback, same as the thumbnails
-    const sid = zoom.dataset.sid;
-    if (sid) { zoom.onerror = null; zoom.src = `https://api.scryfall.com/cards/${sid}?format=image&version=normal`; }
+  const show = (sid) => {
+    zoom.dataset.sid = sid;
+    // Each newly selected card gets its own one-shot mirror fallback.
+    zoom.onerror = () => {
+      zoom.onerror = null;
+      zoom.src = `https://api.scryfall.com/cards/${sid}?format=image&version=normal`;
+    };
+    zoom.src = MIRROR_LARGE.replace('__SID__', sid);
+    zoom.style.display = 'block';
   };
-  const show = (sid) => { zoom.dataset.sid = sid; zoom.src = MIRROR_LARGE.replace('__SID__', sid); zoom.style.display = 'block'; };
   const hide = () => { zoom.style.display = 'none'; };
   const atCursor = (e) => {
     zoom.style.transform = 'none';

@@ -67,6 +67,32 @@ from app.timeutil import utc_now
 
 router = APIRouter()
 
+
+def get_import_session(
+    target_location_id: int = Form(0),
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+):
+    """One transaction for persistence, reconciliation, placement and sorting.
+
+    Inner service commits flush but cannot commit the owning connection. A
+    function-scoped dependency commits before FastAPI sends the response.
+    """
+    if (
+        target_location_id > 0
+        and get_location(session, location_id=target_location_id, user_id=current_user.id) is None
+    ):
+        raise ValueError("Storage location not found.")
+    with Session(bind=session.connection(), join_transaction_mode="rollback_only") as importing:
+        try:
+            yield importing
+            importing.flush()
+            session.commit()
+        except Exception:
+            session.rollback()
+            raise
+
+
 # Import size caps (S4) — reject oversized paste/CSV uploads BEFORE any parsing
 # so a malicious or accidental large blob can't consume excessive memory or
 # processing time. Applies to the two raw-input entry points only (the CSV
@@ -1235,7 +1261,7 @@ async def import_commit(
     location_choice_id: list[str] = Form([]),
     location_choice_type: list[str] = Form([]),
     auto_create_confirm: str = Form("no"),
-    session: Session = Depends(get_db_session),
+    session: Session = Depends(get_import_session, scope="function"),
     current_user: User = Depends(get_current_user),
     _: None = CsrfRequired,
 ):
@@ -1302,6 +1328,7 @@ async def import_commit(
         invalid_type_error = str(exc)
 
     if invalid_type_error or needs_confirm_names:
+        session.rollback()
         # Auto-create requested but not confirmed → reject batch, re-render
         # preview with the same row state + an explicit error message.
         # v3.30.16 — the same re-render shape also handles the
@@ -1828,7 +1855,7 @@ async def manual_import_commit(
     reconcile_action: list[str] = Form([]),
     reconcile_move_qty: list[str] = Form([]),
     reconcile_new_qty: list[str] = Form([]),
-    session: Session = Depends(get_db_session),
+    session: Session = Depends(get_import_session, scope="function"),
     current_user: User = Depends(get_current_user),
     _: None = CsrfRequired,
 ):

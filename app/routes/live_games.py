@@ -122,25 +122,34 @@ async def live_stream(request: Request, game_id: int):
     if not user_id:
         raise HTTPException(status_code=401, detail="Not authenticated")
 
-    session = SessionLocal()
-    try:
+    def snapshot():
+        session = SessionLocal()
         try:
-            live = get_live_state(session, game_id, user_id)
-        except LookupError as e:
-            raise HTTPException(status_code=404, detail=str(e)) from e
-        initial_payload = json.dumps(state_payload(live))
-    finally:
-        session.close()
+            return state_payload(get_live_state(session, game_id, user_id))
+        finally:
+            session.close()
+
+    # Authorize before sending HTTP headers. Subscribe before the second read
+    # so an update between authorization and stream startup cannot disappear.
+    try:
+        await run_in_threadpool(snapshot)
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
 
     async def event_gen():
-        yield _sse_event(initial_payload)
         async with live_game_events.subscribe(game_id) as queue:
+            initial = await run_in_threadpool(snapshot)
+            version = initial["version"]
+            yield _sse_event(json.dumps(initial))
             while True:
                 if await request.is_disconnected():
                     return
                 try:
                     payload = await asyncio.wait_for(queue.get(), timeout=_SSE_HEARTBEAT_SECONDS)
-                    yield _sse_event(payload)
+                    next_version = json.loads(payload)["version"]
+                    if next_version > version:
+                        version = next_version
+                        yield _sse_event(payload)
                 except TimeoutError:
                     yield ": keepalive\n\n"
 

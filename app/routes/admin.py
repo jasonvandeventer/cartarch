@@ -27,6 +27,7 @@ from app.models import (
     WatchlistItem,
     WishlistShare,
 )
+from app.password_reset_service import invalidate_reset_tokens
 from app.scryfall import bulk_cache_status
 
 router = APIRouter(prefix="/admin")
@@ -162,6 +163,7 @@ def reset_password(
     target = session.query(User).filter(User.id == user_id).first()
     if target:
         target.password_hash = hash_password(new_password)
+        invalidate_reset_tokens(session, target.id)
         session.commit()
     return RedirectResponse(url="/admin?success=password_reset", status_code=303)
 
