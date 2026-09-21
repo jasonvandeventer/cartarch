@@ -92,6 +92,7 @@
       z-index: 2000; width: 80vw; max-width: 22rem; border-radius: 0.7rem;
       box-shadow: 0 8px 34px rgba(0,0,0,0.8); pointer-events: none; display: none; }
   </style>
+  <script src="/static/background-art.js?v={{ static_v('background-art.js') }}"></script>
 </head>
 {% if my_seat and game.status == 'created' %}
 <body class="cmp-body">
@@ -103,7 +104,7 @@
     </header>
     <main class="cmp-me cmp-prelive{% if my_commander_id %} cmp-has-art{% endif %}"
           id="cmp-prelive"
-          {% if my_commander_id %}style="--cmp-art: url('{{ mirror_image_url(my_commander_id, 'normal') }}')"{% endif %}>
+          {% if my_commander_id %}data-background-art='{{ [mirror_image_url(my_commander_id, 'normal'), scryfall_image_fallback(my_commander_id, 'normal')] | tojson }}'{% endif %}>
       <div class="cmp-my-name">{{ my_seat.player_name }} <span class="muted">(you)</span></div>
       {% if game.format|lower == 'momir' %}
         {# Momir Basic — no deck to pick; players use basic lands + generated creatures. #}
@@ -149,6 +150,7 @@
     // Mirror URL template with a placeholder, so the client rebuilds the same
     // URL the server would (respecting the configured mirror base).
     const MIRROR = {{ mirror_image_url('__SID__', 'normal') | tojson }};
+    const FALLBACK = {{ scryfall_image_fallback('__SID__', 'normal') | tojson }};
     const picker = document.getElementById('cmp-deck-picker');
     window.toggleDeckPicker = function () {
       picker.style.display = picker.style.display === 'none' ? 'flex' : 'none';
@@ -178,10 +180,10 @@
         const me = document.getElementById('cmp-prelive');
         if (s.commander_scryfall_id) {
           me.classList.add('cmp-has-art');
-          me.style.setProperty('--cmp-art', `url('${MIRROR.replace('__SID__', s.commander_scryfall_id)}')`);
+          setBackgroundArt(me, '--cmp-art', [MIRROR, FALLBACK].map(u => u.replace('__SID__', s.commander_scryfall_id)));
         } else {
           me.classList.remove('cmp-has-art');
-          me.style.removeProperty('--cmp-art');
+          setBackgroundArt(me, '--cmp-art', []);
         }
         // Mark current selection.
         picker.querySelectorAll('.cmp-deck-opt').forEach(b =>
@@ -212,7 +214,7 @@
 
     {% if my_seat %}
       <main class="cmp-me{% if my_commander_id %} cmp-has-art{% endif %}"
-            {% if my_commander_id %}style="--cmp-art: url('{{ mirror_image_url(my_commander_id, 'normal') }}')"{% endif %}>
+            {% if my_commander_id %}data-background-art='{{ [mirror_image_url(my_commander_id, 'normal'), scryfall_image_fallback(my_commander_id, 'normal')] | tojson }}'{% endif %}>
         <div class="cmp-my-name">{{ my_seat.player_name }} <span class="muted">(you)</span></div>
         <div class="cmp-life" id="cmp-life">—</div>
         <div class="cmp-life-btns">

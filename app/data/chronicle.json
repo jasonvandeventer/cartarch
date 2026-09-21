@@ -1,5 +1,17 @@
 [
   {
+    "version": "4.19.3",
+    "date": "2026-09-21",
+    "added": [],
+    "refined": [
+      "Commander backgrounds load independently of the tracker timer, and switching decks on a phone ignores late images from the previous selection."
+    ],
+    "resolved": [
+      "Commander backgrounds now try alternate image sources when an image request fails, covering the table tracker, both partner commanders, the phone companion, and the live-games lobby. Commanders without a cached image address can also use the image library."
+    ],
+    "archivist_note": "A commander can be recorded correctly while its portrait stays blank. We found that background images had no recovery path when a request failed. We gave them alternate sources and checked that both partner portraits recover, without letting an old deck selection paint over a new one."
+  },
+  {
     "version": "4.19.2",
     "date": "2026-09-15",
     "added": [

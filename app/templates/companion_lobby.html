@@ -12,6 +12,7 @@
   <title>Live Games — Companion</title>
   <link rel="icon" type="image/svg+xml" href="/static/brand/icon/favicon.svg">
   <link rel="stylesheet" href="/static/style.css?v={{ static_v('style.css') }}">
+  <script src="/static/background-art.js?v={{ static_v('background-art.js') }}"></script>
 </head>
 <body class="cmp-body cmp-lobby-body">
   <div class="cmp-lobby">
@@ -45,7 +46,7 @@
         {% for e in entries %}
           <a class="cmp-lobby-row{% if e.commander_id %} cmp-has-art{% endif %}"
              href="/games/{{ e.game_id }}/companion"
-             {% if e.commander_id %}style="--cmp-art: url('{{ mirror_image_url(e.commander_id, 'normal') }}')"{% endif %}>
+             {% if e.commander_id %}data-background-art='{{ [mirror_image_url(e.commander_id, 'normal'), scryfall_image_fallback(e.commander_id, 'normal')] | tojson }}'{% endif %}>
             <div class="cmp-lobby-row-main">
               <span class="cmp-badge cmp-badge-{{ 'live' if e.status == 'in_progress' else 'waiting' }}">
                 {{ 'LIVE' if e.status == 'in_progress' else 'Waiting' }}

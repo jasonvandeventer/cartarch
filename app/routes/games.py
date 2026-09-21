@@ -38,7 +38,7 @@ from app.game_service import (
     delete_game,
     end_game,
     get_game,
-    get_seat_commander_image_urls,
+    get_seat_commander_image_sources,
     get_seat_commander_scryfall_ids,
     get_viewable_game,
     list_games,
@@ -488,7 +488,7 @@ def game_detail_page(
     if not game:
         raise HTTPException(status_code=404, detail="Game not found")
     is_owner = game.user_id == current_user.id
-    seat_commander_images = get_seat_commander_image_urls(session, game)
+    seat_commander_images = get_seat_commander_image_sources(session, game)
     # Owner-only controls need supporting data; participants get none of it.
     decks: list[Deck] = []
     pickable_users: list[User] = []

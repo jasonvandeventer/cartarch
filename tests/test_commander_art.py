@@ -92,9 +92,9 @@ def test_an_anchor_only_deck_gets_art_on_the_tablet(db, user):
     card = _card(db, "Auntie Ool, Cursewretch")
     game = _game_with(db, user, _deck(db, user, "Auntie Ool", anchor=[card]))
 
-    urls = game_service.get_seat_commander_image_urls(db, game)
+    urls = game_service.get_seat_commander_image_sources(db, game)
 
-    assert urls[game.seats[0].id] == [card.image_url]
+    assert urls[game.seats[0].id][0][0] == card.image_url.replace("/normal/", "/art_crop/")
 
 
 def test_an_anchor_only_deck_gets_art_on_the_phone(db, user):
@@ -118,7 +118,7 @@ def test_a_typed_commander_placeholder_gets_art(db, user):
     assert unresolved == []
     game = _game_with(db, user, deck)
 
-    assert game_service.get_seat_commander_image_urls(db, game)[game.seats[0].id]
+    assert game_service.get_seat_commander_image_sources(db, game)[game.seats[0].id]
     assert game_service.get_seat_commander_scryfall_ids(db, game)[game.seats[0].id]
 
 
@@ -132,7 +132,7 @@ def test_the_name_and_the_art_agree(db, user):
     _, commander_name = game_service._capture_deck_identity(db, deck.id)
 
     assert commander_name == "Sisay, Weatherlight Captain"
-    assert game_service.get_seat_commander_image_urls(db, game)[game.seats[0].id]
+    assert game_service.get_seat_commander_image_sources(db, game)[game.seats[0].id]
 
 
 # ── Controls: the pre-existing behaviour must not move ──────────────────────
@@ -145,9 +145,9 @@ def test_a_tagged_row_still_wins_over_the_anchor(db, user):
     anchored = _card(db, "Anchored Commander")
     game = _game_with(db, user, _deck(db, user, "Both", anchor=[anchored], tagged=[tagged]))
 
-    assert game_service.get_seat_commander_image_urls(db, game)[game.seats[0].id] == [
-        tagged.image_url
-    ]
+    assert game_service.get_seat_commander_image_sources(db, game)[game.seats[0].id][0][
+        0
+    ] == tagged.image_url.replace("/normal/", "/art_crop/")
 
 
 def test_two_commanders_are_capped_at_two(db, user):
@@ -155,7 +155,7 @@ def test_two_commanders_are_capped_at_two(db, user):
     a, b, c = _card(db, "Partner A"), _card(db, "Partner B"), _card(db, "Partner C")
     game = _game_with(db, user, _deck(db, user, "Partners", anchor=[a, b, c]))
 
-    assert len(game_service.get_seat_commander_image_urls(db, game)[game.seats[0].id]) == 2
+    assert len(game_service.get_seat_commander_image_sources(db, game)[game.seats[0].id]) == 2
 
 
 def test_a_seat_with_no_deck_has_no_art(db, user):
@@ -165,17 +165,21 @@ def test_a_seat_with_no_deck_has_no_art(db, user):
     db.add(GameSeat(game_id=g.id, seat_number=1, player_name="P1", starting_life=40))
     db.commit()
 
-    assert game_service.get_seat_commander_image_urls(db, g)[g.seats[0].id] == []
+    assert game_service.get_seat_commander_image_sources(db, g)[g.seats[0].id] == []
     assert game_service.get_seat_commander_scryfall_ids(db, g)[g.seats[0].id] is None
 
 
-def test_a_commander_with_no_cached_image_degrades_quietly(db, user):
+def test_a_commander_with_no_cached_image_uses_the_mirror(db, user):
     card = _card(db, "No Art Yet")
     card.image_url = None
     db.commit()
     game = _game_with(db, user, _deck(db, user, "Artless", anchor=[card]))
 
-    assert game_service.get_seat_commander_image_urls(db, game)[game.seats[0].id] == []
+    from app.dependencies import mirror_image_url
+
+    assert game_service.get_seat_commander_image_sources(db, game)[game.seats[0].id][0][
+        0
+    ] == mirror_image_url(card.scryfall_id)
     # …but the phone still gets its id: the mirror can serve art the cache lacks.
     assert game_service.get_seat_commander_scryfall_ids(db, game)[game.seats[0].id]
 
@@ -192,9 +196,9 @@ def test_a_borrowed_deck_resolves_against_its_OWNER(db, user):
     deck = _deck(db, owner, "Lent Deck", tagged=[card])
     game = _game_with(db, user, deck)
 
-    assert game_service.get_seat_commander_image_urls(db, game)[game.seats[0].id] == [
-        card.image_url
-    ]
+    assert game_service.get_seat_commander_image_sources(db, game)[game.seats[0].id][0][
+        0
+    ] == card.image_url.replace("/normal/", "/art_crop/")
 
 
 # ── The tablet has to NOTICE ────────────────────────────────────────────────
@@ -225,3 +229,26 @@ def test_the_lobby_signature_covers_deck_changes_not_just_claims(client, db, use
 
     after = client.get(f"/games/{g.id}").text
     assert f'data-sig="{seat.id}:1:Signature Commander|"' in after
+
+
+def test_tracker_page_carries_both_partners_fallbacks(client, db, user):
+    import json
+    import re
+
+    from app.dependencies import mirror_image_url, scryfall_image_fallback
+
+    cards = [_card(db, "Partner One"), _card(db, "Partner Two")]
+    game = _game_with(db, user, _deck(db, user, "Fallback partners", tagged=cards))
+    response = client.get(f"/games/{game.id}")
+    assert response.status_code == 200
+    sources = json.loads(re.search(r"commanderImageSources: (.+),", response.text)[1])
+    assert sources == [
+        [
+            c.image_url.replace("/normal/", "/art_crop/"),
+            mirror_image_url(c.scryfall_id),
+            scryfall_image_fallback(c.scryfall_id, "art_crop"),
+        ]
+        for c in cards
+    ]
+    assert "/static/background-art.js?v=" in response.text
+    assert "commanderImageUrls" not in response.text

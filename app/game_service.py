@@ -323,7 +323,7 @@ def _capture_user_attribution(
     the game owner. Seats may legitimately reference another
     account, mirroring the existing all-decks dropdown precedent in
     ``game_new.html`` and the cross-user-deck pattern documented in
-    ``get_seat_commander_image_urls``.
+    ``get_seat_commander_image_sources``.
 
     Inactive (``User.is_active = False``) accounts are still valid
     targets — matches the deck precedent, which doesn't filter by
@@ -947,25 +947,32 @@ def get_deck_record(session: Session, deck_id: int) -> dict[str, int]:
     return {"wins": wins, "losses": total - wins, "total": total}
 
 
-def get_seat_commander_image_urls(session: Session, game: Game) -> dict[int, list[str]]:
-    """``{seat_id: [commander_image_url, ...]}`` for the seats in ``game``.
+def get_seat_commander_image_sources(session: Session, game: Game) -> dict[int, list[list[str]]]:
+    """Per seat, up to two commanders' ordered background-image candidates.
 
-    The tablet's panel-background art (v3.26.1): one URL yields the full-card
-    cover treatment, two yield a vertical-halves split (top = primary).
-
-    Commanders come from :func:`deck_commander_cards`, so a deck that records its
-    commander ONLY on #163's anchor — every #164 placeholder, and any deck where
-    nobody pressed the commander toggle — now gets art like any other. That
-    fallback used to live only in the name snapshot, which is why the art was
-    intermittent with no visible pattern (v4.12.40).
-
-    A seat with no deck, no commander, or a commander whose card has no cached
-    image URL gets an empty list.
+    Prefer the cached art crop, then the independently hosted normal mirror,
+    then Scryfall's image redirect (which also repairs stale cached URLs).
+    The mirror does not serve art_crop by printing ID. No request-path fetching.
     """
-    result: dict[int, list[str]] = {}
+    from app.dependencies import mirror_image_url, scryfall_image_fallback
+
+    result: dict[int, list[list[str]]] = {}
     for seat in game.seats:
+        result[seat.id] = []
         cards = deck_commander_cards(session, seat.deck) if seat.deck_id else []
-        result[seat.id] = [c.image_url for c in cards if c.image_url][:2]
+        for card in cards:
+            sources = []
+            if card.image_url:
+                sources.append(card.image_url.replace("/normal/", "/art_crop/"))
+            if card.scryfall_id:
+                sources.extend(
+                    [
+                        mirror_image_url(card.scryfall_id),
+                        scryfall_image_fallback(card.scryfall_id, "art_crop"),
+                    ]
+                )
+            if sources:
+                result[seat.id].append(sources)
     return result
 
 

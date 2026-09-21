@@ -1109,7 +1109,7 @@ class GameSeat(Base):
     # NULL = no deck assigned at seat creation, or legacy seat predating this
     # column. commander_name_at_game joins multi-commander pairs with " + "
     # (Partner / Background / Friends Forever, capped at 2 — mirrors
-    # get_seat_commander_image_urls' two-URL cap).
+    # get_seat_commander_image_sources' two-commander cap).
     deck_name_at_game: Mapped[str | None] = mapped_column(Text, nullable=True)
     commander_name_at_game: Mapped[str | None] = mapped_column(Text, nullable=True)
     # v3.26.6 — per-seat opt-out for the v3.26.1 commander art panel background.

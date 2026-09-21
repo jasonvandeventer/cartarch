@@ -737,6 +737,7 @@
   </div>
 {% endblock %}
 {% block extra_scripts %}
+  <script src="/static/background-art.js?v={{ static_v('background-art.js') }}"></script>
   <script>
 // ── Fixed 8-seat topology (preserved verbatim) ────────────────
 // Grid:  p1  p2  p3
@@ -767,11 +768,24 @@ const seatDefs = [
   { id: {{ seat.id }}, seatNumber: {{ seat.seat_number }}, name: {{ seat.player_name | tojson }},
     startingLife: {{ seat.starting_life }},
     storedPosition: {{ (seat.grid_position or '') | tojson }},
-    commanderImageUrls: {{ (seat_commander_images.get(seat.id) or []) | tojson }},
+    commanderImageSources: {{ (seat_commander_images.get(seat.id) or []) | tojson }},
     artBackgroundHidden: {{ (seat.art_background_hidden or false) | tojson }},
     otherIds: [{% for o in game.seats if o.id != seat.id %}{{ o.id }}{% if not loop.last %},{% endif %}{% endfor %}] },
   {% endfor %}
 ];
+// Art is page metadata, not game state. Load once; timer/SSE renders must
+// never overwrite a recovered fallback or restart failed image requests.
+seatDefs.forEach(s => {
+  const card = document.getElementById(`card-${s.id}`);
+  if (!card || s.artBackgroundHidden) return;
+  const sources = s.commanderImageSources || [];
+  card.classList.toggle('has-commander-art', sources.length > 0);
+  card.classList.toggle('has-partner-art', sources.length > 1);
+  sources.forEach((urls, i) => setBackgroundArt(
+    card, i === 0 ? '--commander-art-url-primary' : '--commander-art-url-secondary', urls
+  ));
+});
+
 // v3.27.0 — collision-proof localStorage key (preserved).
 // Companion mode: the token is the OWNER-scoped table token (null for
 // non-owners — see the route). Non-owner localStorage falls back to the
@@ -1842,26 +1856,6 @@ function render() {
     card.classList.toggle('tc-active-turn', s.id === state.currentTurnId);
     card.classList.toggle('tc-eliminated', !!state.eliminated[s.id]);
 
-    // v3.26.1 — commander art panel background (preserved verbatim).
-    // v3.26.6 — respect art_background_hidden.
-    const cmdUrls = s.artBackgroundHidden
-      ? []
-      : (s.commanderImageUrls || []).map(u => u.replace('/normal/', '/art_crop/'));
-    if (cmdUrls.length >= 1) {
-      card.style.setProperty('--commander-art-url-primary', `url("${cmdUrls[0]}")`);
-      card.classList.add('has-commander-art');
-    } else {
-      card.style.removeProperty('--commander-art-url-primary');
-      card.classList.remove('has-commander-art');
-    }
-    if (cmdUrls.length >= 2) {
-      card.style.setProperty('--commander-art-url-secondary', `url("${cmdUrls[1]}")`);
-      card.classList.add('has-partner-art');
-    } else {
-      card.style.removeProperty('--commander-art-url-secondary');
-      card.classList.remove('has-partner-art');
-    }
-
     const lifeEl = document.getElementById(`life-${s.id}`);
     if (lifeEl) {
       const life = state.lives[s.id] ?? s.startingLife;
@@ -2520,17 +2514,6 @@ seatDefs.forEach((s, i) => {
   const card = document.getElementById(`card-${s.id}`);
   if (!card) return;
   card.style.setProperty('--player-color', SEAT_COLORS[i % SEAT_COLORS.length]);
-  const cmdUrls = s.artBackgroundHidden
-    ? []
-    : (s.commanderImageUrls || []).map(u => u.replace('/normal/', '/art_crop/'));
-  if (cmdUrls.length >= 1) {
-    card.style.setProperty('--commander-art-url-primary', `url("${cmdUrls[0]}")`);
-    card.classList.add('has-commander-art');
-  }
-  if (cmdUrls.length >= 2) {
-    card.style.setProperty('--commander-art-url-secondary', `url("${cmdUrls[1]}")`);
-    card.classList.add('has-partner-art');
-  }
 });
 {% endif %}
   </script>
