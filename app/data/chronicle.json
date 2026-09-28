@@ -1,5 +1,22 @@
 [
   {
+    "version": "4.19.6",
+    "date": "2026-09-28",
+    "added": [],
+    "refined": [
+      "Deck cards are easier to reach: detailed analysis and piloting notes collapse, while management actions have their own menu. Saving a profile returns to its notes.",
+      "Import methods now open individually, with examples and exact-printing entry tucked away until needed. Unfinished setup steps remain available after importing.",
+      "Signup guidance now reflects free self-service registration, and dashboard search clearly describes collection search."
+    ],
+    "resolved": [
+      "Mobile collection search no longer expands into a tall empty field, and filters start collapsed on smaller screens.",
+      "A search with no matches no longer treats an existing collection as a new account. Filtered totals state their scope.",
+      "Login and import controls now have accessible names.",
+      "Deck profiles and simulation results from seed exports cannot attach to unrelated decks by numeric ID alone. Unverified seed updates are skipped; existing saved records are preserved."
+    ],
+    "archivist_note": "Cards come first. We shortened the paths through collection search, imports, and deck maintenance, kept detailed information close at hand, and checked the revised controls in both desktop and mobile browsers."
+  },
+  {
     "version": "4.19.5",
     "date": "2026-09-28",
     "added": [],

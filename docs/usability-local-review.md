@@ -1,6 +1,6 @@
 # Local usability candidate
 
-This worktree is a local-only candidate based on v4.19.5. No release tag, image push, or production change is included.
+This worktree is the v4.19.6 release candidate based on v4.19.5. No release tag, image push, or production change is included.
 
 ## Changes
 
@@ -61,4 +61,4 @@ To re-enable an entry, add `_identity` alongside its profile fields (or alongsid
 
 Both values must match the resolved deck exactly. Identity metadata is excluded from persisted profile/result data. Unknown, renamed, or differently owned decks are skipped, preserving existing records.
 
-Automatic approval review rejected a production identity read because the authorized task was local-only. No production identities were retrieved. Before rollout, review whether to supply a verified mapping or keep automatic seed refresh disabled. The UI changes themselves do not require production data or schema changes.
+Automatic approval review rejected a production identity read because the authorized task was local-only. No production identities were retrieved. Release decision: keep unverified automatic seed refresh disabled. A verified mapping can be supplied separately later. The UI changes themselves do not require production data or schema changes.
