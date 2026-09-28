@@ -18,6 +18,7 @@
      Both render identically in Grid mode (via the unchanged macro) and
      are surfaced via a kebab menu in Rows mode. #}
 
+  {% set filtered = search or finish_filter or location_id or location_ids or facet_colors_set or facet_types_set or facet_status_set or facet_finishes_set or facet_price_min_raw or facet_price_max_raw %}
   {% if show_onboarding %}
     <section class="panel">
       <h3>Welcome to Cartarch</h3>
@@ -64,6 +65,7 @@
       <div>
         {{ editorial_eyebrow("Collection · Inventory") }}
         <h2 class="panel-title">Collection Overview</h2>
+        {% if filtered %}<p class="muted">Showing matching inventory. <a href="/collection">View your whole collection</a></p>{% endif %}
         <p class="pagehead-tagline collection-hero-lede">
           {% if total_count > 0 %}
             <b>{{ '{:,}'.format(total_cards) }}</b> cards on the shelves
@@ -87,11 +89,11 @@
        explicit sub-stat below, never folded silently into the headline. #}
     <div class="stat-grid collection-stats-grid">
       <div class="stat-card compact">
-        <div class="stat-label">Total value</div>
+        <div class="stat-label">{{ "Matching value" if filtered else "Total value" }}</div>
         <div class="stat-number">${{ '%.2f'|format(total_value) }}</div>
       </div>
       <div class="stat-card compact">
-        <div class="stat-label">Total cards</div>
+        <div class="stat-label">{{ "Matching placed cards" if filtered else "Total cards" }}</div>
         <div class="stat-number">{{ total_cards }}</div>
       </div>
       <div class="stat-card compact">
@@ -315,7 +317,8 @@
        full URL state. #}
     <aside class="collection-sidebar">
       <details class="collection-sidebar-details" open>
-        <summary class="collection-sidebar-summary">§ Filters</summary>
+        <summary class="collection-sidebar-summary">Filters{% if filtered %} · Active{% endif %}</summary>
+        <script>document.currentScript.parentElement.open = !window.matchMedia('(max-width: 980px)').matches;</script>
         <form method="get" action="/collection" class="collection-facet-form">
           {# Forward non-facet state so the form fully preserves URL params #}
           <input type="hidden" name="search" value="{{ search }}">

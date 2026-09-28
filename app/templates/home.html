@@ -38,21 +38,27 @@
     <section class="next-steps">
       <div class="next-step">
         <div class="next-step-num">Step 2</div>
-        <h4>Set up storage</h4>
+        <h4><a href="/locations">Set up storage</a></h4>
         <p>Create binders, boxes, and shelves that mirror how you physically store your cards.</p>
       </div>
       <div class="next-step">
         <div class="next-step-num">Step 3</div>
-        <h4>Place your cards</h4>
+        <h4><a href="/pending">Place your cards</a></h4>
         <p>Pick a destination for each imported batch, then confirm as you file the cards into place.</p>
       </div>
       <div class="next-step">
         <div class="next-step-num">Step 4</div>
-        <h4>Build &amp; play</h4>
+        <h4><a href="/decks">Build &amp; play</a></h4>
         <p>Assemble decks from your collection, then log your Commander games and track results.</p>
       </div>
     </section>
   {% else %}
+    {% if onboarding_steps %}
+      <details class="panel onboarding-checklist" open>
+        <summary>Finish setting up your collection</summary>
+        <ul>{% for label, url in onboarding_steps %}<li><a href="{{ url }}">{{ label }}</a></li>{% endfor %}</ul>
+      </details>
+    {% endif %}
     {# === MASTHEAD === #}
     <header class="dashboard-masthead">
       <div class="dashboard-masthead-left">
@@ -79,7 +85,7 @@
       <input type="search"
              name="search"
              class="dashboard-search-input"
-             placeholder="Search cards, decks, locations, sets…"
+             placeholder="Search your collection…"
              autocomplete="off">
       <div class="dashboard-search-chips">
         <a class="dashboard-search-chip" href="/collection">Collection</a>

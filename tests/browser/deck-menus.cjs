@@ -43,6 +43,9 @@ const base = process.env.SMOKE_URL || 'http://127.0.0.1:5581';
           await menu.getByRole('button', {name:'Load actions', exact:true}).click();
           await menu.locator('.basic-qty-form').waitFor();
           assert.equal(requests, 2);
+          // Native drawers may expand below the fold; bring the action into view
+          // exactly as a browser does before clicking it, then check hit-testing.
+          await menu.locator('.basic-qty-form button').scrollIntoViewIfNeeded();
           // Form ownership and hit-testing prove more than the CSS spelling.
           assert(await menu.locator('.basic-qty-form button').evaluate(button => {
             const r = button.getBoundingClientRect();

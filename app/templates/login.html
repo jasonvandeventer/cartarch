@@ -17,14 +17,14 @@
   <form method="post" action="/login" class="stack-form">
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
     <input type="hidden" name="next" value="{{ next_url|default('') }}">
-    <label>Email or username</label>
-    <input name="username"
+    <label for="login-username">Email or username</label>
+    <input id="login-username" name="username"
            type="text"
            required
            autofocus
            autocomplete="username">
-    <label>Password</label>
-    <input name="password"
+    <label for="login-password">Password</label>
+    <input id="login-password" name="password"
            type="password"
            required
            autocomplete="current-password">

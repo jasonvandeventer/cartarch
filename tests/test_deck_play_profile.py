@@ -23,7 +23,7 @@ from sqlalchemy.orm import sessionmaker
 import app.legacy_tables  # noqa: F401 — registers the raw tables delete_deck cleans up
 from app import deck_service
 from app.db import Base
-from app.models import DeckPlayProfile, StorageLocation, User
+from app.models import Deck, DeckPlayProfile, StorageLocation, User
 
 _seq = itertools.count(1)
 
@@ -121,11 +121,15 @@ def test_seed_play_profiles(tmp_path):
         str(custom_deck.id): {"primary_plan": ["should not land"]},
         "999999": {"primary_plan": ["no such deck"]},
     }
+    for id, profile in seed.items():
+        deck = s.get(Deck, int(id))
+        if deck:
+            profile["_identity"] = {"owner_username": user.username, "deck_name": deck.name}
     path = tmp_path / "seed.json"
     path.write_text(json.dumps(seed), encoding="utf-8")
 
     stats = deck_service.seed_play_profiles(s, seed_path=str(path))
-    assert stats == {"seeded": 1, "skipped_custom": 1, "missing_decks": 1}
+    assert stats == {"seeded": 1, "skipped_custom": 1, "missing_decks": 1, "skipped_identity": 0}
     row = deck_service.get_play_profile(s, seeded_deck.id)
     assert row.is_custom is False
     assert json.loads(row.profile_data) == {"primary_plan": ["seeded"]}
@@ -143,6 +147,7 @@ def test_seed_play_profiles(tmp_path):
         "seeded": 0,
         "skipped_custom": 0,
         "missing_decks": 0,
+        "skipped_identity": 0,
     }
 
 

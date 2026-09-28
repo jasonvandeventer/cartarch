@@ -622,7 +622,10 @@ def collection_page(
         )
 
     total_pages = max(1, math.ceil(total_count / per_page))
-    show_onboarding = total_count == 0
+    show_onboarding = (
+        session.query(InventoryRow.id).filter(InventoryRow.user_id == current_user.id).first()
+        is None
+    )
 
     # v3.x — filter-scoped bulk-action result, passed back via query string by
     # the /collection/bulk-* routes (same query-param flash pattern as the

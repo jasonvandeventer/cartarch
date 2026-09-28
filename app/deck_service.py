@@ -20,6 +20,7 @@ from app.models import (
     GameSeat,
     InventoryRow,
     StorageLocation,
+    User,
     VariantGroup,
 )
 from app.pricing import effective_price
@@ -2584,9 +2585,21 @@ def save_play_profile(session: Session, deck: Deck, profile: dict, *, is_custom:
 PLAY_PROFILE_SEED = os.path.join(os.path.dirname(__file__), "data", "play_profile_seed.json")
 
 
+def _seed_deck_matches(session: Session, deck: Deck, identity: dict) -> bool:
+    """Numeric IDs alone are not identity across databases; fail closed."""
+    owner = session.get(User, deck.user_id)
+    return bool(
+        owner
+        and identity.get("owner_username") == owner.username
+        and identity.get("deck_name") == deck.name
+    )
+
+
 def seed_play_profiles(session: Session, seed_path: str = PLAY_PROFILE_SEED) -> dict:
     """Deploy-time seed: upsert the shipped play profiles as auto-seeded rows.
 
+    Each profile requires `_identity` with owner_username and deck_name.
+    Legacy exports without identity are skipped; existing records are untouched.
     Runs at every startup (called from the lifespan hook) so profile updates ride
     the normal push→deploy path instead of pod surgery. Idempotent: pilot-edited
     rows (is_custom=True) are never touched — that's the save_play_profile
@@ -2594,15 +2607,20 @@ def seed_play_profiles(session: Session, seed_path: str = PLAY_PROFILE_SEED) -> 
     (the seed ships playgroup decks; a fresh dev DB has none of them).
     """
     if not os.path.exists(seed_path):
-        return {"seeded": 0, "skipped_custom": 0, "missing_decks": 0}
+        return {"seeded": 0, "skipped_custom": 0, "missing_decks": 0, "skipped_identity": 0}
     with open(seed_path, encoding="utf-8") as fh:
         data = json.load(fh)
-    seeded = skipped = missing = 0
+    seeded = skipped = missing = unverified = 0
     for deck_id, profile in data.items():
         deck = session.get(Deck, int(deck_id))
         if deck is None:
             missing += 1
             continue
+        identity = profile.get("_identity", {})
+        if not _seed_deck_matches(session, deck, identity):
+            unverified += 1
+            continue
+        profile = {key: value for key, value in profile.items() if key != "_identity"}
         row = get_play_profile(session, deck.id)
         if row is not None and row.is_custom:
             skipped += 1
@@ -2610,7 +2628,12 @@ def seed_play_profiles(session: Session, seed_path: str = PLAY_PROFILE_SEED) -> 
         save_play_profile(session, deck, profile, is_custom=False)
         seeded += 1
     session.commit()
-    return {"seeded": seeded, "skipped_custom": skipped, "missing_decks": missing}
+    return {
+        "seeded": seeded,
+        "skipped_custom": skipped,
+        "missing_decks": missing,
+        "skipped_identity": unverified,
+    }
 
 
 SIM_RESULTS_SEED = os.path.join(os.path.dirname(__file__), "data", "sim_results_seed.json")
@@ -2619,6 +2642,8 @@ SIM_RESULTS_SEED = os.path.join(os.path.dirname(__file__), "data", "sim_results_
 def seed_sim_results(session: Session, seed_path: str = SIM_RESULTS_SEED) -> dict:
     """Deploy-time seed for AI-simulation results (same pattern as play profiles).
 
+    Each entry requires `_identity` with owner_username and deck_name;
+    missing/mismatched identity is skipped without changing existing records.
     Upserts on (deck_id, run_label, strategy) so re-boots are no-ops and a
     corrected re-export of the same run overwrites in place. Rows are plain
     measurements — there is no is_custom concept here. Missing decks skipped.
@@ -2626,15 +2651,19 @@ def seed_sim_results(session: Session, seed_path: str = SIM_RESULTS_SEED) -> dic
     from app.models import DeckSimResult
 
     if not os.path.exists(seed_path):
-        return {"seeded": 0, "missing_decks": 0}
+        return {"seeded": 0, "missing_decks": 0, "skipped_identity": 0}
     with open(seed_path, encoding="utf-8") as fh:
         data = json.load(fh)
-    seeded = missing = 0
+    seeded = missing = unverified = 0
     for entry in data:
         deck = session.get(Deck, entry["deck_id"])
         if deck is None:
             missing += 1
             continue
+        if not _seed_deck_matches(session, deck, entry.get("_identity", {})):
+            unverified += 1
+            continue
+        entry = {key: value for key, value in entry.items() if key != "_identity"}
         row = (
             session.query(DeckSimResult)
             .filter(
@@ -2650,7 +2679,7 @@ def seed_sim_results(session: Session, seed_path: str = SIM_RESULTS_SEED) -> dic
             session.add(DeckSimResult(**entry))
         seeded += 1
     session.commit()
-    return {"seeded": seeded, "missing_decks": missing}
+    return {"seeded": seeded, "missing_decks": missing, "skipped_identity": unverified}
 
 
 def measured_strength(session: Session, deck: Deck) -> dict | None:

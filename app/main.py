@@ -55,7 +55,7 @@ from app.dependencies import (
 from app.inventory_service import (
     PRICE_STALE_DAYS,
 )
-from app.models import Card, InventoryRow, User
+from app.models import Card, Deck, InventoryRow, StorageLocation, User
 from app.password_reset_service import (
     check_rate_limits,
     consume_token,
@@ -828,6 +828,30 @@ def home(
     # brand-new account has nothing to surface. Total query cost
     # ~30 ms on prod data shape per the dashboard_service module header.
     dashboard = None if show_onboarding else get_dashboard_data(session, user_id=current_user.id)
+    onboarding_steps = []
+    if not show_onboarding:
+        if (
+            session.query(StorageLocation.id)
+            .filter(StorageLocation.user_id == current_user.id, StorageLocation.type != "root")
+            .first()
+            is None
+        ):
+            onboarding_steps.append(("Set up storage", "/locations"))
+        if (
+            session.query(InventoryRow.id)
+            .filter(InventoryRow.user_id == current_user.id, InventoryRow.is_pending.is_(True))
+            .first()
+            is not None
+        ):
+            onboarding_steps.append(("Place your imported cards", "/pending"))
+        if (
+            session.query(Deck.id)
+            .filter(Deck.user_id == current_user.id, Deck.retired_at.is_(None))
+            .first()
+            is None
+        ):
+            onboarding_steps.append(("Create your first deck", "/decks"))
+
     return render(
         request,
         "home.html",
@@ -836,6 +860,7 @@ def home(
             "current_user": current_user,
             "use_drawer_sorter": has_sortable_setup(session, current_user.id),
             "show_onboarding": show_onboarding,
+            "onboarding_steps": onboarding_steps,
             "dashboard": dashboard,
         },
     )

@@ -16776,3 +16776,15 @@ body.cmp-lobby-body { height: auto; min-height: 100dvh; overflow-y: auto; }
   font-size: 0.875rem;
   cursor: pointer;
 }
+
+/* Usability: flex-basis becomes height in the mobile toolbar column. */
+@media (max-width: 980px) {
+  .collection-search-input { flex: 0 1 auto; min-width: 0; width: 100%; }
+}
+.deck-review-details > summary, .import-method > summary { cursor: pointer; font-weight: 600; padding: 0.65rem 0; }
+.deck-review-details { margin-block: 1rem; }
+.deck-manage { flex-basis: 100%; }
+.deck-manage-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; padding-top: 0.5rem; }
+.import-method[open] { border-color: var(--accent); }
+.onboarding-checklist { margin-block: 1rem; }
+.onboarding-checklist li { margin-block: 0.5rem; }

@@ -40,17 +40,19 @@ def _deck(s):
 
 def test_seed_sim_results(tmp_path):
     s = _fresh_session()
-    deck, _ = _deck(s)
+    deck, user = _deck(s)
     seed = [
         {"deck_id": deck.id, "run_label": "run-1", "strategy": "random", "wins": 3, "games": 12},
         {"deck_id": deck.id, "run_label": "run-1", "strategy": "core", "wins": 5, "games": 10},
         {"deck_id": 999999, "run_label": "run-1", "strategy": "random", "wins": 0, "games": 4},
     ]
+    for entry in seed:
+        entry["_identity"] = {"owner_username": user.username, "deck_name": deck.name}
     path = tmp_path / "seed.json"
     path.write_text(json.dumps(seed), encoding="utf-8")
 
     stats = deck_service.seed_sim_results(s, seed_path=str(path))
-    assert stats == {"seeded": 2, "missing_decks": 1}
+    assert stats == {"seeded": 2, "missing_decks": 1, "skipped_identity": 0}
     assert s.query(DeckSimResult).count() == 2
 
     # Re-seed with corrected numbers updates in place — no duplicate rows.
@@ -69,6 +71,7 @@ def test_seed_sim_results(tmp_path):
     assert deck_service.seed_sim_results(s, seed_path=str(tmp_path / "absent.json")) == {
         "seeded": 0,
         "missing_decks": 0,
+        "skipped_identity": 0,
     }
 
 
