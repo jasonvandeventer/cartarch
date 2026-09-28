@@ -32,7 +32,7 @@ from sqlalchemy.orm import Session
 from starlette.middleware.sessions import SessionMiddleware
 
 from app import deck_service, sort_spec
-from app.auth import hash_password, validate_password_strength
+from app.auth import hash_password, set_password, validate_password_strength
 from app.dashboard_service import get_dashboard_data
 from app.db import SessionLocal, checkpoint_and_dispose, init_db, shutdown_event
 from app.decklist_service import (
@@ -1721,7 +1721,7 @@ def reset_password_submit(
             },
         )
 
-    user.password_hash = hash_password(password)
+    set_password(user, password)
     consume_token(session, token_row)
     session.commit()
 

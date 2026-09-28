@@ -15,6 +15,7 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
 from app import card_filters, sort_spec
+from app.auth import session_is_current
 from app.db import SessionLocal
 from app.deck_service import CARD_ROLE_TAGS
 from app.inventory_service import FINISH_OPTIONS
@@ -844,7 +845,8 @@ def get_current_user(
 
     user = session.query(User).filter(User.id == user_id).first()
 
-    if not user:
+    if not user or not session_is_current(request, user):
+        request.session.clear()
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid session",
@@ -880,7 +882,8 @@ def get_optional_current_user(
     if not user_id:
         return None
     user = session.query(User).filter(User.id == user_id).first()
-    if not user or not user.is_active:
+    if not user or not user.is_active or not session_is_current(request, user):
+        request.session.clear()
         return None
     _stamp_last_active(user)
     return user

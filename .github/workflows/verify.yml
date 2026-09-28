@@ -1,0 +1,92 @@
+name: Verify release candidate
+
+on:
+  workflow_call:
+    inputs:
+      app-version:
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  python:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        database: [sqlite, postgres]
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_PASSWORD: local-test-only
+          POSTGRES_DB: cartarch_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d cartarch_test"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt -r requirements-dev.txt
+      - run: ruff check . && ruff format --check .
+      - name: Rehearse fresh and previous-release migrations
+        if: matrix.database == 'postgres'
+        env:
+          TEST_DATABASE_URL: postgresql+psycopg://postgres:local-test-only@127.0.0.1:5432/cartarch_test
+        run: python scripts/check_migrations.py
+      - name: Run the whole suite
+        env:
+          DEV_MODE: "true"
+          TEST_DATABASE_URL: ${{ matrix.database == 'postgres' && 'postgresql+psycopg://postgres:local-test-only@127.0.0.1:5432/cartarch_test' || '' }}
+        run: pytest tests/
+
+  image-browser:
+    needs: python
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: pip install -r requirements.txt -r requirements-dev.txt
+      # djlint's npm wrapper installs into system Python; browser tests don't need it.
+      - run: npm ci --ignore-scripts
+      - run: npx playwright install --with-deps chromium firefox
+      - name: Existing image-fallback browser regressions (both browsers)
+        run: npm run test:browser
+      - name: Build the candidate once
+        env:
+          CANDIDATE_VERSION: ${{ inputs.app-version }}
+        run: docker build --build-arg "APP_VERSION=$CANDIDATE_VERSION" -t cartarch-verified:build .
+      - name: Test the built image and interactive menus
+        env:
+          EXPECTED_VERSION: ${{ inputs.app-version }}
+        run: scripts/check_image.sh cartarch-verified:build
+      - name: Preserve container diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: image-test-log
+          path: /tmp/cartarch-image.log
+          if-no-files-found: ignore
+      - name: Save the tested image for publication (no rebuild)
+        run: docker save cartarch-verified:build | gzip > /tmp/cartarch-verified.tar.gz
+      - uses: actions/upload-artifact@v4
+        with:
+          name: verified-image
+          path: /tmp/cartarch-verified.tar.gz
+          retention-days: 2

@@ -132,6 +132,13 @@ def test_list_view_rows_expose_card_actions(client, deck_with_commander, db, use
     body = resp.text
     assert "deck-list-view" in body, "expected the list-view rendering"
     assert "collection-row-kebab-summary" in body, "expected a row actions trigger"
+    # Follow the rendered lazy URL, so a broken control cannot pass.
+    import re
+
+    url = re.search(r'hx-get="(/decks/\d+/rows/\d+/actions)"', body)[1]
+    response = client.get(url)
+    assert response.status_code == 200
+    body = response.text
     # The action set itself, not just the trigger.
     assert "/toggle-commander" in body
     assert "/decks/return" in body
@@ -166,6 +173,12 @@ def test_grid_view_actions_unchanged_after_macro_extraction(client, deck_with_co
     assert resp.status_code == 200
     body = resp.text
     assert "card-actions-drawer" in body
+    import re
+
+    url = re.search(r'hx-get="(/decks/\d+/rows/\d+/actions)"', body)[1]
+    fragment = client.get(url)
+    assert fragment.status_code == 200
+    body += fragment.text
     assert "/toggle-commander" in body
     assert "/decks/return" in body
     assert "Switch Printing" in body

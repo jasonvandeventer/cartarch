@@ -516,6 +516,8 @@ def _build_deck_card_items(
     search: str,
     sort: str,
     direction: str,
+    *,
+    row_id: int | None = None,
 ) -> tuple[list[dict], float, int]:
     """Filter + sort + materialize the deck-card item list.
 
@@ -556,6 +558,8 @@ def _build_deck_card_items(
             InventoryRow.storage_location_id == deck.storage_location_id,
         )
     )
+    if row_id is not None:
+        deck_query = deck_query.filter(InventoryRow.id == row_id)
     if search.strip():
         deck_query = apply_collection_search_filters(deck_query, search)
 
@@ -577,7 +581,7 @@ def _build_deck_card_items(
     # All three helpers short-circuit to empty for a deck with no variant group,
     # so a non-variant deck's grid is byte-for-byte unchanged.
     shared_out = outbound_share_map(session, deck)
-    inbound_pairs = inbound_shared_rows_for_deck(session, deck, search)
+    inbound_pairs = inbound_shared_rows_for_deck(session, deck, search) if row_id is None else []
     shared_from_by_row = {row.id: source_name for row, source_name in inbound_pairs}
 
     deck_rows = sort_spec.sort_inventory_rows(
@@ -2026,6 +2030,37 @@ async def decks_row_demote(
     re-render — both the deck list and the section change)."""
     demote_to_considering(session, current_user.id, row_id)
     return _deck_redirect(request, deck_id)
+
+
+@router.get("/decks/{deck_id}/rows/{row_id}/actions")
+def deck_row_actions(
+    deck_id: int,
+    row_id: int,
+    request: Request,
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+):
+    """Owner-only, read-only menu; shared-in rows never expose source controls."""
+    deck = get_deck(session, deck_id=deck_id, user_id=current_user.id)
+    if not deck:
+        raise HTTPException(status_code=404, detail="Deck not found")
+    items, _, _ = _build_deck_card_items(
+        session, deck, current_user.id, "", "name", "asc", row_id=row_id
+    )
+    if not items:
+        raise HTTPException(status_code=404, detail="Deck row not found")
+    response = render(
+        request,
+        "_deck_row_actions.html",
+        {
+            "deck": deck,
+            "item": items[0],
+            "use_drawer_sorter": has_sortable_setup(session, current_user.id),
+            "locations": list_locations(session, user_id=current_user.id),
+        },
+    )
+    response.headers["Cache-Control"] = "no-store"
+    return response
 
 
 @router.get("/decks/{deck_id}/rows/{row_id}/printings-modal")

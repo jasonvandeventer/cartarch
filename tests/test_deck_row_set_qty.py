@@ -152,6 +152,12 @@ def test_both_views_render_the_quantity_box_for_a_basic_only(
     db.commit()
 
     body = client.get(f"/decks/{deck.id}").text
+    for row in rows.values():
+        url = f"/decks/{deck.id}/rows/{row.id}/actions"
+        assert url in body
+        fragment = client.get(url)
+        assert fragment.status_code == 200
+        body += fragment.text
     assert f"/decks/{deck.id}/rows/{rows['Forest'].id}/set-qty" in body
     assert f"/decks/{deck.id}/rows/{rows['Sol Ring'].id}/set-qty" not in body
     assert 'name="quantity"' in body

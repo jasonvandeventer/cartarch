@@ -6,7 +6,7 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
+const engine = require(process.env.PLAYWRIGHT_MODULE || 'playwright')[process.env.BROWSER || 'chromium'];
 const root = path.resolve(__dirname, '../..');
 const base = process.env.AUDIT_BROWSER_URL || 'http://127.0.0.1:5581';
 const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect width="100" height="100" fill="red"/></svg>';
@@ -22,11 +22,11 @@ function extract(file, name) {
   throw Error(name);
 }
 (async () => {
-  const browser = await chromium.launch({headless: true, executablePath: process.env.CHROMIUM_EXECUTABLE});
+  const browser = await engine.launch({headless: true, executablePath: process.env.CHROMIUM_EXECUTABLE, firefoxUserPrefs: {'ui.primaryPointerCapabilities':6,'ui.allPointerCapabilities':6}});
   let checks = 0;
   try {
     async function page(width = 1280, touch = false) {
-      const p = await browser.newPage({viewport:{width, height:900}, hasTouch:touch, isMobile:touch});
+      const p = await browser.newPage({viewport:{width, height:900}, hasTouch:touch, isMobile:touch && process.env.BROWSER !== 'firefox'});
       p.setDefaultTimeout(5000);
       await p.route('**/*', r => {
         const url = r.request().url();
@@ -81,7 +81,13 @@ function extract(file, name) {
         await p.addScriptTag({content:"const MIRROR_LARGE='https://audit.test/missing/__SID__';\n" + extract('app/templates/'+file, fn) + `;${fn}();`});
         for (const sid of ['one', 'two', 'one']) {
           if (touch) {
-            await p.locator(`.${cls}[data-sid=${sid}]`).dispatchEvent('touchstart', {touches:[{identifier:1,clientX:50,clientY:50}]});
+            // Firefox's synthetic TouchEvent lacks touches on desktop builds.
+            // Supply the real handler's event shape explicitly in both engines.
+            await p.locator(`.${cls}[data-sid=${sid}]`).evaluate(el => {
+              const event = new Event('touchstart', {bubbles:true});
+              Object.defineProperty(event, 'touches', {value:[{identifier:1,clientX:50,clientY:50}]});
+              el.dispatchEvent(event);
+            });
           } else {
             await p.locator(`.${cls}[data-sid=${sid}]`).dispatchEvent('mouseover');
           }

@@ -1,8 +1,9 @@
 import sys
 
-from app.auth import hash_password
+from app.auth import set_password
 from app.db import SessionLocal
 from app.models import User
+from app.password_reset_service import invalidate_reset_tokens
 
 
 def main() -> None:
@@ -22,7 +23,8 @@ def main() -> None:
             print(f"User not found: {username}")
             raise SystemExit(1)
 
-        user.password_hash = hash_password(password)
+        set_password(user, password)
+        invalidate_reset_tokens(db, user.id)
         user.is_active = True
 
         db.commit()

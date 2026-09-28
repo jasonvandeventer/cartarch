@@ -117,13 +117,30 @@ def authenticate_user(db: Session, username: str, password: str) -> User | None:
     return user
 
 
+def set_password(user: User, password: str) -> None:
+    """Caller commits. SQL increment also revokes sessions on concurrent resets."""
+    user.password_hash = hash_password(password)
+    user.session_version = User.session_version + 1
+
+
+def start_session(request: Request, user: User) -> None:
+    request.session.clear()
+    request.session.update(user_id=user.id, session_version=user.session_version)
+
+
+def session_is_current(request: Request, user: User) -> bool:
+    # Pre-migration cookies remain valid only until the first password change.
+    return request.session.get("session_version", 0) == user.session_version
+
+
 def get_current_user(request: Request, db: Session) -> User | None:
     user_id = request.session.get("user_id")
 
     if not user_id:
         return None
 
-    return db.query(User).filter(User.id == user_id).first()
+    user = db.query(User).filter(User.id == user_id).first()
+    return user if user and user.is_active and session_is_current(request, user) else None
 
 
 def require_user(request: Request, db: Session) -> User:

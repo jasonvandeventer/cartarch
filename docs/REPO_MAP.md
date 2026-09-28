@@ -4,7 +4,9 @@ This file explains **where changes belong** so you stop guessing and start debug
 
 ## Core rule
 
-- **`app/main.py`**: HTTP routes only. Request parsing, calling services, redirects, and choosing templates.
+- **`app/main.py`**: Application startup/shutdown, middleware, background loops, and remaining top-level pages.
+- **`app/routes/`**: Feature HTTP routes: parsing, authorization, calling existing services, redirects, and template context.
+- **`app/dependencies.py`**: Shared route dependencies, rendering, CSRF, and redirect helpers.
 - **`app/presentation_service.py`**: Shapes ORM rows into the dictionaries/totals the templates expect.
 - **`app/inventory_service.py`**: Collection business rules. Drawer assignment, sorting, merge/update/delete, undo, resort.
 - **`app/import_service.py`**: CSV parsing, row normalization, and import persistence.
@@ -38,7 +40,8 @@ Look in:
 
 Look in:
 
-- `app/main.py`
+- `app/routes/` (the feature module)
+- `app/main.py` for remaining top-level pages
 
 ### 4. A page looks bad but data is right
 
@@ -61,23 +64,13 @@ Look in:
 - `app/scryfall.py`
 - `app/import_service.py`
 
-## Current cleanup included in this version
+## Validation and deployment
 
-- Added comments/docstrings across the Python app files.
-- Added `app/presentation_service.py` so routes are thinner.
-- Updated `app/main.py` to use presentation helpers.
-- Fixed the card detail page so it fetches **only the target card rows** instead of loading the whole collection.
+- `tests/`: route, service, schema and template regression tests.
+- `tests/browser/`: Chromium/Firefox behavior checks and image-fallback regressions.
+- `alembic/`: production PostgreSQL migrations; SQLite tests use ORM metadata.
+- `scripts/check_migrations.py`: fresh and previous-release upgrade rehearsal.
+- `scripts/check_image.sh`: real container startup, HTTP and browser checks.
+- `.github/workflows/verify.yml`: shared CI/release gate; publishing reuses its tested image.
 
-## What is still overloaded
-
-The biggest remaining hotspot is **`app/inventory_service.py`**.
-
-That file still owns a lot:
-
-- drawer rules
-- card upsert logic
-- row merge/update/delete
-- undo logic
-- resort logic
-
-That is acceptable for now, but it is still the most likely place for future bugs to cluster.
+See [local validation](local-validation.md) and [backup and recovery](backup-strategy.md).

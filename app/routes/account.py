@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
-from app.auth import hash_password, validate_password_strength, verify_password
+from app.auth import set_password, start_session, validate_password_strength, verify_password
 from app.dependencies import (
     CsrfRequired,
     get_current_user,
@@ -96,9 +96,10 @@ def change_password(
 
     user = session.query(User).filter(User.id == current_user.id).first()
     if user:
-        user.password_hash = hash_password(new_password)
+        set_password(user, new_password)
         invalidate_reset_tokens(session, user.id)
         session.commit()
+        start_session(request, user)
 
     return RedirectResponse(url="/account?success=password_changed", status_code=303)
 

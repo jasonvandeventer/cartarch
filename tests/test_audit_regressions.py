@@ -66,6 +66,7 @@ def test_stream_subscribes_before_initial_event(monkeypatch):
     from app.routes import live_games
 
     monkeypatch.setattr(live_games, "SessionLocal", lambda: SimpleNamespace(close=lambda: None))
+    monkeypatch.setattr(live_games, "session_user", lambda *_: object())
     monkeypatch.setattr(live_games, "get_live_state", lambda *args: object())
     monkeypatch.setattr(live_games, "state_payload", lambda _: {"version": 1, "state": {}})
     monkeypatch.setattr(live_games, "_SSE_HEARTBEAT_SECONDS", 0.01)
@@ -312,6 +313,7 @@ def test_stream_refreshes_after_subscription_and_discards_old_events(monkeypatch
     from app import live_game_events
     from app.routes import live_games
 
+    monkeypatch.setattr(live_games, "session_user", lambda *_: object())
     current = {"version": 1, "state": {}}
     closed = []
     monkeypatch.setattr(

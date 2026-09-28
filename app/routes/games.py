@@ -21,7 +21,7 @@ from fastapi.responses import JSONResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
 from app import deck_service, game_service
-from app.auth import create_guest_user
+from app.auth import create_guest_user, start_session
 from app.dependencies import (
     CsrfRequired,
     get_current_user,
@@ -1114,7 +1114,7 @@ def join_claim(
         # The browser IS that user from here: nothing downstream needs to know it
         # was a guest, because companion mode, seat-scoped turn authorization and
         # the playgroup record all read user_id and find one.
-        request.session["user_id"] = guest.id
+        start_session(request, guest)
 
     # Land on the phone companion view — the seat is theirs now, so they can pick
     # or change their deck from the same place they will play from.

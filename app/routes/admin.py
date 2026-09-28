@@ -5,7 +5,7 @@ from fastapi.responses import RedirectResponse
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from app.auth import hash_password
+from app.auth import hash_password, set_password
 from app.dependencies import CsrfRequired, get_db_session, render, require_admin
 from app.models import (
     Deck,
@@ -162,7 +162,7 @@ def reset_password(
 
     target = session.query(User).filter(User.id == user_id).first()
     if target:
-        target.password_hash = hash_password(new_password)
+        set_password(target, new_password)
         invalidate_reset_tokens(session, target.id)
         session.commit()
     return RedirectResponse(url="/admin?success=password_reset", status_code=303)

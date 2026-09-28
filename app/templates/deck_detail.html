@@ -1638,6 +1638,7 @@
         }
         window.addEventListener('scroll', reposition, true);
         window.addEventListener('resize', reposition);
+        document.addEventListener('htmx:afterSwap', reposition);
       })();
       </script>
       <script>

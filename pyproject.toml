@@ -48,6 +48,8 @@ ignore_decorators = ["@app.*", "@router.*", "@*.get", "@*.post", "@*.put", "@*.d
 
 [tool.deptry]
 ignore = []
+# Generated local audit artifacts are not application source.
+extend_exclude = ["output"]
 
 [tool.deptry.per_rule_ignores]
 DEP002 = ["uvicorn", "jinja2", "python-multipart", "itsdangerous", "psycopg"]

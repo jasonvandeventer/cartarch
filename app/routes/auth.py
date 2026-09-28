@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
-from app.auth import authenticate_user
+from app.auth import authenticate_user, start_session
 from app.dependencies import (
     CsrfRequired,
     client_ip_for,
@@ -95,7 +95,7 @@ def login(
     user.last_signed_in_at = utc_now()
     db.commit()
 
-    request.session["user_id"] = user.id
+    start_session(request, user)
 
     return RedirectResponse(url=next_url or "/", status_code=303)
 

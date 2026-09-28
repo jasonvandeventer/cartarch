@@ -1,5 +1,18 @@
 [
   {
+    "version": "4.19.5",
+    "date": "2026-09-28",
+    "added": [],
+    "refined": [
+      "Deck card actions load when opened, making large decks lighter while keeping the same controls.",
+      "Release checks now cover both database engines, upgrades, and desktop and mobile interactions in two browsers before publication."
+    ],
+    "resolved": [
+      "Changing or resetting a password now signs out older browser sessions, including live companion connections. The browser changing its own password stays signed in."
+    ],
+    "archivist_note": "We strengthened the checks around the archive and made the everyday deck view lighter. Password changes now close older sessions, and each release must prove its database upgrades and interactive controls before it reaches the table."
+  },
+  {
     "version": "4.19.4",
     "date": "2026-09-21",
     "added": [],

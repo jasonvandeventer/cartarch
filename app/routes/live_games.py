@@ -21,6 +21,7 @@ from fastapi.responses import JSONResponse, RedirectResponse, StreamingResponse
 from sqlalchemy.orm import Session
 
 from app import live_game_events
+from app.auth import get_current_user as session_user
 from app.db import SessionLocal
 from app.dependencies import CsrfRequired, get_current_user, get_db_session
 from app.live_game_service import apply_live_action, get_live_state, start_live_game, state_payload
@@ -122,10 +123,13 @@ async def live_stream(request: Request, game_id: int):
     if not user_id:
         raise HTTPException(status_code=401, detail="Not authenticated")
 
-    def snapshot():
+    def snapshot(authorize_only=False):
         session = SessionLocal()
         try:
-            return state_payload(get_live_state(session, game_id, user_id))
+            if session_user(request, session) is None:
+                raise HTTPException(status_code=401, detail="Invalid session")
+            if not authorize_only:
+                return state_payload(get_live_state(session, game_id, user_id))
         finally:
             session.close()
 
@@ -146,12 +150,19 @@ async def live_stream(request: Request, game_id: int):
                     return
                 try:
                     payload = await asyncio.wait_for(queue.get(), timeout=_SSE_HEARTBEAT_SECONDS)
+                    await run_in_threadpool(snapshot, True)
                     next_version = json.loads(payload)["version"]
                     if next_version > version:
                         version = next_version
                         yield _sse_event(payload)
                 except TimeoutError:
+                    try:
+                        await run_in_threadpool(snapshot, True)
+                    except HTTPException:
+                        return
                     yield ": keepalive\n\n"
+                except HTTPException:
+                    return
 
     return StreamingResponse(
         event_gen(),

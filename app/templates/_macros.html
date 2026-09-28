@@ -72,6 +72,13 @@ srcset="{{ mirror_image_url(scryfall_id, 'small') }} 146w, {{ mirror_image_url(s
          loading="lazy">
   {% endif %}
 {% endmacro %}
+{% macro deck_actions_loader(item, deck) %}
+  <div class="deck-actions-slot" aria-live="polite">
+    <button type="button" hx-get="/decks/{{ deck.id }}/rows/{{ item.id }}/actions"
+            hx-target="closest .deck-actions-slot" hx-swap="innerHTML">Load actions</button>
+  </div>
+{% endmacro %}
+
 {% macro deck_actions_body(item, csrf_token, deck, use_drawer_sorter=false, locations=none) %}
   {# The deck-card action set. Shared by the grid view's Actions drawer
      (inventory_card, below) and the list view's row kebab in
@@ -559,9 +566,11 @@ srcset="{{ mirror_image_url(scryfall_id, 'small') }} 146w, {{ mirror_image_url(s
             {% endfor %}
           </div>
         {% endif %}
-        <details class="card-actions-drawer js-dismiss">
+        <details class="card-actions-drawer js-dismiss"
+                 hx-get="/decks/{{ deck.id }}/rows/{{ item.id }}/actions"
+                 hx-trigger="toggle[this.open] once" hx-target="find .deck-actions-slot" hx-swap="innerHTML">
           <summary>Actions</summary>
-          {{ deck_actions_body(item, csrf_token, deck, use_drawer_sorter, locations) }}
+          {{ deck_actions_loader(item, deck) }}
         </details>
       {% endif %}
     </div>

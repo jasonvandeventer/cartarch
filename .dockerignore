@@ -9,3 +9,11 @@ __pycache__
 .env
 data/
 samples/
+
+node_modules/
+output/
+backups/
+*.db
+.env.*
+.codex/
+.agents/
