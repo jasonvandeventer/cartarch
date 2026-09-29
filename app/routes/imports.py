@@ -2,7 +2,7 @@
 
 Covers the full card-import flow: the /import landing page, the CSV / paste-list /
 manual preview + reconcile-preview + commit routes, and their private helpers
-(_parsed_rows_from_form, normalize_proxy_value_for_commit, _build_line_to_location_map,
+(_parsed_rows_from_form, _build_line_to_location_map,
 _deck_for_storage_location, _annotate_collection_dupes, and the two
 _commit_*_with_reconciliation handlers).
 
@@ -40,6 +40,7 @@ from app.import_service import (
     compute_duplicate_counts_for_resolved,
     normalize_finish,
     normalize_language,
+    parse_proxy_bool,
     parse_scanner_csv,
     parse_text_list,
     persist_import_rows,
@@ -295,6 +296,11 @@ def _parsed_rows_from_form(
     persist_import_rows / the resolution helpers consume them
     transparently.
     """
+    required_columns = (scryfall_id, set_code, collector_number, finish, quantity, location)
+    if any(len(column) != len(line_number) for column in required_columns):
+        raise ValueError(
+            "Import rows are incomplete or mismatched. Please preview the import again."
+        )
     rows = []
     languages = language or []
     location_types = location_type or []
@@ -304,16 +310,13 @@ def _parsed_rows_from_form(
     is_brew_list = is_brew or []
     deck_format_list = deck_format or []
     for i in range(len(line_number)):
-        # v3.30.16 — is_proxy form field carries the string "true"/"false";
-        # parse_proxy_bool returns (bool, valid). Form values come from
-        # hidden inputs we wrote ourselves so they're always one of the
-        # two strings — invalid values would have already been routed to
-        # invalid_rows at parse_scanner_csv time and never reach a form.
+        # Hidden form fields are client input; apply the CSV parser's validation.
         raw_proxy = is_proxy_list[i] if i < len(is_proxy_list) else ""
-        proxy_value, _ = normalize_proxy_value_for_commit(raw_proxy)
-        # issue #70 — is_brew rides the same hidden-input grammar as is_proxy.
+        proxy_value, proxy_valid = parse_proxy_bool(raw_proxy)
         raw_brew = is_brew_list[i] if i < len(is_brew_list) else ""
-        brew_value, _ = normalize_proxy_value_for_commit(raw_brew)
+        brew_value, brew_valid = parse_proxy_bool(raw_brew)
+        if not proxy_valid or not brew_valid:
+            raise ValueError("Invalid proxy or brew flag. Please preview the import again.")
         rows.append(
             {
                 "line_number": int(line_number[i]),
@@ -342,18 +345,6 @@ def _parsed_rows_from_form(
             }
         )
     return rows
-
-
-def normalize_proxy_value_for_commit(raw: str) -> tuple[bool, bool]:
-    """Mirror of import_service.parse_proxy_bool used at commit-form-rebuild
-    time. Form values are always one of the two recognized strings (we
-    write them ourselves into the hidden inputs); any other value falls
-    back to False with valid=True (the form has no untrusted path here).
-    """
-    cleaned = (raw or "").strip().lower()
-    if cleaned == "true":
-        return (True, True)
-    return (False, True)
 
 
 def _build_line_to_location_map(
@@ -575,6 +566,7 @@ async def import_reconcile_preview(
     role: list[str] = Form([]),
     tags: list[str] = Form([]),
     is_proxy: list[str] = Form([]),
+    is_brew: list[str] = Form([]),
     session: Session = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
     _: None = CsrfRequired,
@@ -610,6 +602,7 @@ async def import_reconcile_preview(
         role,
         tags,
         is_proxy,
+        is_brew,
     )
 
     # Decorate each parsed row's resolved card with a display_name for
@@ -1544,20 +1537,51 @@ async def import_commit(
             },
         )
 
-    # 3-branch dispatch (no per-row resolution):
-    #  (a) deck destination + reconciliation → deck per-row helper
-    #  (b) non-deck destination + reconciliation → collection per-row helper
-    #  (c) no reconciliation fields → existing path, byte-identical
+    return _commit_single_destination_import(
+        request,
+        session,
+        current_user,
+        rows,
+        filename=filename,
+        target_location_id=target_location_id,
+        reconcile_action=reconcile_action,
+        reconcile_move_qty=reconcile_move_qty,
+        reconcile_new_qty=reconcile_new_qty,
+        redirect_after_sort=True,
+    )
+
+
+def _commit_single_destination_import(
+    request: Request,
+    session: Session,
+    current_user: User,
+    parsed_rows: list[dict],
+    *,
+    filename: str,
+    target_location_id: int,
+    reconcile_action: list[str],
+    reconcile_move_qty: list[str],
+    reconcile_new_qty: list[str],
+    redirect_after_sort: bool,
+):
+    """Shared CSV/text and manual commit; preserve each route's post-sort response."""
+    placed_in = None
+    placed_in_url = "/pending"
+    placed_in_kind = None
+    moved_count = 0
+    stale_match_rows: list[dict] = []
+
     deck = _deck_for_storage_location(session, current_user.id, target_location_id)
     has_reconciliation = any(reconcile_action)
     skipped_count = 0
+    row_ids = []
 
     if deck is not None and has_reconciliation:
         result = _commit_deck_import_with_reconciliation(
             session=session,
             user_id=current_user.id,
             deck=deck,
-            parsed_rows=rows,
+            parsed_rows=parsed_rows,
             actions=reconcile_action,
             move_qtys=[int(q or 0) for q in reconcile_move_qty],
             new_qtys=[int(q or 0) for q in reconcile_new_qty],
@@ -1574,7 +1598,7 @@ async def import_commit(
             session=session,
             user_id=current_user.id,
             target_location_id=target_location_id,
-            parsed_rows=rows,
+            parsed_rows=parsed_rows,
             actions=reconcile_action,
             new_qtys=[int(q or 0) for q in reconcile_new_qty],
             filename=filename,
@@ -1583,48 +1607,30 @@ async def import_commit(
         skipped_count = result.get("skipped_count", 0)
         stale_match_rows = result["stale_match_rows"]
         row_ids = result.get("imported_row_ids", [])
+    else:
+        result = persist_import_rows(
+            session, parsed_rows, filename=filename, user_id=current_user.id
+        )
+        merged_count = 0
+        row_ids = result.get("imported_row_ids", [])
+        if row_ids and target_location_id:
+            place_imported_rows(
+                session, row_ids, user_id=current_user.id, location_id=target_location_id
+            )
 
+    if row_ids or (deck is None and has_reconciliation):
         if target_location_id:
             loc = get_location(session, location_id=target_location_id, user_id=current_user.id)
             placed_in = loc.name if loc else None
             placed_in_url = f"/locations/{target_location_id}" if loc else "/pending"
             placed_in_kind = ("deck" if loc.type == "deck" else "location") if loc else None
-            # No resort here: an explicit destination (box/binder/other or a
-            # deck) was chosen, so the cards belong THERE. Running the drawer
-            # sorter would yank them straight back out into the drawers. The
-            # sorter only runs on the "Auto-sort to drawers" path (the elif
-            # below, where no target_location_id was selected).
         elif row_ids and has_sortable_setup(session, current_user.id):
-            # v3.38.0 intake routing: divert cheap non-staple surplus to Bulk
-            # BEFORE the sorter runs, so the sorter only ever places keepers.
+            # Explicit destinations must never be re-sorted into drawers.
+            # Auto-sort diverts surplus to Bulk before placing the keepers.
             route_intake_to_bulk(session, current_user.id, row_ids)
             resort_collection(session, user_id=current_user.id)
-            return RedirectResponse(url="/pending", status_code=303)
-    else:
-        result = persist_import_rows(session, rows, filename=filename, user_id=current_user.id)
-        merged_count = 0
-        row_ids = result.get("imported_row_ids", [])
-
-        if row_ids and target_location_id:
-            place_imported_rows(
-                session, row_ids, user_id=current_user.id, location_id=target_location_id
-            )
-            loc = get_location(session, location_id=target_location_id, user_id=current_user.id)
-            placed_in = loc.name if loc else None
-            placed_in_url = f"/locations/{target_location_id}" if loc else "/pending"
-            placed_in_kind = ("deck" if loc.type == "deck" else "location") if loc else None
-            # No resort here: an explicit destination (box/binder/other or a
-            # deck) was chosen, so the cards belong THERE. Running the drawer
-            # sorter would yank them straight back out into the drawers. The
-            # sorter only runs on the "Auto-sort to drawers" path (the elif
-            # below, where no target_location_id was selected).
-
-        elif row_ids and has_sortable_setup(session, current_user.id):
-            # v3.38.0 intake routing: divert cheap non-staple surplus to Bulk
-            # BEFORE the sorter runs, so the sorter only ever places keepers.
-            route_intake_to_bulk(session, current_user.id, row_ids)
-            resort_collection(session, user_id=current_user.id)
-            return RedirectResponse(url="/pending", status_code=303)
+            if redirect_after_sort:
+                return RedirectResponse(url="/pending", status_code=303)
 
     return render(
         request,
@@ -1873,106 +1879,15 @@ async def manual_import_commit(
         }
     ]
 
-    placed_in = None
-    placed_in_url = "/pending"
-    placed_in_kind = None
-    moved_count = 0
-    stale_match_rows: list[dict] = []
-
-    deck = _deck_for_storage_location(session, current_user.id, target_location_id)
-    has_reconciliation = any(reconcile_action)
-    skipped_count = 0
-
-    if deck is not None and has_reconciliation:
-        result = _commit_deck_import_with_reconciliation(
-            session=session,
-            user_id=current_user.id,
-            deck=deck,
-            parsed_rows=parsed_rows,
-            actions=reconcile_action,
-            move_qtys=[int(q or 0) for q in reconcile_move_qty],
-            new_qtys=[int(q or 0) for q in reconcile_new_qty],
-            filename="manual import",
-        )
-        moved_count = result["moved_count"]
-        merged_count = result.get("merged_count", 0)
-        stale_match_rows = result["stale_match_rows"]
-        placed_in = deck.name
-        placed_in_url = f"/locations/{target_location_id}"
-        placed_in_kind = "deck"
-    elif deck is None and has_reconciliation:
-        result = _commit_collection_import_with_reconciliation(
-            session=session,
-            user_id=current_user.id,
-            target_location_id=target_location_id,
-            parsed_rows=parsed_rows,
-            actions=reconcile_action,
-            new_qtys=[int(q or 0) for q in reconcile_new_qty],
-            filename="manual import",
-        )
-        merged_count = 0
-        skipped_count = result.get("skipped_count", 0)
-        stale_match_rows = result["stale_match_rows"]
-        row_ids = result.get("imported_row_ids", [])
-        if target_location_id:
-            loc = get_location(session, location_id=target_location_id, user_id=current_user.id)
-            placed_in = loc.name if loc else None
-            placed_in_url = f"/locations/{target_location_id}" if loc else "/pending"
-            placed_in_kind = ("deck" if loc.type == "deck" else "location") if loc else None
-            # No resort here: an explicit destination (box/binder/other or a
-            # deck) was chosen, so the cards belong THERE. Running the drawer
-            # sorter would yank them straight back out into the drawers. The
-            # sorter only runs on the "Auto-sort to drawers" path (the elif
-            # below, where no target_location_id was selected).
-        elif row_ids and has_sortable_setup(session, current_user.id):
-            # v3.38.0 intake routing: divert cheap non-staple surplus to Bulk
-            # BEFORE the sorter runs, so the sorter only ever places keepers.
-            route_intake_to_bulk(session, current_user.id, row_ids)
-            resort_collection(session, user_id=current_user.id)
-    else:
-        result = persist_import_rows(
-            session, parsed_rows, filename="manual import", user_id=current_user.id
-        )
-        merged_count = 0
-        row_ids = result.get("imported_row_ids", [])
-        if row_ids and target_location_id:
-            place_imported_rows(
-                session, row_ids, user_id=current_user.id, location_id=target_location_id
-            )
-            loc = get_location(session, location_id=target_location_id, user_id=current_user.id)
-            placed_in = loc.name if loc else None
-            placed_in_url = f"/locations/{target_location_id}" if loc else "/pending"
-            placed_in_kind = ("deck" if loc.type == "deck" else "location") if loc else None
-            # No resort here: an explicit destination (box/binder/other or a
-            # deck) was chosen, so the cards belong THERE. Running the drawer
-            # sorter would yank them straight back out into the drawers. The
-            # sorter only runs on the "Auto-sort to drawers" path (the elif
-            # below, where no target_location_id was selected).
-        elif row_ids and has_sortable_setup(session, current_user.id):
-            # v3.38.0 intake routing: divert cheap non-staple surplus to Bulk
-            # BEFORE the sorter runs, so the sorter only ever places keepers.
-            route_intake_to_bulk(session, current_user.id, row_ids)
-            resort_collection(session, user_id=current_user.id)
-
-    return render(
+    return _commit_single_destination_import(
         request,
-        "import_result.html",
-        {
-            "title": "Import Results",
-            "imported_count": result["imported_count"],
-            "total_quantity": result.get("total_quantity", result["imported_count"]),
-            "moved_count": moved_count,
-            "merged_count": merged_count,
-            "shared_count": result.get("shared_count", 0),
-            "skipped_count": skipped_count,
-            "token_routed_count": result.get("token_routed_count", 0),
-            "token_routed_quantity": result.get("token_routed_quantity", 0),
-            "stale_match_rows": stale_match_rows,
-            "failed_rows": result["failed_rows"],
-            "batch_id": result["batch_id"],
-            "placed_in": placed_in,
-            "placed_in_url": placed_in_url,
-            "placed_in_kind": placed_in_kind,
-            "current_user": current_user,
-        },
+        session,
+        current_user,
+        parsed_rows,
+        filename="manual import",
+        target_location_id=target_location_id,
+        reconcile_action=reconcile_action,
+        reconcile_move_qty=reconcile_move_qty,
+        reconcile_new_qty=reconcile_new_qty,
+        redirect_after_sort=False,
     )

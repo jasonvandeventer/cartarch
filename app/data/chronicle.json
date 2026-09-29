@@ -1,5 +1,20 @@
 [
   {
+    "version": "4.19.7",
+    "date": "2026-09-29",
+    "added": [],
+    "refined": [
+      "Imports, inventory valuation, and audit lists now share their common rules, and unused code has been removed."
+    ],
+    "resolved": [
+      "Cards imported directly into drawers now appear consistently in drawer views and searches. Import batches keep their correct labels, and malformed import fields are rejected before changes are made.",
+      "Proxy values, collection filters, sidebar counts, and daily value records now agree. Missing foil prices use the same fallback across views.",
+      "Returning cards from decks preserves proxy status and language. Switching printings no longer merges real cards into proxy rows.",
+      "Deleted decks no longer remain available through public shares, sibling links, or the playtester, and their names can be reused when editing or importing decks."
+    ],
+    "archivist_note": "We followed each inconsistency across the archive, repeated the review after fixing it, and removed old paths that no longer served a purpose. The result keeps physical cards, proxy copies, locations, and deck history distinct while making the views agree."
+  },
+  {
     "version": "4.19.6",
     "date": "2026-09-28",
     "added": [],

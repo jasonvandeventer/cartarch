@@ -73,7 +73,7 @@ project convention.
 
 from __future__ import annotations
 
-from sqlalchemy import and_, or_
+from sqlalchemy import or_
 from sqlalchemy.orm import Session, joinedload
 
 from app.decklist_service import _build_full_location_label
@@ -1932,9 +1932,3 @@ def pending_offer_names_for_playgroup(
         if name:
             out.setdefault(owner_id, set()).add(name.lower())
     return out
-
-
-# Reference imported for static-analysis cleanliness (and_ may be reintroduced
-# in future query shapes). Keeping the import documented avoids ruff F401
-# without a noqa comment.
-_ = and_

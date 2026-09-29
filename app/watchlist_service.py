@@ -447,16 +447,6 @@ def update_target_price(
     return True
 
 
-def is_card_watched(session: Session, user_id: int, card_id: int) -> bool:
-    """True if the user has a printing-specific watch for this card_id."""
-    return (
-        session.query(WatchlistItem.id)
-        .filter(WatchlistItem.user_id == user_id, WatchlistItem.card_id == card_id)
-        .first()
-        is not None
-    )
-
-
 def get_watch_ids_for_card(session: Session, user_id: int, card_id: int, card_name: str) -> dict:
     """Return existing watchlist row ids for both identity modes on this card.
 
@@ -485,23 +475,6 @@ def get_watch_ids_for_card(session: Session, user_id: int, card_id: int, card_na
         "printing_id": printing_row[0] if printing_row else None,
         "name_id": name_row[0] if name_row else None,
     }
-
-
-def is_name_watched(session: Session, user_id: int, card_name: str) -> bool:
-    """True if the user has a printing-agnostic watch for this card name.
-
-    Uses exact string match — caller should pass the canonical name
-    (typically the joined Card.name from the page being rendered).
-    """
-    normalized = _normalize_card_name(card_name)
-    if normalized is None:
-        return False
-    return (
-        session.query(WatchlistItem.id)
-        .filter(WatchlistItem.user_id == user_id, WatchlistItem.card_name == normalized)
-        .first()
-        is not None
-    )
 
 
 # ── #146 Wishlist sharing ────────────────────────────────────────

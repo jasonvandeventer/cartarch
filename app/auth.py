@@ -141,12 +141,3 @@ def get_current_user(request: Request, db: Session) -> User | None:
 
     user = db.query(User).filter(User.id == user_id).first()
     return user if user and user.is_active and session_is_current(request, user) else None
-
-
-def require_user(request: Request, db: Session) -> User:
-    user = get_current_user(request, db)
-
-    if not user:
-        raise PermissionError("Authentication required")
-
-    return user

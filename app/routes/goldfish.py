@@ -30,9 +30,9 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session, joinedload
 
-from app.deck_service import get_deck_produced_tokens_for_goldfish
+from app.deck_service import get_deck, get_deck_produced_tokens_for_goldfish
 from app.dependencies import IMAGE_MIRROR_BASE_URL, get_current_user, get_db_session, render
-from app.models import Card, Deck, DeckTokenRequirement, InventoryRow, TokenInventory, User
+from app.models import Card, DeckTokenRequirement, InventoryRow, TokenInventory, User
 
 router = APIRouter()
 
@@ -44,7 +44,7 @@ def goldfish_page(
     session: Session = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
 ):
-    deck = session.query(Deck).filter(Deck.id == deck_id, Deck.user_id == current_user.id).first()
+    deck = get_deck(session, deck_id=deck_id, user_id=current_user.id)
     if deck is None:
         # Non-leakage discipline: bounce to the decks index rather than 404
         # leaking the existence of a deck the user does not own.

@@ -44,10 +44,13 @@ def test_pending_page_renders_a_priced_card(client, db, user):
 
 
 def test_drawer_page_renders_a_priced_card(client, db, user):
-    db.add(StorageLocation(user_id=user.id, name="Drawer 1", type="drawer"))
+    location = StorageLocation(user_id=user.id, name="Drawer 1", type="drawer")
+    db.add(location)
+    db.flush()
     row = InventoryRow(
         user_id=user.id,
         card_id=_card(db, "sf-drawer-price").id,
+        storage_location_id=location.id,
         quantity=1,
         finish="normal",
         is_pending=False,

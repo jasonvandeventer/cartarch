@@ -6,8 +6,7 @@ import re
 from collections.abc import Iterable
 from datetime import datetime, timedelta
 
-from sqlalchemy import Float as SAFloat
-from sqlalchemy import and_, case, cast, func, not_, or_, select, text, tuple_, union
+from sqlalchemy import and_, case, func, not_, or_, select, text, tuple_, union
 from sqlalchemy.orm import Session, joinedload
 
 from app import sort_spec
@@ -21,7 +20,7 @@ from app.location_service import (
     numbered_drawers,
 )
 from app.models import Card, InventoryRow, ShowcaseItem, StorageLocation, TransactionLog
-from app.pricing import effective_price
+from app.pricing import effective_price, inventory_unit_price, inventory_unit_price_expr
 from app.scryfall import card_constructor_kwargs, fetch_card_by_scryfall_id, fetch_oracle_id
 from app.timeutil import utc_now
 
@@ -552,6 +551,14 @@ def get_or_create_card(
     existing = session.query(Card).filter(Card.scryfall_id == scryfall_id).first()
     if existing:
         payload = card_data
+        if not payload and (
+            not existing.image_url
+            or not existing.type_line
+            or not existing.oracle_text
+            or existing.color_identity is None
+            or existing.set_type is None
+        ):
+            payload = fetch_card_by_scryfall_id(scryfall_id)
         if payload:
             existing.name = payload["name"]
             existing.set_code = payload["set_code"]
@@ -571,33 +578,6 @@ def get_or_create_card(
             _apply_card_traits(existing, payload)
             existing.updated_at = utc_now()
             session.flush()
-        elif (
-            not existing.image_url
-            or not existing.type_line
-            or not existing.oracle_text
-            or existing.color_identity is None
-            or existing.set_type is None
-        ):
-            payload = fetch_card_by_scryfall_id(scryfall_id)
-            if payload:
-                existing.name = payload["name"]
-                existing.set_code = payload["set_code"]
-                existing.set_name = payload["set_name"]
-                existing.collector_number = payload["collector_number"]
-                existing.rarity = payload["rarity"]
-                existing.image_url = payload["image_url"]
-                existing.type_line = payload["type_line"]
-                existing.oracle_text = payload["oracle_text"]
-                existing.price_usd = payload["price_usd"]
-                existing.price_usd_foil = payload["price_usd_foil"]
-                existing.price_usd_etched = payload["price_usd_etched"]
-                existing.colors = payload.get("colors")
-                existing.color_identity = payload.get("color_identity")
-                existing.mana_cost = payload.get("mana_cost")
-                existing.cmc = payload.get("cmc")
-                _apply_card_traits(existing, payload)
-                existing.updated_at = utc_now()
-                session.flush()
         return existing
 
     payload = card_data or fetch_card_by_scryfall_id(scryfall_id)
@@ -615,76 +595,6 @@ def get_or_create_card(
     return card
 
 
-def find_matching_inventory_row(
-    session: Session,
-    user_id: int,
-    card_id: int,
-    finish: str,
-    drawer: str | None,
-    slot: str | None,
-    is_pending: bool,
-) -> InventoryRow | None:
-    return (
-        session.query(InventoryRow)
-        .filter(InventoryRow.user_id == user_id)
-        .filter(InventoryRow.card_id == card_id)
-        .filter(InventoryRow.finish == finish)
-        .filter(InventoryRow.drawer == drawer)
-        .filter(InventoryRow.slot == slot)
-        .filter(InventoryRow.is_pending == is_pending)
-        .first()
-    )
-
-
-def create_or_merge_inventory_row(
-    session: Session,
-    user_id: int,
-    card_id: int,
-    finish: str,
-    quantity: int,
-    drawer: str | None = None,
-    slot: str | None = None,
-    is_pending: bool = True,
-    notes: str | None = None,
-) -> InventoryRow:
-    existing = find_matching_inventory_row(
-        session=session,
-        user_id=user_id,
-        card_id=card_id,
-        finish=finish,
-        drawer=drawer,
-        slot=slot,
-        is_pending=is_pending,
-    )
-
-    if existing:
-        existing.quantity += quantity
-        existing.updated_at = utc_now()
-        # #131 — preserve existing notes on merge; only fill when the row had
-        # none. Overwriting silently discarded whatever was there (quick-add is
-        # the main caller that passes notes).
-        if notes and not existing.notes:
-            existing.notes = notes
-        session.flush()
-        return existing
-
-    row = InventoryRow(
-        user_id=user_id,
-        card_id=card_id,
-        finish=finish,
-        quantity=quantity,
-        drawer=drawer,
-        slot=slot,
-        is_pending=is_pending,
-        notes=notes,
-        created_at=utc_now(),
-        updated_at=utc_now(),
-    )
-    session.add(row)
-    session.flush()
-    return row
-
-
 def add_card_to_location(
     session: Session,
     *,
@@ -699,9 +609,7 @@ def add_card_to_location(
 ) -> InventoryRow | None:
     """Quick-add a single card directly into a StorageLocation (v3.32.x).
 
-    The acquisition primitive behind the location quick-add modal. Unlike
-    ``create_or_merge_inventory_row`` (which keys placement on drawer/slot,
-    defaults to pending, and never sets ``storage_location_id``), this places
+    The acquisition primitive behind the location quick-add modal. Places
     the card AT the location as a non-pending row and merges into an existing
     matching placed row using the same key the bulk-place path uses:
     ``(user_id, card_id, finish, coalesce(language,'en'), is_proxy,
@@ -746,7 +654,7 @@ def add_card_to_location(
     if existing is not None:
         existing.quantity += quantity
         existing.updated_at = now
-        # #131 — preserve existing notes on merge (see create_or_merge_inventory_row).
+        # #131 — preserve existing notes on merge.
         if notes and not existing.notes:
             existing.notes = notes
         # A merge is the branch that most needs a record: it changes a quantity
@@ -967,7 +875,13 @@ def _term_to_clause(key: str | None, value: str):
     if key == "finish":
         return InventoryRow.finish == value
     if key == "drawer":
-        return InventoryRow.drawer == value
+        return InventoryRow.storage_location.has(
+            and_(
+                StorageLocation.user_id == InventoryRow.user_id,
+                StorageLocation.type == "drawer",
+                StorageLocation.name == f"Drawer {value}",
+            )
+        )
     if key in ("lang", "language"):
         # Accept Scryfall codes ("ja"), long names ("japanese"), and country-
         # code aliases ("jp") — same alias surface as the paste-list `*XX*`
@@ -1039,13 +953,13 @@ def _term_to_clause(key: str | None, value: str):
         if parsed is None:
             return None
         op, val = parsed
-        # v3.28.8 fix — finish-aware via _effective_price_expr (foil →
+        # v3.28.8 fix — finish-aware via inventory_unit_price_expr (foil →
         # price_usd_foil with price_usd fallback; etched → price_usd_etched
         # with foil/normal fallback; else price_usd). Pre-v3.28.8 cast
         # Card.price_usd directly, which silently let foil rows with cheap
         # foil prices pass a `price:>=N` filter when their normal was ≥N
         # but their displayed price was the cheap foil.
-        price_col = _effective_price_expr()
+        price_col = inventory_unit_price_expr()
         if op == "=":
             return price_col == val
         if op == ">":
@@ -1147,48 +1061,6 @@ def _parse_atom(tokens: list[tuple], pos: int) -> tuple:
 
     # OR/AND/RPAREN in unexpected position — skip
     return None, pos + 1
-
-
-# v3.28.8 post-ship fix — finish-aware effective price expression. The
-# pre-v3.28.8 `price:` search keyword cast Card.price_usd directly, which
-# is the NORMAL price — a foil row with a cheap foil price but an
-# expensive normal would pass `price:>=5` even though its display price
-# was the cheap foil. Same shape as the v3.27.10 dashboard's
-# _placed_value_expr — mirrors app.pricing.effective_price's
-# finish-fallback order so SQL filtering matches what the user actually
-# sees on the row. Used by the new v3.28.8 facet price range AND
-# retroactively fixes the `price:` boolean-search keyword.
-def _effective_price_expr():
-    # v4-prep (pg-readiness "Type affinity" finding / cutover-checklist price
-    # audit): the price_usd* columns are TEXT and get CAST
-    # to Float here. SQLite coerces leniently (CAST('' AS REAL) -> 0.0); Postgres
-    # is STRICT and ERRORs on CAST('' AS double precision) -> 'invalid input
-    # syntax', which would 500 the price:/usd: search keyword and the facet price
-    # range post-cutover. NULLIF(col, '') maps an empty string to NULL so the
-    # cast is safe on both dialects (CAST(NULL) -> NULL). The 2026-06-03 prod
-    # scan found ZERO empty and ZERO non-numeric values across all three columns
-    # (Scryfall always sends a decimal string or nothing), so this is a defensive
-    # guard, not a cleanup -- and it is behavior-identical on today's SQLite (a
-    # real price is never '', so NULLIF is a no-op on every actual row).
-    def nz(col):
-        return func.nullif(col, "")
-
-    return cast(
-        case(
-            (
-                InventoryRow.finish == "foil",
-                func.coalesce(nz(Card.price_usd_foil), nz(Card.price_usd)),
-            ),
-            (
-                InventoryRow.finish == "etched",
-                func.coalesce(
-                    nz(Card.price_usd_etched), nz(Card.price_usd_foil), nz(Card.price_usd)
-                ),
-            ),
-            else_=nz(Card.price_usd),
-        ),
-        SAFloat,
-    )
 
 
 def apply_collection_search_filters(query, search: str):
@@ -1333,7 +1205,7 @@ def apply_collection_facet_filters(
     # their displayed price was the cheap foil. Same expression now used
     # by the `price:` boolean-search keyword.
     if facet_price_min is not None or facet_price_max is not None:
-        price_col = _effective_price_expr()
+        price_col = inventory_unit_price_expr()
         if facet_price_min is not None:
             query = query.filter(price_col >= facet_price_min)
         if facet_price_max is not None:
@@ -1362,9 +1234,9 @@ def get_collection_facet_counts(
     into one query so the round-trip cost is fixed regardless of facet
     surface. Total cost: 1 query, indexed columns throughout.
     """
-    from sqlalchemy import case, func
+    from sqlalchemy import func
 
-    from app.models import Deck, WatchlistItem
+    from app.models import WatchlistItem
 
     # Subqueries for "in_deck" + "watchlist" status counts.
     # Use explicit select() so SQLAlchemy doesn't emit the
@@ -1372,7 +1244,6 @@ def get_collection_facet_counts(
     deck_loc_ids = select(StorageLocation.id).where(
         StorageLocation.user_id == user_id, StorageLocation.type == "deck"
     )
-    _ = Deck  # imported for symmetry with the in_deck JOIN above; not directly used in counts
     watch_card_ids = select(WatchlistItem.card_id).where(
         WatchlistItem.user_id == user_id, WatchlistItem.card_id.isnot(None)
     )
@@ -1450,7 +1321,7 @@ def get_collection_facet_counts(
         )
         .select_from(InventoryRow)
         .join(Card, Card.id == InventoryRow.card_id)
-        .filter(InventoryRow.user_id == user_id)
+        .filter(InventoryRow.user_id == user_id, brew_placeholder_exclusion(user_id))
     )
     # Apply the search filter (boolean parser) — same shape as the row
     # query the page itself runs, so counts reflect the search context.
@@ -1874,7 +1745,7 @@ def list_inventory_rows(
         rows = rows[(page - 1) * per_page : (page - 1) * per_page + per_page]
     elif sort == "value":
         rows = base_query.all()
-        rows.sort(key=lambda r: effective_price(r.card, r.finish) or 0.0, reverse=reverse)
+        rows.sort(key=lambda r: inventory_unit_price(r) or 0.0, reverse=reverse)
         rows = rows[(page - 1) * per_page : (page - 1) * per_page + per_page]
     elif sort == "count":
         # v3.27.19 — count-sorted collection view (consumer of the shared
@@ -1973,7 +1844,7 @@ def get_inventory_row_stats(
     unassigned_count = 0
 
     for row in rows:
-        price = effective_price(row.card, row.finish)
+        price = inventory_unit_price(row)
         line_value = (price or 0.0) * row.quantity
         if row.is_pending:
             pending_value += line_value
@@ -3580,25 +3451,6 @@ def undo_last_batch(session: Session, batch_id: int, user_id: int) -> int:
         .all()
     )
     return _undo_import_logs(session, logs, user_id, batch=True)
-
-
-def get_previous_location_for_row(session: Session, row_id: int, user_id: int) -> str | None:
-    log = (
-        session.query(TransactionLog)
-        .filter(
-            TransactionLog.user_id == user_id,
-            TransactionLog.inventory_row_id == row_id,
-            TransactionLog.event_type == "resort",
-            TransactionLog.source_location.isnot(None),
-        )
-        .order_by(TransactionLog.created_at.desc(), TransactionLog.id.desc())
-        .first()
-    )
-
-    if not log or log.source_location == "pending":
-        return None
-
-    return log.source_location
 
 
 def resort_collection(

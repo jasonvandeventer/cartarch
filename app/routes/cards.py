@@ -29,7 +29,7 @@ from app.inventory_service import get_location_label, list_owned_sets
 from app.jobs.price_ingest import set_price_override
 from app.location_service import list_locations
 from app.models import Card, CardPrice, Deck, InventoryRow, TransactionLog, User
-from app.pricing import effective_price
+from app.pricing import inventory_unit_price
 from app.scryfall import (
     autocomplete_token_names,
     fetch_card_by_scryfall_id,
@@ -95,7 +95,7 @@ def card_detail_page(
     total_value = 0.0
 
     for row in inventory_rows:
-        price = effective_price(target_card, row.finish) or 0.0
+        price = inventory_unit_price(row) or 0.0
         total = price * row.quantity
         card_rows.append(
             {

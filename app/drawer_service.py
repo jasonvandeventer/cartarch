@@ -51,12 +51,15 @@ def list_drawer_groups(session: Session, user_id: int) -> dict[str, list[Invento
 
 def list_rows_for_drawer(session: Session, drawer: str, user_id: int) -> list[InventoryRow]:
     """Return placed rows for one user's drawer."""
+    location = numbered_drawers(session, user_id).get(drawer)
+    if location is None:
+        return []
     rows = (
         session.query(InventoryRow)
         .options(joinedload(InventoryRow.card), joinedload(InventoryRow.storage_location))
         .filter(
             InventoryRow.user_id == user_id,
-            InventoryRow.drawer == drawer,
+            InventoryRow.storage_location_id == location.id,
             InventoryRow.is_pending.is_(False),
         )
         .order_by(InventoryRow.id.asc())

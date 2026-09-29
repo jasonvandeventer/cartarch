@@ -1268,6 +1268,7 @@ def auto_create_locations(
                 .filter(
                     Deck.user_id == user_id,
                     func.lower(Deck.name) == name.lower(),
+                    Deck.retired_at.is_(None),
                 )
                 .first()
             )

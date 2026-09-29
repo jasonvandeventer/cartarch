@@ -9,9 +9,10 @@ from __future__ import annotations
 import json
 from collections.abc import Iterable
 
+from sqlalchemy import Float, case, cast, func
 from sqlalchemy.orm import Session
 
-from app.models import Card
+from app.models import Card, InventoryRow
 
 
 def card_metadata(card: Card) -> dict:
@@ -168,6 +169,31 @@ def bulk_cache_min_price_by_id(session: Session, scryfall_ids: Iterable[str]) ->
         if p is not None:
             out[r.scryfall_id] = p
     return out
+
+
+def inventory_unit_price_expr():
+    """SQL counterpart for inventory filters and totals; unpriced rows remain NULL.
+
+    Normalize empty strings before casting: PostgreSQL rejects CAST('' AS FLOAT).
+    """
+
+    def price(column):
+        return cast(func.nullif(column, ""), Float)
+
+    normal = price(Card.price_usd)
+    foil = func.nullif(price(Card.price_usd_foil), 0)
+    etched = func.nullif(price(Card.price_usd_etched), 0)
+    return case(
+        (InventoryRow.is_proxy.is_(True), 0.0),
+        (InventoryRow.finish == "foil", func.coalesce(foil, normal)),
+        (InventoryRow.finish == "etched", func.coalesce(etched, foil, normal)),
+        else_=normal,
+    )
+
+
+def inventory_unit_price(row: InventoryRow) -> float:
+    """Owned-copy value; catalog/replacement quotes still use effective_price."""
+    return 0.0 if getattr(row, "is_proxy", False) else effective_price(row.card, row.finish)
 
 
 def effective_price(card: Card, finish: str) -> float:

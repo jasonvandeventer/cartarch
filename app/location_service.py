@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session, joinedload
 
 from app import sort_spec
 from app.models import Deck, InventoryRow, StorageLocation
-from app.pricing import effective_price
+from app.pricing import inventory_unit_price
 
 VALID_LOCATION_TYPES = {"root", "drawer", "binder", "box", "deck", "considering", "other"}
 
@@ -264,7 +264,7 @@ def get_location_summary(session: Session, user_id: int) -> list[dict]:
         total_value = 0.0
 
         for row in rows:
-            price = effective_price(row.card, row.finish) or 0.0
+            price = inventory_unit_price(row) or 0.0
             total_value += price * row.quantity
 
         is_orphaned_deck = (

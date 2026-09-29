@@ -1187,30 +1187,6 @@ def fetch_card_by_set_and_number(set_code: str, collector_number: str) -> dict[s
     return _fetch_by_set_number_cached((set_code or "").strip().lower(), collector_number)
 
 
-@lru_cache(maxsize=4096)
-def _fetch_by_name_cached(name: str, set_code: str) -> dict[str, Any] | None:
-    if not name:
-        return None
-    params = f"exact={requests.utils.quote(name)}"
-    if set_code:
-        params += f"&set={set_code}"
-    raw = _get_json(f"{SCRYFALL_CARD_URL}/named?{params}")
-    if not raw:
-        # Fall back to fuzzy match (handles minor typos and alternate punctuation)
-        params = f"fuzzy={requests.utils.quote(name)}"
-        if set_code:
-            params += f"&set={set_code}"
-        raw = _get_json(f"{SCRYFALL_CARD_URL}/named?{params}")
-    return _normalize_card_payload(raw) if raw else None
-
-
-def fetch_card_by_name(name: str, set_code: str = "") -> dict[str, Any] | None:
-    return _fetch_by_name_cached(
-        (name or "").strip(),
-        (set_code or "").strip().lower(),
-    )
-
-
 def refresh_card_from_scryfall(session: Session, card_id: int) -> bool:
     """Refresh a single card from Scryfall. Caller is responsible for commit."""
     card = session.query(Card).filter(Card.id == card_id).first()
@@ -1426,33 +1402,6 @@ def search_tokens_by_name(name: str, limit: int = 12) -> list[dict[str, Any]]:
     formatted = [_format_token_response(c) for c in cards]
     formatted.sort(key=lambda t: 0 if t["is_double_sided"] else 1)
     return formatted[:limit]
-
-
-def fetch_token_by_name(name: str) -> dict[str, Any] | None:
-    """Look up a single token by name and return form-ready fields.
-
-    Tries an exact `!"name"` match first, falls back to fuzzy `name:` search.
-    Returns None if no token matches.
-    """
-    n = (name or "").strip()
-    if not n:
-        return None
-    url = (
-        "https://api.scryfall.com/cards/search"
-        f'?q=is%3Atoken+!"{requests.utils.quote(n)}"&unique=cards&order=released&dir=desc'
-    )
-    data = _get_json(url)
-    cards = data.get("data", []) if data else []
-    if not cards:
-        url = (
-            "https://api.scryfall.com/cards/search"
-            f"?q=is%3Atoken+name%3A{requests.utils.quote(n)}&unique=cards&order=released&dir=desc"
-        )
-        data = _get_json(url)
-        cards = data.get("data", []) if data else []
-    if not cards:
-        return None
-    return _format_token_response(cards[0])
 
 
 def fetch_game_changer_names() -> list[str]:

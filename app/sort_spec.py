@@ -33,7 +33,7 @@ from __future__ import annotations
 from sqlalchemy import case, func
 
 from app.models import Card
-from app.pricing import effective_price
+from app.pricing import inventory_unit_price
 
 # --- Canonical sort fields ---------------------------------------------------
 # The seven fields the shared dropdown must offer, in display order. Surfaces
@@ -269,7 +269,7 @@ def sort_showcase_items(items: list[dict], sort: str, direction: str) -> list[di
 
 
 def _row_price(r):
-    return _price_or_none(effective_price(r.card, r.finish))
+    return _price_or_none(inventory_unit_price(r))
 
 
 # (key_fn, nulls_last). "value" = finish-aware Price; "slot" = location order.

@@ -114,7 +114,7 @@ from app.inventory_service import (
 )
 from app.location_service import list_locations
 from app.models import Card, Deck, InventoryRow, User
-from app.pricing import card_metadata, effective_price
+from app.pricing import card_metadata, effective_price, inventory_unit_price
 from app.scryfall import autocomplete_cards_for_add, fetch_card_printings
 from app.sorter_rule_service import has_sortable_setup
 from app.timeutil import utc_now
@@ -590,7 +590,7 @@ def _build_deck_card_items(
 
     for row in deck_rows:
         is_shared_in = row.id in shared_from_by_row
-        price = effective_price(row.card, row.finish) or 0.0
+        price = inventory_unit_price(row) or 0.0
         row_total = price * row.quantity
         total_value += row_total
         total_cards += row.quantity
@@ -819,7 +819,7 @@ def deck_detail_page(
         )
 
         for row in rows:
-            price = effective_price(row.card, row.finish) or 0.0
+            price = inventory_unit_price(row) or 0.0
             collection_results.append(
                 {
                     "id": row.id,
@@ -962,6 +962,7 @@ def deck_detail_page(
             Deck.variant_group_id == deck.variant_group_id,
             Deck.user_id == current_user.id,
             Deck.id != deck.id,
+            Deck.retired_at.is_(None),
         )
         .order_by(Deck.name.asc())
         .all()

@@ -51,7 +51,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 
-from sqlalchemy import Float, case, cast, desc, distinct, func
+from sqlalchemy import case, desc, distinct, func
 from sqlalchemy.orm import Session
 
 from app.models import (
@@ -65,33 +65,8 @@ from app.models import (
     TransactionLog,
     WatchlistItem,
 )
+from app.pricing import inventory_unit_price_expr
 from app.timeutil import utc_now
-
-
-def _placed_value_expr() -> object:
-    """Finish-aware unit price expression for SUM(quantity * price).
-
-    Mirrors ``app.pricing.effective_price`` finish-fallback order in SQL so
-    the dashboard headline reconciles against the Collection-page total to
-    the cent. ``cast(..., Float)`` because Scryfall prices are stored as
-    TEXT in SQLite (the v3.25.0 bulk cache preserves the wire format for
-    byte-identical round-tripping); the multiplication with
-    ``InventoryRow.quantity`` (Integer) needs a numeric type on both sides.
-    """
-    return cast(
-        case(
-            (
-                InventoryRow.finish == "foil",
-                func.coalesce(Card.price_usd_foil, Card.price_usd),
-            ),
-            (
-                InventoryRow.finish == "etched",
-                func.coalesce(Card.price_usd_etched, Card.price_usd_foil, Card.price_usd),
-            ),
-            else_=Card.price_usd,
-        ),
-        Float,
-    )
 
 
 def snapshot_collection_values(session: Session, day: date | None = None) -> int:
@@ -100,7 +75,7 @@ def snapshot_collection_values(session: Session, day: date | None = None) -> int
     Called by the daily price-ingest job after prices refresh. Idempotent on
     ``(user_id, snapshot_date)``: re-running for the same day UPDATEs the value
     rather than inserting a duplicate. Mirrors the dashboard's placed Collection
-    Value exactly — same ``_placed_value_expr``, ``is_pending == False``, pending
+    Value exactly — same ``inventory_unit_price_expr``, ``is_pending == False``, pending
     excluded — so a day's snapshot reconciles to the cent with the tile. Returns
     the number of users written (users with no placed inventory get no row).
 
@@ -112,7 +87,7 @@ def snapshot_collection_values(session: Session, day: date | None = None) -> int
     totals = (
         session.query(
             InventoryRow.user_id,
-            func.coalesce(func.sum(InventoryRow.quantity * _placed_value_expr()), 0.0),
+            func.coalesce(func.sum(InventoryRow.quantity * inventory_unit_price_expr()), 0.0),
         )
         .join(Card, InventoryRow.card_id == Card.id)
         .filter(InventoryRow.is_pending.is_(False))
@@ -258,7 +233,9 @@ def get_dashboard_data(session: Session, user_id: int, now: datetime | None = No
     placed_cards = int(placed_cards)
 
     placed_value = (
-        session.query(func.coalesce(func.sum(InventoryRow.quantity * _placed_value_expr()), 0.0))
+        session.query(
+            func.coalesce(func.sum(InventoryRow.quantity * inventory_unit_price_expr()), 0.0)
+        )
         .join(Card, InventoryRow.card_id == Card.id)
         .filter(InventoryRow.user_id == user_id, InventoryRow.is_pending.is_(False))
         .scalar()
@@ -654,87 +631,4 @@ def get_dashboard_data(session: Session, user_id: int, now: datetime | None = No
         "deck_performance": deck_performance,
         "color_identity": color_identity,
         "collection_stats": collection_stats,
-    }
-
-
-# v3.27.10/v3.27.11 backward-compatible shape — kept for any caller still
-# reading the old tile dict (none currently, but defensible if something
-# slips in later). The home route handler is rewritten to call
-# ``get_dashboard_data`` directly in v3.28.5.
-def get_dashboard_tiles(session: Session, user_id: int) -> dict:
-    """Legacy shape: the three v3.27.10/v3.27.11 tiles. Use
-    ``get_dashboard_data`` for the v3.28.5 Folio dashboard. Kept here for
-    backward-compat with any other reader (none today)."""
-    placed_cards = (
-        session.query(func.coalesce(func.sum(InventoryRow.quantity), 0))
-        .filter(InventoryRow.user_id == user_id, InventoryRow.is_pending.is_(False))
-        .scalar()
-    )
-    placed_value = (
-        session.query(func.coalesce(func.sum(InventoryRow.quantity * _placed_value_expr()), 0))
-        .join(Card, InventoryRow.card_id == Card.id)
-        .filter(InventoryRow.user_id == user_id, InventoryRow.is_pending.is_(False))
-        .scalar()
-    )
-    pending_cards = (
-        session.query(func.coalesce(func.sum(InventoryRow.quantity), 0))
-        .filter(InventoryRow.user_id == user_id, InventoryRow.is_pending.is_(True))
-        .scalar()
-    )
-    pending_value = (
-        session.query(func.coalesce(func.sum(InventoryRow.quantity * _placed_value_expr()), 0))
-        .join(Card, InventoryRow.card_id == Card.id)
-        .filter(InventoryRow.user_id == user_id, InventoryRow.is_pending.is_(True))
-        .scalar()
-    )
-    decks_total = (session.query(func.count(Deck.id)).filter(Deck.user_id == user_id).scalar()) or 0
-    decks_commander_format = (
-        session.query(func.count(Deck.id))
-        .filter(Deck.user_id == user_id, func.lower(Deck.format) == "commander")
-        .scalar()
-    ) or 0
-    activity_rows = (
-        session.query(
-            TransactionLog.id,
-            TransactionLog.event_type,
-            TransactionLog.created_at,
-            TransactionLog.quantity_delta,
-            TransactionLog.source_location,
-            TransactionLog.destination_location,
-            TransactionLog.note,
-            Card.name.label("card_name"),
-            Card.set_code,
-        )
-        .outerjoin(Card, TransactionLog.card_id == Card.id)
-        .filter(TransactionLog.user_id == user_id)
-        .order_by(TransactionLog.created_at.desc())
-        .limit(8)
-        .all()
-    )
-    activity = [
-        {
-            "id": r.id,
-            "event_type": r.event_type,
-            "created_at": r.created_at,
-            "quantity_delta": r.quantity_delta,
-            "source_location": r.source_location,
-            "destination_location": r.destination_location,
-            "note": r.note,
-            "card_name": r.card_name,
-            "set_code": r.set_code,
-        }
-        for r in activity_rows
-    ]
-    return {
-        "collection": {
-            "placed_cards": int(placed_cards or 0),
-            "placed_value": float(placed_value or 0.0),
-            "pending_cards": int(pending_cards or 0),
-            "pending_value": float(pending_value or 0.0),
-        },
-        "decks": {
-            "total": int(decks_total),
-            "commander_format": int(decks_commander_format),
-        },
-        "activity": activity,
     }

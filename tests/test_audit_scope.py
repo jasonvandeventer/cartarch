@@ -251,3 +251,38 @@ def test_full_audit_scope_null_is_unchanged(db, user):
         d for d in audit_service.list_auditable_locations(db, user.id) if d["location_id"] == loc.id
     )
     assert entry["last_audited_at"] is not None  # full audit resets staleness
+
+
+def test_scan_lists_aggregate_without_mixing_scopes_or_finishes(db, user):
+    from app.models import AuditScan, User
+
+    loc, cards, _ = _mixed_location(db, user)
+    audit, _ = audit_service.start_audit(db, user.id, loc.id, set_codes=["LTR"])
+    for scan_type, finish, quantity in [
+        ("extra", "normal", 2),
+        ("extra", "normal", 3),
+        ("extra", "foil", 7),
+        ("out_of_scope", "normal", 11),
+        ("out_of_scope", "normal", 13),
+    ]:
+        db.add(
+            AuditScan(
+                audit_session_id=audit.id,
+                card_id=cards["neo"].id,
+                scan_type=scan_type,
+                finish=finish,
+                quantity_scanned=quantity,
+            )
+        )
+    outsider = User(username="outside-audit@example.com", password_hash="x")
+    db.add(outsider)
+    db.commit()
+    for reader, expected in [
+        (audit_service.list_extras, {"normal": 5, "foil": 7}),
+        (audit_service.list_out_of_scope, {"normal": 24}),
+    ]:
+        rows = reader(db, audit.id, user.id)
+        assert {r["finish"]: r["quantity_scanned"] for r in rows} == expected
+        assert all(r["card_name"] == "Boseiju" and r["set_code"] == "NEO" for r in rows)
+        with pytest.raises(PermissionError):
+            reader(db, audit.id, outsider.id)

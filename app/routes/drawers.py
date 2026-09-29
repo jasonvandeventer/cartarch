@@ -9,7 +9,7 @@ from app.drawer_service import list_drawer_groups, list_rows_for_drawer
 from app.inventory_service import get_drawer_label
 from app.location_service import numbered_drawers, user_has_drawers
 from app.models import User
-from app.pricing import effective_price
+from app.pricing import inventory_unit_price
 from app.sorter_rule_service import (
     TWELVE_DRAWER_LABELS,
     configure_twelve_drawers,
@@ -42,9 +42,7 @@ def drawers_page(
     drawer_summaries = []
     for drawer_name, rows in grouped.items():
         card_count = sum(row.quantity for row in rows)
-        total_value = sum(
-            (effective_price(row.card, row.finish) or 0.0) * row.quantity for row in rows
-        )
+        total_value = sum((inventory_unit_price(row) or 0.0) * row.quantity for row in rows)
         drawer_summaries.append(
             {
                 "drawer": drawer_name,
@@ -110,7 +108,7 @@ def drawer_detail_page(
     total_value = 0.0
 
     for row in rows:
-        price = effective_price(row.card, row.finish) or 0.0
+        price = inventory_unit_price(row) or 0.0
         total = price * row.quantity
         items.append(
             {

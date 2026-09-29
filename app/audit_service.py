@@ -642,45 +642,24 @@ def get_scan_progress(session: Session, audit_session_id: int, user_id: int) -> 
 def list_extras(session: Session, audit_session_id: int, user_id: int) -> list[dict]:
     """Scanned cards that aren't in the expected set, aggregated by printing +
     finish (for the workspace's Extras panel)."""
-    _owned_audit(session, audit_session_id, user_id)
-    scans = (
-        session.query(AuditScan)
-        .options(joinedload(AuditScan.card))
-        .filter(
-            AuditScan.audit_session_id == audit_session_id,
-            AuditScan.scan_type == "extra",
-        )
-        .all()
-    )
-    agg: dict[tuple[int, str], dict] = {}
-    for s in scans:
-        key = (s.card_id, s.finish)
-        entry = agg.get(key)
-        if entry is None:
-            agg[key] = {
-                "card_id": s.card_id,
-                "card_name": s.card.name if s.card else "",
-                "set_code": (s.card.set_code or "").upper() if s.card else "",
-                "collector_number": s.card.collector_number if s.card else "",
-                "finish": s.finish,
-                "quantity_scanned": s.quantity_scanned,
-                "scryfall_id": s.card.scryfall_id if s.card else None,
-            }
-        else:
-            entry["quantity_scanned"] += s.quantity_scanned
-    return list(agg.values())
+    return _list_scans_by_printing(session, audit_session_id, user_id, "extra")
 
 
 def list_out_of_scope(session: Session, audit_session_id: int, user_id: int) -> list[dict]:
-    """Scanned cards whose set wasn't in a scoped audit's scope, aggregated by
-    printing + finish. Acknowledged-only: shown collapsed, offered no actions."""
+    """Scans outside the audit scope, aggregated by printing and finish."""
+    return _list_scans_by_printing(session, audit_session_id, user_id, "out_of_scope")
+
+
+def _list_scans_by_printing(
+    session: Session, audit_session_id: int, user_id: int, scan_type: str
+) -> list[dict]:
     _owned_audit(session, audit_session_id, user_id)
     scans = (
         session.query(AuditScan)
         .options(joinedload(AuditScan.card))
         .filter(
             AuditScan.audit_session_id == audit_session_id,
-            AuditScan.scan_type == "out_of_scope",
+            AuditScan.scan_type == scan_type,
         )
         .all()
     )

@@ -23,7 +23,7 @@ from app.models import (
     User,
     VariantGroup,
 )
-from app.pricing import effective_price
+from app.pricing import inventory_unit_price
 from app.scryfall import _cache_get_by_ids, extract_token_stubs, fetch_deck_tokens
 from app.timeutil import utc_now
 
@@ -2111,7 +2111,12 @@ def update_deck(
 
     existing = (
         session.query(Deck)
-        .filter(Deck.user_id == user_id, Deck.name == name, Deck.id != deck_id)
+        .filter(
+            Deck.user_id == user_id,
+            Deck.name == name,
+            Deck.id != deck_id,
+            Deck.retired_at.is_(None),
+        )
         .first()
     )
     if existing:
@@ -2369,7 +2374,7 @@ def list_decks(session: Session, user_id: int) -> list[Deck]:
         # Proxies excluded — a buy-list copy isn't held value. effective_price
         # reads only persisted Card columns (no network).
         deck.total_value = sum(
-            (effective_price(r.card, r.finish) or 0.0) * r.quantity
+            (inventory_unit_price(r) or 0.0) * r.quantity
             for r in own_rows
             if r.card and not r.is_proxy
         )
@@ -2422,7 +2427,7 @@ def compute_deck_game_stats(session: Session, user_id: int, deck_ids: list[int])
     if not deck_ids:
         return {}
 
-    from sqlalchemy import case, desc, func, or_
+    from sqlalchemy import case, func
 
     rows = (
         session.query(
@@ -2448,10 +2453,6 @@ def compute_deck_game_stats(session: Session, user_id: int, deck_ids: list[int])
         .group_by(GameSeat.deck_id)
         .all()
     )
-
-    # Silence the unused-import warnings (imported for symmetry with the
-    # dashboard pattern; ``or_`` was the v4.0.1 visibility filter, now removed).
-    _ = (desc, or_)
 
     out: dict[int, dict] = {}
     for r in rows:
@@ -2755,7 +2756,7 @@ def get_deck_by_share_token(session: Session, token: str) -> Deck | None:
     return (
         session.query(Deck)
         .options(joinedload(Deck.storage_location))
-        .filter(Deck.share_token == token)
+        .filter(Deck.share_token == token, Deck.retired_at.is_(None))
         .first()
     )
 
@@ -4310,6 +4311,7 @@ def switch_deck_row_printing(
             InventoryRow.user_id == user_id,
             InventoryRow.card_id == new_card.id,
             InventoryRow.finish == finish_clean,
+            InventoryRow.is_proxy.is_(False),
             InventoryRow.storage_location_id == deck.storage_location_id,
             InventoryRow.is_pending.is_(False),
             InventoryRow.id != row.id,
@@ -4337,6 +4339,8 @@ def switch_deck_row_printing(
             InventoryRow.user_id == user_id,
             InventoryRow.card_id == old_card_id,
             InventoryRow.finish == old_finish,
+            InventoryRow.is_proxy.is_(False),
+            func.coalesce(InventoryRow.language, "en") == (row.language or "en"),
             InventoryRow.storage_location_id.is_(None),
             InventoryRow.is_pending.is_(True),
         )
@@ -4350,6 +4354,7 @@ def switch_deck_row_printing(
             user_id=user_id,
             card_id=old_card_id,
             finish=old_finish,
+            language=row.language or "en",
             quantity=swap_qty,
             is_pending=True,
             storage_location_id=None,
@@ -4857,6 +4862,9 @@ def return_card_from_deck(
             InventoryRow.user_id == user_id,
             InventoryRow.card_id == deck_row.card_id,
             InventoryRow.finish == deck_row.finish,
+            InventoryRow.is_proxy == deck_row.is_proxy,
+            func.coalesce(InventoryRow.language, "en") == (deck_row.language or "en"),
+            InventoryRow.storage_location_id.is_(None),
             InventoryRow.drawer == normalized_drawer,
             InventoryRow.slot == normalized_slot,
             InventoryRow.is_pending.is_(True),
@@ -4874,6 +4882,10 @@ def return_card_from_deck(
             user_id=user_id,
             card_id=deck_row.card_id,
             finish=deck_row.finish,
+            language=deck_row.language or "en",
+            is_proxy=deck_row.is_proxy,
+            notes=deck_row.notes,
+            tags=deck_row.tags,
             quantity=deck_row.quantity,
             drawer=normalized_drawer,
             slot=normalized_slot,

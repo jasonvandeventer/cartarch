@@ -88,7 +88,7 @@ from app.presentation_service import (
     build_pending_batch_groups,
     build_pending_view_model,
 )
-from app.pricing import card_metadata, effective_price
+from app.pricing import card_metadata, effective_price, inventory_unit_price
 from app.sorter_rule_service import (
     create_sorter_rule,
     delete_sorter_rule,
@@ -575,7 +575,7 @@ def collection_page(
     items = []
 
     for row in inventory_rows:
-        price = effective_price(row.card, row.finish)
+        price = inventory_unit_price(row)
         price_updated_at = getattr(row.card, "updated_at", None)
         is_stale = is_price_stale(price_updated_at)
         has_price = price is not None
@@ -1288,7 +1288,7 @@ def collection_cull_preview(
                 "finish": row.finish,
                 "quantity": row.quantity,
                 "surplus": surplus,
-                "price": effective_price(row.card, row.finish) if row.card else 0.0,
+                "price": inventory_unit_price(row) if row.card else 0.0,
             }
         )
 
@@ -2127,7 +2127,7 @@ def _build_bulk_delete_items(session: Session, row_ids: list[int], user_id: int)
     )
     items = []
     for row in rows:
-        price = effective_price(row.card, row.finish) or 0.0
+        price = inventory_unit_price(row) or 0.0
         items.append(
             {
                 "id": row.id,
@@ -2256,7 +2256,7 @@ def _build_location_items(
     total_value = 0.0
     total_quantity = 0
     for row in rows:
-        price = effective_price(row.card, row.finish) or 0.0
+        price = inventory_unit_price(row) or 0.0
         row_total = price * row.quantity
         total_value += row_total
         total_quantity += row.quantity

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from app.inventory_service import get_drawer_label, get_location_label
-from app.pricing import effective_price
+from app.pricing import inventory_unit_price
 
 
 def build_pending_view_model(rows, drawer_locations=None) -> dict:
@@ -14,7 +14,7 @@ def build_pending_view_model(rows, drawer_locations=None) -> dict:
     total_copies = 0
 
     for row in rows:
-        price = effective_price(row.card, row.finish)
+        price = inventory_unit_price(row)
         # FROM should describe where the card physically is right now. Three
         # cases, in priority order:
         #   1. row.from_drawer set (resort_collection captured an old drawer
@@ -78,8 +78,8 @@ def build_pending_batch_groups(session, user_id: int, items: list[dict]) -> list
 
     `InventoryRow` has no direct FK to `ImportBatch`; the link lives on
     `TransactionLog.batch_id`. This function joins pending row ids → most-
-    recent `imported` event → batch → batch.filename + imported_at, in a
-    single batched query (one IN clause + one GROUP-BY) — strict no-N+1.
+    recent import event → batch → batch.filename + imported_at, in a
+    single batched window query — strict no-N+1.
     Rows without a matching imported event fall into a "Manual" pseudo-batch
     so they still group cleanly.
 
@@ -95,45 +95,38 @@ def build_pending_batch_groups(session, user_id: int, items: list[dict]) -> list
 
     row_ids = [it["id"] for it in items]
 
-    # Most-recent imported event per row id → batch id. SQLite's MAX-over-
-    # GROUP-BY returns the largest created_at; the matching batch_id comes
-    # from a correlated subquery to keep this in a single statement.
-    sub_rows = (
+    # Rank within each row so timestamps, then IDs, determine the latest import.
+    ranked = (
         session.query(
             TransactionLog.inventory_row_id.label("row_id"),
-            func.max(TransactionLog.created_at).label("ts"),
+            TransactionLog.batch_id,
+            func.row_number()
+            .over(
+                partition_by=TransactionLog.inventory_row_id,
+                order_by=(TransactionLog.created_at.desc(), TransactionLog.id.desc()),
+            )
+            .label("position"),
         )
         .filter(
             TransactionLog.user_id == user_id,
             TransactionLog.inventory_row_id.in_(row_ids),
-            TransactionLog.event_type == "imported",
+            TransactionLog.event_type.in_(("import", "imported")),
+            TransactionLog.batch_id.isnot(None),
         )
-        .group_by(TransactionLog.inventory_row_id)
-        .all()
+        .subquery()
     )
-    # Second pass: join the (row_id, ts) tuples to TransactionLog and pull
-    # batch_id. Cheap because the rows are already a small set.
-    row_to_batch: dict[int, int] = {}
-    if sub_rows:
-        ts_pairs = [(r.row_id, r.ts) for r in sub_rows]
-        tx_rows = (
-            session.query(TransactionLog.inventory_row_id, TransactionLog.batch_id)
-            .filter(
-                TransactionLog.user_id == user_id,
-                TransactionLog.event_type == "imported",
-                TransactionLog.inventory_row_id.in_([p[0] for p in ts_pairs]),
-            )
-            .all()
-        )
-        # Walk and keep the latest per row (the query above already filtered).
-        for row_id, batch_id in tx_rows:
-            if row_id is not None and batch_id is not None:
-                row_to_batch[row_id] = batch_id
+    row_to_batch = dict(
+        session.query(ranked.c.row_id, ranked.c.batch_id).filter(ranked.c.position == 1).all()
+    )
 
     batch_ids = sorted({b for b in row_to_batch.values() if b is not None})
     batches: dict[int, ImportBatch] = {}
     if batch_ids:
-        for b in session.query(ImportBatch).filter(ImportBatch.id.in_(batch_ids)).all():
+        for b in (
+            session.query(ImportBatch)
+            .filter(ImportBatch.id.in_(batch_ids), ImportBatch.user_id == user_id)
+            .all()
+        ):
             batches[b.id] = b
 
     grouped: dict[int | str, dict] = {}
@@ -185,117 +178,3 @@ def build_pending_batch_groups(session, user_id: int, items: list[dict]) -> list
     # Order: most recent batch first; "_manual" goes to the end.
     out.sort(key=lambda g: (g["_sort"] is None, -(g["_sort"].timestamp() if g["_sort"] else 0)))
     return out
-
-
-def build_drawers_summary_view_model(grouped_rows: dict) -> dict:
-    """Build summary cards for the drawers overview page."""
-    drawer_summaries = []
-    for drawer_name, rows in grouped_rows.items():
-        total_value = sum(effective_price(row.card, row.finish) * row.quantity for row in rows)
-        drawer_summaries.append(
-            {"drawer": drawer_name, "row_count": len(rows), "total_value": total_value}
-        )
-    drawer_summaries.sort(key=lambda d: d["drawer"])
-    return {"drawer_summaries": drawer_summaries}
-
-
-def build_drawer_detail_view_model(drawer: str, rows) -> dict:
-    """Build template payload pieces for one drawer detail page."""
-    items = []
-    total_copies = 0
-    total_value = 0.0
-
-    for row in rows:
-        price = effective_price(row.card, row.finish) or 0.0
-        total = price * row.quantity
-        items.append(
-            {
-                "id": row.id,
-                "card": row.card,
-                "finish": row.finish,
-                "language": row.language or "en",
-                "is_proxy": bool(row.is_proxy),
-                "quantity": row.quantity,
-                "slot": row.slot,
-                "is_pending": row.is_pending,
-                "effective_price": price,
-                "total_value": total,
-                "drawer_label": get_drawer_label(drawer),
-            }
-        )
-        total_copies += row.quantity
-        total_value += total
-
-    return {
-        "drawer": drawer,
-        "drawer_label": get_drawer_label(drawer),
-        "items": items,
-        "entry_count": len(items),
-        "total_copies": total_copies,
-        "total_value": total_value,
-    }
-
-
-def build_deck_detail_view_model(deck) -> dict:
-    """Build template payload pieces for one deck page."""
-    items = []
-    deck_total_value = 0.0
-    total_cards = 0
-
-    if deck:
-        for item in deck.items:
-            price = effective_price(item.card, item.finish) or 0.0
-            total_value = price * item.quantity
-            deck_total_value += total_value
-            total_cards += item.quantity
-            items.append(
-                {
-                    "id": item.id,
-                    "card": item.card,
-                    "finish": item.finish,
-                    "quantity": item.quantity,
-                    "effective_price": price,
-                    "total_value": total_value,
-                }
-            )
-
-    return {
-        "items": items,
-        "deck_total_value": deck_total_value,
-        "deck_total_cards": total_cards,
-    }
-
-
-def build_card_detail_view_model(card, rows) -> dict:
-    """Build template payload pieces for a single-card detail page."""
-    card_rows = []
-    total_copies = 0
-    total_value = 0.0
-
-    for row in rows:
-        price = effective_price(row.card, row.finish) or 0.0
-        total = price * row.quantity
-        card_rows.append(
-            {
-                "id": row.id,
-                "finish": row.finish,
-                "language": row.language or "en",
-                "is_proxy": bool(row.is_proxy),
-                "quantity": row.quantity,
-                "drawer": row.drawer,
-                "slot": row.slot,
-                "is_pending": row.is_pending,
-                "effective_price": price,
-                "total_value": total,
-                "drawer_label": get_location_label(row),
-            }
-        )
-        total_copies += row.quantity
-        total_value += total
-
-    return {
-        "card": card,
-        "rows": card_rows,
-        "total_copies": total_copies,
-        "total_value": total_value,
-    }

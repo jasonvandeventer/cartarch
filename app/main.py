@@ -819,14 +819,7 @@ def home(
         session.query(InventoryRow.id).filter(InventoryRow.user_id == current_user.id).first()
         is None
     )
-    # v3.28.5 — Folio dashboard. ``get_dashboard_data`` returns the full
-    # nine-panel data shape (replaces the v3.27.10/v3.27.11 three-tile
-    # ``get_dashboard_tiles`` shape; the legacy function is kept in
-    # dashboard_service.py for backward-compat but is no longer called
-    # from the home route). Computed only when the populated dashboard
-    # renders — the show_onboarding empty state skips the work since a
-    # brand-new account has nothing to surface. Total query cost
-    # ~30 ms on prod data shape per the dashboard_service module header.
+    # New accounts render onboarding instead of querying the populated dashboard.
     dashboard = None if show_onboarding else get_dashboard_data(session, user_id=current_user.id)
     onboarding_steps = []
     if not show_onboarding:

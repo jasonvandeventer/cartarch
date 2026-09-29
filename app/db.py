@@ -12,7 +12,7 @@ from datetime import UTC
 from pathlib import Path
 
 from sqlalchemy import DateTime, TypeDecorator, create_engine, event
-from sqlalchemy.orm import Session, declarative_base, sessionmaker
+from sqlalchemy.orm import declarative_base, sessionmaker
 
 
 class UTCDateTime(TypeDecorator):
@@ -175,8 +175,3 @@ def init_db() -> None:
         user_count = session.query(User).count()
         if user_count == 0:
             raise RuntimeError("No users found in database. Migration or seed failed.")
-
-
-def get_session() -> Session:
-    """Return a raw session for scripts and non-route callers."""
-    return SessionLocal()

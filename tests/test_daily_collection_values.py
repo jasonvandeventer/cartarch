@@ -224,3 +224,39 @@ def test_dashboard_page_renders_accrual_note_without_history(db, user, client):
     assert resp.status_code == 200
     assert "daily price snapshots accrue" in resp.text
     assert "dashboard-holdings-chart" not in resp.text  # no sparkline yet
+
+
+def test_proxies_have_zero_dashboard_and_snapshot_value(client, db, user):
+    from app import main
+    from app.dependencies import get_optional_current_user
+
+    _placed(db, user, "10.00")
+    _placed(db, user, "10.00", qty=3)
+    proxy = (
+        db.query(InventoryRow).filter_by(user_id=user.id).order_by(InventoryRow.id.desc()).first()
+    )
+    proxy.is_proxy = True
+    yesterday = date(2026, 7, 9)
+    today = date(2026, 7, 10)
+    db.add(DailyCollectionValue(user_id=user.id, snapshot_date=yesterday, total_value=40.0))
+    db.commit()
+    main.app.dependency_overrides[get_optional_current_user] = lambda: user
+    try:
+        page = client.get("/")
+        assert page.status_code == 200
+        assert "The collection sits at <b>$10.00</b>" in page.text
+    finally:
+        main.app.dependency_overrides.pop(get_optional_current_user, None)
+    snapshot_collection_values(db, day=today)
+    by_day = {r.snapshot_date: r.total_value for r in _rows(db, user)}
+    assert by_day == {yesterday: 40.0, today: 10.0}
+    # An all-proxy collection updates today's existing snapshot to zero.
+    for row in db.query(InventoryRow).filter_by(user_id=user.id):
+        row.is_proxy = True
+    db.commit()
+    snapshot_collection_values(db, day=today)
+    assert get_dashboard_data(db, user.id)["holdings"]["placed_value"] == 0.0
+    assert {r.snapshot_date: r.total_value for r in _rows(db, user)} == {
+        yesterday: 40.0,
+        today: 0.0,
+    }

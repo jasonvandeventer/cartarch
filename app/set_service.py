@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from sqlalchemy.orm import Session
 
-from app.inventory_service import get_owned_cards_by_set, list_owned_sets
+from app.inventory_service import get_owned_cards_by_set
 from app.models import Card, TokenInventory
 from app.scryfall import fetch_set_cards_from_cache
 
@@ -221,42 +221,3 @@ def _compute_rarity_breakdown(set_cards: list[dict]) -> list[dict]:
             }
         )
     return breakdown
-
-
-def list_set_completion_summaries(session: Session, user_id: int) -> list[dict]:
-    """Build set-completion summaries for one user's owned sets.
-
-    Note: this function is currently unused (no callers as of v3.27.13);
-    it was scaffolding for a dashboard surface that didn't ship. Kept
-    importable for potential future use. The per-set ``fetch_set_cards``
-    call originally here was repointed to ``fetch_set_cards_from_cache``
-    as part of v3.27.13's request-path-network-invariant restoration so
-    any future wiring inherits the cache-read path by default.
-    """
-    owned_sets = list_owned_sets(session, user_id=user_id)
-    summaries = []
-
-    for owned_set in owned_sets:
-        set_code = owned_set["set_code"]
-        set_cards = fetch_set_cards_from_cache(set_code)
-        owned_map = get_owned_cards_by_set(session, set_code=set_code, user_id=user_id)
-
-        total_cards = len(set_cards)
-        owned_cards = sum(1 for card in set_cards if owned_map.get(card["collector_number"], 0) > 0)
-        missing_count = max(total_cards - owned_cards, 0)
-        completion_pct = round((owned_cards / total_cards) * 100, 2) if total_cards else 0
-
-        summaries.append(
-            {
-                "set_code": set_code,
-                "set_name": owned_set["set_name"],
-                "unique_owned": owned_set["unique_owned"],
-                "total_cards": total_cards,
-                "owned_cards": owned_cards,
-                "missing_count": missing_count,
-                "completion_pct": completion_pct,
-            }
-        )
-
-    summaries.sort(key=lambda s: (-s["completion_pct"], s["set_code"]))
-    return summaries
