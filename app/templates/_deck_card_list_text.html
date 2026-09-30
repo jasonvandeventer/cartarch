@@ -14,7 +14,7 @@
      label, count, unique, subgroups (only populated for Creature when
      group_by='type'), rows.
 #}
-{% from "_macros.html" import deck_actions_loader %}
+{% from "_macros.html" import deck_actions_loader, shared_deck_controls %}
 <section class="deck-list-view">
   {% for group in deck_card_groups %}
     <article class="deck-list-group">
@@ -50,6 +50,7 @@
               or (item.language and item.language != 'en')
               or item.is_proxy
               or item.is_shared_in
+              or item.shared_with
               or item.get('legality_status') in ('banned', 'restricted', 'not_legal') %}
               <span class="dlr-meta">
                 {% if item.finish and item.finish != 'normal' %}
@@ -58,6 +59,7 @@
                 {% if item.language and item.language != 'en' %}<span class="dlr-tag lang">{{ item.language|upper }}</span>{% endif %}
                 {% if item.is_proxy %}<span class="dlr-tag proxy">P</span>{% endif %}
                 {% if item.is_shared_in %}<span class="dlr-tag share" title="Shared from {{ item.shared_from }}">SHARED</span>{% endif %}
+                {% if item.shared_with %}<span class="dlr-tag share" title="Physical card stays here; also listed in {{ item.shared_with|join(', ') }}">ALSO LISTED</span>{% endif %}
                 {% set leg = item.get('legality_status') %}
                 {% if leg == 'banned' %}
                   <span class="dlr-tag bad">!</span>
@@ -70,22 +72,7 @@
             {% endif %}
             <span class="dlr-actions">
               {% if item.is_shared_in %}
-                {# issue #27 — shared-in card: read-only, no qty/printing edits
-                   (its physical row belongs to the source deck). Drop the share
-                   only. #}
-                <form method="post"
-                      action="/decks/{{ deck.id }}/unshare-card"
-                      class="dlr-qty-form">
-                  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                  <input type="hidden" name="inventory_row_id" value="{{ item.id }}">
-                  <input type="hidden" name="target_deck_id" value="{{ deck.id }}">
-                  {# #183 — same wording fix as the grid macro. A dense row has
-                     no space for the explanation, so it rides the tooltip; the
-                     LABEL still has to stop reading as "move this card". #}
-                  <button type="submit"
-                          class="dlr-switch-btn"
-                          title="Removes this card from THIS decklist only. The card itself stays in {{ item.shared_from | default('its own deck', true) }}.">Remove</button>
-                </form>
+                {{ shared_deck_controls(item, deck, csrf_token) }}
               {% else %}
               {% if is_basic %}
                 {# Basic-land quantity box (v4.18.0). Replaces the +/- pair:

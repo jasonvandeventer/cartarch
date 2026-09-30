@@ -113,7 +113,7 @@ from app.inventory_service import (
     resort_collection,
 )
 from app.location_service import list_locations
-from app.models import Card, Deck, InventoryRow, User
+from app.models import Card, Deck, DeckCardShare, InventoryRow, User
 from app.pricing import card_metadata, effective_price, inventory_unit_price
 from app.scryfall import autocomplete_cards_for_add, fetch_card_printings
 from app.sorter_rule_service import has_sortable_setup
@@ -584,6 +584,20 @@ def _build_deck_card_items(
     inbound_pairs = inbound_shared_rows_for_deck(session, deck, search) if row_id is None else []
     shared_from_by_row = {row.id: source_name for row, source_name in inbound_pairs}
 
+    source_decks = (
+        dict(
+            session.query(Deck.storage_location_id, Deck.id)
+            .filter(
+                Deck.user_id == user_id,
+                Deck.retired_at.is_(None),
+                Deck.storage_location_id.in_([row.storage_location_id for row, _ in inbound_pairs]),
+            )
+            .all()
+        )
+        if inbound_pairs
+        else {}
+    )
+
     deck_rows = sort_spec.sort_inventory_rows(
         own_rows + [row for row, _ in inbound_pairs], sort or "name", direction
     )
@@ -615,6 +629,9 @@ def _build_deck_card_items(
                 "shared_with": [] if is_shared_in else shared_out.get(row.id, []),
                 "is_shared_in": is_shared_in,
                 "shared_from": shared_from_by_row.get(row.id),
+                "shared_from_id": source_decks.get(row.storage_location_id)
+                if is_shared_in
+                else None,
             }
         )
 
@@ -1001,10 +1018,16 @@ def deck_detail_page(
         if deck
         else []
     )
+    share_notice = request.session.get("deck_share_notice")
+    if share_notice and share_notice["deck_id"] == deck_id:
+        request.session.pop("deck_share_notice")
+    else:
+        share_notice = None
     return render(
         request,
         "deck_detail.html",
         {
+            "share_notice": share_notice,
             "title": deck.name if deck else "Deck",
             "deck": deck,
             "location_activity": location_activity,
@@ -1407,6 +1430,64 @@ async def decks_delete(
     return RedirectResponse(url="/decks", status_code=303)
 
 
+@router.get("/decks/{deck_id}/assemble", response_class=HTMLResponse)
+def decks_assemble(
+    request: Request,
+    deck_id: int,
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+):
+    deck = get_deck(session, deck_id=deck_id, user_id=current_user.id)
+    if not deck:
+        raise HTTPException(status_code=404, detail="Deck not found")
+    return render(
+        request,
+        "deck_assembly.html",
+        {
+            "title": f"Assemble {deck.name}",
+            "deck": deck,
+            "assembly": deck_service.build_deck_assembly(session, deck),
+            "current_user": current_user,
+        },
+    )
+
+
+@router.post("/decks/{deck_id}/assemble")
+def decks_assemble_confirm(
+    deck_id: int,
+    proxy_id: int = Form(...),
+    source: str = Form(...),
+    quantity: int = Form(...),
+    proxy_version: str = Form(...),
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+    _: None = CsrfRequired,
+):
+    if not get_deck(session, deck_id=deck_id, user_id=current_user.id):
+        raise HTTPException(status_code=404, detail="Deck not found")
+    try:
+        source_id, source_version = source.split(":", 1)
+        source_id = int(source_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid source selection") from None
+    moved = deck_service.confirm_deck_assembly(
+        session,
+        current_user.id,
+        deck_id,
+        proxy_id,
+        source_id,
+        quantity,
+        proxy_version,
+        source_version,
+    )
+    if not moved:
+        session.rollback()
+    return RedirectResponse(
+        url=f"/decks/{deck_id}/assemble?result={'pulled' if moved else 'changed'}",
+        status_code=303,
+    )
+
+
 @router.post("/decks/{deck_id}/materialize")
 async def decks_materialize(
     deck_id: int,
@@ -1670,14 +1751,36 @@ def decks_unshare_card(
     current_user: User = Depends(get_current_user),
     _: None = CsrfRequired,
 ):
-    # issue #27 — drop a share (the row reverts to membership in its source
-    # deck only). Never touches the physical row.
-    unshare_card_from_deck(
+    if not get_deck(session, deck_id=deck_id, user_id=current_user.id):
+        raise HTTPException(status_code=404, detail="Deck not found")
+    target = get_deck(session, deck_id=target_deck_id, user_id=current_user.id)
+    if not target:
+        raise HTTPException(status_code=404, detail="Deck not found")
+    share = (
+        session.query(DeckCardShare)
+        .filter_by(inventory_row_id=inventory_row_id, target_deck_id=target_deck_id)
+        .first()
+    )
+    row = session.get(InventoryRow, inventory_row_id) if share else None
+    source = (
+        get_deck(session, deck_id=share.source_deck_id, user_id=current_user.id) if share else None
+    )
+    if source and row and row.storage_location_id != source.storage_location_id:
+        source = None
+    notice = {
+        "deck_id": deck_id,
+        "target": target.name,
+        "card": row.card.name if row else None,
+        "source": source.name if source else None,
+        "source_id": source.id if source else None,
+    }
+    notice["removed"] = unshare_card_from_deck(
         session,
         current_user.id,
         inventory_row_id=inventory_row_id,
         target_deck_id=target_deck_id,
     )
+    request.session["deck_share_notice"] = notice
     return _deck_redirect(request, deck_id)
 
 

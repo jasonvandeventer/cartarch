@@ -38,5 +38,7 @@ fi
 "${PYTHON:-python}" scripts/smoke_http.py
 node tests/browser/deck-menus.cjs
 node tests/browser/usability.cjs
+node tests/browser/assembly.cjs
+node tests/browser/saved-shared.cjs
 # Optional local inspection before teardown; CI leaves this unset.
 if [[ ${SMOKE_HOLD_SECONDS:-0} -gt 0 ]]; then sleep "$SMOKE_HOLD_SECONDS"; fi

@@ -326,6 +326,10 @@ def delete_user(
     # Composing the helpers also future-proofs the cascade: a child added to
     # decks/inventory/tokens later is cleaned by its own delete path, never re-leaked
     # here. All helpers run with commit=False — this stays a single transaction.
+    from app.models import SavedCollectionView
+
+    session.query(SavedCollectionView).filter_by(user_id=user_id).delete(synchronize_session=False)
+
     from app import deck_service, token_service
     from app.inventory_service import clean_inventory_row_references
 

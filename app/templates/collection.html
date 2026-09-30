@@ -317,8 +317,9 @@
        full URL state. #}
     <aside class="collection-sidebar">
       <details class="collection-sidebar-details" open>
-        <summary class="collection-sidebar-summary">Filters{% if filtered %} · Active{% endif %}</summary>
-        <script>document.currentScript.parentElement.open = !window.matchMedia('(max-width: 980px)').matches;</script>
+        <summary class="collection-sidebar-summary">Filters &amp; saved views{% if filtered %} · Active{% endif %}</summary>
+        <script>document.currentScript.parentElement.open = {{ 'true' if request.query_params.get('view_notice') else 'false' }} || !window.matchMedia('(max-width: 980px)').matches;</script>
+        {% include "_collection_saved_views.html" %}
         <form method="get" action="/collection" class="collection-facet-form">
           {# Forward non-facet state so the form fully preserves URL params #}
           <input type="hidden" name="search" value="{{ search }}">

@@ -11,6 +11,10 @@
     <p class="pagehead-tagline imports-result-lede">
       <em>The batch is in.</em> Below: what was imported new, what moved from your existing collection, what merged into rows you already had, and what was skipped.
     </p>
+    {% if assembly_url|default(none) %}
+      <p>Your assembly placeholders are ready. Planned copies remain in their original locations until you confirm each pull.</p>
+      <a href="{{ assembly_url }}" class="btn-like">Open assembly checklist</a>
+    {% endif %}
     {% set _moved = moved_count if moved_count is defined else 0 %}
     {% set _merged = merged_count if merged_count is defined else 0 %}
     {% set _skipped = skipped_count if skipped_count is defined else 0 %}

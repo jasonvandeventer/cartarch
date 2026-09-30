@@ -46,6 +46,16 @@ GUEST_USERNAME_DOMAIN = "guests.cartarch.invalid"
 _GUEST_USERNAME_SUFFIX = "@" + GUEST_USERNAME_DOMAIN
 
 
+class SavedCollectionView(Base):
+    __tablename__ = "saved_collection_views"
+    __table_args__ = (UniqueConstraint("user_id", "name", name="uq_saved_collection_view_name"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    name: Mapped[str] = mapped_column(String(64))
+    query_string: Mapped[str] = mapped_column(Text)
+
+
 class User(Base):
     __tablename__ = "users"
 

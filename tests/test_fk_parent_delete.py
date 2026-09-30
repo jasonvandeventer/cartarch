@@ -87,6 +87,7 @@ from app.models import (
     PasswordResetToken,
     Playgroup,
     PlaygroupMember,
+    SavedCollectionView,
     Share,
     Showcase,
     ShowcaseItem,
@@ -570,10 +571,21 @@ def seed_delete_user(s) -> Seeded:
     s.add(prt)
     s.flush()
 
+    saved_view = SavedCollectionView(user_id=owner.id, name="Foils", query_string="finish=foil")
+    s.add(saved_view)
+    s.flush()
+
     est_pk, find_pk = _bracket_rows(s, deck.id)
     s.commit()
 
     children = [
+        ChildFK(
+            "saved_collection_views.user_id->users",
+            "saved_collection_views",
+            "user_id",
+            "CASCADE",
+            saved_view.id,
+        ),
         ChildFK(
             "storage_locations.user_id->users", "storage_locations", "user_id", "NO ACTION", loc.id
         ),

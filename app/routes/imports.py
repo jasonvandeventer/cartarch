@@ -821,6 +821,9 @@ def _commit_deck_import_with_reconciliation(
       imported_row_ids     — IDs of rows that actually became new deck
                              rows (merged-then-deleted rows are excluded)
     """
+    if "plan_assembly" in actions and not deck.is_brew:
+        raise ValueError("Assembly planning requires a brew deck")
+
     moved_count = 0
     shared_count = 0  # issue #27 — copies materialized as variant-group shares
     stale_match_rows: list[dict] = []
@@ -831,6 +834,12 @@ def _commit_deck_import_with_reconciliation(
         action = actions[idx] if idx < len(actions) else "import_new"
         move_qty = int(move_qtys[idx]) if idx < len(move_qtys) else 0
         new_qty = int(new_qtys[idx]) if idx < len(new_qtys) else int(row["quantity"])
+
+        if action == "plan_assembly":
+            # Keep physical copies in place until the checklist confirms each pull.
+            new_import_rows.append({**row, "is_proxy": "true"})
+            new_import_indices.append(idx)
+            continue
 
         # issue #27 — for a VARIANT-GROUP deck, re-resolve this row ONCE up front
         # and materialize its variant coverage as shares BEFORE the action
@@ -1651,6 +1660,9 @@ def _commit_single_destination_import(
             "placed_in": placed_in,
             "placed_in_url": placed_in_url,
             "placed_in_kind": placed_in_kind,
+            "assembly_url": f"/decks/{deck.id}/assemble"
+            if deck and "plan_assembly" in reconcile_action
+            else None,
             "current_user": current_user,
         },
     )

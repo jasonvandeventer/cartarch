@@ -11318,6 +11318,7 @@ table.dmtx .dmtx-rowhead {
 
 /* Faceted sidebar */
 .collection-sidebar {
+  min-width: 0;
   position: sticky;
   top: 1rem;
   align-self: flex-start;
@@ -16788,3 +16789,34 @@ body.cmp-lobby-body { height: auto; min-height: 100dvh; overflow-y: auto; }
 .import-method[open] { border-color: var(--accent); }
 .onboarding-checklist { margin-block: 1rem; }
 .onboarding-checklist li { margin-block: 0.5rem; }
+
+/* Assembly follows the filing order; each row is a physical pull. */
+.assembly-list { list-style: none; padding: 0; margin: 0; }
+.assembly-item { padding: 1rem 0; border-bottom: 1px solid var(--border); overflow-wrap: anywhere; }
+.assembly-item:last-child { border-bottom: 0; }
+.assembly-item h4, .assembly-item p { margin: 0 0 0.5rem; }
+.assembly-pull { display: flex; align-items: end; flex-wrap: wrap; gap: 0.75rem; }
+.assembly-pull label { display: flex; flex-direction: column; gap: 0.25rem; min-width: 0; }
+.assembly-source { flex: 1 1 22rem; }
+.assembly-source select { width: 100%; min-width: 0; }
+.assembly-quantity { flex: 0 1 6rem; }
+.assembly-quantity input { width: 100%; box-sizing: border-box; }
+.assembly-pull button { flex: 0 0 auto; }
+
+.collection-saved-views { margin-top: 0.75rem; }
+.saved-view-form { display: flex; flex-wrap: wrap; align-items: end; gap: 0.5rem; margin: 0.75rem 0; }
+.saved-view-form label { display: flex; flex-direction: column; gap: 0.25rem; min-width: 0; }
+.saved-view-form input { width: 100%; box-sizing: border-box; }
+.saved-view-list { list-style: none; padding: 0; }
+.saved-view-list > li { padding: 0.6rem 0; border-top: 1px solid var(--border); overflow-wrap: anywhere; }
+.saved-view-link { display: inline-block; padding: 0.35rem 0; font-weight: bold; }
+
+.shared-card-controls .collection-row-kebab-summary { font-size: 0.8rem; white-space: nowrap; width: auto; height: auto; min-height: 32px; padding: 0.35rem 0.55rem; }
+.shared-card-controls .collection-row-kebab-body { white-space: normal; overflow-wrap: anywhere; text-align: left; }
+.shared-card-controls p { margin: 0; }
+@media (max-width: 768px) {
+  .shared-card-controls .collection-row-kebab-summary { min-height: 44px; }
+  .collection-saved-views > summary, .saved-view-list summary {
+    min-height: 44px; padding: 0.5rem 0; box-sizing: border-box; cursor: pointer;
+  }
+}

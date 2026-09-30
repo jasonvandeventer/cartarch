@@ -50,6 +50,10 @@
 {% if rows and mode == "deck" %}
   <section class="panel" style="margin-top: 0.75rem" id="reconciliation-content" data-card-hover data-card-hover-target="tr[data-card-image]">
     <h3 class="panel-title imports-step-title" style="margin-bottom: 0.4rem"><span class="deck-detail-section-mark">§</span> Reconciliation</h3>
+    {% if is_brew %}
+      <p>Assembling this deck later? Plan placeholders now and confirm each physical move in the deck's assembly checklist.</p>
+      <button type="button" onclick="this.closest('section').querySelectorAll('.reconcile-action-select').forEach(function(s) { s.value = 'plan_assembly'; s.dispatchEvent(new Event('change')); });">Plan all for assembly</button>
+    {% endif %}
     <p class="muted" style="margin-top: 0">
       {% if total_to_move > 0 and total_to_import_new > 0 %}
         <strong>{{ total_to_move }}</strong> {{ "card" if total_to_move == 1 else "cards" }}
@@ -202,6 +206,7 @@
                         Move {{ row.total_available }} + new {{ remaining - row.total_available }}{% if action == "move_existing_plus_new" %} (default){% endif %}
                       </option>
                     {% endif %}
+                    {% if is_brew %}<option value="plan_assembly">Plan {{ row.quantity_needed }} for assembly (leave inventory in place)</option>{% endif %}
                     <option value="import_new" {% if action == "import_new" %}selected{% endif %}>
                       Import {{ remaining if remaining > 0 else row.quantity_needed }} new
                       {% if action != "import_new" %}(override){% endif %}
@@ -244,7 +249,10 @@
         var remaining = Math.max(0, needed - covered);
         sel.addEventListener('change', function () {
           var v = sel.value;
-          if (v === 'covered_by_variant') {
+          if (v === 'plan_assembly') {
+            hiddenMove.value = 0;
+            hiddenNew.value = needed;
+          } else if (v === 'covered_by_variant') {
             hiddenMove.value = 0;
             hiddenNew.value = 0;
           } else if (v === 'move_existing') {

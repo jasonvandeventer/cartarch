@@ -20,6 +20,18 @@
 {% endmacro %}
 
 {% block content %}
+  {% if share_notice %}
+    <section class="panel" role="status">
+      {% if share_notice.removed %}
+        Removed {{ share_notice.card or 'the shared card' }} from {{ share_notice.target }}'s decklist only.
+        The physical card was not moved or deleted.{% if share_notice.source %} It stays in {{ share_notice.source }}.{% endif %}
+        {% if share_notice.source_id %}<a href="/decks/{{ share_notice.source_id }}">Open source deck</a>{% endif %}
+      {% else %}
+        This shared reference was already removed or is no longer available. No physical card was moved or deleted.
+      {% endif %}
+    </section>
+  {% endif %}
+
   <section class="panel hero-panel compact-hero">
     {% if deck %}
       {# #54 — bulk-control destinations, set once here so the top-of-page modal
@@ -48,6 +60,7 @@
                       gap: 0.5rem;
                       margin-top: 0.75rem;
                       flex-wrap: wrap">
+            <a href="/decks/{{ deck.id }}/assemble" class="btn-like">Assembly checklist</a>
             <a href="/decks/{{ deck.id }}/goldfish" class="btn-like">Goldfish this deck</a>
             <a href="/decks/{{ deck.id }}/bracket" class="btn-like">Bracket evaluation</a>
             <a href="/decks/{{ deck.id }}/analysis" class="btn-like">Analyze deck</a>
@@ -209,15 +222,16 @@
     {% set bl = brew_buylist %}
     <section class="panel brew-buylist-panel">
       <h3 class="panel-title" style="margin-bottom: 0.3rem">
-        <span class="deck-detail-section-mark">§</span> Buy-list
+        <span class="deck-detail-section-mark">§</span> Brew preparation
       </h3>
       <p class="muted" style="margin-top: 0">
-        "To buy" = the proxy cards in this brew (cards you don't own). "Owned" = cards backed by a real copy.
+        "Owned" means real copies already in this deck. Remaining placeholders may be available in your collection.
+        <a href="/decks/{{ deck.id }}/assemble">Open the assembly checklist</a> to find and pull them.
       </p>
       {% if materialized is defined and materialized >= 0 %}
         <p class="muted" style="margin-top: 0">
           Materialized: claimed {{ materialized }} card(s) from your collection.
-          {% if materialized_remaining %}{{ materialized_remaining }} proxy card(s) still unowned.{% else %}Every proxy was claimed — this is now a regular deck.{% endif %}
+          {% if materialized_remaining %}{{ materialized_remaining }} placeholder card(s) still unfilled.{% else %}Every proxy was claimed — this is now a regular deck.{% endif %}
         </p>
       {% endif %}
       {% if bl.missing or bl.partial %}
@@ -232,7 +246,7 @@
       <div class="hero-stats-inline" style="margin: 0.5rem 0 0.7rem">
         <span>{{ bl.have|length }} owned</span>
         <span>{{ bl.partial|length }} partial</span>
-        <span>{{ bl.missing|length }} to buy</span>
+        <span>{{ bl.missing|length }} to source</span>
         {% if bl.owned_elsewhere %}<span>{{ bl.owned_elsewhere|length }} in other decks</span>{% endif %}
       </div>
       {# #144 — add-to-wishlist outcome banner (from the ?wl_added/?wl_skipped
@@ -247,7 +261,7 @@
       {% endif %}
       {% if bl.missing or bl.partial or bl.owned_elsewhere %}
         {% if bl.missing %}
-          <h4 class="brew-buylist-sub">To buy ({{ bl.missing|length }})
+          <h4 class="brew-buylist-sub">To source ({{ bl.missing|length }})
             {{ wishlist_all_form(deck, bl.missing, csrf_token) }}
           </h4>
           <ul class="brew-buylist-list">

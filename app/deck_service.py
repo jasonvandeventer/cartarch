@@ -1,12 +1,13 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
 import secrets
 
 from sqlalchemy import Float, and_, bindparam, case, cast, func, or_, select, text
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session, contains_eager, joinedload
 
 from app.audit_service import log_transaction
 from app.models import (
@@ -3656,6 +3657,7 @@ def _brew_same_name_rows(
         return {}
     rows = (
         session.query(InventoryRow, StorageLocation, Card.name, Card.set_code)
+        .options(contains_eager(InventoryRow.card))
         .join(Card, InventoryRow.card_id == Card.id)
         .outerjoin(StorageLocation, InventoryRow.storage_location_id == StorageLocation.id)
         .filter(
@@ -4647,6 +4649,268 @@ def pull_card_to_deck(
     return True
 
 
+def assembly_row_version(row: InventoryRow) -> str:
+    """Reject a stale physical instruction, including a replay of a partial pull."""
+    state = (
+        row.id,
+        row.quantity,
+        row.card_id,
+        row.finish,
+        row.language,
+        row.storage_location_id,
+        row.drawer,
+        row.slot,
+        row.is_pending,
+        row.is_proxy,
+        row.role,
+        str(row.updated_at),
+    )
+    return hashlib.sha256(repr(state).encode()).hexdigest()[:24]
+
+
+def build_deck_assembly(session: Session, deck: Deck) -> dict:
+    """Read-only pull itinerary. Inventory itself records completed pulls."""
+    from app.decklist_service import _build_full_location_label
+    from app.inventory_service import collector_sort_key
+
+    rows = (
+        session.query(InventoryRow)
+        .options(joinedload(InventoryRow.card))
+        .filter(
+            InventoryRow.user_id == deck.user_id,
+            InventoryRow.storage_location_id == deck.storage_location_id,
+        )
+        .order_by(InventoryRow.id)
+        .all()
+        if deck.storage_location_id
+        else []
+    )
+    placeholders = [r for r in rows if deck.is_brew and r.is_proxy]
+    placed = [r for r in rows if r not in placeholders]
+    by_name = _brew_same_name_rows(session, deck.user_id, {r.card.name for r in placeholders})
+    locations = {
+        loc.id: loc
+        for loc in session.query(StorageLocation)
+        .filter(StorageLocation.user_id == deck.user_id)
+        .all()
+    }
+    available = {inv.id: inv.quantity for values in by_name.values() for inv, _, _ in values}
+    groups = {}
+    unavailable = []
+    ready = 0
+    for proxy in placeholders:
+        sources = []
+        committed = []
+        for inv, loc, set_code in by_name.get(proxy.card.name.lower(), []):
+            if inv.quantity <= 0 or inv.storage_location_id == deck.storage_location_id:
+                continue
+            label = _build_full_location_label(loc, locations)
+            if loc and loc.type in {"deck", "considering"}:
+                committed.append(label)
+                continue
+            sources.append(
+                {
+                    "row": inv,
+                    "location": label,
+                    "set_code": set_code,
+                    "value": f"{inv.id}:{assembly_row_version(inv)}",
+                }
+            )
+        sources.sort(
+            key=lambda s: (
+                s["row"].card_id != proxy.card_id,
+                s["row"].finish != proxy.finish,
+                s["location"],
+                collector_sort_key(s["row"].slot),
+                s["row"].id,
+            )
+        )
+        need = proxy.quantity
+        for source in sources:
+            take = min(need, available[source["row"].id])
+            if take <= 0:
+                continue
+            entry = {
+                "proxy": proxy,
+                "version": assembly_row_version(proxy),
+                "source": source,
+                "sources": sources,
+                "quantity": take,
+            }
+            groups.setdefault(source["location"], []).append(entry)
+            available[source["row"].id] -= take
+            ready += take
+            need -= take
+        if need:
+            unavailable.append(
+                {"name": proxy.card.name, "quantity": need, "committed": sorted(set(committed))}
+            )
+    for entries in groups.values():
+        entries.sort(
+            key=lambda e: (
+                collector_sort_key(e["source"]["row"].slot),
+                e["proxy"].card.name,
+                e["proxy"].id,
+            )
+        )
+    return {
+        "groups": sorted(groups.items()),
+        "unavailable": unavailable,
+        "ready": ready,
+        "remaining": sum(r.quantity for r in placeholders),
+        "placed": placed,
+        "placed_count": sum(r.quantity for r in placed),
+        "shared": inbound_shared_rows_for_deck(session, deck),
+    }
+
+
+def confirm_deck_assembly(
+    session: Session,
+    user_id: int,
+    deck_id: int,
+    proxy_id: int,
+    source_id: int,
+    quantity: int,
+    proxy_version: str,
+    source_version: str,
+) -> bool:
+    """Validate the displayed instruction under row locks before moving copies."""
+    deck = (
+        session.query(Deck)
+        .filter(Deck.id == deck_id, Deck.user_id == user_id, Deck.retired_at.is_(None))
+        .with_for_update()
+        .populate_existing()
+        .first()
+    )
+    if not deck or not deck.is_brew or not deck.storage_location_id:
+        return False
+    rows = {
+        r.id: r
+        for r in session.query(InventoryRow)
+        .filter(InventoryRow.user_id == user_id, InventoryRow.id.in_([proxy_id, source_id]))
+        .order_by(InventoryRow.id)
+        .with_for_update()
+        .populate_existing()
+        .all()
+    }
+    proxy, src = rows.get(proxy_id), rows.get(source_id)
+    if (
+        not proxy
+        or not src
+        or not proxy.is_proxy
+        or src.is_proxy
+        or proxy.storage_location_id != deck.storage_location_id
+        or (src.storage_location and src.storage_location.type in {"deck", "considering"})
+        or src.card.name.lower() != proxy.card.name.lower()
+        or quantity < 1
+        or quantity > min(proxy.quantity, src.quantity)
+        or assembly_row_version(proxy) != proxy_version
+        or assembly_row_version(src) != source_version
+    ):
+        return False
+    _claim_brew_row(session, deck, proxy, src, quantity)
+    _finish_brew_claim(session, deck, quantity)
+    return True
+
+
+def _claim_brew_row(
+    session: Session, deck: Deck, proxy: InventoryRow, src: InventoryRow, take: int
+) -> None:
+    """Move selected real copies and consume their placeholder in one transaction."""
+    from app.inventory_service import clean_inventory_row_references
+
+    user_id = deck.user_id
+    # Merge into / create a REAL (non-proxy) deck row of the SOURCE's
+    # printing+finish. Must exclude is_proxy so claimed copies never
+    # land back on the proxy row being replaced.
+    deck_row = (
+        session.query(InventoryRow)
+        .filter(
+            InventoryRow.user_id == user_id,
+            InventoryRow.card_id == src.card_id,
+            InventoryRow.finish == src.finish,
+            func.coalesce(InventoryRow.language, "en") == (src.language or "en"),
+            InventoryRow.storage_location_id == deck.storage_location_id,
+            InventoryRow.is_pending.is_(False),
+            InventoryRow.is_proxy.is_(False),
+        )
+        .first()
+    )
+    if deck_row:
+        deck_row.quantity += take
+        deck_row.updated_at = utc_now()
+        # The proxy row being replaced carries the deck's role marker.
+        # `role == "commander"` is THE deck page's answer to "who is the
+        # commander" (`_split_commanders`), so dropping it here demoted
+        # a materialized brew commander into the main deck list.
+        if proxy.role and not deck_row.role:
+            deck_row.role = proxy.role
+    else:
+        deck_row = InventoryRow(
+            user_id=user_id,
+            card_id=src.card_id,
+            storage_location_id=deck.storage_location_id,
+            finish=src.finish,
+            quantity=take,
+            drawer=None,
+            slot=None,
+            is_pending=False,
+            is_proxy=False,
+            tags=src.tags,
+            language=src.language,
+            notes=src.notes,
+            role=proxy.role,
+            created_at=utc_now(),
+            updated_at=utc_now(),
+        )
+        session.add(deck_row)
+        session.flush()
+
+    src.quantity -= take
+    src.updated_at = utc_now()
+    if src.quantity <= 0:
+        delete_shares_for_inventory_row(session, src.id)
+        clean_inventory_row_references(session, [src.id])
+        session.delete(src)
+
+    log_transaction(
+        session=session,
+        user_id=user_id,
+        event_type="materialize_brew",
+        card_id=deck_row.card_id,
+        finish=deck_row.finish,
+        quantity_delta=-take,
+        source_location=src.storage_location.name if src.storage_location else "collection",
+        destination_location=f"deck:{deck.name}",
+        inventory_row_id=deck_row.id,
+        note=f"Materialized brew {deck.name}",
+    )
+
+    proxy.quantity -= take
+    proxy.updated_at = utc_now()
+    if proxy.quantity == 0:
+        delete_shares_for_inventory_row(session, proxy.id)
+        clean_inventory_row_references(session, [proxy.id])
+        session.delete(proxy)
+    session.flush()
+
+
+def _finish_brew_claim(session: Session, deck: Deck, claimed: int) -> dict:
+    remaining = (
+        session.query(func.coalesce(func.sum(InventoryRow.quantity), 0))
+        .filter(
+            InventoryRow.user_id == deck.user_id,
+            InventoryRow.storage_location_id == deck.storage_location_id,
+            InventoryRow.is_proxy.is_(True),
+        )
+        .scalar()
+    )
+    if remaining == 0:
+        deck.is_brew = False
+    session.commit()
+    return {"claimed": claimed, "remaining_proxies": int(remaining)}
+
+
 def materialize_brew(session: Session, user_id: int, deck_id: int) -> dict | None:
     """Claim owned unassigned copies into a brew deck, converting proxies to
     real cards. One transaction, one commit.
@@ -4663,11 +4927,15 @@ def materialize_brew(session: Session, user_id: int, deck_id: int) -> dict | Non
     Returns ``{"claimed": N, "remaining_proxies": M}`` (copy counts), or None if
     the deck isn't the user's brew.
     """
-    deck = session.query(Deck).filter(Deck.id == deck_id, Deck.user_id == user_id).first()
+    deck = (
+        session.query(Deck)
+        .filter(Deck.id == deck_id, Deck.user_id == user_id, Deck.retired_at.is_(None))
+        .with_for_update()
+        .populate_existing()
+        .first()
+    )
     if not deck or not deck.is_brew or not deck.storage_location_id:
         return None
-
-    from app.inventory_service import clean_inventory_row_references  # local: avoid cycle
 
     proxy_rows = (
         session.query(InventoryRow)
@@ -4680,11 +4948,27 @@ def materialize_brew(session: Session, user_id: int, deck_id: int) -> dict | Non
         .all()
     )
 
-    # One name-IN fetch of the user's REAL inventory (excludes proxies), same
-    # source pool as the brew import reconciliation. ponytail: no SELECT FOR
-    # UPDATE — single-replica app, one user-initiated action, the surrounding
-    # transaction is the atomicity boundary; add row locks if this ever races.
     by_name = _brew_same_name_rows(session, user_id, {r.card.name for r in proxy_rows if r.card})
+    ids = {r.id for r in proxy_rows} | {inv.id for rows in by_name.values() for inv, _, _ in rows}
+    locked_ids = set()
+    if ids:
+        locked_ids = {
+            r.id
+            for r in session.query(InventoryRow)
+            .filter(InventoryRow.id.in_(ids))
+            .order_by(InventoryRow.id)
+            .with_for_update()
+            .populate_existing()
+            .all()
+        }
+    # A different deck may have consumed/moved a source while we waited.
+    # Re-read locations after acquiring locks; never use the pre-lock tuples.
+    by_name = _brew_same_name_rows(session, user_id, {r.card.name for r in proxy_rows if r.card})
+    proxy_rows = [
+        r
+        for r in proxy_rows
+        if r.id in locked_ids and r.is_proxy and r.storage_location_id == deck.storage_location_id
+    ]
 
     claimed = 0
     for proxy in proxy_rows:
@@ -4694,7 +4978,9 @@ def materialize_brew(session: Session, user_id: int, deck_id: int) -> dict | Non
         candidates = [
             (inv, loc)
             for inv, loc, _set in by_name.get(proxy.card.name.lower(), [])
-            if not (loc is not None and loc.type == "deck") and inv.quantity > 0
+            if not (loc is not None and loc.type in {"deck", "considering"})
+            and inv.quantity > 0
+            and inv.id in locked_ids
         ]
         candidates.sort(
             key=lambda il: (
@@ -4710,96 +4996,11 @@ def materialize_brew(session: Session, user_id: int, deck_id: int) -> dict | Non
             take = min(int(src.quantity), need)
             if take <= 0:
                 continue
-            # Merge into / create a REAL (non-proxy) deck row of the SOURCE's
-            # printing+finish. Must exclude is_proxy so claimed copies never
-            # land back on the proxy row being replaced.
-            deck_row = (
-                session.query(InventoryRow)
-                .filter(
-                    InventoryRow.user_id == user_id,
-                    InventoryRow.card_id == src.card_id,
-                    InventoryRow.finish == src.finish,
-                    InventoryRow.storage_location_id == deck.storage_location_id,
-                    InventoryRow.is_pending.is_(False),
-                    InventoryRow.is_proxy.is_(False),
-                )
-                .first()
-            )
-            if deck_row:
-                deck_row.quantity += take
-                deck_row.updated_at = utc_now()
-                # The proxy row being replaced carries the deck's role marker.
-                # `role == "commander"` is THE deck page's answer to "who is the
-                # commander" (`_split_commanders`), so dropping it here demoted
-                # a materialized brew commander into the main deck list.
-                if proxy.role and not deck_row.role:
-                    deck_row.role = proxy.role
-            else:
-                deck_row = InventoryRow(
-                    user_id=user_id,
-                    card_id=src.card_id,
-                    storage_location_id=deck.storage_location_id,
-                    finish=src.finish,
-                    quantity=take,
-                    drawer=None,
-                    slot=None,
-                    is_pending=False,
-                    is_proxy=False,
-                    tags=src.tags,
-                    role=proxy.role,
-                    created_at=utc_now(),
-                    updated_at=utc_now(),
-                )
-                session.add(deck_row)
-                session.flush()
-
-            src.quantity -= take
-            src.updated_at = utc_now()
-            if src.quantity <= 0:
-                delete_shares_for_inventory_row(session, src.id)
-                clean_inventory_row_references(session, [src.id])
-                session.delete(src)
-
-            log_transaction(
-                session=session,
-                user_id=user_id,
-                event_type="materialize_brew",
-                card_id=deck_row.card_id,
-                finish=deck_row.finish,
-                quantity_delta=-take,
-                source_location="collection",
-                destination_location=f"deck:{deck.name}",
-                inventory_row_id=deck_row.id,
-                note=f"Materialized brew {deck.name}",
-            )
+            _claim_brew_row(session, deck, proxy, src, take)
             need -= take
             claimed += take
 
-        # Shrink / drop the proxy by however much we claimed.
-        if need != int(proxy.quantity):
-            proxy.quantity = need
-            proxy.updated_at = utc_now()
-        if proxy.quantity <= 0:
-            delete_shares_for_inventory_row(session, proxy.id)
-            clean_inventory_row_references(session, [proxy.id])
-            session.delete(proxy)
-
-    session.flush()
-    remaining = (
-        session.query(func.count(InventoryRow.id))
-        .filter(
-            InventoryRow.user_id == user_id,
-            InventoryRow.storage_location_id == deck.storage_location_id,
-            InventoryRow.is_proxy.is_(True),
-        )
-        .scalar()
-        or 0
-    )
-    if remaining == 0:
-        deck.is_brew = False
-
-    session.commit()
-    return {"claimed": claimed, "remaining_proxies": int(remaining)}
+    return _finish_brew_claim(session, deck, claimed)
 
 
 def return_card_from_deck(

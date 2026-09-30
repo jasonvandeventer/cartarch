@@ -303,7 +303,7 @@ srcset="{{ mirror_image_url(scryfall_id, 'small') }} 146w, {{ mirror_image_url(s
         {# issue #27 — variant-group sharing. Own rows shared OUT to sibling
            builds badge "SHARED WITH …"; rows shared INTO this deck (rendered in
            the read-only variant-group panel) badge "SHARED FROM …". #}
-        {% if item.shared_with|default(false) %}<span class="share-badge" title="Shared into: {{ item.shared_with|join(', ') }}">SHARED&nbsp;WITH <span class="share-badge-deck">{{ item.shared_with|join(', ') }}</span></span>{% endif %}
+        {% if item.shared_with|default(false) %}<span class="share-badge" title="Physical card stays in this deck; also listed in {{ item.shared_with|join(', ') }}">ALSO&nbsp;LISTED&nbsp;IN <span class="share-badge-deck">{{ item.shared_with|join(', ') }}</span></span>{% endif %}
         {% if item.shared_from|default(false) %}<span class="share-badge" title="Physically lives in {{ item.shared_from }}">SHARED&nbsp;FROM <span class="share-badge-deck">{{ item.shared_from }}</span></span>{% endif %}
         {% if item.card.mana_cost %}· {{ item.card.mana_cost }}{% endif %}
         · Qty {{ item.quantity }} ·
@@ -512,32 +512,7 @@ srcset="{{ mirror_image_url(scryfall_id, 'small') }} 146w, {{ mirror_image_url(s
         </details>
       {% endif %}
       {% if show_deck_actions and deck and item.is_shared_in %}
-        {# issue #27 — a card shared INTO this deck from a sibling build. It is
-           read-only here: its physical InventoryRow belongs to the SOURCE deck
-           (one-card-one-location), so none of the deck/move/return/delete
-           actions are offered — only dropping the share (Unshare), which never
-           touches the physical row. The "SHARED FROM …" badge renders above. #}
-        {# #183 — Unshare was the ONLY control here, so it became the button
-           people pressed when they meant "move this card somewhere else". It
-           does not move anything: the physical card lives in the source deck
-           and stays there. Say so, and point at where the card actually is. #}
-        <p class="muted small-text" style="margin-top: 0.35rem">
-          The card itself lives in
-          {% if item.shared_from %}<strong>{{ item.shared_from }}</strong>{% else %}another deck{% endif %}.
-          To move it, open that deck.
-        </p>
-        <form action="/decks/{{ deck.id }}/unshare-card"
-              method="post"
-              class="inline-form"
-              style="margin-top: 0.35rem">
-          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-          <input type="hidden" name="inventory_row_id" value="{{ item.id }}">
-          <input type="hidden" name="target_deck_id" value="{{ deck.id }}">
-          <button type="submit"
-                  title="Removes this card from THIS decklist only. The card stays where it is.">
-            Remove from this list
-          </button>
-        </form>
+        {{ shared_deck_controls(item, deck, csrf_token) }}
       {% elif show_deck_actions and deck %}
         {% set leg = item.get('legality_status') %}
         {% if leg and leg != 'legal' %}
@@ -575,4 +550,23 @@ srcset="{{ mirror_image_url(scryfall_id, 'small') }} 146w, {{ mirror_image_url(s
       {% endif %}
     </div>
   </article>
+{% endmacro %}
+
+{% macro shared_deck_controls(item, deck, csrf_token) %}
+<details class="collection-row-kebab shared-card-controls js-dismiss">
+  <summary class="collection-row-kebab-summary" aria-label="Shared card options for {{ item.card.name }}">Shared card</summary>
+  <div class="collection-row-kebab-body">
+    <p class="muted">The physical card lives in <strong>{{ item.shared_from or 'another deck' }}</strong>. This decklist includes a reference to it.</p>
+    {% if item.shared_from_id|default(none) %}
+      <a href="/decks/{{ item.shared_from_id }}" class="btn-like shared-card-source">Open source deck</a>
+      <p class="muted small-text">To move the physical card, use its controls in the source deck.</p>
+    {% endif %}
+    <form action="/decks/{{ deck.id }}/unshare-card" method="post" class="inline-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <input type="hidden" name="inventory_row_id" value="{{ item.id }}">
+      <input type="hidden" name="target_deck_id" value="{{ deck.id }}">
+      <button type="submit" title="Removes this reference from this decklist only. The physical card stays in its source deck.">Remove from this list</button>
+    </form>
+  </div>
+</details>
 {% endmacro %}

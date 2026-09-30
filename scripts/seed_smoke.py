@@ -60,5 +60,58 @@ with SessionLocal() as session:
                 is_pending=False,
             )
         )
+    assembly_location = StorageLocation(user_id=user.id, name="Assembly smoke", type="deck")
+    session.add(assembly_location)
+    session.flush()
+    session.add(
+        Deck(
+            user_id=user.id,
+            name="Assembly smoke",
+            is_brew=True,
+            storage_location_id=assembly_location.id,
+        )
+    )
+    for i in range(2):
+        card = Card(
+            scryfall_id=f"assembly-smoke-{i}",
+            name="Assembly Test Card",
+            set_code="one" if i == 0 else "two",
+            collector_number=str(i),
+            type_line="Artifact",
+        )
+        session.add(card)
+        session.flush()
+        session.add(
+            InventoryRow(
+                user_id=user.id,
+                card_id=card.id,
+                quantity=8,
+                storage_location_id=box.id,
+                is_pending=False,
+                slot="2" if i == 0 else "10",
+                language="en" if i == 0 else "ja",
+            )
+        )
+        if i == 0:
+            session.add(
+                InventoryRow(
+                    user_id=user.id,
+                    card_id=card.id,
+                    quantity=8,
+                    storage_location_id=assembly_location.id,
+                    is_pending=False,
+                    is_proxy=True,
+                    role="commander",
+                )
+            )
     session.commit()
+    from app import deck_service
+
+    group = deck_service.create_variant_group(session, user.id, "Smoke variants")
+    source = session.get(Deck, 1)
+    target = deck_service.create_deck(session, user.id, "Shared target")
+    for deck in (source, target):
+        deck_service.assign_deck_variant_group(session, user.id, deck.id, group.id)
+    row = session.query(InventoryRow).join(Card).filter(Card.scryfall_id == "smoke-99").one()
+    deck_service.share_card_to_deck(session, user.id, row.id, target.id)
 print("Seeded 100-card smoke deck")

@@ -1,0 +1,38 @@
+<details class="collection-saved-views"{% if request.query_params.get('view_notice') %} open{% endif %}>
+  <summary>Saved views{% if saved_views %} ({{ saved_views|length }}){% endif %}</summary>
+  <p class="muted">Save the applied filters, sort, and layout. Views stay with your account and always open on page 1.</p>
+  {% set notice = request.query_params.get('view_notice') %}
+  {% if notice == 'saved' %}<p role="status">View saved.</p>
+  {% elif notice == 'deleted' %}<p role="status">Saved view deleted. Your inventory is unchanged.</p>
+  {% elif notice == 'duplicate' %}<p role="alert">That name is already used. Choose another name or update the existing view.</p>
+  {% elif notice == 'missing_location' %}<p role="alert">This saved view uses a location that is no longer available, so it was not applied. Update or delete the saved view.</p>
+  {% elif notice == 'invalid' %}<p role="alert">Use a name of 1–64 characters and a filter URL shorter than 8,192 characters.</p>{% endif %}
+  <form method="post" action="/collection/views/save?{{ saved_view_query }}" class="saved-view-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <label>View name <input name="name" maxlength="64" required placeholder="e.g. Foils to trade"></label>
+    <button type="submit">Save current view</button>
+  </form>
+  {% if saved_views %}
+  <ul class="saved-view-list">
+    {% for saved in saved_views %}
+    <li>
+      <a href="/collection/views/{{ saved.id }}" class="saved-view-link">{{ saved.name }}</a>
+      <details>
+        <summary>Manage {{ saved.name }}</summary>
+        <form method="post" action="/collection/views/save?{{ saved_view_query }}" class="saved-view-form">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <input type="hidden" name="view_id" value="{{ saved.id }}">
+          <label>Name <input name="name" value="{{ saved.name }}" maxlength="64" required></label>
+          <button name="replace_filters" value="false" type="submit">Rename</button>
+          <button name="replace_filters" value="true" type="submit">Replace with current view</button>
+        </form>
+        <form method="post" action="/collection/views/{{ saved.id }}/delete?{{ saved_view_query }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <button type="submit" class="ghost-button">Delete saved view</button>
+        </form>
+      </details>
+    </li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+</details>

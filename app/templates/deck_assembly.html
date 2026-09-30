@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% macro copy_label(source) -%}
+{{ source.set_code|upper }} #{{ source.row.card.collector_number }} · {{ source.row.finish }} · {{ source.row.language or 'en' }} · {{ source.row.quantity }} available · {{ source.location }}{% if source.row.slot %} · slot {{ source.row.slot }}{% endif %}
+{%- endmacro %}
+{% block content %}
+<section class="panel hero-panel compact-hero">
+  <a href="/decks/{{ deck.id }}">Back to {{ deck.name }}</a>
+  <h2 class="panel-title">Assemble {{ deck.name }}</h2>
+  <p>Take a card from the location shown, place it in your deck, then confirm the pull. You can leave and resume here anytime.</p>
+  <div class="hero-stats-inline">
+    <span>{{ assembly.placed_count }} in deck</span>
+    <span>{{ assembly.ready }} ready to pull</span>
+    <span>{{ assembly.remaining - assembly.ready }} unavailable</span>
+  </div>
+  {% if request.query_params.get('result') == 'pulled' %}
+    <p role="status">Pull confirmed. Your inventory and checklist are up to date.</p>
+  {% elif request.query_params.get('result') == 'changed' %}
+    <p role="alert">That pull could not be confirmed. The card, location, or quantity may have changed, or the pull was already recorded. Check the refreshed list before moving another copy.</p>
+  {% endif %}
+  {% if not assembly.remaining %}
+    {% if assembly.placed_count %}
+      <p><strong>No placeholders left to fill.</strong> All {{ assembly.placed_count }} copies are recorded in this deck{% if not deck.is_brew %}, including any physical proxies{% endif %}.</p>
+    {% else %}
+      <p>This deck has no cards to assemble yet. <a href="/decks/{{ deck.id }}">Add or import cards to the deck</a> to start. For a brew, choose “Plan all for assembly” in the import preview to leave owned copies in place until you pull them.</p>
+    {% endif %}
+  {% endif %}
+</section>
+{% for location, entries in assembly.groups %}
+<section class="panel assembly-location">
+  <h3 class="panel-title">{{ location }}</h3>
+  <ul class="assembly-list">
+    {% for entry in entries %}
+    <li class="assembly-item">
+      <div>
+        <h4>{{ entry.quantity }}× {{ entry.proxy.card.name }}{% if entry.proxy.role == 'commander' %} <span class="muted">(commander)</span>{% endif %}</h4>
+        <p class="muted">{{ entry.proxy.quantity }} still needed{% if entry.source.row.slot %} · Slot {{ entry.source.row.slot }}{% endif %}</p>
+      </div>
+      <form method="post" action="/decks/{{ deck.id }}/assemble" class="assembly-pull" data-needed="{{ entry.proxy.quantity }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <input type="hidden" name="proxy_id" value="{{ entry.proxy.id }}">
+        <input type="hidden" name="proxy_version" value="{{ entry.version }}">
+        <label class="assembly-source">Copy to pull
+          <select name="source" aria-label="Copy of {{ entry.proxy.card.name }} to pull">
+            {% for source in entry.sources %}
+            <option value="{{ source.value }}" data-available="{{ source.row.quantity }}"{% if source.row.id == entry.source.row.id %} selected{% endif %}>{{ copy_label(source) }}</option>
+            {% endfor %}
+          </select>
+          <span class="muted assembly-copy" aria-live="polite">{{ copy_label(entry.source) }}</span>
+        </label>
+        <label class="assembly-quantity">Quantity
+          <input type="number" name="quantity" value="{{ entry.quantity }}" min="1" max="{{ [entry.proxy.quantity, entry.source.row.quantity]|min }}" required aria-label="Quantity of {{ entry.proxy.card.name }} to pull">
+        </label>
+        <button type="submit">Confirm pull</button>
+      </form>
+    </li>
+    {% endfor %}
+  </ul>
+</section>
+{% endfor %}
+{% if assembly.unavailable %}
+<section class="panel">
+  <h3 class="panel-title">Not available to pull</h3>
+  <p class="muted">These copies stay as placeholders. Cards in another deck or a considering area cannot be pulled here.</p>
+  <ul class="assembly-list">
+    {% for entry in assembly.unavailable %}
+    <li class="assembly-item"><strong>{{ entry.quantity }}× {{ entry.name }}</strong>
+      {% if entry.committed %}<span>Owned copies in {{ entry.committed|join(', ') }}</span>{% else %}<span class="muted">No unassigned real copies available</span>{% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+  <a href="/decks/{{ deck.id }}">Manage the brew and buy-list</a>
+</section>
+{% endif %}
+{% if assembly.shared %}
+<section class="panel">
+  <h3 class="panel-title">Shared from other decks</h3>
+  <p class="muted">These are references to cards in another deck. They are not counted as assembled here.</p>
+  <ul>{% for row, source_name in assembly.shared %}<li>{{ row.quantity }}× {{ row.card.name }} — {{ source_name }}</li>{% endfor %}</ul>
+</section>
+{% endif %}
+{% if assembly.placed %}
+<details class="panel">
+  <summary>In deck ({{ assembly.placed_count }} copies)</summary>
+  <ul class="assembly-list">
+    {% for row in assembly.placed %}<li class="assembly-item">{{ row.quantity }}× {{ row.card.name }} · {{ row.card.set_code|upper }} · {{ row.finish }} · {{ row.language or 'en' }}{% if row.is_proxy %} · physical proxy{% endif %}</li>{% endfor %}
+  </ul>
+</details>
+{% endif %}
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  document.querySelectorAll('.assembly-pull select').forEach(function (select) {
+    select.addEventListener('change', function () {
+      const option = select.selectedOptions[0];
+      select.closest('label').querySelector('.assembly-copy').textContent = option.textContent;
+      const quantity = select.form.elements.quantity;
+      quantity.max = Math.min(Number(option.dataset.available), Number(select.form.dataset.needed));
+      quantity.value = Math.min(Number(quantity.value), Number(quantity.max));
+    });
+  });
+</script>
+{% endblock %}

@@ -17,7 +17,7 @@ import io
 import json
 import math
 from dataclasses import dataclass
-from urllib.parse import urlencode
+from urllib.parse import parse_qs, urlencode
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
@@ -79,6 +79,7 @@ from app.models import (
     Deck,
     ImportBatch,
     InventoryRow,
+    SavedCollectionView,
     Share,
     ShowcaseItem,
     StorageLocation,
@@ -400,6 +401,117 @@ def collection_filter(
     )
 
 
+def _collection_view_query(filters: CollectionFilter) -> str:
+    """Bookmark only the supported view state; pagination and action notices reset."""
+    return urlencode(
+        {
+            "search": filters.search,
+            "finish": filters.finish,
+            "location_id": filters.location_id,
+            "loc": filters.location_ids,
+            "sort": filters.sort,
+            "direction": filters.direction,
+            "view": filters.view,
+            "colors": filters.colors,
+            "types": filters.types,
+            "status": filters.status,
+            "finishes": filters.finishes,
+            "price_min": filters.price_min_raw,
+            "price_max": filters.price_max_raw,
+        }
+    )
+
+
+@router.get("/collection/views/{view_id}")
+def collection_view_open(
+    view_id: int,
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+):
+    view = session.query(SavedCollectionView).filter_by(id=view_id, user_id=current_user.id).first()
+    if view is None:
+        raise HTTPException(status_code=404, detail="Saved view not found")
+    params = parse_qs(view.query_string)
+    tokens = params.get("location_id", []) + [
+        x for value in params.get("loc", []) for x in value.split(",")
+    ]
+    location_ids = {int(x) for x in tokens if x.isdigit() and int(x) > 0}
+    owned_ids = (
+        {
+            row.id
+            for row in session.query(StorageLocation.id)
+            .filter(
+                StorageLocation.user_id == current_user.id, StorageLocation.id.in_(location_ids)
+            )
+            .all()
+        }
+        if location_ids
+        else set()
+    )
+    if location_ids != owned_ids:
+        # A deleted legacy location_id otherwise silently widens to all locations.
+        return RedirectResponse("/collection?view_notice=missing_location", status_code=303)
+    return RedirectResponse(f"/collection?{view.query_string}", status_code=303)
+
+
+@router.post("/collection/views/save")
+def collection_view_save(
+    name: str = Form(...),
+    view_id: int = Form(0),
+    replace_filters: bool = Form(True),
+    filters: CollectionFilter = Depends(collection_filter),
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+    _: None = CsrfRequired,
+):
+    query = _collection_view_query(filters)
+    name = name.strip()
+    view = None
+    if view_id:
+        view = (
+            session.query(SavedCollectionView)
+            .filter_by(id=view_id, user_id=current_user.id)
+            .first()
+        )
+        if view is None:
+            raise HTTPException(status_code=404, detail="Saved view not found")
+    notice = "saved"
+    if not name or len(name) > 64 or len(query) > 8192:
+        notice = "invalid"
+    else:
+        if view is None:
+            view = SavedCollectionView(user_id=current_user.id, name=name, query_string=query)
+            session.add(view)
+        else:
+            view.name = name
+            if replace_filters:
+                view.query_string = query
+        try:
+            session.commit()
+        except IntegrityError:
+            session.rollback()
+            notice = "duplicate"
+    return RedirectResponse(f"/collection?{query}&view_notice={notice}", status_code=303)
+
+
+@router.post("/collection/views/{view_id}/delete")
+def collection_view_delete(
+    view_id: int,
+    filters: CollectionFilter = Depends(collection_filter),
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+    _: None = CsrfRequired,
+):
+    view = session.query(SavedCollectionView).filter_by(id=view_id, user_id=current_user.id).first()
+    if view is None:
+        raise HTTPException(status_code=404, detail="Saved view not found")
+    session.delete(view)
+    session.commit()
+    return RedirectResponse(
+        f"/collection?{_collection_view_query(filters)}&view_notice=deleted", status_code=303
+    )
+
+
 def _resolve_collection_scope(
     session: Session, user_id: int, location_id: int
 ) -> tuple[StorageLocation | None, str, int]:
@@ -691,6 +803,11 @@ def collection_page(
             "facet_price_max_raw": price_max or "",
             "facet_counts": facet_counts,
             "view_mode": view_mode,
+            "saved_views": session.query(SavedCollectionView)
+            .filter_by(user_id=current_user.id)
+            .order_by(func.lower(SavedCollectionView.name), SavedCollectionView.id)
+            .all(),
+            "saved_view_query": _collection_view_query(filters),
         },
     )
 

@@ -1,5 +1,21 @@
 [
   {
+    "version": "4.20.0",
+    "date": "2026-09-30",
+    "added": [
+      "Brew decks now have an assembly checklist. Plan an imported list without moving owned cards, then confirm physical pulls by location, printing, finish, and language. Progress is saved as you go.",
+      "Save Collection filters, sorting, and layout as named views that follow your account. Rename, update, or delete them from Filters & saved views."
+    ],
+    "refined": [
+      "Shared cards now link to their source deck and clearly distinguish removing a decklist reference from moving the physical card. Removal shows confirmation without changing the physical copy."
+    ],
+    "resolved": [
+      "Assembly confirmations reject stale or repeated pulls and prevent competing decks from claiming the same copy. Materializing a brew preserves language and commander roles.",
+      "Saved views with unavailable locations explain why they cannot be applied, and the Collection filter panel stays within narrow mobile screens."
+    ],
+    "archivist_note": "We brought the decklist closer to the cards on the shelf. The checklist records each confirmed pull, saved views keep familiar searches close, and shared cards make their physical home clear."
+  },
+  {
     "version": "4.19.7",
     "date": "2026-09-29",
     "added": [],
