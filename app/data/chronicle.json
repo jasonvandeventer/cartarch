@@ -1,5 +1,17 @@
 [
   {
+    "version": "4.20.1",
+    "date": "2026-10-14",
+    "added": [
+      "Read-only integrations can retrieve an account-scoped collection valuation, including pending inventory and unpriced-card counts."
+    ],
+    "refined": [
+      "Collection valuations distinguish calculation time from unknown price freshness, and describe estimated card value separately from potential sale proceeds."
+    ],
+    "resolved": [],
+    "archivist_note": "We made the collection easier to include in the bigger picture, while keeping its owner, estimated value, and pricing limits explicit."
+  },
+  {
     "version": "4.20.0",
     "date": "2026-09-30",
     "added": [

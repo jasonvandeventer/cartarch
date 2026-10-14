@@ -22,9 +22,11 @@ from sqlalchemy.orm import Session
 
 from app.deck_service import list_decks_basic
 from app.dependencies import get_db_session
+from app.inventory_service import get_inventory_row_stats
 from app.models import InventoryRow, User
 from app.routes.collections import CollectionFilter, collection_export, collection_filter
 from app.routes.decks import decks_export
+from app.timeutil import utc_now
 
 router = APIRouter(prefix="/api/v1", tags=["api"])
 
@@ -160,6 +162,36 @@ def api_collection(
         # A malformed search term raises ValueError, which the app-wide handler
         # renders as HTML — fine for a page, useless to a JSON client.
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.get("/collection/value")
+def api_collection_value(
+    session: Session = Depends(get_db_session),
+    user: User = Depends(require_api_user),
+) -> Response:
+    """The token owner's estimated collection value, using the Collection totals."""
+    stats = get_inventory_row_stats(session, user.id)
+    return _no_store(
+        {
+            "currency": "USD",
+            "estimated_value": round(stats["total_value"], 2),
+            "pending_value": round(stats["pending_value"], 2),
+            "total_cards": stats["total_cards"],
+            "pending_cards": stats["pending_cards"],
+            "unpriced_cards": stats["unpriced_cards"],
+            "pending_unpriced_cards": stats["pending_unpriced_cards"],
+            "calculated_at": utc_now().isoformat(),
+            # The current valuation helper has no provenance timestamp. Do not
+            # imply that computing a total refreshed its underlying prices.
+            "prices_updated_at": None,
+            "valuation_basis": (
+                "Stored estimated USD card prices; not guaranteed sale proceeds. "
+                "Proxies have zero value; brew placeholders are excluded. "
+                "Pending inventory is reported separately and excluded from estimated_value. "
+                "Unpriced cards contribute zero; price freshness is unknown."
+            ),
+        }
+    )
 
 
 @router.get("/decks")

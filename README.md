@@ -2,7 +2,7 @@
 
 Self-hosted web application for managing a physical Magic: The Gathering collection. (Identifies as **Cartarch** in user-facing UI as of v3.27.6; the in-repo project identifier was aligned to `cartarch` app-side on 2026-07-06. Some infrastructure names may still carry the old identifier pending the full rename near actual public launch.)
 
-**Current version: v4.20.0** · [Platform repo](https://github.com/jasonvandeventer/vanfreckle-platform)
+**Current version: v4.20.1** · [Platform repo](https://github.com/jasonvandeventer/vanfreckle-platform)
 
 ---
 
@@ -302,3 +302,5 @@ The PostgreSQL schema is owned by **Alembic** (`alembic/versions/`) as of the v4
 No database files are stored in this repository.
 
 Local release checks: [PostgreSQL, browser and container validation](docs/local-validation.md).
+
+The read-only `GET /api/v1/collection/value` endpoint returns the API token owner's estimated USD collection value, pending value separately, unpriced-card counts, and calculation time. It uses the Collection page's valuation rules. `prices_updated_at: null` means aggregate price freshness is unknown; estimated card value is not guaranteed sale proceeds.

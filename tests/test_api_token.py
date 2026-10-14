@@ -18,7 +18,13 @@ from app.routes.api import hash_api_token
 TOKEN = "test-api-token-aaaaaaaaaaaaaaaaaaaaaaa"
 OTHER_TOKEN = "test-api-token-bbbbbbbbbbbbbbbbbbbbbbb"
 
-ALL_ROUTES = ["/api/v1/me", "/api/v1/collection", "/api/v1/decks", "/api/v1/decks/1"]
+ALL_ROUTES = [
+    "/api/v1/me",
+    "/api/v1/collection",
+    "/api/v1/collection/value",
+    "/api/v1/decks",
+    "/api/v1/decks/1",
+]
 
 
 def _bearer(token: str) -> dict[str, str]:
@@ -385,3 +391,65 @@ def test_the_stored_value_is_not_the_credential(client, db, user):
     assert (
         client.get("/api/v1/me", headers=_bearer(stored), follow_redirects=False).status_code == 401
     )
+
+
+def test_collection_value_matches_owned_inventory(client, db, tokened_user, other_user):
+    from datetime import datetime
+
+    card = _seed_card(db)
+    card.price_usd = "2.50"
+    card.price_usd_foil = "7.00"
+    missing = _seed_card(db, name="Unpriced", scryfall_id="unpriced", collector="2")
+    deck, loc = _seed_deck(db, tokened_user, name="Brew")
+    deck.is_brew = True
+    binder = StorageLocation(user_id=tokened_user.id, name="Binder", type="binder", mode="manual")
+    db.add(binder)
+    db.flush()
+    for owner, quantity, finish, pending, proxy, location, owned_card in [
+        (tokened_user, 2, "normal", False, False, None, card),
+        (tokened_user, 3, "foil", False, False, None, card),
+        (tokened_user, 1, "etched", False, False, None, card),
+        (tokened_user, 4, "normal", True, False, None, card),
+        (tokened_user, 100, "foil", False, True, binder.id, card),
+        (tokened_user, 500, "foil", False, True, loc.id, card),
+        (tokened_user, 5, "normal", False, False, None, missing),
+        (tokened_user, 6, "normal", True, False, None, missing),
+        (other_user, 1000, "foil", False, False, None, card),
+    ]:
+        db.add(
+            InventoryRow(
+                user_id=owner.id,
+                card_id=owned_card.id,
+                quantity=quantity,
+                finish=finish,
+                is_pending=pending,
+                is_proxy=proxy,
+                storage_location_id=location,
+            )
+        )
+    db.commit()
+    response = client.get("/api/v1/collection/value", headers=_bearer(TOKEN))
+    assert response.status_code == 200
+    value = response.json()
+    assert value["currency"] == "USD"
+    assert value["estimated_value"] == 33.0
+    assert value["pending_value"] == 10.0
+    assert value["total_cards"] == 111
+    assert value["pending_cards"] == 10
+    assert value["unpriced_cards"] == 5
+    assert value["pending_unpriced_cards"] == 6
+    assert datetime.fromisoformat(value["calculated_at"]).tzinfo is not None
+    assert value["prices_updated_at"] is None
+    assert "price freshness is unknown" in value["valuation_basis"]
+    other = client.get("/api/v1/collection/value", headers=_bearer(OTHER_TOKEN)).json()
+    assert other["estimated_value"] == 7000.0
+    tokened_user.is_active = False
+    db.commit()
+    assert client.get("/api/v1/collection/value", headers=_bearer(TOKEN)).status_code == 401
+
+
+def test_collection_value_empty(client, tokened_user):
+    value = client.get("/api/v1/collection/value", headers=_bearer(TOKEN)).json()
+    assert value["estimated_value"] == 0
+    assert value["total_cards"] == 0
+    assert value["unpriced_cards"] == 0

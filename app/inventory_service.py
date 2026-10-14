@@ -1838,6 +1838,8 @@ def get_inventory_row_stats(
     total_cards = 0
     pending_value = 0.0
     pending_cards = 0
+    unpriced_cards = 0
+    pending_unpriced_cards = 0
     seen_names: set[str] = set()
     drawer_counts = dict.fromkeys([*DRAWER_LABELS, *numbered_drawers(session, user_id)], 0)
     non_drawer_location_counts: dict[str, int] = {}
@@ -1849,9 +1851,13 @@ def get_inventory_row_stats(
         if row.is_pending:
             pending_value += line_value
             pending_cards += row.quantity
+            if not row.is_proxy and not price:
+                pending_unpriced_cards += row.quantity
         else:
             total_value += line_value
             total_cards += row.quantity
+            if not row.is_proxy and not price:
+                unpriced_cards += row.quantity
         if row.card and row.card.name:
             seen_names.add(row.card.name)
 
@@ -1892,6 +1898,8 @@ def get_inventory_row_stats(
         "total_cards": total_cards,
         "pending_value": pending_value,
         "pending_cards": pending_cards,
+        "unpriced_cards": unpriced_cards,
+        "pending_unpriced_cards": pending_unpriced_cards,
         "unique_cards": unique_cards,
         "drawer_counts": drawer_counts,
         "non_drawer_location_counts": non_drawer_location_counts,
