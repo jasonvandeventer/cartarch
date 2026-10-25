@@ -12,12 +12,22 @@ function setBackgroundArt(element, property, sources) {
     if (pending[property] !== request || index >= sources.length) return;
     const url = sources[index++];
     const image = new Image();
-    image.onload = () => {
-      if (pending[property] === request) {
+    let settled = false;
+    function finish(loaded) {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      if (pending[property] !== request) return;
+      if (loaded) {
         element.style.setProperty(property, `url(${JSON.stringify(url)})`);
+      } else {
+        next();
       }
-    };
-    image.onerror = next;
+    }
+    // A stalled host must not prevent the independent fallback from loading.
+    const timer = setTimeout(() => finish(false), 5000);
+    image.onload = () => finish(true);
+    image.onerror = () => finish(false);
     image.src = url;
   }
   next();
