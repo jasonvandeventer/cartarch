@@ -129,7 +129,7 @@ def playgroups_detail(
     session: Session = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
 ):
-    detail = svc.get_playgroup_detail(session, playgroup_id, current_user.id)
+    detail = svc.playgroup_ratings(session, playgroup_id, current_user.id)
     if detail is None:
         # Non-member or unknown id; redirect — never expose detail.
         return RedirectResponse(url="/playgroups?error=not_a_member", status_code=303)
@@ -163,6 +163,8 @@ def playgroups_detail(
             "viewer_role": detail["viewer_role"],
             "members": detail["members"],
             "record": detail["record"],  # #152 — win-loss over games linked to this playgroup
+            "player_ratings": {row["user_id"]: row for row in detail["ratings"]},
+            "rated_games": detail["rated_games"],
             "open_session": open_session,  # #166
             "open_session_games": open_session_games,
             "shares": shares,

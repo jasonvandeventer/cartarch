@@ -273,6 +273,10 @@ def test_the_record_table_actually_renders_on_the_page(client, db, user, seq):
     joined = " | ".join(cells)
     assert "Rival" in joined and svc.GUESTS_LABEL in joined
     assert "50%" in joined  # 1 of 2 for both players
+    guest_row = next(
+        row for row in re.findall(r"<tr>.*?</tr>", table.group(0), re.S) if "Guests" in row
+    )
+    assert 'data-label="Rating"' in guest_row and "Unrated" in guest_row
     assert "Each member links their own games" in html  # the incompleteness caveat
 
 

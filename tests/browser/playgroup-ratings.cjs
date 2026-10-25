@@ -29,6 +29,16 @@ const base = process.env.AUDIT_BROWSER_URL || 'http://127.0.0.1:5582';
       if (process.env.RATING_SCREENSHOT_DIR) {
         await page.screenshot({path: `${process.env.RATING_SCREENSHOT_DIR}/ratings-${browserName}-${width}.png`, fullPage: true});
       }
+      await page.goto(base + '/record.html');
+      const record = page.locator('.playgroup-record-table');
+      for (const [name, score] of [['Patryk', '1790'], ['Mason', '1504'], ['Jason V', '1206']]) {
+        const row = record.locator('tbody tr').filter({hasText: name});
+        assert.equal((await row.locator('[data-label="Rating"]').innerText()).trim(), score);
+      }
+      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+      if (process.env.RATING_SCREENSHOT_DIR) {
+        await record.screenshot({path: `${process.env.RATING_SCREENSHOT_DIR}/record-${browserName}-${width}.png`});
+      }
       await page.goto(base + '/deck-ratings.html');
       assert.equal(await page.locator('#deck-ratings tbody tr').count(), 2);
       assert.match(await page.locator('#deck-ratings').innerText(), /1832/);

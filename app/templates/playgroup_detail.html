@@ -146,9 +146,8 @@
   {% endif %}
 
   {# ── Record (#152) — win-loss over games LINKED to this playgroup ────────── #}
-  <section class="panel">
+  <section class="panel" id="record">
     <h3 class="panel-title">Record</h3>
-    <p><a href="/playgroups/{{ playgroup.id }}/ratings">Player and deck ratings</a> — standings that also consider finishing position and opponent strength.</p>
     {% if record %}
       <p class="muted playgroup-record-note">
         Games linked to this playgroup. Each member links their own games, so a game
@@ -163,6 +162,7 @@
               <th>W</th>
               <th>L</th>
               <th>Win rate</th>
+              <th>Rating</th>
             </tr>
           </thead>
           <tbody>
@@ -178,17 +178,27 @@
                 <td data-label="W">{{ r.wins }}</td>
                 <td data-label="L">{{ r.losses }}</td>
                 <td data-label="Win rate">{{ "%.0f%%" | format(r.win_rate * 100) }}</td>
+                <td data-label="Rating">
+                  {% set score = player_ratings.get(r.user_id) %}
+                  {% if score and score.rating is not none %}
+                    <span title="Uncertainty: ±{{ '%.0f' | format(score.uncertainty) }} (one standard deviation)">{{ '%.0f' | format(score.rating) }}</span>
+                  {% else %}
+                    Unrated
+                  {% endif %}
+                </td>
               </tr>
             {% endfor %}
           </tbody>
         </table>
       </div>
+      <p class="muted">Ratings start at 1,500 and use finishing position, opponent strength, and uncertainty across {{ rated_games }} completed game{{ '' if rated_games == 1 else 's' }} with at least two current members. All formats count equally. Manual result corrections take precedence over elimination timing. Guests and players without qualifying results are unrated.</p>
     {% else %}
       <p class="muted">
         No games are linked to this playgroup yet. Link one from the game's page, or pick
         this playgroup when you start a new game.
       </p>
     {% endif %}
+    <p><a href="/playgroups/{{ playgroup.id }}/ratings?rank_by=decks">Deck ratings</a></p>
   </section>
 
   {# ── Shares (v3.29.1) — Showcases members have shared with this playgroup ── #}

@@ -2,6 +2,7 @@
 
 import json
 import os
+import re
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
@@ -152,9 +153,20 @@ def test_page_replays_chronologically_and_updates_after_result_edit(client, db, 
     assert response.status_code == 200
     for text in ("1790", "1504", "1206", "Unrated", "7 completed games", "OpenSkill", "60 seconds"):
         assert text in response.text
-    assert f"/playgroups/{pg.id}/ratings" in client.get(f"/playgroups/{pg.id}").text
+    record_page = client.get(f"/playgroups/{pg.id}")
+    assert record_page.status_code == 200
+    table = re.search(r"playgroup-record-table.*?</tbody>", record_page.text, re.S)
+    assert table is not None
+    assert "<th>Rating</th>" in table.group(0)
+    for label, rating in (("Patryk", "1790"), ("Mason", "1504"), ("Jason V", "1206")):
+        row = next(row for row in re.findall(r"<tr>.*?</tr>", table.group(0), re.S) if label in row)
+        assert f">{rating}</span>" in row
+    assert ">Player and deck ratings</a>" not in record_page.text
     if os.getenv("RATING_BROWSER_FIXTURES"):
         Path(os.environ["RATING_BROWSER_FIXTURES"]).write_text(response.text)
+        Path(os.environ["RATING_BROWSER_FIXTURES"]).with_name("record.html").write_text(
+            record_page.text
+        )
     games[0].seats[0].placement = 1
     games[0].seats[2].placement = 3
     db.commit()

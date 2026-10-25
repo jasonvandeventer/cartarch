@@ -1,5 +1,17 @@
 [
   {
+    "version": "4.20.4",
+    "date": "2026-10-25",
+    "added": [
+      "Deck ratings track each deck’s results separately, including borrowed games, with games played and uncertainty beside each score. Unidentified decks remain provisional opponents rather than guessed deck identities."
+    ],
+    "refined": [
+      "Player rating scores now appear directly beside win rate in the playgroup Record table."
+    ],
+    "resolved": [],
+    "archivist_note": "We brought player scores into the record people already use, and gave decks their own history without losing sight of who piloted them or how much evidence we have."
+  },
+  {
     "version": "4.20.3",
     "date": "2026-10-25",
     "added": [
