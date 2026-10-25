@@ -16,7 +16,7 @@ existence of a playgroup with the given id non-leaky.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Form, Request
+from fastapi import APIRouter, Depends, Form, Query, Request
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
@@ -170,6 +170,32 @@ def playgroups_detail(
             "error": error,
             "success": success,
         },
+    )
+
+
+@router.get("/{playgroup_id}/ratings")
+def playgroups_ratings(
+    playgroup_id: int,
+    request: Request,
+    players: list[int] = Query(default=[]),
+    selection: bool = False,
+    game_format: str = "all",
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+):
+    detail = svc.playgroup_ratings(
+        session,
+        playgroup_id,
+        current_user.id,
+        players if selection or players else None,
+        game_format,
+    )
+    if detail is None:
+        return RedirectResponse(url="/playgroups?error=not_a_member", status_code=303)
+    return render(
+        request,
+        "playgroup_ratings.html",
+        {**detail, "title": "Player ratings", "current_user": current_user},
     )
 
 

@@ -1,5 +1,17 @@
 [
   {
+    "version": "4.20.3",
+    "date": "2026-10-25",
+    "added": [
+      "Playgroups now have player ratings that update from completed games, with all members selected by default and optional player and format filters."
+    ],
+    "refined": [
+      "Ratings consider finishing position and opponent strength, preserve manual result corrections, and use elimination timestamps to distinguish non-simultaneous losses. Games and uncertainty accompany every score."
+    ],
+    "resolved": [],
+    "archivist_note": "We gave each playgroup a running view of its results, with enough context to keep a rating from being mistaken for certainty."
+  },
+  {
     "version": "4.20.2",
     "date": "2026-10-25",
     "added": [],

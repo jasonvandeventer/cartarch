@@ -13,7 +13,17 @@ if make_url(os.environ["DATABASE_URL"]).database != "cartarch_test":
 
 from app.auth import hash_password  # noqa: E402
 from app.db import SessionLocal  # noqa: E402
-from app.models import Card, Deck, InventoryRow, StorageLocation, User  # noqa: E402
+from app.models import (  # noqa: E402
+    Card,
+    Deck,
+    Game,
+    GameSeat,
+    InventoryRow,
+    Playgroup,
+    PlaygroupMember,
+    StorageLocation,
+    User,
+)
 
 with SessionLocal() as session:
     assert session.query(User).count() == 0, "Smoke database must be empty"
@@ -114,4 +124,30 @@ with SessionLocal() as session:
         deck_service.assign_deck_variant_group(session, user.id, deck.id, group.id)
     row = session.query(InventoryRow).join(Card).filter(Card.scryfall_id == "smoke-99").one()
     deck_service.share_card_to_deck(session, user.id, row.id, target.id)
+    opponent = User(username="ratings-opponent@example.invalid", password_hash="unused")
+    playgroup = Playgroup(name="Smoke ratings", created_by=user.id)
+    session.add_all([opponent, playgroup])
+    session.flush()
+    game = Game(user_id=user.id, playgroup_id=playgroup.id, status="finalized", format="Commander")
+    session.add(game)
+    session.flush()
+    for position, player in enumerate([user, opponent], start=1):
+        session.add(
+            PlaygroupMember(
+                playgroup_id=playgroup.id,
+                user_id=player.id,
+                role="owner" if position == 1 else "member",
+            )
+        )
+        session.add(
+            GameSeat(
+                game_id=game.id,
+                seat_number=position,
+                player_name=f"Player {position}",
+                user_id=player.id,
+                placement=position,
+                starting_life=40,
+            )
+        )
+    session.commit()
 print("Seeded 100-card smoke deck")

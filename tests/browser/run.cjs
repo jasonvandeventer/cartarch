@@ -6,10 +6,10 @@ const path = require('node:path');
 const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'cartarch-browser-'));
 const python = process.env.PYTHON || 'python';
 const port = process.env.AUDIT_BROWSER_PORT || '5582';
-const env = {...process.env, AUDIT_BROWSER_FIXTURES: directory, AUDIT_BROWSER_URL: `http://127.0.0.1:${port}`};
+const env = {...process.env, AUDIT_BROWSER_FIXTURES: directory, RATING_BROWSER_FIXTURES: path.join(directory, 'ratings.html'), AUDIT_BROWSER_URL: `http://127.0.0.1:${port}`};
 let server;
 (async () => {
-  const seeded = spawnSync(python, ['-m','pytest','-q','tests/test_audit_regressions.py::test_printing_modal_renders_hover_fallback'], {env, stdio:'inherit'});
+  const seeded = spawnSync(python, ['-m','pytest','-q','tests/test_audit_regressions.py::test_printing_modal_renders_hover_fallback','tests/test_playgroup_ratings.py::test_page_replays_chronologically_and_updates_after_result_edit'], {env, stdio:'inherit'});
   if (seeded.status !== 0) throw Error('Browser fixture rendering failed');
   fs.symlinkSync(path.resolve('app/static'), path.join(directory,'static'));
   server = spawn(python, ['-m','http.server',port,'--bind','127.0.0.1','--directory',directory], {stdio:'ignore'});
@@ -22,6 +22,8 @@ let server;
   for (const browser of ['chromium','firefox']) {
     const result = spawnSync(process.execPath,['tests/browser/audit-regressions.cjs'], {env:{...env,BROWSER:browser},stdio:'inherit'});
     if (result.status !== 0) throw Error(`${browser} audit regressions failed`);
+    const ratings = spawnSync(process.execPath,['tests/browser/playgroup-ratings.cjs'], {env:{...env,BROWSER:browser},stdio:'inherit'});
+    if (ratings.status !== 0) throw Error(`${browser} ratings regressions failed`);
   }
 })().catch(error=>{console.error(error);process.exitCode=1;}).finally(()=>{
   server?.kill('SIGTERM'); fs.rmSync(directory,{recursive:true,force:true});

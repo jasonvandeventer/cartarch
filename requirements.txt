@@ -25,3 +25,6 @@ psycopg[binary]>=3.2,<4.0
 # environment but UNDECLARED, which is precisely the drift that broke prod once.
 # `qrcode.image.svg.SvgPathImage` is pure Python; Pillow is NOT required.
 qrcode==8.2
+
+# Rating replays must not change when a model library updates its defaults.
+openskill==6.2.0

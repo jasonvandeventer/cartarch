@@ -22,15 +22,20 @@ fallback, via :func:`get_pickable_users`.
 
 from __future__ import annotations
 
+import json
 import secrets
+from collections import defaultdict
 
+from openskill.models import PlackettLuce
 from sqlalchemy import case, func, select
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.models import (
     Game,
+    GameEvent,
     GameSeat,
+    GameVariant,
     Playgroup,
     PlaygroupMember,
     Share,
@@ -366,6 +371,170 @@ def playgroup_record(session: Session, playgroup_id: int) -> list[dict]:
     # stable across requests rather than dependent on row order.
     record.sort(key=lambda r: (-r["wins"], -r["win_rate"], -r["played"], r["label"].lower()))
     return record
+
+
+def _rating_placements(game: Game) -> tuple[dict[int, int], bool]:
+    """Resolve same-turn ties for ratings only; explicit result edits take precedence."""
+    ranks = {seat.id: seat.placement for seat in game.seats}
+    from app.game_analytics_service import _final_elimination_events
+
+    elimination_events = []
+    edited_seats = set()
+    for event in sorted(game.events, key=lambda e: (e.created_at, e.id)):
+        try:
+            payload = json.loads(event.payload)
+        except (TypeError, ValueError):
+            continue
+        if not isinstance(payload, dict):
+            continue
+        if event.action_type == "eliminate":
+            elimination_events.append(event)
+        elif event.action_type == "result_edit":
+            # A person's explicit tie must survive the inferred timestamp ordering.
+            edited_seats.update(str(sid) for sid in (payload.get("placements") or {}))
+    eliminated_at = {
+        sid: event.created_at for sid, event in _final_elimination_events(elimination_events)
+    }
+    tied = defaultdict(list)
+    for sid, rank in ranks.items():
+        tied[rank].append(sid)
+    adjusted = False
+    for rank, seat_ids in tied.items():
+        if rank == 1 or len(seat_ids) < 2:
+            continue
+        if any(str(sid) not in eliminated_at or str(sid) in edited_seats for sid in seat_ids):
+            continue
+        bands = []
+        for sid in sorted(seat_ids, key=lambda sid: (eliminated_at[str(sid)], sid)):
+            if (
+                not bands
+                or (eliminated_at[str(sid)] - eliminated_at[str(bands[-1][-1])]).total_seconds()
+                > 60
+            ):
+                bands.append([])
+            bands[-1].append(sid)
+        if len(bands) > 1:
+            adjusted = True
+            for band in reversed(bands):
+                for sid in band:
+                    ranks[sid] = rank
+                rank += len(band)
+    return ranks, adjusted
+
+
+def playgroup_ratings(
+    session: Session,
+    playgroup_id: int,
+    viewer_user_id: int,
+    player_ids: list[int] | None = None,
+    game_format: str = "all",
+) -> dict | None:
+    """Replay shared games with >=2 selected members; retain every opponent in each pod."""
+    from app.game_service import CANONICAL_GAME_FORMATS
+
+    detail = get_playgroup_detail(session, playgroup_id, viewer_user_id)
+    if detail is None:
+        return None
+    members = {row["user"].id: row["user"] for row in detail["members"]}
+    selected = set(members if player_ids is None else player_ids)
+    result = {
+        **detail,
+        "selected_players": selected & members.keys(),
+        "game_format": game_format,
+        "format_choices": CANONICAL_GAME_FORMATS,
+        "ratings": [],
+        "rated_games": 0,
+        "adjusted_games": 0,
+        "skipped_games": 0,
+        "planechase_games": 0,
+        "input_error": None,
+    }
+    if len(selected) < 2 or not selected <= members.keys():
+        result["input_error"] = "Select at least two current playgroup members."
+        return result
+    if game_format != "all" and game_format not in CANONICAL_GAME_FORMATS:
+        result["input_error"] = "Select a listed game format."
+        return result
+    qualifying = (
+        select(GameSeat.game_id)
+        .where(GameSeat.user_id.in_(selected))
+        .group_by(GameSeat.game_id)
+        .having(func.count(func.distinct(GameSeat.user_id)) >= 2)
+    )
+    query = (
+        session.query(Game)
+        .filter(
+            Game.playgroup_id == playgroup_id,
+            Game.status == "finalized",
+            Game.id.in_(qualifying),
+        )
+        .options(
+            selectinload(Game.seats),
+            selectinload(Game.events.and_(GameEvent.action_type.in_(["eliminate", "result_edit"]))),
+        )
+        .order_by(Game.played_at, Game.id)
+    )
+    if game_format != "all":
+        query = query.filter(Game.format == game_format)
+    games = query.all()
+    planechase_ids = set(
+        session.scalars(
+            select(GameVariant.game_id).where(
+                GameVariant.game_id.in_([game.id for game in games]),
+                GameVariant.variant == "planechase",
+            )
+        )
+    )
+    # Explicit parameters + pinned version keep historical replays reproducible.
+    model = PlackettLuce(mu=25, sigma=25 / 3, beta=25 / 6, tau=25 / 300)
+    ratings = {}
+    played = defaultdict(int)
+    wins = defaultdict(int)
+    for game in games:
+        keys = [
+            ("user", seat.user_id)
+            if seat.user_id is not None
+            else ("guest", game.played_at.date().isoformat(), seat.player_name)
+            for seat in game.seats
+        ]
+        # Partial results or duplicate identities are not a complete ranked contest.
+        if len(set(keys)) != len(keys) or any(
+            seat.placement is None or seat.placement < 1 for seat in game.seats
+        ):
+            result["skipped_games"] += 1
+            continue
+        ranks, adjusted = _rating_placements(game)
+        before = [[ratings.setdefault(key, model.rating())] for key in keys]
+        after = model.rate(before, ranks=[ranks[seat.id] for seat in game.seats])
+        for key, seat, (rating,) in zip(keys, game.seats, after, strict=True):
+            ratings[key] = rating
+            played[key] += 1
+            wins[key] += ranks[seat.id] == 1
+        result["rated_games"] += 1
+        result["adjusted_games"] += adjusted
+        result["planechase_games"] += game.id in planechase_ids
+    for uid in selected:
+        key = ("user", uid)
+        rating = ratings.get(key)
+        result["ratings"].append(
+            {
+                "user_id": uid,
+                "label": members[uid].player_label,
+                "rating": rating.mu * 60 if rating else None,
+                "uncertainty": rating.sigma * 60 if rating else None,
+                "played": played[key],
+                "wins": wins[key],
+            }
+        )
+    result["ratings"].sort(
+        key=lambda row: (
+            row["rating"] is None,
+            -(row["rating"] or 0),
+            row["label"].casefold(),
+            row["user_id"],
+        )
+    )
+    return result
 
 
 # ── Mutations ───────────────────────────────────────────────────
