@@ -2,14 +2,19 @@
 {% block content %}
   <section class="panel pagehead">
     <p><a href="/playgroups/{{ playgroup.id }}">{{ playgroup.name }}</a></p>
-    <h1 class="pagehead-title">Player ratings</h1>
+    <h1 class="pagehead-title">Playgroup ratings</h1>
     <p class="pagehead-tagline">Standings update from completed games whenever you open this page.</p>
   </section>
   <section class="panel">
     <form method="get" action="/playgroups/{{ playgroup.id }}/ratings" class="stack-form">
       <input type="hidden" name="selection" value="1">
+      <label for="ratings-kind">Rate</label>
+      <select name="rank_by" id="ratings-kind">
+        <option value="players" {% if rank_by == 'players' %}selected{% endif %}>Players</option>
+        <option value="decks" {% if rank_by == 'decks' %}selected{% endif %}>Decks</option>
+      </select>
       <fieldset>
-        <legend>Players to rank</legend>
+        <legend>Players in qualifying games</legend>
         {% for row in members %}
           <label class="checkbox-row">
             <input type="checkbox" name="players" value="{{ row.user.id }}" {% if row.user.id in selected_players %}checked{% endif %}>
@@ -30,19 +35,23 @@
     {% if input_error %}<p role="alert">{{ input_error }}</p>{% endif %}
   </section>
   {% if not input_error %}
-    <section class="panel" id="player-ratings">
-      <h2>{{ game_format if game_format != 'all' else 'All formats' }} standings</h2>
+    <section class="panel" id="{{ 'deck-ratings' if rank_by == 'decks' else 'player-ratings' }}">
+      <h2>{{ game_format if game_format != 'all' else 'All formats' }} {{ rank_by }} standings</h2>
       <p>{{ rated_games }} completed game{{ '' if rated_games == 1 else 's' }} linked to this playgroup, with at least two selected players.
         Every opponent in each qualifying game contributes to the calculation.</p>
       {% if rated_games %}
         <div class="table-wrap">
           <table class="stacking-table">
-            <thead><tr><th>Rank</th><th>Player</th><th>Games</th><th>Firsts</th><th>Rating</th><th>Uncertainty</th></tr></thead>
+            <thead><tr><th>Rank</th><th>{{ 'Deck' if rank_by == 'decks' else 'Player' }}</th>{% if rank_by == 'decks' %}<th>Owner</th><th>Borrowed</th>{% endif %}<th>Games</th><th>Firsts</th><th>Rating</th><th>Uncertainty</th></tr></thead>
             <tbody>
               {% for row in ratings %}
                 <tr>
                   <td data-label="Rank">{{ loop.index if row.played else '—' }}</td>
-                  <td data-label="Player">{{ row.label }}</td>
+                  <td data-label="{{ 'Deck' if rank_by == 'decks' else 'Player' }}">{{ row.label }}</td>
+                  {% if rank_by == 'decks' %}
+                    <td data-label="Owner">{{ row.owner }}</td>
+                    <td data-label="Borrowed">{{ row.borrowed_games }}</td>
+                  {% endif %}
                   <td data-label="Games">{{ row.played }}</td>
                   <td data-label="Firsts">{{ row.wins }}</td>
                   <td data-label="Rating">{{ '%.0f' | format(row.rating) if row.played else 'Unrated' }}</td>
@@ -54,11 +63,19 @@
         </div>
         <p class="muted">Firsts include shared first place. Uncertainty is one standard deviation; lower means more evidence. Close ratings with overlapping uncertainty do not establish a clear difference in skill.</p>
       {% else %}
-        <p>No completed games qualify yet. Link games to this playgroup and record results to start the standings.</p>
+        {% if rank_by == 'decks' %}
+          <p>No linked decks have rateable results in these games. Link decks to completed game seats to start the standings.</p>
+        {% else %}
+          <p>No completed games qualify yet. Link games to this playgroup and record results to start the standings.</p>
+        {% endif %}
       {% endif %}
-      {% if skipped_games %}<p>{{ skipped_games }} qualifying game{{ '' if skipped_games == 1 else 's' }} excluded because results are incomplete or a player appears in multiple seats.</p>{% endif %}
+      {% if skipped_games %}<p>{{ skipped_games }} qualifying game{{ '' if skipped_games == 1 else 's' }} excluded because results are incomplete or the same {{ 'deck' if rank_by == 'decks' else 'player' }} appears in multiple seats.</p>{% endif %}
+      {% if rank_by == 'decks' %}
+        <p>Decks are tracked separately from players, by deck identity, including borrowed games and retired decks. Names come from their latest named appearance in these games. Decks with the same commander stay separate; decks without qualifying appearances remain unrated.</p>
+        <p>{{ unidentified_deck_seats }} seats have no linked deck. Each is treated as a fresh opponent starting at 1,500 with high uncertainty, not assigned to a guessed deck. {{ unattributed_games }} game{{ ' has' if unattributed_games == 1 else 's have' }} no linked decks and contribute no deck ratings.</p>
+      {% endif %}
       <h3>How the ratings work</h3>
-      <p>Everyone starts at 1,500. OpenSkill updates ratings in game order using finishing position, opponent strength, and uncertainty. Beating stronger opponents can earn more credit, and finishing ahead of someone can help even without winning. Ratings reflect the combination of pilot and deck, not isolated player skill.</p>
+      <p>Each {{ 'deck' if rank_by == 'decks' else 'player' }} starts at 1,500. OpenSkill updates ratings in game order using finishing position, opponent strength, and uncertainty. Beating stronger opponents can earn more credit, and finishing ahead of someone can help even without winning. Ratings reflect the combination of pilot and deck, not isolated player skill.</p>
       <p>For recorded ties below first place, an elimination gap over 60 seconds separates finishing positions when the event history is complete. Explicit result edits take precedence. Shared firsts and ties without enough evidence remain tied. This adjusts the rating calculation, not the saved game results.</p>
       <p class="muted">{{ adjusted_games }} game{{ '' if adjusted_games == 1 else 's' }} adjusted from elimination timestamps. {{ planechase_games }} tagged Planechase game{{ '' if planechase_games == 1 else 's' }} included at equal weight. Select one format to avoid mixing Commander and Draft results. Ratings are relative to this pool, not comparable across unrelated playgroups.</p>
     </section>

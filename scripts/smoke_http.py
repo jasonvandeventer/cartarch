@@ -47,6 +47,9 @@ for path in (
 ratings = get("/playgroups/1/ratings").text
 assert "1 completed game" in ratings and 'id="player-ratings"' in ratings
 assert "OpenSkill" in ratings
+deck_ratings = get("/playgroups/1/ratings?rank_by=decks").text
+assert 'id="deck-ratings"' in deck_ratings and "Borrowed" in deck_ratings
+assert "1 completed game" in deck_ratings
 menu = get("/decks/1/rows/1/actions").text
 assert 'name="quantity"' in menu
 response = client.post(

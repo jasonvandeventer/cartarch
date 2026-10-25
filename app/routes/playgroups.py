@@ -180,6 +180,7 @@ def playgroups_ratings(
     players: list[int] = Query(default=[]),
     selection: bool = False,
     game_format: str = "all",
+    rank_by: str = "players",
     session: Session = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
 ):
@@ -189,13 +190,14 @@ def playgroups_ratings(
         current_user.id,
         players if selection or players else None,
         game_format,
+        rank_by,
     )
     if detail is None:
         return RedirectResponse(url="/playgroups?error=not_a_member", status_code=303)
     return render(
         request,
         "playgroup_ratings.html",
-        {**detail, "title": "Player ratings", "current_user": current_user},
+        {**detail, "title": "Playgroup ratings", "current_user": current_user},
     )
 
 

@@ -9,7 +9,16 @@ from types import SimpleNamespace
 import pytest
 
 from app import playgroup_service as svc
-from app.models import Game, GameEvent, GameSeat, GameVariant, Playgroup, PlaygroupMember, User
+from app.models import (
+    Deck,
+    Game,
+    GameEvent,
+    GameSeat,
+    GameVariant,
+    Playgroup,
+    PlaygroupMember,
+    User,
+)
 
 
 def _event(sid, seconds, *, eliminated=True, action="eliminate", payload=None):
@@ -221,3 +230,90 @@ def test_incomplete_duplicate_and_unfinished_games_do_not_distort_ratings(db, us
     assert result["rated_games"] == 0
     assert result["skipped_games"] == 2
     assert all(r["rating"] is None for r in result["ratings"])
+
+
+def test_decks_replay_full_pods_without_merging_pilots_or_unknown_decks(client, db, user, pod):
+    pg, users = pod
+    a, b, c, _, _ = users
+    alpha = Deck(user_id=a.id, name="Private renamed deck", retired_at=datetime.now(UTC))
+    beta = Deck(user_id=b.id, name="Private second deck")
+    unused = Deck(user_id=a.id, name="Unplayed private deck")
+    db.add_all([alpha, beta, unused])
+    db.commit()
+    # Seed in reverse order; swap pilots, retaining the same two deck identities.
+    for index, pilots in [(1, [b, a, c]), (0, [a, b, c])]:
+        game = _game(db, pg, pilots, [1, 2, 3], index)
+        for seat, deck, name in zip(
+            game.seats, [alpha, beta, None], ["Alpha <deck>", "Beta", None], strict=True
+        ):
+            seat.deck_id = deck.id if deck else None
+            seat.deck_name_at_game = name
+            seat.commander_name_at_game = "Same commander"
+        db.commit()
+    r = svc.playgroup_ratings(db, pg.id, a.id, rank_by="decks")
+    assert r["rated_games"] == 2
+    assert r["unidentified_deck_seats"] == 2
+    assert len(r["ratings"]) == 2
+    rows = {row["deck_id"]: row for row in r["ratings"]}
+    assert rows[alpha.id]["played"] == rows[beta.id]["played"] == 2
+    assert rows[alpha.id]["wins"] == 2
+    assert rows[alpha.id]["borrowed_games"] == rows[beta.id]["borrowed_games"] == 1
+    assert rows[alpha.id]["rating"] > rows[beta.id]["rating"]
+    assert [row["rating"] for row in r["ratings"]] == pytest.approx(
+        [1832.115096786042, 1583.6916652513023], abs=0.001
+    )
+    response = client.get(f"/playgroups/{pg.id}/ratings?rank_by=decks")
+    assert response.status_code == 200
+    assert 'id="deck-ratings"' in response.text
+    assert "Alpha &lt;deck&gt;" in response.text
+    assert "2 seats have no linked deck" in response.text
+    assert "Borrowed" in response.text and "high uncertainty" in response.text
+    assert "Private renamed deck" not in response.text
+    assert "Private second deck" not in response.text
+    assert "Unplayed private deck" not in response.text
+    if os.getenv("DECK_RATING_BROWSER_FIXTURES"):
+        Path(os.environ["DECK_RATING_BROWSER_FIXTURES"]).write_text(response.text)
+    assert db.get(Deck, alpha.id).retired_at is not None
+    # Editing a recorded result updates deck ratings on the next view.
+    game.seats[0].placement, game.seats[1].placement = 2, 1
+    db.commit()
+    changed = svc.playgroup_ratings(db, pg.id, a.id, rank_by="decks")
+    assert {row["deck_id"]: row["wins"] for row in changed["ratings"]}[alpha.id] == 1
+
+
+def test_deck_scope_incomplete_duplicate_and_missing_attribution(client, db, user, pod):
+    pg, users = pod
+    a, b, c, _, outsider = users
+    deck = Deck(user_id=c.id, name="Private owned by another member")
+    db.add(deck)
+    db.commit()
+    good = _game(db, pg, [a, b, c], [1, 2, 3])
+    good.seats[2].deck_id = deck.id
+    good.seats[2].user_id = None  # A guest borrowing counts too.
+    db.commit()
+    unknown = _game(db, pg, [a, b], [1, 2], 1, "Draft")
+    duplicate = _game(db, pg, [a, b], [1, 2], 2)
+    for seat in duplicate.seats:
+        seat.deck_id = deck.id
+    incomplete = _game(db, pg, [a, b], [1, None], 3)
+    incomplete.seats[0].deck_id = deck.id
+    unlinked = _game(db, None, [a, b], [1, 2], 4)
+    unlinked.seats[0].deck_id = deck.id
+    db.commit()
+    r = svc.playgroup_ratings(db, pg.id, a.id, [a.id, b.id], rank_by="decks")
+    assert r["rated_games"] == 1
+    assert r["skipped_games"] == 2
+    assert r["unattributed_games"] == 1
+    assert r["unidentified_deck_seats"] == 4
+    assert len(r["ratings"]) == 1
+    assert r["ratings"][0]["label"] == f"Deck #{deck.id}"
+    assert r["ratings"][0]["owner"] == c.player_label
+    assert r["ratings"][0]["borrowed_games"] == 1
+    assert svc.playgroup_ratings(db, pg.id, a.id, rank_by="bogus")["input_error"]
+    assert svc.playgroup_ratings(db, pg.id, outsider.id, rank_by="decks") is None
+    draft = svc.playgroup_ratings(db, pg.id, a.id, game_format="Draft", rank_by="decks")
+    assert draft["rated_games"] == 0 and draft["unattributed_games"] == 1
+    assert not draft["ratings"]
+    response = client.get(f"/playgroups/{pg.id}/ratings?rank_by=decks&game_format=Draft")
+    assert "1 game has no linked decks" in response.text
+    assert unknown.seats[0].deck_id is None

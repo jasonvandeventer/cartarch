@@ -6,10 +6,10 @@ const path = require('node:path');
 const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'cartarch-browser-'));
 const python = process.env.PYTHON || 'python';
 const port = process.env.AUDIT_BROWSER_PORT || '5582';
-const env = {...process.env, AUDIT_BROWSER_FIXTURES: directory, RATING_BROWSER_FIXTURES: path.join(directory, 'ratings.html'), AUDIT_BROWSER_URL: `http://127.0.0.1:${port}`};
+const env = {...process.env, AUDIT_BROWSER_FIXTURES: directory, RATING_BROWSER_FIXTURES: path.join(directory, 'ratings.html'), DECK_RATING_BROWSER_FIXTURES: path.join(directory, 'deck-ratings.html'), AUDIT_BROWSER_URL: `http://127.0.0.1:${port}`};
 let server;
 (async () => {
-  const seeded = spawnSync(python, ['-m','pytest','-q','tests/test_audit_regressions.py::test_printing_modal_renders_hover_fallback','tests/test_playgroup_ratings.py::test_page_replays_chronologically_and_updates_after_result_edit'], {env, stdio:'inherit'});
+  const seeded = spawnSync(python, ['-m','pytest','-q','tests/test_audit_regressions.py::test_printing_modal_renders_hover_fallback','tests/test_playgroup_ratings.py::test_page_replays_chronologically_and_updates_after_result_edit','tests/test_playgroup_ratings.py::test_decks_replay_full_pods_without_merging_pilots_or_unknown_decks'], {env, stdio:'inherit'});
   if (seeded.status !== 0) throw Error('Browser fixture rendering failed');
   fs.symlinkSync(path.resolve('app/static'), path.join(directory,'static'));
   server = spawn(python, ['-m','http.server',port,'--bind','127.0.0.1','--directory',directory], {stdio:'ignore'});

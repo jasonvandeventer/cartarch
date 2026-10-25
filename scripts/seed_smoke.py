@@ -131,6 +131,9 @@ with SessionLocal() as session:
     game = Game(user_id=user.id, playgroup_id=playgroup.id, status="finalized", format="Commander")
     session.add(game)
     session.flush()
+    rating_decks = (
+        session.query(Deck).filter(Deck.user_id == user.id).order_by(Deck.id).limit(2).all()
+    )
     for position, player in enumerate([user, opponent], start=1):
         session.add(
             PlaygroupMember(
@@ -144,6 +147,8 @@ with SessionLocal() as session:
                 game_id=game.id,
                 seat_number=position,
                 player_name=f"Player {position}",
+                deck_id=rating_decks[position - 1].id,
+                deck_name_at_game=rating_decks[position - 1].name,
                 user_id=player.id,
                 placement=position,
                 starting_life=40,

@@ -32,6 +32,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
 from app.models import (
+    Deck,
     Game,
     GameEvent,
     GameSeat,
@@ -428,6 +429,7 @@ def playgroup_ratings(
     viewer_user_id: int,
     player_ids: list[int] | None = None,
     game_format: str = "all",
+    rank_by: str = "players",
 ) -> dict | None:
     """Replay shared games with >=2 selected members; retain every opponent in each pod."""
     from app.game_service import CANONICAL_GAME_FORMATS
@@ -441,12 +443,15 @@ def playgroup_ratings(
         **detail,
         "selected_players": selected & members.keys(),
         "game_format": game_format,
+        "rank_by": rank_by,
         "format_choices": CANONICAL_GAME_FORMATS,
         "ratings": [],
         "rated_games": 0,
         "adjusted_games": 0,
         "skipped_games": 0,
         "planechase_games": 0,
+        "unidentified_deck_seats": 0,
+        "unattributed_games": 0,
         "input_error": None,
     }
     if len(selected) < 2 or not selected <= members.keys():
@@ -454,6 +459,9 @@ def playgroup_ratings(
         return result
     if game_format != "all" and game_format not in CANONICAL_GAME_FORMATS:
         result["input_error"] = "Select a listed game format."
+        return result
+    if rank_by not in {"players", "decks"}:
+        result["input_error"] = "Choose player or deck ratings."
         return result
     qualifying = (
         select(GameSeat.game_id)
@@ -477,6 +485,15 @@ def playgroup_ratings(
     if game_format != "all":
         query = query.filter(Game.format == game_format)
     games = query.all()
+    deck_owners = {}
+    if rank_by == "decks":
+        deck_ids = {seat.deck_id for game in games for seat in game.seats if seat.deck_id}
+        deck_owners = {
+            did: (uid, label)
+            for did, uid, label in session.query(Deck.id, Deck.user_id, User.player_label_expr())
+            .join(User, User.id == Deck.user_id)
+            .filter(Deck.id.in_(deck_ids))
+        }
     planechase_ids = set(
         session.scalars(
             select(GameVariant.game_id).where(
@@ -490,6 +507,8 @@ def playgroup_ratings(
     ratings = {}
     played = defaultdict(int)
     wins = defaultdict(int)
+    borrowed = defaultdict(int)
+    deck_labels = {}
     for game in games:
         keys = [
             ("user", seat.user_id)
@@ -497,29 +516,53 @@ def playgroup_ratings(
             else ("guest", game.played_at.date().isoformat(), seat.player_name)
             for seat in game.seats
         ]
+        if rank_by == "decks":
+            keys = [
+                ("deck", seat.deck_id) if seat.deck_id else ("unknown", seat.id)
+                for seat in game.seats
+            ]
         # Partial results or duplicate identities are not a complete ranked contest.
         if len(set(keys)) != len(keys) or any(
             seat.placement is None or seat.placement < 1 for seat in game.seats
         ):
             result["skipped_games"] += 1
             continue
+        if rank_by == "decks":
+            result["unidentified_deck_seats"] += sum(not seat.deck_id for seat in game.seats)
+            if not any(seat.deck_id for seat in game.seats):
+                result["unattributed_games"] += 1
+                continue
         ranks, adjusted = _rating_placements(game)
-        before = [[ratings.setdefault(key, model.rating())] for key in keys]
+        before = [[ratings.get(key, model.rating())] for key in keys]
         after = model.rate(before, ranks=[ranks[seat.id] for seat in game.seats])
         for key, seat, (rating,) in zip(keys, game.seats, after, strict=True):
+            # Unknown decks are fresh opponents each game, never an invented deck lineage.
+            if key[0] == "unknown":
+                continue
             ratings[key] = rating
             played[key] += 1
             wins[key] += ranks[seat.id] == 1
+            if rank_by == "decks":
+                borrowed[key] += seat.user_id != deck_owners[seat.deck_id][0]
+                # Only expose names recorded in these games, not a private deck's current metadata.
+                if seat.deck_name_at_game:
+                    deck_labels[seat.deck_id] = seat.deck_name_at_game
         result["rated_games"] += 1
         result["adjusted_games"] += adjusted
         result["planechase_games"] += game.id in planechase_ids
-    for uid in selected:
-        key = ("user", uid)
+    display_keys = [("user", uid) for uid in selected] if rank_by == "players" else list(ratings)
+    for key in display_keys:
+        identity = key[1]
         rating = ratings.get(key)
         result["ratings"].append(
             {
-                "user_id": uid,
-                "label": members[uid].player_label,
+                "user_id": identity if rank_by == "players" else None,
+                "deck_id": identity if rank_by == "decks" else None,
+                "label": members[identity].player_label
+                if rank_by == "players"
+                else deck_labels.get(identity, f"Deck #{identity}"),
+                "owner": deck_owners[identity][1] if rank_by == "decks" else None,
+                "borrowed_games": borrowed[key],
                 "rating": rating.mu * 60 if rating else None,
                 "uncertainty": rating.sigma * 60 if rating else None,
                 "played": played[key],
@@ -531,7 +574,7 @@ def playgroup_ratings(
             row["rating"] is None,
             -(row["rating"] or 0),
             row["label"].casefold(),
-            row["user_id"],
+            row["user_id"] or row["deck_id"],
         )
     )
     return result
