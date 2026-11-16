@@ -9,8 +9,10 @@ const port = process.env.AUDIT_BROWSER_PORT || '5582';
 const env = {...process.env, AUDIT_BROWSER_FIXTURES: directory, RATING_BROWSER_FIXTURES: path.join(directory, 'ratings.html'), DECK_RATING_BROWSER_FIXTURES: path.join(directory, 'deck-ratings.html'), AUDIT_BROWSER_URL: `http://127.0.0.1:${port}`};
 let server;
 (async () => {
-  const seeded = spawnSync(python, ['-m','pytest','-q','tests/test_audit_regressions.py::test_printing_modal_renders_hover_fallback','tests/test_playgroup_ratings.py::test_page_replays_chronologically_and_updates_after_result_edit','tests/test_playgroup_ratings.py::test_decks_replay_full_pods_without_merging_pilots_or_unknown_decks'], {env, stdio:'inherit'});
+  const seeded = spawnSync(python, ['-m','pytest','-q','tests/test_audit_regressions.py::test_printing_modal_renders_hover_fallback','tests/test_game_new_deck_picker.py::test_setup_selection_browser_fixture','tests/test_commander_art.py::test_phone_backgrounds_only_request_art_crops','tests/test_playgroup_ratings.py::test_page_replays_chronologically_and_updates_after_result_edit','tests/test_playgroup_ratings.py::test_decks_replay_full_pods_without_merging_pilots_or_unknown_decks'], {env, stdio:'inherit'});
   if (seeded.status !== 0) throw Error('Browser fixture rendering failed');
+  const setup = spawnSync(process.execPath, ['tests/browser/game-setup.cjs', path.join(directory, 'game-setup.html')], {env, stdio:'inherit'});
+  if (setup.status !== 0) throw Error('Game setup regressions failed');
   fs.symlinkSync(path.resolve('app/static'), path.join(directory,'static'));
   server = spawn(python, ['-m','http.server',port,'--bind','127.0.0.1','--directory',directory], {stdio:'ignore'});
   let ready = false;
@@ -22,6 +24,8 @@ let server;
   for (const browser of ['chromium','firefox']) {
     const result = spawnSync(process.execPath,['tests/browser/audit-regressions.cjs'], {env:{...env,BROWSER:browser},stdio:'inherit'});
     if (result.status !== 0) throw Error(`${browser} audit regressions failed`);
+    const art = spawnSync(process.execPath,['tests/browser/commander-art.cjs'], {env:{...env,BROWSER:browser},stdio:'inherit'});
+    if (art.status !== 0) throw Error(`${browser} commander art regressions failed`);
     const ratings = spawnSync(process.execPath,['tests/browser/playgroup-ratings.cjs'], {env:{...env,BROWSER:browser},stdio:'inherit'});
     if (ratings.status !== 0) throw Error(`${browser} ratings regressions failed`);
   }

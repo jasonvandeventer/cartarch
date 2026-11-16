@@ -98,7 +98,7 @@ def test_an_anchor_only_deck_gets_art_on_the_tablet(db, user):
 
 
 def test_an_anchor_only_deck_gets_art_on_the_phone(db, user):
-    """The phone reads a scryfall_id and builds a mirror URL from it. Same gap,
+    """The phone reads a scryfall_id and builds an art URL from it. Same gap,
     a different function — which is why both now share one resolver."""
     card = _card(db, "Krang, Utrom Warlord")
     game = _game_with(db, user, _deck(db, user, "Krang", anchor=[card]))
@@ -169,18 +169,18 @@ def test_a_seat_with_no_deck_has_no_art(db, user):
     assert game_service.get_seat_commander_scryfall_ids(db, g)[g.seats[0].id] is None
 
 
-def test_a_commander_with_no_cached_image_uses_the_mirror(db, user):
+def test_a_commander_with_no_cached_image_uses_art_redirect(db, user):
     card = _card(db, "No Art Yet")
     card.image_url = None
     db.commit()
     game = _game_with(db, user, _deck(db, user, "Artless", anchor=[card]))
 
-    from app.dependencies import mirror_image_url
+    from app.dependencies import scryfall_image_fallback
 
     assert game_service.get_seat_commander_image_sources(db, game)[game.seats[0].id][0][
         0
-    ] == mirror_image_url(card.scryfall_id)
-    # …but the phone still gets its id: the mirror can serve art the cache lacks.
+    ] == scryfall_image_fallback(card.scryfall_id, "art_crop")
+    # The phone can also request art without a cached image URL.
     assert game_service.get_seat_commander_scryfall_ids(db, game)[game.seats[0].id]
 
 
@@ -235,7 +235,7 @@ def test_tracker_page_carries_both_partners_fallbacks(client, db, user):
     import json
     import re
 
-    from app.dependencies import mirror_image_url, scryfall_image_fallback
+    from app.dependencies import scryfall_image_fallback
 
     cards = [_card(db, "Partner One"), _card(db, "Partner Two")]
     game = _game_with(db, user, _deck(db, user, "Fallback partners", tagged=cards))
@@ -245,10 +245,56 @@ def test_tracker_page_carries_both_partners_fallbacks(client, db, user):
     assert sources == [
         [
             c.image_url.replace("/normal/", "/art_crop/"),
-            mirror_image_url(c.scryfall_id),
             scryfall_image_fallback(c.scryfall_id, "art_crop"),
         ]
         for c in cards
     ]
     assert "/static/background-art.js?v=" in response.text
     assert "commanderImageUrls" not in response.text
+
+
+def test_art_sources_never_fall_back_to_a_full_card():
+    from app.dependencies import commander_art_sources
+
+    fallback = "https://api.scryfall.com/cards/example?format=image&version=art_crop"
+    for size in ("small", "normal", "large", "png", "border_crop", "art_crop"):
+        ext = "png" if size == "png" else "jpg"
+        assert commander_art_sources(
+            "example", f"https://cards.scryfall.io/{size}/front/a/b/example.{ext}?123"
+        ) == ["https://cards.scryfall.io/art_crop/front/a/b/example.jpg?123", fallback]
+    assert commander_art_sources("example", "https://img.cartarch.com/example/normal.jpg") == [
+        fallback
+    ]
+    assert commander_art_sources(None, None) == []
+
+
+def test_phone_backgrounds_only_request_art_crops(client, db, user):
+    import html
+    import json
+    import os
+    import re
+    from pathlib import Path
+
+    card = _card(db, "Phone Art")
+    game = _game_with(db, user, _deck(db, user, "Phone art deck", tagged=[card]))
+    expected = [f"https://api.scryfall.com/cards/{card.scryfall_id}?format=image&version=art_crop"]
+    for status in ("created", "in_progress"):
+        game.status = status
+        db.commit()
+        response = client.get(f"/games/{game.id}/companion")
+        assert response.status_code == 200
+        backgrounds = re.findall(r"data-background-art='([^']+)'", response.text)
+        assert backgrounds
+        assert all(json.loads(html.unescape(value)) == expected for value in backgrounds)
+        if status == "created":
+            sources = json.loads(re.search(r"const ART_SOURCES = (.+);", response.text)[1])
+            assert sources == [
+                "https://api.scryfall.com/cards/__SID__?format=image&version=art_crop"
+            ]
+        if directory := os.environ.get("AUDIT_BROWSER_FIXTURES"):
+            Path(directory, f"commander-{status}.html").write_text(response.text)
+    response = client.get("/companion")
+    assert response.status_code == 200
+    backgrounds = re.findall(r"data-background-art='([^']+)'", response.text)
+    assert backgrounds
+    assert all(json.loads(html.unescape(value)) == expected for value in backgrounds)

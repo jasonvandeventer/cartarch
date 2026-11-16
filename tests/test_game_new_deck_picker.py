@@ -21,7 +21,7 @@ from __future__ import annotations
 import json
 import re
 
-from app.models import Deck, StorageLocation, User
+from app.models import Deck, Playgroup, PlaygroupMember, StorageLocation, User
 
 
 def _deck(db, owner, name):
@@ -135,3 +135,30 @@ def test_borrowed_framing_is_conditional_on_a_pilot_being_chosen(client, db, use
     assert "seatUserId ? `Borrowed from" in body, (
         "the borrowed framing must depend on a pilot being selected"
     )
+
+
+def test_setup_selection_browser_fixture(client, db, user):
+    """Render the actual setup page for the browser regression gate."""
+    import os
+    from pathlib import Path
+
+    mason = _user(db, "mason@example.invalid", display="Mason")
+    patryk = _user(db, "patryk@example.invalid", display="Patryk")
+    _deck(db, patryk, "Test Deck")
+    group = Playgroup(name="Setup Pod", created_by=user.id)
+    db.add(group)
+    db.flush()
+    for member in (user, mason, patryk):
+        db.add(
+            PlaygroupMember(
+                playgroup_id=group.id,
+                user_id=member.id,
+                role="owner" if member == user else "member",
+            )
+        )
+    db.commit()
+    response = client.get("/games/new")
+    assert response.status_code == 200
+    assert "Patryk" in response.text and "Test Deck" in response.text
+    if directory := os.environ.get("AUDIT_BROWSER_FIXTURES"):
+        Path(directory, "game-setup.html").write_text(response.text)

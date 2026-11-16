@@ -46,7 +46,7 @@
         {% for e in entries %}
           <a class="cmp-lobby-row{% if e.commander_id %} cmp-has-art{% endif %}"
              href="/games/{{ e.game_id }}/companion"
-             {% if e.commander_id %}data-background-art='{{ [mirror_image_url(e.commander_id, 'normal'), scryfall_image_fallback(e.commander_id, 'normal')] | tojson }}'{% endif %}>
+             {% if e.commander_id %}data-background-art='{{ commander_art_sources(e.commander_id) | tojson }}'{% endif %}>
             <div class="cmp-lobby-row-main">
               <span class="cmp-badge cmp-badge-{{ 'live' if e.status == 'in_progress' else 'waiting' }}">
                 {{ 'LIVE' if e.status == 'in_progress' else 'Waiting' }}

@@ -950,27 +950,17 @@ def get_deck_record(session: Session, deck_id: int) -> dict[str, int]:
 def get_seat_commander_image_sources(session: Session, game: Game) -> dict[int, list[list[str]]]:
     """Per seat, up to two commanders' ordered background-image candidates.
 
-    Prefer the cached art crop, then the independently hosted normal mirror,
-    then Scryfall's image redirect (which also repairs stale cached URLs).
-    The mirror does not serve art_crop by printing ID. No request-path fetching.
+    Prefer the cached art crop, then Scryfall's art-crop redirect.
+    No request-path fetching and no full-card fallback.
     """
-    from app.dependencies import mirror_image_url, scryfall_image_fallback
+    from app.dependencies import commander_art_sources
 
     result: dict[int, list[list[str]]] = {}
     for seat in game.seats:
         result[seat.id] = []
         cards = deck_commander_cards(session, seat.deck) if seat.deck_id else []
         for card in cards:
-            sources = []
-            if card.image_url:
-                sources.append(card.image_url.replace("/normal/", "/art_crop/"))
-            if card.scryfall_id:
-                sources.extend(
-                    [
-                        mirror_image_url(card.scryfall_id),
-                        scryfall_image_fallback(card.scryfall_id, "art_crop"),
-                    ]
-                )
+            sources = commander_art_sources(card.scryfall_id, card.image_url)
             if sources:
                 result[seat.id].append(sources)
     return result

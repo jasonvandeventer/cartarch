@@ -1,5 +1,16 @@
 [
   {
+    "version": "4.20.7",
+    "date": "2026-11-16",
+    "added": [],
+    "refined": [],
+    "resolved": [
+      "Commander backgrounds use artwork crops throughout the table tracker, phone companion, and lobby, including after changing decks.",
+      "New Game keeps player names, deck selections, and typed commanders when the setup redraws; switching players updates automatically filled names while preserving custom names."
+    ],
+    "archivist_note": "We kept the commanders’ artwork in view and made game setup hold on to your choices."
+  },
+  {
     "version": "4.20.6",
     "date": "2026-11-16",
     "added": [

@@ -262,12 +262,23 @@ function initSeats() {
       position: positions[i] || null,
     });
   }
-  renderSeats();
+  renderSeats(false);
   renderDiagram();
 }
 
-function renderSeats() {
+function renderSeats(preserveInputs = true) {
   const container = document.getElementById('seat-rows');
+  // Redrawing for a playgroup/format change must keep the values being submitted.
+  if (preserveInputs) seats.forEach((seat, i) => {
+    const name = document.getElementById(`name-${i}`);
+    const user = document.getElementById(`user-sel-${i}`);
+    const deck = document.getElementById(`deck-sel-${i}`);
+    const commander = document.getElementById(`cmd-${i}`);
+    if (name) seat.playerName = name.value;
+    if (user) seat.userId = user.value ? parseInt(user.value) : null;
+    if (deck) seat.deckId = deck.value ? parseInt(deck.value) : null;
+    if (commander) seat.commanderName = commander.value;
+  });
   container.innerHTML = '';
 
   seats.forEach((seat, i) => {
@@ -292,7 +303,7 @@ function renderSeats() {
           <option value="">— no deck —</option>
           ${deckOptions}
         </select>
-        <input type="text" name="commander_names" id="cmd-${i}"
+        <input type="text" name="commander_names" id="cmd-${i}" value="${escHtml(seat.commanderName)}"
                placeholder="…or type a commander"
                title="Used only if no deck is selected. Resolves to that commander's deck, creating one if you don't have it yet."
                style="width:190px">`;
@@ -376,6 +387,7 @@ function assignSeat(pos) {
 
 function onUserChange(seatIndex, selectEl) {
   const userId = selectEl.value ? parseInt(selectEl.value) : null;
+  const previousUser = users.find(u => u.id === seats[seatIndex].userId);
   seats[seatIndex].userId = userId;
   const deckSel = document.getElementById(`deck-sel-${seatIndex}`);  // absent in Momir
   if (deckSel) {
@@ -388,7 +400,10 @@ function onUserChange(seatIndex, selectEl) {
   // Auto-fill name
   const nameInput = document.getElementById(`name-${seatIndex}`);
   const userObj = users.find(u => u.id === userId);
-  if (userObj && nameInput && !nameInput.value) nameInput.value = userObj.name;
+  if (userObj && nameInput && (!nameInput.value || nameInput.value === previousUser?.name)) {
+    nameInput.value = userObj.name;
+  }
+  if (nameInput) seats[seatIndex].playerName = nameInput.value;
   renderDiagram();
 }
 

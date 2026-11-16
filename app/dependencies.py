@@ -227,6 +227,18 @@ def scryfall_image_fallback(scryfall_id: str, size: str = "normal", face: str = 
     return url + "&face=back" if face == "back" else url
 
 
+def commander_art_sources(scryfall_id: str | None, image_url: str | None = None) -> list[str]:
+    """Art-only backgrounds; the mirror only hosts full cards."""
+    sources = []
+    if image_url and urlparse(image_url).hostname == "cards.scryfall.io":
+        crop = re.sub(r"/(?:small|normal|large|png|border_crop)/", "/art_crop/", image_url)
+        if "/art_crop/" in crop:
+            sources.append(crop.replace(".png", ".jpg"))
+    if scryfall_id:
+        sources.append(scryfall_image_fallback(scryfall_id, "art_crop"))
+    return sources
+
+
 # Layouts that genuinely have a SECOND IMAGE, so a flip control has something to
 # show. Measured against the live mirror on 2026-08-16, one card per layout —
 # not taken from memory, because the answer is counter-intuitive:
@@ -262,6 +274,7 @@ def has_back_face(card) -> bool:
     return (getattr(card, "layout", None) or "").strip().lower() in BACKED_LAYOUTS
 
 
+templates.env.globals["commander_art_sources"] = commander_art_sources
 templates.env.globals["mirror_image_url"] = mirror_image_url
 templates.env.globals["scryfall_image_fallback"] = scryfall_image_fallback
 templates.env.globals["has_back_face"] = has_back_face
