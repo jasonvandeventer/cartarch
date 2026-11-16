@@ -30,21 +30,24 @@ previously-undefined order for bulk-added rows that share an ``added_at``).
 
 from __future__ import annotations
 
+import re
+
 from sqlalchemy import case, func
 
 from app.models import Card
 from app.pricing import inventory_unit_price
 
 # --- Canonical sort fields ---------------------------------------------------
-# The seven fields the shared dropdown must offer, in display order. Surfaces
+# The fields the shared dropdown must offer, in display order. Surfaces
 # may PREPEND their own surface-specific default (e.g. Showcase "Date Added",
 # Collection "Date Added"/"Placement"/"Owned Count") — the shared partial just
-# renders whatever (key, label) list it is handed. Keep this list to the seven.
+# renders whatever (key, label) list it is handed.
 CARD_SORT_OPTIONS: list[tuple[str, str]] = [
     ("name", "Name"),
     ("cmc", "Mana Value"),
     ("color", "Color"),
     ("set", "Set"),
+    ("collector", "Collector Number"),
     ("rarity", "Rarity"),
     ("price", "Price"),
     ("available", "Quantity Available"),
@@ -119,7 +122,7 @@ def color_sort_value(card) -> tuple:
 # --- Per-surface dropdown option lists ---------------------------------------
 # Each surface PREPENDS its surface-specific default/extra options (preserved so
 # behavior is unchanged until the user picks a sort — decision e) then offers the
-# canonical seven. The shared partial renders whatever (key, label) pairs it is
+# canonical fields. The shared partial renders whatever (key, label) pairs it is
 # given, so the differing internal key for Price ("price" on Showcase/Share,
 # "value" on the live-query surfaces, matching each one's existing query branch)
 # is invisible to the user — the field set is identical everywhere.
@@ -139,6 +142,7 @@ _LIVE_CANONICAL: list[tuple[str, str]] = [
     ("cmc", "Mana Value"),
     ("color", "Color"),
     ("set", "Set"),
+    ("collector", "Collector Number"),
     ("rarity", "Rarity"),
     ("value", "Price"),
     ("available", "Quantity Available"),
@@ -198,6 +202,15 @@ def _price_or_none(value):
     return value or None
 
 
+def collector_sort_key(value: str | None) -> tuple[int, str, str]:
+    """Numeric collector numbers, then suffixes, then nonnumeric identifiers."""
+    text = (value or "").strip().lower()
+    match = re.match(r"^(\d+)([a-z]*)$", text)
+    if match:
+        return (0, f"{int(match.group(1)):09d}", match.group(2))
+    return (1, text, "")
+
+
 def slot_sort_value(slot: str | None) -> tuple[int, int, str]:
     """Numeric-aware ordering for ``InventoryRow.slot``.
 
@@ -232,6 +245,7 @@ SHOWCASE_SORT_KEYS = {
         lambda it: ((it["card"].set_code or ""), (it["card"].collector_number or "")),
         False,
     ),
+    "collector": (lambda it: collector_sort_key(it["card"].collector_number), False),
     "rarity": (lambda it: rarity_rank(it["card"].rarity), False),
     "price": (lambda it: _price_or_none(it["effective_price"]), True),
     "available": (lambda it: _avail(it), False),
@@ -281,6 +295,7 @@ ROW_SORT_KEYS = {
         lambda r: ((r.card.set_code or ""), (r.card.collector_number or "")),
         False,
     ),
+    "collector": (lambda r: collector_sort_key(r.card.collector_number), False),
     "rarity": (lambda r: rarity_rank(r.card.rarity), False),
     "value": (_row_price, True),
     "available": (lambda r: r.quantity, False),

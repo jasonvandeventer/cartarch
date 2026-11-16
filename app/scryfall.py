@@ -1556,9 +1556,10 @@ def search_cards_by_name(name: str, limit: int = 500) -> list[dict[str, Any]]:
     if not query:
         return []
 
+    # Playtest cards are Scryfall extras; collection imports must include them.
     url: str | None = (
         "https://api.scryfall.com/cards/search"
-        f'?q=!"{query}" or {query}&unique=prints&order=released&dir=desc'
+        f'?q=!"{query}" or {query}&unique=prints&order=released&dir=desc&include_extras=true'
     )
     cards: list[dict[str, Any]] = []
     while url and len(cards) < limit:

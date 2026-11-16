@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import logging
-import re
 from collections.abc import Iterable
 from datetime import datetime, timedelta
 
@@ -41,12 +40,8 @@ DRAWER_LABELS = {
 }
 
 
-def collector_sort_key(value: str | None) -> tuple[int, str, str]:
-    text = (value or "").strip().lower()
-    match = re.match(r"^(\d+)([a-z]*)$", text)
-    if match:
-        return (0, f"{int(match.group(1)):09d}", match.group(2))
-    return (1, text, "")
+# Preserve the existing import path for drawer ordering callers.
+collector_sort_key = sort_spec.collector_sort_key
 
 
 def get_drawer_label(drawer: str | None, location: StorageLocation | None = None) -> str:
@@ -1728,6 +1723,9 @@ def list_inventory_rows(
             InventoryRow.id.asc(),
         )
         rows = query.offset((page - 1) * per_page).limit(per_page).all()
+    elif sort == "collector":
+        rows = sort_spec.sort_inventory_rows(base_query.all(), sort, direction)
+        rows = rows[(page - 1) * per_page : page * per_page]
     elif sort == "color":
         rows = base_query.all()
         rows.sort(key=lambda r: sort_spec.color_sort_value(r.card), reverse=reverse)

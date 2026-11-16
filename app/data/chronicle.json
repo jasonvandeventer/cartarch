@@ -1,5 +1,17 @@
 [
   {
+    "version": "4.20.5",
+    "date": "2026-11-16",
+    "added": [
+      "Collector Number sorting is available on collection, deck, location, showcase, shared-view, and trade-picker card lists, with numeric ordering and support for suffixes."
+    ],
+    "refined": [],
+    "resolved": [
+      "Manual import searches now find Mystery Booster playtest cards alongside ordinary printings."
+    ],
+    "archivist_note": "We made it easier to find the unusual cards in an import and put a collection in the order printed on the cards."
+  },
+  {
     "version": "4.20.4",
     "date": "2026-10-25",
     "added": [

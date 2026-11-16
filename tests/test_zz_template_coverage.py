@@ -50,7 +50,6 @@ _ALLOWED_UNRENDERED = {
     "bulk_delete_confirm.html": "reached only from a POST preview",
     "delete_preview.html": "reached only from a POST preview",
     "manual_preview.html": "HTMX fragment of the manual add flow",
-    "manual_search_results.html": "HTMX fragment of the manual add flow",
     "_review_tags_panel_content.html": "HTMX fragment of the tag review panel",
 }
 

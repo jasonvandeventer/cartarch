@@ -228,3 +228,18 @@ def test_the_sort_runs_over_the_WHOLE_set_not_the_page(client, db, user, world):
 
     dearest = client.get(f"/trades/picker/requested?{_base(world)}&sort=price&direction=desc")
     assert _names(dearest.text)[0] == "A059", "the sort only reordered the visible page"
+
+
+def test_picker_collector_number_sort(client, db, user, world):
+    for name, number in (("Alpha", "10"), ("Beta", "2"), ("Gamma", "12a")):
+        db.query(Card).filter(Card.name == name).one().collector_number = number
+    db.commit()
+    for direction, expected in (
+        ("asc", ["Beta", "Alpha", "Gamma"]),
+        ("desc", ["Gamma", "Alpha", "Beta"]),
+    ):
+        response = client.get(
+            f"/trades/picker/requested?{_base(world)}&sort=collector&direction={direction}"
+        )
+        assert response.status_code == 200
+        assert _names(response.text) == expected
