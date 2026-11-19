@@ -1,5 +1,19 @@
 [
   {
+    "version": "4.20.8",
+    "date": "2026-11-19",
+    "added": [],
+    "refined": [
+      "Collection pages sorted by set or collector number load only the requested page of inventory."
+    ],
+    "resolved": [
+      "Cards within a set now follow numeric collector order, including letter suffixes.",
+      "Switch Printing preserves the language of each copy and offers swaps only when enough loose, owned copies are available.",
+      "Editing a deck keeps the active search and sort, and filtered deck views show totals for the whole deck."
+    ],
+    "archivist_note": "We made it easier to follow printed card order and keep track of the physical copies that move into a deck."
+  },
+  {
     "version": "4.20.7",
     "date": "2026-11-16",
     "added": [],
