@@ -1,5 +1,16 @@
 [
   {
+    "version": "4.20.10",
+    "date": "2026-11-19",
+    "added": [],
+    "refined": [],
+    "resolved": [
+      "Collection CSV sync now counts tokens by printing and finish, and distinguishes real cards from proxies.",
+      "Token imports and migrations retain foil and etched finishes. New mixed card and token import batches can be undone together."
+    ],
+    "archivist_note": "We kept physical copies distinct from proxies and made token acquisitions reversible alongside cards."
+  },
+  {
     "version": "4.20.9",
     "date": "2026-11-19",
     "added": [],

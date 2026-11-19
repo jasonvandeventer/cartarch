@@ -861,13 +861,15 @@ def persist_import_rows(
         # collection on every import. Logged directly (tokens have no
         # InventoryRow for the audit payload) and reported separately.
         if is_token_card(card.layout, card.set_type):
-            upsert_token_from_card(
+            token = upsert_token_from_card(
                 session,
                 user_id=user_id,
                 card=card,
                 quantity=qty,
                 storage_location_id=resolved_loc_id,
+                finish=finish,
             )
+            session.flush()
             log_transaction(
                 session=session,
                 user_id=user_id,
@@ -876,6 +878,7 @@ def persist_import_rows(
                 finish=finish,
                 quantity_delta=qty,
                 destination_location="token_inventory",
+                token_inventory_id=token.id,
                 batch_id=batch.id,
                 note=f"Imported from row {row.get('line_number')} (routed to token inventory)",
             )

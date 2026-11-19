@@ -513,10 +513,11 @@ def upsert_token_from_card(
     card: Card,
     quantity: int,
     storage_location_id: int | None = None,
+    finish: str = "normal",
 ) -> TokenInventory:
     """Create-or-merge a token_inventory row from a cards-cache printing.
 
-    Keyed on (user_id, scryfall_id): a merge sums quantity and keeps the
+    Keyed on (user_id, scryfall_id, finish): a merge sums quantity and keeps the
     existing row's location (fills it only when unset). No commit — callers
     own the transaction. DFC back faces stay NULL in v1 (the cards cache
     carries no face data); is_double_sided is still set from layout.
@@ -526,7 +527,9 @@ def upsert_token_from_card(
         .filter(
             TokenInventory.user_id == user_id,
             TokenInventory.scryfall_id == card.scryfall_id,
+            TokenInventory.finish == finish,
         )
+        .with_for_update()
         .first()
     )
     if existing:
@@ -542,6 +545,7 @@ def upsert_token_from_card(
         type_line=card.type_line,
         subtype=_subtype_from_type_line(card.type_line),
         quantity=quantity,
+        finish=finish,
         set_code=card.set_code,
         collector_number=card.collector_number,
         scryfall_id=card.scryfall_id,
@@ -596,6 +600,7 @@ def migrate_rows_to_token_inventory(session: Session, *, user_id: int, row_ids: 
             user_id=user_id,
             card=row.card,
             quantity=row.quantity,
+            finish=row.finish,
             storage_location_id=row.storage_location_id,
         )
         log_transaction(

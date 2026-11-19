@@ -52,6 +52,7 @@ def log_transaction(
     inventory_row_id: int | None = None,
     note: str | None = None,
     flush: bool = False,
+    token_inventory_id: int | None = None,
 ) -> TransactionLog:
     log = TransactionLog(
         user_id=user_id,
@@ -63,6 +64,7 @@ def log_transaction(
         destination_location=destination_location,
         batch_id=batch_id,
         inventory_row_id=inventory_row_id,
+        token_inventory_id=token_inventory_id,
         note=note,
     )
     session.add(log)

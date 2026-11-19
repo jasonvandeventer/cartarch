@@ -18,7 +18,14 @@ from app.location_service import (
     has_extended_drawers,
     numbered_drawers,
 )
-from app.models import Card, InventoryRow, ShowcaseItem, StorageLocation, TransactionLog
+from app.models import (
+    Card,
+    InventoryRow,
+    ShowcaseItem,
+    StorageLocation,
+    TokenInventory,
+    TransactionLog,
+)
 from app.pricing import effective_price, inventory_unit_price, inventory_unit_price_expr
 from app.scryfall import card_constructor_kwargs, fetch_card_by_scryfall_id, fetch_oracle_id
 from app.timeutil import utc_now
@@ -2688,10 +2695,11 @@ def find_inventory_matches_for_collection_import(
 
     # Shared scaffold: resolve sid→card_id, build (card_id, finish) keys, and
     # run the tuple-IN outerjoin fetch (pending rows come through with loc=None).
-    card_by_sid, lookup_keys, rows = resolve_import_inventory_matches(session, user_id, parsed_rows)
+    card_by_sid, _, rows = resolve_import_inventory_matches(session, user_id, parsed_rows)
 
     # Bucket each matching row into its (card_id, finish) breakdown.
-    breakdown_by_key: dict[tuple[int, str], list[dict]] = {key: [] for key in lookup_keys}
+    breakdown_by_key: dict[tuple[str, str, bool], list[dict]] = {}
+    sid_by_card = {cid: sid for sid, cid in card_by_sid.items()}
     for row, loc in rows:
         if loc is None:
             location_name = "Pending"
@@ -2699,12 +2707,36 @@ def find_inventory_matches_for_collection_import(
         else:
             location_name = loc.name
             location_type = loc.type
-        breakdown_by_key[(row.card_id, row.finish)].append(
+        breakdown_by_key.setdefault(
+            (sid_by_card[row.card_id], row.finish, row.is_proxy), []
+        ).append(
             {
                 "location_name": location_name,
                 "location_type": location_type,
                 "quantity": row.quantity,
                 "_inventory_row_id": row.id,  # for sort, stripped before return
+            }
+        )
+
+    token_rows = (
+        session.query(TokenInventory)
+        .options(joinedload(TokenInventory.storage_location))
+        .filter(
+            TokenInventory.user_id == user_id,
+            TokenInventory.scryfall_id.in_(
+                {r.get("scryfall_id") for r in parsed_rows if r.get("scryfall_id")}
+            ),
+        )
+        .all()
+    )
+    for token in token_rows:
+        loc = token.storage_location
+        breakdown_by_key.setdefault((token.scryfall_id, token.finish, False), []).append(
+            {
+                "location_name": loc.name if loc else "Token inventory",
+                "location_type": loc.type if loc else "other",
+                "quantity": token.quantity,
+                "_inventory_row_id": token.id,
             }
         )
 
@@ -2728,23 +2760,7 @@ def find_inventory_matches_for_collection_import(
         quantity_needed = max(1, int(r.get("quantity") or 1))
         line_number = r.get("line_number")
 
-        if card_id is None:
-            output.append(
-                {
-                    "line_number": line_number,
-                    "card_id": None,
-                    "scryfall_id": sid,
-                    "finish": finish,
-                    "quantity_needed": quantity_needed,
-                    "total_user_owned": 0,
-                    "owned_breakdown": [],
-                    "recommended_action": "import_new",
-                    "recommended_new_qty": quantity_needed,
-                }
-            )
-            continue
-
-        breakdown = breakdown_by_key.get((card_id, finish), [])
+        breakdown = breakdown_by_key.get((sid, finish, bool(r.get("is_proxy"))), [])
         total_user_owned = sum(e["quantity"] for e in breakdown)
 
         if total_user_owned >= quantity_needed:
@@ -3392,18 +3408,49 @@ def _undo_import_logs(
         .populate_existing()
         .all()
     }
-    required: dict[int, int] = {}
+    token_ids = [log.token_inventory_id for log in pending if log.token_inventory_id is not None]
+    tokens = (
+        {
+            token.id: token
+            for token in session.query(TokenInventory)
+            .filter(TokenInventory.user_id == user_id, TokenInventory.id.in_(token_ids))
+            .order_by(TokenInventory.id)
+            .with_for_update()
+            .populate_existing()
+            .all()
+        }
+        if token_ids
+        else {}
+    )
+    required = {}
+    targets = {}
     for log in pending:
-        row = rows.get(log.inventory_row_id)
-        if row is None or row.card_id != log.card_id or row.finish != log.finish:
-            raise ValueError("Cannot undo this import: its inventory row was removed or changed.")
-        required[row.id] = required.get(row.id, 0) + abs(log.quantity_delta)
-        if required[row.id] > row.quantity:
+        if log.destination_location == "token_inventory":
+            row = tokens.get(log.token_inventory_id)
+            card = session.get(Card, log.card_id)
+            if (
+                row is None
+                or card is None
+                or row.scryfall_id != card.scryfall_id
+                or row.finish != log.finish
+            ):
+                raise ValueError(
+                    "Cannot undo this import: its original token row cannot be verified."
+                )
+        else:
+            row = rows.get(log.inventory_row_id)
+            if row is None or row.card_id != log.card_id or row.finish != log.finish:
+                raise ValueError(
+                    "Cannot undo this import: its inventory row was removed or changed."
+                )
+        targets[log.id] = row
+        required[row] = required.get(row, 0) + abs(log.quantity_delta)
+        if required[row] > row.quantity:
             raise ValueError("Cannot undo this import: some of its copies are no longer present.")
 
     now = utc_now()
     for log in pending:
-        row = rows[log.inventory_row_id]
+        row = targets[log.id]
         row.quantity -= abs(log.quantity_delta)
         row.updated_at = now
         log.reversed_at = now
@@ -3415,14 +3462,20 @@ def _undo_import_logs(
             finish=log.finish,
             quantity_delta=-abs(log.quantity_delta),
             batch_id=log.batch_id,
-            inventory_row_id=row.id,
+            inventory_row_id=log.inventory_row_id,
+            token_inventory_id=log.token_inventory_id,
             note=f"Undid import log {log.id}" + (f" from batch {log.batch_id}" if batch else ""),
             flush=False,
         )
-    for row_id in required:
-        row = rows[row_id]
-        if row.quantity == 0:
-            clean_inventory_row_references(session, [row_id])
+    for row in required:
+        if row.quantity != 0:
+            continue
+        if isinstance(row, TokenInventory):
+            from app.token_service import delete_token
+
+            delete_token(session, row.id, user_id, commit=False)
+        else:
+            clean_inventory_row_references(session, [row.id])
             session.delete(row)
     session.commit()
     return len(pending)

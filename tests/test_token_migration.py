@@ -201,3 +201,45 @@ def test_migrate_routes(client, db, user):
     resp = client.get("/tokens/migrate")
     assert resp.status_code == 200
     assert "No token printings found" in resp.text
+
+
+def test_mixed_import_sync_and_undo_preserve_finish_and_existing_copies(db, user):
+    from app.inventory_service import find_inventory_matches_for_collection_import, undo_last_batch
+
+    token = _card(db)
+    card = _card(db, name="Island", layout="normal", set_type="expansion")
+    lines = [
+        {"line_number": i, "scryfall_id": c.scryfall_id, "quantity": 2, "finish": finish}
+        for i, (c, finish) in enumerate([(card, "normal"), (token, "normal"), (token, "foil")], 1)
+    ]
+    proxy = _row(db, user.id, card, qty=2)
+    proxy.is_proxy = True
+    upsert_token_from_card(db, user_id=user.id, card=token, finish="foil", quantity=1)
+    db.commit()
+
+    def new_quantities():
+        return [
+            r["recommended_new_qty"]
+            for r in find_inventory_matches_for_collection_import(db, user.id, lines)
+        ]
+
+    assert new_quantities() == [2, 2, 1]
+    batch = persist_import_rows(db, lines, user_id=user.id)
+    assert new_quantities() == [0, 0, 0]
+    assert sorted((r.finish, r.quantity) for r in db.query(TokenInventory)) == [
+        ("foil", 3),
+        ("normal", 2),
+    ]
+    assert undo_last_batch(db, batch["batch_id"], user.id) == 3
+    assert undo_last_batch(db, batch["batch_id"], user.id) == 0
+    assert new_quantities() == [2, 2, 1]
+    assert db.query(InventoryRow).one().is_proxy
+
+
+def test_token_migration_preserves_etched_finish(db, user):
+    token = _card(db)
+    src = _row(db, user.id, token)
+    src.finish = "etched"
+    db.commit()
+    migrate_rows_to_token_inventory(db, user_id=user.id, row_ids=[src.id])
+    assert db.query(TokenInventory).one().finish == "etched"
