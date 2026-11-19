@@ -732,19 +732,23 @@ async def game_end(
     if not game:
         raise HTTPException(status_code=404, detail="Game not found")
 
-    placements: dict[int, int] = {}
+    placements: dict[int, int | None] = {}
     final_lives: dict[int, int | None] = {}
     elimination_causes: dict[int, str | None] = {}
     for seat in game.seats:
         p_val = form_data.get(f"placement_{seat.id}", "")
         l_val = form_data.get(f"final_life_{seat.id}", "")
         c_val = form_data.get(f"elimination_cause_{seat.id}", None)
-        if p_val:
+        if not p_val and f"placement_{seat.id}" in form_data:
+            placements[seat.id] = None
+        elif p_val:
             try:
                 placements[seat.id] = int(p_val)
             except ValueError:
                 pass
-        if l_val:
+        if not l_val and f"final_life_{seat.id}" in form_data:
+            final_lives[seat.id] = None
+        elif l_val:
             try:
                 final_lives[seat.id] = int(l_val)
             except ValueError:
@@ -811,7 +815,8 @@ async def game_end(
             checked.add((int(parts[1]), int(parts[2])))
         except ValueError:
             continue
-    record_goal_results(session, game_id, current_user.id, checked)
+    if not was_finalized or "goals_submitted" in form_data or checked:
+        record_goal_results(session, game_id, current_user.id, checked)
 
     # #175 — last-chance attribution. The form renders `commander_{seat_id}` only
     # for seats holding neither a deck nor a commander name; the service re-checks

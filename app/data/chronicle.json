@@ -1,5 +1,15 @@
 [
   {
+    "version": "4.20.9",
+    "date": "2026-11-19",
+    "added": [],
+    "refined": [],
+    "resolved": [
+      "Editing a finalized game preserves recorded deck goals. Clearing placement or final life on the result form now removes the old value."
+    ],
+    "archivist_note": "We made corrections to a game result preserve the rest of its history."
+  },
+  {
     "version": "4.20.8",
     "date": "2026-11-19",
     "added": [],

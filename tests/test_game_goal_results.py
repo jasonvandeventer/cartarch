@@ -269,3 +269,39 @@ def test_stats_empty_for_non_owner():
     d = _deck(s, owner.id)
     deck_service.create_deck_goal(s, owner.id, d.id, "goal")
     assert deck_service.deck_goal_stats(s, other.id, d.id) == []
+
+
+def test_result_edit(client, db, user):
+    deck = _deck(db, user.id)
+    goal = deck_service.create_deck_goal(db, user.id, deck.id, "Draw three")
+    game = _game(db, user.id)
+    seat = _seat(db, game.id, 1, "Owner", deck_id=deck.id)
+    db.commit()
+    url = f"/games/{game.id}/end"
+    assert (
+        client.post(
+            url,
+            data={
+                f"goal_{seat.id}_{goal.id}": "1",
+                f"final_life_{seat.id}": "12",
+                f"placement_{seat.id}": "1",
+            },
+            follow_redirects=False,
+        ).status_code
+        == 303
+    )
+    assert db.query(GameGoalResult).one().achieved
+    summary = client.get(f"/games/{game.id}")
+    assert summary.status_code == 200
+    assert f'name="goal_{seat.id}_{goal.id}"' not in summary.text
+    assert (
+        client.post(
+            url,
+            data={"notes": "Corrected", f"placement_{seat.id}": "", f"final_life_{seat.id}": ""},
+            follow_redirects=False,
+        ).status_code
+        == 303
+    )
+    db.expire_all()
+    assert db.query(GameGoalResult).one().achieved
+    assert (seat.placement, seat.final_life) == (None, None)
