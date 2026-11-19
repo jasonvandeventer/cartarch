@@ -545,6 +545,13 @@ def shelf_sort_key(row: InventoryRow) -> tuple:
     )
 
 
+def _number_filing_slots(sorted_rows):
+    slots = {}
+    for row in sorted_rows:
+        identity = (row.card_id, row.finish, row.language or "en", bool(row.is_proxy))
+        yield row, str(slots.setdefault(identity, len(slots) + 1))
+
+
 def get_or_create_card(
     session: Session,
     scryfall_id: str,
@@ -2139,8 +2146,7 @@ def renumber_location_slots(session: Session, location_id: int, user_id: int) ->
     rows.sort(key=shelf_sort_key)
 
     changed = 0
-    for index, row in enumerate(rows, start=1):
-        target = str(index)
+    for row, target in _number_filing_slots(rows):
         if row.slot != target:
             row.slot = target
             changed += 1
@@ -3598,10 +3604,10 @@ def resort_collection(
 
     for (loc_id, target_number), bucket_rows in grouped.items():
         target_drawer = str(target_number) if target_number is not None else None
-        for index, row in enumerate(bucket_rows, start=1):
+        for row, slot in _number_filing_slots(bucket_rows):
             # Non-drawer locations (binder/box) carry no slot — the drawer slot
             # machinery only applies to numbered drawers.
-            target_slot = str(index) if target_number is not None else None
+            target_slot = slot if target_number is not None else None
             if target_drawer is not None:
                 if (
                     row.drawer == target_drawer

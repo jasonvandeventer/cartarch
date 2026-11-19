@@ -1,5 +1,16 @@
 [
   {
+    "version": "4.20.12",
+    "date": "2026-11-19",
+    "added": [],
+    "refined": [],
+    "resolved": [
+      "Matching copies of a printing now share one filing slot, including when they arrive in separate inventory rows. Different finishes and languages keep separate slots.",
+      "Pending placement now identifies deck returns and imported copies from their recorded movements."
+    ],
+    "archivist_note": "We keep each acquisition on record while filing matching copies together."
+  },
+  {
     "version": "4.20.11",
     "date": "2026-11-19",
     "added": [],

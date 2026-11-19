@@ -6,7 +6,59 @@ from app.inventory_service import get_drawer_label, get_location_label
 from app.pricing import inventory_unit_price
 
 
-def build_pending_view_model(rows, drawer_locations=None) -> dict:
+def pending_source_labels(session, user_id, rows):
+    """Trace the copies currently pending, newest movement first."""
+    from app.models import TransactionLog
+
+    remaining = {row.id: row.quantity for row in rows if not row.from_drawer}
+    if not remaining:
+        return {}
+    events = (
+        session.query(
+            TransactionLog.inventory_row_id,
+            TransactionLog.event_type,
+            TransactionLog.source_location,
+            TransactionLog.destination_location,
+            TransactionLog.quantity_delta,
+        )
+        .filter(
+            TransactionLog.user_id == user_id,
+            TransactionLog.inventory_row_id.in_(remaining),
+            TransactionLog.reversed_at.is_(None),
+        )
+        .order_by(TransactionLog.created_at.desc(), TransactionLog.id.desc())
+    )
+    sources = {}
+    for row_id, event, source, destination, quantity in events:
+        if remaining[row_id] <= 0:
+            continue
+        if event in ("import", "imported") and destination == "pending" and quantity > 0:
+            label = "New import"
+        elif (
+            event in ("return_from_deck", "switch_printing")
+            and destination == "collection"
+            and source
+            and quantity > 0
+        ):
+            kind, _, name = source.partition(":")
+            label = {"deck": f"Deck · {name}", "considering": f"Considering · {name}"}.get(
+                kind, source
+            )
+        else:
+            label = "Previous location unknown"
+            quantity = remaining[row_id]
+        sources.setdefault(row_id, set()).add(label)
+        remaining[row_id] -= quantity
+
+    labels = {}
+    for row_id, names in sources.items():
+        if remaining[row_id] > 0:
+            names.add("Previous location unknown")
+        labels[row_id] = next(iter(names)) if len(names) == 1 else "Multiple sources"
+    return labels
+
+
+def build_pending_view_model(rows, drawer_locations=None, source_labels=None) -> dict:
     """Build template payload pieces for the pending-placement page."""
     drawer_locations = drawer_locations or {}
     items = []
@@ -15,19 +67,10 @@ def build_pending_view_model(rows, drawer_locations=None) -> dict:
 
     for row in rows:
         price = inventory_unit_price(row)
-        # FROM should describe where the card physically is right now. Three
-        # cases, in priority order:
-        #   1. row.from_drawer set (resort_collection captured an old drawer
-        #      when pulling a placed row to pending — or v3.19.2's audit-log
-        #      backfill recovered it). Show that drawer.
-        #   2. row.from_drawer NULL but the row is imported and has no
-        #      previous physical position. Show "New import" so it reads
-        #      distinctly from a real-drawer source rather than collapsing
-        #      onto the same label as TO.
         if row.from_drawer:
             from_label = get_drawer_label(row.from_drawer, drawer_locations.get(row.from_drawer))
         else:
-            from_label = "New import"
+            from_label = (source_labels or {}).get(row.id, "Previous location unknown")
         item = {
             "id": row.id,
             "card": row.card,

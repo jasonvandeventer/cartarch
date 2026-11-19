@@ -157,3 +157,54 @@ def test_twelve_drawer_sort_confirm_counts_and_audit(db, user, client):
     assert client.get("/collection?drawer=10").status_code == 200
     audit = client.get(f"/audit/start?location_id={woe.storage_location_id}").text
     assert "woe" in audit.lower()
+
+
+def test_identical_foil_returns_and_imports_share_a_slot(db, user, client):
+    from app.models import TransactionLog
+
+    configure_twelve_drawers(db, user.id)
+    returned = seed_row(db, user, "Swamp", "mom", quantity=29, type_line="Basic Land — Swamp")
+    returned.finish = "foil"
+
+    def copy(finish, language):
+        row = InventoryRow(
+            user_id=user.id,
+            card_id=returned.card_id,
+            finish=finish,
+            language=language,
+            quantity=1,
+            is_pending=True,
+        )
+        db.add(row)
+        db.flush()
+        return row
+
+    normal = copy("normal", "en")
+    foreign = copy("foil", "ja")
+    imported = copy("foil", "en")
+    for row, event, source, destination in (
+        (returned, "return_from_deck", "deck:Black Lotus", "collection"),
+        (imported, "import", None, "pending"),
+    ):
+        db.add(
+            TransactionLog(
+                user_id=user.id,
+                inventory_row_id=row.id,
+                event_type=event,
+                source_location=source,
+                destination_location=destination,
+                quantity_delta=row.quantity,
+            )
+        )
+    db.commit()
+    resort_collection(db, user.id)
+    db.expire_all()
+    assert returned.drawer == imported.drawer == "11"
+    assert returned.slot == imported.slot
+    assert len({normal.slot, foreign.slot, imported.slot}) == 3
+    assert (returned.quantity, imported.quantity) == (29, 1)
+    assert resort_collection(db, user.id) == 0
+    page = client.get("/pending")
+    assert page.status_code == 200
+    assert "FROM: Deck · Black Lotus" in page.text
+    assert page.text.count("FROM: New import") == 1

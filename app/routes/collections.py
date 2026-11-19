@@ -88,6 +88,7 @@ from app.models import (
 from app.presentation_service import (
     build_pending_batch_groups,
     build_pending_view_model,
+    pending_source_labels,
 )
 from app.pricing import card_metadata, effective_price, inventory_unit_price
 from app.sorter_rule_service import (
@@ -1755,7 +1756,11 @@ def pending_page(
     )
     from app.location_service import numbered_drawers
 
-    view_model = build_pending_view_model(rows, numbered_drawers(session, current_user.id))
+    view_model = build_pending_view_model(
+        rows,
+        numbered_drawers(session, current_user.id),
+        pending_source_labels(session, current_user.id, rows) if use_drawer_sorter else None,
+    )
 
     # v3.28.7 — batch grouping for non-drawer-sorter users. Drawer-sorter users
     # keep their drawer-grouping (`grouped_drawers`) because that mirrors their
