@@ -57,6 +57,8 @@ def run_alerts(session: Session) -> int:
             watch = session.get(WatchlistItem, r["id"])
             if watch is None:
                 continue
+            if r.get("current_min_price") is None:
+                continue  # A missing quote gives no evidence of a new crossing.
             if not r.get("target_met"):
                 watch.last_alerted_at = None  # re-arm once back above target
                 continue

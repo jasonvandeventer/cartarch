@@ -78,6 +78,7 @@ def trades_inbox(
             "incoming": data["incoming"],
             "sent": data["sent"],
             "recent": data["recent"],
+            "counts": data["counts"],
             "error": error,
             "success": success,
         },

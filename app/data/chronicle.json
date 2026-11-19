@@ -1,5 +1,16 @@
 [
   {
+    "version": "4.20.11",
+    "date": "2026-11-19",
+    "added": [],
+    "refined": [],
+    "resolved": [
+      "Trade counters now notify the player who can respond. The inbox and shared wishlists show the cards in the current offer, including after a counter is declined.",
+      "A missing price quote no longer triggers a repeat wishlist alert when the same price returns."
+    ],
+    "archivist_note": "We made the trade inbox and wishlist alerts reflect what actually changed."
+  },
+  {
     "version": "4.20.10",
     "date": "2026-11-19",
     "added": [],

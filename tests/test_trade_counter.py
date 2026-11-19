@@ -692,3 +692,28 @@ def test_the_page_and_the_service_agree_about_who_answers(client, db, world):
         except ValueError:
             allowed = False
         assert offered == allowed, f"{name}: page offers accept={offered}, service allows={allowed}"
+
+
+def test_counter_view(db, client, world):
+    tr = world["trade"]
+    p = world["proposer"]
+    r = world["recipient"]
+    ts.counter_trade(
+        db,
+        tr.id,
+        r.id,
+        offered=[{"showcase_item_id": world["p_share_items"][0].id, "quantity": 1}],
+        requested=[{"showcase_item_id": world["r_share_items"][1].id, "quantity": 1}],
+    )
+    assert ts.pending_action_count(db, p.id) == 1
+    assert ts.pending_action_count(db, r.id) == 0
+    page = _as(client, p).get("/trades")
+    assert page.status_code == 200
+    assert "1 offered," in page.text and "1 requested" in page.text
+    assert set(ts.pending_offer_names_for_playgroup(db, world["pg"].id, [r.id])[r.id]) == {
+        "sol ring"
+    }
+    assert tr in ts.list_trades_for_user(db, p.id)["incoming"]
+    ts.decline_counter(db, tr.id, p.id)
+    assert ts.pending_action_count(db, r.id) == 1
+    assert ts.pending_offer_names_for_playgroup(db, world["pg"].id, [r.id])[r.id] == {"secret card"}

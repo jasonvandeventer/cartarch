@@ -73,8 +73,8 @@ project convention.
 
 from __future__ import annotations
 
-from sqlalchemy import or_
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy import func, or_, select
+from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.decklist_service import _build_full_location_label
 from app.models import (
@@ -1133,6 +1133,25 @@ class _SnapshotCardProjection:
 # ── Inbox + badge ───────────────────────────────────────────────
 
 
+def _latest_revision_column(column):
+    """SQL counterpart of current_revision: last non-declined revision by ID."""
+    return (
+        select(column)
+        .where(TradeRevision.trade_id == Trade.id, TradeRevision.declined_at.is_(None))
+        .order_by(TradeRevision.id.desc())
+        .limit(1)
+        .correlate(Trade)
+        .scalar_subquery()
+    )
+
+
+def _open_trades(session, user_id):
+    return session.query(Trade).filter(
+        Trade.status == "proposed",
+        or_(Trade.proposer_user_id == user_id, Trade.recipient_user_id == user_id),
+    )
+
+
 def list_trades_for_user(session: Session, user_id: int) -> dict:
     """Inbox payload: incoming pending, sent pending, recent terminal.
 
@@ -1144,36 +1163,21 @@ def list_trades_for_user(session: Session, user_id: int) -> dict:
     ``recent`` is capped to the latest 20 terminal trades involving
     the user (proposer OR recipient) so the inbox stays compact.
     """
-    incoming = (
-        session.query(Trade)
-        .filter(
-            Trade.recipient_user_id == user_id,
-            Trade.status == "proposed",
-        )
+    open_trades = (
+        _open_trades(session, user_id)
         .options(
             joinedload(Trade.proposer),
             joinedload(Trade.recipient),
             joinedload(Trade.playgroup),
-            joinedload(Trade.items),
+            selectinload(Trade.items),
+            selectinload(Trade.revisions),
         )
-        .order_by(Trade.created_at.desc())
+        .order_by(Trade.updated_at.desc(), Trade.id.desc())
         .all()
     )
-    sent = (
-        session.query(Trade)
-        .filter(
-            Trade.proposer_user_id == user_id,
-            Trade.status == "proposed",
-        )
-        .options(
-            joinedload(Trade.proposer),
-            joinedload(Trade.recipient),
-            joinedload(Trade.playgroup),
-            joinedload(Trade.items),
-        )
-        .order_by(Trade.created_at.desc())
-        .all()
-    )
+    incoming, sent = [], []
+    for trade in open_trades:
+        (sent if _current_author_id(trade) == user_id else incoming).append(trade)
     recent = (
         session.query(Trade)
         .filter(
@@ -1187,32 +1191,27 @@ def list_trades_for_user(session: Session, user_id: int) -> dict:
             joinedload(Trade.proposer),
             joinedload(Trade.recipient),
             joinedload(Trade.playgroup),
-            joinedload(Trade.items),
+            selectinload(Trade.items),
+            selectinload(Trade.revisions),
         )
         .order_by(Trade.closed_at.desc().nulls_last(), Trade.updated_at.desc())
         .limit(20)
         .all()
     )
-    return {"incoming": incoming, "sent": sent, "recent": recent}
+    counts = {
+        t.id: {side: len(_items_by_side(t, side)) for side in ("offered", "requested")}
+        for t in open_trades + recent
+    }
+    return {"incoming": incoming, "sent": sent, "recent": recent, "counts": counts}
 
 
 def pending_action_count(session: Session, user_id: int) -> int:
-    """Nav-badge count: proposed trades where the user is the recipient.
-
-    Single indexed count(*) — the inbox aggregate that lives in the
-    nav badge. ``proposed + recipient_user_id`` is covered by the
-    ``ix_trades_recipient_user_id`` + ``ix_trades_status`` indexes.
-    """
     if not user_id:
         return 0
-    return (
-        session.query(Trade)
-        .filter(
-            Trade.recipient_user_id == user_id,
-            Trade.status == "proposed",
-        )
-        .count()
+    author = func.coalesce(
+        _latest_revision_column(TradeRevision.author_user_id), Trade.proposer_user_id
     )
+    return _open_trades(session, user_id).filter(author != user_id).count()
 
 
 def resolve_propose_from_showcase_item(
@@ -1924,6 +1923,7 @@ def pending_offer_names_for_playgroup(
             Trade.recipient_user_id.in_(owner_user_ids),
             Trade.status.in_(("proposed", "accepted")),
             TradeItem.side == "offered",
+            TradeItem.revision_id.is_not_distinct_from(_latest_revision_column(TradeRevision.id)),
         )
         .all()
     )

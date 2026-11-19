@@ -120,6 +120,13 @@ def test_alert_fires_once_then_rearms_above_target(db, user, monkeypatch):
     assert price_alerts.run_alerts(db) == 0  # still met → no re-fire
     assert len(sent) == 1
 
+    c.price_usd = None
+    db.flush()
+    assert price_alerts.run_alerts(db) == 0
+    c.price_usd = "5.00"
+    db.flush()
+    assert price_alerts.run_alerts(db) == 0
+
     c.price_usd = "15.00"  # above target → re-arm
     db.flush()
     assert price_alerts.run_alerts(db) == 0
