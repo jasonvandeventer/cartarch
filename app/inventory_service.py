@@ -1681,14 +1681,6 @@ def list_inventory_rows(
             InventoryRow.id.desc() if reverse else InventoryRow.id.asc(),
         )
         rows = query.offset((page - 1) * per_page).limit(per_page).all()
-    elif sort == "set":
-        query = base_query.order_by(
-            Card.set_code.desc() if reverse else Card.set_code.asc(),
-            Card.collector_number.desc() if reverse else Card.collector_number.asc(),
-            Card.name.desc() if reverse else Card.name.asc(),
-            InventoryRow.id.desc() if reverse else InventoryRow.id.asc(),
-        )
-        rows = query.offset((page - 1) * per_page).limit(per_page).all()
     elif sort == "type":
         query = base_query.order_by(
             Card.type_line.desc() if reverse else Card.type_line.asc(),
@@ -1723,9 +1715,16 @@ def list_inventory_rows(
             InventoryRow.id.asc(),
         )
         rows = query.offset((page - 1) * per_page).limit(per_page).all()
-    elif sort == "collector":
-        rows = sort_spec.sort_inventory_rows(base_query.all(), sort, direction)
-        rows = rows[(page - 1) * per_page : page * per_page]
+    elif sort in {"collector", "set"}:
+        columns = sort_spec.collector_order_columns()
+        if sort == "set":
+            columns = (func.coalesce(Card.set_code, ""), *columns)
+        query = base_query.order_by(
+            *(col.desc() if reverse else col.asc() for col in columns),
+            func.lower(Card.name),
+            InventoryRow.id,
+        )
+        rows = query.offset((page - 1) * per_page).limit(per_page).all()
     elif sort == "color":
         rows = base_query.all()
         rows.sort(key=lambda r: sort_spec.color_sort_value(r.card), reverse=reverse)

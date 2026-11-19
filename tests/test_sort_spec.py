@@ -133,16 +133,6 @@ def test_rarity_sort_orders_by_rank_not_alpha():
     assert [it["card"].rarity for it in asc] == ["common", "rare", "mythic"]
 
 
-def test_set_collector_tiebreaker_is_lexical():
-    # Documented decision (d): lexical collector tiebreak => "#10" before "#2".
-    items = [
-        _item(1, _card(name="A", set_code="abc", collector="2")),
-        _item(2, _card(name="B", set_code="abc", collector="10")),
-    ]
-    asc = sort_spec.sort_showcase_items(list(items), "set", "asc")
-    assert [it["card"].collector_number for it in asc] == ["10", "2"]
-
-
 def test_stable_tiebreaker_breaks_equal_keys_by_name_then_id():
     # All same cmc -> ties must resolve deterministically by name, then id.
     items = [

@@ -63,12 +63,11 @@
                 <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                 <input type="hidden" name="scryfall_id" value="{{ entry.scryfall_id }}">
                 <input type="hidden" name="finish" value="{{ entry.finish }}">
-                {% set is_current = entry.set_code == current_set_code
-                  and entry.collector_number == current_collector_number
+                {% set is_current = entry.scryfall_id == row.card.scryfall_id
                   and entry.finish == current_finish %}
                 <button type="submit" class="switch-printing-pick"
-                  {% if is_current or entry.loose_quantity == 0 %}disabled{% endif %}
-                  {% if entry.loose_quantity == 0 and not is_current %}title="No loose copies available — all copies are in decks"{% endif %}>
+                  {% if is_current or entry.loose_quantity < row.quantity %}disabled{% endif %}
+                  {% if entry.loose_quantity < row.quantity and not is_current %}title="Requires {{ row.quantity }} loose copies"{% endif %}>
                     {{ entry.finish|capitalize }} · {{ entry.loose_quantity }} available
                   </button>
                 </form>

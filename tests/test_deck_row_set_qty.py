@@ -161,3 +161,29 @@ def test_both_views_render_the_quantity_box_for_a_basic_only(
     assert f"/decks/{deck.id}/rows/{rows['Forest'].id}/set-qty" in body
     assert f"/decks/{deck.id}/rows/{rows['Sol Ring'].id}/set-qty" not in body
     assert 'name="quantity"' in body
+
+
+def test_filtered_deck_keeps_view_and_whole_totals_after_edit(client, deck_with_forest):
+    deck, rows = deck_with_forest
+    path = f"/decks/{deck.id}"
+    page = client.get(path + "?search=Forest")
+    assert page.status_code == 200
+    assert "2 Unique Cards" in page.text and "5 Total Cards" in page.text
+    post = path + f"/rows/{rows['Forest'].id}/set-qty"
+
+    def edit(query):
+        response = client.post(
+            post,
+            data={"quantity": 7},
+            headers={"HX-Request": "true", "HX-Current-URL": path + query},
+        )
+        assert response.status_code == 200
+        return response.text
+
+    html = edit("?search=Forest")
+    assert "Forest" in html and "Sol Ring" not in html
+    assert "2 Unique Cards" in html and "8 Total Cards" in html
+    html = edit("?sort=name&direction=desc")
+    assert html.index("Sol Ring") < html.index("Forest")
+    fragment = client.get(path + "/cards-partial?collection_search=Island")
+    assert "collection_search=Island" in fragment.headers["HX-Push-Url"]

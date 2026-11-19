@@ -10,7 +10,7 @@ Two mechanisms, both driven by the constants in this module so they stay in
 lockstep:
 
   * **SQL** — the paginated Collection keeps ORDER BY in the query (it must not
-    fetch-all for large collections). It uses :func:`rarity_case` here for the
+    fetch-all for SQL-sortable fields). It uses :func:`rarity_case` here for the
     Rarity sort and ``InventoryRow.quantity`` for Available, so the rank is
     defined once. Engine-agnostic: SQLite now and Postgres in v4 (plain CASE /
     ``.nulls_last()``, no SQLite-only casts).
@@ -18,7 +18,8 @@ lockstep:
   * **Python** — for the fetch-all surfaces (Decks, Locations — via
     :func:`sort_inventory_rows`) and the computed Showcase/Share item dicts (via
     :func:`sort_showcase_items`), and for any value unreachable by ORDER BY: the
-    WUBRG Color set-order, the finish-aware Price, and the Showcase/Share
+    WUBRG Color set-order, the finish-aware
+    Price, and the Showcase/Share
     ``available = min(offered, inventory qty)``. Python sorts load the full
     result set into memory; the live surfaces already materialize their rows, so
     this adds no fetch — noted as a perf consideration only for very large lists.
@@ -202,13 +203,27 @@ def _price_or_none(value):
     return value or None
 
 
-def collector_sort_key(value: str | None) -> tuple[int, str, str]:
+def collector_sort_key(value: str | None) -> tuple[int, int | str, str]:
     """Numeric collector numbers, then suffixes, then nonnumeric identifiers."""
     text = (value or "").strip().lower()
-    match = re.match(r"^(\d+)([a-z]*)$", text)
+    match = re.match(r"^([0-9]+)([a-z]*)$", text)
     if match:
-        return (0, f"{int(match.group(1)):09d}", match.group(2))
+        return (0, int(match.group(1)), match.group(2))
     return (1, text, "")
+
+
+def collector_order_columns():
+    """SQL equivalent of collector_sort_key for paginated collection queries."""
+    value = func.lower(func.trim(func.coalesce(Card.collector_number, "")))
+    numeric = value.regexp_match(r"^[0-9]+[a-z]*$")
+    digits = func.ltrim(func.rtrim(value, "abcdefghijklmnopqrstuvwxyz"), "0")
+    # Comparing digit count then digits avoids integer overflow on either engine.
+    return (
+        case((numeric, 0), else_=1),
+        case((numeric, func.length(digits)), else_=0),
+        case((numeric, digits), else_=value),
+        case((numeric, func.ltrim(value, "0123456789")), else_=""),
+    )
 
 
 def slot_sort_value(slot: str | None) -> tuple[int, int, str]:
@@ -240,9 +255,8 @@ SHOWCASE_SORT_KEYS = {
     "name": (lambda it: (it["card"].name or "").lower(), False),
     "cmc": (lambda it: it["card"].cmc, True),
     "color": (lambda it: color_sort_value(it["card"]), False),
-    # Collector tiebreaker stays lexical (decision d): cheap + portable.
     "set": (
-        lambda it: ((it["card"].set_code or ""), (it["card"].collector_number or "")),
+        lambda it: ((it["card"].set_code or ""), collector_sort_key(it["card"].collector_number)),
         False,
     ),
     "collector": (lambda it: collector_sort_key(it["card"].collector_number), False),
@@ -278,8 +292,7 @@ def sort_showcase_items(items: list[dict], sort: str, direction: str) -> list[di
 # --- InventoryRow sorting (Python) -------------------------------------------
 # For the fetch-all live surfaces that materialize ORM rows then build dicts
 # (Decks, Locations). Duck-typed: needs r.card, r.finish, r.quantity, r.slot,
-# r.id. Collection is NOT routed here — it is paginated, so it keeps SQL ORDER
-# BY (with Python only for color/value/count/placement, as it already did).
+# r.id. Collection sorts set/collector in SQL before pagination.
 
 
 def _row_price(r):
@@ -292,7 +305,7 @@ ROW_SORT_KEYS = {
     "cmc": (lambda r: r.card.cmc, True),
     "color": (lambda r: color_sort_value(r.card), False),
     "set": (
-        lambda r: ((r.card.set_code or ""), (r.card.collector_number or "")),
+        lambda r: ((r.card.set_code or ""), collector_sort_key(r.card.collector_number)),
         False,
     ),
     "collector": (lambda r: collector_sort_key(r.card.collector_number), False),

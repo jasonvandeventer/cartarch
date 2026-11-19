@@ -142,35 +142,30 @@ _DECK_VIEW_PARAMS = (
 )
 
 
+def _deck_view_params(request: Request, deck_id: int) -> dict[str, str]:
+    url = request.headers.get("HX-Current-URL") or request.headers.get("referer", "")
+    parsed = urlsplit(url)
+    if parsed.path != f"/decks/{deck_id}" or (
+        parsed.netloc and parsed.netloc != request.url.netloc
+    ):
+        return {}
+    return {k: v for k, v in parse_qsl(parsed.query) if k in _DECK_VIEW_PARAMS and v}
+
+
 def _deck_redirect(request: Request, deck_id: int) -> RedirectResponse:
-    """303 back to the deck page, KEEPING the view the user was looking at.
-
-    Reported 2026-08-16: moving a card to Considering "sorta reloads the page —
-    it resets the sort order". Every POST on this page answered with a bare
-    ``/decks/{id}``, so any sort / group / search in the URL was discarded and
-    the page came back in default order. **It was 17 routes, not one** — the
-    reported action was just the one someone happened to use.
-
-    The POST's own URL carries no query (the forms post to action paths), so the
-    view can only come from the **Referer**. That is safe here because the target
-    is BUILT LOCALLY: the path is always ``/decks/{deck_id}``, and only known
-    view keys are copied across, so a forged Referer can at worst set the
-    victim's own sort order. It can never redirect them off-site — the classic
-    Referer-redirect hazard ``safe_redirect_url`` exists for, which is why this
-    does not reuse that helper (it returns the Referer ITSELF).
-    """
     target = f"/decks/{deck_id}"
-    referer = request.headers.get("referer", "")
-    if referer:
-        parsed = urlsplit(referer)
-        same_host = not parsed.netloc or parsed.netloc == request.url.netloc
-        if same_host and parsed.path == target:
-            keep = [
-                (k, v) for k, v in parse_qsl(parsed.query) if k in _DECK_VIEW_PARAMS and v != ""
-            ]
-            if keep:
-                target = f"{target}?{urlencode(keep)}"
+    params = _deck_view_params(request, deck_id)
+    if params:
+        target += "?" + urlencode(params)
     return RedirectResponse(url=target, status_code=303)
+
+
+def _whole_deck_totals(rows):
+    return (
+        len(rows),
+        sum(r.quantity for r in rows),
+        sum((inventory_unit_price(r) or 0) * r.quantity for r in rows),
+    )
 
 
 @router.get("/decks")
@@ -777,6 +772,7 @@ def deck_detail_page(
     deck = get_deck(session, deck_id=deck_id, user_id=current_user.id)
     items = []
     collection_results = []
+    deck_unique_cards = 0
     deck_total_value = 0.0
     total_cards = 0
     deck_record = (
@@ -861,6 +857,9 @@ def deck_detail_page(
         # shared in from sibling decks), so Card Types / Color Pips / mana curve
         # match the header's shared-inclusive total instead of the own-only set.
         all_deck_rows = resolved_deck_rows(session, deck, current_user.id)
+        deck_unique_cards = len(all_deck_rows)
+        if search.strip():
+            deck_unique_cards, total_cards, deck_total_value = _whole_deck_totals(all_deck_rows)
         if all_deck_rows:
             analytics = compute_deck_analytics(all_deck_rows)
             health = compute_deck_health(all_deck_rows)
@@ -1041,6 +1040,7 @@ def deck_detail_page(
             "color_identity": color_identity,
             "commanders": commanders if deck else [],
             "items": deck_cards if deck else [],
+            "deck_unique_cards": deck_unique_cards,
             "deck_total_value": deck_total_value if deck else 0.0,
             "deck_total_cards": total_cards if deck else 0,
             "bracket_v2": bracket_v2,
@@ -1119,8 +1119,7 @@ def _deck_cards_partial_response(
 
     Used by mutation routes (switch-printing, set-qty) that need to
     re-render the deck card display after the underlying row changes.
-    Uses the user's persisted view/group prefs (not URL params — those
-    only matter on the dedicated cards-partial GET endpoint).
+    Preserve the active deck URL's search and ordering across the swap.
 
     Caller is responsible for ensuring the deck exists; this helper does
     a defensive re-check anyway so it can be invoked from anywhere.
@@ -1129,11 +1128,24 @@ def _deck_cards_partial_response(
     if not deck:
         raise HTTPException(status_code=404, detail="Deck not found")
     view_mode = current_user.deck_view_mode or "grid"
-    group_by = current_user.deck_group_by or "type"
+    params = _deck_view_params(request, deck_id)
+    group = params.get("group")
+    group_by = group if group in DECK_GROUP_BY_OPTIONS else current_user.deck_group_by or "type"
+    search = params.get("search", "")
     items, deck_total_value, deck_total_cards = _build_deck_card_items(
-        session, deck, current_user.id, search="", sort="name", direction="asc"
+        session,
+        deck,
+        current_user.id,
+        search,
+        params.get("sort", "name"),
+        params.get("direction", "asc"),
     )
-    commanders, items = _split_commanders(items)
+    deck_unique_cards = len(items)
+    if search.strip():
+        deck_unique_cards, deck_total_cards, deck_total_value = _whole_deck_totals(
+            resolved_deck_rows(session, deck, current_user.id)
+        )
+    _, items = _split_commanders(items)
     use_drawer_sorter = has_sortable_setup(session, current_user.id)
     return render(
         request,
@@ -1154,7 +1166,7 @@ def _deck_cards_partial_response(
             # one — until a reload. The search/view GET renders the same
             # template without this flag and emits no out-of-band block.
             "hero_numbers_oob": True,
-            "deck_unique_cards": len(commanders) + len(items),
+            "deck_unique_cards": deck_unique_cards,
             "deck_total_cards": deck_total_cards,
             "deck_total_value": deck_total_value,
         },
@@ -1220,6 +1232,8 @@ def deck_cards_partial(
     # which only serves a fragment.
     # view is intentionally omitted — it is a stored pref, not a URL axis (#149).
     qs_params = {"search": search, "sort": sort, "direction": direction}
+    if request.query_params.get("collection_search"):
+        qs_params["collection_search"] = request.query_params["collection_search"]
     if group in DECK_GROUP_BY_OPTIONS:
         qs_params["group"] = group
     qs = urlencode(qs_params)

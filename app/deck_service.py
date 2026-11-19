@@ -26,6 +26,7 @@ from app.models import (
 )
 from app.pricing import inventory_unit_price
 from app.scryfall import _cache_get_by_ids, extract_token_stubs, fetch_deck_tokens
+from app.sort_spec import collector_sort_key
 from app.timeutil import utc_now
 
 # Library search for lands. Anchored to "your library" so opponent-search effects
@@ -4111,6 +4112,9 @@ def find_inventory_matches_for_deck_import(
     return output
 
 
+_RESERVED_SWAP_LOCATIONS = ("deck", "considering")
+
+
 def list_user_printings_for_card(session: Session, user_id: int, card_name: str) -> list[dict]:
     """Aggregate the user's owned rows for a given card name.
 
@@ -4118,7 +4122,7 @@ def list_user_printings_for_card(session: Session, user_id: int, card_name: str)
     sorts owned printings to the top so the user picks what they actually
     have first (the source-of-truth positioning the roadmap calls out).
 
-    Returns one entry per (set_code, collector_number, finish) combo, with
+    Returns one entry per (card_id, finish) combo, with
     aggregate `quantity` summed across however many rows hold that exact
     printing+finish (deck rows, drawer rows, pending rows all count). Each
     entry also carries a brief `locations` list — short labels describing
@@ -4138,24 +4142,23 @@ def list_user_printings_for_card(session: Session, user_id: int, card_name: str)
         .filter(
             InventoryRow.user_id == user_id,
             Card.name == cleaned,
+            InventoryRow.is_proxy.is_(False),
+            InventoryRow.quantity > 0,
         )
         .all()
     )
 
-    buckets: dict[tuple[str, str, str], dict] = {}
+    # The swap consumes by card_id and finish, so the picker must count by that key.
+    buckets: dict[tuple[int, str], dict] = {}
     for r in rows:
-        key = (
-            (r.card.set_code or "").lower(),
-            (r.card.collector_number or ""),
-            (r.finish or "normal").lower(),
-        )
+        key = (r.card_id, r.finish or "normal")
         entry = buckets.get(key)
         if entry is None:
             entry = {
-                "set_code": key[0],
+                "set_code": (r.card.set_code or "").lower(),
                 "set_name": r.card.set_name,
-                "collector_number": key[1],
-                "finish": key[2],
+                "collector_number": r.card.collector_number or "",
+                "finish": key[1],
                 "scryfall_id": r.card.scryfall_id,
                 "image_url": r.card.image_url,
                 "quantity": 0,
@@ -4170,7 +4173,7 @@ def list_user_printings_for_card(session: Session, user_id: int, card_name: str)
         # sits in a non-deck location. Deck-resident copies are excluded — they
         # can't be pulled out from under another deck. Advisory: the modal uses
         # it to gate buttons; the authoritative check is in switch_deck_row_printing.
-        if loc is None or loc.type != "deck":
+        if loc is None or loc.type not in _RESERVED_SWAP_LOCATIONS:
             entry["loose_quantity"] += int(r.quantity or 0)
         if loc is not None:
             label = loc.name
@@ -4188,7 +4191,7 @@ def list_user_printings_for_card(session: Session, user_id: int, card_name: str)
         return (
             0 if entry["in_deck"] else 1,
             entry["set_code"],
-            entry["collector_number"],
+            collector_sort_key(entry["collector_number"]),
             entry["finish"],
         )
 
@@ -4216,11 +4219,12 @@ def _get_loose_source_rows(
             InventoryRow.card_id == card_id,
             InventoryRow.finish == finish,
             InventoryRow.quantity > 0,
+            InventoryRow.is_proxy.is_(False),
             or_(
                 InventoryRow.storage_location_id.is_(None),
                 # #148 — a deck's Considering row is committed to that deck's
                 # evaluation, NOT loose/consumable (same reason a deck row isn't).
-                StorageLocation.type.notin_(("deck", "considering")),
+                StorageLocation.type.notin_(_RESERVED_SWAP_LOCATIONS),
             ),
         )
         .with_for_update(of=InventoryRow)
@@ -4271,6 +4275,7 @@ def switch_deck_row_printing(
             InventoryRow.user_id == user_id,
             InventoryRow.storage_location_id == deck.storage_location_id,
         )
+        .with_for_update(of=InventoryRow)
         .first()
     )
     if not row:
@@ -4303,31 +4308,18 @@ def switch_deck_row_printing(
 
     # Authoritative ownership check: enough loose copies of the target?
     source_rows = _get_loose_source_rows(session, user_id, new_card.id, finish_clean)
-    if sum(int(r.quantity or 0) for r in source_rows) < swap_qty:
+    if swap_qty < 1 or sum(int(r.quantity or 0) for r in source_rows) < swap_qty:
         return False
 
-    # An existing deck row of the target printing → merge into it.
-    existing_target = (
-        session.query(InventoryRow)
-        .filter(
-            InventoryRow.user_id == user_id,
-            InventoryRow.card_id == new_card.id,
-            InventoryRow.finish == finish_clean,
-            InventoryRow.is_proxy.is_(False),
-            InventoryRow.storage_location_id == deck.storage_location_id,
-            InventoryRow.is_pending.is_(False),
-            InventoryRow.id != row.id,
-        )
-        .with_for_update()
-        .first()
-    )
-
     # Consume swap_qty from the loose source rows in priority order.
+    taken_by_language: dict[str, int] = {}
     remaining = swap_qty
     for src in source_rows:
         if remaining <= 0:
             break
         take = min(int(src.quantity or 0), remaining)
+        language = src.language or "en"
+        taken_by_language[language] = taken_by_language.get(language, 0) + take
         src.quantity -= take
         remaining -= take
         if src.quantity <= 0:
@@ -4370,20 +4362,48 @@ def switch_deck_row_printing(
     # under the old card_id and are now stale (issue #27).
     delete_shares_for_inventory_row(session, row.id)
 
-    if existing_target:
-        # Merge into the existing target deck row; its metadata (tags/role/notes)
-        # survives, the source row's is discarded.
-        existing_target.quantity += swap_qty
-        existing_target.updated_at = utc_now()
+    destinations = []
+    for language, quantity in taken_by_language.items():
+        target = (
+            session.query(InventoryRow)
+            .filter(
+                InventoryRow.user_id == user_id,
+                InventoryRow.card_id == new_card.id,
+                InventoryRow.finish == finish_clean,
+                func.coalesce(InventoryRow.language, "en") == language,
+                InventoryRow.is_proxy.is_(False),
+                InventoryRow.storage_location_id == deck.storage_location_id,
+                InventoryRow.is_pending.is_(False),
+                InventoryRow.id != row.id,
+            )
+            .with_for_update()
+            .first()
+        )
+        if target:
+            target.quantity += quantity
+        else:
+            if not destinations:
+                target = row
+            else:
+                target = InventoryRow(
+                    user_id=user_id,
+                    storage_location_id=deck.storage_location_id,
+                    is_pending=False,
+                    tags=row.tags,
+                    role=row.role,
+                    notes=row.notes,
+                )
+                session.add(target)
+            target.card_id = new_card.id
+            target.finish = finish_clean
+            target.language = language
+            target.quantity = quantity
+        target.updated_at = utc_now()
+        destinations.append((target, quantity))
+    if all(target is not row for target, _ in destinations):
         clean_inventory_row_references(session, [row.id])
         session.delete(row)
-        deck_row_id = existing_target.id
-    else:
-        # In-place identity change — tags/role/notes/quantity untouched.
-        row.card_id = new_card.id
-        row.finish = finish_clean
-        row.updated_at = utc_now()
-        deck_row_id = row.id
+    session.flush()
 
     note = (
         f"Switch printing in deck {deck.name}: "
@@ -4403,18 +4423,19 @@ def switch_deck_row_printing(
         note=note,
     )
     # Consume leg: target printing pulled into the deck.
-    log_transaction(
-        session=session,
-        user_id=user_id,
-        event_type="switch_printing",
-        card_id=new_card.id,
-        finish=finish_clean,
-        quantity_delta=-swap_qty,
-        source_location="collection",
-        destination_location=f"deck:{deck.name}",
-        inventory_row_id=deck_row_id,
-        note=note,
-    )
+    for target, quantity in destinations:
+        log_transaction(
+            session=session,
+            user_id=user_id,
+            event_type="switch_printing",
+            card_id=new_card.id,
+            finish=finish_clean,
+            quantity_delta=-quantity,
+            source_location="collection",
+            destination_location=f"deck:{deck.name}",
+            inventory_row_id=target.id,
+            note=note,
+        )
 
     session.commit()
     return True
@@ -4671,7 +4692,6 @@ def assembly_row_version(row: InventoryRow) -> str:
 def build_deck_assembly(session: Session, deck: Deck) -> dict:
     """Read-only pull itinerary. Inventory itself records completed pulls."""
     from app.decklist_service import _build_full_location_label
-    from app.inventory_service import collector_sort_key
 
     rows = (
         session.query(InventoryRow)
@@ -5213,8 +5233,6 @@ def _consume_loose_real(
     for r in _get_loose_source_rows(session, user_id, card_id, finish):
         if need <= 0:
             break
-        if r.is_proxy:
-            continue  # a physical proxy is not an "owned real" copy for this purpose
         take = min(need, r.quantity)
         r.quantity -= take
         need -= take

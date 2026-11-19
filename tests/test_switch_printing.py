@@ -621,3 +621,57 @@ def test_crafted_post_disabled_option(client, db, user):
     assert "loose copy" in resp.text
     db.refresh(deck_row)
     assert deck_row.card_id == a.id
+
+
+def test_swap_preserves_languages_and_ignores_reserved_and_proxy_copies(db):
+    s = db
+    u = _user(s)
+    deck = _deck(s, u.id)
+    a, b = _card(s), _card(s)
+    row = _row(s, u.id, a, loc_id=deck.storage_location_id, qty=3)
+    row.language = "fr"
+    existing = _row(s, u.id, b, loc_id=deck.storage_location_id)
+    existing.language = "ja"
+    proxy = _row(s, u.id, b, proxy=True, pending=True)
+    reserved = _row(s, u.id, b, loc_id=_loc(s, u.id, "Considering", "considering").id)
+    _row(s, u.id, b, qty=2, pending=True).language = "ja"
+    s.commit()
+    entry = next(
+        e
+        for e in list_user_printings_for_card(s, u.id, a.name)
+        if e["scryfall_id"] == b.scryfall_id
+    )
+    assert entry["loose_quantity"] == 2
+    assert not switch_deck_row_printing(s, u.id, deck.id, row.id, b.scryfall_id, "normal")
+    _row(s, u.id, b, pending=True).language = "de"
+    s.commit()
+    assert switch_deck_row_printing(s, u.id, deck.id, row.id, b.scryfall_id, "normal")
+    s.expire_all()
+    targets = s.query(InventoryRow).filter_by(storage_location_id=deck.storage_location_id).all()
+    assert sorted((r.language, r.quantity) for r in targets) == [("de", 1), ("ja", 3)]
+    assert proxy.quantity == reserved.quantity == 1
+    assert s.query(InventoryRow).filter_by(card_id=a.id, is_pending=True).one().language == "fr"
+
+
+def test_picker_disables_short_swap_and_keeps_printing_ids_separate(client, db, user, monkeypatch):
+    import re
+
+    from app.routes import decks
+
+    monkeypatch.setattr(decks, "fetch_card_printings", lambda name: [])
+    deck = _deck(db, user.id)
+    a, b, c = [_card(db) for _ in range(3)]
+    b.set_code, b.collector_number = a.set_code, a.collector_number
+    row = _row(db, user.id, a, loc_id=deck.storage_location_id, qty=2)
+    _row(db, user.id, b, qty=2, pending=True)
+    _row(db, user.id, c, pending=True)
+    db.commit()
+    response = client.get(f"/decks/{deck.id}/rows/{row.id}/printings-modal")
+    assert response.status_code == 200
+    buttons = re.findall(
+        r'name="scryfall_id" value="([^"]+)".*?<button[^>]+class="switch-printing-pick"([^>]*)>',
+        response.text,
+        re.S,
+    )
+    disabled = {sid: "disabled" in attrs for sid, attrs in buttons}
+    assert disabled == {a.scryfall_id: True, b.scryfall_id: False, c.scryfall_id: True}
